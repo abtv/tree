@@ -48,6 +48,7 @@ describe('runReport', () => {
     const current = artifactFile('current.json', { 'typing:a': { paintP95Ms: 30 } })
     const baseline = artifactFile('baseline.json', { 'typing:a': { paintP95Ms: 10 } })
     const summary = join(mkdtempSync(join(tmpdir(), 'tree-perf-summary-')), 'summary.md')
+
     directories.push(join(summary, '..'))
     process.env['GITHUB_STEP_SUMMARY'] = summary
 

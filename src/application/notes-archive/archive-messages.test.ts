@@ -18,6 +18,7 @@ describe('notes archive wording', () => {
   // @requirement PRODUCT.md §25.3
   it('describes preserved desktop notes for valid, empty and unreadable current data', () => {
     const incoming = { nodeCount: 1, imageCount: 0, missingImageCount: 0 }
+
     expect(desktopImportConfirmationText('Notes.zip', 10, incoming, 'none').current).toBe('There are no saved notes.')
     expect(desktopImportConfirmationText('Notes.zip', 10, incoming, 'invalid').current).toBe(
       'The saved notes cannot be opened. Importing replaces them and moves their files to the Replaced Notes folder.',
@@ -28,6 +29,7 @@ describe('notes archive wording', () => {
   })
   it('keeps an archive rule message and names the failed step otherwise', () => {
     const rule = new NotesArchiveError('The archive is encrypted.')
+
     expect(exportFailureMessage(rule)).toBe('The archive is encrypted.')
     expect(importFailureMessage(rule, true)).toBe('The archive is encrypted.')
     expect(exportFailureMessage(new Error('EACCES'))).toBe('The notes could not be read: EACCES')
@@ -51,6 +53,7 @@ describe('notes archive wording', () => {
 
   it('names the file and any images that were not included', () => {
     const summary = { imageCount: 2, archiveBytes: 10 }
+
     expect(exportResultText('Tree Notes 2026-10-20.zip', { ...summary, missingImageCount: 0 })).toBe(
       'Exported “Tree Notes 2026-10-20.zip”.',
     )
@@ -72,6 +75,7 @@ describe('notes archive wording', () => {
   // @requirement PRODUCT.md §24.6
   it('names the folder and what restoring replaces', () => {
     const incoming = { nodeCount: 2, imageCount: 0, missingImageCount: 2 }
+
     expect(importConfirmationText('Tree Backup', 1500, incoming, { nodeCount: 1, imageCount: 0 }, true)).toEqual({
       incoming: '“Tree Backup” (1.5 KB) contains 2 nodes and 0 images.',
       current: 'Your current notes have 1 node and 0 images. Restoring replaces them, and this cannot be undone.',
@@ -95,6 +99,7 @@ describe('notes archive wording', () => {
   // @requirement PRODUCT.md §24.4
   it('compares the archive with the current notes before replacing them', () => {
     const incoming = { nodeCount: 1234, imageCount: 1, missingImageCount: 0 }
+
     expect(
       importConfirmationText('Tree Notes 2026-10-20.zip', 2_450_000, incoming, { nodeCount: 1, imageCount: 0 }),
     ).toEqual({

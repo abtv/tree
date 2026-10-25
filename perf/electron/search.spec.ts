@@ -5,10 +5,13 @@ import type { TreeNode } from '../../src/domain/document'
 test('bounds repeated Agenda search and scrolling while retaining the draft', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await window.keyboard.press('Meta+p')
   await window.keyboard.press('/')
   const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+
   await expect(prompt).toBeFocused()
+
   // Attribute the long scan to callback work versus scheduler wait, without production hooks.
   await window.evaluate(() => {
     const probe = { callbacks: 0, workMs: 0, maxWorkMs: 0 }
@@ -28,8 +31,11 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
     }
   })
   const start = performance.now()
+
   await prompt.fill('Item 2999')
+
   await expect(window.locator('.search-count')).toHaveText('2')
+
   const resultMs = performance.now() - start
   const scrollMs = await window.evaluate(async () => {
     const start = performance.now()
@@ -37,8 +43,10 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     return performance.now() - start
   })
+
   await expect(prompt).toBeFocused()
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+
   await window.evaluate(() => {
     const probe = { start: 0, elapsed: 0 }
     ;(window as unknown as { agendaSearchNavigation: typeof probe }).agendaSearchNavigation = probe
@@ -55,8 +63,11 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
     })
   })
   const navigationStart = performance.now()
+
   await window.keyboard.press('Enter')
+
   await expect(window.getByRole('textbox', { name: 'Agenda node dated-2999', exact: true })).toBeFocused()
+
   const navigationMs = performance.now() - navigationStart
   await window.waitForFunction(
     () => (window as unknown as { agendaSearchNavigation: { elapsed: number } }).agendaSearchNavigation.elapsed > 0,
@@ -75,10 +86,14 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
     ['n', '2 / 2'],
   ] as const) {
     const start = performance.now()
+
     await window.keyboard.press(key)
+
     await expect(window.locator('.search-count')).toHaveText(count)
+
     repeats.push(performance.now() - start)
   }
+
   recordPerfResult({
     kind: 'search',
     scenario: 'agenda-6000-occurrences',
@@ -93,6 +108,7 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
       timerMaxWorkMs: round(timers.maxWorkMs),
     },
   })
+
   expect(resultMs).toBeLessThan(2000)
   expect(navigationMs).toBeLessThan(3000)
   expect(scrollMs).toBeLessThan(100)
@@ -107,14 +123,18 @@ test('releases canceled scans across query refinement and presentation switches'
     for (let index = 0; index < 12; index++) {
       await window.keyboard.press('/')
       const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+
       await expect(prompt).toBeFocused()
+
       await prompt.fill(`absent ${index}`)
       await prompt.fill(`Item ${index}`)
       await window.keyboard.press('Escape')
       await window.keyboard.press('Meta+p')
     }
+
     await expect(window.locator('.search-count')).toHaveCount(0)
   }
+
   await burst()
   const warm = await collectRendererHeap(window)
   await burst()
@@ -126,6 +146,7 @@ test('releases canceled scans across query refinement and presentation switches'
     scenario: 'canceled-search-retention',
     metrics: { warmHeapBytes: warm, middleHeapBytes: middle, finalHeapBytes: final, retainedGrowthBytes: final - warm },
   })
+
   // A retained complete corpus per abandoned job would exceed this across both bursts.
   expect(final - warm).toBeLessThan(2_000_000)
   expect(final - middle).toBeLessThan(1_000_000)
@@ -134,8 +155,10 @@ test('releases canceled scans across query refinement and presentation switches'
 test('keeps draft input and current results responsive across a wide Tree', async ({ userDataDir }) => {
   seedDocument(userDataDir, wideSeed(10_000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await window.keyboard.press('/')
   const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+
   await prompt.evaluate((input) => {
     const samples: number[] = []
     ;(window as unknown as { searchPaints: number[] }).searchPaints = samples
@@ -144,8 +167,11 @@ test('keeps draft input and current results responsive across a wide Tree', asyn
     })
   })
   const start = performance.now()
+
   await prompt.pressSequentially('Child 9999')
+
   await expect(window.locator('.search-count')).toHaveText('1')
+
   const resultMs = performance.now() - start
   await window.waitForFunction(() => (window as unknown as { searchPaints: number[] }).searchPaints.length === 10)
   const samples = await window.evaluate(() =>
@@ -153,14 +179,22 @@ test('keeps draft input and current results responsive across a wide Tree', asyn
   )
   const maximum = samples.at(-1)!
   const jumpStart = performance.now()
+
   await window.keyboard.press('Enter')
+
   await expect(window.getByRole('textbox', { name: 'Node 10000', exact: true })).toBeFocused()
+
   const navigationMs = performance.now() - jumpStart
+
   await window.keyboard.press('i')
   const editStart = performance.now()
+
   await window.keyboard.type('x'.repeat(104))
+
   await expect(window.locator('.search-count')).toHaveText('1')
+
   const editMs = performance.now() - editStart
+
   recordPerfResult({
     kind: 'search',
     scenario: 'wide-10000',
@@ -171,6 +205,7 @@ test('keeps draft input and current results responsive across a wide Tree', asyn
       editMs: round(editMs),
     },
   })
+
   expect(maximum).toBeLessThan(100)
   expect(resultMs).toBeLessThan(1000)
   expect(navigationMs).toBeLessThan(1000)
@@ -201,9 +236,12 @@ for (const shape of ['deep', 'long'] as const) {
       location: { currentParentId: null, selectedNodeId: root.id },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await window.keyboard.press('/')
     const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+
     await expect(prompt).toBeFocused()
+
     await prompt.evaluate((input) => {
       const paints: number[] = []
       ;(window as unknown as { searchShapePaints: number[] }).searchShapePaints = paints
@@ -218,9 +256,12 @@ for (const shape of ['deep', 'long'] as const) {
       ['absent phrase', '0'],
     ] as const) {
       const start = performance.now()
+
       await prompt.fill(query)
+
       await expect(window.locator('.search-count')).toHaveText(total)
       if (shape === 'long' && query === 'a') await expect(window.locator('.search-match')).toHaveCount(2500)
+
       times.push(performance.now() - start)
     }
     await window.waitForFunction(
@@ -229,12 +270,19 @@ for (const shape of ['deep', 'long'] as const) {
     const paintMaxMs = await window.evaluate(() =>
       Math.max(...(window as unknown as { searchShapePaints: number[] }).searchShapePaints),
     )
+
     await prompt.fill('needle')
+
     await expect(window.locator('.search-count')).toHaveText('1')
+
     const start = performance.now()
+
     await window.keyboard.press('Enter')
+
     await expect(window.locator('[data-node-id="target"] .node-input')).toBeFocused()
+
     const revealMs = performance.now() - start
+
     recordPerfResult({
       kind: 'search',
       scenario: `${shape}-queries`,
@@ -246,6 +294,7 @@ for (const shape of ['deep', 'long'] as const) {
         revealMs: round(revealMs),
       },
     })
+
     expect(Math.max(...times)).toBeLessThan(1000)
     expect(paintMaxMs).toBeLessThan(100)
     expect(revealMs).toBeLessThan(1000)

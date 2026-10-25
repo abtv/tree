@@ -31,6 +31,7 @@ it('renders attachments on inactive direct matches and excludes contextual ances
     },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
+
   harness.store.openAgenda()
   const state = harness.snapshot()
   const { container } = render(
@@ -53,6 +54,7 @@ it('renders attachments on inactive direct matches and excludes contextual ances
       renderAttachment={(node, editable) => <span data-attachment={node.id} data-editable={editable} />}
     />,
   )
+
   expect(container.querySelectorAll('[data-attachment="child"]')).toHaveLength(2)
   expect(container.querySelectorAll('[data-attachment="child"][data-editable="false"]')).toHaveLength(2)
   expect(container.querySelectorAll('.agenda-role-context [data-attachment]')).toHaveLength(0)
@@ -86,20 +88,30 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
     },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
+
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
+
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
+
   const rows = harness.store.getAgendaRows()
   const distant = rows.find((row) => row.kind === 'node' && row.nodeId === 'n599')!
+
   act(() => harness.store.applyAgenda({ kind: 'select', key: distant.key }))
   const element = container.querySelector(`[data-agenda-key="${distant.key}"]`)!
+
   expect(element).toBe(document.activeElement)
   expect(element.classList.contains('agenda-row-pinned')).toBe(true)
+
   const day = rows.find((row) => row.kind === 'day' && row.content)!
+
   act(() => harness.store.applyAgenda({ kind: 'toggle-fold', key: day.key }))
+
   expect(container.querySelectorAll('.agenda-row').length).toBe(harness.store.getAgendaRows().length)
   expect(container.querySelector(`[data-agenda-key="${day.key}"]`)).toBe(document.activeElement)
+
   act(() => harness.store.applyAgenda({ kind: 'toggle-fold', key: day.key }))
+
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
   expect(container.querySelector(`[data-agenda-key="${day.key}"]`)).toBe(document.activeElement)
   expect(harness.saves).toHaveLength(0)
@@ -116,20 +128,28 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
     },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
+
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
   const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
   const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
   const isMirror = (key: string): boolean =>
     container.querySelector(`[data-agenda-key="${key}"]`)!.classList.contains('agenda-mirror')
+
   expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
+
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
+
   expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(1)
   expect(isMirror(`node:${day20}:multi`)).toBe(true)
+
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day20}:multi` }))
+
   expect(isMirror(`node:${day14}:multi`)).toBe(true)
   expect(isMirror(`node:${day20}:multi`)).toBe(false)
+
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:single` }))
+
   expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
 })
 
@@ -144,22 +164,28 @@ it('dims only the marked occurrence of a pending move, not its mirror or other n
     },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
+
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
   const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
   const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
   const pendingKeys = (): string[] =>
     [...container.querySelectorAll('.agenda-row-pending')].map((row) => row.getAttribute('data-agenda-key')!)
+
   expect(pendingKeys()).toEqual([])
+
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
   act(() => {
     harness.store.startAgendaMove()
   })
+
   expect(pendingKeys()).toEqual([`node:${day14}:multi`])
   expect(container.querySelector(`[data-agenda-key="node:${day20}:multi"]`)!.classList.contains('agenda-mirror')).toBe(
     true,
   )
+
   act(() => harness.store.cancelAgendaMove())
+
   expect(pendingKeys()).toEqual([])
 })
 
@@ -187,6 +213,7 @@ it('keeps the active occurrence at its viewport position when a document change 
   const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation(() => undefined)
   try {
     act(() => harness.store.editText('multi', 'Multi 2026-10-20'))
+
     expect(scroll).toHaveBeenCalledTimes(1)
     expect(scroll).toHaveBeenCalledWith(0, 240)
     expect(container.querySelector(`[data-agenda-key="node:${day20}:multi"]`)).not.toBeNull()

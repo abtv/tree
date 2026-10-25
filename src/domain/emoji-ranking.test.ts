@@ -62,7 +62,9 @@ function names(query: string): string[] {
 // @requirement PRODUCT.md §20.12
 it('orders exact, prefix, word-prefix, substring and subsequence groups alphabetically within contiguous groups', () => {
   expect(names('ab').slice(0, 8)).toEqual(['ab', 'ab_c', 'aba', 'abac', 'abbc', 'abc', 'abc_a_bc', 'abcabc'])
+
   const results = names('ab')
+
   expect(results.indexOf('a_ab')).toBeLessThan(results.indexOf('b_ab'))
   expect(results.indexOf('b_ab')).toBeLessThan(results.indexOf('cab'))
   expect(results.indexOf('cab')).toBeLessThan(results.indexOf('a_b'))
@@ -122,12 +124,15 @@ it('chooses the best alignment, matching an exhaustive search across repeated le
       })
       .sort((a, b) => compare(a.rank, b.rank) || (a.name < b.name ? -1 : 1))
       .map(({ name }) => name)
+
   fc.assert(
     fc.property(fc.array(fc.constantFrom('a', 'b', 'c', '_'), { minLength: 1, maxLength: 5 }), (letters) => {
       const query = letters.join('')
+
       expect(names(query)).toEqual(expected(query))
     }),
     { numRuns: 500, seed: 20261022 },
   )
+
   expect(names('ac')).toEqual(expected('ac'))
 })

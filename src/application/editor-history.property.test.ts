@@ -12,6 +12,7 @@ describe('EditorHistory invariants under the history cap', () => {
       fc.property(fc.array(fc.string(), { minLength: 1, maxLength: HISTORY_LIMIT + 60 }), (texts) => {
         const history = new EditorHistory()
         const retained = texts.slice(-HISTORY_LIMIT)
+
         retained.forEach((text) => history.begin(root(text)))
 
         let current = root('live')
@@ -28,10 +29,13 @@ describe('EditorHistory invariants under the history cap', () => {
 
         for (let index = 0; index < undone.length; index += 1) {
           const redone = history.redo(current, location)
+
           expect(redone).toBeDefined()
+
           if (redone === undefined) return
           current = redone.document
         }
+
         expect(history.redo(current, location)).toBeUndefined()
       }),
     )
@@ -77,6 +81,7 @@ describe('EditorHistory invariants under the history cap', () => {
             for (const document of history.documents()) {
               collectAttachmentIds(document).forEach((id) => expected.add(id))
             }
+
             expect(new Set(history.attachmentIds())).toEqual(expected)
           }
         },

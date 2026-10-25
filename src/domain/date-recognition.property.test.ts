@@ -20,18 +20,22 @@ it('flags exactly the digit-bounded year-month-day shapes that are not canonical
       (parts, offset, length) => {
         const text = parts.map(([prefix, value]) => prefix + value).join('')
         const range = { start: offset, end: offset + length + 1 }
+
         const flagged = findDateLikeTokens(text, [range])
         const canonical = findCanonicalDates(text, [range])
         for (const { start, end } of flagged) {
           const value = text.slice(start, end)
+
           expect(value).toMatch(/^\d{4}-\d{1,2}-\d{1,2}$/)
           expect(/[0-9]/.test(text[start - 1] ?? '')).toBe(false)
           expect(/[0-9]/.test(text[end] ?? '')).toBe(false)
           expect(start < range.end && end > range.start).toBe(false)
           expect(canonical.some((date) => date.start < end && date.end > start)).toBe(false)
         }
+
         for (let index = 1; index < flagged.length; index++)
           expect(flagged[index]!.start).toBeGreaterThanOrEqual(flagged[index - 1]!.end)
+
         // Every digit-bounded shape outside the range is either canonical or flagged.
         for (const match of text.matchAll(/[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}/g)) {
           const start = match.index
@@ -40,6 +44,7 @@ it('flags exactly the digit-bounded year-month-day shapes that are not canonical
           if (start < range.end && end > range.start) continue
           const isCanonical = canonical.some((date) => date.start === start && date.end === end)
           const isFlagged = flagged.some((token) => token.start === start && token.end === end)
+
           expect(isCanonical !== isFlagged).toBe(true)
         }
       },
@@ -81,6 +86,7 @@ it('finds exactly valid canonical substrings outside digit boundaries and exclud
           )
             expected.push({ start, end: start + 10, day: reference.getTime() / 86400000 })
         }
+
         expect(findCanonicalDates(text, [range])).toEqual(expected)
       },
     ),

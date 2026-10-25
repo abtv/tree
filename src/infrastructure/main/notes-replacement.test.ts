@@ -109,6 +109,7 @@ describe('notes replacement', () => {
 
   it('adds a number when a Replaced Notes folder of that time exists', async () => {
     const layout = await userData()
+
     await mkdir(join(layout.replacedNotesDirectory, FOLDER), { recursive: true })
     await mkdir(join(layout.replacedNotesDirectory, `${FOLDER} 2`))
     await seedOldNotes(layout)
@@ -131,6 +132,7 @@ describe('notes replacement', () => {
 
   it('replaces the notes of a new profile that has no data directory yet', async () => {
     const layout = await userData()
+
     await rm(layout.dataDirectory, { recursive: true })
 
     const folder = await commitReplacement(nodeReplacementFileSystem, layout, await stage(layout), NOW)
@@ -141,6 +143,7 @@ describe('notes replacement', () => {
 
   it('keeps images that no document file references in the Replaced Notes folder', async () => {
     const layout = await userData()
+
     await writeFile(join(layout.dataDirectory, 'attachments', 'orphan.png'), 'orphan')
 
     const folder = await commitReplacement(nodeReplacementFileSystem, layout, await stage(layout), NOW)
@@ -151,6 +154,7 @@ describe('notes replacement', () => {
   it('refuses an incomplete staging directory and changes nothing', async () => {
     const layout = await userData()
     await seedOldNotes(layout)
+
     await mkdir(join(layout.importDirectory, 'partial'), { recursive: true })
     await writeFile(join(layout.importDirectory, 'partial', 'document.json'), 'new document')
 
@@ -196,6 +200,7 @@ describe('notes replacement', () => {
     await expect(commitReplacement(failing, layout, staged, NOW, 'Tree Notes 2026-10-20.zip')).rejects.toBeInstanceOf(
       ReplacementIncompleteError,
     )
+
     const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
 
     // The journal keeps the archive name, so the completed import can still report it.
@@ -210,6 +215,7 @@ describe('notes replacement', () => {
 
   it('removes staging and snapshots that no running operation owns', async () => {
     const layout = await userData()
+
     await stage(layout, 'abandoned')
     await stage(layout, 'running')
     await writeFile(join(layout.importDirectory, 'commit.json.tmp'), '{')
@@ -230,6 +236,7 @@ describe('notes replacement', () => {
   it('refuses a damaged journal without changing the notes', async () => {
     const layout = await userData()
     await seedOldNotes(layout)
+
     await stage(layout)
     for (const journal of [
       '{',
@@ -238,10 +245,12 @@ describe('notes replacement', () => {
       '{"staging":"staged","replaced":"x","archive":7}',
     ]) {
       await writeFile(join(layout.importDirectory, 'commit.json'), journal)
+
       await expect(recoverReplacement(nodeReplacementFileSystem, layout, new Set())).rejects.toThrow(
         'The import journal is damaged.',
       )
     }
+
     expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('old document.json')
   })
 })

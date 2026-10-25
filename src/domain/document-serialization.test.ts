@@ -332,6 +332,7 @@ describe('persisted state validator conformance', () => {
     ]) {
       const state = { ...validState, document: { roots: [validState.document.roots[0]!, node] } }
       const expected = 'attachment' in node ? 'A saved attachment is invalid.' : 'A saved node is invalid.'
+
       expect(() => validatePersistedState(state)).toThrow(expected)
       expect(() => parsePersistedState(state)).toThrow(expected)
     }
@@ -339,6 +340,7 @@ describe('persisted state validator conformance', () => {
 
   it('rejects expansion IDs with a length property that are not strings', () => {
     const state = { ...validState, version: 3, view: { expandedIds: [{ length: 1 }] } }
+
     expect(() => validatePersistedState(state)).toThrow('The saved view state is invalid.')
     expect(() => parsePersistedState(state)).toThrow('The saved view state is invalid.')
   })
@@ -359,6 +361,7 @@ describe('persisted state validator conformance', () => {
     'accepts a valid view without treating optional fields as errors: %j',
     (view) => {
       const state = { ...validState, version: 3, view }
+
       expect(validatePersistedState(state)).toBe(state)
       expect(parsePersistedState(state).view).toEqual(view)
     },
@@ -370,12 +373,14 @@ describe('persisted state validator conformance', () => {
       document: { roots: [validState.document.roots[0]!, { id: 'other', text: '', children: [] }] },
       location: { currentParentId: 'other', selectedNodeId: 'root' },
     }
+
     expect(() => validatePersistedState(state)).toThrow('The saved document location does not match its tree.')
     expect(() => parsePersistedState(state)).toThrow('The saved document location does not match its tree.')
   })
 
   it('omits absent optional fields when loading saved nodes and views', () => {
     const parsed = parsePersistedState({ ...validState, version: 3, view: { expandedIds: [] } })
+
     expect(parsed.view).not.toHaveProperty('selectedRowTop')
     expect(parsed.document.roots[0]).not.toHaveProperty('attachment')
     expect(parsed.document.roots[0]).not.toHaveProperty('links')
@@ -398,18 +403,23 @@ describe('persisted state validator conformance', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
       view: { expandedIds: ['root'] },
     }
+
     const parsed = parsePersistedState(state)
+
     expect(parsed.version).toBe(4)
     expect(parsed.document.roots[0]).toMatchObject({ struckThrough: true })
     expect(parsed.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
     expect(parsed.view).toEqual({ expandedIds: ['root'] })
+
     const saved = serializeState(parsed.document, parsed.location, parsed.view)
+
     expect(saved.version).toBe(4)
     expect(JSON.parse(JSON.stringify(saved))).toEqual(state)
   })
 
   it.each([1, 2, 3])('loads a schema version %i file with no struck-through node', (version) => {
     const parsed = parsePersistedState({ ...validState, version, view: { expandedIds: [] } })
+
     expect(parsed.version).toBe(4)
     expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
   })
@@ -434,9 +444,12 @@ describe('persisted state validator conformance', () => {
         },
       ],
     }
+
     expect(validatePersistedState({ ...validState, document }).document).toBe(document)
     expect(reads).toBe(2) // Type validation and link validation each need the text.
+
     reads = 0
+
     assertDocument(document)
     expect(reads).toBe(2)
   })
@@ -453,12 +466,14 @@ describe('persisted state validator conformance', () => {
       document: { roots: [{ ...validState.document.roots[0]!, children: [{ id: 'child', text: '', children: [] }] }] },
       location: { currentParentId: 'root', selectedNodeId: 'root' },
     }
+
     expect(validatePersistedState(state)).toBe(state)
     expect(parsePersistedState(state).location).toEqual(state.location)
   })
 
   it('accepts selecting the parent heading when it is the only node', () => {
     const state = { ...validState, location: { currentParentId: 'root', selectedNodeId: 'root' } }
+
     expect(validatePersistedState(state)).toBe(state)
     expect(parsePersistedState(state).location).toEqual(state.location)
   })

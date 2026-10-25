@@ -27,11 +27,15 @@ describe('viewport motion invariants', () => {
           const intersecting = rows.filter((row) => row.top < viewport.bottom && row.bottom > viewport.top)
           if (intersecting.length === 0) {
             expect(targetId).toBeUndefined()
+
             return
           }
           const target = intersecting.find((row) => row.nodeId === targetId)
+
           expect(target).toBeDefined()
+
           const fullyVisible = intersecting.filter((row) => row.top >= viewport.top && row.bottom <= viewport.bottom)
+
           if ((command === 'top' || command === 'middle' || command === 'bottom') && fullyVisible.length > 0) {
             expect(fullyVisible.some((row) => row.nodeId === targetId)).toBe(true)
           }

@@ -42,8 +42,11 @@ it('never redirects a text destination to its attachment or carries an old image
               location: { currentParentId: null, selectedNodeId: 'destination' },
             },
           })
+
           moveViewportSelection({ store, syncImageCaretToFocus: () => {} }, 'destination', motion, sourceCursor)
+
           expect(store.selectNode).toHaveBeenCalledOnce()
+
           const cursor = vi.mocked(store.selectNode).mock.calls[0]![1]!
           const caret = focusCaretTransition(
             { cursor: sourceCursor, imageActive: true, imageTextReturnCursor: 3 },
@@ -52,6 +55,7 @@ it('never redirects a text destination to its attachment or carries an old image
             image,
             true,
           )
+
           expect(caret.imageActive).toBe(image && text.length === 0)
           expect(caret.imageTextReturnCursor).toBeUndefined()
           expect(caret.cursor).toBeGreaterThanOrEqual(0)

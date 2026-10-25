@@ -56,6 +56,7 @@ it('sorts dates chronologically without changing the preferred candidate', () =>
     ],
   ] as const) {
     const match = recognizeCompletion(text, text.length, today)!
+
     expect(
       match.suggestions.map(({ replacement }) => replacement),
       text,
@@ -72,6 +73,7 @@ it('describes each date with its weekday', () => {
     const description = recognizeCompletion(`in ${offset} days`, `in ${offset} days`.length, today)?.suggestions.find(
       (suggestion) => suggestion.id === `date:${day}:${expression}`,
     )?.description
+
     expect(description).toBe(`${['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'][offset - 1]} · ${expression}`)
   }
 })

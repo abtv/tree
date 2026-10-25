@@ -79,8 +79,11 @@ describe('undo focus invariants', () => {
         ] as const) {
           const root = { currentParentId: null, selectedNodeId: after.roots[0]!.id }
           const visible = changeSiteFocus(before, after, root, () => true)!
+
           expect(visible.location).toEqual({ currentParentId: null, selectedNodeId: source.id })
+
           const hidden = changeSiteFocus(before, after, root, () => false)!
+
           expect(hidden.location).toEqual({
             currentParentId: locateNode(after, source.id)!.parent?.id ?? null,
             selectedNodeId: source.id,
@@ -127,12 +130,15 @@ describe('undo focus invariants', () => {
           const current = { currentParentId: null, selectedNodeId: document.roots[0]!.id }
           const target = changeSiteFocus(before, after, current, () => everythingExpanded)
           if (target === undefined) return
+
           expect(isValidLocation(after, target.location)).toBe(true)
           // Every row is visible from the top-level location, so no change site needs navigation.
           if (everythingExpanded) expect(target.location.currentParentId).toBeNull()
           expect(target.focus.nodeId).toBe(target.location.selectedNodeId)
           expect(target.focus.cursor).toBeGreaterThanOrEqual(0)
+
           const node = locateNode(after, target.focus.nodeId)
+
           expect(node).toBeDefined()
           expect(target.focus.cursor).toBeLessThanOrEqual(node!.node.text.length)
         },
@@ -151,11 +157,14 @@ describe('undo focus invariants', () => {
           if (original.text === text) return
           const mutated = mapNode(document, id, (node) => ({ ...node, text }))
           const site = locateChangeSite(document, mutated)
+
           expect(site).toBeDefined()
           expect(site!.nodeId).toBe(id)
+
           let offset = 0
           while (offset < original.text.length && offset < text.length && original.text[offset] === text[offset])
             offset += 1
+
           expect(site!.cursor).toBe(offset)
         },
       ),
@@ -173,6 +182,7 @@ describe('undo focus invariants', () => {
             ...node,
             children: [...node.children, { id: `${node.id}-new`, text, children: [] }],
           }))
+
           expect(locateChangeSite(document, withChild)).toMatchObject({ nodeId: `${id}-new`, cursor: 0 })
 
           const located = locateNode(document, id)!
@@ -181,6 +191,7 @@ describe('undo focus invariants', () => {
           if (site === undefined) {
             expect(document.roots).toHaveLength(1)
             expect(located.parent).toBeNull()
+
             return
           }
           const siblings = located.siblings
@@ -189,6 +200,7 @@ describe('undo focus invariants', () => {
             siblings[located.index - 1]?.id,
             located.parent?.id,
           ].filter((value): value is string => value !== undefined)
+
           expect(permitted).toContain(site.nodeId)
           expect(site.cursor).toBe(0)
         },

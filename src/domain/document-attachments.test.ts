@@ -28,6 +28,7 @@ describe('derived attachment accounting', () => {
       },
     }
     seedEmptyAttachmentSummary(document)
+
     expect(attachmentSummary(document).size).toBe(0)
     expect(reads).toBe(0)
   })
@@ -42,6 +43,7 @@ describe('derived attachment accounting', () => {
         return undefined
       },
     })
+
     expect(attachmentSummary(document).size).toBe(0)
     expect(reads).toBe(0)
   })
@@ -60,6 +62,7 @@ describe('derived attachment accounting', () => {
     const document: Document = {
       roots: [{ id: 'target', text: url, links: [{ start: 0, end: url.length, url }], children: [] }, watched],
     }
+
     buildNodeIndex(document)
     attachmentSummary(document)
     for (const result of [
@@ -70,9 +73,11 @@ describe('derived attachment accounting', () => {
       attachImage(document, 'target', { id: 'image', mimeType: 'image/png' }),
     ]) {
       const before = childrenReads
+
       expect(requireNode(result, 'target').node).toBe(result.roots[0])
       expect(childrenReads).toBe(before)
     }
+
     expect(() => requireNode(document, 'missing')).toThrow('Node missing does not exist.')
   })
 
@@ -88,6 +93,7 @@ describe('derived attachment accounting', () => {
       },
     }
     const document: Document = { roots: [{ id: 'target', text: '', children: [] }, watched] }
+
     attachmentSummary(document)
     const image = { id: 'added', mimeType: 'image/png' as const }
     const operations = [
@@ -109,11 +115,13 @@ describe('derived attachment accounting', () => {
     for (const operation of operations) {
       const result = operation()
       const readsBeforeQuery = attachmentReads
+
       expect(attachmentSummary(result).get('shared')).toBe(1)
       // Architecture §11 requires propagated summaries so cleanup and history
       // queries cost no additional traversal of the document's untouched nodes.
       expect(attachmentReads).toBe(readsBeforeQuery)
     }
+
     expect(attachmentSummary(deleteNode(document, 'target'))).toBe(attachmentSummary(document))
   })
 })

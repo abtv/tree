@@ -56,7 +56,9 @@ describe('editor context menu', () => {
       'Select All',
     ])
     expect(harness.getTemplate().find((item) => item.label === 'Paste')?.enabled).toBe(false)
+
     harness.choose('Copy')
+
     await expect(promise).resolves.toBe('copy')
   })
 
@@ -93,12 +95,16 @@ describe('editor context menu', () => {
       canPaste: false,
       canSelectAll: true,
     })
+
     showEditorContextMenu(harness.menuHost, harness.window, harness.webContents, openExternal, vi.fn(), request)
 
     const bounded = request.selectionText
+
     expect(harness.getTemplate()[0]?.label).toBe(`Look Up “${bounded}”`)
     expect(bounded.endsWith('…')).toBe(true)
+
     harness.choose('Search with Google')
+
     expect(openExternal).toHaveBeenCalledWith(`https://www.google.com/search?q=${encodeURIComponent(bounded)}`)
   })
 })

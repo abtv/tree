@@ -101,6 +101,7 @@ it('leaves browser Cmd+V to the native paste event without changing a pending Vi
   input.value = node.text
   const { vim } = createVimKeyboardDouble(node.id, { mode: 'replace' })
   const event = keyEvent(input, 'v', { metaKey: true })
+
   createEditorKeyDownHandler({
     store,
     node,
@@ -111,6 +112,7 @@ it('leaves browser Cmd+V to the native paste event without changing a pending Vi
     onPreviewAttachment: vi.fn(),
     shiftFocusedNode: vi.fn(),
   })(event)
+
   expect(event.preventDefault).not.toHaveBeenCalled()
   expect(vim.finishReplace).not.toHaveBeenCalled()
   expect(store.paste).not.toHaveBeenCalled()
@@ -233,14 +235,21 @@ describe('editor keyboard handler', () => {
   it('uses word and bracket text objects with operators and character Visual mode', async () => {
     const { store, node, input, press, vim } = await textFixture({ id: 'node', text: 'one (two three)', children: [] })
     input.setSelectionRange(6, 6)
+
     press('d', 'i', 'w')
+
     expect(node().text).toBe('one ( three)')
     expect(vim.register.current).toEqual({ kind: 'text', value: 'two' })
+
     store.undo()
+
     expect(node().text).toBe('one (two three)')
+
     input.value = node().text
     input.setSelectionRange(6, 6)
+
     press('v', 'i', '(')
+
     expect(input.selectionStart).toBe(5)
     expect(input.selectionEnd).toBe(14)
   })
@@ -264,13 +273,17 @@ describe('editor keyboard handler', () => {
       join: vi.fn(),
       selection: vi.fn(() => undefined),
     }
+
     handle(keyEvent(input, 'V'))
+
     expect(enter).toHaveBeenCalledWith('node')
     expect(vim.mode).toBe('visual-node')
     expect(input.selectionStart).toBe(2)
     expect(input.selectionEnd).toBe(2)
+
     handle(keyEvent(input, 'j'))
     handle(keyEvent(input, 'd'))
+
     expect(move).toHaveBeenCalledWith('down', 1)
     expect(command).toHaveBeenCalledWith('d')
   })
@@ -294,6 +307,7 @@ describe('editor keyboard handler', () => {
       join: vi.fn(),
       selection: vi.fn(() => undefined),
     }
+
     handle(keyEvent(input, 'G'))
     handle(keyEvent(input, 'g'))
     handle(keyEvent(input, 'g'))
@@ -304,10 +318,13 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'U'))
     handle(keyEvent(input, 'p'))
     handle(keyEvent(input, 'P'))
+
     expect(move.mock.calls).toEqual([['last'], ['first']])
     expect(swap).toHaveBeenCalledOnce()
     expect(command.mock.calls.map(([key]) => key)).toEqual(['c', 's', 'u', 'U', 'p', 'P'])
+
     handle(keyEvent(input, 'Escape'))
+
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
@@ -337,7 +354,9 @@ describe('editor keyboard handler', () => {
     }
 
     const plain = press('>')
+
     expect(plain.preventDefault).toHaveBeenCalledOnce()
+
     press('<')
     press('1')
     press('2')
@@ -348,6 +367,7 @@ describe('editor keyboard handler', () => {
     press('1')
     press('0')
     press('<')
+
     expect(shift.mock.calls).toEqual([
       ['in', 1],
       ['out', 1],
@@ -359,20 +379,24 @@ describe('editor keyboard handler', () => {
 
     // A count does not reach another command, and `g` cancels `>` instead of leaving a stale prefix.
     shift.mockClear()
+
     press('3')
     press('j')
     press('>')
     press('g')
     press('>')
+
     // `j` and `k` carry the count; `>` after `3j` sees no leftover count.
     expect(move.mock.calls).toEqual([['down', 3]])
     expect(shift.mock.calls).toEqual([['in', 1]])
     expect(vim.commandState.pending).toBeUndefined()
 
     move.mockClear()
+
     press('k')
     press('g')
     press('j')
+
     expect(move.mock.calls).toEqual([
       ['up', 1],
       ['down', 1],
@@ -387,18 +411,23 @@ describe('editor keyboard handler', () => {
     const press = (...keys: string[]): void => {
       for (const key of keys) handle(keyEvent(input, key))
     }
+
     press('d', 'j', 'y', 'k', 'c', 'j')
     press('2', 'd', '3', 'j')
     press('d', '2', 'k')
+
     expect(vim.verticalOperator).toHaveBeenNthCalledWith(1, 'node', 'd', 'down', 1)
     expect(vim.verticalOperator).toHaveBeenNthCalledWith(2, 'node', 'y', 'up', 1)
     expect(vim.verticalOperator).toHaveBeenNthCalledWith(3, 'node', 'c', 'down', 1)
     expect(vim.verticalOperator).toHaveBeenNthCalledWith(4, 'node', 'd', 'down', 6)
     expect(vim.verticalOperator).toHaveBeenNthCalledWith(5, 'node', 'd', 'up', 2)
     expect(vim.commandState.pending).toBeUndefined()
+
     // `ys` is a surround prefix, not a vertical operator, and a plain `j` keeps navigating.
     vi.mocked(vim.verticalOperator).mockClear()
+
     press('y', 's', 'j')
+
     expect(vim.verticalOperator).not.toHaveBeenCalled()
   })
 
@@ -410,7 +439,9 @@ describe('editor keyboard handler', () => {
     const press = (...keys: string[]): void => {
       for (const key of keys) handle(keyEvent(input, key))
     }
+
     press('J', 'K', 'g', 'J', '3', 'J', '2', 'K', 'g', 'K')
+
     expect(vi.mocked(vim.nodeVisual.join).mock.calls).toEqual([[false]])
     expect(vi.mocked(vim.nodeVisual.move).mock.calls).toEqual([
       ['down', 10],
@@ -419,11 +450,14 @@ describe('editor keyboard handler', () => {
       ['up', 20],
     ])
     expect(vim.commandState.pending).toBeUndefined()
+
     // Character Visual mode has no join: `J` neither joins nor edits there.
     const character = vimHandler(store, { id: 'node', text: 'node', children: [] }, 'visual')
+
     character.handle(keyEvent(input, 'J'))
     character.handle(keyEvent(input, 'g'))
     character.handle(keyEvent(input, 'J'))
+
     expect(character.vim.nodeVisual.join).not.toHaveBeenCalled()
     expect(store.joinNodes).not.toHaveBeenCalled()
   })
@@ -438,8 +472,11 @@ describe('editor keyboard handler', () => {
     vim.commandState.visualFocus = 2
 
     const event = keyEvent(input, '>')
+
     handle(event)
+
     expect(event.preventDefault).toHaveBeenCalledOnce()
+
     handle(keyEvent(input, '2'))
     handle(keyEvent(input, '<'))
 
@@ -466,8 +503,10 @@ describe('editor keyboard handler', () => {
       }
 
       const indent = keyEvent(input, 'Tab')
+
       handle(indent)
       const outdent = keyEvent(input, 'Tab', { shiftKey: true })
+
       handle(outdent)
 
       expect(indent.preventDefault).toHaveBeenCalledOnce()
@@ -512,6 +551,7 @@ describe('editor keyboard handler', () => {
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'g' }
 
     const event = keyEvent(input, 'Tab', { shiftKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -559,13 +599,18 @@ describe('editor keyboard handler', () => {
     const { node, input, press, store, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
     input.setSelectionRange(0, 0)
     const [word] = press('w')
+
     expect(input.selectionStart).toBe(4)
     expect(word!.preventDefault).toHaveBeenCalledOnce()
+
     const [remove] = press('x')
+
     expect(node().text).toBe('one wo')
     expect(remove!.preventDefault).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
+
     store.undo()
+
     expect(node().text).toBe('one two')
   })
 
@@ -578,12 +623,16 @@ describe('editor keyboard handler', () => {
     })
 
     input.setSelectionRange(1, 1)
+
     press('x')
+
     expect(node().text).toBe('a')
     expect(node().attachment?.id).toBe('image')
     expect(caretRequests).toEqual([1])
     expectImageCaret(caretNodeId, caret, 'node', true)
+
     store.undo()
+
     expect(node().text).toBe('ab')
   })
 
@@ -595,7 +644,9 @@ describe('editor keyboard handler', () => {
       children: [],
     })
     input.setSelectionRange(0, 0)
+
     press('x')
+
     expect(node().text).toBe('')
     expect(node().attachment?.id).toBe('image')
     expect(caretRequests).toEqual([0])
@@ -609,7 +660,9 @@ describe('editor keyboard handler', () => {
       children: [],
     })
     input.setSelectionRange(1, 1)
+
     press('x')
+
     expect(node().text).toBe('a')
     expect(caretRequests).toEqual([0])
     expectImageCaret(caretNodeId, caret, 'node', false)
@@ -622,7 +675,9 @@ describe('editor keyboard handler', () => {
     )
 
     input.setSelectionRange(1, 2)
+
     press('d')
+
     expect(node().text).toBe('a')
     expect(node().attachment?.id).toBe('image')
     expect(caretRequests).toEqual([1])
@@ -637,10 +692,12 @@ describe('editor keyboard handler', () => {
       children: [],
     })
     input.setSelectionRange(2, 2)
+
     input.classList.add('node-input-image-caret')
     vim.register.current = { kind: 'text', value: 'Z' }
 
     press('P')
+
     expect(node().text).toBe('abZ')
     expect(node().attachment?.id).toBe('image')
     expect(caretRequests).toEqual([2])
@@ -652,6 +709,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'abcd'
     input.setSelectionRange(4, 4)
+
     input.classList.add('node-input-image-caret')
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
@@ -659,6 +717,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     // Seed through the caret authority, as production does. Writing `imageTextCursor` alone is not
     // enough once the authority owns the node: an authority that has never seen this node reports
     // no saved return position regardless of what the DOM class says.
@@ -675,10 +734,14 @@ describe('editor keyboard handler', () => {
     const roots = ['node', 'second', 'third'].map((id) => ({ id, text: 'abcd', children: [] }))
     const { snapshot, input, press } = await textFixture(roots[0]!, 'normal', { document: { roots } })
     input.setSelectionRange(0, 0)
+
     press('2', 'j')
+
     expect(snapshot().location.selectedNodeId).toBe('third')
     expect(snapshot().focus).toMatchObject({ nodeId: 'third', cursor: 0 })
+
     press('l')
+
     expect(input.selectionStart).toBe(1)
   })
 
@@ -693,7 +756,9 @@ describe('editor keyboard handler', () => {
       location: { currentParentId: 'parent', selectedNodeId: 'child' },
     })
     input.setSelectionRange(4, 5)
+
     press('k')
+
     expect(snapshot().location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
     expect(snapshot().focus).toMatchObject({ nodeId: 'parent', cursor: 4 })
     expectImageCaret(caretNodeId, caret, 'parent', true)
@@ -707,6 +772,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Parent'
     input.setSelectionRange(4, 5)
+
     input.classList.add('node-input-image-caret')
     const { handle, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
@@ -727,6 +793,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Parent'
     input.setSelectionRange(2, 3)
+
     input.classList.add('node-input-image-caret')
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
@@ -734,6 +801,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     vim.applyCaretState('parent', { cursor: 6, imageActive: true, imageTextReturnCursor: 2 })
 
     handle(keyEvent(input, 'k'))
@@ -748,6 +816,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'abcd'
     input.setSelectionRange(4, 4)
+
     input.classList.add('node-input-image-caret')
     const { handle, vim } = vimHandler(store, {
       id: 'node',
@@ -755,6 +824,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     vim.applyCaretState('node', { cursor: 4, imageActive: true, imageTextReturnCursor: 1 })
 
     handle(keyEvent(input, '2'))
@@ -775,6 +845,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input)
     document.body.append(row)
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
@@ -785,16 +856,20 @@ describe('editor keyboard handler', () => {
     })
 
     handle(keyEvent(input, 'j'))
+
     expectImageCaret(caretNodeId, caret, 'node', true)
     expect(vim.imageTextCursor.current).toBe(1)
 
     handle(keyEvent(input, motion))
+
     expect(input.selectionStart).toBe(destination)
     expectImageCaret(caretNodeId, caret, 'node', false)
     expect(vim.imageTextCursor.current).toBeUndefined()
 
     handle(keyEvent(input, 'h'))
+
     expect(input.selectionStart).toBe(afterH)
+
     row.remove()
   })
 
@@ -812,6 +887,7 @@ describe('editor keyboard handler', () => {
         const row = document.createElement('div')
         row.className = 'node-row'
         if (attachment !== undefined) row.dataset.hasAttachment = 'true'
+
         row.append(input)
         document.body.append(row)
         const { handle, vim, commandState, caret, caretNodeId } = vimHandler(store, {
@@ -823,13 +899,17 @@ describe('editor keyboard handler', () => {
         if (attachment !== undefined) handle(keyEvent(input, 'j'))
         for (const key of keys) handle(keyEvent(input, key))
         const activeEnd = commandState.visualFocus!
+
         expect(activeEnd).toBeGreaterThan(0)
+
         handle(keyEvent(input, exitKey))
+
         expect(vim.mode).toBe('normal')
         expect(input.selectionStart).toBe(activeEnd)
         expect(input.selectionEnd).toBe(activeEnd + 1)
         expectImageCaret(caretNodeId, caret, 'node', false)
         expect(vim.imageTextCursor.current).toBeUndefined()
+
         row.remove()
       }
     }
@@ -843,6 +923,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input)
     document.body.append(row)
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
@@ -861,6 +942,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionStart).toBe(0)
     expectImageCaret(caretNodeId, caret, 'node', false)
     expect(vim.imageTextCursor.current).toBeUndefined()
+
     row.remove()
   })
 
@@ -876,6 +958,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Last'
     input.setSelectionRange(4, 4)
+
     input.classList.add('node-input-image-caret')
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
       id: 'node',
@@ -883,6 +966,7 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     vim.applyCaretState('node', { cursor: 4, imageActive: true, imageTextReturnCursor: 1 })
 
     handle(keyEvent(input, 'j'))
@@ -904,6 +988,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'Parent'
     input.setSelectionRange(6, 6)
+
     input.classList.add('node-input-image-caret')
     const { handle, caret, caretNodeId } = vimHandler(store, {
       id: 'parent',
@@ -932,6 +1017,7 @@ describe('editor keyboard handler', () => {
 
     for (const key of ['h', 'l', '2', 'h', '2', 'l']) {
       handle(keyEvent(input, key))
+
       expect(input.selectionStart).toBe(0)
       expectImageCaret(caretNodeId, caret, 'image-only', true)
     }
@@ -980,20 +1066,25 @@ describe('editor keyboard handler', () => {
     })
     input.setSelectionRange(2, 2)
     const event = dispatch('o')
+
     expect(snapshot().document.roots).toEqual([
       { ...parent, children: [{ id: 'generated-0', text: '', children: [] }] },
     ])
     expect(snapshot().location).toEqual({ currentParentId: 'node', selectedNodeId: 'generated-0' })
     expect(vim.mode).toBe('insert')
     expect(event.preventDefault).toHaveBeenCalledOnce()
+
     store.undo()
+
     expect(snapshot().document.roots).toEqual([parent])
   })
 
   it('uses counts and text operators without deleting the node', async () => {
     const { node, input, press, vim } = await textFixture({ id: 'node', text: 'one two three', children: [] })
     input.setSelectionRange(0, 0)
+
     press('2', 'd', 'w')
+
     expect(node()).toEqual({ id: 'node', text: 'three', children: [] })
     expect(vim.register.current).toEqual({ kind: 'text', value: 'one two ' })
     expect(vim.commandState.lastChange).toEqual({ kind: 'delete', motion: 'w', count: 2 })
@@ -1002,7 +1093,9 @@ describe('editor keyboard handler', () => {
   it('changes the current word and enters Insert mode with a text baseline', async () => {
     const { node, input, press, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
     input.setSelectionRange(0, 0)
+
     press('c', 'w')
+
     expect(node().text).toBe(' two')
     expect(vim.register.current).toEqual({ kind: 'text', value: 'one' })
     expect(vim.beginInsert).toHaveBeenCalledWith('node', ' two', 0, { kind: 'change', motion: 'w', count: 1 })
@@ -1013,23 +1106,35 @@ describe('editor keyboard handler', () => {
     const original: TreeNode = { id: 'node', text: 'one two', children: [{ id: 'child', text: 'Child', children: [] }] }
     const { store, node, input, press, vim } = await textFixture(original)
     input.setSelectionRange(4, 4)
+
     press('y', 'w')
+
     expect(vim.register.current).toEqual({ kind: 'text', value: 'two' })
     expect(node()).toEqual(original)
+
     press('D')
+
     expect(node()).toEqual({ ...original, text: 'one ' })
+
     store.undo()
+
     expect(node()).toEqual(original)
   })
 
   it('finds characters and replaces a counted run', async () => {
     const { node, input, press, store } = await textFixture({ id: 'node', text: 'a.b.c', children: [] })
     input.setSelectionRange(0, 0)
+
     press('2', 'f', '.')
+
     expect(input.selectionStart).toBe(3)
+
     press('2', 'r', 'X')
+
     expect(node().text).toBe('a.bXX')
+
     store.undo()
+
     expect(node().text).toBe('a.b.c')
   })
 
@@ -1040,21 +1145,31 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 0)
     const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
     for (const key of ['t', 'c']) handle(keyEvent(input, key))
+
     expect(input.selectionStart).toBe(3)
+
     for (const key of ['T', 'a']) handle(keyEvent(input, key))
+
     expect(input.selectionStart).toBe(1)
+
     for (const key of ['f', 'z']) handle(keyEvent(input, key))
+
     expect(input.selectionStart).toBe(1)
   })
 
   it('applies backward h operators and inclusive adjacent t ranges', async () => {
     const first = await textFixture({ id: 'node', text: 'abc', children: [] })
     first.input.setSelectionRange(1, 1)
+
     first.press('d', 'h')
+
     expect(first.node().text).toBe('bc')
+
     const second = await textFixture({ id: 'node', text: 'abc', children: [] })
     second.input.setSelectionRange(1, 1)
+
     second.press('c', 'h')
+
     expect(second.node().text).toBe('bc')
     expect(second.vim.mode).toBe('insert')
     expect(second.vim.beginInsert).toHaveBeenCalledWith('node', 'bc', 0, {
@@ -1065,14 +1180,18 @@ describe('editor keyboard handler', () => {
 
     const third = await textFixture({ id: 'node', text: 'aXb', children: [] })
     third.input.setSelectionRange(0, 0)
+
     third.press('d', 't', 'X')
+
     expect(third.node().text).toBe('Xb')
   })
 
   it('applies inclusive end-of-text deletion and leaves a final character available to change', async () => {
     const { node, input, press, vim } = await textFixture({ id: 'node', text: 'abc def', children: [] })
     input.setSelectionRange(4, 4)
+
     press('d', '$')
+
     expect(node().text).toBe('abc ')
     expect(vim.register.current).toEqual({ kind: 'text', value: 'def' })
   })
@@ -1084,19 +1203,27 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 0)
     const { handle } = vimHandler(store, { id: 'node', text: input.value, children: [] })
     for (const key of '999999999w') handle(keyEvent(input, key))
+
     expect(input.selectionStart).toBe(6)
   })
 
   it('repeats the last text edit at the current caret without replacing it on yank', async () => {
     const { node, input, press, store, vim } = await textFixture({ id: 'node', text: 'one two three', children: [] })
     input.setSelectionRange(0, 0)
+
     press('d', 'w')
+
     expect(node().text).toBe('two three')
+
     input.setSelectionRange(4, 4)
+
     press('y', 'w', '.')
+
     expect(vim.register.current).toEqual({ kind: 'text', value: 'three' })
     expect(node().text).toBe('two ')
+
     store.undo()
+
     expect(node().text).toBe('two three')
     expect(vim.commandState.lastChange).toEqual({ kind: 'delete', motion: 'w', count: 1 })
   })
@@ -1109,6 +1236,7 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'one two', children: [] })
 
     const event = keyEvent(input, 'A')
+
     handle(event)
 
     expect(vim.mode).toBe('insert')
@@ -1158,8 +1286,11 @@ describe('editor keyboard handler', () => {
     const siblings = () => (nested ? snapshot().document.roots[0]!.children : snapshot().document.roots)
     input.setSelectionRange(2, 2)
     const below = dispatch('o')
+
     expect(siblings().map(({ text }) => text)).toEqual(['text', ''])
+
     const belowId = snapshot().location.selectedNodeId
+
     expect(belowId).not.toBe('node')
     expect(snapshot().location.currentParentId).toBe(nested ? 'parent' : null)
     expect(snapshot().focus).toMatchObject({ nodeId: belowId, cursor: 0 })
@@ -1168,14 +1299,19 @@ describe('editor keyboard handler', () => {
 
     vim.mode = 'normal'
     const above = dispatch('O')
+
     expect(siblings().map(({ text }) => text)).toEqual(['text', '', ''])
     expect(siblings()[1]!.id).toBe(snapshot().location.selectedNodeId)
     expect(siblings()[2]!.id).toBe(belowId)
     expect(vim.mode).toBe('insert')
     expect(above.preventDefault).toHaveBeenCalledOnce()
+
     store.undo()
+
     expect(siblings().map(({ id }) => id)).toEqual(['node', belowId])
+
     store.undo()
+
     expect(siblings().map(({ id }) => id)).toEqual(['node'])
   })
 
@@ -1185,6 +1321,7 @@ describe('editor keyboard handler', () => {
     })
     const original = snapshot()
     const event = dispatch('O')
+
     expect(snapshot().document).toEqual(original.document)
     expect(snapshot().location).toEqual(original.location)
     expect(vim.mode).toBe('normal')
@@ -1206,12 +1343,18 @@ describe('editor keyboard handler', () => {
   it('deletes the selected node only after dd', async () => {
     const { snapshot, store, press, vim } = await textFixture({ id: 'node', text: 'text', children: [] })
     const original = snapshot().document
+
     press('d')
+
     expect(snapshot().document).toEqual(original)
+
     press('d')
+
     expect(snapshot().document.roots).toEqual([{ id: 'generated-0', text: '', children: [] }])
     expect(vim.register.current).toMatchObject({ kind: 'node', value: { id: 'node', text: 'text' } })
+
     store.undo()
+
     expect(snapshot().document).toEqual(original)
   })
 
@@ -1226,12 +1369,18 @@ describe('editor keyboard handler', () => {
       location: { currentParentId: 'parent', selectedNodeId: 'node' },
     })
     input.setSelectionRange(0, 0)
+
     press('3', 'j')
+
     expect(snapshot().location.selectedNodeId).toBe('node-3')
+
     press('5', 'k')
+
     expect(snapshot().location.selectedNodeId).toBe('parent')
     expect(snapshot().focus).toMatchObject({ nodeId: 'parent', cursor: 0 })
+
     press('1', '0', 'G')
+
     expect(vim.moveBoundary).toHaveBeenLastCalledWith('last', 0, 10)
   })
 
@@ -1254,15 +1403,19 @@ describe('editor keyboard handler', () => {
     }
     const node: TreeNode = treeDocument.roots[0]!.children[0]!
     const { store, snapshot, press, vim } = await textFixture(node, 'normal', options)
+
     press('2', 'y', 'y')
+
     expect(vim.register.current).toEqual({
       kind: 'nodes',
       value: { nodes: [node, treeDocument.roots[0]!.children[1]], sourceIds: ['first', 'second'] },
     })
 
     expect(snapshot().document).toEqual(treeDocument)
+
     press('3', 'p')
     const children = snapshot().document.roots[0]!.children
+
     expect(children.map(({ text }) => text)).toEqual([
       'First',
       'First',
@@ -1274,15 +1427,22 @@ describe('editor keyboard handler', () => {
       'Second',
     ])
     expect(new Set(children.map(({ id }) => id)).size).toBe(8)
+
     // A counted put is one undoable command (PRODUCT §20.2.16).
     store.undo()
+
     expect(snapshot().document).toEqual(treeDocument)
+
     const deletion = await textFixture(node, 'normal', options)
+
     deletion.press('3', 'd', 'd')
+
     expect(deletion.snapshot().document.roots).toEqual([{ id: 'root', text: 'Root', children: [] }])
     expect(deletion.vim.register.current.kind).toBe('nodes')
+
     // A counted deletion is one undoable command.
     deletion.store.undo()
+
     expect(deletion.snapshot().document).toEqual(treeDocument)
   })
 
@@ -1294,11 +1454,15 @@ describe('editor keyboard handler', () => {
       children: [{ id: 'child', text: 'child', children: [] }],
     }
     const f = await textFixture(node)
+
     f.press('d', 'd')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: node.text })
     expect(f.vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
     expect(f.snapshot().document.roots.some((root) => root.id === node.id)).toBe(false)
+
     f.store.undo()
+
     expect(f.snapshot().document.roots).toEqual([node])
   })
 
@@ -1309,7 +1473,9 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     f.press('l', 'l', 'd', 'd')
+
     expect(f.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
     expect(f.vim.register.current.kind).toBe('node')
   })
@@ -1318,13 +1484,21 @@ describe('editor keyboard handler', () => {
     const first: TreeNode = { id: 'first', text: 'first', children: [] }
     const last: TreeNode = { id: 'last', text: 'last', children: [] }
     const multiple = await textFixture(first, 'normal', { document: { roots: [first, last] } })
+
     multiple.press('2', 'd', 'd')
+
     expect(multiple.clipboard.content).toBeUndefined()
+
     const clamped = await textFixture(last)
+
     clamped.press('2', 'd', 'd')
+
     expect(clamped.clipboard.content).toEqual({ kind: 'text', text: 'last' })
+
     const empty = await textFixture({ id: 'empty', text: '', children: [] })
+
     empty.press('d', 'd')
+
     expect(empty.clipboard.content).toBeUndefined()
   })
 
@@ -1336,11 +1510,15 @@ describe('editor keyboard handler', () => {
         },
       },
     })
+
     f.press('d', 'd')
     await vi.waitFor(() => expect(f.snapshot().operationError).toBe('native copy failed'))
+
     expect(f.snapshot().document.roots.some((root) => root.id === 'node')).toBe(false)
     expect(f.vim.register.current.kind).toBe('node')
+
     f.press('p')
+
     expect(f.snapshot().document.roots.some((root) => root.text === 'text')).toBe(true)
   })
 
@@ -1354,7 +1532,9 @@ describe('editor keyboard handler', () => {
     const f = await textFixture(node)
     const before = f.snapshot()
     f.input.setSelectionRange(4, 4)
+
     f.press('y', 'y')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: node.text })
     expect(f.snapshot()).toBe(before)
     expect(f.input.selectionStart).toBe(4)
@@ -1364,7 +1544,9 @@ describe('editor keyboard handler', () => {
   it('copies a Visual character selection externally without expanding it to the node', async () => {
     const f = await textFixture({ id: 'node', text: 'one two', children: [] }, 'visual')
     f.input.setSelectionRange(0, 3)
+
     f.press('y')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: 'one' })
     expect(f.vim.register.current).toEqual({ kind: 'text', value: 'one' })
     expect(f.snapshot().document.roots[0]!.text).toBe('one two')
@@ -1377,9 +1559,12 @@ describe('editor keyboard handler', () => {
       attachment: { id: 'image', mimeType: 'image/png' },
       children: [],
     })
+
     f.press('l', 'l')
     const before = f.caret()
+
     f.press('y', 'y')
+
     expect(f.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
     expect(f.caret()).toEqual(before)
   })
@@ -1388,10 +1573,14 @@ describe('editor keyboard handler', () => {
     const first: TreeNode = { id: 'first', text: 'first', children: [] }
     const last: TreeNode = { id: 'last', text: 'last', children: [] }
     const f = await textFixture(first, 'normal', { document: { roots: [first, last] } })
+
     f.press('2', 'y', 'y')
+
     expect(f.clipboard.content).toBeUndefined()
+
     f.store.selectNode('last', 0)
     f.press('2', 'y', 'y')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: 'last' })
   })
 
@@ -1403,10 +1592,14 @@ describe('editor keyboard handler', () => {
         },
       },
     })
+
     f.press('y', 'y')
     await vi.waitFor(() => expect(f.snapshot().operationError).toBe('native copy failed'))
+
     expect(f.vim.register.current.kind).toBe('node')
+
     f.press('p')
+
     expect(f.snapshot().document.roots).toHaveLength(2)
   })
 
@@ -1417,27 +1610,39 @@ describe('editor keyboard handler', () => {
       children: [{ id: 'child', text: 'child', children: [] }],
     }
     const { store, snapshot, press, vim } = await textFixture(node)
+
     press('y')
+
     expect(snapshot().document.roots).toEqual([node])
+
     press('y')
 
     expect(vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
     expect(vim.register.current).not.toBe(node)
+
     press('P')
     const beforeId = snapshot().location.selectedNodeId
+
     expect(snapshot().document.roots.map(({ id }) => id)).toEqual([beforeId, 'node'])
+
     // A leaf inside the copy: `p` on a leaf is the sibling-after put.
     const copyChildId = snapshot().document.roots[0]!.children[0]!.id
+
     store.selectNode(copyChildId, 0)
     press('p')
     const afterId = snapshot().location.selectedNodeId
     const children = snapshot().document.roots[0]!.children
+
     expect(children.map(({ id }) => id)).toEqual([copyChildId, afterId])
     expect(children[1]!.children.map(({ text }) => text)).toEqual(['child'])
+
     const ids = snapshot().document.roots.flatMap((root) => [root.id, ...root.children.map(({ id }) => id)])
+
     expect(new Set(ids).size).toBe(ids.length)
+
     store.undo()
     store.undo()
+
     expect(snapshot().document.roots).toEqual([node])
   })
 
@@ -1454,29 +1659,39 @@ describe('editor keyboard handler', () => {
 
     it('puts the register as the first child like o on an expanded branch', async () => {
       const { store, snapshot, press, vim } = await textFixture(parent())
+
       store.applyFold('open', 'parent')
       vim.register.current = { kind: 'node', value: { id: 'src', text: 'copy', children: [] }, sourceIds: ['src'] }
+
       press('p')
       const state = snapshot()
+
       expect(state.document.roots.map(({ id }) => id)).toEqual(['parent'])
+
       const children = state.document.roots[0]!.children
+
       expect(children.map(({ text }) => text)).toEqual(['copy', 'one', 'two'])
       expect(state.location).toEqual({ currentParentId: null, selectedNodeId: children[0]!.id })
       expect(state.expansion.expandedIds.has('parent')).toBe(true)
+
       store.undo()
+
       expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['one', 'two'])
     })
 
     it('keeps P as a sibling before', async () => {
       const { snapshot, press, vim } = await textFixture(parent())
       vim.register.current = { kind: 'node', value: { id: 'src', text: 'copy', children: [] }, sourceIds: ['src'] }
+
       press('P')
+
       expect(snapshot().document.roots.map(({ text }) => text)).toEqual(['copy', 'parent'])
       expect(snapshot().document.roots[1]!.children).toHaveLength(2)
     })
 
     it('puts a counted forest as first children and gp leaves the selection on the old first child', async () => {
       const { store, snapshot, press, vim } = await textFixture(parent())
+
       store.applyFold('open', 'parent')
       vim.register.current = {
         kind: 'nodes',
@@ -1488,8 +1703,10 @@ describe('editor keyboard handler', () => {
           sourceIds: ['s1', 's2'],
         },
       }
+
       press('2', 'g', 'p')
       const children = snapshot().document.roots[0]!.children
+
       expect(children.map(({ text }) => text)).toEqual(['S1', 'S2', 'S1', 'S2', 'one', 'two'])
       expect(snapshot().location.selectedNodeId).toBe('c1')
     })
@@ -1497,18 +1714,23 @@ describe('editor keyboard handler', () => {
     it('leaves a text register to the text put', async () => {
       const { snapshot, press, vim } = await textFixture(parent())
       vim.register.current = { kind: 'text', value: 'abc' }
+
       press('p')
+
       expect(snapshot().document.roots[0]!.children).toHaveLength(2)
       expect(snapshot().document.roots[0]!.text).toBe('parentabc')
     })
 
     it('reports an error and changes nothing when the node is put into itself', async () => {
       const { store, snapshot, press } = await textFixture(parent())
+
       store.applyFold('open', 'parent')
       const before = snapshot().document
+
       press('y')
       press('y')
       press('p')
+
       expect(snapshot().document).toBe(before)
       expect(snapshot().operationError).toBe('Cannot paste a node into one of its descendants.')
     })
@@ -1521,9 +1743,13 @@ describe('editor keyboard handler', () => {
       children: [{ id: 'child', text: 'Child', children: [] }],
     })
     const original = snapshot().document
+
     press('g')
+
     expect(snapshot().location).toEqual({ currentParentId: null, selectedNodeId: 'node' })
+
     press('d')
+
     expect(snapshot().location).toEqual({ currentParentId: 'node', selectedNodeId: 'child' })
     expect(snapshot().document).toEqual(original)
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
@@ -1537,6 +1763,7 @@ describe('editor keyboard handler', () => {
     })
     input.setSelectionRange(2, 2)
     const event = dispatch('o', { ctrlKey: true })
+
     expect(snapshot().location).toEqual({ currentParentId: null, selectedNodeId: 'parent' })
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledOnce()
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -1551,6 +1778,7 @@ describe('editor keyboard handler', () => {
       vim.commandState.pending = { count: '', motionCount: '', operator: 'd' }
 
       const event = keyEvent(input, 'w', { ctrlKey: true })
+
       handle(event)
 
       expect(event.preventDefault, mode).toHaveBeenCalledOnce()
@@ -1569,6 +1797,7 @@ describe('editor keyboard handler', () => {
     const { handle } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
 
     const event = keyEvent(input, 'w', { ctrlKey: true })
+
     handle(event)
 
     expect(event.preventDefault).not.toHaveBeenCalled()
@@ -1646,11 +1875,17 @@ describe('editor keyboard handler', () => {
   it('undoes with u and redoes with Ctrl+r in Normal mode', async () => {
     const { node, input, press, dispatch, vim } = await textFixture({ id: 'node', text: 'text', children: [] })
     input.setSelectionRange(0, 0)
+
     press('x')
+
     expect(node().text).toBe('ext')
+
     press('u')
+
     expect(node().text).toBe('text')
+
     dispatch('r', { ctrlKey: true })
+
     expect(node().text).toBe('ext')
     expect(vim.syncImageCaretToFocus).toHaveBeenCalledTimes(2)
   })
@@ -1782,7 +2017,9 @@ describe('editor keyboard handler', () => {
       vim.commandState.visualFocus = 2
       vim.finishReplace = vi.fn(() => true)
       const event = keyEvent(input, 'p', { metaKey: true })
+
       handle(event)
+
       expect(event.preventDefault).toHaveBeenCalledOnce()
       expect(vim.finishInsert).toHaveBeenCalledWith(input)
       expect(store.openAgenda).toHaveBeenCalledWith(2)
@@ -1901,11 +2138,16 @@ describe('editor keyboard handler', () => {
     }
 
     handle(keyEvent(input, 'g'))
+
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
+
     handle(keyEvent(input, 'Escape'))
+
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.commandState.pending).toBeUndefined()
+
     handle(keyEvent(input, 'd'))
+
     expect(store.enter).not.toHaveBeenCalled()
   })
 
@@ -1932,7 +2174,9 @@ describe('editor keyboard handler', () => {
     expect(exit).toHaveBeenCalledOnce()
     expect(vim.mode).toBe('normal')
     expect(vim.commandState.pending).toBeUndefined()
+
     handle(keyEvent(input, 'd'))
+
     expect(store.enter).not.toHaveBeenCalled()
   })
 
@@ -2005,6 +2249,7 @@ describe('editor keyboard handler', () => {
 
     vim.commandState.visualAnchor = 2
     vim.commandState.visualFocus = 3
+
     handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
 
     expect(store.redo).toHaveBeenCalledOnce()
@@ -2025,7 +2270,9 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
     handle(keyEvent(input, 'd'))
+
     expect(vim.commandState.pending).toBeDefined()
 
     handle(keyEvent(input, key, options))
@@ -2044,6 +2291,7 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
     handle(keyEvent(input, 'd'))
 
     handle(keyEvent(input, 'e', { metaKey: true }))
@@ -2102,6 +2350,7 @@ describe('editor keyboard handler', () => {
       const store = createStore()
       const input = textInput()
       const { handle, vim } = vimHandler(store, node)
+
       handle(keyEvent(input, 'd'))
 
       handle(keyEvent(input, 'Enter', { metaKey: true }))
@@ -2240,7 +2489,9 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
     handle(keyEvent(input, 'g'))
+
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
 
     handle(keyEvent(input, '.', { metaKey: true }))
@@ -2254,7 +2505,9 @@ describe('editor keyboard handler', () => {
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
     handle(keyEvent(input, 'z'))
+
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
 
     handle(keyEvent(input, '.', { metaKey: true }))
@@ -2375,7 +2628,9 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'z'))
     // A physical keyboard fires Shift's own keydown before the capital key that follows it.
     handle(keyEvent(input, 'Shift', { shiftKey: true }))
+
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+
     handle(keyEvent(input, 'O'))
 
     expect(vim.fold).toHaveBeenCalledExactlyOnceWith('open-recursive', 'node')
@@ -2405,7 +2660,9 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, 'z'))
     handle(keyEvent(input, key, options))
+
     expect(vim.commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
+
     handle(keyEvent(input, 'c'))
 
     expect(vim.fold).toHaveBeenCalledExactlyOnceWith('close', 'node')
@@ -2431,6 +2688,7 @@ describe('editor keyboard handler', () => {
       // the pending `z` must survive it and stay available for the composition path to clear.
       handle(keyEvent(input, 'z'))
       handle(keyEvent(input, imeKey))
+
       expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
 
       // `compositionstart` then clears the unfinished command — the same production `clearPending`
@@ -2438,6 +2696,7 @@ describe('editor keyboard handler', () => {
       // composing state is set.
       clearPending(commandState)
       composing = true
+
       handle(keyEvent(input, 'Enter'))
 
       expect(commandState.pending).toBeUndefined()
@@ -2462,6 +2721,7 @@ describe('editor keyboard handler', () => {
     // method. It must run no command — a motion (`w`), a text edit (`x`), or a structural command
     // (`Enter`) — and must stay available to the IME instead of being prevented and consumed.
     const event = keyEvent(input, key, { isComposing: true })
+
     handle(event)
 
     expect(event.preventDefault).not.toHaveBeenCalled()
@@ -2498,6 +2758,7 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'abcd', children: [] }, 'replace')
 
     const event = keyEvent(input, 'X', { isComposing: true })
+
     handle(event)
 
     expect(event.preventDefault).not.toHaveBeenCalled()
@@ -2516,6 +2777,7 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'insert')
 
     const event = keyEvent(input, 'Escape', { isComposing: true })
+
     handle(event)
 
     // The first Escape during composition cancels the composition, so the Insert session must
@@ -2530,15 +2792,19 @@ describe('editor keyboard handler', () => {
   it('keeps a pending operator and an awaited character across a bare Shift keydown', async () => {
     const { node, input, press, dispatch } = await textFixture({ id: 'node', text: 'abc def', children: [] })
     input.setSelectionRange(4, 4)
+
     press('d')
     dispatch('Shift', { shiftKey: true })
     press('$')
+
     expect(node().text).toBe('abc ')
 
     input.setSelectionRange(0, 0)
+
     press('r')
     dispatch('Shift', { shiftKey: true })
     press('A')
+
     expect(node().text).toBe('Abc ')
   })
 
@@ -2555,9 +2821,11 @@ describe('editor keyboard handler', () => {
     const { handle, vim, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
 
     handle(keyEvent(input, 'z'))
+
     expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'z' })
 
     const repeat = keyEvent(input, 'z', { repeat: true })
+
     handle(repeat)
 
     // `zz` is not one of the implemented fold keys, so the repeat consumes the prefix as an
@@ -2570,6 +2838,7 @@ describe('editor keyboard handler', () => {
     expect(repeat.preventDefault).toHaveBeenCalledOnce()
 
     handle(keyEvent(input, 'l'))
+
     expect(input.selectionStart).toBe(1)
     expect(vim.fold).not.toHaveBeenCalled()
   })
@@ -2577,7 +2846,9 @@ describe('editor keyboard handler', () => {
   it('treats a repeated r keydown as the awaited replacement character', async () => {
     const { node, input, press, dispatch, commandState } = await textFixture({ id: 'node', text: 'abc', children: [] })
     input.setSelectionRange(0, 0)
+
     press('r')
+
     expect(commandState.pending).toEqual({ count: '', motionCount: '', awaiting: 'r' })
 
     const repeat = dispatch('r', { repeat: true })
@@ -2590,6 +2861,7 @@ describe('editor keyboard handler', () => {
     expect(repeat.preventDefault).toHaveBeenCalledOnce()
 
     press('l')
+
     expect(input.selectionStart).toBe(1)
     expect(node().text).toBe('rbc')
   })
@@ -2602,9 +2874,11 @@ describe('editor keyboard handler', () => {
     const { handle, vim, commandState } = vimHandler(store, { id: 'node', text: input.value, children: [] })
 
     handle(keyEvent(input, 'g'))
+
     expect(commandState.pending).toEqual({ count: '', motionCount: '', prefix: 'g' })
 
     const repeat = keyEvent(input, 'g', { repeat: true })
+
     handle(repeat)
 
     // `gg` consumes the prefix and selects the current parent; the repeat leaves no second `g`
@@ -2616,6 +2890,7 @@ describe('editor keyboard handler', () => {
     expect(repeat.preventDefault).toHaveBeenCalledOnce()
 
     handle(keyEvent(input, 'l'))
+
     expect(input.selectionStart).toBe(1)
     expect(vim.moveBoundary).toHaveBeenCalledTimes(1)
   })
@@ -2629,7 +2904,9 @@ describe('editor keyboard handler', () => {
       document: { roots },
     })
     input.setSelectionRange(0, 0)
+
     press('d')
+
     expect(commandState.pending).toEqual({ count: '', motionCount: '', operator: 'd' })
 
     const repeat = dispatch('d', { repeat: true })
@@ -2649,6 +2926,7 @@ describe('editor keyboard handler', () => {
     expect(repeat.preventDefault).toHaveBeenCalledOnce()
 
     press('l')
+
     expect(input.selectionStart).toBe(1)
     expect(snapshot().document.roots).toEqual([roots[1]])
   })
@@ -2712,27 +2990,42 @@ describe('editor keyboard handler', () => {
     const { node, store, input, clipboard, dispatch, vim } = await pendingReplaceFixture()
     clipboard.current = { kind: 'text', text: 'YZ' }
     input.setSelectionRange(3, 3)
+
     dispatch('v', { metaKey: true })
+
     expect(vim.finishReplace).toHaveBeenCalledWith(input, false, true)
     expect(vim.mode).toBe('normal')
+
     await vi.waitFor(() => expect(node().text).toBe('abXYZd'))
+
     store.undo()
+
     expect(node().text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abcd')
   })
 
   it('commits and ends a pending Replace session before Cmd+X cuts the visible selection', async () => {
     const { node, store, input, clipboard, dispatch, vim } = await pendingReplaceFixture()
     input.setSelectionRange(0, 4)
+
     dispatch('x', { metaKey: true })
+
     expect(vim.finishReplace).toHaveBeenCalledWith(input, false, true)
     expect(vim.mode).toBe('normal')
+
     await vi.waitFor(() => expect(node().text).toBe(''))
+
     expect(clipboard.written?.text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abcd')
   })
 
@@ -2778,7 +3071,9 @@ describe('editor keyboard handler', () => {
     input.value = 'text'
     input.setSelectionRange(0, 1)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] })
+
     handle(keyEvent(input, 'd'))
+
     expect(vim.commandState.pending).toBeDefined()
 
     handle(keyEvent(input, key, { metaKey: true }))
@@ -2872,7 +3167,9 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 2)
     const treeNode = { id: 'node', text: 'text', children: [] }
     const { vim } = vimHandler(store, treeNode, 'insert')
+
     executeEditorContextMenuCommand(command, store, treeNode, input, textCommandState(vim))
+
     expect(vim.finishInsert).toHaveBeenCalledExactlyOnceWith(input)
     expect(vim.setMode).not.toHaveBeenCalled()
   })
@@ -2886,10 +3183,15 @@ describe('editor keyboard handler', () => {
 
     expect(vim.finishReplace).toHaveBeenCalledWith(input, false, true)
     expect(vim.mode).toBe('normal')
+
     await vi.waitFor(() => expect(node().text).toBe('abXYZd'))
+
     store.undo()
+
     expect(node().text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abcd')
   })
 
@@ -2901,11 +3203,17 @@ describe('editor keyboard handler', () => {
 
     expect(vim.finishReplace).toHaveBeenCalledWith(input, false, true)
     expect(vim.mode).toBe('normal')
+
     await vi.waitFor(() => expect(node().text).toBe(''))
+
     expect(clipboard.written?.text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abXd')
+
     store.undo()
+
     expect(node().text).toBe('abcd')
   })
 
@@ -2953,6 +3261,7 @@ describe('editor keyboard handler', () => {
     const second = vimHandler(store, { id: 'node', text: 'abc', children: [] }, 'visual')
     second.vim.commandState.visualAnchor = first.vim.commandState.visualAnchor
     second.vim.commandState.visualFocus = first.vim.commandState.visualFocus
+
     second.handle(keyEvent(input, 'h'))
 
     expect(input.selectionStart).toBe(0)
@@ -2967,6 +3276,7 @@ describe('editor keyboard handler', () => {
     const { handle } = vimHandler(store, { id: 'node', text: 'abc', children: [] }, 'visual')
 
     const event = keyEvent(input, 'j')
+
     handle(event)
 
     expect(store.moveSelection).not.toHaveBeenCalled()
@@ -3007,17 +3317,24 @@ describe('editor keyboard handler', () => {
     vim.register.current = { kind: 'text', value: 'XY' }
 
     const [after] = press('p')
+
     expect(node().text).toBe('abXYcd')
     expect(caretRequests).toEqual([3])
     expect(after!.preventDefault).toHaveBeenCalledOnce()
+
     input.setSelectionRange(3, 3)
     const [before] = press('P')
+
     expect(node().text).toBe('abXXYYcd')
     expect(caretRequests).toEqual([3, 4])
     expect(before!.preventDefault).toHaveBeenCalledOnce()
+
     store.undo()
+
     expect(node().text).toBe('abXYcd')
+
     store.undo()
+
     expect(node().text).toBe('abcd')
   })
 
@@ -3031,21 +3348,30 @@ describe('editor keyboard handler', () => {
     vim.register.current = { kind: 'text', value: 'XY' }
 
     press('g', 'p')
+
     expect(node().text).toBe('abXYcd')
     expect(caretRequests).toEqual([4])
+
     input.setSelectionRange(3, 3)
+
     press('g', 'P')
+
     expect(node().text).toBe('abXXYYcd')
     expect(caretRequests).toEqual([4, 5])
+
     // A count repeats the text; the caret still follows all of it.
     input.setSelectionRange(0, 0)
+
     press('g', 'P')
     press('2', 'g', 'p')
+
     expect(node().text).toBe('XYaXYXYbXXYYcd')
     // The insertion point was after `a` (index 3), and four characters went in.
     expect(caretRequests.at(-1)).toBe(7)
     expect(vim.mode).toBe('normal')
+
     store.undo()
+
     expect(node().text).toBe('XYabXXYYcd')
     expect(vim.register.current).toEqual({ kind: 'text', value: 'XY' })
   })
@@ -3054,10 +3380,15 @@ describe('editor keyboard handler', () => {
     const { node, input, press, vim, caretRequests } = await textFixture({ id: 'node', text: 'abcd', children: [] })
     input.setSelectionRange(0, 0)
     vim.register.current = { kind: 'text', value: 'X' }
+
     press('g', 'p')
+
     expect(node().text).toBe('aXbcd')
+
     input.setSelectionRange(3, 3)
+
     press('.')
+
     expect(node().text).toBe('aXbcXd')
     expect(caretRequests.at(-1)).toBe(5)
   })
@@ -3066,7 +3397,9 @@ describe('editor keyboard handler', () => {
     const { node, input, press, vim, caretRequests } = await textFixture({ id: 'node', text: 'abc', children: [] })
     input.setSelectionRange(2, 2)
     vim.register.current = { kind: 'text', value: 'XY' }
+
     press('g', 'p')
+
     expect(node().text).toBe('abcXY')
     expect(caretRequests).toEqual([4])
   })
@@ -3080,7 +3413,9 @@ describe('editor keyboard handler', () => {
     })
     input.setSelectionRange(2, 2)
     vim.register.current = { kind: 'text', value: 'XY' }
+
     press('g', 'p')
+
     expect(node().text).toBe('abcXY')
     expectImageCaret(caretNodeId, caret, 'node', true)
   })
@@ -3104,17 +3439,24 @@ describe('editor keyboard handler', () => {
     }
     const { store, snapshot, press, vim } = await textFixture(treeDocument.roots[0]!.children[0]!, 'normal', options)
     vim.register.current = { kind: 'node', value: { id: 'src', text: 'Put', children: [] }, sourceIds: ['src'] }
+
     press('g', 'p')
+
     // `second` follows the inserted copy.
     expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['First', 'Put', 'Second'])
     expect(snapshot().location.selectedNodeId).toBe('second')
+
     store.undo()
+
     expect(snapshot().document).toEqual(treeDocument)
+
     // `gP` puts before `first`, which then follows the copy.
     store.selectNode('first', 0)
     press('g', 'P')
+
     expect(snapshot().document.roots[0]!.children.map(({ text }) => text)).toEqual(['Put', 'First', 'Second'])
     expect(snapshot().location.selectedNodeId).toBe('first')
+
     store.undo()
     // A counted forest put after the last sibling selects the last inserted copy.
     vim.register.current = {
@@ -3127,12 +3469,16 @@ describe('editor keyboard handler', () => {
         sourceIds: ['x', 'y'],
       },
     }
+
     store.selectNode('second', 0)
     press('2', 'g', 'p')
     const children = snapshot().document.roots[0]!.children
+
     expect(children.map(({ text }) => text)).toEqual(['First', 'Second', 'X', 'Y', 'X', 'Y'])
     expect(snapshot().location.selectedNodeId).toBe(children[5]!.id)
+
     store.undo()
+
     expect(snapshot().document).toEqual(treeDocument)
   })
 
@@ -3140,7 +3486,9 @@ describe('editor keyboard handler', () => {
     const { input, press, snapshot, caretRequests } = await textFixture({ id: 'node', text: 'abc', children: [] })
     input.setSelectionRange(1, 1)
     const original = snapshot()
+
     press('g', 'p')
+
     expect(snapshot().document).toEqual(original.document)
     expect(caretRequests).toEqual([])
   })
@@ -3154,7 +3502,9 @@ describe('editor keyboard handler', () => {
       location: { currentParentId: 'root', selectedNodeId: 'root' },
     })
     vim.register.current = { kind: 'node', value: { id: 'src', text: 'Put', children: [] }, sourceIds: ['src'] }
+
     press('g', 'p')
+
     expect(snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual(['Put', 'Child'])
     expect(snapshot().location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
   })
@@ -3180,8 +3530,10 @@ describe('editor keyboard handler', () => {
                 f.vim.commandState.lastChange = { kind: 'delete', motion: 'w', count: 1 }
                 f.vim.register.current = { kind: 'text', value: 'kept' }
               }
+
               fast.press(String(count), key)
               slow.press(...String(count * 10), key.toLowerCase())
+
               expect(fast.snapshot().location).toEqual(slow.snapshot().location)
               expect(fast.snapshot().focus).toEqual(slow.snapshot().focus)
               expect(fast.caret()).toEqual(slow.caret())
@@ -3200,14 +3552,21 @@ describe('editor keyboard handler', () => {
       const n = { id: 'node', text: 'aJbKc', children: [] }
       const visual = await textFixture(n, 'visual')
       visual.input.setSelectionRange(1, 4)
+
       visual.press('2', key)
+
       expect([visual.input.selectionStart, visual.input.selectionEnd]).toEqual([1, 4])
       expect(visual.vim.mode).toBe('visual')
+
       const f = await textFixture(n)
       f.input.setSelectionRange(0, 0)
+
       f.press('f', key)
+
       expect(f.input.selectionStart).toBe(key === 'J' ? 1 : 3)
+
       f.press('r', key)
+
       expect(f.snapshot().document.roots[0]!.text).toBe(n.text)
     })
 
@@ -3218,7 +3577,9 @@ describe('editor keyboard handler', () => {
       ]
       const f = await textFixture(roots[0]!, 'normal', { document: { roots } })
       const before = f.snapshot()
+
       f.press(...keys)
+
       expect(f.snapshot().location).toEqual(before.location)
       expect(f.snapshot().document).toBe(before.document)
       expect(f.vim.commandState.pending).toBeUndefined()
@@ -3249,7 +3610,9 @@ describe('editor keyboard handler', () => {
     it('joins with the next sibling without changing whitespace for gJ', async () => {
       const { press, snapshot, vim } = await fixture('a')
       vim.register.current = { kind: 'text', value: 'kept' }
+
       press('g', 'J')
+
       expect(snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
       expect(snapshot().location.selectedNodeId).toBe('a')
       expect(vim.register.current).toEqual({ kind: 'text', value: 'kept' })
@@ -3259,33 +3622,52 @@ describe('editor keyboard handler', () => {
 
     it('keeps the texts unchanged for gJ and applies a count', async () => {
       const gj = await fixture('a')
+
       gj.press('g', 'J')
+
       expect(gj.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
+
       const counted = await fixture('a')
+
       counted.press('3', 'g', 'J')
+
       expect(counted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    betagamma'])
+
       const gCounted = await fixture('a')
+
       gCounted.press('3', 'g', 'J')
+
       expect(gCounted.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    betagamma'])
+
       // `1gJ` still joins two nodes, and a count past the end clamps at the last sibling.
       const one = await fixture('a')
+
       one.press('1', 'g', 'J')
+
       expect(one.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha    beta', 'gamma'])
+
       const clamped = await fixture('b')
+
       clamped.press('9', 'g', 'J')
+
       expect(clamped.snapshot().document.roots.map((root) => root.text)).toEqual(['alpha  ', '  betagamma'])
     })
 
     it('does nothing on the last sibling or the current-parent heading, and discards the pending count', async () => {
       const last = await fixture('c')
       const before = last.snapshot().document
+
       last.press('J')
       last.press('g', 'J')
+
       expect(last.snapshot().document).toBe(before)
       expect(last.vim.commandState.pending).toBeUndefined()
+
       const heading = await fixture('a', { currentParentId: 'a', selectedNodeId: 'a' })
       const headingBefore = heading.snapshot().document
+
       heading.press('g', 'J')
+
       expect(heading.snapshot().document).toBe(headingBefore)
     })
 
@@ -3293,11 +3675,15 @@ describe('editor keyboard handler', () => {
       const { press, snapshot, vim } = await fixture('a')
       const saved = { kind: 'delete', motion: 'w', count: 1 } as const
       vim.commandState.lastChange = saved
+
       press('d', 'J')
+
       expect(snapshot().document.roots).toHaveLength(3)
       expect(vim.commandState.pending).toBeUndefined()
       expect(vim.commandState.lastChange).toBe(saved)
+
       press('g', 'J')
+
       expect(snapshot().document.roots.length).toBeLessThan(3)
       expect(vim.commandState.lastChange).toEqual({ kind: 'structural-join', span: 2, spaced: false })
     })
@@ -3308,7 +3694,9 @@ describe('editor keyboard handler', () => {
       const { press, vim } = await textFixture({ id: 'node', text: 'abc', children: [] })
       const saved = { kind: 'delete', motion: 'w', count: 1 } as const
       vim.commandState.lastChange = saved
+
       press('g', 'v')
+
       expect(vim.restoreVisual).toHaveBeenCalledTimes(1)
       expect(vim.commandState.pending).toBeUndefined()
       expect(vim.commandState.lastChange).toBe(saved)
@@ -3316,17 +3704,24 @@ describe('editor keyboard handler', () => {
 
     it('is neither a continuation of an operator nor a Visual-mode command', async () => {
       const { press, vim } = await textFixture({ id: 'node', text: 'abc', children: [] })
+
       press('d', 'g', 'v')
+
       expect(vim.restoreVisual).not.toHaveBeenCalled()
+
       const visual = await textFixture({ id: 'node', text: 'abc', children: [] }, 'visual')
+
       visual.press('g', 'v')
+
       expect(visual.vim.restoreVisual).not.toHaveBeenCalled()
     })
 
     it('remembers a character Visual selection written by v, a motion, a text object, and o', async () => {
       const { input, press, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
       input.setSelectionRange(1, 1)
+
       press('v')
+
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
         nodeId: 'node',
@@ -3334,7 +3729,9 @@ describe('editor keyboard handler', () => {
         focus: 1,
         hadText: true,
       })
+
       press('l')
+
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
         nodeId: 'node',
@@ -3342,7 +3739,9 @@ describe('editor keyboard handler', () => {
         focus: 2,
         hadText: true,
       })
+
       press('o')
+
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
         nodeId: 'node',
@@ -3350,7 +3749,9 @@ describe('editor keyboard handler', () => {
         focus: 1,
         hadText: true,
       })
+
       press('i', 'w')
+
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
         nodeId: 'node',
@@ -3358,7 +3759,9 @@ describe('editor keyboard handler', () => {
         focus: 2,
         hadText: true,
       })
+
       press('Escape')
+
       expect(vim.commandState.visualAnchor).toBeUndefined()
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
@@ -3373,7 +3776,9 @@ describe('editor keyboard handler', () => {
       const { input, press, vim } = await textFixture({ id: 'node', text: 'red blue', children: [] }, 'visual')
       vim.register.current = { kind: 'text', value: 'green' }
       input.setSelectionRange(4, 8)
+
       press('p')
+
       expect(vim.commandState.lastVisual).toEqual({
         kind: 'text',
         nodeId: 'node',
@@ -3393,9 +3798,12 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(1, 1)
     const original = snapshot()
     const [after, before] = press('p', 'P')
+
     expect(snapshot().document).toEqual(original.document)
     expect(snapshot().location).toEqual(original.location)
+
     store.undo()
+
     expect(snapshot().document).toEqual(original.document)
     expect(input.selectionStart).toBe(1)
     expect(vim.mode).toBe('normal')
@@ -3422,15 +3830,25 @@ describe('editor keyboard handler', () => {
   it('supports WORD and backward word-end motions with operators', async () => {
     const { input, press, node, store } = await textFixture({ id: 'node', text: 'foo.bar  baz qux', children: [] })
     input.setSelectionRange(0, 0)
+
     press('W')
+
     expect(input.selectionStart).toBe(9)
+
     press('E')
+
     expect(input.selectionStart).toBe(11)
+
     press('g', 'e')
+
     expect(input.selectionStart).toBe(6)
+
     press('d', 'W')
+
     expect(node().text).toBe('foo.babaz qux')
+
     store.undo()
+
     expect(node().text).toBe('foo.bar  baz qux')
   })
 
@@ -3442,8 +3860,11 @@ describe('editor keyboard handler', () => {
     const { handle, vim } = vimHandler(store, { id: 'node', text: input.value, children: [] })
 
     for (const key of ['f', '.', ';']) handle(keyEvent(input, key))
+
     expect(input.selectionStart).toBe(3)
+
     handle(keyEvent(input, ','))
+
     expect(input.selectionStart).toBe(1)
     expect(vim.commandState.lastFind).toEqual({ kind: 'f', character: '.' })
   })
@@ -3456,11 +3877,15 @@ describe('editor keyboard handler', () => {
       children: [{ id: 'child', text: 'child', children: [] }],
     }
     const fixture = await textFixture(original)
+
     fixture.press(...keys)
+
     expect(fixture.node()).toEqual({ ...original, text: '' })
     expect(fixture.snapshot().location).toEqual({ currentParentId: null, selectedNodeId: 'node' })
     expect(fixture.vim.mode).toBe('insert')
+
     fixture.store.undo()
+
     expect(fixture.node()).toEqual(original)
   })
 
@@ -3473,13 +3898,19 @@ describe('editor keyboard handler', () => {
     const fixture = await textFixture({ id: 'node', text: 'aBcD', children: [] })
     fixture.vim.register.current = { kind: 'text', value: 'xy' }
     fixture.input.setSelectionRange(cursor, cursor)
+
     fixture.press(...keys)
+
     expect(fixture.node().text).toBe(text)
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
     expect(fixture.vim.mode).toBe('normal')
+
     fixture.store.undo()
+
     expect(fixture.node().text).toBe('aBcD')
+
     fixture.store.redo()
+
     expect(fixture.node().text).toBe(text)
   })
 
@@ -3491,14 +3922,20 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 2)
     vim.commandState.visualAnchor = 0
     vim.commandState.visualFocus = 1
+
     press('o')
+
     expect(vim.commandState.visualAnchor).toBe(1)
     expect(vim.commandState.visualFocus).toBe(0)
+
     press('u')
+
     expect(node().text).toBe('abCd')
     expect(vim.mode).toBe('normal')
     expect(caretRequests.at(-1)).toBe(0)
+
     store.undo()
+
     expect(node().text).toBe('AbCd')
   })
 
@@ -3514,11 +3951,15 @@ describe('editor keyboard handler', () => {
     fixture.vim.commandState.visualAnchor = 1
     fixture.vim.commandState.visualFocus = 2
     fixture.input.setSelectionRange(1, 3)
+
     fixture.press(key)
+
     expect(fixture.node().text).toBe(text)
     expect(fixture.vim.mode).toBe(mode)
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
+
     fixture.store.undo()
+
     expect(fixture.node().text).toBe('AbCd')
   })
 
@@ -3531,11 +3972,15 @@ describe('editor keyboard handler', () => {
     fixture.vim.commandState.visualAnchor = 1
     fixture.vim.commandState.visualFocus = 2
     fixture.input.setSelectionRange(1, 3)
+
     fixture.press('3', key)
+
     expect(fixture.node().text).toBe('AZZZZZZd')
     expect(fixture.vim.mode).toBe('normal')
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: register })
+
     fixture.store.undo()
+
     expect(fixture.node().text).toBe('AbCd')
   })
 
@@ -3546,7 +3991,9 @@ describe('editor keyboard handler', () => {
     fixture.vim.commandState.visualFocus = 2
     fixture.input.setSelectionRange(1, 3)
     vi.spyOn(fixture.store, 'replaceTextRange').mockReturnValue(false)
+
     fixture.press('p')
+
     expect(fixture.node().text).toBe('AbCd')
     expect(fixture.vim.mode).toBe('visual')
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'ZZ' })
@@ -3559,7 +4006,9 @@ describe('editor keyboard handler', () => {
       const fixture = await textFixture({ id: 'node', text: 'AbCd', children: [] }, 'visual')
       fixture.vim.register.current = register
       fixture.input.setSelectionRange(1, 3)
+
       fixture.press('p')
+
       expect(fixture.node().text).toBe('AbCd')
       expect(fixture.vim.mode).toBe('visual')
       expect(fixture.vim.register.current).toEqual(register)
@@ -3583,6 +4032,7 @@ describe('editor keyboard handler', () => {
       selection: vi.fn(() => undefined),
     }
     for (const key of ['3', 'p', '2', 'P', '4', 'd', 'p']) handle(keyEvent(input, key))
+
     expect(command.mock.calls).toEqual([['p', 3], ['P', 2], ['d'], ['p', 1]])
   })
 
@@ -3593,6 +4043,7 @@ describe('editor keyboard handler', () => {
     lower.vim.commandState.visualFocus = 1
 
     lower.press('u')
+
     expect(lower.node().text).toBe('abcde')
     expect(lower.vim.mode).toBe('normal')
     expect(lower.caretRequests).toEqual([1])
@@ -3604,8 +4055,10 @@ describe('editor keyboard handler', () => {
     upper.vim.commandState.visualFocus = 1
 
     upper.press('U')
+
     expect(upper.node().text).toBe('AB')
     expect(upper.caretRequests).toEqual([0])
+
     const image = await textFixture(
       { id: 'node', text: 'ab', attachment: { id: 'image', mimeType: 'image/png' }, children: [] },
       'visual',
@@ -3615,6 +4068,7 @@ describe('editor keyboard handler', () => {
     image.vim.commandState.visualFocus = 1
 
     image.press('u')
+
     expect(image.node().text).toBe('ab')
     expect(image.node().attachment?.id).toBe('image')
     expect(image.caretRequests).toEqual([0])
@@ -3627,12 +4081,16 @@ describe('editor keyboard handler', () => {
     fixture.vim.commandState.visualAnchor = 3
     fixture.vim.commandState.visualFocus = 1
     fixture.vim.register.current = { kind: 'text', value: 'keep' }
+
     fixture.press('~')
+
     expect(fixture.node().text).toBe('abCde')
     expect(fixture.vim.mode).toBe('normal')
     expect(fixture.caretRequests).toEqual([1])
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
+
     fixture.store.undo()
+
     expect(fixture.node().text).toBe('aBcDe')
   })
 
@@ -3659,19 +4117,24 @@ describe('editor keyboard handler', () => {
     const fixture = await textFixture({ id: 'node', text, children: [] })
     fixture.input.setSelectionRange(cursor, cursor)
     fixture.vim.register.current = { kind: 'text', value: 'keep' }
+
     fixture.press(...keys)
+
     expect(fixture.node().text).toBe(expected)
     expect(fixture.vim.mode).toBe('normal')
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
     expect(fixture.vim.commandState.pending).toBeUndefined()
     if (expected !== text) expect(fixture.caretRequests.at(-1)).toBe(caret)
+
     fixture.store.undo()
+
     expect(fixture.node().text).toBe(text)
   })
 
   it('leaves the document and the repeatable change alone for a case operator that matches nothing', async () => {
     const fixture = await textFixture({ id: 'node', text: 'ABC', children: [] })
     fixture.input.setSelectionRange(0, 0)
+
     fixture.press('x')
     const last = fixture.vim.commandState.lastChange
     fixture.input.setSelectionRange(0, 0)
@@ -3684,23 +4147,32 @@ describe('editor keyboard handler', () => {
       ['g', 'U', 'x'],
     ])
       fixture.press(...keys)
+
     expect(fixture.node().text).toBe('BC')
     expect(fixture.vim.commandState.lastChange).toBe(last)
     expect(fixture.vim.commandState.pending).toBeUndefined()
+
     const empty = await textFixture({ id: 'node', text: '', children: [] })
+
     empty.press('g', 'U', 'U')
+
     expect(empty.node().text).toBe('')
   })
 
   it('cancels a case operator instead of reading the next g as a prefix command', async () => {
     const fixture = await textFixture({ id: 'node', text: 'ab cd', children: [] })
     fixture.input.setSelectionRange(3, 3)
+
     fixture.press('g', 'U', 'g', 'g')
+
     expect(fixture.node().text).toBe('ab cd')
     expect(fixture.vim.commandState.pending).toBeUndefined()
+
     for (const operator of ['U', 'u', '~']) {
       vi.spyOn(fixture.store, 'enter')
+
       fixture.press('g', operator, 'g', 'd')
+
       expect(fixture.store.enter).not.toHaveBeenCalled()
       expect(fixture.node().text).toBe('ab cd')
       expect(fixture.vim.commandState.pending).toBeUndefined()
@@ -3710,13 +4182,17 @@ describe('editor keyboard handler', () => {
   it('keeps the repeatable change when a Visual case command changes nothing', async () => {
     const fixture = await textFixture({ id: 'node', text: 'abCD', children: [] })
     fixture.input.setSelectionRange(0, 0)
+
     fixture.press('x')
     const last = fixture.vim.commandState.lastChange
+
     fixture.vim.setMode('visual')
     fixture.vim.commandState.visualAnchor = 1
     fixture.vim.commandState.visualFocus = 2
     fixture.input.setSelectionRange(1, 3)
+
     fixture.press('U')
+
     expect(fixture.node().text).toBe('bCD')
     expect(fixture.vim.mode).toBe('normal')
     expect(fixture.vim.commandState.lastChange).toBe(last)
@@ -3725,10 +4201,15 @@ describe('editor keyboard handler', () => {
   it('records a case operator for repeat and replays it at the caret', async () => {
     const fixture = await textFixture({ id: 'node', text: 'ab cd ef', children: [] })
     fixture.input.setSelectionRange(0, 0)
+
     fixture.press('g', 'U', 'w')
+
     expect(fixture.node().text).toBe('AB cd ef')
+
     fixture.input.setSelectionRange(3, 3)
+
     fixture.press('.')
+
     expect(fixture.node().text).toBe('AB CD ef')
   })
 
@@ -3747,14 +4228,21 @@ describe('editor keyboard handler', () => {
     }
     const fixture = await textFixture(original)
     fixture.input.setSelectionRange(0, 0)
+
     // A link's text is its URL, so the case command rewrites around it and shifts the link when
     // an earlier character grows (`ß` to `SS`).
     fixture.press('g', 'U', 'U')
+
     expect(fixture.node()).toEqual(upper)
+
     fixture.store.undo()
+
     expect(fixture.node()).toEqual(original)
+
     fixture.input.setSelectionRange(0, 0)
+
     fixture.press('g', '~', '~')
+
     expect(fixture.node()).toEqual({ ...upper, text: 'SS SEE https://Example.test/Path NOW' })
   })
 
@@ -3767,23 +4255,31 @@ describe('editor keyboard handler', () => {
     }
     const fixture = await textFixture(original)
     fixture.input.setSelectionRange(2, 2)
+
     fixture.press('g', 'U', 'w')
+
     expect(fixture.node().text).toBe('ab')
   })
 
   it('yanks to the end of the text with Y without replacing the repeatable change', async () => {
     const fixture = await textFixture({ id: 'node', text: 'foo bar', children: [] })
     fixture.input.setSelectionRange(0, 0)
+
     fixture.press('x')
     const last = fixture.vim.commandState.lastChange
     fixture.input.setSelectionRange(3, 3)
+
     fixture.press('Y')
+
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'bar' })
     expect(fixture.node().text).toBe('oo bar')
     expect(fixture.vim.commandState.lastChange).toBe(last)
     expect(fixture.vim.mode).toBe('normal')
+
     fixture.input.setSelectionRange(4, 4)
+
     fixture.press('2', 'Y')
+
     expect(fixture.vim.register.current).toEqual({ kind: 'text', value: 'ar' })
   })
 
@@ -3796,11 +4292,16 @@ describe('editor keyboard handler', () => {
     })
     image.vim.register.current = { kind: 'text', value: 'keep' }
     image.input.setSelectionRange(2, 2)
+
     image.press('Y')
+
     expect(image.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
+
     const empty = await textFixture({ id: 'node', text: '', children: [] })
     empty.vim.register.current = { kind: 'text', value: 'keep' }
+
     empty.press('Y')
+
     expect(empty.vim.register.current).toEqual({ kind: 'text', value: 'keep' })
   })
 
@@ -3877,7 +4378,9 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 0)
     const { handle } = handler(store, { id: 'node', text: 'Bugfixes', children: [] })
     const event = keyEvent(input, 'Backspace')
+
     handle(event)
+
     expect(store.deletePreviousEmpty).toHaveBeenCalledWith(0)
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
@@ -3896,7 +4399,9 @@ describe('editor keyboard handler', () => {
       input.value = 'Bugfixes'
       input.setSelectionRange(start, end, 'backward')
       const { handle } = handler(store, { id: 'node', text: 'Bugfixes', children: [] })
+
       handle(keyEvent(input, 'Backspace', options))
+
       expect(store.deletePreviousEmpty).not.toHaveBeenCalled()
     },
   )
@@ -3909,7 +4414,9 @@ describe('editor keyboard handler', () => {
     input.setSelectionRange(0, 0)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'Current', children: [] })
     vim.mode = 'insert'
+
     handle(keyEvent(input, 'Backspace'))
+
     expect(vim.finishInsert).toHaveBeenCalledTimes(removed ? 1 : 0)
     expect(vim.setMode).not.toHaveBeenCalled()
   })
@@ -3928,15 +4435,18 @@ describe('editor keyboard handler', () => {
     const { handle, setSelectAllNodeId } = handler(store, node)
 
     const selectAllEvent = keyEvent(input, 'a', { metaKey: true })
+
     handle(selectAllEvent)
     await Promise.resolve()
     const selection = window.getSelection()!
     const range = document.createRange()
+
     range.selectNodeContents(input)
     range.collapse(false)
     selection.removeAllRanges()
     selection.addRange(range)
     const deleteEvent = keyEvent(input, 'Backspace')
+
     handle(deleteEvent)
 
     expect(selectAllEvent.preventDefault).toHaveBeenCalledOnce()
@@ -3953,6 +4463,7 @@ describe('editor keyboard handler', () => {
     const { handle, setSelectAllNodeId } = handler(store, { id: 'node', text: 'plain text', children: [] })
 
     const event = keyEvent(input, 'a', { metaKey: true })
+
     handle(event)
     await Promise.resolve()
 
@@ -3971,6 +4482,7 @@ describe('editor keyboard handler', () => {
 
     const copyEvent = keyEvent(input, 'c', { metaKey: true })
     const cutEvent = keyEvent(input, 'x', { metaKey: true })
+
     handle(copyEvent)
     handle(cutEvent)
 
@@ -3990,10 +4502,13 @@ describe('editor keyboard handler', () => {
     const { handle } = handler(store, node())
 
     const event = keyEvent(input, 'c', { metaKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
+
     await vi.waitFor(() => expect(clipboard.written?.text).toBe('text'))
+
     expect(node().text).toBe('text')
   })
 
@@ -4007,12 +4522,17 @@ describe('editor keyboard handler', () => {
     const { handle } = handler(store, node())
 
     const event = keyEvent(input, 'x', { metaKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
+
     await vi.waitFor(() => expect(node().text).toBe(''))
+
     expect(clipboard.written?.text).toBe('text')
+
     store.undo()
+
     expect(node().text).toBe('text')
   })
 
@@ -4027,11 +4547,15 @@ describe('editor keyboard handler', () => {
     const { handle } = handler(store, node())
 
     const event = keyEvent(input, 'v', { metaKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
+
     await vi.waitFor(() => expect(node().text).toBe('teXYxt'))
+
     store.undo()
+
     expect(node().text).toBe('text')
   })
 
@@ -4041,6 +4565,7 @@ describe('editor keyboard handler', () => {
     const { handle, onPreviewAttachment } = handler(store, { id: 'node', text: 'text', children: [] })
 
     const event = keyEvent(input, 'y', { metaKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -4075,6 +4600,7 @@ describe('editor keyboard handler', () => {
     const { handle } = handler(store, { id: 'node', text: 'text', children: [] })
 
     const event = keyEvent(input, '0', { metaKey: true })
+
     handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -4106,6 +4632,7 @@ describe('editor keyboard handler', () => {
 
     const left = keyEvent(input, 'ArrowLeft')
     const right = keyEvent(input, 'ArrowRight')
+
     handle(left)
     handle(right)
 
@@ -4124,6 +4651,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input, document.createElement('button'))
     document.body.append(row)
     const node = {
@@ -4138,21 +4666,26 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'l'))
     handle(keyEvent(input, 'l'))
     handle(keyEvent(input, 'l'))
+
     expect(input.selectionStart).toBe(6)
     expect(input.selectionEnd).toBe(6)
     expectImageCaret(caretNodeId, caret, 'node', true)
 
     const enter = keyEvent(input, 'Enter')
+
     handle(enter)
+
     expect(onPreviewAttachment).toHaveBeenCalledOnce()
     expect(onPreviewAttachment).toHaveBeenCalledWith('image')
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
     expect(enter.preventDefault).toHaveBeenCalledOnce()
 
     handle(keyEvent(input, 'h'))
+
     expect(input.selectionStart).toBe(5)
     expect(input.selectionEnd).toBe(6)
     expectImageCaret(caretNodeId, caret, 'node', false)
+
     row.remove()
   })
 
@@ -4164,6 +4697,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input)
     document.body.append(row)
     const node = {
@@ -4181,6 +4715,7 @@ describe('editor keyboard handler', () => {
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(2)
     expectImageCaret(caretNodeId, caret, 'node', false)
+
     row.remove()
   })
 
@@ -4192,6 +4727,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input)
     document.body.append(row)
     const node = {
@@ -4203,15 +4739,18 @@ describe('editor keyboard handler', () => {
     const { handle, caret, caretNodeId } = vimHandler(store, node)
 
     handle(keyEvent(input, 'j'))
+
     expect(input.selectionStart).toBe(4)
     expect(store.moveSelection).not.toHaveBeenCalled()
     expectImageCaret(caretNodeId, caret, 'node', true)
 
     handle(keyEvent(input, 'k'))
+
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(2)
     expect(store.moveSelection).not.toHaveBeenCalled()
     expectImageCaret(caretNodeId, caret, 'node', false)
+
     row.remove()
   })
 
@@ -4225,8 +4764,10 @@ describe('editor keyboard handler', () => {
     const first = await textFixture(image)
     const initialFocus = first.snapshot().focus
     first.input.setSelectionRange(4, 4)
+
     first.input.classList.add('node-input-image-caret')
     first.press('j')
+
     expect(first.snapshot().location.selectedNodeId).toBe('node')
     expect(first.snapshot().focus).toEqual(initialFocus)
     expectImageCaret(first.caretNodeId, first.caret, 'node', true)
@@ -4241,7 +4782,9 @@ describe('editor keyboard handler', () => {
       document: { roots: [{ id: 'previous', text: 'Previous', children: [] }, imageOnly] },
       location: { currentParentId: null, selectedNodeId: 'image-only' },
     })
+
     second.press('k')
+
     expect(second.snapshot().location.selectedNodeId).toBe('previous')
     expect(second.snapshot().focus).toMatchObject({ nodeId: 'previous', cursor: 0 })
     expectImageCaret(second.caretNodeId, second.caret, 'previous', false)
@@ -4255,6 +4798,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input)
     document.body.append(row)
     const { handle, vim, caret, caretNodeId } = vimHandler(store, {
@@ -4266,13 +4810,17 @@ describe('editor keyboard handler', () => {
 
     handle(keyEvent(input, '9'))
     handle(keyEvent(input, 'l'))
+
     expect(input.selectionStart).toBe(4)
     expect(vim.imageTextCursor.current).toBe(3)
+
     input.classList.add('node-input-image-caret')
     handle(keyEvent(input, 'h'))
+
     expect(input.selectionStart).toBe(3)
     expect(input.selectionEnd).toBe(4)
     expectImageCaret(caretNodeId, caret, 'node', false)
+
     row.remove()
   })
 
@@ -4287,6 +4835,7 @@ describe('editor keyboard handler', () => {
     })
 
     handle(keyEvent(input, 'l'))
+
     expect(vim.imageTextCursor.current).toBeUndefined()
     expect(input.selectionStart).toBe(0)
     expectImageCaret(caretNodeId, caret, 'node', true)
@@ -4303,8 +4852,10 @@ describe('editor keyboard handler', () => {
       document: { roots: [image, { id: 'next', text: 'Next', children: [] }] },
     })
     input.setSelectionRange(3, 3)
+
     input.classList.add('node-input-image-caret')
     press('j')
+
     expect(snapshot().location.selectedNodeId).toBe('next')
     expect(snapshot().focus).toMatchObject({ nodeId: 'next', cursor: 0 })
     expectImageCaret(caretNodeId, caret, 'next', false)
@@ -4316,6 +4867,7 @@ describe('editor keyboard handler', () => {
     const row = document.createElement('div')
     row.className = 'node-row'
     row.dataset.hasAttachment = 'true'
+
     row.append(input, document.createElement('button'))
     document.body.append(row)
     const { handle, onPreviewAttachment } = vimHandler(store, {
@@ -4329,6 +4881,7 @@ describe('editor keyboard handler', () => {
 
     expect(onPreviewAttachment).toHaveBeenCalledWith('image')
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
+
     row.remove()
   })
 
@@ -4343,14 +4896,18 @@ describe('editor keyboard handler', () => {
 
     const firstChar = keyEvent(input, 'Enter')
     input.setSelectionRange(1, 1)
+
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(firstChar)
+
     expect(open).toHaveBeenCalledWith(url, '_blank')
     expect(firstChar.preventDefault).toHaveBeenCalledOnce()
 
     open.mockClear()
     const lastChar = keyEvent(input, 'Enter')
     input.setSelectionRange(url.length, url.length)
+
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(lastChar)
+
     expect(open).toHaveBeenCalledWith(url, '_blank')
 
     open.mockRestore()
@@ -4366,11 +4923,14 @@ describe('editor keyboard handler', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
 
     input.setSelectionRange(0, 0)
+
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(keyEvent(input, 'Enter'))
     input.setSelectionRange(1 + url.length, 1 + url.length)
+
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(keyEvent(input, 'Enter'))
 
     expect(open).not.toHaveBeenCalled()
+
     open.mockRestore()
   })
 
@@ -4385,6 +4945,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'Enter'))
 
     expect(open).not.toHaveBeenCalled()
+
     open.mockRestore()
   })
 
@@ -4403,6 +4964,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'Enter'))
 
     expect(open).not.toHaveBeenCalled()
+
     open.mockRestore()
   })
 
@@ -4420,6 +4982,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'Enter'))
 
     expect(open).not.toHaveBeenCalled()
+
     open.mockRestore()
   })
 
@@ -4466,7 +5029,9 @@ describe('Agenda split and sibling keys', () => {
   it('splits a direct match at the caret in standard editing without running the Tree split', () => {
     const store = agendaStore()
     const event = keyEvent(input(), 'Enter')
+
     handler(store, node).handle(event)
+
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
@@ -4474,12 +5039,17 @@ describe('Agenda split and sibling keys', () => {
 
   it('splits in Vim Insert and keeps Enter inert in Replace and Visual modes', () => {
     const store = agendaStore()
+
     vimHandler(store, node, 'insert').handle(keyEvent(input(), 'Enter'))
+
     expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
+
     for (const mode of ['replace', 'visual', 'visual-node'] as const) {
       const inert = agendaStore()
       const event = keyEvent(input(), 'Enter')
+
       vimHandler(inert, node, mode).handle(event)
+
       expect(event.preventDefault).toHaveBeenCalled()
       expect(inert.splitAgendaNode).not.toHaveBeenCalled()
       expect(inert.createSiblingOrFirstChild).not.toHaveBeenCalled()
@@ -4498,6 +5068,7 @@ describe('Agenda split and sibling keys', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     try {
       keyboard.handle(keyEvent(element, 'Enter'))
+
       expect(open).toHaveBeenCalledWith('https://example.com', '_blank')
       expect(store.splitAgendaNode).not.toHaveBeenCalled()
       expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
@@ -4518,8 +5089,10 @@ describe('Agenda split and sibling keys', () => {
     const keyboard = vimHandler(store, attached, 'normal')
     const element = input()
     element.setSelectionRange(4, 4)
+
     keyboard.vim.applyCaretState(node.id, { cursor: 4, imageActive: true }, false, 'preserve-selection')
     keyboard.handle(keyEvent(element, 'Enter'))
+
     expect(keyboard.onPreviewAttachment).toHaveBeenCalledWith('image')
     expect(store.splitAgendaNode).not.toHaveBeenCalled()
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
@@ -4529,7 +5102,9 @@ describe('Agenda split and sibling keys', () => {
   it('does nothing on a contextual ancestor', () => {
     const store = agendaStore('context')
     const event = keyEvent(input(), 'Enter')
+
     handler(store, node).handle(event)
+
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(store.splitAgendaNode).not.toHaveBeenCalled()
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
@@ -4541,7 +5116,9 @@ describe('Agenda split and sibling keys', () => {
   ] as const)('%s opens a dated sibling and enters Insert without the Tree commands', (pressed, position) => {
     const store = agendaStore()
     const { handle, vim } = vimHandler(store, node, 'normal')
+
     handle(keyEvent(input(), pressed))
+
     expect(store.createAgendaSibling).toHaveBeenCalledWith(position)
     expect(store.createSibling).not.toHaveBeenCalled()
     expect(vim.mode).toBe('insert')
@@ -4580,8 +5157,10 @@ describe('Agenda split and sibling keys', () => {
       const keyboard = vimHandler(store, node, 'normal')
       keyboard.vim.register.current = register
       const element = input()
+
       keyboard.handle(keyEvent(element, 'd'))
       keyboard.handle(keyEvent(element, 'd'))
+
       expect(store.startAgendaMove).toHaveBeenCalledWith(1)
       expect(store.deleteSiblingRange).not.toHaveBeenCalled()
       expect(keyboard.vim.register.current).toBe(register)
@@ -4592,13 +5171,17 @@ describe('Agenda split and sibling keys', () => {
       const counted = pendingStore(false)
       const first = vimHandler(counted, node, 'normal')
       first.commandState.pending = { count: '3', motionCount: '', operator: 'd' }
+
       first.handle(keyEvent(input(), 'd'))
+
       expect(counted.startAgendaMove).toHaveBeenCalledWith(3)
 
       const motion = pendingStore(false)
       const second = vimHandler(motion, node, 'normal')
       second.commandState.pending = { count: '2', motionCount: '3', operator: 'd' }
+
       second.handle(keyEvent(input(), 'd'))
+
       expect(motion.startAgendaMove).toHaveBeenCalledWith(6)
     })
 
@@ -4606,7 +5189,9 @@ describe('Agenda split and sibling keys', () => {
       const store = pendingStore(true)
       const keyboard = vimHandler(store, node, 'normal')
       keyboard.vim.register.current = { kind: 'node', value: node, sourceIds: ['node'] }
+
       keyboard.handle(keyEvent(input(), pressed))
+
       expect(store.putAgendaMove).toHaveBeenCalledOnce()
       expect(store.pasteSubtree).not.toHaveBeenCalled()
       expect(store.pasteNodeForest).not.toHaveBeenCalled()
@@ -4622,7 +5207,9 @@ describe('Agenda split and sibling keys', () => {
         const keyboard = vimHandler(store, node, 'normal')
         keyboard.vim.register.current = register
         const event = keyEvent(input(), pressed)
+
         keyboard.handle(event)
+
         expect(event.preventDefault).toHaveBeenCalled()
         expect(store.putAgendaMove).not.toHaveBeenCalled()
         expect(store.pasteSubtree).not.toHaveBeenCalled()
@@ -4634,7 +5221,9 @@ describe('Agenda split and sibling keys', () => {
       const store = pendingStore(false)
       const keyboard = vimHandler(store, node, 'normal')
       keyboard.vim.register.current = { kind: 'text', value: 'abc' }
+
       keyboard.handle(keyEvent(input(), 'p'))
+
       expect(store.putAgendaMove).not.toHaveBeenCalled()
       expect(store.pasteSubtree).not.toHaveBeenCalled()
       expect(store.replaceTextRange).toHaveBeenCalled()
@@ -4642,18 +5231,22 @@ describe('Agenda split and sibling keys', () => {
 
     it('cancels a pending move with Escape', () => {
       const { store } = press(['Escape'])
+
       expect(store.cancelAgendaMove).toHaveBeenCalledOnce()
     })
 
     it.each(['insert', 'replace'] as const)('cancels a pending move with the Escape that leaves %s', (mode) => {
       const store = pendingStore(true)
       const keyboard = vimHandler(store, node, mode)
+
       keyboard.handle(keyEvent(input(), 'Escape'))
+
       expect(store.cancelAgendaMove).toHaveBeenCalledOnce()
     })
 
     it('leaves gp and gP structural puts inert', () => {
       const { store } = press(['g', 'p'])
+
       expect(store.putAgendaMove).not.toHaveBeenCalled()
       expect(store.pasteNodeForest).not.toHaveBeenCalled()
     })
@@ -4663,12 +5256,17 @@ describe('Agenda split and sibling keys', () => {
     const store = agendaStore()
     vi.mocked(store.createAgendaSibling).mockReturnValue(false)
     const failed = vimHandler(store, node, 'normal')
+
     failed.handle(keyEvent(input(), 'o'))
+
     expect(failed.vim.mode).toBe('normal')
+
     const counted = agendaStore()
     const { handle, vim, commandState } = vimHandler(counted, node, 'normal')
     commandState.pending = { count: '2', motionCount: '' }
+
     handle(keyEvent(input(), 'o'))
+
     expect(counted.createAgendaSibling).not.toHaveBeenCalled()
     expect(vim.mode).toBe('normal')
     expect(commandState.pending).toBeUndefined()

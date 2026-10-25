@@ -70,6 +70,7 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
       }
     })
     const page = await context.newPage()
+
     await page.route(/backup\.worker.*\.js/, async (route) => {
       const response = await route.fetch()
       const patch = `{
@@ -91,6 +92,7 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
     await page.goto(origin)
     await ready(page)
     await seedLargeProfile(page)
+
     await page.reload()
     await ready(page)
     const samples: { enabled: boolean; metrics: Record<string, number> }[] = []
@@ -100,22 +102,31 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
         const occupied = page.getByRole('dialog', { name: 'This Folder Already Contains Notes' })
         // The second enabled repetition uses the same folder, with explicit overwrite consent.
         if (index > 1) await occupied.getByRole('button', { name: 'Replace Backup with Current Notes' }).click()
+
         await expect(page.locator('#backup-status')).toContainText('Backed up', { timeout: 90_000 })
       } else if (index > 0) await chooseMenuItem(page, 'Stop Backing Up')
       const input = page.locator('[data-node-id="r0"] .node-input')
+
       await input.click()
+
       await expect(input).toBeFocused()
+
       const heading = await page.locator('.location-bar').textContent()
+
       await page.evaluate(() => {
         window.backupMeasurements = { writes: [], paints: [], saves: [] }
       })
       const stop = await watchMainThread(context, page)
       const started = Date.now()
+
       // A real input stream lasts beyond the backup interval; rapid commits are not postponed.
       await input.pressSequentially(' ordinary typing '.repeat(28), { delay: 25 })
       await page.evaluate(() => window.prototypeStore.flushPersistence())
+
       await expect(page.locator('#prototype-save-status')).toHaveText('Saved locally in this browser')
+
       const savedAt = Date.now()
+
       if (enabled) {
         await expect
           .poll(
@@ -132,12 +143,15 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
           )
           .toBe(true)
       }
+
       const backupLagMs = enabled ? Date.now() - savedAt : 0
       const elapsed = Date.now() - started
       const mainThread = await stop()
       const measured = await page.evaluate(() => window.backupMeasurements)
+
       expect(measured.paints.length).toBeGreaterThan(100)
       expect(await page.locator('.location-bar').textContent()).toBe(heading)
+
       const documentWrites = measured.writes.filter((write) => write.name === 'document.json')
       const metrics = {
         inputPaintP50Ms: percentile(measured.paints, 0.5),
@@ -149,12 +163,14 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
         bytesPerMinute: (measured.writes.reduce((sum, write) => sum + write.bytes, 0) * 60_000) / elapsed,
         ...mainThread,
       }
+
       samples.push({ enabled, metrics })
       recordPerfResult({
         kind: 'web-backup',
         scenario: `nodes-${NODE_COUNT}-images-${IMAGE_COUNT}-${enabled ? 'on' : 'off'}-${index}`,
         metrics,
       })
+
       expect(mainThread.maxLongTaskMs).toBeLessThan(LONG_TASK_CEILING_MS)
       if (enabled) {
         expect(backupLagMs).toBeLessThan(15_000)
@@ -166,6 +182,7 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
     const mean = (enabled: boolean, metric: string) =>
       samples.filter((sample) => sample.enabled === enabled).reduce((sum, sample) => sum + sample.metrics[metric]!, 0) /
       2
+
     // Compare within one alternating run; the additive allowance covers frame-scheduling noise.
     expect(mean(true, 'inputPaintP95Ms')).toBeLessThan(mean(false, 'inputPaintP95Ms') * 1.5 + 16.7)
   } finally {

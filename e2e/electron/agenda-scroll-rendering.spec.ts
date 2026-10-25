@@ -17,11 +17,14 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
       location: { currentParentId: null, selectedNodeId: 'dated-0' },
     })
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Escape')
     await window.keyboard.press(mode === 'vim' ? 'j' : 'ArrowDown')
+
     await expect(window.locator('.agenda-row[aria-selected="true"]')).toHaveAttribute('data-node-id', 'dated-0')
+
     await window.keyboard.press('ArrowRight')
 
     const samples = await window.evaluate(async () => {
@@ -90,6 +93,7 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
       }
       return { samples, pendingVisible }
     })
+
     for (const visible of samples.pendingVisible) expect(visible).toBeGreaterThan(5)
     for (const sample of samples.samples) {
       expect(sample.visible).toBeGreaterThan(5)
@@ -98,6 +102,7 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
       expect(sample.caret).toBe(true)
       expect(sample.mounted).toBeLessThan(100)
     }
+
     await window.screenshot({ path: testInfo.outputPath('agenda-after-scroll.png') })
   })
 })

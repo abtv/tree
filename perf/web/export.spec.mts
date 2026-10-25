@@ -34,24 +34,30 @@ test('exports a large profile without blocking the main thread', async ({ browse
   const context = await browser.newContext({ viewport: { width: 1100, height: 760 }, acceptDownloads: true })
   try {
     const page = await context.newPage()
+
     await page.goto(origin)
     await ready(page)
     const imageBytes = await seedLargeProfile(page)
+
     await page.reload()
     await ready(page)
 
     const stop = await watchMainThread(context, page)
+
     await page.getByRole('button', { name: 'Tree menu', exact: true }).click()
     const downloading = page.waitForEvent('download', { timeout: 240_000 })
     const started = Date.now()
+
     await page.getByRole('dialog', { name: 'Tree menu' }).getByRole('button', { name: 'Export Notes…' }).click()
     const download = await downloading
     const exportMs = Date.now() - started
     const mainThread = await stop()
 
     const archive = new Uint8Array(await readFile(await download.path()))
+
     expect(listCentralEntries(archive)).toHaveLength(IMAGE_COUNT + 1)
     expect(await page.evaluate(() => document.getElementById('data-activity-text')!.textContent)).toMatch(/^Exported/)
+
     recordPerfResult({
       kind: 'web-export',
       scenario: `nodes-${NODE_COUNT}-images-${IMAGE_COUNT}`,
@@ -62,6 +68,7 @@ test('exports a large profile without blocking the main thread', async ({ browse
         imageKiB: Math.round(imageBytes / 1024),
       },
     })
+
     expect(mainThread.maxLongTaskMs, 'The main thread must not block while the worker writes the archive').toBeLessThan(
       LONG_TASK_CEILING_MS,
     )

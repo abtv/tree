@@ -47,7 +47,9 @@ async function rejection(promise: Promise<unknown>): Promise<string> {
     () => undefined,
     (reason: unknown) => reason,
   )
+
   expect(error).toBeInstanceOf(NotesArchiveError)
+
   return (error as Error).message
 }
 
@@ -57,8 +59,10 @@ const rejected = (archive: Uint8Array, limits = ARCHIVE_LIMITS) => rejection(rea
 describe('notes archive central directory', () => {
   it('lists the entries export writes, in central-directory order', async () => {
     const image = imageEntry('image-1', new Uint8Array([7, 8, 9]))
+
     const archive = buildZip([documentEntry, { ...image, flags: 0x0008, descriptor: true }])
     const entries = await read(archive)
+
     expect(
       entries.map(({ name, attachmentId, method, size, compressedSize, localHeaderOffset }) => ({
         name,
@@ -86,6 +90,7 @@ describe('notes archive central directory', () => {
 
   it('rejects files that are not complete archives', async () => {
     const archive = buildZip([documentEntry])
+
     expect(await rejected(new Uint8Array(21))).toBe(NOT_AN_ARCHIVE_MESSAGE)
     expect(await rejected(new Uint8Array(4096).fill(0x50))).toBe(NOT_AN_ARCHIVE_MESSAGE)
     // Truncation removes the end record.
@@ -114,8 +119,11 @@ describe('notes archive central directory', () => {
     )
     expect(await rejected(buildZip([documentEntry], { directoryOffset: 0xffffffff }))).toBe(UNSUPPORTED_ARCHIVE_MESSAGE)
     expect(await rejected(buildZip([documentEntry], { directoryBytes: 0xffffffff }))).toBe(UNSUPPORTED_ARCHIVE_MESSAGE)
+
     const locator = new Uint8Array(20)
+
     new DataView(locator.buffer).setUint32(0, 0x07064b50, true)
+
     expect(await rejected(buildZip([documentEntry], { beforeEnd: locator }))).toBe(UNSUPPORTED_ARCHIVE_MESSAGE)
     for (const field of [
       { compressedSize: 0xffffffff },
@@ -132,12 +140,15 @@ describe('notes archive central directory', () => {
 
   it('rejects archive and entry counts outside the limits', async () => {
     const limits = { ...ARCHIVE_LIMITS, entries: 2 }
+
     expect(await read(buildZip([documentEntry, imageEntry('a')]), limits)).toHaveLength(2)
     expect(await rejected(buildZip([documentEntry, imageEntry('a'), imageEntry('b')]), limits)).toBe(
       TOO_MANY_ENTRIES_MESSAGE,
     )
     expect(await rejected(buildZip([]))).toBe(NO_DOCUMENT_MESSAGE)
+
     const archive = buildZip([documentEntry])
+
     expect(await rejected(archive, { ...ARCHIVE_LIMITS, archiveBytes: archive.byteLength - 1 })).toBe(
       ARCHIVE_FILE_TOO_LARGE_MESSAGE,
     )
@@ -150,6 +161,7 @@ describe('notes archive central directory', () => {
   it('rejects damaged central records', async () => {
     const archive = buildZip([documentEntry])
     const directory = directoryOffsetOf(archive)
+
     expect(await rejected(patch(archive, directory, 0x02014b51, 4))).toBe(NOT_AN_ARCHIVE_MESSAGE)
     // A name length that reaches past the directory.
     expect(await rejected(patch(archive, directory + 28, 40, 2))).toBe(NOT_AN_ARCHIVE_MESSAGE)
@@ -164,8 +176,10 @@ describe('notes archive central directory', () => {
     // Extra-field and comment lengths that reach past the directory.
     expect(await rejected(patch(archive, directory + 30, 1000, 2))).toBe(NOT_AN_ARCHIVE_MESSAGE)
     expect(await rejected(patch(archive, directory + 32, 1000, 2))).toBe(NOT_AN_ARCHIVE_MESSAGE)
+
     // A name that would run into the next record and past the directory is not decoded.
     const two = buildZip([documentEntry, imageEntry('a')])
+
     expect(await rejected(patch(two, directoryOffsetOf(two) + 28, 200, 2))).toBe(NOT_AN_ARCHIVE_MESSAGE)
   })
 
@@ -203,9 +217,11 @@ describe('notes archive central directory', () => {
 
   it('accepts only document.json and attachments/<id>.png names', async () => {
     const longId = 'a'.repeat(251)
+
     expect(classifyEntryName('document.json')).toBeNull()
     expect(classifyEntryName('attachments/abc_D-9.png')).toBe('abc_D-9')
     expect(classifyEntryName(`attachments/${longId}.png`)).toBe(longId)
+
     const foreign = [
       '',
       '../document.json',
@@ -226,6 +242,7 @@ describe('notes archive central directory', () => {
       '.DS_Store',
       'attachments/.DS_Store',
     ]
+
     for (const name of foreign) {
       expect(classifyEntryName(name), name).toBeUndefined()
       expect(await rejected(buildZip([documentEntry, { name, data: new Uint8Array(1) }]))).toBe(
@@ -235,8 +252,10 @@ describe('notes archive central directory', () => {
     expect(
       await rejected(buildZip([documentEntry, { name: new Uint8Array([0x61, 0xff]), data: new Uint8Array(1) }])),
     ).toBe(INVALID_NAME_MESSAGE)
+
     // A byte-order mark stays part of the name.
     const marked = new Uint8Array([0xef, 0xbb, 0xbf, ...bytes('document.json')])
+
     expect(await rejected(buildZip([{ ...documentEntry, name: marked }]))).toBe(
       unexpectedEntryMessage('﻿document.json'),
     )
@@ -244,6 +263,7 @@ describe('notes archive central directory', () => {
 
   it('reports a foreign name before the other problems of its record', async () => {
     const finder = { name: '__MACOSX/._document.json', data: new Uint8Array(1), centralExtra: new Uint8Array(12) }
+
     expect(await rejected(buildZip([finder, documentEntry]))).toBe(unexpectedEntryMessage(finder.name))
   })
 
@@ -271,6 +291,7 @@ describe('notes archive central directory', () => {
 
   it('rejects entries larger than the limits or with inconsistent sizes', async () => {
     const limits = { ...ARCHIVE_LIMITS, documentBytes: 7, imageBytes: 3, archiveBytes: 1000 }
+
     expect(await read(buildZip([documentEntry, imageEntry('a')]), limits)).toHaveLength(2)
     expect(await rejected(buildZip([{ ...documentEntry, data: bytes('{"x":12}') }]), limits)).toBe(
       entryTooLargeMessage('document.json'),
@@ -284,12 +305,14 @@ describe('notes archive central directory', () => {
       entryTooLargeMessage('document.json'),
     )
     expect(await rejected(buildZip([{ ...documentEntry, size: 6 }]))).toBe(damagedEntryMessage('document.json'))
+
     // Deflated entries may declare more bytes in total than the file holds, but not more than the limit.
     const many = buildZip([
       documentEntry,
       ...['a', 'b', 'c'].map((id) => ({ ...imageEntry(id, new Uint8Array(1)), method: 8, size: 1000 })),
     ])
     const declared = { ...limits, imageBytes: 1000, archiveBytes: 3007 }
+
     expect(many.byteLength).toBeLessThan(3007)
     expect(await read(many, declared)).toHaveLength(4)
     expect(await rejected(many, { ...declared, archiveBytes: 3006 })).toBe(CONTENT_TOO_LARGE_MESSAGE)
@@ -302,11 +325,15 @@ describe('notes archive central directory', () => {
     // The entry's data would reach into the central directory.
     expect(await rejected(buildZip([{ ...documentEntry, method: 8, compressedSize: 8 }]))).toBe(NOT_AN_ARCHIVE_MESSAGE)
     expect(await rejected(buildZip([{ ...documentEntry, localHeaderOffset: 1 }]))).toBe(NOT_AN_ARCHIVE_MESSAGE)
+
     // Entries may be listed in any order and may leave gaps for data descriptors.
     const reordered = buildZip([imageEntry('b'), { ...documentEntry, flags: 0x0008, descriptor: true }])
+
     expect((await read(reordered)).map((entry) => entry.name)).toEqual(['attachments/b.png', 'document.json'])
+
     // The central directory may list entries in another order than their local headers.
     const shuffled = buildZip([documentEntry, imageEntry('a'), imageEntry('b')], { centralOrder: [2, 0, 1] })
+
     expect((await read(shuffled)).map((entry) => entry.name)).toEqual([
       'attachments/b.png',
       'document.json',
@@ -323,6 +350,7 @@ describe('notes archive entries', () => {
 
   it('reads stored and deflated entries with matching sizes and CRC-32', async () => {
     const data = bytes('{"x":1}')
+
     expect([...(await readEntry(buildZip([documentEntry])))]).toEqual([...data])
     expect([...(await readEntry(buildZip([{ ...documentEntry, method: 8 }])))]).toEqual([...data])
     expect([...(await readEntry(buildZip([{ ...documentEntry, flags: 0x0008, descriptor: true }])))]).toEqual([...data])
@@ -334,7 +362,9 @@ describe('notes archive entries', () => {
 
   it('rejects a CRC-32 or size that does not match the produced bytes', async () => {
     const damaged = damagedEntryMessage('document.json')
+
     const archive = buildZip([{ ...documentEntry, crc32: 1 }])
+
     expect(await rejection(readEntry(archive))).toBe(damaged)
     expect(await rejection(readEntry(buildZip([{ ...documentEntry, method: 8, size: 8 }])))).toBe(damaged)
     expect(await rejection(readEntry(buildZip([{ ...documentEntry, method: 8, size: 6 }])))).toBe(damaged)
@@ -342,6 +372,7 @@ describe('notes archive entries', () => {
 
   it('rejects a local header that does not repeat the central record', async () => {
     const damaged = damagedEntryMessage('document.json')
+
     for (const field of [
       { localName: 'document.jsoN' },
       { localName: 'document.jsonx' },
@@ -356,7 +387,9 @@ describe('notes archive entries', () => {
         damaged,
       )
     }
+
     const archive = buildZip([documentEntry])
+
     expect(await rejection(readEntry(patch(archive, 0, 0x04034b51, 4)))).toBe(damaged)
     expect(await rejection(readEntry(patch(archive, 18, 8, 4)))).toBe(damaged)
     // A data descriptor leaves the local CRC-32 and sizes empty.
@@ -372,8 +405,10 @@ describe('notes archive entries', () => {
         onData(chunk.slice())
       },
     })
+
     const archive = buildZip([{ ...documentEntry, method: 8, data }], {})
     const result = await readArchiveEntry(memoryFile(archive), await entryOf(archive), recording)
+
     // A deep equality matcher walks a megabyte element by element and times out under coverage.
     expect(result.byteLength).toBe(data.byteLength)
     expect(result.every((byte, index) => byte === data[index])).toBe(true)
@@ -384,8 +419,10 @@ describe('notes archive entries', () => {
 
     // Data that ends exactly at a slice boundary still ends with one final push.
     pushes.length = 0
+
     const even = buildZip([{ ...documentEntry, method: 8, data: data.slice(0, 32 * 1024) }])
     await readArchiveEntry(memoryFile(even), await entryOf(even), recording)
+
     expect(pushes).toEqual([
       { length: 16 * 1024, final: false },
       { length: 16 * 1024, final: true },
@@ -400,6 +437,7 @@ describe('notes archive entries', () => {
         throw new Error('unexpected data after the end of the stream')
       },
     })
+
     expect(await rejection(readArchiveEntry(memoryFile(archive), await entryOf(archive), trailingGarbage))).toBe(
       damagedEntryMessage('document.json'),
     )
@@ -413,7 +451,9 @@ describe('notes archive entries', () => {
         onData(new Uint8Array(1024 * 1024))
       },
     })
+
     const archive = buildZip([{ ...documentEntry, method: 8, data: new Uint8Array(64 * 1024), size: 1024 * 1024 }])
+
     expect(await rejection(readArchiveEntry(memoryFile(archive), await entryOf(archive), bomb))).toBe(
       damagedEntryMessage('document.json'),
     )
@@ -427,17 +467,22 @@ describe('notes archive entries', () => {
         throw new Error('invalid block type')
       },
     })
+
     expect(await rejection(readArchiveEntry(memoryFile(archive), await entryOf(archive), failing))).toBe(
       damagedEntryMessage('document.json'),
     )
+
     const refusing: CreateInflater = () => ({
       push() {
         throw new NotesArchiveError('specific')
       },
     })
+
     expect(await rejection(readArchiveEntry(memoryFile(archive), await entryOf(archive), refusing))).toBe('specific')
+
     // An empty Deflate entry still ends the stream, which a real decoder rejects.
     const finals: boolean[] = []
+
     const empty = buildZip([{ ...documentEntry, method: 8, data: new Uint8Array(0) }])
     const ending: CreateInflater = (onData) => ({
       push(chunk, final) {
@@ -445,6 +490,7 @@ describe('notes archive entries', () => {
         onData(chunk)
       },
     })
+
     expect(await readArchiveEntry(memoryFile(empty), await entryOf(empty), ending)).toHaveLength(0)
     expect(finals).toEqual([true])
   })

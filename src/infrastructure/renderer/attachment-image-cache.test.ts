@@ -54,9 +54,12 @@ describe('attachment image cache', () => {
     const cache = createAttachmentImageCache(() => pending.promise, fakeDecoder().decode, 64)
 
     const request = cache.get('image')
+
     expect(cache.peek('image')).toBeUndefined()
+
     pending.resolve(bytes(4))
     await request
+
     expect(cache.peek('image')).toBeDefined()
   })
 
@@ -68,6 +71,7 @@ describe('attachment image cache', () => {
 
     const first = cache.get('image')
     const second = cache.get('image')
+
     pending.resolve(bytes(3))
 
     expect(await second).toBe(await first)
@@ -83,14 +87,18 @@ describe('attachment image cache', () => {
 
     const a = await cache.get('a')
     const b = await cache.get('b')
+
     await cache.get('a')
     await cache.get('c')
 
     expect(decoder.released).toEqual([b!.url])
     expect(cache.peek('a')).toBe(a)
     expect(cache.peek('b')).toBeUndefined()
+
     read.mockClear()
+
     await cache.get('b')
+
     expect(read).toHaveBeenCalledTimes(1)
   })
 
@@ -154,11 +162,14 @@ describe('attachment image cache', () => {
     const cache = createAttachmentImageCache(read, decoder.decode, 64)
 
     const image = await cache.get('image')
+
     expect(cache.discard('image', image!.url)).toBe(true)
 
     expect(decoder.released).toEqual([image!.url])
     expect(cache.peek('image')).toBeUndefined()
+
     await cache.get('image')
+
     expect(read).toHaveBeenCalledTimes(2)
   })
 
@@ -167,6 +178,7 @@ describe('attachment image cache', () => {
     const cache = createAttachmentImageCache(async () => bytes(4), decoder.decode, 64)
 
     const stale = await cache.get('image')
+
     cache.discard('image', stale!.url)
     const fresh = await cache.get('image')
 
@@ -182,6 +194,7 @@ describe('attachment image cache', () => {
 
     const a = await cache.get('a')
     const b = await cache.get('b')
+
     cache.clear()
     await cache.get('a')
 
@@ -195,6 +208,7 @@ describe('attachment image cache', () => {
     const cache = createAttachmentImageCache(read, fakeDecoder().decode, 64)
 
     const first = cache.get('image')
+
     cache.clear()
     pending.resolve(bytes(4))
     await first

@@ -27,6 +27,7 @@ it('includes contextual and repeated Agenda occurrences, filtering focused days'
     ],
   }))
   const all = [...searchScope(document, { kind: 'agenda', projection })].filter((row) => row !== undefined)
+
   expect(all.map(({ nodeId, day }) => [nodeId, day])).toEqual([
     ['a', 1],
     ['b', 1],

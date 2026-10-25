@@ -13,10 +13,15 @@ describe('Vim caret transitions', () => {
   it('counts complete emoji and restores the complete final character from an attached image', () => {
     const text = 'A🚀👩‍💻'
     const rocket = horizontalCaretTransition({ cursor: 0, imageActive: false }, 'right', 1, text, true)
+
     expect(rocket.cursor).toBe(1)
+
     const woman = horizontalCaretTransition(rocket, 'right', 1, text, true)
+
     expect(woman.cursor).toBe(3)
+
     const image = horizontalCaretTransition(woman, 'right', 1, text, true)
+
     expect(image).toEqual({ cursor: text.length, imageActive: true, imageTextReturnCursor: 3 })
     expect(horizontalCaretTransition(image, 'left', 1, text, true)).toEqual({ cursor: 3, imageActive: false })
     expect(horizontalCaretTransition(image, 'left', 2, text, true)).toEqual({ cursor: 1, imageActive: false })
@@ -24,12 +29,14 @@ describe('Vim caret transitions', () => {
   })
   it('saves the last traversed text character on a counted image entry and restores it', () => {
     const image = horizontalCaretTransition({ cursor: 0, imageActive: false }, 'right', 99, 'x'.repeat(3), true)
+
     expect(image).toEqual({ cursor: 3, imageActive: true, imageTextReturnCursor: 2 })
     expect(horizontalCaretTransition(image, 'left', 2, 'x'.repeat(3), true)).toEqual({ cursor: 1, imageActive: false })
   })
 
   it('preserves the return position on repeated image-boundary motions', () => {
     const image = sameNodeImageTransition({ cursor: 1, imageActive: false }, 'enter', 3)
+
     expect(horizontalCaretTransition(image, 'right', 5, 'x'.repeat(3), true)).toEqual(image)
     expect(sameNodeImageTransition(image, 'exit', 3)).toEqual({ cursor: 1, imageActive: false })
   })
@@ -58,6 +65,7 @@ describe('Vim caret transitions', () => {
   it('round trips between a non-final text position and its image with vertical keys', () => {
     const text = { cursor: 1, imageActive: false }
     const entered = verticalCaretTransition(text, 'down', 4, true, true)
+
     expect(entered).toEqual({
       caret: { cursor: 4, imageActive: true, imageTextReturnCursor: 1 },
       crossNode: false,
@@ -88,15 +96,19 @@ describe('Vim caret transitions', () => {
   it('preserves an image-only caret and return position at vertical no-op boundaries', () => {
     const image = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
     const step = verticalCaretTransition(image, 'down', 3, true, false)
+
     expect(step.caret).toBe(image)
     expect(step.crossNode).toBe(false)
     expect(focusCaretTransition(image, 0, 3, true, false)).toBe(image)
+
     const onlyImage = { cursor: 0, imageActive: true }
+
     expect(verticalCaretTransition(onlyImage, 'up', 0, true, false).caret).toBe(onlyImage)
   })
 
   it('transfers authority across nodes and never carries the previous image return position', () => {
     const oldImage = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+
     expect(verticalCaretTransition(oldImage, 'down', 4, true, true).focusCursor).toBe(0)
     expect(focusCaretTransition(oldImage, 2, 5, false, true)).toEqual({
       cursor: 2,
@@ -112,6 +124,7 @@ describe('Vim caret transitions', () => {
 
   it('treats pointer placement as a new caret intent on the selected node', () => {
     const image = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+
     expect(pointerCaretTransition(image, 2, 4, true)).toEqual({
       cursor: 2,
       imageActive: false,
@@ -142,16 +155,19 @@ describe('Vim caret transitions', () => {
 
     it('drops the return position when an edit moves the caret from the image back onto text', () => {
       const onImage = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+
       expect(editCaretTransition(onImage, 0, 3, true)).toEqual({ cursor: 0, imageActive: false })
     })
 
     it('preserves a saved return position across a true no-op while already on the image', () => {
       const onImage = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+
       expect(editCaretTransition(onImage, 3, 3, true)).toBe(onImage)
     })
 
     it('recomputes a fresh return position when a mutation still leaves the caret on the image', () => {
       const onImage = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+
       expect(editCaretTransition(onImage, 2, 2, true)).toEqual({
         cursor: 2,
         imageActive: true,

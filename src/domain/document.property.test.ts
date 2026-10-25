@@ -188,6 +188,7 @@ function expectLinksAligned(text: string, links: readonly LinkRange[]): void {
     expect(text.slice(link.start, link.end)).toBe(link.url)
     expect(isHttpUrl(link.url)).toBe(true)
     expect(link.start).toBeGreaterThanOrEqual(previousEnd)
+
     previousEnd = link.end
   }
 }
@@ -270,6 +271,7 @@ describe('document invariants', () => {
           },
           location: { currentParentId: null, selectedNodeId: 'root' },
         }
+
         expect(validatePersistedState(state)).toBe(state)
       }),
     )
@@ -279,8 +281,11 @@ describe('document invariants', () => {
     fc.assert(
       fc.property(forest, fc.nat(), (rawForest, seed) => {
         const document = materialize(rawForest)
+
         expect(maxDepth(document)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
+
         const node = pick(document, seed)
+
         const state = serializeState(document, locationFor(document, node))
 
         expect(state.document).toBe(document)
@@ -317,12 +322,16 @@ describe('document invariants', () => {
           )
           expect(() => replaceSiblingRange(document, deepestId, 1, sources)).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
           expect(JSON.parse(JSON.stringify(document))).toEqual(before)
+
           return
         }
 
         const inserted = insertSubtreeSibling(document, deepestId, 'after', tallest, createId)
+
         expect(maxDepth(inserted)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
+
         const replaced = replaceSiblingRange(document, deepestId, 1, sources)
+
         expect(maxDepth(replaced)).toBeLessThanOrEqual(MAX_DOCUMENT_DEPTH)
       }),
     )
@@ -396,9 +405,11 @@ describe('document invariants', () => {
     fc.assert(
       fc.property(fc.integer({ min: -10, max: 10 }), (cursor) => {
         const document = { roots: [{ id: 'root', text: 'prefix', children: [] }] }
+
         const result = pasteText(document, 'root', cursor, 'https://example.com')
         const node = result.roots[0]!
         const link = node.links?.[0]
+
         expect(link).toBeDefined()
         expect(node.text.slice(link!.start, link!.end)).toBe(link!.url)
       }),
@@ -474,20 +485,29 @@ describe('document invariants', () => {
           const document = materialize(rawForest)
           const first = pick(document, seed)
           const before = locateNode(document, first.id)!
+
           const result = shiftSiblingRange(document, first.id, count, direction)
           if (result.kind !== 'moved') {
             expect(result.kind).toBe('impossible')
+
             return
           }
           const range = before.siblings.slice(before.index, before.index + count)
+
           expect(allIds(result.document).slice().sort()).toEqual(allIds(document).slice().sort())
           expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+
           const after = locateNode(result.document, first.id)!
+
           expect(after.ancestors.length).toBe(before.ancestors.length + (direction === 'in' ? 1 : -1))
+
           const placed = after.siblings.slice(after.index, after.index + count)
+
           expect(placed.map((node) => node.id)).toEqual(range.map((node) => node.id))
+
           // Moved subtrees are reused, not copied.
           placed.forEach((node, index) => expect(node).toBe(range[index]))
+
           assertDocument(result.document)
         },
       ),
@@ -501,8 +521,11 @@ describe('document invariants', () => {
         const first = pick(document, seed)
         const shifted = shiftSiblingRange(document, first.id, count, 'in')
         if (shifted.kind !== 'moved') return
+
         expect(allIds(shifted.document)).toEqual(allIds(document))
+
         const restored = shiftSiblingRange(shifted.document, first.id, count, 'out')
+
         expect(restored.kind).toBe('moved')
         if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
@@ -518,27 +541,38 @@ describe('document invariants', () => {
         const nodes = allNodes(document)
         const slot = parentSeed % (nodes.length + 1)
         const parentId = slot === nodes.length ? null : nodes[slot]!.id
+
         const result = moveSubtree(document, node.id, parentId, index)
         if (result.kind === 'impossible') {
           expect(parentId !== null && subtreeIds(node).includes(parentId)).toBe(true)
+
           return
         }
         if (result.kind === 'too-deep') {
           const landing = parentId === null ? 1 : locateNode(document, parentId)!.ancestors.length + 2
+
           expect(landing + heightOf(node) - 1).toBeGreaterThan(MAX_DOCUMENT_DEPTH)
+
           return
         }
+
         expect(allIds(result.document).slice().sort()).toEqual(allIds(document).slice().sort())
         expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+
         const after = locateNode(result.document, node.id)!
+
         expect(after.node).toBe(node)
         expect(after.parent?.id ?? null).toBe(parentId)
+
         const siblingCount = (parentId === null ? document.roots : locateNode(document, parentId)!.node.children).length
         const expectedLength =
           siblingCount - (before.parent?.id === parentId || (before.parent === null && parentId === null) ? 1 : 0)
+
         expect(after.index).toBe(Math.max(0, Math.min(index, expectedLength)))
         assertDocument(result.document)
+
         const restored = moveSubtree(result.document, node.id, before.parent?.id ?? null, before.index)
+
         expect(restored.kind).toBe('moved')
         if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
@@ -552,26 +586,36 @@ describe('document invariants', () => {
         const document = materialize(rawForest)
         const first = pick(document, seed)
         const before = locateNode(document, first.id)!
+
         const result = joinSiblingRange(document, first.id, count, spaced)
         const range = before.siblings.slice(before.index, before.index + count)
         if (count < 2 || before.index + count > before.siblings.length) {
           expect(result.kind).toBe('impossible')
+
           return
         }
         const attached = range.filter((node) => node.attachment !== undefined)
         if (attached.length > 1) {
           expect(result.kind).toBe('attachments')
+
           return
         }
         if (result.kind !== 'joined') throw new Error(`expected a join, got ${result.kind}`)
         const mergedIds = new Set(range.slice(1).map((node) => node.id))
+
         expect(allIds(result.document)).toEqual(allIds(document).filter((id) => !mergedIds.has(id)))
         expect(attachmentSummary(result.document)).toEqual(attachmentSummary(document))
+
         const after = locateNode(result.document, first.id)!
+
         expect(after.node.attachment).toBe(attached[0]?.attachment)
+
         const children = range.flatMap((node) => node.children)
+
         expect(after.node.children).toHaveLength(children.length)
+
         after.node.children.forEach((child, index) => expect(child).toBe(children[index]))
+
         expect(after.siblings.length).toBe(before.siblings.length - (count - 1))
         if (!spaced) expect(after.node.text).toBe(range.map((node) => node.text).join(''))
         expect(result.cursor).toBeGreaterThanOrEqual(0)
@@ -596,11 +640,14 @@ describe('document invariants', () => {
 
         const result = toggleStrikethrough(document, anchor.id, focus.id)!
         const rangeIds = new Set(range.map((node) => node.id))
+
         expect(allIds(result)).toEqual(allIds(document))
         expect(attachmentSummary(result)).toEqual(attachmentSummary(document))
+
         const before = new Map(allNodes(document).map((node) => [node.id, node]))
         for (const node of allNodes(result)) {
           const original = before.get(node.id)!
+
           if (rangeIds.has(node.id)) {
             expect(node.struckThrough === true).toBe(strike)
             expect(node.text).toBe(original.text)
@@ -611,6 +658,7 @@ describe('document invariants', () => {
             expect(node).toBe(original)
           }
         }
+
         if (strike && range.length === 1) {
           expect(toggleStrikethrough(result, anchor.id, focus.id)).toEqual(document)
         }
@@ -630,6 +678,7 @@ describe('document invariants', () => {
         const anchor = pick(document, seed)
         const other = pick(document, otherSeed)
         if (locateNode(document, anchor.id)!.siblings.includes(other)) return
+
         expect(toggleStrikethrough(document, anchor.id, other.id)).toBeUndefined()
       }),
     )
@@ -675,6 +724,7 @@ describe('document invariants', () => {
 
         for (const node of nodes) {
           const located = locateNode(document, node.id)!
+
           expect(located.node.id).toBe(node.id)
           expect(nodePath(document, node.id).at(-1)!.id).toBe(node.id)
           expect(nodePath(document, node.id).length).toBe(located.ancestors.length + 1)
@@ -726,6 +776,7 @@ describe('document invariants', () => {
         createFirstChild(document, node.id, 'new-child')
         createLastChild(document, node.id, 'new-last-child', text)
         createLastChild(document, null, 'new-last-root', text)
+
         splitNode(document, node.id, cursor, 'new-split')
         deleteNode(document, node.id)
         moveSibling(document, node.id, cursor)
@@ -775,6 +826,7 @@ describe('document invariants', () => {
             if (path.has(candidate.id)) continue
             const original = before.get(candidate.id)
             if (original === undefined) continue
+
             expect(candidate).toBe(original)
           }
         }
@@ -819,6 +871,7 @@ describe('document invariants', () => {
           toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
+
         for (const result of results) {
           expect([...collectAttachmentIds(result)].sort()).toEqual(reference(result))
         }
@@ -865,6 +918,7 @@ describe('document invariants', () => {
           toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
+
         for (const result of results) {
           expect([...attachmentSummary(result).entries()].sort()).toEqual(reference(result))
         }
@@ -880,7 +934,9 @@ describe('document invariants', () => {
         const start = startSeed % document.roots.length
         const count = 1 + (countSeed % (document.roots.length - start))
         const replacement: TreeNode = { id: 'replacement', text: 'new', children: [] }
+
         const next = replaceSiblingRange(document, document.roots[start]!.id, count, [replacement])
+
         expect(next.roots.map((node) => node.id)).toEqual([
           ...document.roots.slice(0, start).map((node) => node.id),
           'replacement',
@@ -910,7 +966,9 @@ describe('document invariants', () => {
     }
 
     expect(attachmentSummary(document).get('shared')).toBe(2)
+
     const withoutA = deleteNode(document, 'a')
+
     expect(attachmentSummary(withoutA).get('shared')).toBe(1)
     expect(attachmentSummary(deleteNode(withoutA, 'b')).has('shared')).toBe(false)
   })
@@ -919,6 +977,7 @@ describe('document invariants', () => {
     fc.assert(
       fc.property(forest, (rawForest) => {
         const document = materialize(rawForest)
+
         for (const node of allNodes(document)) {
           expect(normalizeLocation(locateNode(document, node.id))).toEqual(locateNodeReference(document, node.id))
         }
@@ -952,6 +1011,7 @@ describe('document invariants', () => {
           toggleStrikethrough(document, node.id, node.id)!,
           ensureRoot(document, 'new-root'),
         ]
+
         for (const result of results) {
           for (const candidate of allNodes(result)) {
             expect(normalizeLocation(locateNode(result, candidate.id))).toEqual(
@@ -979,6 +1039,7 @@ describe('document invariants', () => {
         const end = Math.max(a, b)
         const nextText = text.slice(0, start) + inserted + text.slice(end)
         const nextLinks = linksAfterTextEdit(text, links, nextText)
+
         for (const [index, link] of nextLinks.entries()) {
           expect(nextText.slice(link.start, link.end)).toBe(link.url)
           expect(isHttpUrl(link.url)).toBe(true)
@@ -1022,11 +1083,13 @@ describe('document invariants', () => {
           const target = generated.links.length === 0 ? undefined : generated.links[seed % generated.links.length]
           const deleted = target === undefined ? undefined : deleteLink(document, 'root', target.end)
           if (deleted !== undefined) results.push(deleted)
+
           for (const result of results) expectDocumentLinksAligned(result)
 
           const ranges = replaceLinkedTextRanges(generated.text, generated.links, [
             { start: cursor, end: Math.min(cursor + 2, generated.text.length), inserted },
           ])
+
           expectLinksAligned(ranges.text, ranges.links)
         },
       ),

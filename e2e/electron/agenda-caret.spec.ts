@@ -74,6 +74,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       location: { currentParentId: null, selectedNodeId: 'first' },
     })
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
@@ -81,7 +82,9 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
+
     await expect(selected).toHaveAttribute('data-node-id', 'first')
+
     if (mode === 'vim') await window.keyboard.type('0' + '5l')
     else {
       await window.keyboard.press('Home')
@@ -92,17 +95,25 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.keyboard.press('ArrowRight')
     }
     const down = mode === 'vim' ? 'j' : 'ArrowDown'
+
     await window.keyboard.press(down)
+
     await expect(selected).toHaveClass(/agenda-row-day/u)
     expect((await caretMark(selected))!.before).toBe(5)
     await expect(window).toHaveScreenshot(screenshotName('agenda-caret-arrival-light.png'))
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window).toHaveScreenshot(screenshotName('agenda-caret-arrival-dark.png'))
+
     await window.emulateMedia({ colorScheme: 'light' })
     await window.keyboard.press(down)
+
     await expect(selected).toHaveAttribute('data-node-id', 'parent')
     expect((await caretMark(selected))!.before).toBe(5)
+
     await window.keyboard.press(down)
+
     await expect(selected).toHaveAttribute('data-node-id', 'second')
     expect(
       await selected.locator('.node-input').evaluate((input) => {
@@ -120,14 +131,18 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   test('shows the caret on days, gaps and contextual ancestors but not on unselected rows', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Escape')
     const today = window.locator('.agenda-today')
+
     await expect(today).toHaveAttribute('aria-selected', 'true')
+
     const expectCaret = async (row: Locator, first: string): Promise<void> => {
       const mark = await caretMark(row)
+
       expect(mark).toBeDefined()
       expect(mark!.before).toBe(0)
       if (mode === 'vim') {
@@ -140,18 +155,27 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
         expect(mark!.leftBorder).toBe('1px solid')
       }
     }
+
     await expectCaret(today, 'T')
+
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
+
     await expect(selected).toContainText('Fri Oct 9')
     await expectCaret(selected, 'F')
     expect(await caretMark(today)).toBeUndefined()
+
     const gap = window.locator('.agenda-row-gap').first()
+
     await gap.click()
+
     await expect(gap).toHaveAttribute('aria-selected', 'true')
     await expectCaret(gap, '1')
+
     const work = window.locator('.agenda-row[data-node-id="work"]').first()
+
     await work.click()
+
     await expect(work).toHaveAttribute('aria-selected', 'true')
     await expectCaret(work, 'W')
     expect(await caretMark(gap)).toBeUndefined()
@@ -164,6 +188,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       location: { currentParentId: null, selectedNodeId: 'item' },
     })
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Escape')
@@ -177,11 +202,15 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
           selection.anchorNode?.parentElement?.closest('.node-input') != null
         )
       })
+
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
+
     await expect(selected).toHaveAttribute('data-node-id', 'item')
     expect(await nativeSelectionInEditor()).toBe(true)
+
     await window.keyboard.press(mode === 'vim' ? 'k' : 'ArrowUp')
+
     await expect(selected).toHaveClass(/agenda-row-day/u)
     await expect(selected).toBeFocused()
     expect(await nativeSelectionInEditor()).toBe(false)
@@ -191,44 +220,69 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   test('moves, selects and copies over the text of a day without editing', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Escape')
     const today = window.locator('.agenda-today')
+
     await expect(today).toHaveAttribute('aria-selected', 'true')
+
     const clipboard = (): Promise<string> => app.evaluate(({ clipboard }) => clipboard.readText())
     if (mode === 'vim') {
       await window.keyboard.type('3l')
+
       expect((await caretMark(today))!.before).toBe(3)
+
       await window.keyboard.press('$')
+
       expect((await caretMark(today))!).toMatchObject({ before: TODAY_LABEL.length - 1, text: 'Y' })
+
       await window.keyboard.press('l')
+
       await expect(today).toHaveAttribute('aria-selected', 'false')
+
       await window.keyboard.press('h')
+
       await expect(today).toHaveAttribute('aria-selected', 'true')
       expect((await caretMark(today))!.before).toBe(TODAY_LABEL.length - 1)
+
       await window.keyboard.type('0')
+
       expect((await caretMark(today))!.before).toBe(0)
+
       await window.keyboard.type('fO')
+
       expect((await caretMark(today))!.before).toBe(4)
+
       await window.keyboard.type('w')
+
       expect((await caretMark(today))!.before).toBe(8)
+
       await window.keyboard.type('0vee')
+
       await expect(window.locator('.vim-mode-indicator, [aria-label="Vim mode"]').first()).toHaveText('VISUAL')
       expect(await selectionText(today)).toBe('Thu Oct')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
+
       await window.emulateMedia({ colorScheme: 'dark' })
+
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-dark.png'))
+
       await window.emulateMedia({ colorScheme: 'light' })
       await lockSystemClipboard()
       await window.keyboard.press('y')
+
       await expect.poll(clipboard).toBe('Thu Oct')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       expect((await caretMark(today))!.before).toBe(0)
+
       await window.keyboard.press('l')
       await window.keyboard.press('Meta+c')
+
       await expect.poll(clipboard).toBe('h')
+
       for (const exitKey of ['Escape', 'v']) {
         for (const [keys, endpoint] of [
           ['0lvll', 3],
@@ -236,8 +290,11 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
           ['0lvllo', 1],
         ] as const) {
           await window.keyboard.type(keys)
+
           expect(await selectionText(today)).toBeTruthy()
+
           await window.keyboard.press(exitKey)
+
           await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
           expect((await caretMark(today))!.before).toBe(endpoint)
           expect(await selectionText(today)).toBeUndefined()
@@ -247,35 +304,53 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     } else {
       await window.keyboard.press('ArrowRight')
       await window.keyboard.press('ArrowRight')
+
       expect((await caretMark(today))!.before).toBe(2)
+
       await window.keyboard.press('Shift+ArrowRight')
       await window.keyboard.press('Shift+ArrowRight')
       await window.keyboard.press('Shift+ArrowRight')
+
       expect(await selectionText(today)).toBe('u O')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
+
       await window.emulateMedia({ colorScheme: 'dark' })
+
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-dark.png'))
+
       await window.emulateMedia({ colorScheme: 'light' })
       await lockSystemClipboard()
       await window.keyboard.press('Meta+c')
+
       await expect.poll(clipboard).toBe('u O')
+
       await window.keyboard.press('ArrowLeft')
+
       expect((await caretMark(today))!.before).toBe(2)
+
       await window.keyboard.press('Meta+ArrowRight')
+
       expect((await caretMark(today))!.before).toBe(TODAY_LABEL.length)
+
       await window.keyboard.press('Home')
+
       expect((await caretMark(today))!.before).toBe(0)
     }
     // Typing and editing keys leave every text alone and never open an editor on the row.
     const texts = await window.locator('.agenda-row').allTextContents()
+
     await window.keyboard.type('ixdD')
+
     await expect(today.locator('.agenda-label')).toHaveText(TODAY_LABEL)
     await expect(today.locator('.node-input')).toHaveCount(0)
     expect(await window.locator('.agenda-row').allTextContents()).toEqual(texts)
+
     // Vertical navigation carries the current position rather than resetting it.
     const beforeNavigation = (await caretMark(today))!.before
+
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowUp')
+
     await expect(today).toHaveAttribute('aria-selected', 'true')
     expect((await caretMark(today))!.before).toBe(beforeNavigation)
   })

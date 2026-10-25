@@ -55,6 +55,7 @@ describe('pending move sources', () => {
 
   it('does not run past a gap', () => {
     const list = [header(10), node('x', 10, 0), gap, header(31), node('y', 31, 0)]
+
     expect(pendingMoveSources(list, 'node:10:x', 4).map((source) => source.nodeId)).toEqual(['x'])
   })
 
@@ -71,18 +72,24 @@ describe('pending move sources', () => {
         const sources = pendingMoveSources(list, selected.key, count)
         if (selected.kind !== 'node' || selected.role !== 'match') {
           expect(sources).toEqual([])
+
           return
         }
+
         expect(sources.length).toBeGreaterThanOrEqual(1)
         expect(sources.length).toBeLessThanOrEqual(Math.max(1, count))
         expect(sources[0]!.nodeId).toBe(selected.nodeId)
+
         const order = sources.map((source) =>
           list.findIndex((candidate) => candidate.key === `node:5:${source.nodeId}`),
         )
+
         expect([...order].sort((a, b) => a - b)).toEqual(order)
         expect(new Set(order).size).toBe(order.length)
+
         for (const index of order) {
           const candidate = list[index]!
+
           expect(candidate.kind === 'node' && candidate.role === 'match' && candidate.depth === selected.depth).toBe(
             true,
           )
@@ -96,10 +103,12 @@ describe('pending move sources', () => {
 describe('pending move queries', () => {
   it('recognizes only the marked occurrence of a node, not its mirror on another day', () => {
     const agenda = { pendingMove: [{ nodeId: 'a', day: 10 }] }
+
     expect(isPendingMoveSource(agenda, 'a', 10)).toBe(true)
     expect(isPendingMoveSource(agenda, 'a', 11)).toBe(false)
     expect(isPendingMoveSource(agenda, 'b', 10)).toBe(false)
     expect(isPendingMoveSource({}, 'a', 10)).toBe(false)
+
     // Any one marked occurrence is enough when several are marked.
     const several = {
       pendingMove: [
@@ -107,6 +116,7 @@ describe('pending move queries', () => {
         { nodeId: 'b', day: 10 },
       ],
     }
+
     expect(isPendingMoveSource(several, 'a', 10)).toBe(true)
     expect(isPendingMoveSource(several, 'b', 10)).toBe(true)
     expect(isPendingMoveSource(several, 'c', 10)).toBe(false)

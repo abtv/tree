@@ -42,11 +42,13 @@ async function memorySample({ app, window }: Launched): Promise<unknown> {
       pending: globalThis.__treeSharedTest?.pending() ?? 0,
       errors: globalThis.__treeSharedTest?.errors() ?? 0,
     }))
+
     expect(native.windows).toBe(1)
     expect(native.renderers).toBe(1)
     expect(native.processes.filter(({ type }) => type === 'Tab')).toHaveLength(1)
     expect(native.pending).toBe(0)
     expect(native.errors).toBe(0)
+
     return { raw, retained, native }
   } finally {
     await session.detach()

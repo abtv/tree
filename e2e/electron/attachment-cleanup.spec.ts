@@ -47,25 +47,34 @@ test.describe('attachment cleanup', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await countCleanups(app)
 
     await typeInto(node(window, 1), 'keep')
     await window.keyboard.press('Enter')
     await node(window, 2).focus()
+
     await writeClipboardImage(app)
     await firePaste(node(window, 2))
+
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[1]?.attachment?.id)
       .toEqual(expect.any(String))
+
     const attachmentId = readPersisted(userDataDir).document.roots[1]!.attachment!.id
+
     expect(existsSync(attachmentPath(userDataDir, attachmentId))).toBe(true)
 
     // Delete the image-bearing node through the UI and trigger a volume save.
     await node(window, 2).press('Backspace')
+
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
+
     const cleanupsBefore = await readCleanupCount(app)
+
     await typeInto(node(window, 1), ' one two three four five six seven eight nine ten')
+
     await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots.length ?? 0).toBe(1)
     await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment).toBeUndefined()
 
@@ -76,13 +85,16 @@ test.describe('attachment cleanup', () => {
 
     // A retained recovery generation still references the attachment, so explicit cleanup retains it.
     await cleanupAttachments(window, [])
+
     expect(attachmentFiles(userDataDir)).toContain(`${attachmentId}.png`)
 
     // With the recovery generations gone and no live references passed, cleanup removes it.
     for (const generation of documentGenerations(userDataDir)) {
       rmSync(join(userDataDir, 'data', generation), { force: true })
     }
+
     await cleanupAttachments(window, [])
+
     await expect.poll(() => attachmentFiles(userDataDir)).not.toContain(`${attachmentId}.png`)
   })
 })

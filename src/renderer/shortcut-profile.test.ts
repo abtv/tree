@@ -91,10 +91,12 @@ describe('profile Ctrl and arrow rules', () => {
   it.each(allFlagCombinations)('reports a non-primary Ctrl per platform for %o', (flags) => {
     expect(APPLE_SHORTCUTS.hasNonPrimaryCtrl(flags)).toBe(flags.ctrlKey)
     expect(OTHER_SHORTCUTS.hasNonPrimaryCtrl(flags)).toBe(flags.ctrlKey && flags.metaKey)
+
     const altGraph = {
       ...flags,
       getModifierState: (key: string) => key === 'AltGraph' && flags.ctrlKey && flags.altKey,
     }
+
     expect(OTHER_SHORTCUTS.hasNonPrimaryCtrl(altGraph)).toBe(flags.ctrlKey && (flags.metaKey || flags.altKey))
   })
 

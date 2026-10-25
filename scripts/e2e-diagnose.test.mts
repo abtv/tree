@@ -17,6 +17,7 @@ describe('E2E diagnostic command', () => {
       ],
       { PATH: '/bin' },
     )
+
     expect(result.env).toEqual({
       PATH: '/bin',
       TREE_E2E_SHARED_RESET: 'window',
@@ -38,6 +39,7 @@ describe('E2E diagnostic command', () => {
 
   it('allows a fresh-process control even when the parent opted into reuse', () => {
     const inherited = { TREE_E2E_SHARED_RESET: 'reload' }
+
     expect(diagnosticOptions(['--shared-reset=fresh'], inherited).env).toEqual({ TREE_E2E_SHARED_RESET: 'off' })
     expect(inherited.TREE_E2E_SHARED_RESET).toBe('reload')
     expect(diagnosticOptions(['--shared-reset=reload'], {}).env.TREE_E2E_SHARED_RESET).toBe('reload')
@@ -55,6 +57,7 @@ describe('E2E diagnostic command', () => {
     '--json-output',
   ])('rejects malformed setting %s before launching', (arg) => {
     let launched = false
+
     expect(() =>
       runDiagnostics([arg], () => {
         launched = true
@@ -71,6 +74,7 @@ describe('E2E diagnostic command', () => {
         expect(args).toEqual(['run', 'test:e2e', '--', '--list'])
         expect(options.shell).toBeUndefined()
         expect(options.stdio).toBe('inherit')
+
         return { status: 7 }
       }),
     ).toBe(7)

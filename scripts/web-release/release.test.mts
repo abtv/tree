@@ -32,29 +32,43 @@ describe('release manifest and package', () => {
   it('verifies a complete immutable static package and rejects changed or added files', async () => {
     const dir = await fixture()
     const manifest = await createManifest(dir, identity)
+
     await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+
     await writeFile(join(dir, 'assets/app.js'), 'changed')
+
     await expect(verifyPackage(dir, manifest)).rejects.toThrow('differs')
+
     await writeFile(join(dir, 'unexpected.txt'), 'unexpected')
+
     await expect(verifyPackage(dir, manifest)).rejects.toThrow('Unexpected')
   })
 
   it('rejects symlinks, nested directories and external or root-relative HTML assets', async () => {
     const linked = await fixture()
+
     await symlink('app.js', join(linked, 'assets/link.js'))
+
     await expect(createManifest(linked, identity)).rejects.toThrow('Unexpected')
+
     const nested = await fixture()
+
     await mkdir(join(nested, 'assets/nested'))
+
     await expect(createManifest(nested, identity)).rejects.toThrow('Unexpected')
+
     for (const ref of ['https://example.com/app.js', '/assets/app.js', '../app.js']) {
       const dir = await fixture()
+
       await writeFile(join(dir, 'index.html'), `<script src="${ref}"></script>`)
+
       await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
     }
   })
 
   it('accepts the exact installable-app root files and rejects other root names', async () => {
     const dir = await fixture()
+
     await writeFile(
       join(dir, 'index.html'),
       '<script src="./assets/app.js"></script><link rel="manifest" href="./manifest.webmanifest">' +
@@ -64,30 +78,43 @@ describe('release manifest and package', () => {
       await writeFile(join(dir, name), name)
     }
     const manifest = await createManifest(dir, identity)
+
     expect(manifest.assetGenerations[0]!.some((path) => !path.startsWith('assets/'))).toBe(false)
     await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+
     for (const name of ['other.html', 'icon.svg', 'icon-256.png', 'manifest.json', 'Icon-192.png']) {
       const other = await fixture()
+
       await writeFile(join(other, name), name)
+
       await expect(createManifest(other, identity)).rejects.toThrow('Unexpected')
     }
     const nested = await fixture()
+
     await mkdir(join(nested, 'icons'))
     await writeFile(join(nested, 'icons/icon-192.png'), 'icon')
+
     await expect(createManifest(nested, identity)).rejects.toThrow('Unexpected')
+
     const missing = await fixture()
+
     await writeFile(join(missing, 'index.html'), '<link rel="manifest" href="./manifest.webmanifest">')
+
     await expect(createManifest(missing, identity)).rejects.toThrow('asset reference')
+
     for (const ref of ['/manifest.webmanifest', 'manifest.webmanifest', './icons/icon-192.png']) {
       const dir = await fixture()
+
       await writeFile(join(dir, 'manifest.webmanifest'), '{}')
       await writeFile(join(dir, 'index.html'), `<link href="${ref}">`)
+
       await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
     }
   })
 
   it('rejects untrusted identities, duplicate/traversing paths and oversized manifests', async () => {
     const manifest = await createManifest(await fixture(), identity)
+
     for (const replacement of [
       { schema: 3 },
       { sourceRepository: 'other/tree' },
@@ -107,12 +134,15 @@ describe('release gates', () => {
   const success = Object.fromEntries(['check', 'audit', 'chrome'].map((key) => [key, { result: 'success' }]))
   it('requires every Linux publication check to succeed', () => {
     expect(() => validateGate(success)).not.toThrow()
+
     for (const key of Object.keys(success)) {
       for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
         expect(() => validateGate({ ...success, [key]: { result } })).toThrow()
       }
+
       const missing = { ...success }
       delete missing[key]
+
       expect(() => validateGate(missing)).toThrow()
     }
   })

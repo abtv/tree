@@ -21,6 +21,7 @@ test.describe('long text wrapping', () => {
     await node(window, 1).fill(text)
 
     const box = await metrics(node(window, 1))
+
     expect(box.value).toBe(text)
     expect(box.height).toBeGreaterThan(30)
     expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1)
@@ -32,6 +33,7 @@ test.describe('long text wrapping', () => {
     await node(window, 1).fill('x'.repeat(400))
 
     const box = await metrics(node(window, 1))
+
     expect(box.height).toBeGreaterThan(30)
     expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1)
   })
@@ -43,6 +45,7 @@ test.describe('long text wrapping', () => {
     await window.keyboard.press('Meta+.')
 
     const box = await metrics(parent(window))
+
     expect(box.height).toBeGreaterThan(40)
     expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth + 1)
   })

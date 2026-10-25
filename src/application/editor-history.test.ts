@@ -39,6 +39,7 @@ describe('EditorHistory', () => {
   it('retains snapshots by reference instead of deep-cloning them', () => {
     const history = new EditorHistory()
     const initial = root('Before')
+
     const edited = root('After')
 
     history.begin(initial)
@@ -79,6 +80,7 @@ describe('EditorHistory', () => {
 
   it('reports a reachability change when a new edit discards the redo branch', () => {
     const history = new EditorHistory()
+
     history.begin(root('v1'))
     history.undo(root('v2'), location)
 
@@ -94,13 +96,17 @@ describe('EditorHistory', () => {
 
   it('tracks attachment references across undo and redo', () => {
     const history = new EditorHistory()
+
     history.begin(attached('image'))
+
     expect([...history.attachmentIds()]).toEqual(['image'])
 
     history.undo(root('live'), location)
+
     expect([...history.attachmentIds()]).toEqual([])
 
     history.redo(root('live'), location)
+
     expect([...history.attachmentIds()]).toEqual([])
   })
 
@@ -109,14 +115,18 @@ describe('EditorHistory', () => {
     for (let index = 0; index < HISTORY_LIMIT; index += 1) {
       history.begin(root(`v${index}`))
     }
+
     history.begin(attached('image'))
     history.begin(attached('image'))
+
     expect([...history.attachmentIds()]).toEqual(['image'])
 
     history.undo(root('live'), location)
+
     expect([...history.attachmentIds()]).toEqual(['image'])
 
     history.undo(root('live'), location)
+
     expect([...history.attachmentIds()]).toEqual([])
   })
 
@@ -131,8 +141,10 @@ describe('EditorHistory', () => {
     }
 
     const before = collections
+
     history.attachmentIds()
     history.attachmentIds()
+
     expect(collections).toBe(before)
   })
 
@@ -144,6 +156,7 @@ describe('EditorHistory', () => {
     )
 
     for (let index = 0; index < HISTORY_LIMIT; index += 1) history.begin(root('shared'))
+
     expect(shared.reads()).toBe(1)
     expect([...history.attachmentIds()].sort()).toEqual(['a', 'b'])
 
@@ -216,10 +229,12 @@ describe('EditorHistory', () => {
     for (let index = 0; index < HISTORY_LIMIT; index += 1) history.begin(root('one'))
     current = second.summary
     for (let index = 0; index < HISTORY_LIMIT; index += 1) history.begin(root('two'))
+
     expect([...history.attachmentIds()].sort()).toEqual(['extra', 'shared'])
 
     current = third.summary
     for (let index = 0; index < HISTORY_LIMIT; index += 1) history.begin(root('three'))
+
     expect([...history.attachmentIds()]).toEqual(['extra'])
   })
 
@@ -248,11 +263,16 @@ describe('EditorHistory', () => {
         { id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Before', children: [] }] },
       ],
     }
+
     const after = editNodeText(before, 'child', 'After')
     const selectedChild = { currentParentId: 'parent', selectedNodeId: 'child' }
+
     history.begin(before)
+
     expect(history.undo(after, selectedChild)).toEqual({ document: before, location: selectedChild })
+
     const selectedRoot = { currentParentId: null, selectedNodeId: 'parent' }
+
     expect(history.redo(before, selectedRoot)).toEqual({ document: after, location: selectedRoot })
   })
 
@@ -276,7 +296,9 @@ describe('EditorHistory', () => {
         },
       ],
     }
+
     history.begin(before)
+
     expect(history.undo(after, { currentParentId: 'removed', selectedNodeId: 'removed' })).toEqual({
       document: before,
       location: { currentParentId: 'middle', selectedNodeId: 'middle' },
@@ -287,7 +309,9 @@ describe('EditorHistory', () => {
     const history = new EditorHistory()
     const before = root('Restored')
     const after: Document = { roots: [{ id: 'removed', text: '', children: [] }] }
+
     history.begin(before)
+
     expect(history.undo(after, { currentParentId: 'removed', selectedNodeId: 'removed' })).toEqual({
       document: before,
       location,
@@ -304,7 +328,9 @@ describe('EditorHistory', () => {
       ],
     }
     const after: Document = { roots: [{ id: 'removed', text: '', children: [] }] }
+
     history.begin(before)
+
     expect(history.undo(after, { currentParentId: null, selectedNodeId: 'removed' })).toEqual({
       document: before,
       location: { currentParentId: null, selectedNodeId: 'first' },
@@ -318,19 +344,26 @@ describe('EditorHistory', () => {
     let current = snapshots[HISTORY_LIMIT]!
     for (let index = HISTORY_LIMIT - 1; index >= 0; index -= 1) {
       const previous = history.undo(current, location)
+
       expect(previous?.document).toBe(snapshots[index])
+
       current = previous!.document
     }
+
     expect(history.undo(current, location)).toBeUndefined()
     expect([...history.documents()]).toHaveLength(HISTORY_LIMIT)
     expect([...history.attachmentIds()].sort()).toEqual(
       Array.from({ length: HISTORY_LIMIT }, (_, index) => `image-${index + 1}`).sort(),
     )
+
     for (let index = 1; index <= HISTORY_LIMIT; index += 1) {
       const next = history.redo(current, location)
+
       expect(next?.document).toBe(snapshots[index])
+
       current = next!.document
     }
+
     expect(history.redo(current, location)).toBeUndefined()
     expect([...history.documents()]).toHaveLength(HISTORY_LIMIT)
     expect([...history.attachmentIds()].sort()).toEqual(

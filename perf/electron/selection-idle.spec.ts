@@ -15,14 +15,18 @@ for (const view of ['Tree', 'Agenda'] as const) {
       exact: true,
     })
     await input.focus()
+
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     // Settle focus and the Normal block projection before counting only idle events.
     await window.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
     )
+
     await expect(input).toHaveAttribute('contenteditable', 'true')
     expect(await input.evaluate(() => globalThis.getSelection()?.toString().length)).toBe(1)
+
     const events = await window.evaluate(async () => {
       let count = 0
       const onSelection = (): void => {
@@ -33,12 +37,14 @@ for (const view of ['Tree', 'Agenda'] as const) {
       document.removeEventListener('selectionchange', onSelection)
       return count
     })
+
     recordPerfResult({
       kind: 'state',
       scenario: `${view.toLowerCase()}-normal-idle-selection`,
       samples: 1,
       metrics: { selectionchangeEvents: events },
     })
+
     expect(events).toBeLessThan(10)
     await expect(input).toBeFocused()
   })

@@ -19,16 +19,20 @@ async function lockedStore(): Promise<{ store: EditorStore; services: ReturnType
   )
   const clock: Clock = { setTimeout: () => 0, clearTimeout: () => {} }
   const store = new EditorStore(services, freshIds(), clock)
+
   await store.initialize()
   await store.flushPersistence()
   services.save = async () => {
     throw new Error('disk full')
   }
+
   store.editText('a', 'Changed')
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await expect(store.flushPersistence()).rejects.toThrow('disk full')
   }
   expect(store.getSnapshot()).toMatchObject({ persistenceLocked: true })
+
   return { store, services }
 }
 
@@ -41,13 +45,17 @@ it('avoids building a reordered document while locked and permits the transition
   const build = vi.spyOn(transitions, 'moveNodeTransition')
   try {
     store.moveNodeTo('a', 2)
+
     expect(build).not.toHaveBeenCalled()
     expect(store.getSnapshot()).toBe(before)
+
     services.save = async (state) => {
       services.saves.push(state)
     }
     await store.flushPersistence()
+
     store.moveNodeTo('a', 2)
+
     expect(build).toHaveBeenCalledTimes(1)
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'b' }, { id: 'a', text: 'Changed' }] },
@@ -68,10 +76,12 @@ it('avoids building a moved document while locked and permits the move to anothe
     expect(store.moveNodeToParent('a', 'b', 0)).toBe(false)
     expect(build).not.toHaveBeenCalled()
     expect(store.getSnapshot()).toBe(before)
+
     services.save = async (state) => {
       services.saves.push(state)
     }
     await store.flushPersistence()
+
     expect(store.moveNodeToParent('a', 'b', 0)).toBe(true)
     expect(build).toHaveBeenCalledTimes(1)
     expect(store.getSnapshot()).toMatchObject({

@@ -37,27 +37,33 @@ describe('nodeDragReducer', () => {
   it('ignores duplicate presses while a gesture is pending or active', () => {
     const pending = nodeDragReducer(IDLE_NODE_DRAG, press())
     const other = { nodeId: 'b', index: 4, pointerId: 9 }
+
     expect(nodeDragReducer(pending, press({ source: other }))).toBe(pending)
 
     const dragging = nodeDragReducer(pending, { type: 'hold', pointerId: source.pointerId })
+
     expect(nodeDragReducer(dragging, press({ source: other }))).toBe(dragging)
   })
 
   it('activates only when the hold matches the pending pointer', () => {
     const pending = nodeDragReducer(IDLE_NODE_DRAG, press())
+
     expect(nodeDragReducer(IDLE_NODE_DRAG, { type: 'hold', pointerId: 7 })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(pending, { type: 'hold', pointerId: 8 })).toBe(pending)
     expect(nodeDragReducer(pending, { type: 'hold', pointerId: 7 })).toEqual({
       phase: 'dragging',
       source,
     })
+
     const dragging: NodeDragState = { phase: 'dragging', source }
+
     expect(nodeDragReducer(dragging, { type: 'hold', pointerId: 7 })).toBe(dragging)
   })
 
   it('returns to idle on release from pending or dragging', () => {
     const pending = nodeDragReducer(IDLE_NODE_DRAG, press())
     const dragging = nodeDragReducer(pending, { type: 'hold', pointerId: 7 })
+
     expect(nodeDragReducer(pending, { type: 'release', pointerId: 8 })).toBe(pending)
     expect(nodeDragReducer(pending, { type: 'release', pointerId: 7 })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(dragging, { type: 'release', pointerId: 7 })).toBe(IDLE_NODE_DRAG)
@@ -67,6 +73,7 @@ describe('nodeDragReducer', () => {
   it('cancels from any phase', () => {
     const pending = nodeDragReducer(IDLE_NODE_DRAG, press())
     const dragging = nodeDragReducer(pending, { type: 'hold', pointerId: 7 })
+
     expect(nodeDragReducer(pending, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(dragging, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
     expect(nodeDragReducer(IDLE_NODE_DRAG, { type: 'cancel' })).toBe(IDLE_NODE_DRAG)
@@ -122,6 +129,7 @@ describe('dropZoneAtPoint', () => {
   it('splits a row into an upper gap band, a middle drop on the node, and a lower gap band', () => {
     // A 20px row has 5px bands.
     const regions = [{ index: 3, top: 100, bottom: 120 }]
+
     expect(dropZoneAtPoint(regions, 100)).toEqual({ gap: 3 })
     expect(dropZoneAtPoint(regions, 104.9)).toEqual({ gap: 3 })
     expect(dropZoneAtPoint(regions, 105)).toEqual({ row: 3 })
@@ -132,6 +140,7 @@ describe('dropZoneAtPoint', () => {
 
   it('caps the band of a tall row so its middle stays a drop on the node', () => {
     const regions = [{ index: 0, top: 0, bottom: 100 }]
+
     expect(DROP_BAND_MAX_PX).toBe(8)
     expect(dropZoneAtPoint(regions, 7.9)).toEqual({ gap: 0 })
     expect(dropZoneAtPoint(regions, 8)).toEqual({ row: 0 })
@@ -144,6 +153,7 @@ describe('dropZoneAtPoint', () => {
       { index: 0, top: 0, bottom: 27 },
       { index: 1, top: 27, bottom: 54 },
     ]
+
     expect(dropZoneAtPoint(regions, 26.9)).toEqual({ gap: 1 })
     expect(dropZoneAtPoint(regions, 27)).toEqual({ gap: 1 })
   })
@@ -153,16 +163,19 @@ describe('dropZoneAtPoint', () => {
       { index: 0, top: 0, bottom: 27 },
       { index: 1, top: 27, bottom: 54 },
     ]
+
     expect(dropZoneAtPoint(regions, -10)).toEqual({ gap: 0 })
     expect(dropZoneAtPoint(regions, 100)).toEqual({ gap: 2 })
   })
 
   it('maps a point exactly on the bottom edge of a row to the gap after it', () => {
     expect(dropZoneAtPoint([{ index: 4, top: 0, bottom: 27 }], 27)).toEqual({ gap: 5 })
+
     const regions = [
       { index: 0, top: 0, bottom: 27 },
       { index: 36, top: 972, bottom: 999 },
     ]
+
     expect(dropZoneAtPoint(regions, 27)).toEqual({ gap: 1 })
     expect(dropZoneAtPoint(regions, 999)).toEqual({ gap: 37 })
   })
@@ -173,6 +186,7 @@ describe('dropZoneAtPoint', () => {
       { index: 0, top: 0, bottom: 27 },
       { index: 36, top: 972, bottom: 999 },
     ]
+
     expect(dropZoneAtPoint(regions, 500)).toEqual({ gap: 1 })
     expect(dropZoneAtPoint(regions, 10000)).toEqual({ gap: 37 })
     expect(dropZoneAtPoint(regions, 20000)).toEqual({ gap: 551 })
@@ -184,6 +198,7 @@ describe('dropZoneAtPoint', () => {
       { index: 1, top: 40, bottom: 40 },
       { index: 2, top: 54, bottom: 81 },
     ]
+
     expect(dropZoneAtPoint(regions, 40)).toEqual({ gap: 1 })
     expect(dropZoneAtPoint(regions, -5)).toEqual({ gap: 0 })
   })
@@ -245,6 +260,7 @@ describe('dropMarkerFor', () => {
 
   it('keeps an idle gesture identity for stale pointer events', () => {
     const idleWithSource: NodeDragState = { phase: 'idle', source }
+
     expect(nodeDragReducer(idleWithSource, { type: 'release', pointerId: source.pointerId })).toBe(idleWithSource)
     expect(nodeDragReducer(idleWithSource, { type: 'cancel' })).toBe(idleWithSource)
     expect(resolveNodeDrag(idleWithSource, { locked: true, sourceAvailable: false })).toBe(idleWithSource)

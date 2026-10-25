@@ -63,6 +63,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     await seedSiblings(window)
 
     const source = window.locator('.node-row').nth(3)
+
     await startRowDrag(window, source.locator('.node-input'))
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
@@ -70,7 +71,9 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     await expect(source).toHaveCSS('cursor', 'not-allowed')
 
     const target = await rowBox(window, 1)
+
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
+
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
     await expect(source).toHaveCSS('cursor', 'grabbing')
 
@@ -79,7 +82,9 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'D', 'B', 'C'])
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('body')).not.toHaveClass(/node-drag-active/)
+
     const moved = window.locator('.node-row').nth(1).locator('.node-input')
+
     await expect(moved).toBeFocused()
     await expect(moved).toHaveValue('D')
   })
@@ -91,19 +96,25 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     const source = window.locator('.node-row').nth(2).locator('.node-input')
     const box = await source.boundingBox()
     if (box === null) throw new Error('The third row was not rendered.')
+
     await window.mouse.click(box.x + box.width - 6, box.y + box.height / 2)
+
     await expect(source).toBeFocused()
     await expect(source).toHaveJSProperty('selectionStart', 1)
 
     await startRowDrag(window, source)
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     const frozen = await source.evaluate((element) => {
       const input = element as HTMLTextAreaElement
       return [input.selectionStart, input.selectionEnd]
     })
+
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.keyboard.press('Escape')
+
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.mouse.up()
@@ -133,22 +144,29 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
       location: { currentParentId: null, selectedNodeId: 'd' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     else await expect(window.getByLabel('Vim mode')).toHaveCount(0)
 
     const first = window.locator('.node-row').nth(0).locator('.node-input')
+
     await first.click()
+
     await expect(first).toBeFocused()
 
     const source = window.locator('.node-row').nth(2).locator('.node-input')
+
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
+
     await startRowDrag(window, source)
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
     const frozen = await source.evaluate((element) => {
       const input = element as HTMLTextAreaElement
       return [input.selectionStart, input.selectionEnd]
     })
+
     expect(frozen[0]).toBe(frozen[1])
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
@@ -173,9 +191,12 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     await seedSiblings(window)
 
     const source = window.locator('.node-row').nth(3).locator('.node-input')
+
     await startRowDrag(window, source)
     const target = await rowBox(window, 1)
+
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
+
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
 
     await window.keyboard.press('Escape')
@@ -186,6 +207,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.mouse.move(target.x + 180, target.y + 40, { steps: 10 })
+
     expect(
       await source.evaluate((element) => {
         const input = element as HTMLTextAreaElement
@@ -207,6 +229,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
 
   test('keeps a pressed drag as a text selection instead of starting a node drag', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await typeInto(node(window, 1), 'Forest')
     await window.keyboard.press('Enter')
     await typeInto(node(window, 2), 'Second')
@@ -217,6 +240,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     const source = rows.nth(2).locator('.node-input')
     const box = await source.boundingBox()
     if (box === null) throw new Error('The third row was not rendered.')
+
     await window.mouse.move(box.x + 10, box.y + box.height / 2)
     // The hold timer must not run on wall-clock time here: a slow driver round trip between the press
     // and the first move would let the hold elapse and start a node drag, which is a different
@@ -227,6 +251,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     await window.mouse.move(box.x + 55, box.y + box.height / 2, { steps: 4 })
 
     await window.clock.runFor(HOLD_MS)
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('body')).not.toHaveClass(/node-drag-active/)
     expect(
@@ -249,6 +274,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
 
   test('keeps the selection collapsed while dragging a node across the text', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await typeInto(node(window, 1), 'Alpha text one')
     await window.keyboard.press('Enter')
     await typeInto(node(window, 2), 'Bravo text two')
@@ -288,29 +314,38 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     }
 
     await startRowDrag(window, source, { xOffset: 60 })
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
     const frozen = await selectionState()
+
     expect(frozen[0]).toBe(frozen[1])
     expect(await source.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.mouse.move(x + 120, y, { steps: 20 })
+
     expect(await selectionState()).toEqual(frozen)
+
     await window.mouse.move(x - 60, y - 20, { steps: 20 })
+
     expect(await selectionState()).toEqual(frozen)
 
     const target = await rowBox(window, 0)
+
     await window.mouse.move(target.x + 10, target.y + 4, { steps: 5 })
     await window.mouse.up()
 
     await expect
       .poll(() => nodeTexts(window))
       .toEqual(['Delta text four', 'Alpha text one', 'Bravo text two', 'Charlie text three'])
+
     const moved = window.locator('.node-row').nth(0).locator('.node-input')
+
     const after = await moved.evaluate((element) => {
       const input = element as HTMLTextAreaElement
       return [input.selectionStart, input.selectionEnd]
     })
+
     expect(after[0]).toBe(after[1])
     expect(await moved.evaluate((element) => document.activeElement === element)).toBe(true)
     expect(
@@ -329,14 +364,17 @@ test.describe('drag and drop (mode-independent)', () => {
     const source = window.locator('.node-row').nth(3)
     const box = await source.locator('.node-input').boundingBox()
     if (box === null) throw new Error('The fourth row was not rendered.')
+
     await window.mouse.move(box.x + 8, box.y + box.height / 2)
     await window.mouse.down()
     const target = await rowBox(window, 1)
+
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 2 })
     await window.waitForTimeout(HOLD_MS)
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
+
     await window.mouse.up()
 
     expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
@@ -344,6 +382,7 @@ test.describe('drag and drop (mode-independent)', () => {
 
   test('keeps dragging when the pointer moves within the hold tolerance', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await typeInto(node(window, 1), 'Forest')
     await window.keyboard.press('Enter')
     await typeInto(node(window, 2), 'Second')
@@ -352,15 +391,18 @@ test.describe('drag and drop (mode-independent)', () => {
 
     const rows = window.locator('.node-row')
     const source = rows.nth(2).locator('.node-input')
+
     await startRowDrag(window, source, {
       xOffset: 10,
       duringHold: async (box) => {
         await window.mouse.move(box.x + 13, box.y + box.height / 2)
       },
     })
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
     const target = await rowBox(window, 0)
+
     await window.mouse.move(target.x + 10, target.y + 4, { steps: 5 })
     await window.mouse.up()
 
@@ -372,7 +414,9 @@ test.describe('drag and drop (mode-independent)', () => {
     await seedSiblings(window)
 
     await startRowDrag(window, window.locator('.node-row').nth(1).locator('.node-input'))
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     await window.mouse.up()
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
@@ -390,6 +434,7 @@ test.describe('drag and drop (mode-independent)', () => {
     const target = source.locator('.node-input')
     const box = await target.boundingBox()
     if (box === null) throw new Error('The drag source was not rendered.')
+
     await window.mouse.move(box.x + 8, box.y + box.height / 2)
     await window.mouse.down()
     await source.evaluate((element) => {
@@ -397,6 +442,7 @@ test.describe('drag and drop (mode-independent)', () => {
     })
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     await window.mouse.up()
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
@@ -419,16 +465,20 @@ test.describe('drag and drop (Vim editing only)', () => {
       location: { currentParentId: null, selectedNodeId: 'd' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     const source = window.locator('.node-row').nth(3)
     const sourceBox = await source.locator('.node-input').boundingBox()
     if (sourceBox === null) throw new Error('The fourth row was not rendered.')
+
     await window.mouse.click(sourceBox.x + 8, sourceBox.y + sourceBox.height / 2)
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await startRowDrag(window, source.locator('.node-input'))
     const target = await rowBox(window, 1)
+
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
     await window.mouse.up()
 
@@ -450,6 +500,7 @@ test.describe('text selection highlight in standard editing', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await dragSelectText(window, editor, 6, 70)
 
     expect(
@@ -461,8 +512,10 @@ test.describe('text selection highlight in standard editing', () => {
     await expect(editor).toHaveScreenshot('standard-text-selection-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
+
     expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
     await expect(editor).toHaveScreenshot('standard-text-selection-dark.png')
+
     await window.emulateMedia({ colorScheme: 'light' })
   })
 })

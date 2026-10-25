@@ -55,6 +55,7 @@ describe('diffTypedText', () => {
 describe('resolveReplaceCommit', () => {
   it('replaces the selected word before overwriting subsequent characters', () => {
     const session = { nodeId: 'a', baseline: 'one word tail', position: 4, selectionEnd: 8, typed: '' }
+
     expect(applyReplaceKey(session, 'X')).toEqual({ workingText: 'one X tail', cursor: 5 })
     expect(applyReplaceKey(session, 'Y')).toEqual({ workingText: 'one XYtail', cursor: 6 })
     expect(resolveReplaceCommit(session)).toEqual({
@@ -92,6 +93,7 @@ describe('resolveReplaceCommit', () => {
 
   it('shrinks the replaced range after a Backspace during Replace', () => {
     const grown = resolveReplaceCommit({ baseline: 'ab', position: 1, typed: 'XY' })
+
     expect(grown).toEqual({ finalText: 'aXY', replacedStart: 1, replacedEnd: 2, rawCursor: 3 })
     expect(resolveReplaceCommit({ baseline: 'ab', position: 1, typed: 'X' })).toEqual({
       finalText: 'aX',
@@ -105,19 +107,24 @@ describe('resolveReplaceCommit', () => {
 describe('VimEditSessionState', () => {
   it('consumes an Agenda row click once and clears its destination and blur state', () => {
     const state = createVimEditSessionState()
+
     beginReplaceClick(state, 'day:1')
     state.replaceClickMoved = true
+
     expect(state.replaceClickAgendaKey).toBe('day:1')
     expect(takeReplaceClick(state)).toBe(true)
     expect(state.replaceClickAgendaKey).toBeUndefined()
     expect(state.replaceClickMoved).toBeUndefined()
     expect(takeReplaceClick(state)).toBe(false)
+
     beginReplaceClick(state)
+
     expect(state.replaceClickAgendaKey).toBeUndefined()
   })
 
   it('starts with an empty register and no pending session', () => {
     const state = createVimEditSessionState()
+
     expect(state.register).toEqual({ kind: 'empty' })
     expect(state.insert).toBeUndefined()
     expect(state.replace).toBeUndefined()
@@ -133,7 +140,9 @@ describe('VimEditSessionState', () => {
       position: 1,
       change: { kind: 'insert', entry: 'i' } as const,
     }
+
     beginInsertSession(state, session)
+
     expect(takeInsertSession(state)).toBe(session)
     expect(takeInsertSession(state)).toBeUndefined()
     expect(state.register).toBe(register)
@@ -142,19 +151,25 @@ describe('VimEditSessionState', () => {
 
   it('starts a Replace session with no typed text and takes it exactly once', () => {
     const state = createVimEditSessionState()
+
     beginReplaceSession(state, { nodeId: 'a', baseline: 'abc', position: 2 })
+
     expect(state.replace).toEqual({ nodeId: 'a', baseline: 'abc', position: 2, typed: '' })
+
     const taken = takeReplaceSession(state)
+
     expect(taken).toEqual({ nodeId: 'a', baseline: 'abc', position: 2, typed: '' })
     expect(takeReplaceSession(state)).toBeUndefined()
   })
 
   it('replaces a prior session of the same kind rather than accumulating one', () => {
     const state = createVimEditSessionState()
+
     beginInsertSession(state, { nodeId: 'a', baseline: 'a', position: 0, change: { kind: 'insert', entry: 'i' } })
     beginInsertSession(state, { nodeId: 'b', baseline: 'b', position: 0, change: { kind: 'insert', entry: 'a' } })
     beginReplaceSession(state, { nodeId: 'a', baseline: 'a', position: 0 })
     beginReplaceSession(state, { nodeId: 'b', baseline: 'b', position: 1 })
+
     expect(takeInsertSession(state)?.nodeId).toBe('b')
     expect(takeReplaceSession(state)?.nodeId).toBe('b')
     expect(takeInsertSession(state)).toBeUndefined()
@@ -177,6 +192,7 @@ describe('applyReplaceKey', () => {
 
   it('overwrites in place and appends past the end of the baseline', () => {
     const target = session()
+
     expect(applyReplaceKey(target, 'X')).toEqual({ workingText: 'aXcd', cursor: 2 })
     expect(applyReplaceKey(target, 'Y')).toEqual({ workingText: 'aXYd', cursor: 3 })
     expect(applyReplaceKey(target, 'Z')).toEqual({ workingText: 'aXYZ', cursor: 4 })
@@ -185,6 +201,7 @@ describe('applyReplaceKey', () => {
 
   it('shrinks the working text again when Backspace removes a typed character', () => {
     const target = session({ typed: 'XY' })
+
     // The character the shorter typed text no longer overwrites reappears, matching a commit of
     // the shorter session (`baseline.slice(position + replaced)` is re-exposed).
     expect(applyReplaceKey(target, 'Backspace')).toEqual({ workingText: 'aXcd', cursor: 2 })
@@ -192,6 +209,7 @@ describe('applyReplaceKey', () => {
 
   it('leaves a key it does not consume untouched', () => {
     const target = session({ typed: 'X' })
+
     expect(applyReplaceKey(target, 'Enter')).toBeUndefined()
     expect(applyReplaceKey(target, 'ArrowLeft')).toBeUndefined()
     expect(target.typed).toBe('X')
@@ -288,6 +306,7 @@ describe('register transitions', () => {
   it('snapshots a structurally deleted node and keeps its ID', () => {
     const register = nodeRegister(node)
     if (register.kind !== 'node') throw new Error('expected a node register')
+
     expect(register.sourceIds).toEqual(['a'])
     expect(register.value).toEqual(node)
     expect(register.value).not.toBe(node)

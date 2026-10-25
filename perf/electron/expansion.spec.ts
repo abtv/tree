@@ -29,11 +29,13 @@ test.describe('inline expansion at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
 
     // Setup (expanding 250 of 600 top-level roots, producing 1,100 visible rows) is not measured;
     // only the subsequent keyboard traversal is.
     await expandFirstTopLevelRoots(window, EXPANDED_TOP_LEVEL_COUNT)
+
     expect(await window.locator('.node-list-spacer').count()).toBe(2)
 
     await window.evaluate(() => {
@@ -55,16 +57,19 @@ test.describe('inline expansion at scale', () => {
     const samples = await window.evaluate(() =>
       (window as unknown as { verticalPaints: number[] }).verticalPaints.slice().sort((a, b) => a - b),
     )
+
     await expect(input).toBeFocused()
 
     const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
     const paintMaxMs = samples[samples.length - 1]!
+
     recordPerfResult({
       kind: 'state',
       scenario: 'inline-expansion-vertical-traversal-1100-visible-rows',
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
+
     expect(paintP95Ms).toBeLessThan(50)
     expect(paintMaxMs).toBeLessThan(100)
 
@@ -94,15 +99,18 @@ test.describe('inline expansion at scale', () => {
     const countedSamples = await window.evaluate(() =>
       (window as unknown as { countedPaints: number[] }).countedPaints.slice().sort((a, b) => a - b),
     )
+
     await expect(input).toBeFocused()
 
     const countedMaxMs = countedSamples[countedSamples.length - 1]!
+
     recordPerfResult({
       kind: 'state',
       scenario: 'inline-expansion-counted-vertical-traversal-50-steps-1100-visible-rows',
       samples: countedSamples.length,
       metrics: { paintMaxMs: round(countedMaxMs) },
     })
+
     expect(countedMaxMs).toBeLessThan(100)
   })
 
@@ -112,6 +120,7 @@ test.describe('inline expansion at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
 
     await window.evaluate(() => {
@@ -138,23 +147,29 @@ test.describe('inline expansion at scale', () => {
     // after each fold command is measured, not the `z` prefix keypress. Four more pairs cover both
     // directions repeatedly.
     await foldPair()
+
     expect(await window.locator('.node-list-spacer').count()).toBe(2)
     expect(await window.locator('.node-row').count()).toBeLessThan(600 + 600 * 2)
+
     for (let index = 0; index < 4; index += 1) await foldPair()
     await window.waitForFunction(() => (window as unknown as { foldPaints: number[] }).foldPaints.length === 10)
+
     await expect(input).toBeFocused()
+
     const samples = await window.evaluate(() =>
       (window as unknown as { foldPaints: number[] }).foldPaints.slice().sort((a, b) => a - b),
     )
 
     const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
     const paintMaxMs = samples[samples.length - 1]!
+
     recordPerfResult({
       kind: 'state',
       scenario: 'fold-open-all-and-close-all-600-roots',
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
+
     expect(paintP95Ms).toBeLessThan(50)
     expect(paintMaxMs).toBeLessThan(100)
   })
@@ -171,12 +186,15 @@ test.describe('inline expansion at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', memoryProbe: true })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
     expect(await window.locator('.node-list-spacer').count()).toBe(0)
 
     const before = await collectRendererHeap(window)
     await expandFirstTopLevelRoots(window, expandedCount)
+
     expect(await window.locator('.node-list-spacer').count()).toBe(2)
+
     const afterExpand = await collectRendererHeap(window)
 
     // `zM` closes every fold in the location regardless of which rows are currently mounted (most of
@@ -186,11 +204,14 @@ test.describe('inline expansion at scale', () => {
     // than accumulate.
     await window.keyboard.press('z')
     await window.keyboard.press('M')
+
     await expect(window.locator('.node-list-spacer')).toHaveCount(0)
+
     const afterCollapse = await collectRendererHeap(window)
 
     const expandGrowthBytes = afterExpand - before
     const residualGrowthBytes = afterCollapse - before
+
     recordPerfResult({
       kind: 'state',
       scenario: 'inline-expansion-heap-growth-100-branches',
@@ -202,6 +223,7 @@ test.describe('inline expansion at scale', () => {
         residualGrowthBytes,
       },
     })
+
     expect(expandGrowthBytes).toBeLessThan(5_000_000)
     expect(residualGrowthBytes).toBeLessThan(2_000_000)
   })

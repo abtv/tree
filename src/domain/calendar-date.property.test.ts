@@ -8,9 +8,12 @@ it('round trips every canonical day and agrees with an independent UTC calendar'
   fc.assert(
     fc.property(fc.integer({ min: -719528, max: 2932896 }), (day) => {
       const date = calendarDateOf(day)
+
       expect(isValidCalendarDate(date)).toBe(true)
       expect(dayNumberOf(date)).toBe(day)
+
       const reference = new Date(day * 86400000)
+
       expect(date).toEqual({
         year: reference.getUTCFullYear(),
         month: reference.getUTCMonth() + 1,

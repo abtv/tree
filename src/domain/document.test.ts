@@ -50,6 +50,7 @@ describe('document operations', () => {
         { id: 'other', text: 'Other', children: [{ id: 'other-child', text: 'Child', children: [] }] },
       ],
     }
+
     const result = editNodeContent(document, 'child', 'Updated', [])
 
     expect(result.roots[0]).not.toBe(document.roots[0])
@@ -123,6 +124,7 @@ describe('document operations', () => {
     }
 
     const ids = ['copy', 'copy-child']
+
     const inserted = insertSubtreeSibling(document, 'target', 'after', source, () => ids.shift()!)
     const copy = inserted.roots[1]!
 
@@ -198,6 +200,7 @@ describe('document operations', () => {
 
   it('round-trips a valid persisted state and rejects duplicate IDs', () => {
     const document = createInitialDocument('root')
+
     const state = serializeState(document, { currentParentId: null, selectedNodeId: 'root' })
 
     expect(state.document).toBe(document)
@@ -212,6 +215,7 @@ describe('document operations', () => {
 
   it('validates persisted state without rebuilding the document', () => {
     const document = createInitialDocument('root')
+
     const state = serializeState(document, { currentParentId: null, selectedNodeId: 'root' })
 
     expect(validatePersistedState(state)).toBe(state)
@@ -247,7 +251,9 @@ describe('document operations', () => {
 
   it('deletes a subtree as one operation', () => {
     const document = createFirstChild(createInitialDocument('a'), 'a', 'child')
+
     const result = deleteNode(document, 'a')
+
     expect(result.roots).toEqual([])
   })
 
@@ -305,11 +311,14 @@ describe('document operations', () => {
       ],
     }
     const underParent = createLastChild(document, 'a', 'new', '2026-10-14 ')
+
     expect(underParent.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'new'])
     expect(underParent.roots[0]!.children.at(-1)).toEqual({ id: 'new', text: '2026-10-14 ', children: [] })
     expect(underParent.roots[0]!.children[0]).toBe(document.roots[0]!.children[0])
     expect(underParent.roots[1]).toBe(document.roots[1])
+
     const underRoot = createLastChild(document, null, 'new', 'text')
+
     expect(underRoot.roots.map((node) => node.id)).toEqual(['a', 'b', 'new'])
     expect(underRoot.roots[0]).toBe(document.roots[0])
     expect(attachmentSummary(underRoot)).toBe(attachmentSummary(document))
@@ -323,6 +332,7 @@ describe('document operations', () => {
       node = { id: `n${index}`, text: '', children: [node] }
     }
     const document: Document = { roots: [node] }
+
     expect(() => createLastChild(document, `n${MAX_DOCUMENT_DEPTH - 1}`, 'new', '')).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
     expect(() => assertDocument(createLastChild(document, `n${MAX_DOCUMENT_DEPTH - 2}`, 'new', ''))).not.toThrow()
   })
@@ -339,6 +349,7 @@ describe('document operations', () => {
       text: 'Source',
       children: [{ id: 'source-child', text: 'Child', children: [] }],
     }
+
     expect(subtreeHeight(source)).toBe(2)
 
     expect(() => insertSubtreeSibling(document, deepestId, 'after', source, () => 'copy')).toThrow(
@@ -347,6 +358,7 @@ describe('document operations', () => {
     expect(() => replaceSiblingRange(document, deepestId, 1, [source])).toThrow(MAX_DOCUMENT_DEPTH_ERROR)
 
     let nextId = 0
+
     const accepted = insertSubtreeSibling(
       document,
       `n${MAX_DOCUMENT_DEPTH - 2}`,
@@ -354,6 +366,7 @@ describe('document operations', () => {
       source,
       () => `copy-${nextId++}`,
     )
+
     expect(() => assertDocument(accepted)).not.toThrow()
   })
 
@@ -375,9 +388,11 @@ describe('document operations', () => {
   it('creates a link when a valid URL is pasted and leaves invalid text unlinked', () => {
     const document = createInitialDocument('a')
     const linked = pasteText(document, 'a', 0, 'https://example.com')
+
     expect(linked.roots[0]!.links).toEqual([{ start: 0, end: 19, url: 'https://example.com' }])
 
     const plain = pasteText(document, 'a', 0, 'example.com')
+
     expect(plain.roots[0]!.links).toBeUndefined()
   })
 
@@ -388,10 +403,12 @@ describe('document operations', () => {
     }
 
     const invalid = pasteText(document, 'a', 5, 'XYZ')
+
     expect(invalid.roots[0]!.text).toBe('httpsXYZ://example.com')
     expect(invalid.roots[0]!.links).toBeUndefined()
 
     const valid = pasteText(document, 'a', 15, 'x')
+
     expect(valid.roots[0]!.text).toBe('https://examplex.com')
     expect(valid.roots[0]!.links).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])
   })
@@ -404,13 +421,17 @@ describe('document operations', () => {
     const location = { currentParentId: null, selectedNodeId: 'a' }
 
     const valid = pasteText(document, 'a', 15, 'x')
+
     const validState = serializeState(valid, location)
+
     expect(parsePersistedState(JSON.parse(JSON.stringify(validState)))).toEqual(validState)
     expect(validState.document.roots[0]!.links).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])
 
     const invalid = pasteText(document, 'a', 5, 'XYZ')
+
     const invalidState = serializeState(invalid, location)
     const reloaded = parsePersistedState(JSON.parse(JSON.stringify(invalidState)))
+
     expect(reloaded.document.roots[0]!.links).toBeUndefined()
     expect(reloaded).toEqual(invalidState)
   })
@@ -418,6 +439,7 @@ describe('document operations', () => {
   it('updates an edited URL and its destination on each valid character edit', () => {
     const original = 'go https://example.com now'
     const links = [{ start: 3, end: 22, url: 'https://example.com' }]
+
     expect(linksAfterTextEdit(original, links, 'go https://exmple.com now')).toEqual([
       { start: 3, end: 21, url: 'https://exmple.com' },
     ])
@@ -428,6 +450,7 @@ describe('document operations', () => {
 
   it('replaces a linked character without snapping to a link boundary', () => {
     const url = 'https://example.com'
+
     expect(replaceLinkedText(url, [{ start: 0, end: url.length, url }], 9, 10, 'A')).toEqual({
       text: 'https://eAample.com',
       links: [{ start: 0, end: url.length, url: 'https://eAample.com' }],
@@ -439,6 +462,7 @@ describe('document operations', () => {
     const original = 'https://example.com'
     const links = [{ start: 0, end: original.length, url: original }]
     const invalid = 'htps://example.com'
+
     expect(linksAfterTextEdit(original, links, invalid)).toEqual([])
     expect(linksAfterTextEdit(invalid, [], original)).toEqual(links)
   })
@@ -448,21 +472,27 @@ describe('document operations', () => {
     const original = `A${url}B`
     const links = [{ start: 1, end: 1 + url.length, url }]
     const invalid = `Ahtps://example.comB`
+
     const first = reconcileLinkTextEdit(original, links, invalid)
+
     expect(first.links).toEqual([])
     expect(first.draft).toEqual({ start: 1, end: url.length, url: 'htps://example.com' })
 
     const restored = reconcileLinkTextEdit(invalid, [], original, first.draft)
+
     expect(restored.links).toEqual(links)
     expect(restored.draft).toBeUndefined()
   })
 
   it('does not treat a link revalidated after a brief invalid edit as a new link', () => {
     const url = 'https://example.com'
+
     const first = reconcileLinkTextEdit(url, [{ start: 0, end: url.length, url }], 'htps://example.com')
+
     expect(first.createsNewLink).toBe(false)
 
     const restored = reconcileLinkTextEdit('htps://example.com', [], url, first.draft)
+
     expect(restored.links).toEqual([{ start: 0, end: url.length, url }])
     expect(restored.createsNewLink).toBe(false)
   })
@@ -479,6 +509,7 @@ describe('document operations', () => {
     }
 
     type('http://a.co/')
+
     expect(links).toEqual([{ start: 0, end: 12, url: 'http://a.co/' }])
 
     for (const char of ' hello this is a great resource for learning') type(text + char)
@@ -496,6 +527,7 @@ describe('document operations', () => {
       { start: first.length + 1, end: original.length, url: second },
     ]
     const next = `${first}/a ${second}`
+
     expect(linksAfterTextEdit(original, links, next)).toEqual([
       { start: 0, end: first.length + 2, url: `${first}/a` },
       { start: first.length + 3, end: next.length, url: second },
@@ -535,6 +567,7 @@ describe('document operations', () => {
       document: { roots: [{ id: 'a', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     }
+
     expect(() => parsePersistedState({ ...base, document: { roots: 'not an array' } })).toThrow('children')
     expect(() =>
       parsePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', links: {}, children: [] }] } }),
@@ -571,6 +604,7 @@ describe('document operations', () => {
       document: { roots: [{ id: 'a', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     }
+
     expect(() => validatePersistedState({ ...base, document: { roots: 'not an array' } })).toThrow('children')
     expect(() =>
       validatePersistedState({ ...base, document: { roots: [{ id: 'a', text: '', links: {}, children: [] }] } }),
@@ -609,6 +643,7 @@ describe('document operations', () => {
 
   it('handles link removal, insertion, and range edge cases', () => {
     const linked = pasteText(createInitialDocument('a'), 'a', 0, 'https://example.com')
+
     expect(deleteLink(linked, 'a', 0)).toBeUndefined()
     expect(deleteLink(linked, 'a', 19)).toBeDefined()
     expect(removeTextRange(linked, 'a', 4, 4).roots[0]!.text).toBe('https://example.com')
@@ -628,18 +663,23 @@ describe('document operations', () => {
 
   it('preserves link ranges supplied by rich clipboard paste', () => {
     const document = createInitialDocument('a')
+
     const result = pasteText(document, 'a', 0, 'See https://example.com', [
       { start: 4, end: 23, url: 'https://example.com' },
     ])
+
     expect(result.roots[0]!.links).toEqual([{ start: 4, end: 23, url: 'https://example.com' }])
 
     const partial = pasteText(document, 'a', 0, 'example.com', [{ start: 0, end: 11, url: 'https://example.com' }])
+
     expect(partial.roots[0]!.links).toBeUndefined()
   })
 
   it('removes the complete link when Backspace is at its end', () => {
     const document = pasteText(createInitialDocument('a'), 'a', 0, 'https://example.com')
+
     const result = deleteLink(document, 'a', 19)
+
     expect(result?.roots[0]).toMatchObject({ text: '' })
     expect(result?.roots[0]!.links).toBeUndefined()
   })
@@ -650,9 +690,12 @@ describe('document operations', () => {
       document: { roots: [{ id: 'a', text: 'https://example.com', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
+
     expect(parsed.version).toBe(4)
     expect(parsed.view).toEqual({ expandedIds: [] })
+
     const document = pasteText(parsed.document, 'a', 0, 'https://example.com')
+
     expect(serializeState(document, parsed.location).version).toBe(4)
   })
 
@@ -668,6 +711,7 @@ describe('document operations', () => {
 
   it('persists only expanded ids of nodes the document contains, with the selected row position', () => {
     const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
+
     const state = serializeState(
       document,
       { currentParentId: null, selectedNodeId: 'child' },
@@ -692,6 +736,7 @@ describe('document operations', () => {
 
   it('builds a parent index that maps every node to its parent or the root collection', () => {
     const document = createFirstChild(createInitialDocument('root'), 'root', 'child')
+
     const index = buildNodeIndex(document)
 
     expect(index.get('root')).toBeNull()
@@ -701,9 +746,11 @@ describe('document operations', () => {
 
   it('locates a node created by a topology-changing operation', () => {
     const document = createInitialDocument('a')
+
     const result = insertSiblingAfter(document, 'a', 'b')
 
     const located = locateNode(result, 'b')
+
     expect(located?.node.id).toBe('b')
     expect(located?.parent).toBeNull()
     expect(located?.siblings.map((node) => node.id)).toEqual(['a', 'b'])
@@ -744,14 +791,17 @@ describe('document operations', () => {
 
     const first = makeCountingDocument('a')
     const second = makeCountingDocument('b')
+
     locateNode(first.document, 'a0')
     locateNode(second.document, 'b0')
 
     first.reset()
+
     expect(locateNode(first.document, 'a999')?.index).toBe(999)
     expect(first.reads()).toBe(1)
 
     second.reset()
+
     expect(locateNode(second.document, 'b999')?.index).toBe(999)
     expect(second.reads()).toBe(1)
   })
@@ -850,6 +900,7 @@ describe('document operations', () => {
     const document: Document = { roots: [related, unrelated] }
 
     expect([...collectAttachmentIds(document)]).toEqual(['target-image'])
+
     locateNode(document, 'target-child')
     unrelatedReads = 0
 
@@ -867,12 +918,15 @@ describe('document operations', () => {
   it('tracks attachment id changes when attaching an image', () => {
     const empty = createInitialDocument('a')
     const attached = attachImage(empty, 'a', { id: 'one', mimeType: 'image/png' })
+
     expect([...collectAttachmentIds(attached)]).toEqual(['one'])
 
     const same = attachImage(attached, 'a', { id: 'one', mimeType: 'image/png' })
+
     expect([...collectAttachmentIds(same)]).toEqual(['one'])
 
     const replaced = attachImage(attached, 'a', { id: 'two', mimeType: 'image/png' })
+
     expect([...collectAttachmentIds(replaced)]).toEqual(['two'])
   })
 
@@ -883,12 +937,15 @@ describe('document operations', () => {
         { id: 'b', text: '', attachment: { id: 'shared', mimeType: 'image/png' }, children: [] },
       ],
     }
+
     collectAttachmentIds(document)
 
     const withoutA = deleteNode(document, 'a')
+
     expect([...collectAttachmentIds(withoutA)]).toEqual(['shared'])
 
     const withoutB = deleteNode(withoutA, 'b')
+
     expect([...collectAttachmentIds(withoutB)]).toEqual([])
   })
 
@@ -904,6 +961,7 @@ describe('document operations', () => {
   it('replaces the attachment summary when membership changes', () => {
     const document = attachImage(createInitialDocument('root'), 'root', { id: 'a', mimeType: 'image/png' })
     const first = attachmentSummary(document)
+
     const edited = editNodeContent(document, 'root', 'changed', [])
 
     expect(attachmentSummary(edited)).toBe(first)
@@ -916,9 +974,11 @@ describe('document operations', () => {
   it('returns a defensive attachment id copy without exposing the cached summary', () => {
     const document = attachImage(createInitialDocument('root'), 'root', { id: 'a', mimeType: 'image/png' })
     const summary = attachmentSummary(document)
+
     const collected = collectAttachmentIds(document)
 
     collected.add('mutated')
+
     expect([...summary.keys()]).toEqual(['a'])
     expect([...collectAttachmentIds(document)]).toEqual(['a'])
     expect(collected).not.toBe(summary as unknown as Set<string>)

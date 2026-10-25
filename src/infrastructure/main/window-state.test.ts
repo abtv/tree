@@ -45,10 +45,14 @@ describe('createWindowBoundsStore', () => {
     const store = createWindowBoundsStore(path)
 
     expect(store.load()).toBeNull()
+
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, '{broken')
+
     expect(store.load()).toBeNull()
+
     writeFileSync(path, JSON.stringify({ ...bounds, height: 100 }))
+
     expect(store.load()).toBeNull()
   })
 })
@@ -59,7 +63,9 @@ describe('createBooleanPreferenceStore', () => {
     const store = createBooleanPreferenceStore(path)
 
     expect(store.load()).toBe(false)
+
     store.save(true)
+
     expect(store.load()).toBe(true)
     expect(JSON.parse(readFileSync(path, 'utf8'))).toBe(true)
   })
@@ -81,8 +87,10 @@ describe('createAppearancePreferenceStore', () => {
     const store = createAppearancePreferenceStore(path)
 
     expect(store.load()).toBe('system')
+
     for (const value of ['dark', 'light', 'system'] as const) {
       store.save(value)
+
       expect(createAppearancePreferenceStore(path).load()).toBe(value)
       expect(JSON.parse(readFileSync(path, 'utf8'))).toBe(value)
     }
@@ -95,6 +103,7 @@ describe('createAppearancePreferenceStore', () => {
 
     for (const content of ['"sepia"', 'true', 'not json']) {
       writeFileSync(path, content)
+
       expect(store.load()).toBe('system')
     }
   })
@@ -112,9 +121,13 @@ describe('createDebouncedWindowBoundsSaver', () => {
       saver.save({ ...bounds, x: 3 })
 
       expect(saved).toEqual([])
+
       vi.advanceTimersByTime(299)
+
       expect(saved).toEqual([])
+
       vi.advanceTimersByTime(1)
+
       expect(saved).toEqual([{ ...bounds, x: 3 }])
     } finally {
       vi.useRealTimers()
@@ -131,7 +144,9 @@ describe('createDebouncedWindowBoundsSaver', () => {
       saver.flush()
 
       expect(saved).toEqual([{ ...bounds, y: 7 }])
+
       vi.advanceTimersByTime(300)
+
       expect(saved).toHaveLength(1)
     } finally {
       vi.useRealTimers()

@@ -23,6 +23,7 @@ test.describe('hidden window mode', () => {
         return String(error)
       }
     })
+
     expect(message).toContain('Native popup menus are disabled in hidden E2E runs')
     await expect(
       app.evaluate(({ Menu }) => Menu.buildFromTemplate([{ label: 'Must stay off the desktop' }]).popup()),
@@ -39,18 +40,22 @@ test.describe('hidden window mode', () => {
     const visibility = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().map((entry) => entry.isVisible()),
     )
+
     expect(visibility).toEqual([false])
 
     await typeInto(node(window, 1), 'Hidden window')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveValue('Hidden window')
 
     await setMainWindowBounds(app, { width: 900, height: 640 })
     const bounds = await readMainWindowBounds(app)
+
     expect(bounds.width).toBe(900)
     expect(bounds.height).toBe(640)
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await closeMainWindow(app)
     await closed
 

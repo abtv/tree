@@ -53,34 +53,54 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const first = node(window, 1)
     await first.focus()
+
     await window.keyboard.press('$')
     await window.keyboard.press('l')
+
     await expect(first).toHaveClass(/node-input-image-caret/u)
+
     await window.keyboard.press('l')
+
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.press('l')
+
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveClass(/node-input-image-caret/u)
+
     await window.screenshot({ path: testInfo.outputPath('horizontal-image-arrival.png') })
     await window.keyboard.press('l')
+
     await expect(node(window, 4)).toBeFocused()
     await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.type('3h')
+
     await expect(first).toBeFocused()
     await expect(first).toHaveClass(/node-input-image-caret/u)
+
     await window.keyboard.press('h')
+
     await expect(first).toHaveJSProperty('selectionStart', 1)
     await expect(first).not.toHaveClass(/node-input-image-caret/u)
+
     await window.keyboard.type('99l')
+
     await expect(node(window, 4)).toBeFocused()
     await expect(node(window, 4)).toHaveJSProperty('selectionStart', 1)
+
     await window.keyboard.press('l')
+
     await expect(node(window, 4)).toHaveJSProperty('selectionStart', 1)
+
     await window.screenshot({ path: testInfo.outputPath('horizontal-text-arrival.png') })
     await window.keyboard.type('99h')
+
     await expect(first).toBeFocused()
     await expect(first).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('h')
+
     await expect(first).toHaveJSProperty('selectionStart', 0)
   })
 
@@ -100,27 +120,41 @@ test.describe('Vim editing: image caret', () => {
     })
     seedAttachmentImage(userDataDir, 'wrapped-image')
     const { app, window } = await launchTree(userDataDir)
+
     await setMainWindowBounds(app, { width: 680, height: 800 })
     const first = node(window, 1)
     await first.focus()
+
     await setCursor(first, 0)
     await window.keyboard.press('j')
+
     await expect(first).not.toHaveClass(/node-input-image-caret/u)
     await expect(first).toBeFocused()
+
     await window.keyboard.press('$')
     await window.keyboard.press('j')
+
     await expect(first).toHaveClass(/node-input-image-caret/u)
+
     await window.keyboard.press('k')
+
     await expect(first).toHaveJSProperty('selectionStart', text.length - 1)
+
     await window.keyboard.press('j')
     await window.keyboard.press('j')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('k')
+
     await expect(first).toHaveClass(/node-input-image-caret/u)
+
     await window.keyboard.press('k')
+
     await expect(first).not.toHaveClass(/node-input-image-caret/u)
     expect(await first.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBeGreaterThan(0)
+
     await window.screenshot({ path: testInfo.outputPath('wrapped-image-return.png') })
   })
 
@@ -149,26 +183,33 @@ test.describe('Vim editing: image caret', () => {
         await setCursor(editor, 2)
         if (imageActive) {
           await editor.press('j')
+
           await expect(editor).toHaveClass(/node-input-image-caret/)
         }
+
         await window.keyboard.press('V')
         const cursor = imageActive ? (boundary === 'first' ? 'First text' : 'Last text').length : 2
         for (const keys of [...motions, ...motions]) {
           for (const key of keys) await window.keyboard.press(key)
+
           await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
           await expect(editor).toBeFocused()
           await expect(editor).toHaveJSProperty('selectionStart', cursor)
           await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
           await expect(editor).not.toHaveClass(/node-input-image-caret/)
         }
+
         if (imageActive && boundary === 'first')
           await expect(window.locator('.node-list')).toHaveScreenshot('vim-clamped-visual-node-range.png')
+
         await window.keyboard.press('Escape')
         if (imageActive) {
           await expect(editor).toHaveClass(/node-input-image-caret/)
           if (boundary === 'first')
             await expect(window.locator('.node-list')).toHaveScreenshot('vim-clamped-visual-node-image.png')
+
           await editor.press('k')
+
           await expect(editor).toHaveJSProperty('selectionStart', 2)
           await expect(editor).not.toHaveClass(/node-input-image-caret/)
         }
@@ -190,9 +231,11 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     for (const boundary of ['first', 'last'] as const) {
       await node(window, 2).focus()
+
       await window.keyboard.press('V')
       await window.keyboard.press(boundary === 'first' ? 'k' : 'j')
       const editor = node(window, boundary === 'first' ? 1 : 3)
+
       await setCursor(editor, 2)
       const selected = window.locator('.node-row-visual-selected')
       const ids = await selected.evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.nodeId))
@@ -205,13 +248,16 @@ test.describe('Vim editing: image caret', () => {
           : [['9', 'j'], ['G']]
       for (const keys of motions) {
         for (const key of keys) await window.keyboard.press(key)
+
         await expect(editor).toBeFocused()
         await expect(editor).toHaveJSProperty('selectionStart', 2)
         expect(await selected.evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.nodeId))).toEqual(
           ids,
         )
       }
+
       await expect(selected).toHaveCount(2)
+
       await window.keyboard.press('Escape')
     }
   })
@@ -226,16 +272,20 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'image')
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
+
     await window.keyboard.press('V')
     for (const keys of [['j'], ['k'], ['9', 'j'], ['9', 'k'], ['g', 'g'], ['G']]) {
       for (const key of keys) await window.keyboard.press(key)
+
       await expect(editor).toBeFocused()
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
       await expect(editor).toHaveJSProperty('selectionStart', 0)
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
     }
+
     await window.keyboard.press('Escape')
     await editor.press('k')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
   })
 
@@ -251,6 +301,7 @@ test.describe('Vim editing: image caret', () => {
     const input = window.locator('.node-input')
     for (const keys of [['g', 'g'], ['G'], ['H'], ['M'], ['L'], ['Control+d'], ['Control+u']]) {
       for (const key of keys) await window.keyboard.press(key)
+
       await expect(input).toBeFocused()
       await expect(input).toHaveClass(/node-input-image-caret/)
       await expect(input).toHaveJSProperty('selectionStart', 0)
@@ -271,36 +322,48 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'image')
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.press('0')
     await pressShifted(window, 'Y')
     const picture = node(window, 3)
     await picture.focus()
+
     await window.keyboard.press('$')
     await window.keyboard.press('g')
     await window.keyboard.press('p')
+
     await expect(picture).toHaveValue('abA')
     await expect(picture).toHaveClass(/node-input-image-caret/)
+
     await window.keyboard.press('u')
     await window.keyboard.press('$')
     await window.keyboard.press('.')
+
     await expect(picture).toHaveValue('abA')
     await expect(picture).toHaveClass(/node-input-image-caret/)
+
     await window.keyboard.press('k')
+
     await expect(picture).not.toHaveClass(/node-input-image-caret/)
+
     await setCursor(picture, 0)
     await window.keyboard.press('v')
     await pressShifted(window, '>')
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await picture.focus()
+
     await window.keyboard.press('$')
     await window.keyboard.press('l')
     await window.keyboard.press('.')
+
     await expect(window.locator('.node-row[data-node-id="picture"]')).toHaveAttribute('data-depth', '1')
     await expect(picture).toBeFocused()
     await expect(picture).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-image-shift-light.png')
+
     await window.keyboard.press('k')
+
     await expect(picture).not.toHaveClass(/node-input-image-caret/)
   })
 
@@ -317,24 +380,37 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'first-image')
     seedAttachmentImage(userDataDir, 'second-image')
     const { window } = await launchTree(userDataDir)
+
     await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
+
     await node(window, 2).press('k')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 6)
+
     await window.locator('.node-list').screenshot({ path: test.info().outputPath('upward-image-caret.png') })
     await node(window, 1).press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+
     await window.keyboard.press('Escape')
+
     await expect(node(window, 1)).toBeFocused()
+
     await node(window, 1).press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+
     await window.keyboard.press('Escape')
     await node(window, 1).press('k')
+
     await expect(node(window, 1)).not.toHaveClass(/node-input-image-caret/)
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+
     await node(window, 1).press('j')
     await node(window, 1).press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
   })
 
@@ -356,24 +432,34 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'branch-image')
     const { window } = await launchTree(userDataDir)
     const branch = node(window, 1)
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await branch.focus()
+
     await setCursor(branch, 1)
 
     await branch.press('j')
+
     await expect(branch).toHaveClass(/node-input-image-caret/)
+
     await branch.press('j')
+
     await expect(node(window, 2)).toBeFocused()
+
     await node(window, 2).press('k')
+
     await expect(branch).toBeFocused()
     await expect(branch).toHaveClass(/node-input-image-caret/)
+
     await branch.press('k')
+
     await expect(branch).not.toHaveClass(/node-input-image-caret/)
     await expect(branch).toHaveJSProperty('selectionStart', 0)
 
     await setCursor(branch, 1)
     await branch.press('2')
     await branch.press('j')
+
     await expect(node(window, 2)).toBeFocused()
   })
 
@@ -398,32 +484,48 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const withImage = node(window, 1)
     await withImage.focus()
+
     await setCursor(withImage, 1)
 
     await withImage.press('j')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 6)
+
     await withImage.press('h')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 1)
+
     await withImage.press('j')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 6)
+
     await withImage.press('k')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 1)
 
     await setCursor(withImage, 3)
     await withImage.press('l')
     await withImage.press('l')
     await withImage.press('l')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 6)
+
     await withImage.press('h')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 5)
 
     await withImage.press('j')
+
     await expect(withImage).toHaveJSProperty('selectionStart', 6)
+
     await withImage.press('j')
+
     await expect(node(window, 2)).toBeFocused()
 
     await node(window, 3).focus()
+
     await node(window, 3).press('k')
+
     await expect(node(window, 2)).toBeFocused()
   })
 
@@ -441,29 +543,39 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
 
     await editor.press('j')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-image-before-text-motion.png')
+
     await editor.press('0')
+
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 0)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-text-motion-from-image.png')
+
     await editor.press('h')
+
     await expect(editor).toHaveJSProperty('selectionStart', 0)
 
     await editor.press('j')
     await editor.press('$')
+
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 3)
+
     await editor.press('h')
+
     await expect(editor).toHaveJSProperty('selectionStart', 2)
 
     await editor.press('j')
     await editor.press('v')
     await editor.press('0')
     await editor.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 0)
@@ -472,6 +584,7 @@ test.describe('Vim editing: image caret', () => {
     await editor.press('v')
     await editor.press('0')
     await editor.press('v')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 0)
@@ -486,6 +599,7 @@ test.describe('Vim editing: image caret', () => {
         await editor.press('v')
         await window.keyboard.type(keys)
         await editor.press(exitKey)
+
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
         await expect(editor).not.toHaveClass(/node-input-image-caret/)
         await expect(editor).toHaveJSProperty('selectionStart', endpoint)
@@ -509,14 +623,18 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await startRowDrag(window, editor)
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     const frozen = await editor.evaluate((element) => {
       const input = element as HTMLTextAreaElement
       return [input.selectionStart, input.selectionEnd]
     })
+
     expect(await editor.evaluate((element) => document.activeElement === element)).toBe(false)
 
     await window.keyboard.press('Escape')
@@ -550,14 +668,19 @@ test.describe('Vim editing: image caret', () => {
       const { window } = await launchTree(userDataDir)
       const editor = window.locator('.node-row[data-node-id="source"] .node-input')
       await editor.focus()
+
       await startRowDrag(window, editor)
       const cursor = await editor.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
       const target = window.locator('.node-row[data-node-id="parent"]')
       const box = await target.boundingBox()
       if (box === null) throw new Error('The receiving parent was not rendered.')
+
       await window.mouse.move(box.x + 30, box.y + box.height / 2)
+
       await expect(target).toHaveClass(/node-row-drop-on/)
+
       await window.mouse.up()
+
       await expect(editor).toBeFocused()
       await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '1')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -591,34 +714,46 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const imageOnly = node(window, 2)
     await imageOnly.focus()
+
     await expect(imageOnly).toHaveClass(/node-input-image-caret/)
 
     for (const key of ['0', '$']) {
       await imageOnly.press(key)
+
       await expect(imageOnly).toBeFocused()
       await expect(imageOnly).toHaveClass(/node-input-image-caret/)
       await expect(imageOnly).toHaveJSProperty('selectionStart', 0)
     }
 
     await imageOnly.press('h')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
+
     await window.keyboard.press('l')
+
     await expect(imageOnly).toBeFocused()
     await expect(imageOnly).toHaveClass(/node-input-image-caret/)
+
     await imageOnly.press('l')
+
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('h')
+
     await expect(imageOnly).toBeFocused()
     await expect(imageOnly).toHaveClass(/node-input-image-caret/)
 
     await imageOnly.press('j')
+
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
 
     await imageOnly.focus()
+
     await imageOnly.press('k')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).not.toHaveClass(/node-input-image-caret/)
   })
@@ -642,6 +777,7 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const first = node(window, 1)
     await first.focus()
+
     await expect(first).toHaveClass(/node-input-image-caret/)
 
     await first.press('k')
@@ -652,7 +788,9 @@ test.describe('Vim editing: image caret', () => {
     await expect(window.locator('.node-row[data-node-id="first-image-only"]')).toHaveScreenshot(
       'vim-image-only-first-root-boundary-light.png',
     )
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="first-image-only"]')).toHaveScreenshot(
       'vim-image-only-first-root-boundary-dark.png',
     )
@@ -676,10 +814,13 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const imageOnly = node(window, 1)
     await imageOnly.focus()
+
     await expect(imageOnly).toHaveClass(/node-input-image-caret/)
 
     await imageOnly.press('i')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.keyboard.press('Escape')
 
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -687,7 +828,9 @@ test.describe('Vim editing: image caret', () => {
     await expect(window.locator('.node-row[data-node-id="image-only"]')).toHaveScreenshot(
       'vim-insert-escape-image-only-light.png',
     )
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="image-only"]')).toHaveScreenshot(
       'vim-insert-escape-image-only-dark.png',
     )
@@ -707,15 +850,20 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const withImage = node(window, 1)
     await withImage.focus()
+
     await setCursor(withImage, 1)
     await withImage.press('2')
     await withImage.press('j')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 3)
 
     await node(window, 2).press('k')
+
     await expect(withImage).toHaveClass(/node-input-image-caret/)
+
     await withImage.press('k')
+
     await expect(withImage).not.toHaveClass(/node-input-image-caret/)
     await expect(withImage).toHaveJSProperty('selectionStart', 3)
   })
@@ -734,16 +882,22 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const withImage = node(window, 1)
     await withImage.focus()
+
     await setCursor(withImage, 1)
     await withImage.press('j')
+
     await expect(withImage).toHaveClass(/node-input-image-caret/)
 
     const next = node(window, 2)
+
     await next.click()
+
     await expect(next).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(withImage).not.toHaveClass(/node-input-image-caret/)
+
     await next.press('x')
+
     await expect.poll(async () => (await next.inputValue()).length).toBe(3)
   })
 
@@ -760,6 +914,7 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'last-image')
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.press('G')
 
     await expect(node(window, 2)).toBeFocused()
@@ -788,13 +943,16 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const root = node(window, 1)
     await root.focus()
+
     await setCursor(root, 3)
     await root.press('l')
+
     await expect(root).toHaveClass(/node-input-image-caret/)
 
     await root.press('j')
 
     const next = node(window, 2)
+
     await expect(next).toBeFocused()
     await expect(next).toHaveJSProperty('selectionStart', 0)
     await expect(next).toHaveJSProperty('selectionEnd', 1)
@@ -815,18 +973,22 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const last = node(window, 3)
     await last.focus()
+
     await setCursor(last, 2)
     await last.press('2')
     await last.press('k')
 
     const first = node(window, 1)
+
     await expect(first).toBeFocused()
     await expect(first).toHaveJSProperty('selectionStart', 2)
     await expect(first).not.toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-row[data-node-id="first"]')).toHaveScreenshot(
       'vim-counted-k-past-image-light.png',
     )
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="first"]')).toHaveScreenshot(
       'vim-counted-k-past-image-dark.png',
     )
@@ -843,17 +1005,22 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const last = node(window, 1)
     await last.focus()
+
     await setCursor(last, 1)
     await last.press('j')
     await last.press('j')
+
     await expect(last).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-row[data-node-id="last"] .attachment-image-caret')).toHaveCount(1)
     await expect(window.locator('.node-row[data-node-id="last"]')).toHaveScreenshot('vim-last-image-boundary-light.png')
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="last"]')).toHaveScreenshot('vim-last-image-boundary-dark.png')
 
     await last.press('2')
     await last.press('h')
+
     await expect(last).toHaveJSProperty('selectionStart', 0)
     await expect(last).toHaveJSProperty('selectionEnd', 1)
   })
@@ -869,23 +1036,31 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
 
     await editor.press('9')
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 4)
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-counted-l-image-light.png')
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-counted-l-image-dark.png')
+
     await editor.press('h')
+
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 3)
     await expect(editor).toHaveJSProperty('selectionEnd', 4)
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot(
       'vim-counted-l-return-text-dark.png',
     )
+
     await window.emulateMedia({ colorScheme: 'light' })
+
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot(
       'vim-counted-l-return-text-light.png',
     )
@@ -905,6 +1080,7 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
 
     await editor.press('x')
@@ -914,20 +1090,27 @@ test.describe('Vim editing: image caret', () => {
     await expect(editor).toHaveJSProperty('selectionEnd', 1)
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(1)
+
     const captureNodeList = async (name: string) => {
       const bounds = await window.locator('.node-list').boundingBox()
       if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+
       await expect(window).toHaveScreenshot(name, { clip: bounds })
     }
+
     await captureNodeList('vim-edited-image-caret-focused-light.png')
     await window.emulateMedia({ colorScheme: 'dark' })
     await captureNodeList('vim-edited-image-caret-focused-dark.png')
 
     await editor.press('G')
+
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
+
     await node(window, 2).press('j')
+
     await expect(node(window, 2)).toHaveClass(/node-input-image-caret/)
+
     await captureNodeList('vim-edited-image-caret-peer-dark.png')
     await window.emulateMedia({ colorScheme: 'light' })
     await captureNodeList('vim-edited-image-caret-peer-light.png')
@@ -944,6 +1127,7 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
 
     await editor.press('~')
@@ -964,6 +1148,7 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
     await editor.press('v')
     await editor.press('d')
@@ -985,12 +1170,14 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 0)
     await editor.press('v')
     await lockSystemClipboard()
     await editor.press('y')
     await editor.press('2')
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await editor.press('P')
@@ -1001,12 +1188,17 @@ test.describe('Vim editing: image caret', () => {
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-row[data-node-id="root"] .attachment-image-caret')).toHaveCount(0)
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-put-from-image-light.png')
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-row[data-node-id="root"]')).toHaveScreenshot('vim-put-from-image-dark.png')
 
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
+
     await editor.press('p')
+
     await expect(editor).toHaveValue('abaa')
     await expect(editor).toHaveJSProperty('selectionStart', 3)
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
@@ -1028,9 +1220,11 @@ test.describe('Vim editing: image caret', () => {
     const first = node(window, 1)
     const last = node(window, 2)
     await first.focus()
+
     await first.press('G')
     await last.press('g')
     await last.press('g')
+
     await expect(first).toBeFocused()
     await expect(first).not.toHaveClass(/node-input-image-caret/)
     await expect(first).toHaveJSProperty('selectionStart', 0)
@@ -1038,16 +1232,22 @@ test.describe('Vim editing: image caret', () => {
 
     await first.press('G')
     await last.press('H')
+
     await expect(first).toBeFocused()
     await expect(first).not.toHaveClass(/node-input-image-caret/)
     await expect(first).toHaveJSProperty('selectionStart', 0)
+
     await first.press('Control+d')
+
     await expect(last).toBeFocused()
     await expect(last).toHaveJSProperty('selectionStart', 0)
     await expect(last).not.toHaveClass(/node-input-image-caret/)
+
     await last.press('Control+u')
+
     await expect(first).toBeFocused()
     await expect(first).toHaveJSProperty('selectionStart', 0)
+
     await window.screenshot({ path: 'test-results/nr1-text-before-image.png' })
   })
 
@@ -1067,14 +1267,20 @@ test.describe('Vim editing: image caret', () => {
     const first = node(window, 1)
     const last = node(window, 2)
     await first.focus()
+
     await setCursor(first, 1)
     await first.press('j')
     await first.press('G')
+
     await expect(last).not.toHaveClass(/node-input-image-caret/)
     await expect(last).toHaveJSProperty('selectionStart', 0)
+
     await last.press('j')
+
     await expect(last).toHaveClass(/node-input-image-caret/)
+
     await last.press('h')
+
     await expect(last).toHaveJSProperty('selectionStart', 0)
     await expect(last).toHaveJSProperty('selectionEnd', 1)
   })
@@ -1097,9 +1303,11 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
 
     await node(window, 1).focus()
+
     await window.keyboard.press('k')
 
     const parent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parent).toBeFocused()
     await expect(parent).toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.current-parent .attachment-image-caret')).toHaveCount(1)
@@ -1136,13 +1344,16 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
 
     await node(window, 1).focus()
+
     await window.keyboard.press('k')
     const parent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parent).toHaveClass(/node-input-image-caret/)
 
     await parent.press('Control+o')
 
     const root = node(window, 1)
+
     await expect(root).toHaveValue('Parent')
     await expect(root).toBeFocused()
     await expect(root).not.toHaveClass(/node-input-image-caret/)
@@ -1176,18 +1387,22 @@ test.describe('Vim editing: image caret', () => {
     // Expand the parent and move the child's caret onto its own image, then close every fold with
     // zM: the hidden image caret must not stay active when the displayed ancestor is selected.
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('a')
     const child = node(window, 2)
     await child.focus()
+
     await setCursor(child, 'Child'.length - 1)
     await child.press('l')
+
     await expect(child).toHaveClass(/node-input-image-caret/)
 
     await child.press('z')
     await pressShifted(window, 'M')
 
     const destination = node(window, 1)
+
     await expect(destination).toBeFocused()
     await expect(destination).toHaveValue('Parent')
     await expect(destination).not.toHaveClass(/node-input-image-caret/)
@@ -1207,14 +1422,17 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
 
     await editor.press('x')
+
     await expect(editor).toHaveValue('a')
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     // Undo restores the deleted character and puts the caret on it, clearing the stale image caret.
     await editor.press('u')
+
     await expect(editor).toHaveValue('ab')
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
     await expect(editor).toHaveJSProperty('selectionStart', 1)
@@ -1223,6 +1441,7 @@ test.describe('Vim editing: image caret', () => {
     // Redoing the deletion leaves the same state the original `x` did: the change is at offset 1,
     // which is the image once the final text character is gone.
     await editor.press('Control+r')
+
     await expect(editor).toHaveValue('a')
     await expect(editor).toHaveClass(/node-input-image-caret/)
   })
@@ -1241,25 +1460,37 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
     await editor.press('j')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await editor.press('u')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
+
     await editor.press('Control+r')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
+
     await editor.press('Control+o')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(node(window, 2)).not.toHaveClass(/node-input-image-caret/)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-noop-image-caret-light.png')
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-noop-image-caret-dark.png')
 
     await editor.press('V')
     await editor.press('Escape')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
+
     await editor.press('k')
+
     await expect(editor).toHaveJSProperty('selectionStart', 1)
     await expect(editor).not.toHaveClass(/node-input-image-caret/)
   })
@@ -1275,14 +1506,17 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await window.keyboard.press('g')
     await window.keyboard.press('d')
 
     const parent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parent).toHaveValue('ab')
     await expect(parent).not.toHaveClass(/node-input-image-caret/)
   })
@@ -1300,13 +1534,16 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
 
     const parent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parent).toHaveValue('ab')
     await expect(parent).not.toHaveClass(/node-input-image-caret/)
   })
@@ -1330,19 +1567,26 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('d')
     const parent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parent).toHaveValue('ab')
+
     await setCursor(parent, 1)
     await parent.press('l')
+
     await expect(parent).toHaveClass(/node-input-image-caret/)
 
     await window.getByRole('button', { name: 'Grandparent' }).click()
 
     const newParent = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(newParent).toHaveValue('Grandparent')
+
     const rootRow = node(window, 1)
+
     await expect(rootRow).toHaveValue('ab')
     await expect(rootRow).not.toHaveClass(/node-input-image-caret/)
   })
@@ -1360,8 +1604,10 @@ test.describe('Vim editing: image caret', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 1)
     await editor.press('l')
+
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
     await window.keyboard.press('V')
@@ -1389,12 +1635,15 @@ test.describe('Vim editing: image caret', () => {
     seedAttachmentImage(userDataDir, 'second-image')
     const { app, window } = await launchTree(userDataDir)
     const imageButtons = window.getByRole('button', { name: 'Open image preview' })
+
     await expect(imageButtons).toHaveCount(2)
 
     // The image of the later node moves to the retained node, and nothing is cleaned up.
     await node(window, 1).focus()
+
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(node(window, 1)).toHaveValue('PlainFirst')
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 5)
     await expect(
@@ -1406,6 +1655,7 @@ test.describe('Vim editing: image caret', () => {
     allowRendererError(exactMessage('Operation failed: Cannot join nodes that both have attachments'))
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(window.getByText('Operation failed: Cannot join nodes that both have attachments')).toBeVisible()
     await expect(node(window, 1)).toHaveValue('PlainFirst')
     await expect(node(window, 2)).toHaveValue('Second')
@@ -1413,6 +1663,7 @@ test.describe('Vim editing: image caret', () => {
 
     // A structural change saves on quit: the saved document holds the carried image, and both files remain.
     await closeApp(app)
+
     expect(readPersisted(userDataDir).document.roots.map((root) => [root.id, root.attachment?.id])).toEqual([
       ['plain', 'first-image'],
       ['second', 'second-image'],

@@ -71,27 +71,42 @@ test('copies dd text and images by the pre-deletion caret while preserving undo 
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardTextAndHtml(app, 'old', '<b>old</b>')
   await node(window, 1).focus()
+
   await window.keyboard.press('d')
   await window.keyboard.press('d')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
   await expect.poll(() => nodeTexts(window)).toEqual(['', '', 'Last'])
+
   await window.keyboard.press('u')
+
   await expect.poll(() => nodeTexts(window)).toEqual(['see https://example.com', '', '', 'Last'])
+
   await node(window, 1).focus()
+
   await window.keyboard.press('j')
+
   await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
+
   await window.keyboard.press('d')
   await window.keyboard.press('d')
+
   await expect
     .poll(() => content(app))
     .toMatchObject({ text: '', html: false, image: { size: { width: 1, height: 1 } } })
+
   await window.keyboard.press('p')
+
   await expect.poll(() => nodeTexts(window)).toEqual(['', 'see https://example.com', '', 'Last'])
+
   await node(window, 2).focus()
+
   await window.keyboard.press('g')
   await window.keyboard.press('d')
+
   await expect(node(window, 1)).toHaveValue('Excluded child')
 })
 
@@ -100,20 +115,26 @@ test('preserves the clipboard for empty and counted multiple-node dd and exports
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardTextAndHtml(app, 'keep', '<b>keep</b>')
   await node(window, 2).focus()
+
   await window.keyboard.press('d')
   await window.keyboard.press('d')
   await node(window, 1).focus()
+
   await window.keyboard.press('2')
   await window.keyboard.press('d')
   await window.keyboard.press('d')
   await window.evaluate(() => (globalThis.window as unknown as { treeApi: TreeApi }).treeApi.getVimEnabled())
+
   expect(await content(app)).toMatchObject({ text: 'keep', html: true, image: null })
   await expect.poll(() => nodeTexts(window)).toEqual(['Last'])
+
   await window.keyboard.press('2')
   await window.keyboard.press('d')
   await window.keyboard.press('d')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'Last', html: false, image: null })
 })
 
@@ -122,6 +143,7 @@ test('keeps dd deletion and local put available when the native clipboard reject
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardText(app, 'keep')
   await app.evaluate(() => {
     globalThis.__treeIpc.wrap('tree:write-clipboard-content', async () => {
@@ -130,12 +152,16 @@ test('keeps dd deletion and local put available when the native clipboard reject
   })
   allowRendererError(/Operation failed:.*Synthetic dd clipboard failure/)
   await node(window, 1).focus()
+
   await window.keyboard.press('d')
   await window.keyboard.press('d')
+
   await expect(window.locator('.save-error')).toContainText('Synthetic dd clipboard failure')
   expect((await content(app)).text).toBe('keep')
   await expect.poll(() => nodeTexts(window)).toEqual(['', '', 'Last'])
+
   await window.keyboard.press('p')
+
   await expect.poll(() => nodeTexts(window)).toEqual(['', 'see https://example.com', '', 'Last'])
 })
 
@@ -145,27 +171,37 @@ test('copies yy text and character Visual y as plain text while retaining local 
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardTextAndHtml(app, 'old', '<b>old</b>')
   await node(window, 1).focus()
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
   await expect(node(window, 1)).toBeFocused()
+
   // `p` on this node would put the copy into its own children, which is rejected; `P` puts it before.
   await window.keyboard.press('P')
+
   await expect
     .poll(() => nodeTexts(window))
     .toEqual(['see https://example.com', 'see https://example.com', '', '', 'Last'])
+
   await window.keyboard.press('g')
   await window.keyboard.press('d')
+
   await expect(node(window, 1)).toHaveValue('Excluded child')
+
   await window.keyboard.press('Control+o')
   await node(window, 1).focus()
+
   await window.keyboard.press('0')
   await window.keyboard.press('v')
   await window.keyboard.press('l')
   await window.keyboard.press('l')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'see', html: false, image: null })
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 })
@@ -175,30 +211,44 @@ test('copies an image with yy on the image caret and uses text priority for a si
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardText(app, 'old')
   await node(window, 1).focus()
+
   await window.keyboard.press('j')
+
   await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect
     .poll(() => content(app))
     .toMatchObject({ text: '', html: false, image: { size: { width: 1, height: 1 } } })
+
   const expectedBitmap = await app.evaluate(
     ({ nativeImage }, bytes) => [...nativeImage.createFromBuffer(Buffer.from(bytes)).toBitmap()],
     [...onePixelPng],
   )
+
   expect((await content(app)).image?.bitmap).toEqual(expectedBitmap)
   await expect(node(window, 1)).toHaveClass(/node-input-image-caret/)
+
   await window.keyboard.press('V')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
+
   await node(window, 3).focus()
+
   await window.keyboard.press('V')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: '', image: { size: { width: 1, height: 1 } } })
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: '', image: { size: { width: 1, height: 1 } } })
 })
 
@@ -207,43 +257,56 @@ test('copies reverse Visual sibling text with blank lines and excludes descendan
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardText(app, 'old')
   await node(window, 4).focus()
+
   await window.keyboard.press('V')
   await window.keyboard.press('3')
   await window.keyboard.press('k')
   await window.keyboard.press('y')
+
   await expect
     .poll(() => content(app))
     .toMatchObject({ text: 'see https://example.com\n\n\nLast', html: false, image: null })
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
   await node(window, 2).focus()
+
   await window.keyboard.press('V')
   await window.keyboard.press('j')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: '\n', html: false, image: null })
 })
 
 test('preserves the system clipboard for empty single nodes and counted multiple-node yy', async ({ userDataDir }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardTextAndHtml(app, 'keep', '<b>keep</b>')
   await node(window, 2).focus()
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
   await window.keyboard.press('V')
   await window.keyboard.press('y')
   await node(window, 1).focus()
+
   await window.keyboard.press('2')
   await window.keyboard.press('y')
   await window.keyboard.press('y')
   // A subsequent Invoke is a renderer-to-main barrier; no-copy assertions don't rely on a timeout.
   await window.evaluate(() => (globalThis.window as unknown as { treeApi: TreeApi }).treeApi.getVimEnabled())
+
   expect(await content(app)).toMatchObject({ text: 'keep', html: true, image: null })
+
   await node(window, 4).focus()
+
   await window.keyboard.press('2')
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'Last', html: false, image: null })
 })
 
@@ -253,6 +316,7 @@ test('reports native copy failure, preserves the old clipboard and local yank, t
 }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await writeClipboardText(app, 'keep')
   await app.evaluate(() => {
     let fail = true
@@ -266,15 +330,21 @@ test('reports native copy failure, preserves the old clipboard and local yank, t
   })
   allowRendererError(/Operation failed:.*Synthetic native clipboard failure/)
   await node(window, 1).focus()
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect(window.locator('.save-error')).toContainText('Synthetic native clipboard failure')
   expect((await content(app)).text).toBe('keep')
+
   await window.keyboard.press('P')
+
   await expect
     .poll(() => nodeTexts(window))
     .toEqual(['see https://example.com', 'see https://example.com', '', '', 'Last'])
+
   await window.keyboard.press('y')
   await window.keyboard.press('y')
+
   await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false })
 })

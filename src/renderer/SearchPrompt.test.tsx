@@ -20,14 +20,19 @@ it('leaves composition confirmation and cancellation to native input before acce
     />,
   )
   const input = screen.getByRole('textbox', { name: 'Search' })
+
   expect(input).toHaveFocus()
+
   fireEvent.compositionStart(input)
   fireEvent.keyDown(input, { key: 'Enter' })
   fireEvent.keyDown(input, { key: 'Escape' })
+
   expect(confirm).not.toHaveBeenCalled()
   expect(cancel).not.toHaveBeenCalled()
+
   fireEvent.compositionEnd(input)
   fireEvent.keyDown(input, { key: 'Enter' })
+
   expect(confirm).toHaveBeenCalledOnce()
   expect(restoreEditor).toHaveBeenCalledOnce()
 })
@@ -43,7 +48,9 @@ it('cancels on window deactivation without stealing focus back from another wind
       restoreEditor={restoreEditor}
     />,
   )
+
   fireEvent.blur(window)
+
   expect(cancel).toHaveBeenCalledOnce()
   expect(restoreEditor).not.toHaveBeenCalled()
 })

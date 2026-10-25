@@ -141,19 +141,23 @@ test.describe('persistence', () => {
     seedDocument(userDataDir, depthSeed(20))
     const before = readFileSync(`${userDataDir}/data/document.json`)
     const { app, window } = await launchTree(userDataDir)
+
     allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
 
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('alert')).toHaveText(
       'Operation failed: Nodes cannot be nested deeper than 20 levels.',
     )
     expect(readFileSync(`${userDataDir}/data/document.json`)).toEqual(before)
+
     await closeApp(app)
   })
 
   test('shows the document error and leaves an over-depth file byte-for-byte unchanged', async ({ userDataDir }) => {
     seedDocument(userDataDir, depthSeed(21))
     const before = readFileSync(`${userDataDir}/data/document.json`)
+
     allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
     const { window } = await launchTree(userDataDir, { expectReady: false })
 
@@ -194,6 +198,7 @@ test.describe('persistence', () => {
           return 'rejected'
         }
       }, state)
+
       expect(result).toBe('rejected')
       expect(readFileSync(documentPath(userDataDir))).toEqual(before)
     }
@@ -201,11 +206,13 @@ test.describe('persistence', () => {
 
   test('does not surface a save error during rapid edits', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await window.clock.install()
     const text = 'rapid '.repeat(100)
 
     await typeInto(node(window, 1), text)
     await fireIdleSave(window)
+
     await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll).toBe(text)
   })
 
@@ -225,27 +232,36 @@ test.describe('persistence', () => {
     }) => {
       seedDocument(userDataDir, seed())
       const first = await launchTree(userDataDir)
+
       await wheelBy(first.window, distance)
 
       // Select a row inside the viewport so focusing it does not move the page. A windowed list mounts
       // the rows for the new offset only after its scroll handler runs.
       await expect.poll(() => rowInViewport(first.window)).not.toBe('')
+
       const label = await rowInViewport(first.window)
       const selected = (page: Page) => page.getByRole('textbox', { name: label, exact: true })
+
       await selected(first.window).click()
+
       await expect(selected(first.window)).toBeFocused()
+
       const savedTop = await viewportTop(selected(first.window))
 
       await closeApp(first.app)
+
       expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(savedTop)
 
       // Relaunch twice without touching the page: the view must survive both. Normal mode starts
       // without the Insert keypress, which as user input would end the restore early.
       for (let relaunch = 0; relaunch < 2; relaunch += 1) {
         const next = await launchTree(userDataDir, { initialMode: 'normal' })
+
         await expect(selected(next.window)).toBeFocused()
         await expect.poll(() => viewportTop(selected(next.window))).toBe(savedTop)
+
         await closeApp(next.app)
+
         expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(savedTop)
       }
     })
@@ -255,19 +271,25 @@ test.describe('persistence', () => {
     seedDocument(userDataDir, rowsSeed(120))
     const first = await launchTree(userDataDir)
     const firstRow = (page: Page) => page.getByRole('textbox', { name: 'Node 1', exact: true })
+
     await expect(firstRow(first.window)).toBeFocused()
 
     await wheelBy(first.window, 2_000)
+
     await expect(firstRow(first.window)).not.toBeInViewport()
+
     const contentTop = await first.window.evaluate(
       () => document.querySelector('.scroll-viewport')?.getBoundingClientRect().top ?? 0,
     )
+
     await closeApp(first.app)
+
     // The nearest edge is the top of the content area, directly below the toolbar.
     expect(contentTop).toBeGreaterThan(0)
     expect(readPersisted(userDataDir).view?.selectedRowTop).toBe(contentTop)
 
     const second = await launchTree(userDataDir)
+
     await expect(firstRow(second.window)).toBeFocused()
     await expect(firstRow(second.window)).toBeInViewport()
   })
@@ -277,6 +299,7 @@ test.describe('persistence', () => {
     const requestedBounds = { x: 120, y: 140, width: 900, height: 600 }
 
     await setMainWindowBounds(first.app, requestedBounds)
+
     await expect.poll(() => tryReadWindowBounds(userDataDir)).toEqual(requestedBounds)
 
     await closeApp(first.app)
@@ -291,12 +314,16 @@ test.describe('persistence', () => {
 
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+
     unlockSystemClipboard()
+
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
       .toEqual(expect.any(String))
+
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await closeApp(first.app)
@@ -311,7 +338,9 @@ test.describe('persistence', () => {
 
     await writeClipboardText(first.app, 'https://example.com')
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByRole('link', { name: 'https://example.com' })).toBeVisible()
+
     unlockSystemClipboard()
 
     await closeApp(first.app)
@@ -326,33 +355,45 @@ test.describe('persistence', () => {
     await typeInto(node(first.window, 1), 'Recover me')
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+
     unlockSystemClipboard()
+
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
       .toEqual(expect.any(String))
+
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()
+
     await first.window.keyboard.press('Meta+Backspace')
+
     await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
 
     await closeApp(first.app)
+
     expect(readPersisted(userDataDir).document.roots[0]?.attachment).toBeUndefined()
+
     const generation = documentGenerations(userDataDir).find((name) => {
       const state = JSON.parse(readFileSync(join(userDataDir, 'data', name), 'utf8')) as {
         document: { roots: { attachment?: { id: string } }[] }
       }
       return state.document.roots[0]?.attachment?.id === attachmentId
     })
+
     expect(generation).toBeDefined()
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
 
     const second = await launchTree(userDataDir)
+
     await expect(second.window.getByAltText('Attached image')).toHaveCount(0)
     await expect.poll(() => attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+
     await closeApp(second.app)
+
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
   })
 
@@ -362,17 +403,24 @@ test.describe('persistence', () => {
     await typeInto(node(first.window, 1), 'Recover me')
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
+
     unlockSystemClipboard()
+
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(1)
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
       .toEqual(expect.any(String))
+
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
 
     await node(first.window, 1).focus()
+
     await first.window.keyboard.press('Meta+Backspace')
+
     await expect(first.window.getByAltText('Attached image')).toHaveCount(0)
+
     await closeApp(first.app)
 
     const generation = documentGenerations(userDataDir).find((name) => {
@@ -381,6 +429,7 @@ test.describe('persistence', () => {
       }
       return state.document.roots[0]?.attachment?.id === attachmentId
     })
+
     expect(generation).toBeDefined()
 
     writeFileSync(documentPath(userDataDir), '{ damaged')
@@ -389,6 +438,7 @@ test.describe('persistence', () => {
     await expect(node(second.window, 1)).toHaveValue('Recover me')
     await expect(second.window.getByAltText('Attached image')).toBeVisible()
     expect(attachmentFiles(userDataDir)).toEqual([`${attachmentId}.png`])
+
     await closeApp(second.app)
   })
 
@@ -396,13 +446,16 @@ test.describe('persistence', () => {
     seedDocument(userDataDir, depthSeedWithLeaf(19))
     const before = readFileSync(documentPath(userDataDir))
     const { window } = await launchTree(userDataDir)
+
     allowRendererError(/^Operation failed: Nodes cannot be nested deeper than 20 levels\.$/)
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
+
     await expect(parent(window)).toHaveValue('Level 20')
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
 
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('alert')).toHaveText(
       'Operation failed: Nodes cannot be nested deeper than 20 levels.',
     )
@@ -415,18 +468,22 @@ test.describe('persistence', () => {
     seedDocument(userDataDir, overDepthPasteSeed())
     const before = readFileSync(documentPath(userDataDir))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
 
     // Yank the level-19 sibling subtree, enter the target's parent, and put the register after the
     // level-20 node: the copied child would land at level 21, so the paste must reject in full.
     await node(window, 2).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await window.getByRole('button', { name: 'Enter node 1' }).click()
+
     await expect(parent(window)).toHaveValue('Level 19')
 
     await window.keyboard.press('p')
+
     await expect(window.getByRole('alert')).toHaveText(
       'Operation failed: Nodes cannot be nested deeper than 20 levels.',
     )
@@ -452,9 +509,12 @@ describeForEachEditingMode('persistence of the selection', () => {
 
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
+
     expect(persisted.document.roots[0]?.text).toBe('Projects')
+
     const parentId = persisted.document.roots[0]!.id
     const childId = persisted.document.roots[0]!.children[0]!.id
+
     expect(persisted.document.roots[0]!.children[0]!.text).toBe('Work')
     expect(persisted.location).toEqual({ currentParentId: parentId, selectedNodeId: childId })
 

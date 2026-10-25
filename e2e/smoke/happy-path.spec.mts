@@ -44,11 +44,14 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
     const stop = async () => {
       if (!app) return undefined
       const child = app.process()
+
       await closeApp(app)
+
       expect(
         child.exitCode !== null || child.signalCode !== null,
         `Smoke process still running; retained ${profile}`,
       ).toBe(true)
+
       app = undefined
       return child
     }
@@ -65,11 +68,13 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       })
       // Own the process before waiting for renderer readiness, including failed startup.
       const page = await app.firstWindow({ timeout: 5000 })
+
       expect(
         await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((window) => window.isVisible())),
       ).toEqual([false])
       expect(await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered('CommandOrControl+0'))).toBe(false)
       expect(await page.evaluate(() => devicePixelRatio)).toBe(1)
+
       const owned = app
       return {
         ...observe(page),
@@ -77,10 +82,14 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
         showView: (view) => clickApplicationMenuItem(owned, 'View', view === 'tree' ? 'Tree' : 'Agenda'),
         reload: async () => {
           const previous = await stop()
+
           // A forced teardown must not count as a successful normal quit.
           expect(previous?.exitCode).toBe(0)
+
           const driver = await launch()
+
           expect(app!.process().pid).not.toBe(previous?.pid)
+
           return driver
         },
       }
@@ -89,6 +98,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       await mkdir(join(profile, 'data'))
       await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
       await happyPath(await launch())
+
       expect(errors).toEqual([])
     } finally {
       await stop()
@@ -108,8 +118,10 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       browser = await playwright.chromium.launch({ channel: process.platform === 'darwin' ? 'chrome' : 'chromium' })
       const page = await browser.newPage()
       const driver = observe(page)
+
       await page.goto(`http://localhost:${address.port}`)
       await happyPath(driver)
+
       expect(errors).toEqual([])
     } finally {
       try {

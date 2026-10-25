@@ -36,6 +36,7 @@ describe('editor command transition properties', () => {
             children: [{ id: `nested-${index}`, text: 'Nested', children: [] }],
           }))
           let sequence = 0
+
           const result = pasteNodeForestTransition(
             document,
             {
@@ -50,8 +51,11 @@ describe('editor command transition properties', () => {
             past,
           )
           if (result.kind === 'rejected') throw new Error(result.message)
+
           assertDocument(result.document)
+
           const copies = result.document.roots[0]!.children
+
           expect(copies.map((node) => node.text)).toEqual([
             ...Array.from({ length: repeat }, () => incoming).flat(),
             ...existing,
@@ -92,8 +96,11 @@ describe('editor command transition properties', () => {
               ? openBelowTransition(document, location, () => 'new', expanded)
               : createSiblingOrFirstChildTransition(document, location, branch.text.length, () => 'new', expanded)
           if (!('document' in result)) throw new Error('Expected creation.')
+
           assertDocument(result.document)
+
           const created = locateNode(result.document, 'new')!
+
           expect(created.parent?.id ?? null).toBe(expanded ? 'branch' : location.currentParentId)
           expect(created.siblings.map((node) => node.id)).toEqual(
             expanded ? ['new', ...branch.children.map((node) => node.id)] : ['branch', 'new', 'next'],
@@ -122,7 +129,9 @@ describe('editor command transition properties', () => {
         for (const [index, text] of texts.entries()) branch = { id: `ancestor-${index}`, text, children: [branch] }
         const document: Document = { roots: [branch] }
         const location = { currentParentId: branch.id, selectedNodeId: current.id }
+
         const result = deletePreviousEmptyTransition(document, location, 0, () => true)!
+
         assertDocument(result.document)
         expect(locateNode(result.document, 'blank')).toBeUndefined()
         expect(locateNode(result.document, 'current')!.node).toEqual(current)
@@ -155,12 +164,15 @@ describe('editor command transition properties', () => {
             roots: focused ? [{ id: 'scope', text: 'Scope', children: siblings }] : siblings,
           }
           const currentParentId = focused ? 'scope' : null
+
           const rows = buildVisibleRows(siblings, (id) => expanded.has(id))
           const emptyIndex = rows.findIndex((row) => row.node.id === 'empty')
           const target = rows[emptyIndex - 1]!.node
+
           const result = deleteEmptySelectedTransition(document, { currentParentId, selectedNodeId: 'empty' }, (id) =>
             expanded.has(id),
           )
+
           expect(result?.focus).toEqual({ nodeId: target.id, cursor: target.text.length })
           expect(result?.location).toEqual({ currentParentId, selectedNodeId: target.id })
           expect(displayedNodes(result!.document, currentParentId)).toEqual([branch])
@@ -191,14 +203,18 @@ describe('editor command transition properties', () => {
                 ? openBelowTransition(document, location, () => id)
                 : createSiblingOrFirstChildTransition(document, location, 0, () => id)
             if (!('document' in result)) throw new Error('Expected creation.')
+
             assertDocument(result.document)
             expect(result.document.roots).toHaveLength(1)
+
             const children = result.document.roots[0]!.children
+
             expect(children[index]!.id).toBe(selectedNodeId)
             expect(children[index + 1]).toEqual({ id, text: '', children: [] })
             expect(children.slice(index + 2)).toEqual(following)
             expect(result.focus).toEqual({ nodeId: id, cursor: 0 })
             expect(result.location).toEqual({ ...location, selectedNodeId: id })
+
             document = result.document
             selectedNodeId = id
           }
@@ -232,19 +248,26 @@ describe('editor command transition properties', () => {
                 ? openBelowTransition(before, location, createId)
                 : createSiblingOrFirstChildTransition(before, location, 0, createId)
             if (!('document' in result)) throw new Error('Expected a transition.')
+
             assertDocument(result.document)
+
             const after = locateNode(result.document, 'empty')!
             if (movesLeft) {
               expect(createId).not.toHaveBeenCalled()
+
               const parent = locateNode(before, selected.parent!.id)!
+
               expect(after.parent?.id ?? null).toBe(parent.parent?.id ?? null)
               expect(after.index).toBe(parent.index + 1)
             } else {
               expect(createId).toHaveBeenCalledTimes(1)
             }
+
             expect(result.location).toEqual({ currentParentId, selectedNodeId: movesLeft ? 'empty' : 'created' })
+
             if (!movesLeft) break
             document = result.document
+
             expect(locateNode(document, 'empty')!.node).toEqual({ id: 'empty', text: '', children: [] })
             expect(countNodes(document.roots)).toBe(nodeCount)
           }
@@ -270,6 +293,7 @@ describe('editor command transition properties', () => {
             })),
           }
           const target = nodes[nodes.length - 1]!
+
           const rows = buildVisibleRows(document.roots, () => false)
           const focus = moveSelectionBoundaryTransition(
             document,
@@ -314,6 +338,7 @@ describe('editor command transition properties', () => {
             ],
           }
           let expansion = COLLAPSED_EXPANSION_STATE
+
           branches.forEach((branch, index) => {
             if (branch.expanded && branch.childCount > 0) expansion = expandNode(expansion, `child-${index}`)
           })
@@ -338,6 +363,7 @@ describe('editor command transition properties', () => {
             return visited
           }
           const down = traverse('down', rows[0]!.node.id)
+
           expect(down).toEqual(rows.map((row) => row.node.id))
           expect(traverse('up', rows[rows.length - 1]!.node.id)).toEqual([...rows].reverse().map((row) => row.node.id))
           expect(
@@ -380,6 +406,7 @@ describe('editor command transition properties', () => {
             ],
           }
           let expansion = COLLAPSED_EXPANSION_STATE
+
           branches.forEach((branch, index) => {
             if (branch.expanded && branch.childCount > 0) expansion = expandNode(expansion, `child-${index}`)
           })
@@ -389,15 +416,19 @@ describe('editor command transition properties', () => {
           for (const row of rows) {
             const at = { ...location, selectedNodeId: row.node.id }
             const cursor = row.node.text.length
+
             // → at the end of the text reaches the same node ↓ reaches (both undefined at the last
             // visible row, since ↓ clamps there and → simply has no next row).
             const down = moveSelectionTransition(document, at, rows, 'down', cursor)
             const right = moveHorizontalTransition(document, at, rows, 'right', cursor)
+
             expect(right?.nodeId).toBe(down?.nodeId)
+
             // ← at the beginning reaches the same node ↑ reaches, including the shared heading
             // fallback from the first visible row.
             const up = moveSelectionTransition(document, at, rows, 'up', 0)
             const left = moveHorizontalTransition(document, at, rows, 'left', 0)
+
             expect(left?.nodeId).toBe(up?.nodeId)
           }
 
@@ -409,6 +440,7 @@ describe('editor command transition properties', () => {
             'last',
             0,
           )
+
           expect(g?.nodeId).toBe(rows[rows.length - 1]!.node.id)
         },
       ),

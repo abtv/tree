@@ -34,12 +34,14 @@ describe('notes archive compatibility with the desktop data directory', () => {
       { expandedIds: ['root'], selectedRowTop: 40 },
     )
     const chunks: Uint8Array[] = []
+
     await exportNotesArchive(
       { readHead: async () => head, readImage: async () => onePixelPng.slice() },
       createZipWriter((chunk) => chunks.push(chunk.slice())),
     )
     const archive = concat(chunks)
     const directory = await mkdtemp(join(tmpdir(), 'tree-notes-archive-'))
+
     directories.push(directory)
     for (const [name, bytes] of Object.entries(unzipSync(archive))) {
       await mkdir(dirname(join(directory, name)), { recursive: true })
@@ -47,6 +49,7 @@ describe('notes archive compatibility with the desktop data directory', () => {
     }
 
     const services = createFileServices(directory, () => {})
+
     expect(await services.load()).toEqual(head)
     expect(await services.readAttachment('image-1')).toEqual(onePixelPng)
   })

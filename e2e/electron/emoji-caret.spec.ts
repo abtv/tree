@@ -24,6 +24,7 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
         location: { currentParentId: null, selectedNodeId: 'n' },
       })
       const path = attachmentPath(userDataDir, 'image')
+
       mkdirSync(dirname(path), { recursive: true })
       writeFileSync(
         path,
@@ -39,22 +40,32 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
           const input = element as HTMLTextAreaElement
           return { start: input.selectionStart, end: input.selectionEnd }
         })
+
       await window.keyboard.press('Escape')
       await window.keyboard.press('0')
       await window.keyboard.type('99')
       await window.keyboard.press('l')
+
       await expect(input).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('h')
+
       await expect(input).not.toHaveClass(/node-input-image-caret/)
       await expect.poll(selection).toEqual({ start: 3, end: 8 })
+
       await window.screenshot({ path: testInfo.outputPath('emoji-image-return.png') })
       await window.keyboard.press('l')
+
       await expect(input).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('2')
       await window.keyboard.press('h')
+
       await expect.poll(selection).toEqual({ start: 1, end: 3 })
+
       await window.keyboard.press('i')
       await window.keyboard.type('!')
+
       await expect(input).toHaveValue('A!🚀👩‍💻')
     })
   }
@@ -71,6 +82,7 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
         location: { currentParentId: null, selectedNodeId: 'n' },
       })
       const { window } = await launchTree(userDataDir)
+
       await setAgendaToday(window)
       if (view === 'Agenda') {
         await window.keyboard.press('Meta+p')
@@ -96,11 +108,17 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
       for (const emoji of emojis) {
         await setCursor(input, start)
         await window.keyboard.press('ArrowRight')
+
         await expect.poll(selection).toEqual({ start: start + emoji.length, end: start + emoji.length })
+
         await window.keyboard.press('ArrowLeft')
+
         await expect.poll(selection).toEqual({ start, end: start })
+
         await window.keyboard.press('Shift+ArrowRight')
+
         await expect.poll(selection).toEqual({ start, end: start + emoji.length })
+
         start += emoji.length + 1
       }
       if (mode === 'vim') {
@@ -109,13 +127,19 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
         await window.keyboard.press('0')
         await window.keyboard.type(String(prefix.length))
         await window.keyboard.press('l')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length })
+
         start = prefix.length
         for (const emoji of emojis) {
           await window.keyboard.press('l')
+
           await expect.poll(selection).toEqual({ start: start + emoji.length, end: start + emoji.length + 1 })
+
           await window.keyboard.press('h')
+
           await expect.poll(selection).toEqual({ start, end: start + emoji.length })
+
           await window.screenshot({ path: testInfo.outputPath(`emoji-${view}-${emoji.codePointAt(0)}-normal.png`) })
           if (emoji === '👩‍💻') {
             await window.emulateMedia({ colorScheme: 'dark' })
@@ -129,49 +153,73 @@ describeForEachEditingMode('Emoji caret movement', ({ mode }) => {
           }
           start += emoji.length + 1
         }
+
         await window.keyboard.press('0')
         await window.keyboard.type(String(prefix.length))
         await window.keyboard.press('l')
         await window.keyboard.press('v')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('l')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length + 1 })
+
         await window.keyboard.press('h')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('Escape')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('g')
         await window.keyboard.press('v')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('Escape')
         await window.keyboard.press('a')
+
         await expect
           .poll(selection)
           .toEqual({ start: prefix.length + emojis[0]!.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('ArrowLeft')
+
         await expect.poll(selection).toEqual({ start: prefix.length, end: prefix.length })
+
         await window.keyboard.press('ArrowRight')
+
         await expect
           .poll(selection)
           .toEqual({ start: prefix.length + emojis[0]!.length, end: prefix.length + emojis[0]!.length })
+
         await window.keyboard.press('Escape')
         await window.keyboard.press('2')
         await window.keyboard.press('l')
         const joinedStart = prefix.length + emojis[0]!.length + 1
+
         await window.keyboard.press('v')
         await window.keyboard.press('Escape')
         await window.keyboard.press('g')
         await window.keyboard.press('v')
+
         await expect.poll(selection).toEqual({ start: joinedStart, end: joinedStart + emojis[1]!.length })
+
         await window.keyboard.press('d')
         const readText = async () =>
           input.evaluate((element) =>
             element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
           )
+
         await expect.poll(readText).toBe(text.slice(0, joinedStart) + text.slice(joinedStart + emojis[1]!.length))
+
         await window.keyboard.press('u')
+
         await expect.poll(readText).toBe(text)
       }
+
       await expect(input).toBeFocused()
     })
   }

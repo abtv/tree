@@ -8,7 +8,9 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
   if (cpuSession !== undefined) await cpuSession.send('Emulation.setCPUThrottlingRate', { rate: cpuRate })
   const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
   await input.focus()
+
   await expect(input).toBeFocused()
+
   await app.evaluate(() => {
     const control = globalThis as typeof globalThis & {
       __saveResponsiveness?: { started: boolean; completed: boolean }
@@ -43,6 +45,7 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
 
   await window.keyboard.type('one two three four five six seven eight nine ')
   await window.keyboard.press('z')
+
   await expect
     .poll(() =>
       app.evaluate(
@@ -52,12 +55,15 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
       ),
     )
     .toBe(true)
+
   const saveFinishedBeforeNextKey = await app.evaluate(
     () =>
       (globalThis as typeof globalThis & { __saveResponsiveness?: { completed: boolean } }).__saveResponsiveness
         ?.completed,
   )
+
   expect(saveFinishedBeforeNextKey).toBe(false)
+
   await window.keyboard.press('x')
   await window.waitForFunction(
     () => Object.keys((window as unknown as { saveInputPaints: object }).saveInputPaints).length === 2,
@@ -65,6 +71,7 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
   const paints = await window.evaluate(
     () => (window as unknown as { saveInputPaints: Record<string, number> }).saveInputPaints,
   )
+
   await expect
     .poll(() =>
       app.evaluate(
@@ -81,8 +88,10 @@ async function measureSaveResponsiveness(userDataDir: string, cpuRate: number): 
     scenario: `typing-during-save-large-10000-cpu-${cpuRate}x`,
     metrics: { triggerPaintMs: round(paints['z']!), inFlightPaintMs: round(paints['x']!) },
   })
+
   expect(paints['z']).toBeLessThan(100)
   expect(paints['x']).toBeLessThan(100)
+
   await cpuSession?.detach()
 }
 

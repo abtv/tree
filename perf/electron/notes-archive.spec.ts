@@ -62,6 +62,7 @@ async function stopMainProbe(app: ElectronApplication) {
 
 function percentile(values: number[], fraction: number): number {
   expect(values.length).toBeGreaterThan(0)
+
   const sorted = [...values].sort((a, b) => a - b)
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]!
 }
@@ -71,7 +72,9 @@ async function measure(app: ElectronApplication, page: Page, operation: Operatio
   const parent = page.getByRole('textbox', { name: 'Current parent', exact: true })
   const parentBefore = await parent.inputValue()
   await field.focus()
+
   await expect(field).toBeFocused()
+
   await field.evaluate((element) => {
     const probe = { paints: [] as { start: number; elapsed: number }[], finished: Infinity }
     let keyStarted = 0
@@ -115,10 +118,12 @@ async function measure(app: ElectronApplication, page: Page, operation: Operatio
   } while (!done || typed < 100)
   const { result, main: operationMain } = await observedJob
   const durationMs = operation === 'idle' ? performance.now() - started : operationMs
+
   expect(result).toMatchObject({ ok: true })
   if (operation === 'export') expect(result).toMatchObject({ summary: { imageCount: 256, missingImageCount: 0 } })
   if (operation === 'import')
     expect(result).toMatchObject({ incoming: { nodeCount: 50176, imageCount: 256, missingImageCount: 0 } })
+
   await page.waitForFunction(
     (count) =>
       (globalThis as typeof globalThis & { archiveTyping: { paints: number[] } }).archiveTyping.paints.length === count,
@@ -133,10 +138,12 @@ async function measure(app: ElectronApplication, page: Page, operation: Operatio
     return probe.paints.filter((sample) => sample.start <= probe.finished).map((sample) => sample.elapsed)
   })
   const main = operationMain ?? (await stopMainProbe(app))
+
   await expect(field).toHaveValue(new RegExp(`x{${typed}}`))
   await expect(parent).toHaveValue(parentBefore)
   if (operation !== 'idle') expect(overlappingKeys).toBeGreaterThan(10)
   expect(paints.length).toBeGreaterThan(10)
+
   const metrics = {
     durationMs: round(durationMs),
     paintP50Ms: round(percentile(paints, 0.5)),
@@ -152,6 +159,7 @@ async function measure(app: ElectronApplication, page: Page, operation: Operatio
 
 async function cancelPreparation(app: ElectronApplication, page: Page, archivePath: string): Promise<void> {
   await expect(callNotes(page, 'chooseNotesImportArchive')).resolves.toMatchObject({ ok: true })
+
   // Cancel after an actual image write, while the worker still owns its open archive FileHandle.
   await page.evaluate(() => {
     const api = (globalThis as unknown as { treeApi: TreeApi }).treeApi
@@ -161,7 +169,9 @@ async function cancelPreparation(app: ElectronApplication, page: Page, archivePa
       void api.cancelNotesOperation!()
     })
   })
+
   await expect(callNotes(page, 'prepareNotesImport')).resolves.toEqual({ ok: false, canceled: true })
+
   // lsof inspects the main PID including its worker threads; /proc is the Linux equivalent.
   const pid = app.process().pid!
   const openFiles =
@@ -176,6 +186,7 @@ async function cancelPreparation(app: ElectronApplication, page: Page, archivePa
             }
           })
           .join('\n')
+
   expect(openFiles).not.toContain(archivePath)
   expect(openFiles).not.toContain('.notes-import/')
   expect(openFiles).not.toContain('.notes-export/')
@@ -185,23 +196,32 @@ async function cancelPreparation(app: ElectronApplication, page: Page, archivePa
 test('large notes archive keeps typing and the main event loop responsive', async ({ userDataDir }) => {
   test.setTimeout(180_000)
   const profile = seedNotesArchiveProfile(userDataDir)
+
   expect(profile.nodeCount).toBe(50176)
+
   const archivePath = join(userDataDir, 'Notes.zip')
   const { app, window } = await launchTree(userDataDir)
+
   await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toHaveValue('Node 0.1')
+
   await app.evaluate(({ dialog }, path) => {
     dialog.showSaveDialog = (async () => ({ canceled: false, filePath: path })) as typeof dialog.showSaveDialog
     dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as typeof dialog.showOpenDialog
   }, archivePath)
 
   const idle = await measure(app, window, 'idle')
+
   await expect(callNotes(window, 'chooseNotesExportDestination')).resolves.toMatchObject({ ok: true })
+
   const exported = await measure(app, window, 'export')
+
   expect(statSync(archivePath).size).toBeGreaterThan(profile.imageBytes)
   await expect(callNotes(window, 'chooseNotesImportArchive')).resolves.toMatchObject({ ok: true })
+
   const imported = await measure(app, window, 'import')
   await callNotes(window, 'cancelNotesOperation')
   await cancelPreparation(app, window, archivePath)
+
   expect(readdirSync(join(userDataDir, '.notes-import'))).toEqual([])
   expect(readdirSync(join(userDataDir, '.notes-export'))).toEqual([])
   expect(existsSync(join(userDataDir, 'Replaced Notes'))).toBe(false)

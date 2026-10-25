@@ -128,11 +128,14 @@ describe('command panel owner', () => {
     const before = store.getSnapshot()
     try {
       await act(async () => getMenuViewCommands().showAgenda())
+
       expect(store.getSnapshot()).toBe(before)
     } finally {
       modal.remove()
     }
+
     await act(async () => getMenuViewCommands().showAgenda())
+
     expect(store.getSnapshot()).toHaveProperty('agenda.today')
   })
 
@@ -142,20 +145,27 @@ describe('command panel owner', () => {
     const launch = vi.fn(() => {
       expect(document.activeElement).toBe(editor)
     })
+
     source.update([{ name: 'export-notes', enabled: false, run: launch }])
     const { editor, historyWrite } = await setup('normal', true, false, APPLE_SHORTCUTS, source)
+
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'export-notes' } })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
+
     expect(launch).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Command')).toBe(document.activeElement)
     expect(historyWrite).not.toHaveBeenCalled()
+
     act(() => source.update([{ name: 'export-notes', enabled: true, run: launch }]))
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
     await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['export-notes']))
+
     expect(launch).toHaveBeenCalledOnce()
+
     fireEvent.keyDown(editor, { key: ':' })
     act(() => source.update([{ name: 'resume-backing-up', enabled: true, run: launch }]))
+
     expect(screen.getByLabelText('Commands').textContent).toContain('resume-backing-up')
     expect(screen.getByLabelText('Commands').textContent).not.toContain('export-notes')
   })
@@ -164,21 +174,27 @@ describe('command panel owner', () => {
     const { editor } = await setup('visual', true, true)
     const text = editor.firstChild!
     const selection = window.getSelection()!
+
     selection.setBaseAndExtent(text, 4, text, 1)
     fireEvent.keyDown(editor, { key: 'P', metaKey: true, shiftKey: true })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+
     expect(selection.anchorNode).toBe(text)
     expect(selection.anchorOffset).toBe(4)
     expect(selection.focusOffset).toBe(1)
   })
   it('restores backward editor selection after its decorated text nodes are replaced', async () => {
     const { editor } = await setup('visual', true, true)
+
     editor.classList.add('node-input')
     const selection = window.getSelection()!
+
     selection.setBaseAndExtent(editor.firstChild!, 4, editor.firstChild!, 1)
     fireEvent.keyDown(editor, { key: 'P', metaKey: true, shiftKey: true })
     editor.innerHTML = '<span class="date-future">alpha</span>'
+
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+
     expect(document.activeElement).toBe(editor)
     expect(selection.anchorNode).toBe(editor.firstChild!.firstChild)
     expect(selection.anchorOffset).toBe(4)
@@ -193,21 +209,33 @@ describe('command panel owner', () => {
       fireEvent.change(screen.getByLabelText('Command'), { target: { value: query } })
       fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
     }
+
     // Read the hook's message through its status presentation in the harness.
     unknown('unknown')
+
     expect(screen.getByRole('status').textContent).toBe('Not a command: unknown')
+
     act(() => vi.advanceTimersByTime(1999))
+
     expect(screen.getByRole('status').textContent).toBe('Not a command: unknown')
+
     act(() => vi.advanceTimersByTime(1))
+
     expect(screen.queryByRole('status')).toBeNull()
+
     unknown('first')
     act(() => vi.advanceTimersByTime(1000))
     fireEvent.keyDown(editor, { key: 'h' })
+
     expect(screen.queryByRole('status')).toBeNull()
+
     unknown('second')
     act(() => vi.advanceTimersByTime(1000))
+
     expect(screen.getByRole('status').textContent).toBe('Not a command: second')
+
     act(() => vi.advanceTimersByTime(1000))
+
     expect(screen.queryByRole('status')).toBeNull()
     expect(document.activeElement).toBe(editor)
   })
@@ -220,7 +248,9 @@ describe('command panel owner', () => {
     ['normal', false],
   ])('does not open in %s (Vim enabled %s)', async (mode, enabled) => {
     const { editor } = await setup(mode, enabled)
+
     fireEvent.keyDown(editor, { key: ':' })
+
     expect(screen.queryByLabelText('Command')).toBeNull()
   })
 
@@ -235,9 +265,13 @@ describe('command panel owner', () => {
   ])('opens with Cmd+Shift+P in %s (Vim enabled %s) and restores selection', async (mode, enabled) => {
     const { editor } = await setup(mode, enabled)
     ;(editor as HTMLTextAreaElement).setSelectionRange(1, 4, 'backward')
+
     fireEvent.keyDown(editor, { key: 'P', metaKey: true, shiftKey: true })
+
     expect(screen.getByLabelText('Command')).toBe(document.activeElement)
+
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+
     expect(document.activeElement).toBe(editor)
     expect((editor as HTMLTextAreaElement).selectionStart).toBe(1)
     expect((editor as HTMLTextAreaElement).selectionEnd).toBe(4)
@@ -248,10 +282,14 @@ describe('command panel owner', () => {
     const { editor, commandState, historyWrite, save } = await setup()
     ;(editor as HTMLTextAreaElement).setSelectionRange(2, 3)
     commandState.pending = { count: '3', operator: 'd', motionCount: '2' }
+
     fireEvent.keyDown(editor, { key: ':' })
+
     expect(commandState.pending).toBeUndefined()
+
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'theme' } })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+
     expect(document.activeElement).toBe(editor)
     expect((editor as HTMLTextAreaElement).selectionStart).toBe(2)
     expect((editor as HTMLTextAreaElement).selectionEnd).toBe(3)
@@ -261,27 +299,35 @@ describe('command panel owner', () => {
 
   it('writes history once on success and excludes a rejected command', async () => {
     const { editor, historyWrite, appearanceWrite } = await setup()
+
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'dark' } })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
     await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['set-theme-dark']))
     appearanceWrite.mockRejectedValueOnce(new Error('appearance write failed'))
+
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'light' } })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
     await waitFor(() => expect(appearanceWrite).toHaveBeenCalledTimes(2))
+
     expect(historyWrite).toHaveBeenCalledTimes(1)
   })
 
   it('does not suppress a later click after a canceled outside pointer gesture', async () => {
     const { editor } = await setup()
+
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent(editor, new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true }))
+
     expect(screen.queryByLabelText('Command')).toBeNull()
+
     fireEvent(document, new Event('pointercancel', { bubbles: true }))
     const clicked = vi.fn()
     editor.addEventListener('click', clicked)
+
     fireEvent.click(editor)
+
     expect(clicked).toHaveBeenCalledOnce()
   })
 })
@@ -298,7 +344,9 @@ describe('command panel shortcuts per platform profile', () => {
     ['Cmd+Ctrl+Shift+P on Apple', APPLE_SHORTCUTS, { metaKey: true, ctrlKey: true }, false],
   ])('%s opens the panel: %s', async (_name, profile, modifiers, opens) => {
     const { editor } = await setup('normal', true, false, profile)
+
     fireEvent.keyDown(editor, { key: 'P', shiftKey: true, ...modifiers })
+
     expect(screen.queryByLabelText('Command') !== null).toBe(opens)
   })
 
@@ -307,14 +355,22 @@ describe('command panel shortcuts per platform profile', () => {
     'moves the open panel selection with Ctrl+N and Ctrl+P',
     async (profile) => {
       const { editor } = await setup('normal', true, false, profile)
+
       fireEvent.keyDown(editor, { key: ':' })
       const command = screen.getByLabelText('Command')
+
       expect(screen.getByLabelText('Selected row').textContent).toBe('0')
+
       fireEvent.keyDown(command, { key: 'n', ctrlKey: true })
+
       expect(screen.getByLabelText('Selected row').textContent).toBe('1')
+
       fireEvent.keyDown(command, { key: 'n', ctrlKey: true })
+
       expect(screen.getByLabelText('Selected row').textContent).toBe('2')
+
       fireEvent.keyDown(command, { key: 'p', ctrlKey: true })
+
       expect(screen.getByLabelText('Selected row').textContent).toBe('1')
     },
   )
@@ -323,8 +379,10 @@ describe('command panel shortcuts per platform profile', () => {
   it('keeps Ctrl+P navigation ahead of the Agenda command while the panel is open', async () => {
     const { editor, store } = await setup('normal', true, false, OTHER_SHORTCUTS)
     const open = vi.spyOn(store, 'openAgenda')
+
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'p', ctrlKey: true })
+
     expect(open).not.toHaveBeenCalled()
   })
 })

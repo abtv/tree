@@ -18,11 +18,13 @@ it('loads script libraries with native Node type stripping and no transpilation 
     './scripts/web-release/publish.mts',
     './scripts/web-release/verify-target.mts',
   ]
+
   const result = spawnSync(
     process.execPath,
     ['--input-type=module', '-e', `for (const path of ${JSON.stringify(modules)}) await import(path)`, 'runtime-smoke'],
     { cwd: root, encoding: 'utf8' },
   )
+
   expect(result.error).toBeUndefined()
   expect(result.status, result.stderr).toBe(0)
 })
@@ -32,6 +34,7 @@ it.each(['cli', 'publish', 'verify-target'])('preserves the installed %s.mjs rel
     spawnSync(process.execPath, [`scripts/web-release/${name}.${extension}`], { cwd: root, encoding: 'utf8' })
   const legacy = run('mjs')
   const migrated = run('mts')
+
   expect(legacy.error).toBeUndefined()
   expect(migrated.error).toBeUndefined()
   expect(migrated.status).toBe(1)

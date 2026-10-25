@@ -53,6 +53,7 @@ function sameDocument(a: Document, b: Document): boolean {
  */
 function expectRestoredLocation(store: EditorStore, hadEffect: boolean, document: Document, location: Location): void {
   if (!hadEffect) return
+
   expect(isValidLocation(document, location)).toBe(true)
   expect(isDisplayed(store)).toBe(true)
 }
@@ -75,6 +76,7 @@ describe('EditorStore undo and redo semantics', () => {
             createServices({ version: 1, document, location: firstLocation(document) }, () => clipboard.current),
             freshIds(),
           )
+
           await store.initialize()
 
           const initial = store.getSnapshot()
@@ -91,6 +93,7 @@ describe('EditorStore undo and redo semantics', () => {
 
             const ran = await applyCommand(store, action, clipboard)
             if (!ran) break
+
             store.endTextSession()
 
             const stateAfter = store.getSnapshot()
@@ -103,18 +106,26 @@ describe('EditorStore undo and redo semantics', () => {
             // restores the document and the stack depth exactly as they were, so it can run after
             // every command without disturbing the sequence still to come.
             const beforeUndo = store.getSnapshot()
+
             store.undo()
             const undone = store.getSnapshot()
+
             expect(undone.status).toBe('ready')
+
             if (undone.status !== 'ready') return
+
             expect(undone.document).toEqual(target)
             expectRestoredLocation(store, undone !== beforeUndo, undone.document, undone.location)
 
             const beforeRedo = store.getSnapshot()
+
             store.redo()
             const redone = store.getSnapshot()
+
             expect(redone.status).toBe('ready')
+
             if (redone.status !== 'ready') return
+
             expect(redone.document).toEqual(after)
             expectRestoredLocation(store, redone !== beforeRedo, redone.document, redone.location)
 
@@ -130,24 +141,35 @@ describe('EditorStore undo and redo semantics', () => {
           const rounds = commands.length
           for (let i = 0; i < rounds; i++) {
             const beforeUndo = store.getSnapshot()
+
             store.undo()
             const state = store.getSnapshot()
+
             expect(state.status).toBe('ready')
+
             if (state.status !== 'ready') return
+
             expectRestoredLocation(store, state !== beforeUndo, state.document, state.location)
           }
           for (let i = 0; i < rounds; i++) {
             const beforeRedo = store.getSnapshot()
+
             store.redo()
             const state = store.getSnapshot()
+
             expect(state.status).toBe('ready')
+
             if (state.status !== 'ready') return
+
             expectRestoredLocation(store, state !== beforeRedo, state.document, state.location)
           }
 
           const restored = store.getSnapshot()
+
           expect(restored.status).toBe('ready')
+
           if (restored.status !== 'ready') return
+
           expect(restored.document).toEqual(finalDocument)
         },
       ),

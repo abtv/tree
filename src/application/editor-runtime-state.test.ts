@@ -8,8 +8,11 @@ describe('EditorRuntimeState', () => {
     const state = new EditorRuntimeState()
     const listener = vi.fn()
     const unsubscribe = state.subscribe(listener)
+
     expect(() => state.ready()).toThrow('The editor is not ready.')
+
     const document = createInitialDocument('root')
+
     state.replaceReady({
       status: 'ready',
       document,
@@ -19,15 +22,20 @@ describe('EditorRuntimeState', () => {
       expansion: COLLAPSED_EXPANSION_STATE,
       operationError: 'old error',
     })
+
     expect(state.ready().focus.token).toBe(1)
     expect(state.ready().operationError).toBeUndefined()
     expect(state.getStructuralVersion()).toBe(0)
+
     state.replaceReady({ ...state.ready(), focus: state.newFocus('root', 1) }, true)
+
     expect(state.ready().focus.token).toBe(2)
     expect(state.getStructuralVersion()).toBe(1)
     expect(listener).toHaveBeenCalledTimes(2)
+
     unsubscribe()
     state.emit()
+
     expect(listener).toHaveBeenCalledTimes(2)
   })
 
@@ -48,6 +56,7 @@ describe('EditorRuntimeState', () => {
     it('drops the index of the previous document when the document changes', () => {
       const state = readyState()
       const previous = state.ready().document
+
       const cached = buildNodeIndex(previous)
 
       state.replaceReady({ ...state.ready(), document: createInitialDocument('other') })
@@ -58,6 +67,7 @@ describe('EditorRuntimeState', () => {
     it('keeps the index when the same document is replaced by a new snapshot', () => {
       const state = readyState()
       const current = state.ready().document
+
       const cached = buildNodeIndex(current)
 
       state.replaceReady({ ...state.ready(), focus: state.newFocus('root', 1) })
@@ -67,6 +77,7 @@ describe('EditorRuntimeState', () => {
 
     it('does not touch the index of a document installed from the loading state', () => {
       const document = createInitialDocument('root')
+
       const cached = buildNodeIndex(document)
 
       readyState(document)

@@ -50,6 +50,7 @@ describe('automatic publication wiring', () => {
       const workflow = await read(`.github/workflows/${file}`)
       for (const [, path] of workflow.matchAll(/^\s+uses: \.\/(\.github\/workflows\/[^\s]+)$/gm)) {
         const target = await read(path!)
+
         expect(target, `${file} calls ${path}`).toMatch(/^ {2}workflow_call:/m)
       }
     }
@@ -68,34 +69,45 @@ describe('automatic publication wiring', () => {
     ]) {
       const workflow = await readWorkflow(file!)
       const audit = workflow.split('\n  audit:')[1]!.split(/\n {2}\w+:/)[0]!
+
       expect(audit).toContain(
         `uses: ./.github/workflows/${['ci', 'browser', 'demo'].includes(file!) ? 'require-dependency-audit' : 'audit-dependencies'}.yml`,
       )
       expect(audit).toContain(`caller: ${file}`)
+
       const section = workflow.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+
       expect(section).toContain('needs: audit')
       expect(section).not.toMatch(/^ {4}if:/m) // Retain GitHub's default success() gate.
     }
     const release = await read('.github/workflows/release-web-app.yml')
     for (const job of ['check', 'chrome']) {
       const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+
       expect(section).toContain('needs: audit')
       expect(section).not.toMatch(/if:.*(?:always\(|!cancelled\()/)
     }
     const audit = await read('.github/workflows/audit-dependencies.yml')
+
     expect(audit).toContain('runs-on: ubuntu-24.04')
     expect(audit).toContain('npm audit --audit-level=high')
     expect(audit).toContain("-${{ inputs.caller || 'audit' }}")
     expect(audit).not.toContain('continue-on-error:')
+
     const context = { workflow: 'Release web app', ref: 'refs/heads/main' }
     const callers = ['audit', 'ci', 'e2e', 'browser', 'e2e-memory', 'demo']
     const groups = callers.map((caller) => concurrencyGroup(audit, { ...context, caller }))
+
     expect(new Set(groups).size).toBe(callers.length)
+
     const firstPr = concurrencyGroup(audit, { ...context, pr: 1 })
     const secondPr = concurrencyGroup(audit, { ...context, pr: 2 })
+
     expect(firstPr).not.toBe(secondPr)
+
     const central = { workflow: 'Audit dependencies', ref: 'refs/heads/main' }
     const automatic = concurrencyGroup(audit, { ...central, event: 'push' })
+
     for (const event of ['schedule', 'workflow_dispatch']) {
       expect(concurrencyGroup(audit, { ...central, event })).not.toBe(automatic)
     }
@@ -103,28 +115,35 @@ describe('automatic publication wiring', () => {
 
   it('runs one automatic audit and makes independent consumers require that same result', async () => {
     const audit = await readWorkflow('audit')
+
     expect(audit).toMatch(/^ {2}push:\n {4}branches: \[main\]/m)
     expect(audit).toMatch(/^ {2}pull_request:/m)
     expect(audit).toContain('run: node scripts/dependency-audit.mts identify')
     expect(audit).toContain('name: ${{ steps.identity.outputs.marker }}-${{ github.run_attempt }}')
     expect(audit).toContain("if: ${{ always() && steps.identity.outcome == 'success' }}")
+
     const files = await readdir(new URL('../../.github/workflows/', import.meta.url))
     for (const file of files.filter((name) => name.endsWith('.yml'))) {
       const text = await read(`.github/workflows/${file}`)
+
       if (file !== 'audit-dependencies.yml') expect(text).not.toMatch(/run: npm audit/)
     }
     for (const file of ['ci', 'browser', 'demo', 'release']) {
       const text = await readWorkflow(file)
       const gate = text.split('\n  audit:')[1]!.split(/\n {2}\w+:/)[0]!
+
       expect(gate).toContain('uses: ./.github/workflows/require-dependency-audit.yml')
       expect(text).toContain('actions: read')
       expect(text).not.toContain('uses: ./.github/workflows/audit-dependencies.yml')
     }
     const smoke = await read('.github/workflows/run-smoke-tests.yml')
+
     expect(smoke).toContain('uses: ./.github/workflows/require-dependency-audit.yml')
     expect(smoke).toContain('needs: audit')
     expect(smoke).toContain('actions: read')
+
     const gate = await readWorkflow('audit-gate')
+
     expect(gate).toContain("if: github.event_name == 'push' || github.event_name == 'pull_request'")
     expect(gate).toContain('run: node scripts/dependency-audit.mts require')
     expect(gate).toContain("if: github.event_name != 'push' && github.event_name != 'pull_request'")
@@ -138,6 +157,7 @@ describe('automatic publication wiring', () => {
   ])('lets %s follow a successful %s with source identity guards', async (job, prerequisite) => {
     const release = await read('.github/workflows/release-web-app.yml')
     const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+
     expect(section).toContain(`needs: [${prerequisite}]`)
     // Keep cancellation, direct prerequisite and source identity checks fail-closed.
     expect(section.match(/^ {4}if: (.+)$/m)?.[1]).toBe(
@@ -154,12 +174,16 @@ describe('automatic publication wiring', () => {
       const standaloneName = workflow.match(/^name: (.+)$/m)![1]!
       const called = concurrencyGroup(workflow, context)
       const standalone = concurrencyGroup(workflow, { ...context, workflow: standaloneName })
+
       expect(called, file).not.toBe(standalone)
+
       groups.push(called)
+
       expect(workflow).toContain('cancel-in-progress: true')
       // Successive standalone runs still supersede each other on the same ref.
       expect(concurrencyGroup(workflow, { ...context, workflow: standaloneName, runId: 2 })).toBe(standalone)
     }
+
     expect(new Set(groups).size).toBe(groups.length)
     expect(release).toContain('cancel-in-progress: false')
   })
@@ -168,6 +192,7 @@ describe('automatic publication wiring', () => {
     for (const file of ['ci', 'e2e', 'e2e-memory']) {
       const workflow = await readWorkflow(file!)
       const context = { workflow: workflow.match(/^name: (.+)$/m)![1]!, ref: 'refs/heads/main' }
+
       expect(concurrencyGroup(workflow, { ...context, pr: 12 })).not.toBe(
         concurrencyGroup(workflow, { ...context, pr: 13 }),
       )
@@ -176,17 +201,20 @@ describe('automatic publication wiring', () => {
       )
     }
     const demo = await read('.github/workflows/publish-demo.yml')
+
     expect(concurrencyGroup(demo, { workflow: 'Publish demo', ref: 'refs/heads/main' })).not.toBe(
       concurrencyGroup(demo, { workflow: 'Publish demo', ref: 'refs/heads/feature' }),
     )
   })
   it('never executes publisher-controlled target verifier scripts', async () => {
     const target = await read('deployment/github-pages/deploy-web-app.yml')
+
     expect(target).not.toContain('run: node .github/scripts/')
     expect(target).toContain('repository: abtv/tree')
   })
   it('gates same-run transfer on every applicable check and keeps secrets out of check jobs', async () => {
     const release = await read('.github/workflows/release-web-app.yml')
+
     expect(release).toContain('branches: [main]')
     expect(release).not.toContain('pull_request_target')
     expect(release).not.toContain('workflow_run:')
@@ -205,10 +233,14 @@ describe('automatic publication wiring', () => {
     expect(release).not.toContain('RELEASE_MEMORY_REQUIRED')
     expect(release).not.toContain('RELEASE_DEMO_REQUIRED')
     expect(release).not.toContain('runs-on: macos')
+
     const checks = release.split('\n  publish:')[0]
+
     expect(checks).not.toContain('secrets.')
     expect(checks).not.toContain('secrets: inherit')
+
     const browser = await read('.github/workflows/run-web-e2e-tests.yml')
+
     expect(browser).toContain('npm run test:web:built')
     expect(browser).toContain('include-hidden-files: true')
     expect(browser).not.toContain('npm run build:web') // No rebuilding after Chrome passes.
@@ -217,8 +249,11 @@ describe('automatic publication wiring', () => {
   it('keeps macOS tests weekly/manual, demo on main pushes, and Linux validation on PRs and main', async () => {
     for (const name of ['e2e', 'e2e-memory', 'performance', 'demo']) {
       const text = await readWorkflow(name)
+
       expect(text).toContain('runs-on: macos-15')
+
       const triggers = text.split('\non:\n')[1]!.split('\npermissions:')[0]!
+
       expect(triggers).toContain('workflow_dispatch:')
       expect(triggers).not.toMatch(/^ {2}(?:pull_request|workflow_call):/m)
       if (name === 'demo') {
@@ -232,28 +267,35 @@ describe('automatic publication wiring', () => {
     }
     for (const name of ['ci', 'browser']) {
       const text = await readWorkflow(name)
+
       expect(text).toContain('pull_request:')
       expect(text).toContain('workflow_call:')
       expect(text).not.toMatch(/^ {2}push:/m)
     }
     const electron = await read('.github/workflows/run-electron-e2e-tests.yml')
+
     expect(electron).toContain('shard: [1, 2, 3, 4, 5, 6]')
     expect(electron).toContain('test "${{ needs.shard.result }}" = "success"')
+
     const demo = await read('.github/workflows/publish-demo.yml')
+
     expect(demo).toContain('path: reports/site/')
     expect(demo).not.toContain('tree-editor.github.io')
   })
 
   it('deploys the transferred package with repeated provenance guards and serialized publication', async () => {
     const target = await read('deployment/github-pages/deploy-web-app.yml')
+
     expect(target).toContain('cancel-in-progress: false')
     expect(target).toContain('path: candidate/site/')
     expect(target).toContain('pages: write')
     expect(target).toContain('id-token: write')
     expect(target).not.toMatch(/npm |node (?:candidate|site)\//)
     expect(target).toContain('verify-target.mts hosted verified-provenance')
+
     const verify = target.split('\n  verify:')[1]!.split('\n  deploy:')[0]
     const deploy = target.split('\n  deploy:')[1]!.split('\n  hosted:')[0]
+
     expect(verify).not.toMatch(/pages: write|id-token: write/)
     expect(deploy).not.toMatch(/actions\/checkout|run:/)
     expect(deploy).toContain('needs: verify')
@@ -269,12 +311,14 @@ describe('automatic publication wiring', () => {
       .concat('deployment/github-pages/deploy-web-app.yml')) {
       const workflow = await read(path)
       const actions = [...workflow.matchAll(/uses:\s+(actions\/[^@\s]+)@([^\s]+)/g)]
+
       expect(actions.length).toBeGreaterThan(0)
       for (const [, , sha] of actions) expect(sha).toMatch(/^[a-f0-9]{40}$/)
     }
     const release = await read('.github/workflows/release-web-app.yml')
     const sign = release.split('\n  sign:')[1]!.split('\n  publish:')[0]
     const publish = release.split('\n  publish:')[1]
+
     expect(sign).toContain('attestations: write')
     expect(sign).toContain('subject-path: signed-browser/web-provenance.json')
     expect(sign).not.toContain('secrets.')

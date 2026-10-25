@@ -48,6 +48,7 @@ describe('replaceLinkedTextRanges invariants', () => {
           const prefix = `b${'a'.repeat(kept)}`
           const draft = { start: 0, end: prefix.length, url: prefix }
           const start = prefix.length + removed + 1
+
           expect(
             reconcileLinkTextEdit(
               `${prefix}${'a'.repeat(removed)} ${url}`,
@@ -77,6 +78,7 @@ describe('replaceLinkedTextRanges invariants', () => {
           const text = `old ${first} ${second} end`
           const firstStart = 4
           const secondStart = firstStart + first.length + 1
+
           const result = replaceLinkedTextRanges(
             text,
             [
@@ -88,6 +90,7 @@ describe('replaceLinkedTextRanges invariants', () => {
               { start: 0, end: 3, inserted: prefix },
             ],
           )
+
           expect(result.text).toBe(`${prefix} ${first} ${second} ${suffix}`)
           // Surrounding text is separated by spaces, so these two original ranges
           // stay links regardless of whether either replacement also forms a URL.
@@ -111,13 +114,16 @@ describe('replaceLinkedTextRanges invariants', () => {
     fc.assert(
       fc.property(scenario, ({ text, link, edits }) => {
         const result = replaceLinkedTextRanges(text, [link], edits)
+
         expect(result.text).toBe(referenceText(text, edits))
+
         let previousEnd = 0
         for (const current of result.links) {
           expect(current.start).toBeGreaterThanOrEqual(previousEnd)
           expect(current.end).toBeGreaterThan(current.start)
           expect(current.end).toBeLessThanOrEqual(result.text.length)
           expect(result.text.slice(current.start, current.end)).toBe(current.url)
+
           previousEnd = current.end
         }
       }),
@@ -135,6 +141,7 @@ describe('replaceLinkedTextRanges invariants', () => {
           const text = `${before} ${url} ${after}`
           const start = before.length + 1
           const end = start + url.length
+
           const result = replaceLinkedTextRanges(
             text,
             [{ start, end, url }],
@@ -143,6 +150,7 @@ describe('replaceLinkedTextRanges invariants', () => {
               { start: end, end, inserted: ']' },
             ],
           )
+
           expect(result.text).toBe(`${before} [${url}] ${after}`)
           expect(result.links).toEqual([{ start: start + 1, end: end + 1, url }])
         },

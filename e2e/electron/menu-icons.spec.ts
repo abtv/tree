@@ -24,10 +24,12 @@ test('keeps native view commands outside a modal image preview and restores its 
     location: { currentParentId: null, selectedNodeId: 'note' },
   })
   const attachments = join(userDataDir, 'data', 'attachments')
+
   mkdirSync(attachments, { recursive: true })
   writeFileSync(join(attachments, 'menu-image.png'), onePixelPng)
   const { app, window } = await launchTree(userDataDir)
   const delivered: string[] = []
+
   await window.exposeFunction('observeMenuCommand', (command: string) => delivered.push(command))
   await window.evaluate(() => {
     const rendererWindow = globalThis as unknown as {
@@ -40,18 +42,28 @@ test('keeps native view commands outside a modal image preview and restores its 
   })
   const editor = window.locator('.node-input').first()
   await editor.focus()
+
   await window.getByRole('button', { name: 'Open image preview' }).click()
   const preview = window.getByRole('dialog', { name: 'Image preview' })
+
   await expect(preview).toBeVisible()
+
   await clickApplicationMenuItem(app, 'View', 'Agenda')
+
   await expect.poll(() => delivered).toEqual(['agenda'])
+
   await window.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+
   await expect(window.locator('.agenda-list')).toHaveCount(0)
+
   await clickApplicationMenuItem(app, 'View', 'Tree')
+
   await expect.poll(() => delivered).toEqual(['agenda', 'tree'])
   await expect(preview).toBeVisible()
   await expect(window.getByRole('button', { name: 'Close image preview' })).toBeFocused()
+
   await window.keyboard.press('Escape')
+
   await expect(preview).toHaveCount(0)
   await expect(editor).toBeFocused()
 })
@@ -72,6 +84,7 @@ test('installs nonempty native symbols on labeled view and data menu items', asy
         }),
     )
   })
+
   expect(items.map((item) => item.label)).toEqual(['Export Notes…', 'Import Notes…', 'Tree', 'Agenda'])
   for (const item of items) {
     expect(item.empty, item.label).toBe(false)
@@ -119,10 +132,13 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
     const menu = page.locator('#tree-menu')
     for (const appearance of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: appearance })
+
       await expect(menu).toHaveScreenshot(`browser-menu-${appearance}.png`)
     }
+
     await page.setViewportSize({ width: 390, height: 650 })
     const bounds = await menu.boundingBox()
+
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
     await expect(menu).toHaveScreenshot('browser-menu-narrow.png')

@@ -16,8 +16,10 @@ it('decorates dates without changing text, links or caret offsets', () => {
     { start: 31, end: 41, className: 'agenda-date-secondary' },
   ])
   document.body.append(input)
+
   expect(readEditableContent(input)).toEqual({ text: node.text, links: node.links })
   expect(input.querySelector('.agenda-date-active')?.textContent).toBe('2026-10-14')
+
   for (const [start, end] of [
     [0, 4],
     [8, 12],
@@ -25,6 +27,7 @@ it('decorates dates without changing text, links or caret offsets', () => {
     [41, 41],
   ]) {
     setSelectionRange(input, start!, end!)
+
     expect(getSelectionRange(input)).toEqual({ start, end })
   }
   input.remove()

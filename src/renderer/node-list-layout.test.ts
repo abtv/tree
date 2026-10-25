@@ -16,12 +16,15 @@ describe('breadcrumbAtPoint', () => {
       const width = this.classList.contains('location-bar') ? 200 : 20
       return { left, right: left + width, top: 0, bottom: 30, height: 30, width } as DOMRect
     })
+
     expect(breadcrumbAtPoint(1, 0)).toEqual({ parentId: null })
     expect(breadcrumbAtPoint(20, 29)).toEqual({ parentId: 'a' })
     expect(breadcrumbAtPoint(40, 15)).toEqual({ parentId: undefined })
     expect(breadcrumbAtPoint(20, 30)).toBeUndefined()
     expect(breadcrumbAtPoint(-1, 15)).toBeUndefined()
+
     document.body.replaceChildren()
+
     expect(breadcrumbAtPoint(20, 15)).toBeUndefined()
   })
 })

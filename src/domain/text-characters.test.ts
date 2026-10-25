@@ -6,6 +6,7 @@ it.each(['🚀', '👩‍💻', '👍🏽', '🇬🇧', 'e\u0301'])(
   'steps over the complete visible character %s in either direction',
   (character) => {
     const text = `A${character}Z`
+
     expect(characterBoundaries(text)).toEqual([0, 1, 1 + character.length, text.length])
     expect(moveCharacterOffset(text, 1, 1)).toBe(1 + character.length)
     expect(moveCharacterOffset(text, 1 + character.length, -1)).toBe(1)
@@ -19,6 +20,7 @@ it.each(['🚀', '👩‍💻', '👍🏽', '🇬🇧', 'e\u0301'])(
 // @requirement PRODUCT.md §22.1
 it('reuses only the latest text boundaries and handles empty text', () => {
   const boundaries = characterBoundaries('A🚀Z')
+
   expect(characterBoundaries('A🚀Z')).toBe(boundaries)
   expect(characterBoundaries('')).toEqual([0])
   expect(characterBoundaries('A🚀Z')).not.toBe(boundaries)

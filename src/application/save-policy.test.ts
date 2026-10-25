@@ -10,6 +10,7 @@ describe('countInsertedWords', () => {
       count += countInsertedWords(text, next)
       text = next
     }
+
     expect(count).toBe(1)
   })
 
@@ -21,6 +22,7 @@ describe('countInsertedWords', () => {
       count += countInsertedWords(text, next)
       text = next
     }
+
     expect(count).toBe(3)
   })
 

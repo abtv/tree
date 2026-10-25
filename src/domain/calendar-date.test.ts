@@ -25,6 +25,7 @@ describe('calendar dates', () => {
     [2026, 4, 31],
   ])('rejects invalid date %s-%s-%s', (year, month, day) => {
     const date = { year, month, day }
+
     expect(isValidCalendarDate(date)).toBe(false)
     expect(() => dayNumberOf(date)).toThrow(RangeError)
     expect(() => formatCanonicalDate(date)).toThrow(RangeError)

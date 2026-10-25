@@ -24,11 +24,14 @@ it('rejects native drops across the window before target listeners and releases 
       },
       { once: true },
     )
+
     expect(input.dispatchEvent(event)).toBe(false)
     expect(canceledAtTarget).toBe(true)
     expect(dataTransfer.dropEffect).toBe('none')
   }
+
   dispose()
+
   expect(input.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))).toBe(true)
   expect(
     input.dispatchEvent(
@@ -42,12 +45,16 @@ it('blocks drop insertion without intercepting paste, typing, or internal node p
   for (const inputType of ['insertFromDrop', 'insertFromPaste', 'insertText']) {
     const event = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType })
     document.body.dispatchEvent(event)
+
     expect(event.defaultPrevented).toBe(inputType === 'insertFromDrop')
   }
+
   for (const type of ['pointerdown', 'pointermove', 'pointerup', 'paste']) {
     expect(document.body.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }))).toBe(true)
   }
+
   const event = new Event('drop', { cancelable: true })
   Object.defineProperty(event, 'dataTransfer', { value: null })
+
   expect(window.dispatchEvent(event)).toBe(false)
 })

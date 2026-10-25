@@ -28,6 +28,7 @@ describe('structural repeat replay', () => {
               persistenceLocked: true,
             },
     })
+
     expect(
       repeatStructural({ store, session: createVimEditSessionState() }, { kind: 'structural-delete', span: 1 }, 0),
     ).toBe(false)
@@ -42,6 +43,7 @@ describe('structural repeat replay', () => {
       },
     })
     const change = kind === 'structural-delete' ? { kind, span: 1 } : { kind, span: 1, spaced: true }
+
     expect(repeatStructural({ store, session: createVimEditSessionState() }, change, 0)).toBe(false)
   })
 
@@ -56,6 +58,7 @@ describe('structural repeat replay', () => {
     })
     const session = createVimEditSessionState()
     const register = session.register
+
     expect(repeatStructural({ store, session }, { kind: 'structural-delete', span: 1 }, 0)).toBe(false)
     expect(session.register).toBe(register)
   })
@@ -66,6 +69,7 @@ describe('structural repeat replay', () => {
       location: { currentParentId: 'parent', selectedNodeId: 'parent' },
       clock: { setTimeout: () => 0, clearTimeout: () => undefined },
     })
+
     expect(
       repeatStructural(
         { store: real.store, session: createVimEditSessionState() },
@@ -86,6 +90,7 @@ describe('structural repeat replay', () => {
       clock: { setTimeout: () => 0, clearTimeout: () => undefined },
     })
     const before = real.snapshot().document
+
     expect(
       repeatStructural(
         { store: real.store, session: createVimEditSessionState() },
@@ -98,7 +103,9 @@ describe('structural repeat replay', () => {
 
   it('shifts the current sibling under its preceding sibling', async () => {
     const deps = await setup()
+
     deps.store.selectNode('b', 0)
+
     expect(repeatStructural(deps, { kind: 'structural-shift', direction: 'in', span: 1, count: 1 }, 2)).toBe(true)
     expect(deps.snapshot().document.roots[0]?.children.map((child) => child.id)).toEqual(['b'])
   })
@@ -107,6 +114,7 @@ describe('structural repeat replay', () => {
     const deps = await setup()
     const before = deps.snapshot()
     const register = deps.session.register
+
     expect(repeatStructural(deps, { kind: 'structural-delete', span: 4 }, 0)).toBe(false)
     expect(deps.snapshot().document).toBe(before.document)
     expect(deps.session.register).toBe(register)
@@ -114,6 +122,7 @@ describe('structural repeat replay', () => {
 
   it.each([1, 2])('records the deleted sibling span of %s in the register', async (span) => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-delete', span }, 0)).toBe(true)
     expect(deps.snapshot().document.roots.map((root) => root.id)).toEqual(span === 1 ? ['b', 'c'] : ['c'])
     expect(deps.session.register.kind).toBe(span === 1 ? 'node' : 'nodes')
@@ -121,6 +130,7 @@ describe('structural repeat replay', () => {
 
   it.each(['before', 'after'] as const)('opens a sibling %s with captured text', async (position) => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-open', position, text: 'captured' }, 0)).toBe(true)
     expect(deps.snapshot().document.roots.map((root) => root.text)).toEqual(
       position === 'before' ? ['captured', 'a', 'b', 'c'] : ['a', 'captured', 'b', 'c'],
@@ -129,6 +139,7 @@ describe('structural repeat replay', () => {
 
   it('opens a child with captured text', async () => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-child-open', text: 'child' }, 0)).toBe(true)
     expect(deps.snapshot().document.roots[0]?.children.map((child) => child.text)).toEqual(['child'])
   })
@@ -142,8 +153,11 @@ describe('structural repeat replay', () => {
         kind === 'structural-put'
           ? { kind, position: 'after' as const, source, sourceIds: ['source', 'nested'] }
           : { kind, position: 'after' as const, source: { nodes: [source], sourceIds: ['source', 'nested'] } }
+
       expect(repeatStructural(deps, change, 0)).toBe(true)
+
       const roots = deps.snapshot().document.roots
+
       expect(roots.map((root) => root.text)).toEqual(['a', 'incoming', 'b', 'c'])
       expect(roots[1]?.id).not.toBe('source')
       expect(roots[1]?.children[0]?.id).not.toBe('nested')
@@ -165,6 +179,7 @@ describe('structural repeat replay', () => {
               repeat: 2,
               past: true,
             }
+
       expect(repeatStructural(deps, change, 0)).toBe(true)
       expect(deps.snapshot().document.roots.map((root) => root.text)).toEqual(['incoming', 'incoming', 'a', 'b', 'c'])
     },
@@ -172,11 +187,13 @@ describe('structural repeat replay', () => {
 
   it('rejects a Visual span without an ending sibling', async () => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-join', span: 4, spaced: true }, 0)).toBe(false)
   })
 
   it('joins the exact sibling span', async () => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-join', span: 2, spaced: true }, 0)).toBe(true)
     expect(deps.snapshot().document.roots.map((root) => root.text)).toEqual(['a b', 'c'])
   })
@@ -184,12 +201,14 @@ describe('structural repeat replay', () => {
   it('keeps the register when a shift is unavailable', async () => {
     const deps = await setup()
     const register = deps.session.register
+
     expect(repeatStructural(deps, { kind: 'structural-shift', direction: 'out', span: 1, count: 1 }, 2)).toBe(false)
     expect(deps.session.register).toBe(register)
   })
 
   it('updates the register after a successful Visual deletion', async () => {
     const deps = await setup()
+
     expect(repeatStructural(deps, { kind: 'structural-visual', command: 'd', span: 2 }, 0)).toBe(true)
     expect(deps.snapshot().document.roots.map((root) => root.id)).toEqual(['c'])
     expect(deps.session.register.kind).toBe('nodes')
@@ -198,6 +217,7 @@ describe('structural repeat replay', () => {
   it('preserves the register when a Visual put lacks a source', async () => {
     const deps = await setup()
     const register = deps.session.register
+
     expect(repeatStructural(deps, { kind: 'structural-visual', command: 'p', span: 1 }, 0)).toBe(false)
     expect(deps.session.register).toBe(register)
   })
@@ -205,6 +225,7 @@ describe('structural repeat replay', () => {
   it('preserves the register after a successful Visual case change', async () => {
     const deps = await setup()
     const register = deps.session.register
+
     expect(repeatStructural(deps, { kind: 'structural-visual', command: 'U', span: 2 }, 0)).toBe(true)
     expect(deps.snapshot().document.roots.map((root) => root.text)).toEqual(['A', 'B', 'c'])
     expect(deps.session.register).toBe(register)

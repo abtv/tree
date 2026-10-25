@@ -182,6 +182,7 @@ async function assertSequence(
       const state = store.getSnapshot()
       if (state.status !== 'ready') throw new Error('Store left ready state')
       const context = `step ${step}: ${JSON.stringify(event)}`
+
       expect(
         state.document.roots.map((node) => node.text),
         `${context} texts`,

@@ -11,6 +11,7 @@ test.describe('content security policy', () => {
     const policy = await window.evaluate(
       () => document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') ?? '',
     )
+
     expect(policy).toContain("script-src 'self'")
     expect(policy).toContain("img-src 'self' blob: data:")
     expect(policy).toContain("object-src 'none'")
@@ -21,6 +22,7 @@ test.describe('content security policy', () => {
     expect(policy).toContain("frame-ancestors 'none'")
 
     const violations: string[] = []
+
     window.on('console', (message) => {
       if (/frame-ancestors.+ignored when delivered via a <meta> element/i.test(message.text())) return
       if (/Content Security Policy|Refused to (load|execute|apply)/i.test(message.text())) {
@@ -29,6 +31,7 @@ test.describe('content security policy', () => {
     })
 
     await window.reload()
+
     await expect(window.locator('main.tree-app')).toBeVisible()
 
     expect(violations).toEqual([])
@@ -71,6 +74,7 @@ test.describe('content security policy', () => {
     await window.evaluate(() => {
       document.location.href = 'https://example.com/'
     })
+
     await expect
       .poll(() =>
         app.evaluate(
@@ -84,10 +88,13 @@ test.describe('content security policy', () => {
 
   test('blocks renderer reads of local files outside the application bundle', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     // From the app:// origin Chromium refuses file: fetches itself; the session filter is a second
     // layer covered by window.test.ts. This test pins the user-facing outcome on the real renderer.
     expect(window.url()).toBe('app://tree/index.html')
+
     const documentFileUrl = pathToFileURL(join(userDataDir, 'data', 'document.json')).toString()
+
     expect(existsSync(fileURLToPath(documentFileUrl))).toBe(true)
 
     const result = await window.evaluate(
@@ -141,7 +148,9 @@ test.describe('content security policy', () => {
     expect(result).toEqual({ requestResult: 'rejected', error: 'net::ERR_BLOCKED_BY_CLIENT' })
 
     const editor = node(window, 1)
+
     await typeInto(editor, 'Still editable')
+
     await expect(editor).toHaveValue('Still editable')
   })
 })

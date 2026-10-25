@@ -5,14 +5,21 @@ import styles from './styles.css?raw'
 // @requirement PRODUCT.md §2.2
 it('keeps the location toolbar outside the scrolling content area, with an opaque background', () => {
   const bar = /\.location-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(bar).toMatch(/flex:\s*0 0 auto/)
   expect(bar).toMatch(/background:\s*var\(--color-background\)/)
+
   const app = /\.tree-app\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(app).toMatch(/height:\s*100vh/)
+
   const viewport = /\.scroll-viewport\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(viewport).toMatch(/overflow-y:\s*auto/)
   expect(viewport).toMatch(/min-height:\s*0/)
+
   const status = /\.status-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(status).toMatch(/flex:\s*0 0 auto/)
   expect(status).toMatch(/background:\s*var\(--color-background\)/)
   expect(/\.vim-mode\s*\{([^}]*)\}/.exec(styles)?.[1] ?? '').not.toMatch(/position:\s*fixed/)
@@ -21,6 +28,7 @@ it('keeps the location toolbar outside the scrolling content area, with an opaqu
 // @requirement PRODUCT.md §20.5
 it('draws the window title strip in the document background and lets it drag the window', () => {
   const strip = /\.title-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(strip).toMatch(/background:\s*var\(--color-background\)/)
   expect(strip).toMatch(/color:\s*var\(--color-secondary\)/)
   expect(strip).toMatch(/-webkit-app-region:\s*drag/)
@@ -38,14 +46,19 @@ it('shows the text-editing cursor only over a focused node editor', () => {
       for (const rule of Array.from(rules)) {
         if ('style' in rule) {
           const { selectorText, style } = rule as CSSStyleRule
+
           if (selectorText === 'body') expect(style.getPropertyValue('cursor')).toBe('default')
+
           if (/^(?:auto|text)$/.test(style.getPropertyValue('cursor'))) textCursorSelectors.push(selectorText)
         }
         if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
       }
     }
+
     expect(sheet.sheet).not.toBeNull()
+
     inspect(sheet.sheet!.cssRules)
+
     expect(textCursorSelectors).toEqual(['.node-input:focus'])
   } finally {
     sheet.remove()
@@ -75,8 +88,11 @@ it('declares color values only as custom properties', () => {
         if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
       }
     }
+
     expect(sheet.sheet).not.toBeNull()
+
     inspect(sheet.sheet!.cssRules)
+
     expect(literals).toEqual([])
   } finally {
     sheet.remove()
@@ -86,10 +102,15 @@ it('declares color values only as custom properties', () => {
 // @requirement PRODUCT.md §20.10
 it('draws the date-like underline as a 1px wavy muted-red line that the caret rule can hide', () => {
   const light = /:root\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(light).toMatch(/--color-date-like:\s*#b4554b/i)
+
   const dark = /@media \(prefers-color-scheme: dark\)\s*\{[\s\S]*?:root\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(dark).toMatch(/--color-date-like:\s*#cc9393/i)
+
   const rule = /\.date-like-text:not\(\[data-caret\]\)\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
+
   expect(rule).toMatch(/text-decoration:\s*underline wavy var\(--color-date-like\)/)
   expect(rule).toMatch(/text-decoration-thickness:\s*1px/)
 })
@@ -113,6 +134,7 @@ it('keeps application styles free of time-based animations and transitions that 
         .filter(([property]) => property !== ''),
     )
     const where = selector.trim()
+
     for (const [property, value] of declarations) {
       // caret-animation controls blinking; it does not animate application transitions.
       if (/^(?:-webkit-)?transition(?:-|$)/.test(property)) {
@@ -121,12 +143,16 @@ it('keeps application styles free of time-based animations and transitions that 
       // The shorthand resets the timeline to time, so only longhands may declare an animation.
       if (/^(?:-webkit-)?animation$/.test(property)) expect(value, `${where}: ${property}`).toBe('none')
     }
+
     const name = declarations.get('animation-name')
     if (name === undefined || name === 'none') continue
+
     // An animation is allowed only when the scroll position drives it, so it has no duration.
     expect(scrollTimelines, `${where}: animation-timeline`).toContain(declarations.get('animation-timeline'))
+
     scrollDrivenAnimations.add(name)
   }
+
   for (const [, name] of source.matchAll(/@(?:-webkit-)?keyframes\s+([\w-]+)/g)) {
     expect(scrollDrivenAnimations, `@keyframes ${name}`).toContain(name)
   }

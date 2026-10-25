@@ -99,20 +99,27 @@ test.describe('interrupted notes replacement', () => {
     test(`completes a replacement interrupted ${stage.name}`, async ({ userDataDir }) => {
       seedOldNotes(userDataDir)
       const previous = readFileSync(documentPath(userDataDir), 'utf8')
+
       stage.apply(userDataDir, stageImport(userDataDir, importedDocument))
 
       // Recovery focuses the import result panel, so no editing session is needed.
       const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
       await expect(node(window, 1)).toHaveValue('Imported notes')
+
       const result = window.getByRole('complementary', { name: 'Notes activity' })
+
       await expect(result.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
+
       await closeApp(app)
       const folder = join(userDataDir, 'Replaced Notes', FOLDER)
+
       expect(readdirSync(folder).sort()).toEqual(['attachments', ...OLD_DOCUMENT_FILES].sort())
       expect(readFileSync(join(folder, 'document.json'), 'utf8')).toBe(previous)
       expect(readdirSync(join(folder, 'attachments'))).toEqual(['old.png'])
+
       const data = readdirSync(join(userDataDir, 'data'))
+
       expect(data.filter((name) => /^document\.(\d+\.json|json\.bak)$/.test(name))).toEqual([])
       expect(readdirSync(join(userDataDir, 'data', 'attachments'))).toEqual(['new.png'])
       expect(readdirSync(join(userDataDir, '.notes-import'))).toEqual([])
@@ -121,14 +128,17 @@ test.describe('interrupted notes replacement', () => {
 
   test('never opens the previous notes when the imported document is damaged', async ({ userDataDir }) => {
     seedOldNotes(userDataDir)
+
     stageImport(userDataDir, '{"version":1,"document":')
 
     const { app, window } = await launchTree(userDataDir, { expectReady: false })
 
     await expect(window.getByRole('alert')).toContainText('Tree could not open this document')
     await expect(window.getByRole('textbox')).toHaveCount(0)
+
     await closeApp(app)
     const folder = join(userDataDir, 'Replaced Notes', FOLDER)
+
     expect(readdirSync(folder).sort()).toEqual(['attachments', ...OLD_DOCUMENT_FILES].sort())
     expect(existsSync(join(userDataDir, '.notes-import', 'commit.json'))).toBe(false)
   })

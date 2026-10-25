@@ -87,14 +87,19 @@ describe('p on a node with children, repeated with .', () => {
       f.press('y', 'y')
       f.select('parent')
       f.press('p')
+
       expect(f.texts('parent')).toEqual(['one', 'two'])
+
       f.select('parent')
       f.press('z', 'o', '.')
+
       expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
+
       f.select('parent')
       f.press('z', 'c', '.')
       const state = f.store.getSnapshot()
       if (state.status !== 'ready') throw new Error('Editor did not load')
+
       expect(state.document.roots.map((node) => node.text)).toEqual(['parent', 'other', 'other', 'other'])
       expect(state.expansion.expandedIds.has('parent')).toBe(false)
       expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
@@ -111,15 +116,22 @@ describe('p on a node with children, repeated with .', () => {
       f.select('parent')
       f.press('z', 'o')
       f.press('p')
+
       expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
+
       f.select('parent')
       f.press('.')
+
       expect(f.texts('parent')).toEqual(['other', 'other', 'one', 'two'])
+
       // On a leaf the repeated put is the sibling-after put it records.
       f.select('c2')
       f.press('.')
+
       expect(f.texts('parent')).toEqual(['other', 'other', 'one', 'two', 'other'])
+
       f.press('u')
+
       expect(f.texts('parent')).toEqual(['other', 'other', 'one', 'two'])
     } finally {
       f.dispose()
@@ -134,12 +146,15 @@ describe('p on a node with children, repeated with .', () => {
       f.select('parent')
       f.press('z', 'o')
       f.press('2', 'p')
+
       expect(f.texts('parent')).toEqual(['other', 'other', 'one', 'two'])
+
       f.select('parent')
       f.press('.')
       const state = f.store.getSnapshot()
       if (state.status !== 'ready') throw new Error('Editor did not load')
       const ids = state.document.roots[0]!.children.map((child) => child.id)
+
       expect(ids).toHaveLength(6)
       expect(new Set(ids).size).toBe(6)
     } finally {

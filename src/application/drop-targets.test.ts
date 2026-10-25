@@ -83,6 +83,7 @@ describe('gapLevels', () => {
 
   it('has no levels inside the dragged block or outside the list', () => {
     const a = blockOf(rows, 'a')
+
     expect(gapLevels(rows, a, 1)).toBeUndefined()
     expect(gapLevels(rows, a, 2)).toBeUndefined()
     expect(gapLevels(rows, b, -1)).toBeUndefined()
@@ -121,9 +122,12 @@ describe('dropTargetAtGap', () => {
 
   it('counts the destination index without the dragged node', () => {
     const c1 = blockOf(rows, 'c1')
+
     expect(dropTargetAtGap(rows, c1, 5, 1)).toEqual(target('c', 0))
     expect(dropTargetAtGap(rows, c1, 5, 0)).toEqual(target(null, 3))
+
     const d = blockOf(rows, 'd')
+
     expect(dropTargetAtGap(rows, d, 4, 0)).toEqual(target(null, 2))
   })
 
@@ -138,6 +142,7 @@ describe('dropTargetAtGap', () => {
 
   it('uses the displayed parent as the parent of top-level targets', () => {
     const inside = buildVisibleRows([node('x'), node('y')], () => false, 'location')
+
     expect(dropTargetAtGap(inside, blockOf(inside, 'y'), 0, 0)).toEqual(target('location', 0))
     expect(dropTargetAtGap(inside, blockOf(inside, 'x'), 2, 0)).toEqual(target('location', 1))
   })
@@ -145,6 +150,7 @@ describe('dropTargetAtGap', () => {
   it('resolves the only gap of a single-row list', () => {
     const single = buildVisibleRows([node('only')], () => false)
     const block = blockOf(single, 'only')
+
     expect(dropTargetAtGap(single, block, 0, 0)).toEqual(target(null, 0))
     expect(dropTargetAtGap(single, block, 1, 0)).toEqual(target(null, 0))
     expect(dropTargetAtGap(single, block, 0, 1)).toBeUndefined()
@@ -154,6 +160,7 @@ describe('dropTargetAtGap', () => {
 describe('dropTargetOnRow', () => {
   it('appends as the last child, including to a collapsed node and a leaf', () => {
     const b = blockOf(rows, 'b')
+
     expect(dropTargetOnRow(rows, b, 2)).toEqual(target('a2', 2))
     expect(dropTargetOnRow(rows, b, 6)).toEqual(target('d', 0))
     expect(dropTargetOnRow(rows, b, 4)).toEqual(target('c', 1))
@@ -165,6 +172,7 @@ describe('dropTargetOnRow', () => {
 
   it('rejects the dragged row, its visible descendants, and positions outside the list', () => {
     const a = blockOf(rows, 'a')
+
     for (const row of [0, 1, 2]) expect(dropTargetOnRow(rows, a, row)).toBeUndefined()
     expect(dropTargetOnRow(rows, a, 3)).toEqual(target('b', 0))
     expect(dropTargetOnRow(rows, a, -1)).toBeUndefined()
@@ -176,14 +184,18 @@ describe('dropTargetOnRow', () => {
 describe('isNoOpDrop', () => {
   it('is true for the current parent and position, however the target was chosen', () => {
     const b = blockOf(rows, 'b')
+
     expect(isNoOpDrop(rows, b, dropTargetAtGap(rows, b, 3, 0)!)).toBe(true)
     expect(isNoOpDrop(rows, b, dropTargetAtGap(rows, b, 4, 0)!)).toBe(true)
+
     const c1 = blockOf(rows, 'c1')
+
     expect(isNoOpDrop(rows, c1, dropTargetOnRow(rows, c1, 4)!)).toBe(true)
   })
 
   it('is false when the parent or the position differs', () => {
     const b = blockOf(rows, 'b')
+
     expect(isNoOpDrop(rows, b, target(null, 0))).toBe(false)
     expect(isNoOpDrop(rows, b, target('a', 1))).toBe(false)
   })

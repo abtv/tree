@@ -38,45 +38,62 @@ it.each([false, true])('restores backward selection after Escape (rich=%s)', asy
   const f = fixture(rich)
   f.editor.focus()
   setSelectionRange(f.editor, 8, 2)
+
   f.open()
   f.item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+
   expect(document.activeElement).toBe(f.editor)
   expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 8, focus: 2 })
+
   await Promise.resolve()
+
   expect(document.activeElement).toBe(f.editor)
 })
 
 it('restores before dispatch, leaves a following dialog alone, and ignores hidden-menu commands', async () => {
   const f = fixture()
   f.editor.focus()
+
   f.open()
   f.focus.close()
+
   expect(document.activeElement).toBe(f.editor)
+
   const dialog = document.createElement('button')
   document.body.append(dialog)
   dialog.focus()
   await Promise.resolve()
+
   expect(document.activeElement).toBe(dialog)
+
   f.focus.close()
+
   expect(document.activeElement).toBe(dialog)
 })
 
 it('keeps explicit outside focus and never restores a detached editor or disposed snapshot', async () => {
   const f = fixture()
   f.editor.focus()
+
   f.open()
   const other = document.createElement('button')
   document.body.append(other)
   other.focus()
   await Promise.resolve()
+
   expect(document.activeElement).toBe(other)
+
   f.editor.focus()
+
   f.open()
   f.editor.remove()
   f.focus.close()
+
   expect(document.activeElement).toBe(f.trigger)
+
   f.focus.dispose()
   await Promise.resolve()
+
   expect(document.activeElement).toBe(f.trigger)
 })
 
@@ -84,8 +101,12 @@ it.each([0, 5, 10])('keeps a collapsed caret at %s and preserves native Tab', (o
   const f = fixture()
   f.editor.focus()
   setSelectionRange(f.editor, offset, offset)
+
   f.open()
+
   expect(f.item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))).toBe(true)
+
   f.focus.close()
+
   expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: offset, focus: offset })
 })

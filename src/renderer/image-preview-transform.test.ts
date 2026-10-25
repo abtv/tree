@@ -6,6 +6,7 @@ const geometry = { width: 600, height: 400, viewportWidth: 600, viewportHeight: 
 describe('image preview geometry', () => {
   it('preserves the image point under the zoom anchor', () => {
     const result = zoomPreview(INITIAL_PREVIEW_TRANSFORM, 2, geometry, { x: 100, y: 50 })
+
     expect(result).toEqual({ scale: 2, x: -100, y: -50 })
     expect(zoomPreview(result, 0.5, geometry, { x: 100, y: 50 })).toEqual(INITIAL_PREVIEW_TRANSFORM)
   })

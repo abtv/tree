@@ -257,7 +257,9 @@ function assertSiblingMotionSequence(
         direction,
         cursor,
       )
+
       expect(target).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
+
       if (target === undefined) return
       selectNode(target.nodeId, target.cursor)
     }),
@@ -321,12 +323,14 @@ function assertSiblingMotionSequence(
           vim,
         })(keyEvent(inputAt(selectedNodeId), String(count)))
       }
+
       press(key)
 
       const selected = nodes.find((node) => node.id === selectedNodeId)!
       const input = inputAt(selectedNodeId)
       const cursor = input.selectionStart
       const maximum = selected.attachment !== undefined ? selected.text.length : Math.max(0, selected.text.length - 1)
+
       expect(document.activeElement, `focused input after ${count}${key}`).toBe(input)
       expect(focus.nodeId, `focus owner after ${count}${key}`).toBe(selectedNodeId)
       expect(cursor, `cursor bounds after ${count}${key}`).toBeGreaterThanOrEqual(0)
@@ -388,6 +392,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   const row = document.createElement('div')
   row.className = 'node-row'
   row.dataset.hasAttachment = 'true'
+
   row.append(input)
   const store = createEditorStoreDouble({
     snapshot: () => ({
@@ -410,6 +415,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
     },
     scheduleCaret: vi.fn((target, position) => setNormalCaret(target as HTMLTextAreaElement, position)),
   }
+
   vim.applyCaretState(node.id, { cursor, imageActive: false })
   const imageCaretActive = (): boolean => double.caret().imageActive
   const imageTextCursor = vim.imageTextCursor
@@ -427,6 +433,7 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   }
 
   press('j')
+
   expect(imageCaretActive()).toBe(true)
   expect(imageTextCursor.current).toBe(cursor)
   expect(input.selectionStart).toBe(text.length)
@@ -434,17 +441,20 @@ function assertImagePutReturnSequence(text: string, cursor: number, pastedText: 
   press('p')
   const expectedText = text + pastedText
   const expectedCursor = expectedText.length - 1
+
   expect(node.text).toBe(expectedText)
   expect(input.selectionStart).toBe(expectedCursor)
   expect(imageCaretActive()).toBe(false)
   expect(imageTextCursor.current).toBeUndefined()
 
   press('l')
+
   expect(input.selectionStart).toBe(expectedText.length)
   expect(imageCaretActive()).toBe(true)
   expect(imageTextCursor.current).toBe(expectedCursor)
 
   press('h')
+
   expect(input.selectionStart).toBe(expectedCursor)
   expect(imageCaretActive()).toBe(false)
   expect(imageTextCursor.current).toBeUndefined()
@@ -489,6 +499,7 @@ describe('generated Vim image-caret interaction sequences', () => {
         fc.array(motionCommand, { minLength: 1, maxLength: 30 }),
         (textLength, hasAttachment, arbitraryCursor, commands) => {
           const maximum = hasAttachment ? textLength : Math.max(0, textLength - 1)
+
           assertImageMotionSequence(textLength, hasAttachment, Math.min(arbitraryCursor, maximum), commands)
         },
       ),
@@ -510,6 +521,7 @@ describe('generated Vim image-caret interaction sequences', () => {
           const index = arbitraryIndex % specifications.length
           const selected = specifications[index]!
           const maximum = selected.hasAttachment ? selected.textLength : Math.max(0, selected.textLength - 1)
+
           assertSiblingMotionSequence(specifications, index, Math.min(arbitraryCursor, maximum), commands)
         },
       ),
@@ -540,6 +552,7 @@ describe('generated Vim image-caret interaction sequences', () => {
               children: [],
             })),
           }
+
           const actual = moveSelectionTransition(
             documentTree,
             { currentParentId: null, selectedNodeId: `node-${selectedIndex}` },
@@ -547,6 +560,7 @@ describe('generated Vim image-caret interaction sequences', () => {
             direction,
             cursor,
           )
+
           expect(actual).toEqual(expectedRootSiblingMove(specifications, selectedIndex, direction, cursor))
         },
       ),

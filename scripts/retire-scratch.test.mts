@@ -58,6 +58,7 @@ afterEach(() => {
 describe('resolveScratchRetirement', () => {
   it('accepts a task directory directly under .scratch', () => {
     const root = createRepository()
+
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'task' })).toEqual({
       ok: true,
       relativePath: join('.scratch', 'task'),
@@ -66,12 +67,14 @@ describe('resolveScratchRetirement', () => {
 
   it('refuses a missing, empty, or non-string name', () => {
     const root = createRepository()
+
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: undefined })).toMatchObject({ ok: false })
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: '' })).toMatchObject({ ok: false })
   })
 
   it('refuses option-like names and names that are not one directory', () => {
     const root = createRepository()
+
     for (const taskName of ['--force', '.', '..', 'task/nested', '../task', 'task\\nested', join(root, '.scratch')]) {
       expect(resolveScratchRetirement({ rootDirectory: root, taskName })).toMatchObject({ ok: false })
     }
@@ -79,8 +82,10 @@ describe('resolveScratchRetirement', () => {
 
   it('retires one task without removing another task', () => {
     const root = createRepository()
+
     mkdirSync(join(root, '.scratch', 'completed-task'))
     writeFileSync(join(root, '.scratch', 'completed-task', 'evidence.txt'), 'synthetic evidence')
+
     expect(retireScratch({ rootDirectory: root, taskName: 'completed-task' })).toEqual({
       ok: true,
       relativePath: join('.scratch', 'completed-task'),
@@ -91,7 +96,9 @@ describe('resolveScratchRetirement', () => {
 
   it('refuses a missing directory and a regular file', () => {
     const root = createRepository()
+
     writeFileSync(join(root, '.scratch', 'task.lock'), '{}\n')
+
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'missing' })).toMatchObject({ ok: false })
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'task.lock' })).toMatchObject({
       ok: false,
@@ -100,16 +107,21 @@ describe('resolveScratchRetirement', () => {
 
   it('refuses a symbolic link to a directory', () => {
     const root = createRepository()
+
     symlinkSync(createOutsideDirectory(), join(root, '.scratch', 'link'))
+
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'link' })).toMatchObject({ ok: false })
   })
 
   it('refuses a task whose real location escapes through a symlinked .scratch', () => {
     const root = mkdtempSync(join(tmpdir(), 'tree-retire-scratch-'))
+
     temporaryDirectories.push(root)
     const outside = createOutsideDirectory()
+
     mkdirSync(join(outside, 'task'))
     symlinkSync(outside, join(root, '.scratch'))
+
     expect(resolveScratchRetirement({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
   })
 })
@@ -118,9 +130,11 @@ describe('retireScratch', () => {
   it('removes a clean worktree and its Git registration, including ignored build output', () => {
     const root = createGitRepository()
     const checkout = addWorktree(root)
+
     mkdirSync(join(checkout, 'output'))
     writeFileSync(join(checkout, 'output', 'build.txt'), 'generated\n')
     const other = join(root, '.scratch', 'other')
+
     git(root, 'worktree', 'add', '--quiet', '--detach', other)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' }).ok).toBe(true)
@@ -136,6 +150,7 @@ describe('retireScratch', () => {
     const root = createGitRepository()
     const clean = addWorktree(root, 'a-clean')
     const dirty = addWorktree(root, 'z-dirty')
+
     writeFileSync(join(dirty, kind === 'untracked' ? 'new.txt' : 'source.txt'), 'unfinished\n')
     if (kind === 'staged') git(dirty, 'add', 'source.txt')
 
@@ -152,6 +167,7 @@ describe('retireScratch', () => {
   it('refuses a locked worktree', () => {
     const root = createGitRepository()
     const checkout = addWorktree(root)
+
     git(root, 'worktree', 'lock', '--reason', 'unfinished', checkout)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
@@ -162,6 +178,7 @@ describe('retireScratch', () => {
   it('does not follow a symlink to an outside worktree', () => {
     const root = createGitRepository()
     const outside = join(root, '.scratch', 'outside')
+
     git(root, 'worktree', 'add', '--quiet', '--detach', outside)
     symlinkSync(outside, join(root, '.scratch', 'task', 'linked'))
 
@@ -174,6 +191,7 @@ describe('retireScratch', () => {
     const root = createGitRepository()
     const outside = createGitRepository()
     const checkout = join(root, '.scratch', 'task', 'foreign')
+
     git(outside, 'worktree', 'add', '--quiet', '--detach', checkout)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
@@ -184,6 +202,7 @@ describe('retireScratch', () => {
   it.each([false, true])('checks an embedded standalone clone for uncommitted files (dirty=%s)', (dirty) => {
     const root = createGitRepository()
     const clone = join(root, '.scratch', 'task', 'clone')
+
     git(root, 'clone', '--quiet', '--no-hardlinks', root, clone)
     if (dirty) writeFileSync(join(clone, 'source.txt'), 'unfinished\n')
 
@@ -194,8 +213,10 @@ describe('retireScratch', () => {
   it('refuses to delete an embedded clone that owns an outside worktree', () => {
     const root = createGitRepository()
     const clone = join(root, '.scratch', 'task', 'clone')
+
     git(root, 'clone', '--quiet', '--no-hardlinks', root, clone)
     const outside = join(root, '.scratch', 'outside')
+
     git(clone, 'worktree', 'add', '--quiet', '--detach', outside)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
@@ -206,8 +227,10 @@ describe('retireScratch', () => {
   it('refuses to delete a bare clone that owns an outside worktree', () => {
     const root = createGitRepository()
     const bare = join(root, '.scratch', 'task', 'bare.git')
+
     git(root, 'clone', '--quiet', '--bare', '--no-hardlinks', root, bare)
     const outside = join(root, '.scratch', 'outside')
+
     git(bare, 'worktree', 'add', '--quiet', '--detach', outside)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
@@ -218,6 +241,7 @@ describe('retireScratch', () => {
   it('removes a standalone bare clone without linked worktrees', () => {
     const root = createGitRepository()
     const bare = join(root, '.scratch', 'task', 'bare.git')
+
     git(root, 'clone', '--quiet', '--bare', '--no-hardlinks', root, bare)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' }).ok).toBe(true)
@@ -227,6 +251,7 @@ describe('retireScratch', () => {
 
   it('refuses malformed Git metadata instead of treating it as disposable files', () => {
     const root = createGitRepository()
+
     writeFileSync(join(root, '.scratch', 'task', '.git'), 'gitdir: missing\n')
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' })).toMatchObject({ ok: false })
@@ -236,6 +261,7 @@ describe('retireScratch', () => {
   it('retires a task that is itself a linked worktree', () => {
     const root = createGitRepository()
     const checkout = join(root, '.scratch', 'whole-checkout')
+
     git(root, 'worktree', 'add', '--quiet', '--detach', checkout)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'whole-checkout' }).ok).toBe(true)
@@ -247,12 +273,15 @@ describe('retireScratch', () => {
     const root = createGitRepository()
     const missing = addWorktree(root)
     const unrelated = join(root, '.scratch', 'unrelated')
+
     git(root, 'worktree', 'add', '--quiet', '--detach', unrelated)
     rmSync(missing, { recursive: true })
     rmSync(unrelated, { recursive: true })
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' }).ok).toBe(true)
+
     const registered = git(root, 'worktree', 'list', '--porcelain')
+
     expect(registered).not.toContain(missing)
     expect(registered).toContain(unrelated)
   })
@@ -261,6 +290,7 @@ describe('retireScratch', () => {
     const root = createGitRepository()
     const checkout = addWorktree(root)
     const outside = createOutsideDirectory()
+
     rmSync(checkout, { recursive: true })
     symlinkSync(outside, checkout)
 
@@ -273,6 +303,7 @@ describe('retireScratch', () => {
     const root = createGitRepository()
     const checkout = addWorktree(root)
     const marker = join(root, 'monitor-ran')
+
     git(root, 'config', 'core.fsmonitor', `touch '${marker}'`)
 
     expect(retireScratch({ rootDirectory: root, taskName: 'task' }).ok).toBe(true)
@@ -293,6 +324,7 @@ describe('retireScratch', () => {
   it('removes a nested symlink without deleting its target', () => {
     const root = createRepository()
     const outside = createOutsideDirectory()
+
     symlinkSync(outside, join(root, '.scratch', 'task', 'outside-link'))
 
     retireScratch({ rootDirectory: root, taskName: 'task' })

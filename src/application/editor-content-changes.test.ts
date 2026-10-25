@@ -14,7 +14,9 @@ describe('nodeContent', () => {
     const content = nodeContent(source)
 
     expect(content.links[0]).not.toBe(link)
+
     content.links[0] = { ...link, end: 3 }
+
     expect(source.links[0]).toEqual(link)
   })
 

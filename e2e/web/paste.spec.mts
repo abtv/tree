@@ -8,10 +8,13 @@ for (const vimEnabled of [false, true]) {
     baseURL,
   }) => {
     const context = await newContext()
+
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     const page = await context.newPage()
+
     await page.goto(baseURL!)
     await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
     await page.evaluate(async (enabled) => {
       await window.treeApi.setVimEnabled(enabled)
     }, vimEnabled)
@@ -21,14 +24,18 @@ for (const vimEnabled of [false, true]) {
       await input.click()
       await page.keyboard.press('i')
     }
+
     await input.fill('')
     const url = 'https://example.com/settings/data-controls'
+
     await page.evaluate(async (text) => navigator.clipboard.writeText(text), url)
     await pressPaste(page)
     const link = input.locator('a')
+
     await expect(link).toHaveText(url)
     await expect(link).toHaveAttribute('href', url)
     await expect(input).toBeFocused()
+
     const opened = page.waitForEvent('popup')
     await link.click({ modifiers: [primaryKey] })
     const popup = await opened
@@ -82,10 +89,14 @@ test('uses native text paste in every Vim mode and editor location', async ({ ne
       if (mode === 'replace') await page.keyboard.press('R')
       if (mode === 'visual') await page.keyboard.press('v')
       const before = await input.innerText()
+
       await pressPaste(page)
+
       await expect(input, `${scope} ${mode}`).toHaveText('PASTED' + before)
+
       await page.keyboard.press('Escape')
       await page.keyboard.press('u')
+
       await expect(input).toHaveText(before)
     }
   }
@@ -97,10 +108,13 @@ test('pastes an external image from the native event without requesting clipboar
   baseURL,
 }) => {
   const context = await newContext()
+
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const page = await context.newPage()
+
   await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
   await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 24
@@ -117,17 +131,25 @@ test('pastes an external image from the native event without requesting clipboar
     })
   })
   const input = page.locator('.node-row[data-node-id="welcome"] .node-input')
+
   await input.fill('')
   await pressPaste(page)
+
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
   expect(await page.evaluate(() => window.programmaticReads)).toBe(0)
   expect(await page.evaluate(() => window.nativePastes)).toBe(1)
+
   await capture(page, 'native-image-paste.png')
   await page.keyboard.press(`${primaryKey}+z`)
+
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(0)
+
   await page.keyboard.press(`${primaryKey}+Shift+z`)
+
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
+
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   await page.reload()
+
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
 })

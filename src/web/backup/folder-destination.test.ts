@@ -34,12 +34,19 @@ function fixture() {
 describe('folder destination', () => {
   it('lists files only, writes into attachments and commits document.json by closing its stream', async () => {
     const { destination, folder, images, stream } = fixture()
+
     expect(await destination.listImages()).toEqual(new Set(['a.png']))
+
     await destination.writeImage('b.png', new Uint8Array([1, 2]))
+
     expect(images.getFileHandle).toHaveBeenCalledWith('b.png', { create: true })
+
     const image = stream.write.mock.calls[0]![0] as Blob
+
     expect([...new Uint8Array(await image.arrayBuffer())]).toEqual([1, 2])
+
     await destination.writeDocument('json')
+
     expect(folder.getFileHandle).toHaveBeenCalledWith('document.json', { create: true })
     expect(stream.write).toHaveBeenLastCalledWith('json')
     expect(stream.close).toHaveBeenCalledTimes(2)
@@ -49,6 +56,7 @@ describe('folder destination', () => {
     const { destination, stream } = fixture()
     const failure = new DOMException('Denied', 'NotAllowedError')
     stream[operation].mockRejectedValueOnce(failure)
+
     await expect(destination.writeDocument('json')).rejects.toBe(failure)
     expect(stream.abort).toHaveBeenCalledOnce()
   })

@@ -32,24 +32,31 @@ afterEach(() => {
 describe('scroll viewport', () => {
   it('measures the content area below the toolbar, and falls back to the window without one', () => {
     expect(viewportBounds()).toEqual({ top: 0, bottom: globalThis.innerHeight })
+
     mountScroller({ top: 30, bottom: 700 })
+
     expect(viewportBounds()).toEqual({ top: 30, bottom: 700 })
   })
 
   it('falls back to the window when the content area has no laid-out height', () => {
     mountScroller({ top: 0, bottom: 0 })
+
     expect(viewportBounds()).toEqual({ top: 0, bottom: globalThis.innerHeight })
   })
 
   it('scrolls the content area, or the window when there is none', () => {
     const windowScroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation(() => undefined)
+
     scrollViewportBy(7)
+
     expect(windowScroll).toHaveBeenCalledWith(0, 7)
 
     const element = mountScroller({ top: 30, bottom: 700 })
     const elementScroll = vi.fn()
     element.scrollBy = elementScroll
+
     scrollViewportBy(-9)
+
     expect(elementScroll).toHaveBeenCalledWith(0, -9)
     expect(windowScroll).toHaveBeenCalledOnce()
   })
@@ -91,92 +98,134 @@ describe('scroll viewport', () => {
 
     it('leaves a fully visible element alone, even one inside the margin', () => {
       const { scrollBy, place } = mountRow()
+
       place(100)
       place(30)
       place(610)
+
       expect(scrollBy).not.toHaveBeenCalled()
     })
 
     it('moves a nearby element by the smallest distance that leaves one row of context', () => {
       const { scrollBy, place } = mountRow()
+
       // Partly hidden under the toolbar: its top must end at 30 + 25.
       place(20)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, -35)
+
       // Just below the content area: its bottom must end at 630 - 25.
       place(630)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, 45)
+
       // Partly hidden at the bottom edge.
       place(620)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, 35)
+
       // Almost half a viewport away is still nearby.
       place(900)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, 315)
+
       place(-270)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, -325)
     })
 
     it('keeps one row of context around a fully visible element when asked to', () => {
       const { scrollBy, place } = mountRow()
+
       place(100, true)
       place(55, true)
       place(585, true)
+
       expect(scrollBy).not.toHaveBeenCalled()
+
       // Inside the top and bottom context zones: scroll just far enough to restore it.
       place(40, true)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, -15)
+
       place(600, true)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, 15)
     })
 
     it('does nothing for an element that is not laid out', () => {
       const { scrollBy, place } = mountRow({ height: 0 })
+
       place(-500, true)
+
       expect(scrollBy).not.toHaveBeenCalled()
     })
 
     it('centers an element more than half the content area away', () => {
       const { scrollBy, place } = mountRow()
+
       // 30 + (600 - 20) / 2 = 320 is the centered top.
       place(-1_160)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, -1_480)
+
       place(1_000)
+
       expect(scrollBy).toHaveBeenLastCalledWith(0, 680)
     })
 
     it('shrinks the context in a short content area and keeps the start of an element taller than it', () => {
       // A 60 high area keeps a quarter of it, 15: the bottom must end at 90 - 15.
       const short = mountRow({ area: { top: 30, bottom: 90 } })
+
       short.place(100)
+
       expect(short.scrollBy).toHaveBeenLastCalledWith(0, 45)
+
       document.body.replaceChildren()
       const taller = mountRow({ height: 700 })
+
       taller.place(100)
+
       expect(taller.scrollBy).toHaveBeenLastCalledWith(0, 45)
     })
 
     it('keeps the readable start of a near-fit or distant oversized row below the context', () => {
       const near = mountRow({ height: 570 })
+
       near.place(100, true)
+
       expect(near.scrollBy).toHaveBeenLastCalledWith(0, 45)
+
       near.place(55, true)
+
       expect(near.scrollBy).toHaveBeenLastCalledWith(0, 0)
+
       near.place(1500, true)
+
       expect(near.scrollBy).toHaveBeenLastCalledWith(0, 1445)
     })
 
     it('reaches the document start for an oversized first row and preserves its padding on retry', () => {
       const first = mountRow({ height: 700, scrollTop: 5000 })
+
       first.place(30 + 48 - 5000, true)
+
       expect(first.scrollBy).toHaveBeenLastCalledWith(0, -5000)
+
       document.body.replaceChildren()
       const retry = mountRow({ height: 700, scrollTop: 0 })
+
       retry.place(78, true)
+
       expect(retry.scrollBy).not.toHaveBeenCalled()
     })
 
     it('does not snap an oversized final row past its visible start', () => {
       const last = mountRow({ height: 570, scrollTop: 9000, scrollHeight: 10000 })
+
       last.place(480, true)
+
       // The desired target9435 is close to max9400, but start priority forbids the end snap.
       expect(last.scrollBy).toHaveBeenLastCalledWith(0, 425)
     })
@@ -184,19 +233,29 @@ describe('scroll viewport', () => {
     it('goes all the way to the document edge when the move ends within two rows of it', () => {
       // Moving up: 80 px scrolled, the move would stop at 80 - 35 = 45 < 50, so it reaches 0.
       const top = mountRow({ scrollTop: 80 })
+
       top.place(20)
+
       expect(top.scrollBy).toHaveBeenLastCalledWith(0, -80)
+
       top.place(-1_160)
+
       expect(top.scrollBy).toHaveBeenLastCalledWith(0, -80)
+
       document.body.replaceChildren()
       // Moving down: the end is at 9 400 and the move would stop at 9 385, within two rows of it.
       const bottom = mountRow({ scrollTop: 9_340, scrollHeight: 10_000 })
+
       bottom.place(630)
+
       expect(bottom.scrollBy).toHaveBeenLastCalledWith(0, 60)
+
       document.body.replaceChildren()
       // Farther from the edge than that, the move is exact.
       const far = mountRow({ scrollTop: 200 })
+
       far.place(20)
+
       expect(far.scrollBy).toHaveBeenLastCalledWith(0, -35)
     })
 
@@ -204,12 +263,17 @@ describe('scroll viewport', () => {
       // Scrolled to the very start and moving down by 45: the target 45 is within two rows of the
       // start, but the move must go down, not back to 0.
       const top = mountRow({ scrollTop: 0 })
+
       top.place(630)
+
       expect(top.scrollBy).toHaveBeenLastCalledWith(0, 45)
+
       document.body.replaceChildren()
       // Scrolled to the very end and moving up by 35.
       const bottom = mountRow({ scrollTop: 9_400 })
+
       bottom.place(20)
+
       expect(bottom.scrollBy).toHaveBeenLastCalledWith(0, -35)
     })
   })
@@ -223,16 +287,23 @@ describe('scroll viewport', () => {
 
   it('reads the single-line height from CSS and refreshes it after a layout change', () => {
     document.documentElement.style.setProperty('--node-row-min-height', '30px')
+
     refreshViewportContext()
+
     expect(contextMargin(20, 600)).toBe(30)
+
     document.documentElement.style.setProperty('--node-row-min-height', '35px')
+
     expect(contextMargin(20, 600)).toBe(30)
+
     refreshViewportContext()
+
     expect(contextMargin(20, 600)).toBe(35)
   })
 
   it('reports whether the content area is scrolled to its start or end', () => {
     expect(viewportScrollEdges()).toEqual({ atStart: true, atEnd: true })
+
     const element = mountScroller({ top: 30, bottom: 630 })
     const metrics = (scrollTop: number): void => {
       Object.defineProperties(element, {
@@ -241,16 +312,23 @@ describe('scroll viewport', () => {
         clientHeight: { value: 600, configurable: true },
       })
     }
+
     metrics(0)
+
     expect(viewportScrollEdges()).toEqual({ atStart: true, atEnd: false })
+
     metrics(200)
+
     expect(viewportScrollEdges()).toEqual({ atStart: false, atEnd: false })
+
     metrics(400)
+
     expect(viewportScrollEdges()).toEqual({ atStart: false, atEnd: true })
   })
 
   it('observes the scrolled content rather than the fixed-size container', () => {
     const element = mountScroller({ top: 30, bottom: 700 })
+
     expect(viewportContent()).toBe(element.firstElementChild)
   })
 
@@ -262,14 +340,20 @@ describe('scroll viewport', () => {
     const unsubscribe = onViewportScroll(listener)
 
     element.dispatchEvent(new Event('scroll'))
+
     expect(listener).toHaveBeenCalledTimes(1)
+
     globalThis.dispatchEvent(new Event('scroll'))
+
     expect(listener).toHaveBeenCalledTimes(2)
+
     other.dispatchEvent(new Event('scroll'))
+
     expect(listener).toHaveBeenCalledTimes(2)
 
     unsubscribe()
     element.dispatchEvent(new Event('scroll'))
+
     expect(listener).toHaveBeenCalledTimes(2)
   })
 })

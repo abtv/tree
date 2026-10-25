@@ -19,12 +19,15 @@ describe('notes archive export properties', () => {
         fc.array(fc.uint8Array({ minLength: 1, maxLength: 16 }), { maxLength: 3 }),
         async (forest, imageFor, unreferenced) => {
           const document = materialize(forest)
+
           const head = serializeState(document, firstLocation(document), { expandedIds: [] })
           const referenced = [...collectAttachmentIds(document)].sort()
           const stored = new Map<string, Uint8Array | undefined>(referenced.map((id) => [id, imageFor(id)]))
+
           unreferenced.forEach((bytes, index) => stored.set(`unreferenced-${index}`, bytes))
 
           const chunks: Uint8Array[] = []
+
           const summary = await exportNotesArchive(
             { readHead: async () => head, readImage: async (id) => stored.get(id)?.slice() },
             createZipWriter((chunk) => chunks.push(chunk.slice())),
@@ -36,7 +39,9 @@ describe('notes archive export properties', () => {
             'document.json',
             ...available.map((id) => `attachments/${id}.png`),
           ])
+
           const entries = readArchive(archive)
+
           expect(JSON.parse(new TextDecoder().decode(entries.get('document.json')))).toEqual(head)
           for (const id of available) expect(entries.get(`attachments/${id}.png`)).toEqual(stored.get(id))
           expect(summary).toEqual({
@@ -59,10 +64,12 @@ describe('notes archive round-trip properties', () => {
         fc.func(fc.oneof(fc.constant(undefined), fc.uint8Array({ minLength: 1, maxLength: 64 }))),
         async (forest, imageFor) => {
           const document = materialize(forest)
+
           const head = serializeState(document, firstLocation(document), { expandedIds: [] })
           const referenced = [...collectAttachmentIds(document)].sort()
           const stored = new Map(referenced.map((id) => [id, imageFor(id)]))
           const chunks: Uint8Array[] = []
+
           await exportNotesArchive(
             { readHead: async () => head, readImage: async (id) => stored.get(id)?.slice() },
             createZipWriter((chunk) => chunks.push(chunk.slice())),
@@ -79,6 +86,7 @@ describe('notes archive round-trip properties', () => {
             },
           })
           const available = referenced.filter((id) => stored.get(id) !== undefined)
+
           expect(prepared.head).toEqual(head)
           expect([...imported.keys()].sort()).toEqual(available)
           for (const id of available) expect(imported.get(id)).toEqual(stored.get(id))

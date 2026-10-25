@@ -19,7 +19,9 @@ describe('focused Agenda day', () => {
       activeOccurrence: { nodeId: 'match', day },
     }
     const document = { roots: [{ id: 'match', text: 'Prepare 2026-10-20', children: [] }] }
+
     const edited = reconcileAgenda(document, state)!
+
     expect(edited.focusedDay).toBe(otherDay)
     expect(edited.selectedKey).toBe(`node:${otherDay}:match`)
     expect(edited.activeOccurrence).toEqual({ nodeId: 'match', day: otherDay })
@@ -37,13 +39,17 @@ describe('focused Agenda day', () => {
     const cache = new AgendaRowsCache()
     const timeline = openAgendaState({ currentParentId: null, selectedNodeId: 'item-0' }, 0, today)
     const timelineRows = cache.get(document, timeline)
+
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: dayKey(day), scrollTop: 120 }, timelineRows)
     const focusedRows = cache.get(document, focused)
+
     expect(focusedRows).toHaveLength(2001)
     expect(focusedRows).not.toBe(timelineRows)
     expect(cache.get(document, { ...focused, selectedKey: `node:${day}:item-1000` })).toBe(focusedRows)
+
     const returned = applyAgendaCommand(focused, { kind: 'return-timeline', key: dayKey(day) }, focusedRows)
     const returnedRows = cache.get(document, returned)
+
     expect(returnedRows).toEqual(timelineRows)
     expect(cache.get(document, returned)).toBe(returnedRows)
   })
@@ -56,17 +62,23 @@ describe('focused Agenda day', () => {
       revealed: new Set([otherDay]),
       pendingMove: [{ nodeId: 'source', day }],
     }
+
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 360 }, [header])
+
     expect(focused.focusedDay).toBe(day)
     expect(focused.pendingMove).toBeUndefined()
     expect(focused.timelineReturn?.scrollTop).toBe(360)
+
     const folded = applyAgendaCommand(focused, { kind: 'toggle-fold', key: header.key }, [header])
+
     expect(folded.collapsed.has(header.key)).toBe(true)
+
     const returned = applyAgendaCommand(
       { ...folded, pendingMove: [{ nodeId: 'source', day }] },
       { kind: 'return-timeline', key: header.key },
       [header],
     )
+
     expect(returned.pendingMove).toBeUndefined()
     expect(returned.focusedDay).toBeUndefined()
     expect(returned.timelineReturn).toBeUndefined()
@@ -77,6 +89,7 @@ describe('focused Agenda day', () => {
 
   it('includes only the focused heading and its hierarchy, including an empty focused day', () => {
     const state = { ...openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today), focusedDay: day }
+
     const rows = buildAgendaRows(
       [
         {
@@ -90,14 +103,18 @@ describe('focused Agenda day', () => {
       ],
       state,
     )
+
     expect(rows.map((row) => row.key)).toEqual([dayKey(day), `node:${day}:context`, `node:${day}:match`])
     expect(buildAgendaRows([], state)).toEqual([{ ...header, content: false }])
   })
 
   it('rejects nested focusing and returning from the timeline', () => {
     const timeline = openAgendaState({ currentParentId: null, selectedNodeId: 'source' }, 0, today)
+
     expect(applyAgendaCommand(timeline, { kind: 'return-timeline', key: header.key }, [header])).toBe(timeline)
+
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 0 }, [header])
+
     expect(applyAgendaCommand(focused, { kind: 'focus-day', key: header.key, scrollTop: 50 }, [header])).toBe(focused)
   })
 })

@@ -12,7 +12,9 @@ function declaredRules(): Rule[] {
     .flatMap((name) => {
       const source = readFileSync(new URL(name, directory), 'utf8')
       const blocks = [...source.matchAll(/^prefix_rule\(([\s\S]*?)^\)/gm)]
+
       expect(blocks.length, `${name}: expected literal prefix_rule declarations`).toBeGreaterThan(0)
+
       return blocks.map((block) => {
         const literal = /^\s*pattern\s*=\s*(\[[^\n]*\]),?\s*$/m.exec(block[1]!)?.[1]
         if (!literal) throw new Error(`${name}: coverage check requires a one-line literal pattern`)
@@ -79,10 +81,13 @@ it('covers every package workflow with repository approval or an explicit exempt
   }
   const rules = declaredRules()
   const exemptions = new Set([...lifecycle, ...sandbox])
+
   for (const name of exemptions) expect(name in scripts, `Stale permission exemption: ${name}`).toBe(true)
+
   for (const name of Object.keys(scripts)) {
     if (exemptions.has(name)) continue
     const args = ['npm', 'run', name, ...(name === 'retire:scratch' ? ['--', 'completed-task'] : [])]
+
     expect(explicitlyAllowed(rules, args), `Missing repository allowance: npm run ${name}`).toBe(true)
     expect(explicitlyAllowed(rules, [...args, '--help']), `Missing argument allowance: npm run ${name}`).toBe(true)
     expect(explicitlyAllowed(rules, ['npm', 'run', `${name}-extra`]), `Overbroad workflow allowance: ${name}`).toBe(

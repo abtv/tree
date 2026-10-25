@@ -32,7 +32,9 @@ it('agrees relative day and week descriptions with numeric and written counts', 
           const expected = past ? `${count} ${agreedUnit} ago` : `in ${count} ${agreedUnit}`
           for (const prefix of ['', 'Plan ']) {
             const text = prefix + input
+
             const result = suggestDates(text, text.length, today)!
+
             expect(result.suggestions[0]!.expression, text).toBe(expected)
             expect(text.slice(result.start, result.end)).toBe(input)
             expect(dates(text)).toEqual(dates(expected))
@@ -49,20 +51,25 @@ describe('adjacent calendar months', () => {
   it('shows both interpretations for mon and disambiguates at mond or mont', () => {
     for (const qualifier of ['next', 'last']) {
       const text = `${qualifier} mon`
+
       const result = suggestDates(text, text.length, day('2026-10-17'))!
       const weekday = `${qualifier} monday`
       const month = `${qualifier} month`
+
       expect(result.suggestions).toHaveLength(4)
       expect(result.suggestions.filter(({ expression }) => expression === weekday)).toHaveLength(1)
       expect(result.suggestions.filter(({ expression }) => expression === month)).toHaveLength(3)
       expect(result.suggestions[0]!.day).toBe(day(qualifier === 'next' ? '2026-10-19' : '2026-10-05'))
       expect(dates(`${qualifier} mond`)).toEqual(dates(weekday))
       expect(dates(`${qualifier} mont`)).toEqual(dates(month))
+
       const spaced = `Plan ${qualifier.toUpperCase()}   MON at noon`
       const match = suggestDates(spaced, spaced.indexOf(' at noon'), today)!
+
       expect(spaced.slice(match.start, match.end)).toBe(`${qualifier.toUpperCase()}   MON`)
       expect(match.suggestions).toHaveLength(4)
     }
+
     expect(suggestDates('next mon', 8, day('2026-10-31'))!.suggestions[0]!.expression).toBe('next month')
     expect(suggestDates('last mon', 8, day('2026-10-02'))!.suggestions[0]!.expression).toBe('last month')
   })
@@ -73,6 +80,7 @@ describe('adjacent calendar months', () => {
       ['last mon', '2024-10-07', '2024-09-30'],
     ]) {
       const result = suggestDates(text!, text!.length, day(reference!))!
+
       expect(result.suggestions).toHaveLength(4)
       expect(
         result.suggestions.filter(({ day: value }) => value === day(sharedDay!)).map(({ expression }) => expression),
@@ -103,6 +111,7 @@ describe('adjacent calendar months', () => {
   it('recognizes full month expressions with case, spacing and exact replacement boundaries', () => {
     const text = 'Plan LAST   MONTH at noon'
     const match = suggestDates(text, 17, today)!
+
     expect(text.slice(match.start, match.end)).toBe('LAST   MONTH')
     expect(match.suggestions.every(({ expression }) => expression === 'last month')).toBe(true)
     expect(dates('next months')).toBeUndefined()
@@ -225,9 +234,11 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('last January', day('0000-01-01'))).toBeUndefined()
     expect(dates('in 1 week', day('9999-12-31'))).toBeUndefined()
     expect(dates('1 week ago', day('0000-01-01'))).toBeUndefined()
+
     for (const expression of ['in October', 'last October', 'in three weeks', 'three weeks ago']) {
       const text = `Plan ${expression} at noon`
       const match = suggestDates(text, 5 + expression.length, today)!
+
       expect(text.slice(match.start, match.end)).toBe(expression)
       expect(suggestDates(`${expression}suffix`, expression.length, today)).toBeUndefined()
     }
@@ -259,8 +270,10 @@ describe('natural date expression table proposed in AG-22', () => {
     expect(dates('in the end of February', day('2027-02-10'))).toEqual(['2027-02-28'])
     expect(dates('in the end of December', day('9999-12-31'))).toEqual(['9999-12-31'])
     expect(dates('in the end of October', day('9999-11-01'))).toBeUndefined()
+
     const text = 'Plan IN   THE END OF OCTOBER at noon'
     const match = suggestDates(text, 27, today)!
+
     expect(text.slice(match.start, match.end)).toBe('IN   THE END OF OCTOBER')
     expect(match.suggestions).toEqual([{ day: day('2026-10-31'), expression: 'in the end of october' }])
     expect(dates('in the end of Oct')).toEqual(['2026-10-31'])
@@ -299,10 +312,12 @@ describe('natural date expression table proposed in AG-22', () => {
             : tens[Math.floor(count / 10) - 2]! + (count % 10 ? ` ${small[(count % 10) - 1]}` : '')
       for (const spelling of [word, word.replace(' ', '-'), word.toUpperCase().replace(' ', '   ')]) {
         if (spelling === 'one-hundred') continue
+
         expect(dates(`in ${spelling} days`)).toEqual(dates(`in ${count} days`))
         expect(dates(`${spelling} days ago`)).toEqual(dates(`${count} days ago`))
       }
     }
+
     expect(dates('in one day')).toEqual(dates('in 1 day'))
     expect(dates('one day ago')).toEqual(dates('1 day ago'))
   })
@@ -324,8 +339,10 @@ describe('natural date expression table proposed in AG-22', () => {
     ]) {
       expect(dates(text)).toBeUndefined()
     }
+
     const text = 'Plan in TWENTY   FIVE days at noon'
     const match = suggestDates(text, 15, today)!
+
     expect(text.slice(match.start, match.end)).toBe('in TWENTY   FIVE days')
     expect(match.suggestions).toEqual([{ day: today + 25, expression: 'in twenty five days' }])
     expect(dates('one day ago', day('0000-01-01'))).toBeUndefined()
@@ -338,6 +355,7 @@ describe('natural date expression table proposed in AG-22', () => {
     'uses Monday-based weeks for %s',
     (name) => {
       const index = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(name)
+
       for (const [qualifier, offset] of [
         ['this', 0],
         ['next', 7],
@@ -389,14 +407,18 @@ describe('natural date expression table proposed in AG-22', () => {
             // The ambiguous next/last mon matrix is covered independently above.
             if (name === 'monday' && length === 3 && qualifier !== 'this') continue
             const fragment = `${qualifier} ${name.slice(0, length)}`
+
             expect(dates(fragment), fragment).toEqual(dates(expression))
+
             const text = `Plan (${fragment.toUpperCase().replaceAll(' ', '   ')}) at noon`
             const caret = text.indexOf(')')
             const match = suggestDates(text, caret, today)!
+
             expect(text.slice(match.start, match.end)).toBe(text.slice(6, caret))
             expect(match.suggestions.every((suggestion) => suggestion.expression === expression)).toBe(true)
             expect(dates(`${fragment}suffix`)).toBeUndefined()
           }
+
           expect(dates(`${qualifier} ${name.slice(0, 2)}`)).toBeUndefined()
         }
       }
@@ -410,15 +432,18 @@ describe('natural date expression table proposed in AG-22', () => {
         for (const prefix of ['', 'Plan ', 'beyond ', 'nearby ', 'on a ', 'by noon ', 'Plan on Monday then ']) {
           const text = `${prefix}${fragment.toUpperCase()} at noon`
           const match = suggestDates(text, prefix.length + fragment.length, today)!
+
           expect(match, text).toBeDefined()
           expect(match.start).toBe(prefix.length)
           expect(match.end).toBe(prefix.length + fragment.length)
           expect(match.suggestions).toEqual(suggestDates(name, name.length, today)!.suggestions)
         }
+
         expect(dates(fragment)).toEqual(dates(name))
         expect(dates(`${fragment}suffix`)).toBeUndefined()
         expect(dates(`prefix${fragment}`)).toBeUndefined()
       }
+
       expect(dates(name.slice(0, 2))).toBeUndefined()
     }
   })
@@ -432,6 +457,7 @@ describe('natural date expression table proposed in AG-22', () => {
           const start = text.indexOf(fragment.toUpperCase())
           const end = start + fragment.length
           const match = suggestDates(text, end, today)!
+
           expect(match, text).toBeDefined()
           expect(match.start).toBe(start)
           expect(match.end).toBe(end)
@@ -441,13 +467,17 @@ describe('natural date expression table proposed in AG-22', () => {
             `Plan ${preposition.toUpperCase()}   DATE at noon`,
           )
         }
+
         expect(dates(`${preposition} ${name.slice(0, 2)}`)).toBeUndefined()
       }
     }
+
     expect(dates('beyond Friday')).toEqual(dates('Friday'))
     expect(dates('nearby Friday')).toEqual(dates('Friday'))
+
     for (const text of ['on fri', 'by fri']) {
       const match = suggestDates(text, text.length, today)!
+
       expect(match.start).toBe(3)
       expect(dates(text)).toEqual(dates('Friday'))
     }
@@ -474,6 +504,7 @@ describe('natural date expression table proposed in AG-22', () => {
           const fragment = `${name.slice(0, length)} 15`
           const text = `Plan ${preposition}${fragment} at noon`
           const match = suggestDates(text, 5 + preposition.length + fragment.length, today)!
+
           expect(match, text).toBeDefined()
           expect(text.slice(match.start, match.end)).toBe(fragment)
           expect(match.start).toBe(5 + preposition.length)
@@ -518,6 +549,7 @@ describe('natural date expression table proposed in AG-22', () => {
   it('returns only the expression span, including its original spacing and case', () => {
     const text = 'Plan NEXT   Friday at 10, tomorrow morning'
     const match = suggestDates(text, 10, today)!
+
     expect(match.start).toBe(5)
     expect(match.end).toBe(18)
     expect(match.suggestions).toEqual([{ day: day('2026-10-16'), expression: 'next friday' }])
@@ -538,11 +570,13 @@ describe('natural date expression table proposed in AG-22', () => {
     ]) {
       const text = `Plan (${fragment}) at noon`
       const match = suggestDates(text, 6 + fragment!.length, today)!
+
       expect(text.slice(match.start, match.end)).toBe(fragment)
       expect(match.suggestions.every((suggestion) => suggestion.expression === expression)).toBe(true)
       expect(suggestDates(`${fragment}suffix`, fragment!.length, today)).toBeUndefined()
     }
     const text = 'Plan yesterday at noon'
+
     expect(suggestDates(text, 9, today)).toMatchObject({ start: 5, end: 14 })
   })
 
@@ -587,6 +621,7 @@ describe('natural date expression table proposed in AG-22', () => {
   it('keeps suggestions inside the canonical calendar at its boundaries', () => {
     const first = day('0000-01-01')
     const last = day('9999-12-31')
+
     expect(dates('yesterday', first)).toBeUndefined()
     expect(dates('tomorrow', last)).toBeUndefined()
     expect(dates('Jan 1', first)).toEqual(['0000-01-01'])
@@ -599,6 +634,7 @@ describe('natural date expression table proposed in AG-22', () => {
   it('initializes the canonical limits correctly on a fresh module load', async () => {
     vi.resetModules()
     const { suggestDates: freshSuggestDates } = await import('./natural-date')
+
     for (const value of ['0000-01-01', '9999-12-31']) {
       expect(freshSuggestDates('today', 5, day(value))?.suggestions[0]?.day).toBe(day(value))
     }

@@ -100,19 +100,25 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
 
     it.each(['ArrowDown', 'ArrowUp', 'j', 'k'])('%s selects the adjacent visible row', async (key) => {
       const f = await fixture(element)
+
       const rows = f.store.getAgendaRows()
       const index = rows.findIndex((row) => row.key === f.selected.key)
       f.press(key)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[index + (['ArrowDown', 'j'].includes(key) ? 1 : -1)]!.key)
     })
 
     it('Cmd+E toggles the occurrence fold or reveals at most seven gap days, then reverses it', async () => {
       const f = await fixture(element)
       const before = f.snapshot()
+
       f.press('e', { metaKey: true })
+
       if (element === 'gap') expect(f.snapshot().agenda?.revealed.size).toBe(7)
       else expect(f.snapshot().agenda?.collapsed.has(f.selected.key)).toBe(true)
+
       f.press('e', { metaKey: true })
+
       expect(f.snapshot().agenda?.collapsed.size).toBe(0)
       expect(f.snapshot().agenda?.revealed.size).toBe(0)
       expect(f.snapshot().document).toBe(before.document)
@@ -122,7 +128,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     it('standard Enter creates on a day, splits a match and is inert elsewhere', async () => {
       const f = await fixture(element, true)
       const before = f.snapshot().document
+
       f.press('Enter')
+
       if (element === 'day') expect(f.snapshot().document.roots.at(-1)!.text).toBe('2026-10-15 ')
       else if (element === 'match') {
         expect(f.node('match').text).toBe('2026-10-15 W')
@@ -133,7 +141,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     it('Normal Enter with no link or image leaves text, selection and mode unchanged', async () => {
       const f = await fixture(element)
       const before = f.snapshot()
+
       f.press('Enter')
+
       expect(f.snapshot().document).toBe(before.document)
       expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
       expect(f.vim.mode).toBe('normal')
@@ -147,7 +157,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       if (element === 'day' || element === 'match') {
         expect(f.node().text).toBe(`2026-10-${element === 'day' && key === 'O' ? '14' : '15'} `)
         expect(f.vim.mode).toBe('insert')
+
         f.store.undo()
+
         expect(f.snapshot().document).toBe(before)
       } else {
         expect(f.snapshot().document).toBe(before)
@@ -164,7 +176,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     ])('structural %s keeps document, occurrence, caret and mode', async (key, options) => {
       const f = await fixture(element)
       const before = f.snapshot()
+
       f.press(key as string, options as { metaKey?: boolean; shiftKey?: boolean })
+
       expect(f.snapshot().document).toBe(before.document)
       expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
       expect(f.input.selectionStart).toBe(Math.min(12, f.input.value.length))
@@ -174,7 +188,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     it('Cmd+Enter strikes through only a direct match', async () => {
       const f = await fixture(element)
       const before = f.snapshot().document
+
       f.press('Enter', { metaKey: true })
+
       if (element === 'match') expect(f.node('match').struckThrough).toBe(true)
       else expect(f.snapshot().document).toBe(before)
     })
@@ -185,6 +201,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
         const f = await fixture(element)
         const before = f.snapshot()
         for (const key of keys) f.press(key)
+
         expect(f.snapshot().document).toBe(before.document)
         expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
         expect(f.input.selectionStart).toBe(Math.min(12, f.input.value.length))
@@ -197,8 +214,10 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       const f = await fixture(element)
       const before = f.snapshot().document
       const register = f.vim.register.current
+
       f.press('d')
       f.press('d')
+
       expect(f.snapshot().agenda?.pendingMove).toEqual(
         element === 'match' ? [{ nodeId: 'match', day: day(15) }] : undefined,
       )
@@ -220,7 +239,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       } else {
         expect(f.node('source').text).toBe('2026-10-15 Source')
         expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
+
         f.store.undo()
+
         expect(f.snapshot().document).toBe(before)
       }
     })
@@ -229,7 +250,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       const f = await fixture(element)
       f.vim.register.current = { kind: 'node', value: f.node('source'), sourceIds: ['source'] }
       const before = f.snapshot().document
+
       f.press(key)
+
       expect(f.snapshot().document).toBe(before)
       expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
     })
@@ -238,14 +261,18 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       const f = await fixture(element)
       f.vim.register.current = { kind: 'text', value: 'XYZ' }
       const before = f.snapshot().document
+
       f.press(key)
+
       if (element === 'match') expect(f.node('match').text).toContain('XYZ')
       else expect(f.snapshot().document).toBe(before)
     })
 
     it('Cmd+. focuses a day, opens Tree for real rows and leaves a gap unchanged', async () => {
       const f = await fixture(element)
+
       f.press('.', { metaKey: true })
+
       if (element === 'day') expect(f.snapshot().agenda?.focusedDay).toBe(day(15))
       else if (element === 'gap') expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
       else {
@@ -260,7 +287,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
         f.store.applyAgenda({ kind: 'focus-day', key: `day:${day(15)}`, scrollTop: 123 })
         f.store.applyAgenda({ kind: 'select', key: f.selected.key })
       }
+
       f.press(',', { metaKey: true })
+
       expect(f.snapshot().agenda?.focusedDay).toBeUndefined()
       expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
     })
@@ -268,7 +297,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     it('Cmd+P closes Agenda at the origin', async () => {
       const f = await fixture(element)
       const origin = f.snapshot().agenda!.origin.location
+
       f.press('p', { metaKey: true })
+
       expect(f.snapshot().agenda).toBeUndefined()
       expect(f.snapshot().location).toEqual(origin)
     })
@@ -277,6 +308,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       it('standard printable input never edits a non-editable row', async () => {
         const f = await fixture(element, true)
         const before = f.snapshot()
+
         expect(f.press('q').preventDefault).toHaveBeenCalledOnce()
         expect(f.snapshot().document).toBe(before.document)
         expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
@@ -286,7 +318,9 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
         async (key) => {
           const f = await fixture(element)
           const before = f.snapshot()
+
           f.press(key)
+
           expect(f.snapshot().document).toBe(before.document)
           expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
           expect(f.vim.mode).toBe('normal')
@@ -299,11 +333,13 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
 // @requirement PRODUCT.md §23.10
 it.each([false, true])('empty direct match deletion respects children=%s', async (children) => {
   const f = await fixture('match', true)
+
   f.store.replaceTextRange('match', 0, f.node('match').text.length, '')
   if (!children) {
     f.store.selectNode('child', 0)
     f.store.deleteSelected()
   }
+
   f.store.applyAgenda({ kind: 'select', key: `node:${day(15)}:match` })
   const input = document.createElement('textarea')
   const before = f.snapshot().document
@@ -315,7 +351,9 @@ it.each([false, true])('empty direct match deletion respects children=%s', async
     onPreviewAttachment: vi.fn(),
     shiftFocusedNode: vi.fn(),
   })
+
   keyboard({ key: 'Backspace', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
   if (children) expect(f.snapshot().document).toBe(before)
   else expect(() => requireNode(f.snapshot().document, 'match')).toThrow()
 })

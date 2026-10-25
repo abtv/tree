@@ -23,7 +23,9 @@ it('resolves exactly one gated drag state', () => {
       fc.boolean(),
       (phase, locked, sourceAvailable) => {
         const state: NodeDragState = phase === 'idle' ? IDLE_NODE_DRAG : { phase, source }
+
         const resolved = resolveNodeDrag(state, { locked, sourceAvailable })
+
         if (phase === 'idle' || locked || !sourceAvailable) expect(resolved).toBe(IDLE_NODE_DRAG)
         else expect(resolved).toBe(state)
         if (resolved.phase === 'dragging') {
@@ -62,6 +64,7 @@ it('resolves every point over a row to a zone of that row, with outer bands with
       const region = regions.find((candidate) => pointerY >= candidate.top && pointerY < candidate.bottom)!
       const zone = dropZoneAtPoint(regions, pointerY)!
       const band = dropBandHeight(region.bottom - region.top)
+
       expect(band).toBeLessThanOrEqual(DROP_BAND_MAX_PX)
       expect(band).toBeLessThanOrEqual((region.bottom - region.top) / 4)
       if (pointerY < region.top + band) expect(zone).toEqual({ gap: region.index })
@@ -81,6 +84,7 @@ it('never moves to an earlier position as the pointer moves down', () => {
         const regions = stack(heights, firstIndex)
         const sorted = points.slice().sort((a, b) => a - b)
         const orders = sorted.map((y) => order(dropZoneAtPoint(regions, y)!))
+
         for (let index = 1; index < orders.length; index += 1) {
           expect(orders[index]!).toBeGreaterThanOrEqual(orders[index - 1]!)
         }
@@ -102,6 +106,7 @@ it('resolves the same zone for any region order', () => {
           .map((region) => ({ region, key: shuffle.next().value as number }))
           .sort((a, b) => a.key - b.key)
           .map((entry) => entry.region)
+
         expect(dropZoneAtPoint(shuffled, pointerY)).toEqual(dropZoneAtPoint(regions, pointerY))
       },
     ),
@@ -122,6 +127,7 @@ it('keeps the drop level within the offered levels and monotonic in the pointer 
         const [left, right] = [firstShift, secondShift].sort((x, y) => x - y) as [number, number]
         const leftLevel = dropLevelAtPoint(sourceLevel, pressX, pressX + left, levels)
         const rightLevel = dropLevelAtPoint(sourceLevel, pressX, pressX + right, levels)
+
         expect(leftLevel).toBeGreaterThanOrEqual(levels.min)
         expect(rightLevel).toBeLessThanOrEqual(levels.max)
         expect(rightLevel).toBeGreaterThanOrEqual(leftLevel)

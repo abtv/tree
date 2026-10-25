@@ -25,7 +25,9 @@ describe('Vim external clipboard projections', () => {
   it('copies Normal text or image by caret without descendants or link metadata', () => {
     expect(vimNodeClipboardContent(node, false)).toEqual({ kind: 'text', text: node.text })
     expect(vimNodeClipboardContent(node, true)).toEqual({ kind: 'image', attachmentId: 'picture' })
+
     const textOnly: TreeNode = { id: 'text-only', text: '', children: [] }
+
     expect(vimNodeClipboardContent(textOnly, false)).toBeUndefined()
     expect(vimNodeClipboardContent(textOnly, true)).toBeUndefined()
   })
@@ -40,6 +42,7 @@ describe('Vim external clipboard projections', () => {
   it('joins sibling text in order with leading, middle and trailing empty entries', () => {
     const blank = { id: 'empty', text: '', children: [] }
     const imageOnly = { ...node, text: '' }
+
     expect(vimForestClipboardContent([blank, node, imageOnly, { ...node, text: 'last' }, blank])).toEqual({
       kind: 'text',
       text: '\nsee https://example.com\n\nlast\n',
@@ -55,6 +58,7 @@ describe('Vim external clipboard projections', () => {
         throw new Error('descendant traversal')
       },
     }
+
     expect(vimForestClipboardContent([root, root])).toEqual({ kind: 'text', text: 'root\nroot' })
   })
 

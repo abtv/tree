@@ -123,35 +123,42 @@ describe('notes replacement after a crash', () => {
     await fc.assert(
       fc.asyncProperty(oldNotes, fc.nat(), fc.nat({ max: 40 }), async (old, crashSeed, recoveryCrashAt) => {
         const counting = crashingFileSystem(Number.POSITIVE_INFINITY)
+
         await commitReplacement(counting.fs, await fixture(old), 'staged', NOW)
         const crashAt = crashSeed % (counting.calls() + 1)
 
         const layout = await fixture(old)
         const before = await tree(layout.dataDirectory)
         const crashing = crashingFileSystem(crashAt)
+
         await commitReplacement(crashing.fs, layout, 'staged', NOW).catch(() => undefined)
         // A start may itself stop during recovery; a later start recovers before loading.
         await recoverReplacement(crashingFileSystem(recoveryCrashAt).fs, layout, new Set()).catch(() => undefined)
         await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
 
         expect(await tree(layout.importDirectory)).toEqual({})
+
         const folder = join(layout.replacedNotesDirectory, '2026-10-23 14-05-09')
         // Once the journal exists, the replacement can only complete.
         if (!crashing.journalCommitted()) {
           expect(await tree(layout.dataDirectory)).toEqual(before)
           expect(await tree(layout.replacedNotesDirectory)).toEqual({})
+
           return
         }
+
         expect(await tree(layout.dataDirectory)).toEqual({
           ...(old.newProfile ? {} : { 'vim-enabled.json': 'true' }),
           'document.json': 'new document',
           'attachments/': '',
           'attachments/new.png': 'new image',
         })
+
         const moved: Record<string, string> = {}
         for (const [path, contents] of Object.entries(before)) {
           if (path !== 'vim-enabled.json') moved[path] = contents
         }
+
         if (old.documents.length === 0 && old.images === 0) {
           expect(await tree(layout.replacedNotesDirectory)).toEqual({})
         } else {

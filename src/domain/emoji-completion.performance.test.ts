@@ -29,8 +29,10 @@ it('keeps shortcode recognition below one millisecond with long text and increme
     for (const text of workloads) matches += suggestEmoji(text, text.length)?.suggestions.length ?? 0
     samples.push((performance.now() - start) / workloads.length)
   }
+
   samples.sort((a, b) => a - b)
   console.log('PERF emoji-completion', { p50Ms: samples[50], p99Ms: samples[99], calls: 100 * workloads.length })
+
   expect(matches).toBeGreaterThan(0)
   expect(samples[99]).toBeLessThan(1)
 })

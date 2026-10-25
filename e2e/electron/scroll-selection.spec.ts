@@ -80,10 +80,14 @@ async function launchDelayedImage(userDataDir: string) {
 // @requirement PRODUCT.md §20.8
 test('entering an image keeps its delayed-load reveal active', async ({ userDataDir }) => {
   const { window, release } = await launchDelayedImage(userDataDir)
+
   await window.keyboard.press('G')
   await window.keyboard.press('j')
+
   await expect(window.locator('.node-input:focus')).toHaveClass(/node-input-image-caret/u)
+
   await release()
+
   await expect(window.getByAltText('Attached image')).toBeVisible()
   await expect
     .poll(async () => {
@@ -96,11 +100,14 @@ test('entering an image keeps its delayed-load reveal active', async ({ userData
 // @requirement PRODUCT.md §20.8
 test('keeps the last windowed row visible after a delayed image loads', async ({ userDataDir }, info) => {
   const { window, release } = await launchDelayedImage(userDataDir)
+
   await window.keyboard.press('G')
   await painted(window)
   const before = await geometry(window)
+
   expect(before.id).toBe('n649')
   expect(before.scrollTop).toBe(before.max)
+
   await window.evaluate(() => {
     const frames: { height: number; gap: number }[] = []
     const state = window as unknown as { scrollFrames: typeof frames; stopScrollFrames: () => void }
@@ -119,6 +126,7 @@ test('keeps the last windowed row visible after a delayed image loads', async ({
     state.stopScrollFrames = () => observer.disconnect()
   })
   await release()
+
   await expect(window.getByAltText('Attached image')).toBeVisible()
   await expect
     .poll(async () => {
@@ -126,6 +134,7 @@ test('keeps the last windowed row visible after a delayed image loads', async ({
       return state.height > 100 && state.gap >= 25 && Math.abs(state.scrollTop - state.max) <= 1
     })
     .toBe(true)
+
   const after = await geometry(window)
   await painted(window)
   const frames = await window.evaluate(() => {
@@ -136,28 +145,34 @@ test('keeps the last windowed row visible after a delayed image loads', async ({
     state.stopScrollFrames()
     return state.scrollFrames
   })
+
   await info.attach('geometry', { body: JSON.stringify({ before, after, frames }), contentType: 'application/json' })
+
   expect(frames.some((frame) => frame.height > 100)).toBe(true)
   expect(frames.filter((frame) => frame.height > 100).every((frame) => frame.gap >= 25)).toBe(true)
   // The overlay scrollbar fades out a moment after scrolling, so whether its thumb is in the capture
   // depends on timing, and page styles do not hide it. This test checks the row geometry, so the
   // capture stops short of the window's right edge, where the thumb is drawn.
   await expect(window).toHaveScreenshot('loaded-last-row.png', { clip: { x: 0, y: 0, width: 628, height: 528 } })
+
   await window.keyboard.type('gg')
   await window.keyboard.press('G')
   await painted(window)
+
   expect(await geometry(window)).toEqual(after)
 })
 
 // @requirement PRODUCT.md §20.8
 test('does not pull the viewport back after wheel scrolling during image loading', async ({ userDataDir }) => {
   const { window, release } = await launchDelayedImage(userDataDir)
+
   await window.keyboard.press('G')
   await painted(window)
   await window.mouse.move(400, 250)
   await window.mouse.wheel(0, -500)
   let previousScrollTop = Number.NaN
   let lastScrollChangeAt = Date.now()
+
   await expect
     .poll(async () => {
       const { scrollTop, max } = await geometry(window)
@@ -168,11 +183,16 @@ test('does not pull the viewport back after wheel scrolling during image loading
       return scrollTop < max - 200 && Date.now() - lastScrollChangeAt >= 300
     })
     .toBe(true)
+
   const before = await geometry(window)
+
   await release()
+
   await expect.poll(async () => (await geometry(window)).height).toBeGreaterThan(100)
+
   await painted(window)
   const after = await geometry(window)
+
   expect(after.id).toBe('n649')
   expect(after.top).toBeGreaterThan(after.area)
   // Native anchoring may adjust offsets during measurement, but navigation must not return to the end.
@@ -183,12 +203,14 @@ test('does not pull the viewport back after wheel scrolling during image loading
 // @requirement PRODUCT.md §20.8
 test('a new destination replaces the delayed image reveal', async ({ userDataDir }) => {
   const { window, release } = await launchDelayedImage(userDataDir)
+
   await window.keyboard.press('G')
   await window.keyboard.type('gg')
   await release()
   await painted(window)
   await window.waitForTimeout(100)
   const state = await geometry(window)
+
   expect(state.id).toBe('n0')
   expect(state.scrollTop).toBe(0)
 })
@@ -197,11 +219,13 @@ test('a new destination replaces the delayed image reveal', async ({ userDataDir
 test('gg reaches the document start with an oversized first row', async ({ userDataDir }) => {
   seedRows(userDataDir, { tall: [0, 50] })
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await setMainWindowContentSize(app, { width: 640, height: 450 })
   await window.keyboard.type('51G')
   await window.keyboard.type('gg')
   await painted(window)
   const state = await geometry(window)
+
   expect(state.height).toBeGreaterThan(state.area)
   expect(state.scrollTop).toBe(0)
   expect(state.top).toBeGreaterThanOrEqual(25)
@@ -213,6 +237,7 @@ for (const key of ['H', 'M', 'L']) {
   test(`${key} keeps scrolling unchanged when only a clipped row is visible`, async ({ userDataDir }) => {
     seedRows(userDataDir, { tall: [50] })
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await setMainWindowContentSize(app, { width: 640, height: 450 })
     await window.keyboard.type('51G')
     // The reveal keeps correcting while the oversized row is measured and ends only on user scrolling
@@ -220,12 +245,16 @@ for (const key of ['H', 'M', 'L']) {
     // undo it and leave the row above fully visible; the wheel cancels the reveal like a user would.
     await window.mouse.move(400, 250)
     await window.mouse.wheel(0, 75)
+
     // Only the clipped row is visible once the row's start has scrolled out of view.
     await expect.poll(async () => (await geometry(window)).top).toBe(-50)
+
     await painted(window)
     const before = await geometry(window)
+
     await window.keyboard.press(key)
     await painted(window)
+
     expect(await geometry(window)).toEqual(before)
   })
 }
@@ -234,20 +263,26 @@ for (const key of ['H', 'M', 'L']) {
 test('a near-fit row and oversized final row keep their readable start', async ({ userDataDir }) => {
   seedRows(userDataDir, { tall: [20, 99], lines: 21 })
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await setMainWindowContentSize(app, { width: 640, height: 500 })
   await window.keyboard.type('21G')
   await painted(window)
   const state = await geometry(window)
+
   expect(state.height).toBeLessThan(state.area)
   expect(state.height).toBeGreaterThan(state.area - 50)
   expect(state.top).toBe(25)
+
   // Native overlay scrollbars fade independently of CSS animations. Exclude the right edge, where
   // the scrollbar thumb may or may not be drawn during the capture.
   const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+
   await expect(window).toHaveScreenshot('near-fit-start.png', { clip })
+
   await window.keyboard.press('G')
   await painted(window)
   const end = await geometry(window)
+
   expect(end.id).toBe('n99')
   expect(end.top).toBe(25)
   expect(end.scrollTop).toBeLessThan(end.max)
@@ -259,6 +294,7 @@ for (const appearance of ['light', 'dark'] as const) {
   test(`a short ${appearance} viewport caps both context and fades`, async ({ userDataDir }) => {
     seedRows(userDataDir)
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', appearance })
+
     await window.emulateMedia({ colorScheme: appearance })
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setMinimumSize(100, 80))
     await setMainWindowContentSize(app, { width: 640, height: 120 })
@@ -270,11 +306,14 @@ for (const appearance of ['light', 'dark'] as const) {
         parseFloat(getComputedStyle(document.querySelector('.tree-app')!, pseudo).height),
       ),
     )
+
     expect(fades[0]).toBeLessThanOrEqual(state.top)
     expect(fades[1]).toBeLessThanOrEqual(state.gap)
+
     // Native overlay scrollbars fade independently of CSS animations. Keep both context fades
     // in the capture, excluding only the right edge where the scrollbar thumb is drawn.
     const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+
     await expect(window).toHaveScreenshot(`short-viewport-${appearance}.png`, { clip })
   })
 }

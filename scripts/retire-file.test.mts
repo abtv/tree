@@ -28,6 +28,7 @@ afterEach(() => {
 describe('resolveRetirement', () => {
   it('accepts a tracked regular file', () => {
     const root = createRepository()
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'tracked.ts' })).toEqual({
       ok: true,
       relativePath: 'tracked.ts',
@@ -36,12 +37,14 @@ describe('resolveRetirement', () => {
 
   it('refuses a missing, empty, or non-string path', () => {
     const root = createRepository()
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: undefined })).toMatchObject({ ok: false })
     expect(resolveRetirement({ rootDirectory: root, requestedPath: '' })).toMatchObject({ ok: false })
   })
 
   it('refuses option-like and absolute paths', () => {
     const root = createRepository()
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: '--force' })).toMatchObject({ ok: false })
     expect(resolveRetirement({ rootDirectory: root, requestedPath: join(root, 'tracked.ts') })).toMatchObject({
       ok: false,
@@ -50,28 +53,35 @@ describe('resolveRetirement', () => {
 
   it('refuses the repository root and paths outside it', () => {
     const root = createRepository()
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: '.' })).toMatchObject({ ok: false })
     expect(resolveRetirement({ rootDirectory: root, requestedPath: '../outside.ts' })).toMatchObject({ ok: false })
   })
 
   it('refuses a directory', () => {
     const root = createRepository()
+
     mkdirSync(join(root, 'directory'))
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'directory' })).toMatchObject({ ok: false })
   })
 
   it('refuses a symbolic link', () => {
     const root = createRepository()
+
     symlinkSync('tracked.ts', join(root, 'link.ts'))
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'link.ts' })).toMatchObject({ ok: false })
   })
 
   it('refuses a path whose real location escapes through a directory symlink', () => {
     const root = createRepository()
     const outside = mkdtempSync(join(tmpdir(), 'tree-retire-outside-'))
+
     temporaryDirectories.push(outside)
     writeFileSync(join(outside, 'tracked.ts'), 'export const value = 3\n')
     symlinkSync(outside, join(root, 'escaped'))
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'escaped/tracked.ts' })).toMatchObject({
       ok: false,
     })
@@ -79,7 +89,9 @@ describe('resolveRetirement', () => {
 
   it('refuses a missing or untracked file', () => {
     const root = createRepository()
+
     writeFileSync(join(root, 'untracked.ts'), 'export const value = 2\n')
+
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'missing.ts' })).toMatchObject({ ok: false })
     expect(resolveRetirement({ rootDirectory: root, requestedPath: 'untracked.ts' })).toMatchObject({ ok: false })
   })
@@ -96,11 +108,13 @@ describe('retireFile', () => {
     expect(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })).toBe('D  tracked.ts\n')
 
     execFileSync('git', ['restore', '--staged', '--worktree', 'tracked.ts'], { cwd: root })
+
     expect(existsSync(join(root, 'tracked.ts'))).toBe(true)
   })
 
   it('refuses a file with local modifications and leaves it in place', () => {
     const root = createRepository()
+
     writeFileSync(join(root, 'tracked.ts'), 'export const value = 2\n')
 
     expect(() => retireFile({ rootDirectory: root, requestedPath: 'tracked.ts' })).toThrow()

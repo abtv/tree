@@ -23,17 +23,26 @@ describe('window appearance', () => {
   it('updates the native background and removes its listener when the window closes', () => {
     const theme = { shouldUseDarkColors: true, on: vi.fn(), removeListener: vi.fn() }
     const window = { setBackgroundColor: vi.fn(), once: vi.fn() }
+
     followWindowAppearance(window as never, theme as never)
     const update = theme.on.mock.calls[0]![1] as () => void
     const closed = window.once.mock.calls[0]![1] as () => void
+
     expect(theme.on).toHaveBeenCalledWith('updated', update)
+
     update()
+
     expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#3f3f3f')
+
     theme.shouldUseDarkColors = false
+
     update()
+
     expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#fbf8f1')
     expect(window.once).toHaveBeenCalledWith('closed', closed)
+
     closed()
+
     expect(theme.removeListener).toHaveBeenCalledWith('updated', update)
   })
 })
@@ -88,21 +97,28 @@ describe('configureWebContentsSecurity', () => {
     const preventDefault = vi.fn()
     const frameNavigation = listeners.get('will-frame-navigate') as
       ((event: { preventDefault(): void; url: string }) => void) | undefined
+
     frameNavigation?.({ preventDefault, url: 'https://evil.example/' })
+
     expect(preventDefault).toHaveBeenCalledOnce()
 
     const redirect = listeners.get('will-redirect') as
       ((event: { preventDefault(): void; url: string }) => void) | undefined
+
     redirect?.({ preventDefault, url: 'https://evil.example/redirected' })
+
     expect(preventDefault).toHaveBeenCalledTimes(2)
 
     const webviewAttachment = listeners.get('will-attach-webview') as
       ((event: { preventDefault(): void }) => void) | undefined
+
     webviewAttachment?.({ preventDefault })
+
     expect(preventDefault).toHaveBeenCalledTimes(3)
 
     const openHandler = contents.setWindowOpenHandler.mock.calls[0]?.[0] as
       ((details: { url: string }) => { action: 'deny' }) | undefined
+
     expect(openHandler?.({ url: 'https://example.com/' })).toEqual({ action: 'deny' })
     expect(openExternal).toHaveBeenCalledWith('https://example.com/')
     expect(openHandler?.({ url: 'javascript:alert(1)' })).toEqual({ action: 'deny' })
@@ -138,7 +154,9 @@ describe('surfaceWindow', () => {
       show: vi.fn(),
       focus: vi.fn(),
     }
+
     surfaceWindow(window)
+
     expect(window.show).not.toHaveBeenCalled()
     expect(window.focus).not.toHaveBeenCalled()
   })
@@ -152,7 +170,9 @@ describe('surfaceWindow', () => {
       show: vi.fn(),
       focus: vi.fn(),
     }
+
     surfaceWindow(window)
+
     expect(window.show).not.toHaveBeenCalled()
   })
 
@@ -165,7 +185,9 @@ describe('surfaceWindow', () => {
       show: vi.fn(),
       focus: vi.fn(),
     }
+
     surfaceWindow(window)
+
     expect(window.restore).toHaveBeenCalledOnce()
     expect(window.show).toHaveBeenCalledOnce()
     expect(window.focus).toHaveBeenCalledOnce()
@@ -267,12 +289,15 @@ describe('configureRendererSessionSecurity', () => {
 
   it('disables the spellchecker', () => {
     const { session } = createSession()
+
     configureRendererSessionSecurity(session, { url: 'file:///app/renderer/index.html', isDevelopment: false })
+
     expect(session.setSpellCheckerEnabled).toHaveBeenCalledWith(false)
   })
 
   it('denies permission requests, checks, and device permission', () => {
     const { session } = createSession()
+
     configureRendererSessionSecurity(session, {
       url: 'file:///app/renderer/index.html',
       isDevelopment: false,
@@ -292,6 +317,7 @@ describe('configureRendererSessionSecurity', () => {
 
   it('allows only the packaged renderer origin and no local files in packaged mode', () => {
     const { session, onBeforeRequest } = createSession()
+
     configureRendererSessionSecurity(session, {
       url: 'app://tree/index.html',
       isDevelopment: false,
@@ -326,14 +352,17 @@ describe('configureRendererSessionSecurity', () => {
 
   it('allows local renderer schemes except files and only allows the resolved development origin', () => {
     const { session, onBeforeRequest } = createSession()
+
     configureRendererSessionSecurity(session, {
       url: 'http://localhost:5173/',
       isDevelopment: true,
     })
 
     const [filter, listener] = onBeforeRequest.mock.calls[0] ?? []
+
     expect(filter).toEqual({ urls: ['<all_urls>'] })
     expect(listener).toBeTypeOf('function')
+
     if (listener === undefined) throw new Error('The request filter was not installed.')
 
     const decisions: Array<{ url: string; cancel?: boolean }> = []
@@ -362,13 +391,16 @@ describe('configureRendererSessionSecurity', () => {
 
   it('does not allow a remote origin in packaged mode', () => {
     const { session, onBeforeRequest } = createSession()
+
     configureRendererSessionSecurity(session, {
       url: 'app://tree/index.html',
       isDevelopment: false,
     })
 
     const listener = onBeforeRequest.mock.calls[0]?.[1]
+
     expect(listener).toBeTypeOf('function')
+
     if (listener === undefined) throw new Error('The request filter was not installed.')
     const callback = vi.fn()
 

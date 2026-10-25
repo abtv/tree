@@ -83,6 +83,7 @@ describe('GitHub release trust', () => {
   it('pins API origin and fails closed without printing response secrets', async () => {
     const fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 })
     vi.stubGlobal('fetch', fetch)
+
     await expect(api('https://evil.test/repos/a/b/x', { token: 'secret' })).rejects.toThrow('Invalid')
     expect(fetch).not.toHaveBeenCalled()
     await expect(api('/repos/abtv/tree/pages', { token: 'secret' })).rejects.toThrow('GitHub API GET failed (403)')
@@ -105,6 +106,7 @@ describe('GitHub release trust', () => {
       [500, refusal, undefined],
     ] as const) {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message }), { status })))
+
       await expect(api(path, { token: 'secret', method: 'PUT', body: {} })).rejects.toMatchObject({
         status,
         message: `GitHub API PUT failed (${status})`,
@@ -112,11 +114,13 @@ describe('GitHub release trust', () => {
       })
     }
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('invalid JSON', { status: 403 })))
+
     await expect(api(path, { method: 'PUT' })).rejects.toMatchObject({ workflowWriteDenied: false })
   })
   it('checks source identity, current head, exact attempt and successful unique gate including pagination', async () => {
     const { manifest } = await fixture()
     const request = sourceRequest({ jobs: [{ name: 'other' }, goodGate], paginated: true })
+
     await expect(verifySource(manifest, { request })).resolves.toBeUndefined()
     expect(request.mock.calls.at(-1)![0]).toContain('/attempts/2/jobs?per_page=100&page=2')
     for (const override of [
@@ -145,12 +149,17 @@ describe('GitHub release trust', () => {
   })
   it('rejects identity changes and unsigned retained assets even with the obsolete retention option', async () => {
     const { dir, manifest } = await fixture()
+
     expect(() => verifyIdentity(manifest, { GITHUB_REPOSITORY: 'evil/tree' })).toThrow('identity')
+
     await writeFile(join(dir, 'assets/old.js'), 'old')
+
     await expect(verifyPackage(dir, manifest)).rejects.toThrow('differs')
     // @ts-expect-error Exercise the obsolete JavaScript call shape; extra options must not bypass validation.
     await expect(verifyPackage(dir, manifest, { allowRetainedAssets: true })).rejects.toThrow('differs')
+
     await writeFile(join(dir, 'provenance.json'), '{}')
+
     // @ts-expect-error Exercise the obsolete JavaScript call shape; extra options must not bypass validation.
     await expect(verifyPackage(dir, manifest, { allowRetainedAssets: true })).rejects.toThrow('Unexpected')
   })
@@ -166,13 +175,17 @@ describe('atomic package transfer', () => {
       expect(url.origin).toBe('https://tree-editor.github.io')
       expect(url.searchParams.get('release')).toBe('123-2')
       expect(options.redirect).toBe('error')
+
       return new Response(url.searchParams.get('attempt') === '1' ? 'stale' : contents[url.pathname.slice(1)])
     })
     const wait = vi.fn().mockResolvedValue(undefined)
+
     await expect(verifyHosted(manifest, { request, wait })).resolves.toBeUndefined()
     expect(wait).toHaveBeenCalledExactlyOnceWith(10000)
+
     const unavailable = vi.fn().mockResolvedValue({ ok: false })
     const waits = vi.fn().mockResolvedValue(undefined)
+
     await expect(verifyHosted(manifest, { request: unavailable, wait: waits })).rejects.toThrow('Deployment switched')
     expect(unavailable).toHaveBeenCalledTimes(6)
     expect(waits).toHaveBeenCalledTimes(5)
@@ -215,51 +228,64 @@ describe('atomic package transfer', () => {
   }
   it('continues publication with the installed legacy hosting workflow during migration', async () => {
     const { dir, manifest, request, ...auth } = await targetFixture({ workflow: '.github/workflows/pages.yml' })
+
     await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).resolves.toBe(
       'c'.repeat(40),
     )
   })
   it('preserves existing tree paths and appends one non-forced commit containing only allowlisted files', async () => {
     const { dir, manifest, request, ...auth } = await targetFixture()
+
     await transferPackage(dir, manifest, { ...auth, token: 'source', targetToken: 'target', request })
+
     expect(request.mock.calls.some(([path]) => path.endsWith('/pages'))).toBe(false)
+
     const tree = request.mock.calls.find(
       ([path, opts]) => path.endsWith('/git/trees') && (opts!.body as TestBody | undefined)?.base_tree,
     )![1]!.body as TestBody
+
     expect(tree.base_tree).toBe('base-tree')
     expect(tree.tree.map((entry) => entry.path).sort()).toEqual(
       ['site', 'provenance.json', 'provenance.sigstore.json'].sort(),
     )
+
     const site = request.mock.calls.find(
       ([path, opts]) => path.endsWith('/git/trees') && !(opts!.body as TestBody | undefined)?.base_tree,
     )![1]!.body as TestBody
+
     expect(site.tree.map((file) => file.path).sort()).toEqual(manifest.files.map((file) => file.path).sort())
     expect(site.tree.every((entry) => entry.mode === '100644' && entry.type === 'blob')).toBe(true)
     expect(tree.tree.find((entry) => entry.path === 'site')!.mode).toBe('040000')
+
     const commit = request.mock.calls.find(
       ([path, opts]) => path.endsWith('/git/commits') && opts!.method === 'POST',
     )![1]!.body as TestBody
+
     expect(commit.parents).toEqual(['b'.repeat(40)])
     expect(request.mock.calls.at(-1)![1]!.body).toEqual({ sha: 'c'.repeat(40), force: false })
   })
   it('does not mutate target on rejected trust or missing setup and never retries a ref conflict', async () => {
     for (const options of [{ workflow: '' }, { source: sourceRequest({ sha: 'd'.repeat(40) }) }]) {
       const { dir, manifest, request, ...auth } = await targetFixture(options)
+
       await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow()
       expect(request.mock.calls.some(([, opts]) => ['POST', 'PATCH'].includes(opts?.method ?? ''))).toBe(false)
     }
     const { dir, manifest, request, ...auth } = await targetFixture({ conflict: true })
+
     await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow('422')
     expect(request.mock.calls.filter(([, opts]) => opts?.method === 'PATCH')).toHaveLength(1)
   })
   it('target rechecks current target and source heads before permitting deployment without a source token', async () => {
     const { dir, manifest, attest } = await fixture()
     const file = `${dir}-provenance.json`
+
     await writeFile(file, JSON.stringify(manifest))
     const source = sourceRequest()
     const request = vi.fn(async (path: string, options: ApiOptions = {}) =>
       path.startsWith('/repos/tree-editor/') ? { object: { sha: 'b'.repeat(40) } } : source(path, options),
     )
+
     await expect(
       verifyTarget({ directory: dir, manifestFile: file, sha: 'b'.repeat(40), request, attest }),
     ).resolves.toEqual(manifest)
@@ -272,10 +298,12 @@ describe('atomic package transfer', () => {
   it('does not deploy a package when independent attestation verification rejects its manifest', async () => {
     const { dir, manifest } = await fixture()
     const file = `${dir}-provenance.json`
+
     await writeFile(file, JSON.stringify(manifest))
     const source = sourceRequest()
     const request = async (path: string, options: ApiOptions = {}) =>
       path.startsWith('/repos/tree-editor/') ? { object: { sha: 'b'.repeat(40) } } : source(path, options)
+
     await expect(
       verifyTarget({
         directory: dir,
@@ -296,6 +324,7 @@ describe('atomic package transfer', () => {
     const request = async (path: string, options: ApiOptions = {}) =>
       path.startsWith('/repos/tree-editor/') ? { object: { sha: 'b'.repeat(40) } } : source(path, options)
     const before = await readFile(join(dir, 'assets/app.js'))
+
     await expect(
       probeRejection({ directory: dir, manifestFile: file, sha: 'b'.repeat(40), request, attest }),
     ).resolves.toBeUndefined()

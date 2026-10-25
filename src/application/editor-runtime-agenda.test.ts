@@ -18,13 +18,19 @@ it('short-circuits Agenda reconciliation in Tree and calls the seam once when Ag
   const reconcile = vi.spyOn(agendaModule, 'reconcileAgenda')
   try {
     runtime.replaceReady(state)
+
     expect(reconcile).not.toHaveBeenCalled()
     expect(runtime.ready()).not.toHaveProperty('agenda')
+
     const agenda = openAgendaState(state.location, 4, 100)
+
     runtime.replaceReady({ ...state, agenda })
+
     expect(reconcile).toHaveBeenCalledExactlyOnceWith(state.document, agenda, false, undefined)
     expect(runtime.ready().agenda).toBe(agenda)
+
     runtime.replaceReady({ ...runtime.ready(), agenda: { ...agenda, selectedKey: 'day:101' } })
+
     expect(reconcile).toHaveBeenCalledTimes(1)
   } finally {
     reconcile.mockRestore()
@@ -53,11 +59,14 @@ it.each(['deleted', 'moved'] as const)(
       expansion: COLLAPSED_EXPANSION_STATE,
       structuralVersion: 0,
     }
+
     runtime.replaceReady(state)
     const changed: Document = {
       roots: [{ ...document.roots[0]!, children: [{ ...scope, children: [] }] }, ...(kind === 'moved' ? [node] : [])],
     }
+
     runtime.replaceReady({ ...runtime.ready(), document: changed }, true)
+
     expect(runtime.ready().location).toEqual({ currentParentId: 'scope', selectedNodeId: 'scope' })
     expect(runtime.ready().focus).toMatchObject({ nodeId: 'scope', cursor: 0 })
     expect(runtime.ready().agenda!.selectedKey).toBe('day:100')
@@ -78,22 +87,31 @@ it('calls the cache-release callback only when Agenda closes and reconciles an a
     expansion: COLLAPSED_EXPANSION_STATE,
     structuralVersion: 0,
   }
+
   runtime.replaceReady(state)
   const agenda = {
     ...openAgendaState(state.location, 4, 100),
     selectedKey: 'node:100:a',
     activeOccurrence: { nodeId: 'a', day: 100 },
   }
+
   runtime.replaceReady({ ...state, agenda })
   runtime.replaceReady({ ...runtime.ready(), document: { roots: [{ ...document.roots[0]!, text: '1970-04-13' }] } })
+
   expect(runtime.ready().agenda!.selectedKey).toBe('node:102:a')
   expect(runtime.ready().location.selectedNodeId).toBe('a')
   expect(closed).not.toHaveBeenCalled()
+
   const { agenda: _agenda, ...tree } = runtime.ready()
+
   expect(_agenda).toBeDefined()
+
   runtime.replaceReady(tree)
+
   expect(closed).toHaveBeenCalledOnce()
+
   runtime.replaceReady(tree)
+
   expect(closed).toHaveBeenCalledOnce()
 })
 
@@ -121,6 +139,7 @@ it('does not reconcile unchanged pinned content when only its focus intent chang
   const reconcile = vi.spyOn(agendaModule, 'reconcileAgenda')
   try {
     runtime.replaceReady({ ...runtime.ready(), focus: runtime.newFocus('a', 3) })
+
     expect(reconcile).not.toHaveBeenCalled()
     expect(runtime.ready().agenda).toBe(agenda)
   } finally {

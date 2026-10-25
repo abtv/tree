@@ -79,8 +79,11 @@ async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Pr
 test.describe('state and persistence work', () => {
   test('fresh application process footprint', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     const memory = await readProcessWorkingSet(app)
+
     recordPerfResult({
       kind: 'state',
       scenario: 'fresh-process-footprint',
@@ -91,6 +94,7 @@ test.describe('state and persistence work', () => {
         processCount: memory.processCount,
       },
     })
+
     expect(memory.mainBytes).toBeGreaterThan(0)
     expect(memory.rendererBytes).toBeGreaterThan(0)
     expect(memory.rendererBytes).toBeLessThan(300 * MIB)
@@ -106,6 +110,7 @@ test.describe('state and persistence work', () => {
     const { app, window } = await launchTree(userDataDir)
     const input = window.getByRole('textbox').first()
     await input.focus()
+
     await installPersistenceProbes(app)
     const baseline = await readProbe(app)
 
@@ -117,6 +122,7 @@ test.describe('state and persistence work', () => {
 
     const typed = `${'lorem ipsum dolor sit amet '.repeat(4)}final`
     const typingStart = performance.now()
+
     await window.keyboard.type(typed)
     const typingMs = performance.now() - typingStart
 
@@ -167,6 +173,7 @@ test.describe('state and persistence work', () => {
       Array.from({ length: 100 }, (_, index) => `child-image-${index}`),
     )
     const { app, window } = await launchTree(userDataDir)
+
     await installPersistenceProbes(app)
     const baseline = await readProbe(app)
     await window.getByRole('textbox', { name: 'Node 1', exact: true }).focus()
@@ -220,6 +227,7 @@ test.describe('state and persistence work', () => {
     const { app, window } = await launchTree(userDataDir, { memoryProbe: true })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
 
     const structuralCycle = async (): Promise<void> => {
@@ -227,14 +235,17 @@ test.describe('state and persistence work', () => {
       await window.keyboard.press('Meta+Backspace')
     }
     for (let index = 0; index < 50; index += 1) await structuralCycle()
+
     const warmHeapBytes = await collectRendererHeap(window)
     const warmProcess = await readProcessWorkingSet(app)
 
     const cycles = 250
     for (let index = 0; index < cycles; index += 1) await structuralCycle()
+
     const middleHeapBytes = await collectRendererHeap(window)
     const middleProcess = await readProcessWorkingSet(app)
     for (let index = 0; index < cycles; index += 1) await structuralCycle()
+
     const finalHeapBytes = await collectRendererHeap(window)
     const finalProcess = await readProcessWorkingSet(app)
     const growthBytes = finalHeapBytes - warmHeapBytes
@@ -277,6 +288,7 @@ test.describe('state and persistence work', () => {
 
   test('image insertion decode latency for small and larger images', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await app.evaluate(() => {
       const control = globalThis as typeof globalThis & { __decodeProbe?: number[] }
       control.__decodeProbe = []
@@ -297,7 +309,9 @@ test.describe('state and persistence work', () => {
     ] as const) {
       await writeClipboardImageSized(app, width, height)
       await firePaste(window.getByRole('textbox').first())
+
       await expect(window.getByAltText('Attached image').last()).toBeVisible()
+
       const durations = await app.evaluate(
         () => (globalThis as typeof globalThis & { __decodeProbe?: number[] }).__decodeProbe ?? [],
       )

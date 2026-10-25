@@ -197,9 +197,11 @@ describe('notes archive controller: export', () => {
       defaultPath: 'Tree Notes 2026-10-23.zip',
       filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
     })
+
     const result = await controller.startExport()
 
     const archive = await readFile(join(destinations, 'Tree Notes 2026-10-23.zip'))
+
     expect(result).toEqual({
       ok: true,
       fileName: 'Tree Notes 2026-10-23.zip',
@@ -215,6 +217,7 @@ describe('notes archive controller: export', () => {
 
   it('round-trips a desktop export through import into another profile', async () => {
     const source = await setup()
+
     await source.controller.chooseExportDestination()
     await source.controller.startExport()
     const target = await setup({ withNotes: false })
@@ -224,6 +227,7 @@ describe('notes archive controller: export', () => {
     })
 
     await target.controller.chooseImportArchive()
+
     await expect(target.controller.prepareImport()).resolves.toMatchObject({
       ok: true,
       incoming: { nodeCount: 2, imageCount: 1, missingImageCount: 0 },
@@ -247,18 +251,23 @@ describe('notes archive controller: export', () => {
   it('leaves no partial file and keeps an existing file when the export is cancelled', async () => {
     const { controller, destinations, userData, scripted, fileServices } = await setup({ worker: 'scripted' })
     const destination = join(destinations, 'Tree Notes 2026-10-23.zip')
+
     await writeFile(destination, 'previous archive')
     const unpin = vi.fn()
     vi.spyOn(fileServices, 'pinAttachments').mockReturnValue(unpin)
+
     await controller.chooseExportDestination()
 
     const result = controller.startExport()
     const worker = await waitForWorker(scripted)
     if (worker.task.type !== 'export') throw new Error('Expected an export task.')
+
     expect(worker.task.temporaryPath.startsWith(join(destinations, '.Tree Notes 2026-10-23.zip.'))).toBe(true)
+
     await writeFile(worker.task.temporaryPath, 'partial archive')
     worker.send({ type: 'pin', ids: ['a'] })
     await vi.waitFor(() => expect(worker.replies).toEqual([{ type: 'pinned' }]))
+
     await controller.cancel()
 
     await expect(result).resolves.toEqual({ ok: false, canceled: true })
@@ -267,13 +276,16 @@ describe('notes archive controller: export', () => {
     expect(await readdir(destinations)).toEqual(['Tree Notes 2026-10-23.zip'])
     expect(await readFile(destination, 'utf8')).toBe('previous archive')
     expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+
     // A message the worker queued before it stopped is ignored.
     worker.send({ type: 'written', summary: { imageCount: 0, missingImageCount: 0, archiveBytes: 0 } })
+
     expect(await readdir(destinations)).toEqual(['Tree Notes 2026-10-23.zip'])
   })
 
   it('waits for the worker to stop before removing a file it was still creating', async () => {
     const { controller, destinations, scripted } = await setup({ worker: 'scripted' })
+
     await controller.chooseExportDestination()
     const result = controller.startExport()
     const worker = await waitForWorker(scripted)
@@ -300,10 +312,12 @@ describe('notes archive controller: export', () => {
       [(worker: ScriptedWorker) => worker.emit('exit', 1), `The notes could not be read: ${WORKER_STOPPED_MESSAGE}`],
     ] as const) {
       const { controller, destinations, scripted } = await setup({ worker: 'scripted' })
+
       await controller.chooseExportDestination()
       const result = controller.startExport()
       const worker = await waitForWorker(scripted)
       if (worker.task.type !== 'export') throw new Error('Expected an export task.')
+
       await writeFile(worker.task.temporaryPath, 'partial archive')
 
       fail(worker)
@@ -316,6 +330,7 @@ describe('notes archive controller: export', () => {
   it('reports a destination that cannot be written', async () => {
     const { controller, dialogs, home } = await setup()
     dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: join(home, 'missing', 'notes.zip') })
+
     await controller.chooseExportDestination()
 
     await expect(controller.startExport()).resolves.toEqual({
@@ -326,6 +341,7 @@ describe('notes archive controller: export', () => {
 
   it('runs one operation at a time', async () => {
     const { controller, scripted } = await setup({ worker: 'scripted' })
+
     await controller.chooseExportDestination()
     const result = controller.startExport()
     await waitForWorker(scripted)
@@ -333,7 +349,9 @@ describe('notes archive controller: export', () => {
     await expect(controller.chooseExportDestination()).rejects.toThrow(BUSY_MESSAGE)
     await expect(controller.chooseImportArchive()).rejects.toThrow(BUSY_MESSAGE)
     await expect(controller.commitImport()).rejects.toThrow('No import is prepared.')
+
     await controller.cancel()
+
     await expect(result).resolves.toEqual({ ok: false, canceled: true })
   })
 })
@@ -341,6 +359,7 @@ describe('notes archive controller: export', () => {
 describe('notes archive controller: import', () => {
   it('cancels both the export worker and the import retained behind it', async () => {
     const { controller, destinations, userData, dependencies } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -351,10 +370,13 @@ describe('notes archive controller: import', () => {
       temporaryPath: '',
     })
     dependencies.startWorker.mockReturnValueOnce(worker)
+
     await controller.chooseExportDestination()
     const exportJob = controller.startExport()
     await vi.waitFor(() => expect(dependencies.startWorker).toHaveBeenCalledTimes(2))
+
     await controller.cancel()
+
     await expect(exportJob).resolves.toEqual({ ok: false, canceled: true })
     expect(worker.terminated).toBe(true)
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
@@ -363,12 +385,15 @@ describe('notes archive controller: import', () => {
   // @requirement PRODUCT.md §25.3
   it('exports current notes from confirmation, retains preparation after native cancel and permits replacement', async () => {
     const { controller, destinations, dialogs, fileServices } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([], 'Incoming'), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
     dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: true, filePath: '' })
+
     await controller.chooseExportDestination()
     await controller.chooseExportDestination()
+
     await expect(controller.startExport()).resolves.toMatchObject({ ok: true })
     await expect(controller.commitImport()).resolves.toEqual({ ok: true })
     await expect(fileServices.load()).resolves.toEqual(headWithImages([], 'Incoming'))
@@ -376,6 +401,7 @@ describe('notes archive controller: import', () => {
 
   it('discards the retained import when cancellation interrupts its export choice', async () => {
     const { controller, destinations, dialogs, userData } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -387,9 +413,11 @@ describe('notes archive controller: import', () => {
         }),
     )
     const choosing = controller.chooseExportDestination()
+
     await controller.shutdown()
     release({ canceled: true, filePath: '' })
     await choosing
+
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
   })
   it('prepares a browser archive, replaces the notes and reports the Replaced Notes folder once', async () => {
@@ -420,7 +448,9 @@ describe('notes archive controller: import', () => {
       replacedFolder: '~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09',
     })
     expect(controller.takeImportNotice()).toBeNull()
+
     controller.showReplacedFolder()
+
     expect(dependencies.showItemInFolder).toHaveBeenCalledExactlyOnceWith(
       join(userData, 'Replaced Notes', '2026-10-23 14-05-09'),
     )
@@ -428,6 +458,7 @@ describe('notes archive controller: import', () => {
 
   it('reports an import into empty notes without a Replaced Notes folder', async () => {
     const { controller, destinations } = await setup({ withNotes: false })
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -441,28 +472,36 @@ describe('notes archive controller: import', () => {
     const { controller, destinations, userData } = await setup()
     const archivePath = join(destinations, 'Tree Notes 2026-10-20.zip')
     const document = new TextEncoder().encode(JSON.stringify(headWithImages([])))
+
     await writeFile(archivePath, buildZip([{ name: 'document.json', data: document, flags: 0x0001 }]))
 
     await controller.chooseImportArchive()
+
     await expect(controller.prepareImport()).resolves.toEqual({ ok: false, message: ENCRYPTED_ARCHIVE_MESSAGE })
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
 
     await writeArchive(archivePath, headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
+
     expect(await readdir(join(userData, '.notes-import'))).toHaveLength(1)
+
     await controller.cancel()
+
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
     await expect(controller.commitImport()).rejects.toThrow('No import is prepared.')
   })
 
   it('stops a running preparation, discards staging and ignores later worker messages', async () => {
     const { controller, userData, scripted, dependencies } = await setup({ worker: 'scripted' })
+
     await controller.chooseImportArchive()
     const result = controller.prepareImport()
     const worker = await waitForWorker(scripted)
+
     worker.send({ type: 'validate-image', bytes: onePixelPng })
     await vi.waitFor(() => expect(worker.replies).toEqual([{ type: 'image-validated', decodable: true }]))
+
     worker.send({ type: 'staged' })
     await vi.waitFor(() => expect(worker.replies).toHaveLength(2))
 
@@ -471,13 +510,16 @@ describe('notes archive controller: import', () => {
     await expect(result).resolves.toEqual({ ok: false, canceled: true })
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
     expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+
     worker.send({ type: 'validate-image', bytes: onePixelPng })
     await new Promise((resolve) => setImmediate(resolve))
+
     expect(dependencies.decodePng).toHaveBeenCalledOnce()
   })
 
   it('keeps the notes and resumes when the replacement fails before its journal', async () => {
     const { controller, destinations, fileServices, userData } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -495,6 +537,7 @@ describe('notes archive controller: import', () => {
 
   it('requires a restart after a replacement fails past its journal', async () => {
     const { controller, destinations, fileServices } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -522,7 +565,9 @@ describe('notes archive controller: import', () => {
       fileName: 'Tree Notes 2026-10-20.zip',
       replacedFolder: '~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09',
     })
+
     controller.showReplacedFolder()
+
     expect(dependencies.showItemInFolder).toHaveBeenCalledWith(folder)
     expect(controller.takeImportNotice()).toEqual({ replacedFolder: null })
     expect(controller.takeImportNotice()).toBeNull()
@@ -532,22 +577,27 @@ describe('notes archive controller: import', () => {
 describe('notes archive controller: quitting', () => {
   it('has nothing to wait for when idle', async () => {
     const { controller } = await setup()
+
     expect(controller.shutdown()).toBeNull()
     await expect(controller.chooseExportDestination()).rejects.toThrow('Tree is quitting.')
   })
 
   it('cancels a running export and its cleanup finishes before quitting', async () => {
     const { controller, destinations, scripted } = await setup({ worker: 'scripted' })
+
     await controller.chooseExportDestination()
     const result = controller.startExport()
     const worker = await waitForWorker(scripted)
     if (worker.task.type !== 'export') throw new Error('Expected an export task.')
+
     await writeFile(worker.task.temporaryPath, 'partial archive')
 
     const pending = controller.shutdown()
 
     expect(pending).not.toBeNull()
+
     await pending
+
     await expect(result).resolves.toEqual({ ok: false, canceled: true })
     expect(await readdir(destinations)).toEqual([])
     expect(controller.shutdown()).toBeNull()
@@ -555,6 +605,7 @@ describe('notes archive controller: quitting', () => {
 
   it('discards a prepared import when quitting from the confirmation', async () => {
     const { controller, destinations, userData } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -567,6 +618,7 @@ describe('notes archive controller: quitting', () => {
 
   it('waits for a running replacement instead of cancelling it', async () => {
     const { controller, destinations, fileServices } = await setup()
+
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([], 'Imported'), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
@@ -586,7 +638,9 @@ describe('notes archive controller: quitting', () => {
       settled = true
     })
     await new Promise((resolve) => setImmediate(resolve))
+
     expect(settled).toBe(false)
+
     release()
     await pending
 

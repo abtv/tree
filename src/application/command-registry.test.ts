@@ -19,9 +19,12 @@ describe('command registry', () => {
     [true, false, 7],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
+
     expect(commands).toHaveLength(count)
+
     const history = ['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark']
     const matches = (query: string) => matchCommands(query, history, commands).map((command) => command.name)
+
     expect(matches('toggle-always-on-top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
     expect(matches('top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
     expect(matches('vim')).toEqual(vim ? ['toggle-vim-mode'] : [])
@@ -41,6 +44,7 @@ describe('command registry', () => {
   // @requirement PRODUCT.md §20.2.28
   it('records only the quit shortcut, as data without a platform label', () => {
     const shortcuts = commandRegistry.filter((command) => command.shortcut !== undefined)
+
     expect(shortcuts.map((command) => [command.name, command.shortcut])).toEqual([['quit', { key: 'Q' }]])
   })
 
@@ -68,6 +72,7 @@ describe('command registry', () => {
 
   it('ranks exact matches, unique history, then alphabetical remaining commands', () => {
     const history = ['set-theme-light', 'set-theme-dark', 'set-theme-light', 'unknown']
+
     expect(names('', history)).toEqual([
       'set-theme-light',
       'set-theme-dark',
@@ -105,13 +110,17 @@ describe('command registry', () => {
     }
     for (const command of commandRegistry)
       await command.run(services, { alwaysOnTop: true, appearance: 'dark', vimEnabled: true, view: 'tree' })
+
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
     expect(services.showTree).toHaveBeenCalledExactlyOnceWith()
     expect(services.quit).toHaveBeenCalledExactlyOnceWith()
     expect(services.setAlwaysOnTop).toHaveBeenCalledExactlyOnceWith(false)
     expect(services.setVimEnabled).toHaveBeenCalledExactlyOnceWith(false)
+
     const toggleVim = commandRegistry.find((command) => command.name === 'toggle-vim-mode')!
+
     await toggleVim.run(services, { alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'agenda' })
+
     expect(services.setVimEnabled).toHaveBeenLastCalledWith(true)
     expect(services.setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark']])
     expect(

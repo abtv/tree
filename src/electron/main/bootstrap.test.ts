@@ -78,6 +78,7 @@ describe('bootstrapApplication', () => {
 
     await Promise.resolve()
     const requestQuit = dependencies.setApplicationMenu.mock.calls[0]![0]
+
     requestQuit()
 
     expect(app.quit).toHaveBeenCalledOnce()
@@ -88,6 +89,7 @@ describe('bootstrapApplication', () => {
     dependencies.getWindowCount.mockReturnValue(0)
 
     await Promise.resolve()
+
     listeners.activate?.()
 
     expect(dependencies.createMainWindow).toHaveBeenCalledTimes(2)
@@ -98,6 +100,7 @@ describe('bootstrapApplication', () => {
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
 
     await Promise.resolve()
+
     listeners.beforeQuit?.(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -111,6 +114,7 @@ describe('bootstrapApplication', () => {
 
     await Promise.resolve()
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+
     windowListeners.close?.(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -123,6 +127,7 @@ describe('bootstrapApplication', () => {
 
     await Promise.resolve()
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+
     listeners.beforeQuit?.(event)
 
     expect(app.quit).toHaveBeenCalledOnce()
@@ -141,23 +146,31 @@ describe('bootstrapApplication', () => {
     )
 
     await Promise.resolve()
+
     registerReadyServices.mock.calls[0]![1]()
     const deferred: BeforeQuitEvent = { preventDefault: vi.fn() }
+
     listeners.beforeQuit?.(deferred)
 
     expect(deferred.preventDefault).toHaveBeenCalledOnce()
     expect(dependencies.unregisterShortcut).not.toHaveBeenCalled()
     expect(app.quit).not.toHaveBeenCalled()
+
     finish()
     await vi.waitFor(() => expect(app.quit).toHaveBeenCalledOnce())
 
     const final: BeforeQuitEvent = { preventDefault: vi.fn() }
+
     listeners.beforeQuit?.(final)
+
     expect(final.preventDefault).not.toHaveBeenCalled()
     expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+
     // A window must not be recreated while the work finishes.
     dependencies.getWindowCount.mockReturnValue(0)
+
     listeners.activate?.()
+
     expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
   })
 
@@ -176,8 +189,10 @@ describe('bootstrapApplication', () => {
     const { app, windowListeners, registerReadyServices } = createHarness()
 
     await Promise.resolve()
+
     registerReadyServices.mock.calls[0]![1]()
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
+
     windowListeners.close?.(event)
 
     expect(event.preventDefault).not.toHaveBeenCalled()
@@ -233,6 +248,7 @@ describe('bootstrapApplication', () => {
       const event: BeforeQuitEvent = { preventDefault: vi.fn() }
 
       await Promise.resolve()
+
       listeners.beforeQuit?.(event)
       vi.advanceTimersByTime(5_000)
 
@@ -253,6 +269,7 @@ describe('bootstrapApplication', () => {
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
 
     await Promise.resolve()
+
     listeners.beforeQuit?.(event)
 
     expect(event.preventDefault).not.toHaveBeenCalled()
@@ -260,7 +277,9 @@ describe('bootstrapApplication', () => {
     expect(dependencies.unregisterShortcut).toHaveBeenCalledOnce()
 
     dependencies.getWindowCount.mockReturnValue(0)
+
     listeners.activate?.()
+
     expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
   })
 })

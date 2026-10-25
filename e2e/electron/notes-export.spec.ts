@@ -47,6 +47,7 @@ async function availability(app: ElectronApplication): Promise<boolean[]> {
 
 async function startExport(app: ElectronApplication): Promise<void> {
   await expect.poll(() => availability(app)).toEqual([true, true])
+
   await clickApplicationMenuItem(app, 'File', 'Export Notes…')
 }
 
@@ -79,6 +80,7 @@ async function inspectGeometry(page: Page, error = false): Promise<void> {
       ),
     }
   })
+
   expect(geometry.visible).toBe(true)
   expect(geometry.separate).toBe(true)
   expect(geometry.nearTop).toBe(error)
@@ -92,23 +94,31 @@ test.describe('desktop Export Notes', () => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Panel Notes.zip')
     const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+
     await choosePath(app, destination)
     await holdExport(app)
     await node(window, 1).focus()
+
     await window.keyboard.press('Meta+Shift+p')
     await window.getByRole('combobox', { name: 'Command' }).fill('export-notes')
     await window.keyboard.press('Enter')
     await waitForExport(app)
+
     await window.keyboard.press('Meta+Shift+p')
     await window.getByRole('combobox', { name: 'Command' }).fill('import-notes')
+
     await expect(window.locator('#command-import-notes')).toHaveAttribute('aria-disabled', 'true')
+
     await window.screenshot({ path: '.scratch/menu-command-parity/disabled-data-command.png' })
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('combobox', { name: 'Command' })).toBeFocused()
+
     await window.keyboard.press('Escape')
     await app.evaluate(() => {
       globalThis.__treeArchiveWorkers.release()
     })
+
     await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText('Exported')
     expect(exportedText(destination)).toBe('Synthetic export notes')
   })
@@ -123,11 +133,14 @@ test.describe('desktop Export Notes', () => {
       seed(userDataDir)
       const destination = join(userDataDir, 'Notes.zip')
       const { app, window } = await launchTree(userDataDir, { appearance, vimPreference: false })
+
       await window.emulateMedia({ colorScheme: appearance })
+
       await expect(window.locator('html')).toHaveCSS(
         'background-color',
         appearance === 'dark' ? 'rgb(63, 63, 63)' : 'rgb(251, 248, 241)',
       )
+
       await window.clock.install()
       await choosePath(app, destination)
       await node(window, 1).fill('The latest notes before export')
@@ -135,25 +148,34 @@ test.describe('desktop Export Notes', () => {
       await startExport(app)
       await waitForExport(app)
       const panel = window.getByRole('complementary', { name: 'Notes activity' })
+
       await expect(panel).toContainText('Exporting Notes…')
       expect(existsSync(destination)).toBe(false)
       expect(await availability(app)).toEqual([false, false])
+
       await inspectGeometry(window)
+
       await expect(panel).toHaveScreenshot(`export-running-${appearance}.png`)
+
       await window.screenshot({ path: `.scratch/desktop-notes-export/running-${appearance}.png` })
 
       // The worker already took its snapshot. Later editing remains usable and is saved separately.
       await node(window, 1).fill('Editing continues during export')
       await fireIdleSave(window)
+
       // A save briefly renames the primary away; retry the read as well as its assertion.
       await expect(async () => {
         expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Editing continues during export')
       }).toPass(idleSavePoll)
+
       await app.evaluate(() => globalThis.__treeArchiveWorkers.release())
+
       await expect(panel).toContainText('Exported “Notes.zip”.')
       expect(exportedText(destination)).toBe('The latest notes before export')
       await expect(panel).toHaveScreenshot(`export-done-${appearance}.png`)
+
       await window.clock.fastForward(6000)
+
       await expect(panel).toHaveCount(0)
 
       await blockSaves(app)
@@ -162,16 +184,25 @@ test.describe('desktop Export Notes', () => {
       )
       await node(window, 1).fill('A pending edit cannot be saved')
       await startExport(app)
+
       await expect(panel).toContainText('Export failed. Your latest changes could not be saved:')
+
       await inspectGeometry(window, true)
+
       await expect(panel).toHaveScreenshot(`export-failed-${appearance}.png`)
+
       await window.screenshot({ path: `.scratch/desktop-notes-export/failed-${appearance}.png` })
       await window.clock.fastForward(6000)
+
       await expect(panel).toBeVisible()
+
       await panel.getByRole('button', { name: 'OK' }).focus()
+
       await window.keyboard.press('Enter')
+
       await expect(panel).toHaveCount(0)
       await expect(node(window, 1)).toBeFocused()
+
       await restoreSaves(app)
     })
   }
@@ -180,15 +211,21 @@ test.describe('desktop Export Notes', () => {
   test('cancels the native choice and active export while preserving an existing archive', async ({ userDataDir }) => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Notes.zip')
+
     writeFileSync(destination, 'Previous archive')
     const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+
     await window.clock.install()
     const before = readPersisted(userDataDir)
+
     await choosePath(app, null)
     await startExport(app)
+
     await expect.poll(() => availability(app)).toEqual([true, true])
+
     await fireIdleSave(window)
     await window.evaluate(() => (globalThis as typeof globalThis & { treeApi: TreeApi }).treeApi.load())
+
     expect(readPersisted(userDataDir)).toEqual(before)
     await expect(window.locator('.data-activity')).toHaveCount(0)
 
@@ -196,7 +233,9 @@ test.describe('desktop Export Notes', () => {
     await holdExport(app)
     await startExport(app)
     await waitForExport(app)
+
     await window.getByRole('button', { name: 'Cancel', exact: true }).click()
+
     await expect(window.locator('.data-activity')).toHaveCount(0)
     await expect.poll(() => availability(app)).toEqual([true, true])
     expect(readFileSync(destination, 'utf8')).toBe('Previous archive')
@@ -208,13 +247,17 @@ test.describe('desktop Export Notes', () => {
   test('reports a real write failure and a limit refusal, then permits another export', async ({ userDataDir }) => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Notes.zip')
+
     mkdirSync(destination)
     const { app, window } = await launchTree(userDataDir)
+
     await choosePath(app, destination)
     await startExport(app)
+
     await expect(window.locator('.data-activity')).toContainText('Export failed. The archive could not be saved:')
     expect(readdirSync(destination)).toEqual([])
     expect(readdirSync(userDataDir).filter((name) => name.startsWith('.Notes.zip.'))).toEqual([])
+
     await window.getByRole('button', { name: 'OK', exact: true }).click()
 
     await app.evaluate((_electron, channel) => {
@@ -224,9 +267,11 @@ test.describe('desktop Export Notes', () => {
       }))
     }, ipcChannels.startNotesExport)
     await startExport(app)
+
     await expect(window.locator('.data-activity')).toHaveText(
       'Export failed. Your notes are too large to export as one archive.OK',
     )
+
     // The injected result skips the worker; release its chosen destination before teardown.
     await window.evaluate(() =>
       (globalThis as typeof globalThis & { treeApi: TreeApi }).treeApi.cancelNotesOperation!(),
@@ -237,19 +282,25 @@ test.describe('desktop Export Notes', () => {
   test('cancels an active export on renderer reload and permits a new export', async ({ userDataDir }) => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Notes.zip')
+
     writeFileSync(destination, 'Previous archive')
     const { app, window } = await launchTree(userDataDir)
+
     await choosePath(app, destination)
     await holdExport(app)
     await startExport(app)
     await waitForExport(app)
+
     await window.reload()
+
     await expect(node(window, 1)).toBeVisible()
     await expect.poll(() => availability(app)).toEqual([true, true])
     expect(readFileSync(destination, 'utf8')).toBe('Previous archive')
     await expect.poll(() => readdirSync(userDataDir).filter((name) => name.startsWith('.Notes.zip.'))).toEqual([])
+
     await app.evaluate(() => globalThis.__treeArchiveWorkers.release())
     await startExport(app)
+
     await expect(window.locator('.data-activity')).toContainText('Exported “Notes.zip”.')
     expect(exportedText(destination)).toBe('Synthetic export notes')
   })
@@ -259,10 +310,12 @@ test.describe('desktop Export Notes', () => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Notes.zip')
     const { app, window } = await launchTree(userDataDir, { vimPreference: true, initialMode: 'normal' })
+
     await choosePath(app, destination)
     await window.keyboard.press('R')
     await window.keyboard.type('ABC')
     await startExport(app)
+
     await expect(window.locator('.data-activity')).toContainText('Exported “Notes.zip”.')
     expect(exportedText(destination)).toBe('ABCthetic export notes')
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('ABCthetic export notes')
@@ -273,6 +326,7 @@ test.describe('desktop Export Notes', () => {
     mkdirSync(join(userDataDir, 'data'), { recursive: true })
     writeFileSync(join(userDataDir, 'data', 'document.json'), 'invalid notes')
     const { app, window } = await launchTree(userDataDir, { expectReady: false })
+
     await expect(window.getByText('Tree could not open this document')).toBeVisible()
     expect(await availability(app)).toEqual([false, true])
   })

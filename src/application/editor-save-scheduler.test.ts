@@ -66,9 +66,11 @@ describe('EditorSaveScheduler idle saves', () => {
     await clock.advanceTo(IDLE / 2)
     scheduler.markPersistedChange()
     await clock.advanceTo(IDLE)
+
     expect(save).not.toHaveBeenCalled()
 
     await clock.advanceTo(IDLE / 2 + IDLE)
+
     expect(save).toHaveBeenCalledTimes(1)
     expect(scheduler.hasPendingChanges()).toBe(false)
   })
@@ -80,14 +82,17 @@ describe('EditorSaveScheduler idle saves', () => {
     await clock.advanceTo(1_000)
     scheduler.requestImmediateSave()
     await settle()
+
     expect(save).toHaveBeenCalledTimes(1)
 
     await clock.advanceTo(2_000)
     scheduler.markPersistedChange()
     await clock.advanceTo(IDLE + 1_000)
+
     expect(save).toHaveBeenCalledTimes(1)
 
     await clock.advanceTo(2_000 + IDLE)
+
     expect(save).toHaveBeenCalledTimes(2)
   })
 
@@ -102,9 +107,11 @@ describe('EditorSaveScheduler idle saves', () => {
     await clock.advanceTo(2_000)
     scheduler.markPersistedChangeWithoutDelay()
     await clock.advanceTo(IDLE + 1_000)
+
     expect(save).toHaveBeenCalledTimes(1)
 
     await clock.advanceTo(2_000 + IDLE)
+
     expect(save).toHaveBeenCalledTimes(2)
   })
 
@@ -147,15 +154,19 @@ describe('EditorSaveScheduler volume trigger', () => {
 
     scheduler.noteChange(10, false)
     await settle()
+
     expect(save).toHaveBeenCalledTimes(1)
+
     scheduler.registerSaveFailure('save')
     scheduler.scheduleIdleSave()
 
     scheduler.noteChange(0, false)
     await settle()
+
     expect(save).toHaveBeenCalledTimes(1)
 
     await clock.advanceTo(IDLE)
+
     expect(save).toHaveBeenCalledTimes(2)
   })
 })
@@ -189,9 +200,11 @@ describe('EditorSaveScheduler cleanup retry', () => {
 
     scheduler.scheduleCleanupRetry()
     await clock.advanceTo(IDLE - 1)
+
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     await clock.advanceTo(IDLE)
+
     expect(cleanupAttachments).toHaveBeenCalledTimes(1)
     expect(save).not.toHaveBeenCalled()
   })
@@ -203,9 +216,11 @@ describe('EditorSaveScheduler cleanup retry', () => {
     await clock.advanceTo(IDLE / 2)
     scheduler.scheduleCleanupRetry()
     await clock.advanceTo(IDLE)
+
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     await clock.advanceTo(IDLE / 2 + IDLE)
+
     expect(cleanupAttachments).toHaveBeenCalledTimes(1)
   })
 

@@ -16,17 +16,21 @@ describeForEachEditingMode('text edit sessions', () => {
 
   test('starts a new undo entry after five seconds without a text change', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await window.clock.install()
 
     await typeInto(node(window, 1), 'first')
     await window.clock.fastForward(5_200)
     await typeInto(node(window, 1), ' second')
+
     await expect(node(window, 1)).toHaveValue('first second')
 
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('first')
 
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('')
   })
 
@@ -37,11 +41,15 @@ describeForEachEditingMode('text edit sessions', () => {
     await typeInto(node(window, 1), 'ab')
     await window.keyboard.press('ArrowLeft')
     await typeInto(node(window, 1), 'X')
+
     await expect(node(window, 1)).toHaveValue('aXb')
 
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('ab')
+
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('')
 
     // Paste is recorded separately from the preceding typing session.
@@ -49,17 +57,25 @@ describeForEachEditingMode('text edit sessions', () => {
     await window.keyboard.press('End')
     await writeClipboardText(app, 'Z')
     await firePaste(node(window, 1))
+
     await expect(node(window, 1)).toHaveValue('abZ')
+
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('ab')
 
     // A structural command is recorded separately from the text-editing session.
     await window.keyboard.press('Enter')
+
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
+
     await window.keyboard.press('Meta+z')
+
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('ab')
+
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('')
   })
 
@@ -70,16 +86,20 @@ describeForEachEditingMode('text edit sessions', () => {
     await window.keyboard.press('Enter')
     await typeInto(node(window, 2), 'cd')
     await window.keyboard.press('ArrowUp')
+
     await expect(node(window, 1)).toBeFocused()
 
     await typeInto(node(window, 1), 'X')
+
     await expect(node(window, 1)).toHaveValue('abX')
 
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 1)).toHaveValue('ab')
     await expect(node(window, 2)).toHaveValue('cd')
 
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 2)).toHaveValue('')
   })
 })
@@ -99,12 +119,14 @@ test.describe('Escape in standard editing', () => {
     await typeInto(editor, 'ab')
     await window.keyboard.press('ArrowLeft')
     await window.keyboard.press('Escape')
+
     await expect(editor).toBeFocused()
     await expect(editor).toHaveValue('ab')
     expect(await selection()).toEqual([1, 1])
 
     await window.keyboard.press('Meta+a')
     await window.keyboard.press('Escape')
+
     await expect(editor).toBeFocused()
     expect(await selection()).toEqual([0, 2])
 
@@ -113,8 +135,11 @@ test.describe('Escape in standard editing', () => {
     await window.keyboard.type('c')
     await window.keyboard.press('Escape')
     await window.keyboard.type('d')
+
     await expect(editor).toHaveValue('abcd')
+
     await window.keyboard.press('Meta+z')
+
     await expect(editor).toHaveValue('ab')
   })
 })

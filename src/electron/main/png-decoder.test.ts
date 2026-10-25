@@ -20,6 +20,7 @@ describe('createPngDecoder', () => {
     expect(createFromBuffer.mock.calls[0]![0]).toEqual(Buffer.from(onePixelPng))
 
     const decodeEmpty = createPngDecoder({ createFromBuffer: () => ({ isEmpty: () => true }) })
+
     expect(decodeEmpty(onePixelPng)).toBe(false)
   })
 

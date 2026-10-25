@@ -21,6 +21,7 @@ it('selects only the fixed smoke mode with the same offline container restrictio
     .mockReturnValueOnce({ status: 0, stdout: `${id}\n` } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 9 } as ReturnType<typeof spawnSync>)
+
   expect(runSmoke([])).toBe(9)
   expect(spawn.mock.calls[2]).toEqual([
     'docker',
@@ -32,6 +33,7 @@ it('selects only the fixed smoke mode with the same offline container restrictio
 
 it('streams smoke launch dependencies without baseline images, host output or credentials', () => {
   const files = containerSourceFiles(true)
+
   expect(files).toEqual(
     expect.arrayContaining([
       'config/build/electron.vite.config.ts',
@@ -59,6 +61,7 @@ it('streams smoke launch dependencies without baseline images, host output or cr
 
 it('runs only a local immutable image with the fixed isolation settings', () => {
   const id = `sha256:${'a'.repeat(64)}`
+
   expect(containerArguments(id)).toEqual([
     'run',
     '--rm',
@@ -91,6 +94,7 @@ it('reuses dependencies for script edits but invalidates changed install inputs'
   const name = (value: unknown, lock = 'lock', recipe = 'recipe', ignore = 'ignore', buildRecipe = 'buildRecipe') =>
     dependencyImage(bytes(JSON.stringify(value)), bytes(lock), bytes(recipe), bytes(ignore), bytes(buildRecipe))
   const image = name(manifest)
+
   expect(name({ ...manifest, scripts: { test: 'new' }, description: 'new' })).toBe(image)
   expect(name({ ...manifest, dependencies: { react: '20.0.0' } })).not.toBe(image)
   expect(name(manifest, 'changed')).not.toBe(image)
@@ -101,6 +105,7 @@ it('reuses dependencies for script edits but invalidates changed install inputs'
 
 it('stops at a missing image without building, pulling, archiving, or running anything', () => {
   spawn.mockReturnValueOnce({ status: 1, stdout: '', stderr: 'No such image' } as ReturnType<typeof spawnSync>)
+
   expect(() => run([])).toThrow('make setup')
   expect(spawn).toHaveBeenCalledTimes(1)
   expect(spawn.mock.calls[0]![0]).toBe('docker')
@@ -120,8 +125,11 @@ it('passes current source over stdin to the fixed container and propagates test 
     .mockReturnValueOnce({ status: 0, stdout: `${id}\n` } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 0, stdout: archive } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 7 } as ReturnType<typeof spawnSync>)
+
   expect(run([])).toBe(7)
+
   const [command, args] = spawn.mock.calls[1]!
+
   expect(command).toBe('tar')
   expect(args).toEqual(
     expect.arrayContaining([
@@ -152,6 +160,7 @@ it('does not start a container when source archiving fails', () => {
   spawn
     .mockReturnValueOnce({ status: 0, stdout: `sha256:${'b'.repeat(64)}` } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 1, stderr: Buffer.from('archive failure') } as ReturnType<typeof spawnSync>)
+
   expect(() => run([])).toThrow('Source archive failed: archive failure')
   expect(spawn).toHaveBeenCalledTimes(2)
 })
@@ -162,16 +171,22 @@ it('creates a source archive with container ownership and no macOS metadata', as
     .mockReturnValueOnce({ status: 0, stdout: `sha256:${'b'.repeat(64)}` } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 0 } as ReturnType<typeof spawnSync>)
+
   run([])
   const [, args, options] = spawn.mock.calls[1]!
   // Exercise the real host tar using the runner's options and one source file.
   const archive = actual.spawnSync('tar', [...args!.slice(0, args!.indexOf('--') + 1), 'package.json'], options)
+
   expect(archive.status, archive.stderr.toString()).toBe(0)
+
   const listing = actual.spawnSync('tar', ['-tvf', '-'], { input: archive.stdout, encoding: 'utf8' })
+
   expect(listing.status, listing.stderr).toBe(0)
   expect(listing.stdout.trim().split('\n')).toHaveLength(1)
   expect(listing.stdout).toMatch(/\sroot(?:\/|\s+)root\s/)
+
   if (!Buffer.isBuffer(archive.stdout)) throw new Error('Expected a binary source archive')
+
   expect(Number.parseInt(archive.stdout.subarray(108, 116).toString(), 8)).toBe(0)
   expect(Number.parseInt(archive.stdout.subarray(116, 124).toString(), 8)).toBe(0)
   expect(listing.stdout).not.toContain('._')

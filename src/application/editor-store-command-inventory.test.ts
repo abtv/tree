@@ -90,6 +90,7 @@ it('accounts for every public EditorStore prototype method in the command genera
     }
     ts.forEachChild(node, visit)
   }
+
   visit(apply)
   // A read is not a generated command, even when applyCommand uses it to choose a target.
   driven.delete('getSnapshot')

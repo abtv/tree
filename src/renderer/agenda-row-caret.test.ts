@@ -19,6 +19,7 @@ const modes: RowCaretMode[] = ['normal', 'insert', 'visual', 'hidden']
 it('marks and copies complete emoji in read-only rows and clamps restored offsets to their starts', () => {
   const text = 'A👩‍💻Z'
   const caret = { key: 'k', anchor: 1, focus: 3 }
+
   expect(clampCaret(caret, text, 'normal')).toEqual({ key: 'k', anchor: 1, focus: 1 })
   expect(caretMarks(caret, text, 'normal')).toEqual([{ start: 1, end: 6, className: 'agenda-caret' }])
   expect(copyRange(caret, text, 'normal')).toEqual({ start: 1, end: 6 })
@@ -43,7 +44,9 @@ describe('Agenda row caret', () => {
       anchor: 5,
       focus: 5,
     })
+
     const caret = { key: 'k', anchor: 2, focus: 2 }
+
     expect(clampCaret(caret, 'x'.repeat(5), 'normal')).toBe(caret)
     // Normal has no range, so a stale selection collapses to the caret.
     expect(clampCaret({ key: 'k', anchor: 1, focus: 3 }, 'x'.repeat(5), 'normal')).toEqual({
@@ -66,6 +69,7 @@ describe('Agenda row caret', () => {
   // @requirement PRODUCT.md §23.4
   it('draws a block, a thin caret, a selection, or nothing by mode, and an end caret for empty text', () => {
     const caret = { key: 'k', anchor: 2, focus: 2 }
+
     expect(caretMarks(caret, 'x'.repeat(6), 'normal')).toEqual([{ start: 2, end: 3, className: 'agenda-caret' }])
     expect(caretMarks(caret, 'x'.repeat(6), 'insert')).toEqual([{ start: 2, end: 2, className: 'agenda-caret' }])
     expect(caretMarks({ key: 'k', anchor: 6, focus: 6 }, 'x'.repeat(6), 'insert')).toEqual([
@@ -95,15 +99,20 @@ describe('Agenda row caret', () => {
         fc.nat(12),
         (text, anchor, focus, mode, cutA, cutB) => {
           const caret = clampCaret({ key: 'k', anchor, focus }, text, mode)
+
           expect(caret.anchor).toBeLessThanOrEqual(maxOffset(text, mode))
           expect(caret.focus).toBeLessThanOrEqual(maxOffset(text, mode))
+
           const marks = caretMarks(caret, text, mode)
           const start = Math.min(cutA, cutB, text.length)
           const end = Math.min(Math.max(cutA, cutB), text.length)
           const pieces = markedPieces(text, start, end, marks, end === text.length)
+
           expect(pieces.map((piece) => piece.text).join('')).toBe(text.slice(start, end))
           expect(marks.filter((mark) => mark.className === 'agenda-caret').length).toBeLessThanOrEqual(1)
+
           const whole = markedPieces(text, 0, text.length, marks, true)
+
           expect(whole.map((piece) => piece.text).join('')).toBe(text)
           if (mode === 'hidden') expect(whole.every((piece) => piece.className === undefined)).toBe(true)
           else
@@ -121,6 +130,7 @@ describe('Agenda row caret', () => {
     const marks = caretMarks({ key: 'k', anchor: 4, focus: 4 }, 'x'.repeat(8), 'insert')
     const first = markedPieces('abcdefgh', 0, 4, marks, false)
     const second = markedPieces('abcdefgh', 4, 8, marks, true)
+
     expect(first.some((piece) => piece.className !== undefined)).toBe(false)
     expect(second[0]).toEqual({ text: '', className: 'agenda-caret' })
     expect(second.map((piece) => piece.text).join('')).toBe('efgh')

@@ -23,37 +23,54 @@ it('defers readonly link focus until click without intercepting ordinary text', 
   const input = document.createElement('span')
   input.innerHTML = '<a href="https://example.com"><span>link</span></a> text'
   const preventDefault = vi.fn()
+
   preventReadOnlyLinkFocus({ currentTarget: input, target: input.querySelector('a span'), preventDefault } as never)
+
   expect(preventDefault).toHaveBeenCalledOnce()
+
   preventDefault.mockClear()
+
   preventReadOnlyLinkFocus({ currentTarget: input, target: input, preventDefault } as never)
+
   expect(preventDefault).not.toHaveBeenCalled()
+
   preventReadOnlyLinkFocus({ currentTarget: input, target: input.lastChild, preventDefault } as never)
   const outside = document.createElement('a')
   outside.href = 'https://example.com'
+
   preventReadOnlyLinkFocus({ currentTarget: input, target: outside, preventDefault } as never)
+
   expect(preventDefault).not.toHaveBeenCalled()
 })
 
 it('selects the focused Agenda occurrence without issuing Tree selection, and keeps same-occurrence focus stable', async () => {
   const f = await fixture({ node: { text: '2026-10-14 hello' } })
+
   f.store.openAgenda()
   const row = f.store.getAgendaRows().find((candidate) => candidate.kind === 'node')!
   const container = document.createElement('div')
   container.className = 'agenda-row'
   container.dataset.agendaKey = row.key
   const input = richInput(f.node().text, 12)
+
   container.append(input)
   document.body.append(container)
+
   setCaret(input, 12)
   f.handlers().onFocus({ currentTarget: input } as never)
+
   expect(f.snapshot().agenda?.selectedKey).toBe(row.key)
   expect(f.snapshot().focus.cursor).toBe(12)
+
   const focus = f.snapshot().focus
+
   f.handlers().onFocus({ currentTarget: input } as never)
+
   expect(f.snapshot().focus).toBe(focus)
+
   container.removeAttribute('data-agenda-key')
   f.handlers().onFocus({ currentTarget: input } as never)
+
   expect(f.snapshot().focus).toBe(focus)
 })
 
@@ -146,6 +163,7 @@ describe('blur', () => {
     async (context) => {
       const f = await fixture({ mode: 'normal' })
       const handlers = f.handlers()
+
       f.store.selectNode('other', 0)
       const goal = {
         nodeId: context === 'same-node' ? 'node' : context === 'different-selection' ? 'missing' : 'other',
@@ -159,7 +177,9 @@ describe('blur', () => {
       const destination = document.createElement(context === 'control' ? 'button' : 'textarea')
       if (context !== 'control') destination.className = 'node-input'
       if (context === 'loading') vi.spyOn(f.store, 'getSnapshot').mockReturnValue({ status: 'loading' })
+
       handlers.onBlur({ relatedTarget: destination } as never)
+
       expect(f.commandState.verticalGoal).toBe(context === 'arrival' ? goal : undefined)
     },
   )
@@ -172,8 +192,10 @@ describe('blur', () => {
       if (surface === 'command-input-line') panel.className = surface
       else panel.setAttribute('data-editor-focus-borrow', '')
       const input = document.createElement('input')
+
       panel.append(input)
       f.handlers().onBlur({ relatedTarget: surface === 'menu-trigger' ? panel : input } as never)
+
       expect(f.deps.finishVimInsert).not.toHaveBeenCalled()
       expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
       expect(f.deps.changeVimMode).not.toHaveBeenCalled()
@@ -182,10 +204,13 @@ describe('blur', () => {
   it('clears command assembly, finishes the session, and ends the text session', async () => {
     const f = await fixture()
     const input = textarea('hello')
+
     f.inputs.set('node', input)
     f.commandState.pending = { count: '2', motionCount: '' }
     const endTextSession = vi.spyOn(f.store, 'endTextSession')
+
     f.handlers().onBlur()
+
     expect(f.deps.setSelectAllNodeId).toHaveBeenCalledExactlyOnceWith(undefined)
     expect(f.commandState.pending).toBeUndefined()
     expect(f.deps.finishVimInsert).toHaveBeenCalledExactlyOnceWith(input)
@@ -196,19 +221,25 @@ describe('blur', () => {
 
   it('does not finish Insert without a registered input', async () => {
     const f = await fixture()
+
     f.handlers().onBlur()
+
     expect(f.deps.finishVimInsert).not.toHaveBeenCalled()
     expect(f.deps.finishVimReplace).toHaveBeenCalledOnce()
   })
 
   it('leaves a structural session to the blur of the node it did not begin on', async () => {
     const f = await fixture()
+
     f.inputs.set('node', textarea('hello'))
     beginStructuralOpen(f.commandState, 'node', 'after')
     f.handlers().onBlur()
+
     expect(f.deps.finishVimInsert).not.toHaveBeenCalled()
+
     beginStructuralOpen(f.commandState, 'other', 'after')
     f.handlers().onBlur()
+
     expect(f.deps.finishVimInsert).toHaveBeenCalledOnce()
   })
 
@@ -218,7 +249,9 @@ describe('blur', () => {
     ['normal', undefined],
   ] as const)('handles %s mode by switching to %s', async (mode, expected) => {
     const f = await fixture({ mode })
+
     f.handlers().onBlur()
+
     if (expected === undefined) expect(f.deps.changeVimMode).not.toHaveBeenCalled()
     else expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith(expected)
   })
@@ -226,8 +259,10 @@ describe('blur', () => {
   it('keeps Replace mode while an ordinary text click is pending, but still commits the replacement', async () => {
     vi.spyOn(document, 'hasFocus').mockReturnValue(true)
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     f.handlers().onBlur()
+
     expect(f.deps.finishVimReplace).toHaveBeenCalledOnce()
     expect(f.deps.changeVimMode).not.toHaveBeenCalled()
     expect(f.session.replaceClickMoved).toBe(true)
@@ -236,8 +271,10 @@ describe('blur', () => {
   it('ends Replace when the window lost focus during the press', async () => {
     vi.spyOn(document, 'hasFocus').mockReturnValue(false)
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     f.handlers().onBlur()
+
     expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith('normal')
   })
 })
@@ -246,12 +283,15 @@ describe('mouse down', () => {
   it('publishes the pointer caret without rewriting the selection and resets pointer-bound state', async () => {
     const f = await fixture()
     const input = textarea('hello', 2)
+
     f.inputs.set('node', input)
     input.classList.add('select-all')
     f.commandState.pending = { count: '', motionCount: '' }
     const endTextSession = vi.spyOn(f.store, 'endTextSession')
     const event = mouse(input)
+
     f.handlers().onMouseDown(event)
+
     expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith(
       'node',
       expect.objectContaining({ cursor: 2 }),
@@ -271,7 +311,9 @@ describe('mouse down', () => {
     const f = await fixture()
     const input = textarea('hello', 1)
     const event = mouse(input, { button: 2 })
+
     f.handlers().onMouseDown(event)
+
     expect(event.preventDefault).toHaveBeenCalledOnce()
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
@@ -280,14 +322,18 @@ describe('mouse down', () => {
     const f = await fixture({ mode: 'replace' })
     const input = textarea('hello word')
     input.setSelectionRange(6, 10)
+
     f.handlers().onMouseDown(mouse(input, { detail: 2 }))
+
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
 
   it('leaves a pending replacement of another node to that node’s blur', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceSession(f.session, { nodeId: 'other', baseline: 'other', position: 0 })
     f.handlers().onMouseDown(mouse(textarea('hello')))
+
     expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
     expect(f.session.replaceClick).toBe(true)
   })
@@ -300,7 +346,9 @@ describe('mouse down', () => {
     ['a primary click in Normal', 'normal', { button: 0 }, false],
   ] as const)('marks the click intent for %s: %s', async (_name, mode, extra, marked) => {
     const f = await fixture({ mode })
+
     f.handlers().onMouseDown(mouse(textarea('hello'), extra))
+
     expect(f.session.replaceClick === true).toBe(marked)
   })
 
@@ -311,15 +359,20 @@ describe('mouse down', () => {
     ['a right click in Replace', { button: 2 }, false],
   ] as const)('marks the click intent on the other profile for %s: %s', async (_name, extra, marked) => {
     const f = await fixture({ mode: 'replace' })
+
     f.handlers(OTHER_SHORTCUTS).onMouseDown(mouse(textarea('hello'), extra))
+
     expect(f.session.replaceClick === true).toBe(marked)
   })
 
   it('interrupts a structural session even when there is no blur', async () => {
     const f = await fixture()
+
     beginStructuralOpen(f.commandState, 'node', 'after')
     const input = textarea('hello')
+
     f.handlers().onMouseDown(mouse(input))
+
     expect(f.deps.finishVimInsert).toHaveBeenCalledExactlyOnceWith(input)
   })
 
@@ -327,10 +380,15 @@ describe('mouse down', () => {
     const f = await fixture()
     const readAuthority = vi.spyOn(f.deps, 'readAuthority')
     const handlers = f.handlers()
+
     expect(readAuthority).not.toHaveBeenCalled()
+
     handlers.onMouseDown(mouse(textarea('hello', 1)))
+
     expect(readAuthority).toHaveBeenCalledOnce()
+
     const expected = pointerCaretTransition({ cursor: 0, imageActive: false }, 1, 5, false)
+
     expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith('node', expected, false, 'preserve-selection')
   })
 })
@@ -338,12 +396,15 @@ describe('mouse down', () => {
 describe('mouse up', () => {
   it.each([false, true])('keeps a double-clicked word as the new Replace range (cross-node: %s)', async (moved) => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     f.session.replaceClickMoved = moved
     const input = textarea('hello word tail')
     input.focus()
     input.setSelectionRange(6, 10)
+
     f.handlers().onMouseUp(mouse(input, { detail: 2 }))
+
     expect(f.session.replace).toEqual({
       nodeId: 'node',
       baseline: 'hello word tail',
@@ -359,7 +420,9 @@ describe('mouse up', () => {
     'does nothing outside Normal mode without a pending Replace click (%s)',
     async (mode) => {
       const f = await fixture({ mode })
+
       f.handlers().onMouseUp(mouse(textarea('hello')))
+
       expect(f.deps.applyCaretState).not.toHaveBeenCalled()
       expect(f.session.replace).toBeUndefined()
     },
@@ -367,10 +430,13 @@ describe('mouse up', () => {
 
   it('continues Replace with a new session at the clicked caret and the current text', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     const input = textarea('hello', 2)
     input.focus()
+
     f.handlers().onMouseUp(mouse(input))
+
     expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 2, typed: '' })
     expect(f.session.replaceClick).toBeUndefined()
     expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith(
@@ -383,22 +449,28 @@ describe('mouse up', () => {
 
   it('reads rich input text for the new session', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     const input = richInput('hello', 4)
     input.tabIndex = 0
     input.focus()
+
     setCaret(input, 4)
     f.handlers().onMouseUp(mouse(input))
+
     expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 4, typed: '' })
   })
 
   it('starts no session for a same-node dragged selection and keeps the mode', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     const input = textarea('hello')
     input.focus()
     input.setSelectionRange(1, 3)
+
     f.handlers().onMouseUp(mouse(input))
+
     expect(f.session.replace).toBeUndefined()
     expect(f.session.replaceClick).toBeUndefined()
     expect(f.deps.changeVimMode).not.toHaveBeenCalled()
@@ -406,27 +478,34 @@ describe('mouse up', () => {
 
   it('ends Replace for a selection dragged in a node the press moved to', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     f.session.replaceClickMoved = true
     const input = textarea('hello')
     input.focus()
     input.setSelectionRange(1, 3)
+
     f.handlers().onMouseUp(mouse(input))
+
     expect(f.session.replace).toBeUndefined()
     expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith('normal')
   })
 
   it('starts no session when the release lands on an input that is not focused', async () => {
     const f = await fixture({ mode: 'replace' })
+
     beginReplaceClick(f.session)
     f.handlers().onMouseUp(mouse(textarea('hello', 2)))
+
     expect(f.session.replace).toBeUndefined()
     expect(f.session.replaceClick).toBeUndefined()
   })
 
   it('publishes the pointer caret in Normal mode', async () => {
     const f = await fixture({ mode: 'normal' })
+
     f.handlers().onMouseUp(mouse(textarea('hello', 3)))
+
     expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith(
       'node',
       expect.objectContaining({ cursor: 3 }),
@@ -438,8 +517,10 @@ describe('mouse up', () => {
   it('reads the mode at event time', async () => {
     const f = await fixture({ mode: 'insert' })
     const handlers = f.handlers()
+
     f.setMode('normal')
     handlers.onMouseUp(mouse(textarea('hello')))
+
     expect(f.deps.applyCaretState).toHaveBeenCalledOnce()
   })
 })
@@ -447,7 +528,9 @@ describe('mouse up', () => {
 describe('focus', () => {
   it('selects a node that is not the selected one at the focus caret', async () => {
     const f = await fixture({ selectedNodeId: 'other' })
+
     f.handlers().onFocus({ currentTarget: textarea('hello', 4) } as never)
+
     expect(f.snapshot().location.selectedNodeId).toBe('node')
     expect(f.snapshot().focus?.cursor).toBe(4)
   })
@@ -455,7 +538,9 @@ describe('focus', () => {
   it('does not select again when the node is already selected', async () => {
     const f = await fixture()
     const selectNode = vi.spyOn(f.store, 'selectNode')
+
     f.handlers().onFocus({ currentTarget: textarea('hello') } as never)
+
     expect(selectNode).not.toHaveBeenCalled()
   })
 
@@ -466,9 +551,11 @@ describe('focus', () => {
     })
     const input = richInput('hello', 5, true)
     input.focus()
+
     setCaret(input, 0)
     setCaret(input, 5)
     f.handlers().onFocus({ currentTarget: input } as never)
+
     expect(getCaret(input)).toBe(5)
     expect(getSelection()?.isCollapsed).toBe(true)
   })
@@ -480,7 +567,9 @@ describe('focus', () => {
   ] as const)('leaves the caret alone for %s', async (_name, mode, attachment, cursor) => {
     const f = await fixture({ mode, node: attachment === undefined ? {} : { attachment } })
     const input = richInput('hello', cursor, attachment !== undefined)
+
     f.handlers().onFocus({ currentTarget: input } as never)
+
     expect(getCaret(input)).toBe(cursor)
   })
 })
@@ -491,7 +580,9 @@ describe('select', () => {
     const endTextSession = vi.spyOn(f.store, 'endTextSession')
     const input = textarea('hello', 0)
     input.setSelectionRange(0, 3)
+
     f.handlers().onSelect({ currentTarget: input } as never)
+
     expect(endTextSession).not.toHaveBeenCalled()
   })
 
@@ -499,10 +590,15 @@ describe('select', () => {
     const f = await fixture()
     const endTextSession = vi.spyOn(f.store, 'endTextSession')
     const input = textarea('hello', 2)
+
     f.handlers().onSelect({ currentTarget: input } as never)
+
     expect(endTextSession).not.toHaveBeenCalled()
+
     input.setSelectionRange(0, 3)
+
     f.handlers().onSelect({ currentTarget: input } as never)
+
     expect(endTextSession).toHaveBeenCalledOnce()
   })
 
@@ -510,14 +606,19 @@ describe('select', () => {
     const f = await fixture()
     const endTextSession = vi.spyOn(f.store, 'endTextSession')
     const input = richInput('hello', 2)
+
     f.handlers().onSelect({ currentTarget: input } as never)
+
     expect(endTextSession).not.toHaveBeenCalled()
+
     const range = document.createRange()
+
     range.setStart(input.firstChild!, 0)
     range.setEnd(input.firstChild!, 3)
     getSelection()?.removeAllRanges()
     getSelection()?.addRange(range)
     f.handlers().onSelect({ currentTarget: input } as never)
+
     expect(endTextSession).toHaveBeenCalledOnce()
   })
 })
@@ -529,13 +630,17 @@ describe('paste', () => {
     const transfer = {} as DataTransfer
     const capturePasteClipboard = vi.fn(() => source)
     const input = textarea('hello', 5)
+
     createPointerHandlers({ ...f.deps, capturePasteClipboard }, f.node()).onPaste({
       currentTarget: input,
       clipboardData: transfer,
       preventDefault: vi.fn(),
     } as never)
+
     expect(capturePasteClipboard).toHaveBeenCalledExactlyOnceWith(transfer)
+
     await vi.waitFor(() => expect(f.node().text).toBe('hello event'))
+
     expect(source).toHaveBeenCalledOnce()
   })
 
@@ -544,10 +649,13 @@ describe('paste', () => {
     f.clipboard.current = { kind: 'text', text: ' world' }
     const input = textarea('hello', 5)
     const event = { currentTarget: input, preventDefault: vi.fn() } as never
+
     f.handlers().onPaste(event)
+
     expect(f.deps.setSelectAllNodeId).toHaveBeenCalledExactlyOnceWith(undefined)
     expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
     expect(f.deps.vimTextCommandState.finishReplace).toHaveBeenCalledOnce()
+
     await vi.waitFor(() => expect(f.node().text).toBe('hello world'))
   })
 
@@ -565,7 +673,9 @@ describe('cut', () => {
   it('marks the next text edit standalone', async () => {
     const f = await fixture()
     const mark = vi.spyOn(f.store, 'markNextTextEditStandalone')
+
     f.handlers().onCut()
+
     expect(mark).toHaveBeenCalledOnce()
   })
 })
@@ -583,7 +693,9 @@ describe('link click', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const { input, link } = linkInput()
     const event = { target: link, currentTarget: input, metaKey: false, preventDefault: vi.fn() } as never
+
     f.handlers().onClick(event)
+
     expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
     expect(open).not.toHaveBeenCalled()
   })
@@ -592,7 +704,9 @@ describe('link click', () => {
     const f = await fixture()
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const { input, link } = linkInput()
+
     f.handlers().onClick({ target: link, currentTarget: input, metaKey: true, preventDefault: vi.fn() } as never)
+
     expect(open).toHaveBeenCalledExactlyOnceWith('https://example.test', '_blank')
   })
 
@@ -607,7 +721,9 @@ describe('link click', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const { input, link } = linkInput()
     const event = { target: link, currentTarget: input, preventDefault: vi.fn(), ...modifiers } as never
+
     f.handlers(OTHER_SHORTCUTS).onClick(event)
+
     expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
     expect(open).toHaveBeenCalledTimes(opens)
   })
@@ -616,7 +732,9 @@ describe('link click', () => {
     const f = await fixture()
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const { input, link } = linkInput()
+
     f.handlers().onClick({ target: link, currentTarget: input, ctrlKey: true, preventDefault: vi.fn() } as never)
+
     expect(open).not.toHaveBeenCalled()
   })
 
@@ -631,7 +749,9 @@ describe('link click', () => {
       document.body.append(outside)
       const target = kind === 'plain text' ? input : kind === 'a link outside the input' ? outside : document
       const event = { target, currentTarget: input, metaKey: true, preventDefault: vi.fn() } as never
+
       f.handlers().onClick(event)
+
       expect((event as { preventDefault: () => void }).preventDefault).not.toHaveBeenCalled()
       expect(open).not.toHaveBeenCalled()
     },
@@ -649,7 +769,9 @@ describe('context menu', () => {
     const showEditorContextMenu = vi.fn()
     window.treeApi = { showEditorContextMenu } as never
     const event = menuEvent(textarea('hello'))
+
     f.handlers().onContextMenu(event)
+
     expect((event as { preventDefault: () => void }).preventDefault).not.toHaveBeenCalled()
     expect(showEditorContextMenu).not.toHaveBeenCalled()
   })
@@ -658,7 +780,9 @@ describe('context menu', () => {
     const f = await fixture()
     window.treeApi = {} as never
     const event = menuEvent(textarea('hello'))
+
     f.handlers().onContextMenu(event)
+
     expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
   })
 
@@ -669,7 +793,9 @@ describe('context menu', () => {
     const copy = vi.spyOn(f.store, 'copy').mockResolvedValue(true)
     const input = textarea('hello')
     input.setSelectionRange(1, 3)
+
     f.handlers().onContextMenu(menuEvent(input))
+
     expect(showEditorContextMenu).toHaveBeenCalledExactlyOnceWith({
       x: 10,
       y: 20,
@@ -679,6 +805,7 @@ describe('context menu', () => {
       canPaste: true,
       canSelectAll: true,
     })
+
     await vi.waitFor(() => expect(copy).toHaveBeenCalledExactlyOnceWith('node', 1, 3))
   })
 
@@ -687,7 +814,9 @@ describe('context menu', () => {
     const showEditorContextMenu = vi.fn(async () => 'selectAll' as const)
     window.treeApi = { showEditorContextMenu } as never
     const input = richInput('', 0)
+
     f.handlers().onContextMenu(menuEvent(input))
+
     expect(showEditorContextMenu).toHaveBeenCalledExactlyOnceWith({
       x: 10,
       y: 20,
@@ -705,7 +834,9 @@ describe('context menu', () => {
     window.treeApi = { showEditorContextMenu } as never
     const input = richInput('hello', 0)
     vi.spyOn(window, 'getSelection').mockReturnValue(null)
+
     f.handlers().onContextMenu(menuEvent(input))
+
     expect(showEditorContextMenu).toHaveBeenCalledWith(expect.objectContaining({ selectionText: '' }))
   })
 

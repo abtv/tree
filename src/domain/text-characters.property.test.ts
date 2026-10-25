@@ -13,13 +13,17 @@ it('never leaves a character motion inside a grapheme and round trips complete c
         const text = characters.join('')
         const boundaries = characterBoundaries(text)
         const offset = offsetSeed % (text.length + 1)
+
         for (const direction of [-1, 1] as const) {
           expect(boundaries).toContain(moveCharacterOffset(text, offset, direction, count))
         }
         expect(boundaries).toContain(characterStart(text, offset))
+
         for (let index = 0; index < boundaries.length - 1; index++) {
           const start = boundaries[index]!
+
           const end = moveCharacterOffset(text, start, 1)
+
           expect(end).toBe(boundaries[index + 1])
           expect(moveCharacterOffset(text, end, -1)).toBe(start)
         }

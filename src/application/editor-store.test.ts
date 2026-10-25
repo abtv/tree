@@ -59,11 +59,15 @@ describe('event-supplied paste source', () => {
     )
     const systemRead = vi.spyOn(services, 'readClipboard')
     const store = new EditorStore(services, ids('new'), new FakeClock())
+
     await store.initialize()
     await store.paste('root', 5, async () => ({ kind: 'text', text: ' world' }))
+
     expect((store.getSnapshot() as ReadySnapshot).document.roots[0]?.text).toBe('Hello world')
     expect(systemRead).not.toHaveBeenCalled()
+
     store.undo()
+
     expect((store.getSnapshot() as ReadySnapshot).document.roots[0]?.text).toBe('Hello')
   })
 
@@ -74,8 +78,10 @@ describe('event-supplied paste source', () => {
     )
     const systemRead = vi.spyOn(services, 'readClipboard')
     const store = new EditorStore(services, ids('new'), new FakeClock())
+
     await store.initialize()
     const before = store.getSnapshot()
+
     await expect(
       store.paste('root', 5, async () => {
         throw new Error('Clipboard read failed')
@@ -160,6 +166,7 @@ describe('EditorStore', () => {
           selectedNodeId: command === 'enter' ? 'root' : 'child',
         })
         const store = new EditorStore(services, ids('unused'), clock)
+
         await store.initialize()
         const version = (store.getSnapshot() as ReadySnapshot).structuralVersion
         if (command === 'ancestor') store.navigateToAncestor(null)
@@ -168,6 +175,7 @@ describe('EditorStore', () => {
           command === 'enter'
             ? { currentParentId: 'root', selectedNodeId: 'child' }
             : { currentParentId: null, selectedNodeId: 'root' }
+
         expect(store.getSnapshot()).toMatchObject({
           document,
           location: expectedLocation,
@@ -175,8 +183,10 @@ describe('EditorStore', () => {
         })
         expect((store.getSnapshot() as ReadySnapshot).structuralVersion).toBe(version + 1)
         expect(services.saves).toEqual([])
+
         clock.runAll()
         await tick()
+
         expect(services.saves).toHaveLength(1)
         expect(services.saves[0]).toMatchObject({ document, location: expectedLocation })
       },
@@ -190,14 +200,19 @@ describe('EditorStore', () => {
           { currentParentId: command === 'enter' ? null : 'root', selectedNodeId: 'root' },
         )
         const store = new EditorStore(services, ids('unused'), new FakeClock())
+
         await store.initialize()
         store.editText('root', 'Root first')
         if (command === 'ancestor') store.navigateToAncestor(null)
         else store[command]()
+
         store.editText('root', 'Root second')
         store.undo()
+
         expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: 'Root first' }] } })
+
         store.undo()
+
         expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: 'Root' }] } })
       },
     )
@@ -210,9 +225,12 @@ describe('EditorStore', () => {
         ),
         ids('unused'),
       )
+
       await store.initialize()
       const before = store.getSnapshot()
+
       store.moveSelectionBoundary('last', 2)
+
       expect(store.getSnapshot()).toBe(before)
     })
   })
@@ -239,20 +257,28 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const { store, services } = await lockEditor(clock)
       const before = store.getSnapshot()
+
       expect(command(store)).toBe(result)
       expect(store.getSnapshot()).toBe(before)
+
       services.save = async (state) => {
         services.saves.push(state)
       }
       await store.flushPersistence()
+
       expect((store.getSnapshot() as ReadySnapshot).persistenceLocked).toBeUndefined()
+
       // Make empty deletion and reordering real mutations, rather than no-op defenses.
       store.createSibling('after')
+
       expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'id-2' } })
+
       store.selectNode('root', 0)
       store.editText('root', '')
       const recovered = store.getSnapshot()
+
       command(store)
+
       expect(store.getSnapshot()).not.toBe(recovered)
     })
   })
@@ -263,10 +289,12 @@ describe('EditorStore', () => {
       { id: 'root', text: '', children: [] },
       { id: 'empty', text: '', children: [] },
     ])
+
     store.selectNode('empty', 0)
     const before = store.getSnapshot()
     if (command === 'empty deletion') store.deleteEmptySelected()
     else store.moveNodeTo('empty', 0)
+
     expect(store.getSnapshot()).toBe(before)
   })
 
@@ -277,6 +305,7 @@ describe('EditorStore', () => {
       { id: 'b', text: 'B', children: [] },
     ])
     const before = store.getSnapshot()
+
     expect(store.shiftNodeVisual('in', 'b', 'b')).toBe(false)
     expect(store.getSnapshot()).toBe(before)
   })
@@ -309,16 +338,21 @@ describe('EditorStore', () => {
 
     it('indents a range into the preceding sibling in one undo step, expands it, and keeps the selection', async () => {
       const store = await load('c')
+
       expect(store.shiftNodeVisual('in', 'b', 'c')).toBe(true)
       expect(rootShape(store)).toEqual([
         ['a', ['b', 'c']],
         ['d', []],
       ])
+
       const snapshot = ready(store)
+
       expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'c' })
       expect(snapshot.expansion.expandedIds.has('a')).toBe(true)
       expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'b', 'c', 'd'])
+
       store.undo()
+
       expect(rootShape(store)).toEqual([
         ['a', []],
         ['b', ['b1']],
@@ -329,18 +363,24 @@ describe('EditorStore', () => {
 
     it('uses the live renderer cursor for shift replay and publishes no focus on rejection', async () => {
       const store = await load('b')
+
       store.selectNode('b', 0)
+
       expect(store.shiftNodeVisual('in', 'b', 'b', 1, 1)).toBe(true)
       expect(ready(store).focus).toMatchObject({ nodeId: 'b', cursor: 1 })
+
       store.undo()
       const before = ready(store)
+
       expect(store.shiftNodeVisual('out', 'b', 'b', 1, 1)).toBe(false)
       expect(ready(store)).toBe(before)
     })
 
     it('outdents a range to directly after its parent and changes the location only when it leaves it', async () => {
       const store = await load('c')
+
       store.shiftNodeVisual('in', 'b', 'c')
+
       // Same range, now one level down inside `a`, displayed from the root location.
       expect(store.shiftNodeVisual('out', 'c', 'b')).toBe(true)
       expect(rootShape(store)).toEqual([
@@ -354,7 +394,9 @@ describe('EditorStore', () => {
 
     it('moves the displayed location up when the range leaves the current parent', async () => {
       const store = await load('b1', 'b')
+
       store.selectNode('b1', 0)
+
       expect(store.shiftNodeVisual('out', 'b1', 'b1')).toBe(true)
       expect(rootShape(store)).toEqual([
         ['a', []],
@@ -386,8 +428,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await direct.initialize()
       const directBefore = ready(direct)
+
       expect(direct.canShiftNodeVisualOutWithinCurrentParent('b', 'c')).toBe(false)
       expect(direct.shiftNodeVisual('out', 'b', 'c', 1, 0, true)).toBe(false)
       expect(ready(direct)).toBe(directBefore)
@@ -414,8 +458,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await deep.initialize()
       const beforeDeepShift = ready(deep)
+
       expect(deep.canShiftNodeVisualOutWithinCurrentParent('b1', 'b1')).toBe(true)
       // The first internal step would make `b1` a direct child of A, so the second would cross A.
       // The whole counted transition must remain atomic.
@@ -429,27 +475,35 @@ describe('EditorStore', () => {
     it('applies a count as successive levels in one undo step, or not at all', async () => {
       const store = await load('d')
       const before = ready(store)
+
       // `d` can enter `c`, but `c` then has no earlier child to receive it a second time.
       expect(store.shiftNodeVisual('in', 'd', 'd', 2)).toBe(false)
       expect(ready(store).document).toBe(before.document)
 
       // `c` enters `b`, then `b1`: two levels, both destinations expanded, one history entry.
       expect(store.shiftNodeVisual('in', 'c', 'c', 2)).toBe(true)
+
       const snapshot = ready(store)
+
       expect(snapshot.document.roots[1]!.children[0]!.children.map((child) => child.id)).toEqual(['c'])
       expect([...snapshot.expansion.expandedIds].sort()).toEqual(['b', 'b1'])
+
       store.undo()
+
       expect(ready(store).document).toBe(before.document)
     })
 
     it('does nothing for the first sibling, a root moving out, and the current-parent heading', async () => {
       const store = await load('a')
       const before = ready(store)
+
       expect(store.shiftNodeVisual('in', 'a', 'a')).toBe(false)
       expect(store.shiftNodeVisual('out', 'b', 'c')).toBe(false)
       expect(ready(store)).toBe(before)
+
       const parentStore = await load('b', 'b')
       const parentBefore = ready(parentStore)
+
       expect(parentStore.shiftNodeVisual('out', 'b', 'b')).toBe(false)
       expect(parentStore.shiftNodeVisual('in', 'b', 'b')).toBe(false)
       expect(ready(parentStore)).toBe(parentBefore)
@@ -468,8 +522,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = ready(store)
+
       // `n1` is MAX_DOCUMENT_DEPTH - 1 levels tall: one indent fits, a second would pass the limit.
       expect(store.shiftNodeVisual('in', 'n1', 'n1', 2)).toBe(false)
       expect(ready(store).document).toBe(before.document)
@@ -526,15 +582,22 @@ describe('EditorStore', () => {
       'is the same command as Visual shift %s for %s (parent %s, index %s, location %s)',
       async (direction, nodeId, parentId, index, currentParentId) => {
         const shifted = await load(nodeId, currentParentId)
+
         shifted.store.selectNode(nodeId, 1)
+
         expect(shifted.store.shiftNodeVisual(direction, nodeId, nodeId)).toBe(true)
+
         const dropped = await load(nodeId, currentParentId)
+
         dropped.store.selectNode(nodeId, 1)
+
         expect(dropped.store.moveNodeToParent(nodeId, parentId, index)).toBe(true)
         expect(outcome(dropped.store)).toEqual(outcome(shifted.store))
+
         // One history entry each: a single undo restores the starting document.
         shifted.store.undo()
         dropped.store.undo()
+
         expect(ready(dropped.store).document).toEqual({ roots })
         expect(ready(dropped.store).document).toEqual(ready(shifted.store).document)
       },
@@ -542,13 +605,16 @@ describe('EditorStore', () => {
 
     it('opens the receiving fold and every fold on the way, selects the moved node, and undoes in one step', async () => {
       const { store } = await load('d')
+
       expect(store.moveNodeToParent('d', 'b1', 0)).toBe(true)
       expect(rootShape(store)).toEqual([
         ['a', []],
         ['b', ['b1']],
         ['c', []],
       ])
+
       const snapshot = ready(store)
+
       expect(snapshot.document.roots[1]!.children[0]!.children.map((child) => child.id)).toEqual(['d'])
       expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'd' })
       expect([...snapshot.expansion.expandedIds].sort()).toEqual(['b', 'b1'])
@@ -559,9 +625,13 @@ describe('EditorStore', () => {
         ['d', 2],
         ['c', 0],
       ])
+
       store.undo()
+
       expect(ready(store).document).toEqual({ roots })
+
       store.redo()
+
       expect(rootShape(store)).toEqual([
         ['a', []],
         ['b', ['b1']],
@@ -572,10 +642,14 @@ describe('EditorStore', () => {
 
     it('keeps the caret of a focused node and starts an unfocused node at the start', async () => {
       const { store } = await load('a')
+
       store.selectNode('a', 1)
+
       expect(store.moveNodeToParent('a', 'd', 0)).toBe(true)
       expect(ready(store).focus).toMatchObject({ nodeId: 'a', cursor: 1 })
+
       store.selectNode('b', 1)
+
       expect(store.moveNodeToParent('c', 'b', 0)).toBe(true)
       expect(ready(store).focus).toMatchObject({ nodeId: 'c', cursor: 0 })
       expect(ready(store).location.selectedNodeId).toBe('c')
@@ -583,22 +657,30 @@ describe('EditorStore', () => {
 
     it('moves the displayed location up to the new parent only when the node leaves it', async () => {
       const inside = await load('b1', 'b')
+
       expect(inside.store.moveNodeToParent('b1', 'b', 0)).toBe(false)
       expect(inside.store.moveNodeToParent('b1', 'a', 0)).toBe(true)
       expect(ready(inside.store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'b1' })
+
       inside.store.undo()
+
       expect(ready(inside.store).document).toEqual({ roots })
+
       const restored = ready(inside.store)
+
       expect(isValidLocation(restored.document, restored.location)).toBe(true)
       expect(restored.location).toEqual({ currentParentId: 'b', selectedNodeId: 'b1' })
       expect(restored.focus).toMatchObject({ nodeId: 'b1', cursor: 0 })
+
       inside.store.redo()
+
       expect(ready(inside.store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'b1' })
     })
 
     it('opens no fold and adds no pending mark for a no-op, and reports nothing', async () => {
       const { store, services, clock } = await load('b')
       const before = ready(store)
+
       // The same place, a clamped index past the end, a destination inside the node, and unknown ids.
       expect(store.moveNodeToParent('b', null, 1)).toBe(false)
       expect(store.moveNodeToParent('d', null, 99)).toBe(false)
@@ -607,10 +689,14 @@ describe('EditorStore', () => {
       expect(store.moveNodeToParent('missing', null, 0)).toBe(false)
       expect(store.moveNodeToParent('b', 'missing', 0)).toBe(false)
       expect(ready(store)).toBe(before)
+
       clock.runAll()
       await tick()
+
       expect(services.saves).toEqual([])
+
       store.undo()
+
       expect(ready(store).document).toBe(before.document)
     })
 
@@ -627,8 +713,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = ready(store)
+
       expect(store.moveNodeToParent('n1', 'second', 0)).toBe(false)
       expect(ready(store).document).toBe(before.document)
       expect(ready(store).location).toBe(before.location)
@@ -639,11 +727,16 @@ describe('EditorStore', () => {
       const { store, services, clock } = await load('c')
       const cleanup = vi.fn(async () => undefined)
       services.cleanupAttachments = cleanup
+
       expect(store.moveNodeToParent('c', 'b', 1)).toBe(true)
+
       await tick()
+
       expect(services.saves).toEqual([])
+
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(1)
       expect(services.saves[0]).toMatchObject({
         document: {
@@ -660,12 +753,15 @@ describe('EditorStore', () => {
         { id: 'b', text: 'B', children: [] },
       ])
       const before = ready(store)
+
       expect(store.moveNodeToParent('b', 'root', 0)).toBe(false)
       expect(store.getSnapshot()).toBe(before)
+
       services.save = async (state) => {
         services.saves.push(state)
       }
       await store.flushPersistence()
+
       expect(store.moveNodeToParent('b', 'root', 0)).toBe(true)
       expect(rootShape(store)).toEqual([['root', ['b']]])
     })
@@ -699,8 +795,11 @@ describe('EditorStore', () => {
 
     it('joins the selected node with the next one, selects the first, and puts the caret on the join point', async () => {
       const store = await load('a')
+
       expect(store.joinNodes({ count: 1 }, true)).toBe(true)
+
       const snapshot = ready(store)
+
       expect(
         snapshot.document.roots.map((root) => [root.id, root.text, root.children.map((child) => child.id)]),
       ).toEqual([
@@ -714,6 +813,7 @@ describe('EditorStore', () => {
 
     it('keeps the texts unchanged for gJ', async () => {
       const store = await load('a')
+
       expect(store.joinNodes({ count: 1 }, false)).toBe(true)
       expect(ready(store).document.roots[0]!.text).toBe('alpha    beta')
       expect(ready(store).focus).toMatchObject({ cursor: 7 })
@@ -722,13 +822,17 @@ describe('EditorStore', () => {
     it('joins a counted range in one undo step, clamped at the last sibling', async () => {
       const store = await load('a')
       const before = ready(store).document
+
       expect(store.joinNodes({ count: 3 }, true)).toBe(true)
       expect(ready(store).document.roots.map((root) => root.text)).toEqual(['alpha beta gamma', 'delta'])
+
       store.undo()
+
       expect(ready(store).document).toBe(before)
 
       // `9J` from `c` reaches only `d`; the single attachment moves to the retained node.
       const clamped = await load('c')
+
       expect(clamped.joinNodes({ count: 9 }, true)).toBe(true)
       expect(ready(clamped).document.roots.map((root) => [root.id, root.text, root.attachment])).toEqual([
         ['a', 'alpha  ', undefined],
@@ -740,10 +844,13 @@ describe('EditorStore', () => {
     it('does nothing for the last sibling and the current-parent heading', async () => {
       const last = await load('d')
       const lastBefore = ready(last)
+
       expect(last.joinNodes({ count: 1 }, true)).toBe(false)
       expect(ready(last)).toBe(lastBefore)
+
       const heading = await load('a', 'a')
       const headingBefore = ready(heading)
+
       expect(heading.joinNodes({ count: 1 }, true)).toBe(false)
       expect(heading.joinNodes({ anchorId: 'a', focusId: 'a' }, true)).toBe(false)
       expect(ready(heading)).toBe(headingBefore)
@@ -751,10 +858,13 @@ describe('EditorStore', () => {
 
     it('joins a whole-node Visual range in either direction', async () => {
       const store = await load('c')
+
       expect(store.joinNodes({ anchorId: 'c', focusId: 'a' }, true)).toBe(true)
       expect(ready(store).document.roots.map((root) => root.text)).toEqual(['alpha beta gamma', 'delta'])
+
       const single = await load('b')
       const before = ready(single)
+
       expect(single.joinNodes({ anchorId: 'b', focusId: 'b' }, true)).toBe(false)
       expect(ready(single)).toBe(before)
     })
@@ -773,8 +883,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = ready(store).document
+
       expect(store.joinNodes({ count: 1 }, true)).toBe(false)
       expect(ready(store).document).toBe(before)
       expect(ready(store).operationError).toBe('Cannot join nodes that both have attachments')
@@ -786,10 +898,12 @@ describe('EditorStore', () => {
         { id: 'root', text: 'one', children: [] },
         { id: 'next', text: 'two', children: [] },
       ])
+
       // The two-node document needs one more failed retry before the editor locks.
       clock.runAll()
       await tick()
       const before = store.getSnapshot()
+
       expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
       expect(store.joinNodes({ count: 1 }, true)).toBe(false)
       expect(store.getSnapshot()).toBe(before)
@@ -806,17 +920,23 @@ describe('EditorStore', () => {
         { currentParentId: null, selectedNodeId: 'root' },
       )
       const store = new EditorStore(services, ids('created'), new FakeClock())
+
       await store.initialize()
       const text = 'Stryker was here!'
       if (kind === 'sibling') store.createSiblingWithText('after', text)
       else store.createChildWithText(text)
       const created = store.getSnapshot() as ReadySnapshot
       const node = kind === 'sibling' ? created.document.roots[1] : created.document.roots[0]?.children[0]
+
       expect(node?.text).toBe(text)
+
       await tick()
+
       expect(services.saves).toEqual([])
+
       store.editText('created', `${text} four five six seven eight nine ten`)
       await tick()
+
       expect(services.saves).toHaveLength(1)
     })
 
@@ -826,20 +946,29 @@ describe('EditorStore', () => {
         { currentParentId: null, selectedNodeId: 'root' },
       )
       const store = new EditorStore(services, ids('created'), new FakeClock())
+
       await store.initialize()
       const text = 'Some words are inserted into a new node here!'
       if (kind === 'sibling') store.createSiblingWithText('after', text)
       else store.createChildWithText(text)
+
       await tick()
+
       expect(services.saves).toEqual([])
       expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'created', cursor: text.length } })
+
       store.editText('created', `${text} ten`)
       await tick()
+
       expect(services.saves).toHaveLength(1)
       expect(services.saves[0]).toMatchObject({ location: { selectedNodeId: 'created' } })
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'created' } })
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: '', children: [] }] } })
     })
   })
@@ -858,7 +987,9 @@ describe('EditorStore', () => {
       ids('copy'),
       new FakeClock(),
     )
+
     await store.initialize()
+
     expect(store.pasteSubtree('target', 'after', { id: 'unrelated', text: 'Copy', children: [] })).toBe(true)
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ children: [{ id: 'target' }, { id: 'copy', text: 'Copy' }] }] },
@@ -876,12 +1007,14 @@ describe('EditorStore', () => {
     services.cleanupAttachments = async (ids) => {
       cleanups.push(ids)
     }
+
     store.selectNode('empty', 0)
     store.deleteEmptySelected()
     services.save = async (state) => {
       services.saves.push(state)
     }
     await store.flushPersistence()
+
     expect(cleanups).toEqual([])
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root' }, { id: 'empty' }] } })
   })
@@ -894,21 +1027,27 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
     const before = store.getSnapshot()
     const result =
       kind === 'subtree'
         ? store.pasteSubtree('child', 'after', source, ['root'])
         : store.pasteNodeForest('child', 'after', { nodes: [source], sourceIds: ['root'] })
+
     expect(result).toBe(false)
     expect(store.getSnapshot()).toMatchObject({
       operationError: 'Cannot paste a node into one of its descendants.',
     })
+
     const after = store.getSnapshot() as ReadySnapshot
+
     expect(after.document).toBe((before as ReadySnapshot).document)
     expect(after.location).toEqual((before as ReadySnapshot).location)
     expect(after.focus).toEqual((before as ReadySnapshot).focus)
+
     store.undo()
+
     expect((store.getSnapshot() as ReadySnapshot).document).toBe(after.document)
   })
 
@@ -927,9 +1066,11 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
     store.selectNode('a', 3)
     store.moveNodeTo('b', 0)
+
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'b' }, { id: 'a' }] },
       location: { selectedNodeId: 'b' },
@@ -954,19 +1095,26 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.editText('root', 'Typed')
       if (command === 'case') store.applyNodeVisual('U', 'root', 'root')
       else store.moveSelectedTo(2)
       const afterCommand = (store.getSnapshot() as ReadySnapshot).document
+
       store.editText('root', 'Following')
       store.undo()
+
       expect((store.getSnapshot() as ReadySnapshot).document).toEqual(afterCommand)
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({
         document: { roots: [{ id: 'root', text: 'Typed' }, { id: 'other' }] },
       })
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({
         document: { roots: [{ id: 'root', text: 'Initial' }, { id: 'other' }] },
       })
@@ -1000,6 +1148,7 @@ describe('EditorStore', () => {
         events.push([...ids].sort())
       }
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       await store.flushPersistence()
       events.length = 0
@@ -1007,8 +1156,11 @@ describe('EditorStore', () => {
       else if (command === 'empty deletion') store.deleteEmptySelected()
       else store.applyNodeVisual('U', 'root', 'root')
       await store.flushPersistence()
+
       expect(events).toEqual(command === 'case' ? ['save'] : ['save', ['image']])
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({
         document: { roots: [{ id: 'root', attachment: { id: 'image' } }, { id: 'other' }] },
       })
@@ -1034,20 +1186,30 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
     const collapsedRows = store.getVisibleRows()
+
     expect(collapsedRows.map((row) => row.node.id)).toEqual(['root'])
     expect(store.getVisibleRows()).toBe(collapsedRows)
+
     store.toggleExpansion('root')
     const expandedRows = store.getVisibleRows()
+
     expect(expandedRows.map((row) => row.node.id)).toEqual(['root', 'child'])
     expect(expandedRows).not.toBe(collapsedRows)
+
     store.selectNode('child', 1)
+
     expect(store.getVisibleRows()).toBe(expandedRows)
+
     store.editText('child', 'Updated child')
     const editedRows = store.getVisibleRows()
+
     expect(editedRows).not.toBe(expandedRows)
+
     store.toggleExpansion('root')
+
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       location: { selectedNodeId: 'root' },
@@ -1070,13 +1232,17 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
     store.toggleExpansion('a1')
+
     expect(store.getVisibleRows().map((row) => [row.node.id, row.depth, row.parentId])).toEqual([
       ['a1', 0, 'a'],
       ['a1x', 1, 'a1'],
     ])
+
     store.navigateToAncestor(null)
+
     expect(store.getVisibleRows()[0]).toMatchObject({ node: { id: 'a' }, parentId: null })
   })
 
@@ -1106,6 +1272,7 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(tasks, { currentParentId: null, selectedNodeId: 'a' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.selectNode('a', 3)
       const before = store.getSnapshot()
@@ -1113,8 +1280,10 @@ describe('EditorStore', () => {
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
       expect(struck(store)).toEqual(['a', 'b'])
+
       const after = store.getSnapshot()
       if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
       expect(after.location).toEqual(before.location)
       expect(after.focus).toBe(before.focus)
       expect(after.document.roots[0]!.children).toBe(before.document.roots[0]!.children)
@@ -1122,13 +1291,21 @@ describe('EditorStore', () => {
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
       expect(struck(store)).toEqual(['b'])
+
       store.undo()
+
       expect(struck(store)).toEqual(['a', 'b'])
+
       const undone = store.getSnapshot()
+
       expect(undone.status === 'ready' && undone.focus).toMatchObject({ nodeId: 'a', cursor: 0 })
+
       store.undo()
+
       expect(struck(store)).toEqual(['b'])
+
       store.redo()
+
       expect(struck(store)).toEqual(['a', 'b'])
     })
 
@@ -1136,13 +1313,17 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(tasks, { currentParentId: null, selectedNodeId: 'c' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
 
       store.toggleStrikethrough('c', 'c')
       await tick()
+
       expect(services.saves).toHaveLength(0)
+
       clock.runAll()
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({
         version: 4,
         document: { roots: [{ id: 'a' }, { id: 'b', struckThrough: true }, { id: 'c', struckThrough: true }] },
@@ -1154,30 +1335,39 @@ describe('EditorStore', () => {
 
     it('strikes a mixed range through and returns an all-struck range to normal, in either direction', async () => {
       const store = new EditorStore(loadedState(tasks, { currentParentId: null, selectedNodeId: 'c' }), ids('unused'))
+
       await store.initialize()
 
       expect(store.toggleStrikethrough('c', 'a')).toBe(true)
       expect(struck(store)).toEqual(['a', 'b', 'c'])
       expect(store.toggleStrikethrough('a', 'b')).toBe(true)
       expect(struck(store)).toEqual(['c'])
+
       store.undo()
+
       expect(struck(store)).toEqual(['a', 'b', 'c'])
+
       const undone = store.getSnapshot()
+
       expect(undone.status === 'ready' && undone.focus).toMatchObject({ nodeId: 'a', cursor: 0 })
     })
 
     it('strikes the editable current-parent heading without changing its children', async () => {
       const store = new EditorStore(loadedState(tasks, { currentParentId: 'a', selectedNodeId: 'a' }), ids('unused'))
+
       await store.initialize()
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
       expect(struck(store)).toEqual(['a', 'b'])
+
       const state = store.getSnapshot()
+
       expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'a', selectedNodeId: 'a' })
     })
 
     it('changes nothing for ends that are not siblings', async () => {
       const store = new EditorStore(loadedState(tasks, { currentParentId: null, selectedNodeId: 'a' }), ids('unused'))
+
       await store.initialize()
       const before = store.getSnapshot()
 
@@ -1198,13 +1388,17 @@ describe('EditorStore', () => {
         loadedState(tasks, { currentParentId: null, selectedNodeId: 'b' }),
         ids('split', 'copy'),
       )
+
       await store.initialize()
 
       // Splitting keeps the first part struck through; the new part starts normal.
       store.selectNode('b', 2)
       store.createSiblingOrFirstChild(2)
+
       expect(struck(store)).toEqual(['b'])
+
       const split = store.getSnapshot()
+
       expect(split.status === 'ready' && split.document.roots.map((node) => node.text)).toEqual([
         'Alpha',
         'Be',
@@ -1214,15 +1408,19 @@ describe('EditorStore', () => {
 
       // A join keeps the first node's state.
       store.selectNode('b', 0)
+
       expect(store.joinNodes({ count: 2 }, false)).toBe(true)
       expect(struck(store)).toEqual(['b'])
 
       // A subtree put copies the strikethrough with the node; a move keeps it.
       const source = store.getSnapshot()
       if (source.status !== 'ready') throw new Error('Expected a ready editor.')
+
       expect(store.pasteSubtree('b', 'after', source.document.roots[1]!)).toBe(true)
       expect(struck(store)).toEqual(['b', 'copy'])
+
       store.moveNodeTo('copy', 0)
+
       expect(struck(store)).toEqual(['copy', 'b'])
     })
   })
@@ -1264,10 +1462,14 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = store.getSnapshot() as ReadySnapshot
+
       expect(rowIds(store)).toEqual(['root', 'child', 'other'])
+
       store.enter()
+
       expect((store.getSnapshot() as ReadySnapshot).document).toBe(before.document)
       expect((store.getSnapshot() as ReadySnapshot).expansion).toBe(before.expansion)
       expect(rowIds(store)).toEqual(['child'])
@@ -1276,13 +1478,17 @@ describe('EditorStore', () => {
     it('keeps a newer row measurement reader when the old registration is disposed', async () => {
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       const disposeOld = store.registerSelectedRowTopReader(() => 100)
       const disposeNew = store.registerSelectedRowTopReader(() => 321.4)
+
       disposeOld()
       store.noteViewportChange()
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 321 } })
+
       disposeNew()
     })
 
@@ -1294,13 +1500,18 @@ describe('EditorStore', () => {
         { expandedIds: ['root', 'other'] },
       )
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       store.selectNode('child', 3)
       const before = store.getSnapshot() as ReadySnapshot
+
       store.toggleExpansion('child')
+
       expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
       expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
+
       store.toggleExpansion('other')
+
       expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
       expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
@@ -1314,14 +1525,19 @@ describe('EditorStore', () => {
       )
       const clock = new FakeClock()
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       const before = store.getSnapshot()
+
       store.toggleExpansion('root')
       store.applyFold('open', 'root')
       store.applyFold('open')
+
       expect(store.getSnapshot()).toBe(before)
+
       clock.runAll()
       await store.flushPersistence()
+
       expect(services.saves).toEqual([])
     })
 
@@ -1335,14 +1551,18 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.toggleExpansion('root')
+
       expect(rowIds(store)).toEqual(['root', 'other'])
       expect(store.getSnapshot()).toMatchObject({
         location: { selectedNodeId: 'root' },
         focus: { nodeId: 'root', cursor: 0 },
       })
+
       store.toggleExpansion('root')
+
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
     })
 
@@ -1350,24 +1570,34 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.selectNode('root', 2)
       await store.flushPersistence()
       services.saves.length = 0
       const before = store.getSnapshot() as ReadySnapshot
+
       store.applyFold('open-all')
+
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'leaf', 'other', 'other-child'])
       expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
       expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
       expect(services.saves).toEqual([])
+
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(1)
       expect(services.saves[0]).toMatchObject({ view: { expandedIds: ['root', 'child', 'grandchild', 'other'] } })
+
       const opened = store.getSnapshot()
+
       store.applyFold('open-all')
+
       expect(store.getSnapshot()).toBe(opened)
+
       await store.flushPersistence()
+
       expect(services.saves).toHaveLength(1)
     })
 
@@ -1390,6 +1620,7 @@ describe('EditorStore', () => {
       Object.defineProperty(root, 'children', { configurable: true, get: readChildren })
       try {
         store.applyFold('close-all')
+
         expect(readChildren).not.toHaveBeenCalled()
         expect([...(store.getSnapshot() as ReadySnapshot).expansion.expandedIds]).toEqual([])
       } finally {
@@ -1401,28 +1632,42 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.selectNode('root', 2)
       await store.flushPersistence()
       services.saves.length = 0
       const before = store.getSnapshot() as ReadySnapshot
+
       store.applyFold('close-all')
       store.applyFold('close', 'root')
+
       expect(store.getSnapshot()).toBe(before)
+
       store.applyFold('open', 'root')
+
       expect(rowIds(store)).toEqual(['root', 'child', 'other'])
+
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(1)
       expect(services.saves[0]).toMatchObject({ view: { expandedIds: ['root'] } })
+
       const opened = store.getSnapshot()
+
       store.applyFold('open', 'root')
+
       expect(store.getSnapshot()).toBe(opened)
+
       store.applyFold('close-all')
+
       expect((store.getSnapshot() as ReadySnapshot).focus).toBe(before.focus)
       expect((store.getSnapshot() as ReadySnapshot).location).toBe(before.location)
+
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(2)
       expect(services.saves[1]).toMatchObject({ view: { expandedIds: [] } })
     })
@@ -1433,21 +1678,30 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.toggleExpansion('root')
       store.toggleExpansion('child')
+
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
 
       store.enter()
+
       expect(rowIds(store)).toEqual(['child', 'grandchild'])
+
       store.selectNode('child', 0)
       store.enter()
+
       expect(rowIds(store)).toEqual(['grandchild'])
+
       store.navigateToAncestor(null)
+
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
+
       store.selectNode('child', 0)
       store.enter()
       store.leave()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: 'root', selectedNodeId: 'child' } })
       expect(rowIds(store)).toEqual(['child', 'grandchild'])
     })
@@ -1456,19 +1710,25 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
 
       store.toggleExpansion('root')
+
       expect(services.saves).toHaveLength(0)
+
       clock.runAll()
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ version: 4, view: { expandedIds: ['root'] } })
 
       store.applyFold('open', 'child')
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: ['root', 'child'] } })
 
       store.undo()
+
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
     })
 
@@ -1482,6 +1742,7 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
 
       expect(rowIds(store)).toEqual(['root', 'child', 'grandchild', 'other'])
@@ -1497,6 +1758,7 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
 
       expect(store.getSnapshot()).toMatchObject({
@@ -1515,16 +1777,22 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
+
       expect(rowIds(store)).toEqual(['child', 'grandchild', 'leaf'])
 
       store.applyFold('close-all')
+
       expect(rowIds(store)).toEqual(['child'])
       expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'child' }, focus: { cursor: 0 } })
 
       store.navigateToAncestor(null)
+
       expect(rowIds(store)).toEqual(['root', 'child', 'other', 'other-child'])
+
       store.applyFold('close-all')
+
       expect(rowIds(store)).toEqual(['root', 'other'])
     })
 
@@ -1536,35 +1804,51 @@ describe('EditorStore', () => {
         { expandedIds: [], selectedRowTop: 240 },
       )
       const store = new EditorStore(services, ids('unused'), clock)
+
       expect(store.getRestoredSelectedRowTop()).toBeUndefined()
+
       store.noteViewportChange()
       await store.initialize()
+
       expect(store.getRestoredSelectedRowTop()).toBe(240)
+
       await store.flushPersistence()
+
       expect(services.saves).toHaveLength(0)
 
       let measured: number | undefined = 512.6
       const unregister = store.registerSelectedRowTopReader(() => measured)
+
       store.noteViewportChange()
+
       expect(services.saves).toHaveLength(0)
+
       clock.runAll()
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: [], selectedRowTop: 513 } })
 
       // A reading with no rendered row, or a non-finite one, keeps the last known value.
       measured = undefined
+
       store.toggleExpansion('root')
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
+
       measured = Number.NaN
+
       store.toggleExpansion('root')
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
 
       unregister()
       measured = 7
+
       store.toggleExpansion('root')
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 513 } })
       expect(store.getRestoredSelectedRowTop()).toBe(240)
     })
@@ -1573,6 +1857,7 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.editText('root', 'Root edited')
       const clearTimeout = vi.spyOn(clock, 'clearTimeout')
@@ -1580,26 +1865,32 @@ describe('EditorStore', () => {
 
       store.noteViewportChange()
       store.noteViewportChange()
+
       expect(clearTimeout).not.toHaveBeenCalled()
       expect(setTimeout).not.toHaveBeenCalled()
 
       clock.runAll()
       await store.flushPersistence()
+
       expect(services.saves).toHaveLength(1)
 
       // With nothing armed, a scroll arms the idle save itself.
       store.noteViewportChange()
+
       expect(setTimeout).toHaveBeenCalledOnce()
     })
 
     it('omits the selected row position while nothing has measured it', async () => {
       const services = loadedState(nestedDocument, { currentParentId: null, selectedNodeId: 'root' })
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
+
       expect(store.getRestoredSelectedRowTop()).toBeUndefined()
 
       store.toggleExpansion('root')
       await store.flushPersistence()
+
       expect(services.saves.at(-1)).toMatchObject({ view: { expandedIds: ['root'] } })
       expect((services.saves.at(-1) as { view: object }).view).not.toHaveProperty('selectedRowTop')
     })
@@ -1610,6 +1901,7 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.toggleExpansion('root')
       store.toggleExpansion('child')
@@ -1618,6 +1910,7 @@ describe('EditorStore', () => {
       store.enter()
 
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({
         location: { currentParentId: 'child', selectedNodeId: 'grandchild' },
       })
@@ -1630,19 +1923,23 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.toggleExpansion('root')
       store.toggleExpansion('child')
       store.selectNode('grandchild', 0)
 
       store.deleteSelected()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'child' } })
 
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'grandchild' } })
       expect(rowIds(store)).toContain('grandchild')
 
       store.redo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'child' } })
       expect(rowIds(store)).not.toContain('grandchild')
     })
@@ -1653,21 +1950,30 @@ describe('EditorStore', () => {
         ids('copy'),
         new FakeClock(),
       )
+
       await store.initialize()
       for (const id of ['root', 'child', 'grandchild']) store.toggleExpansion(id)
       const atRoot = (selectedNodeId: string) => ({ location: { currentParentId: null, selectedNodeId } })
 
       store.selectNode('leaf', 0)
       store.applyNodeVisual('d', 'leaf', 'leaf')
+
       expect(store.getSnapshot()).toMatchObject(atRoot('grandchild'))
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject(atRoot('leaf'))
 
       store.pasteSubtree('leaf', 'after', { id: 'src', text: 'Src', children: [] })
+
       expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject(atRoot('leaf'))
+
       store.redo()
+
       expect(store.getSnapshot()).toMatchObject(atRoot('copy'))
     })
 
@@ -1677,6 +1983,7 @@ describe('EditorStore', () => {
         ids('copy'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = store.getSnapshot()
 
@@ -1689,6 +1996,7 @@ describe('EditorStore', () => {
       ).toBe(false)
 
       const after = store.getSnapshot()
+
       expect(after).toMatchObject({ document: (before as { document: unknown }).document })
       expect(after).toMatchObject({ location: { currentParentId: 'child', selectedNodeId: 'child' } })
     })
@@ -1708,15 +2016,19 @@ describe('EditorStore', () => {
             ids('copy', 'copy-2'),
             new FakeClock(),
           )
+
           await store.initialize()
           const before = store.getSnapshot()
           const source = { id: 'source', text: 'Source', children: [] }
+
           expect(
             kind === 'subtree'
               ? store.pasteSubtree('parent', 'after', source)
               : store.pasteNodeForest('parent', 'after', { nodes: [source], sourceIds: [] }, 2, true),
           ).toBe(true)
+
           const state = store.getSnapshot() as ReadySnapshot
+
           expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual([
             'copy',
             ...(kind === 'forest' ? ['copy-2'] : []),
@@ -1727,9 +2039,13 @@ describe('EditorStore', () => {
             selectedNodeId: kind === 'subtree' ? 'copy' : (children[0]?.id ?? 'copy-2'),
           })
           expect(state.focus).toMatchObject({ nodeId: state.location.selectedNodeId, cursor: 0 })
+
           store.undo()
+
           expect(store.getSnapshot()).toMatchObject({ document: (before as ReadySnapshot).document })
+
           store.redo()
+
           expect(store.getSnapshot()).toMatchObject({
             document: state.document,
             location: { currentParentId: 'parent' },
@@ -1744,17 +2060,23 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       for (const id of ['root', 'child', 'grandchild']) store.toggleExpansion(id)
+
       store.editText('leaf', 'Edited')
       store.selectNode('other', 0)
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'leaf' } })
 
       store.editText('leaf', '')
       store.deleteEmptySelected()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'grandchild' } })
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'leaf' } })
     })
   })
@@ -1770,29 +2092,45 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('new-node', 'copy-a', 'copy-child', 'copy-b'))
+
     await store.initialize()
     const forest = store.applyNodeVisual('y', 'a', 'b')!
+
     expect(forest.nodes.map((node) => node.id)).toEqual(['a', 'b'])
     expect(forest.nodes[0]?.children[0]?.id).toBe('a-child')
+
     store.enter()
     const before = store.getSnapshot()
+
     expect(store.pasteNodeForest('a-child', 'after', forest)).toBe(false)
     expect(store.applyNodeVisual('p', 'a-child', 'a-child', forest)).toBeUndefined()
+
     const rejected = store.getSnapshot()
+
     expect(rejected.status).toBe('ready')
+
     if (rejected.status !== 'ready') throw new Error('Editor did not load')
+
     expect(rejected.document).toBe(before.status === 'ready' ? before.document : undefined)
     expect(rejected.operationError).toMatch(/descendant/u)
+
     store.leave()
     store.applyNodeVisual('d', 'a', 'b')
     const deleted = store.getSnapshot()
+
     expect(deleted.status).toBe('ready')
+
     if (deleted.status !== 'ready') throw new Error('Editor did not load')
+
     expect(deleted.document.roots.map((node) => node.id)).toEqual(['c'])
+
     store.undo()
     const restored = store.getSnapshot()
+
     expect(restored.status).toBe('ready')
+
     if (restored.status !== 'ready') throw new Error('Editor did not load')
+
     expect(restored.document.roots.map((node) => node.id)).toEqual(['a', 'b', 'c'])
   })
 
@@ -1807,18 +2145,28 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('copy-a', 'copy-child'))
+
     await store.initialize()
     const forest = store.applyNodeVisual('y', 'a', 'a')!
+
     expect(store.pasteNodeForest('b', 'after', forest)).toBe(true)
+
     const pasted = store.getSnapshot()
+
     expect(pasted.status).toBe('ready')
+
     if (pasted.status !== 'ready') throw new Error('Editor did not load')
+
     expect(pasted.document.roots[2]?.id).toBe('copy-a')
     expect(pasted.document.roots[2]?.children[0]?.id).toBe('copy-child')
+
     store.applyNodeVisual('U', 'a', 'b')
     const upper = store.getSnapshot()
+
     expect(upper.status).toBe('ready')
+
     if (upper.status !== 'ready') throw new Error('Editor did not load')
+
     expect(upper.document.roots[0]?.text).toBe('AB')
     expect(upper.document.roots[0]?.children[0]?.text).toBe('CD')
     expect(upper.document.roots[1]?.text).toBe('EF')
@@ -1836,15 +2184,19 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const removed = store.deleteSiblingRange(5)
+
     expect(removed?.map((node) => node.id)).toEqual(['b', 'c'])
     expect(removed?.[0]?.children.map((node) => node.id)).toEqual(['b-child'])
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'a' }] },
       location: { selectedNodeId: 'a' },
     })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'a' }, { id: 'b', children: [{ id: 'b-child' }] }, { id: 'c' }] },
     })
@@ -1856,8 +2208,10 @@ describe('EditorStore', () => {
       { currentParentId: 'a', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const before = store.getSnapshot()
+
     expect(store.deleteSiblingRange(2)).toBeUndefined()
     expect(store.getSnapshot()).toBe(before)
   })
@@ -1873,14 +2227,18 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('c1', 'c2', 'c3'))
+
     await store.initialize()
     const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+
     expect(store.pasteNodeForest('a', 'after', forest, 3)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'a' }, { id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'b' }] },
       location: { selectedNodeId: 'c1' },
     })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'a' }, { id: 'b' }] } })
   })
 
@@ -1921,14 +2279,18 @@ describe('EditorStore', () => {
 
     it.each(['subtree', 'forest'] as const)('puts a %s after a folded branch without opening it', async (kind) => {
       const store = await setup(['c1', 'c2', 'c3', 'c4'])
+
       store.applyFold('close', 'a')
       const before = ready(store)
       const result =
         kind === 'subtree'
           ? store.pasteSubtree('a', 'after', source, ['x'])
           : store.pasteNodeForest('a', 'after', forest, 2)
+
       expect(result).toBe(true)
+
       const state = ready(store)
+
       expect(state.document.roots.map((node) => node.id)).toEqual(
         kind === 'subtree' ? ['a', 'c1', 'b'] : ['a', 'c1', 'c3', 'b'],
       )
@@ -1936,16 +2298,22 @@ describe('EditorStore', () => {
       expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'c1' })
       expect(state.focus).toMatchObject({ nodeId: 'c1', cursor: 0 })
       expect(state.expansion).toBe(before.expansion)
+
       store.undo()
+
       expect(ready(store).document).toEqual(before.document)
+
       store.redo()
+
       expect(ready(store).document).toEqual(state.document)
       expect(ready(store).expansion).toBe(before.expansion)
     })
 
     it('selects the next sibling after gp on a folded branch', async () => {
       const store = await setup(['c1', 'c2'])
+
       store.applyFold('close', 'a')
+
       expect(store.pasteNodeForest('a', 'after', forest, 1, true)).toBe(true)
       expect(ready(store).document.roots.map((node) => node.id)).toEqual(['a', 'c1', 'b'])
       expect(ready(store).location.selectedNodeId).toBe('b')
@@ -1954,28 +2322,37 @@ describe('EditorStore', () => {
 
     it('puts a subtree as the first child, keeps the location, and keeps the fold open', async () => {
       const store = await setup(['c1', 'c2'])
+
       expect(store.pasteSubtree('a', 'after', source, ['x'])).toBe(true)
+
       const state = ready(store)
+
       expect(state.document.roots.map((node) => node.id)).toEqual(['a', 'b'])
       expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'a1', 'a2'])
       expect(state.document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c2'])
       expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'c1' })
       expect(state.expansion.expandedIds.has('a')).toBe(true)
+
       store.undo()
+
       expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
     })
 
     it('puts counted forest copies as the first children in one undo step', async () => {
       const store = await setup(['c1', 'c2', 'c3', 'c4'])
+
       expect(store.pasteNodeForest('a', 'after', forest, 2)).toBe(true)
       expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'c3', 'a1', 'a2'])
       expect(ready(store).location.selectedNodeId).toBe('c1')
+
       store.undo()
+
       expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
     })
 
     it('selects the old first child after a put that leaves the caret after the content', async () => {
       const store = await setup(['c1', 'c2'])
+
       expect(store.pasteNodeForest('a', 'after', forest, 1, true)).toBe(true)
       expect(ready(store).document.roots[0]!.children.map((node) => node.id)).toEqual(['c1', 'a1', 'a2'])
       expect(ready(store).location.selectedNodeId).toBe('a1')
@@ -1984,7 +2361,9 @@ describe('EditorStore', () => {
 
     it('keeps the sibling-before put and the sibling put on a leaf', async () => {
       const store = await setup(['c1', 'c2', 'c3', 'c4'])
+
       store.applyFold('close', 'a')
+
       expect(store.pasteSubtree('a', 'before', source, ['x'])).toBe(true)
       expect(ready(store).document.roots.map((node) => node.id)).toEqual(['c1', 'a', 'b'])
       expect(ready(store).document.roots[1]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
@@ -2002,8 +2381,10 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       const before = store.getSnapshot()
+
       expect(store.pasteSubtree('a', 'before', source, ['x'])).toBe(false)
       expect(store.pasteNodeForest('a', 'before', forest)).toBe(false)
       expect(store.getSnapshot()).toBe(before)
@@ -2027,8 +2408,10 @@ describe('EditorStore', () => {
         createId,
         new FakeClock(),
       )
+
       await store.initialize()
       const before = store.getSnapshot() as ReadySnapshot
+
       expect(store.pasteSubtree('parent', 'after', own, ['parent'])).toBe(false)
       expect(store.pasteNodeForest('parent', 'after', { nodes: [own], sourceIds: ['parent'] }, 2)).toBe(false)
       expect((store.getSnapshot() as ReadySnapshot).document).toBe(before.document)
@@ -2046,6 +2429,7 @@ describe('EditorStore', () => {
         kind === 'subtree'
           ? store.pasteSubtree('a', 'after', own, ['a'])
           : store.pasteNodeForest('a', 'after', { nodes: [own], sourceIds: ['a'] })
+
       expect(result).toBe(false)
       expect(ready(store).operationError).toBe('Cannot paste a node into one of its descendants.')
       expect(ready(store).document).toBe(before.document)
@@ -2064,9 +2448,11 @@ describe('EditorStore', () => {
         ids('c1', 'c2'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.applyFold('open', 'n')
       const before = ready(store)
+
       expect(store.pasteSubtree('n', 'after', source, ['x'])).toBe(false)
       expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
       expect(ready(store).document).toBe(before.document)
@@ -2086,16 +2472,21 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('c1', 'c2', 'c3'))
+
     await store.initialize()
     const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+
     const removed = store.applyNodeVisual('p', 'b', 'b', forest, '', 3)
+
     expect(removed?.sourceIds).toEqual(['b'])
     expect(removed?.nodes[0]?.children.map((node) => node.id)).toEqual(['b-child'])
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'a' }, { id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'c' }] },
       location: { selectedNodeId: 'c1' },
     })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ id: 'a' }, { id: 'b', children: [{ id: 'b-child' }] }, { id: 'c' }] },
     })
@@ -2109,6 +2500,7 @@ describe('EditorStore', () => {
     ])
     const before = store.getSnapshot()
     const forest = { nodes: [{ id: 'x', text: 'X', children: [] }], sourceIds: ['x'] }
+
     expect(store.applyNodeVisual('p', 'b', 'b', forest, '', 2)).toBeUndefined()
     expect(store.replaceTextRange('b', 0, 1, 'ZZ')).toBe(false)
     expect(store.getSnapshot()).toBe(before)
@@ -2126,29 +2518,39 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('empty', 'copy-a', 'copy-b', 'open'))
+
     await store.initialize()
     const forest = store.applyNodeVisual('y', 'a', 'b')!
     store.applyNodeVisual('c', 'a', 'b')
     let snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots.map((node) => node.text)).toEqual(['', 'C'])
     expect(snapshot.location.selectedNodeId).toBe('empty')
+
     store.undo()
     snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'B', 'C'])
+
     store.applyNodeVisual('P', 'a', 'b', forest)
     snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots.map((node) => node.id)).toEqual(['copy-a', 'copy-b', 'c'])
+
     store.undo()
     store.createSiblingWithText('after', 'opened')
     snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'opened', 'B', 'C'])
+
     store.undo()
     snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots.map((node) => node.text)).toEqual(['A', 'B', 'C'])
   })
 
@@ -2163,20 +2565,26 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('replacement'))
+
     await store.initialize()
     const initial = store.getSnapshot()
+
     expect(store.applyNodeVisual('d', 'missing', 'b')).toBeUndefined()
     expect(store.applyNodeVisual('p', 'a', 'b')).toBeUndefined()
     expect(store.applyNodeVisual('u', 'a', 'b')).toBeUndefined()
     expect(store.pasteNodeForest('a', 'before', { nodes: [], sourceIds: [] })).toBe(false)
     expect(store.getSnapshot()).toBe(initial)
+
     store.applyNodeVisual('x', 'a', 'b')
     const deleted = store.getSnapshot()
     if (deleted.status !== 'ready') throw new Error('Editor did not load')
+
     expect(deleted.document.roots).toEqual([{ id: 'replacement', text: '', children: [] }])
+
     store.undo()
     const restored = store.getSnapshot()
     if (restored.status !== 'ready') throw new Error('Editor did not load')
+
     expect(restored.document.roots.map((node) => node.id)).toEqual(['a', 'b'])
   })
 
@@ -2187,10 +2595,12 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     store.applyNodeVisual('U', 'a', 'a')
     const snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.document.roots[0]?.text).toBe('SS HTTPS://EXAMPLE.COM')
     expect(snapshot.document.roots[0]?.links).toEqual([{ start: 3, end: 3 + url.length, url: 'HTTPS://EXAMPLE.COM' }])
   })
@@ -2210,6 +2620,7 @@ describe('EditorStore', () => {
       const services = loadedState({ roots: [root] }, { currentParentId: deepest.id, selectedNodeId: deepest.id })
       const createId = vi.fn(() => 'must-not-be-consumed')
       const store = new EditorStore(services, createId)
+
       await store.initialize()
       const before = store.getSnapshot()
       if (before.status !== 'ready') throw new Error('Expected a ready editor.')
@@ -2219,18 +2630,22 @@ describe('EditorStore', () => {
       else store.createChildWithText('Inserted')
 
       const after = store.getSnapshot()
+
       expect(after).toMatchObject({
         status: 'ready',
         location: { currentParentId: deepest.id, selectedNodeId: deepest.id },
         operationError: 'Nodes cannot be nested deeper than 20 levels.',
       })
+
       if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
       expect(after.document).toEqual(before.document)
       expect(after.focus).toEqual(before.focus)
       expect(createId).not.toHaveBeenCalled()
       expect(services.saves).toEqual([])
 
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
     },
   )
@@ -2253,6 +2668,7 @@ describe('EditorStore', () => {
       )
       const createId = vi.fn(() => 'must-not-be-consumed')
       const store = new EditorStore(services, createId)
+
       await store.initialize()
       const before = store.getSnapshot()
       if (before.status !== 'ready') throw new Error('Expected a ready editor.')
@@ -2268,24 +2684,30 @@ describe('EditorStore', () => {
       else expect(store.applyNodeVisual('p', deepest.id, deepest.id, forest)).toBeUndefined()
 
       const after = store.getSnapshot()
+
       expect(after).toMatchObject({
         status: 'ready',
         location: { currentParentId: `n${MAX_DOCUMENT_DEPTH - 2}`, selectedNodeId: deepest.id },
         operationError: MAX_DOCUMENT_DEPTH_ERROR,
       })
+
       if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
       expect(after.document).toEqual(before.document)
       expect(after.focus).toEqual(before.focus)
       expect(createId).not.toHaveBeenCalled()
       expect(services.saves).toEqual([])
 
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: deepest.id } })
 
       // The document is still valid, so a later change saves normally instead of failing on the
       // over-depth document the rejected paste must never create.
       expect(store.createSibling('after')).toBe(true)
+
       await store.flushPersistence()
+
       expect(services.saves).toHaveLength(1)
     },
   )
@@ -2296,6 +2718,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('next'))
+
     await store.initialize()
     const initial = store.getSnapshot()
     if (initial.status !== 'ready') throw new Error('Expected a ready editor.')
@@ -2304,31 +2727,37 @@ describe('EditorStore', () => {
     store.selectNode('child', 0)
     const afterEdits = store.getSnapshot()
     if (afterEdits.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(afterEdits.structuralVersion).toBe(initial.structuralVersion)
 
     store.enter()
     const afterEnter = store.getSnapshot()
     if (afterEnter.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(afterEnter.structuralVersion).toBeGreaterThan(initial.structuralVersion)
 
     store.createSiblingOrFirstChild(0)
     const afterStructural = store.getSnapshot()
     if (afterStructural.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(afterStructural.structuralVersion).toBeGreaterThan(afterEnter.structuralVersion)
 
     store.undo()
     const afterUndo = store.getSnapshot()
     if (afterUndo.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(afterUndo.structuralVersion).toBeGreaterThan(afterStructural.structuralVersion)
   })
 
   it('creates an initial root and a sibling split', async () => {
     const store = new EditorStore(createServices(), ids('root', 'next'))
+
     await store.initialize()
     store.editText('root', 'Current')
     store.createSiblingOrFirstChild(3)
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots.map((node) => [node.id, node.text])).toEqual([
@@ -2347,11 +2776,13 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('before'))
+
     await store.initialize()
 
     store.createSiblingOrFirstChild(0)
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots.map((node) => [node.id, node.text, node.children.map((child) => child.id)])).toEqual([
@@ -2373,6 +2804,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'empty' },
     )
     const store = new EditorStore(services, ids('next'))
+
     await store.initialize()
 
     store.createSiblingOrFirstChild(0)
@@ -2391,11 +2823,13 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('created'))
+
     await store.initialize()
     if (expanded) store.toggleExpansion('root')
     const before = store.getSnapshot() as ReadySnapshot
     store.createSiblingOrFirstChild(4)
     const after = store.getSnapshot() as ReadySnapshot
+
     expect(after.document.roots.map((node) => node.id)).toEqual(expanded ? ['root'] : ['root', 'created'])
     expect(after.document.roots[0]!.children.map((node) => node.id)).toEqual(
       expanded ? ['created', 'child'] : ['child'],
@@ -2403,19 +2837,25 @@ describe('EditorStore', () => {
     expect(after.location).toEqual({ currentParentId: null, selectedNodeId: 'created' })
     expect(after.focus).toMatchObject({ nodeId: 'created', cursor: 0 })
     expect(after.expansion).toBe(before.expansion)
+
     store.undo()
+
     expect((store.getSnapshot() as ReadySnapshot).document).toEqual(before.document)
+
     store.redo()
+
     expect((store.getSnapshot() as ReadySnapshot).document).toEqual(after.document)
   })
 
   it('creates a first child from the focused current parent', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
+
     await store.initialize()
     store.enter()
     store.createSiblingOrFirstChild(0)
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots[0]!.children[0]!.id).toBe('child')
@@ -2425,6 +2865,7 @@ describe('EditorStore', () => {
 
   it('creates and focuses a child with Vim structural insertion', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child', 'empty-grandchild', 'grandchild'))
+
     await store.initialize()
 
     expect(store.createChild()).toBe(true)
@@ -2435,6 +2876,7 @@ describe('EditorStore', () => {
 
     store.createChildWithText('')
     store.createChildWithText('Grandchild')
+
     expect(store.getSnapshot()).toMatchObject({
       document: {
         roots: [
@@ -2466,6 +2908,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('before', 'after'))
+
     await store.initialize()
 
     expect(store.createSibling('before')).toBe(true)
@@ -2509,6 +2952,7 @@ describe('EditorStore', () => {
       )
       const store = new EditorStore(services, ids('first', 'repeat'))
       const ready = (target: EditorStore) => target.getSnapshot() as ReadySnapshot
+
       await store.initialize()
       if (expanded) store.toggleExpansion('p')
       const expansionBefore = ready(store).expansion
@@ -2530,16 +2974,23 @@ describe('EditorStore', () => {
       expect(ready(store).expansion).toBe(expansionBefore)
 
       store.undo()
+
       expect(ready(store).document.roots[0]!.children[0]!.children.map((node) => node.id)).toEqual(['c'])
+
       store.redo()
+
       expect(ready(store).location.selectedNodeId).toBe('first')
+
       store.undo()
 
       store.selectNode('p', 0)
       store.createSiblingWithText('after', 'Typed')
       const parent = ready(store).document.roots[0]!.children[0]!
+
       expect(parent.children.map((node) => node.id)).toEqual(expanded ? ['repeat', 'c'] : ['c'])
+
       const inserted = expanded ? parent.children[0]! : ready(store).document.roots[0]!.children[1]!
+
       expect(inserted).toMatchObject({ id: 'repeat', text: 'Typed' })
       expect(ready(store).expansion).toBe(expansionBefore)
     },
@@ -2547,12 +2998,15 @@ describe('EditorStore', () => {
 
   it('returns to the current parent after deleting its only child', async () => {
     const store = new EditorStore(createServices(), ids('root', 'child'))
+
     await store.initialize()
     store.enter()
     store.createSiblingOrFirstChild(0)
+
     store.deleteSelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
@@ -2576,11 +3030,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['a'])
@@ -2606,11 +3062,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b'])
@@ -2625,11 +3083,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots[0]!.children).toEqual([])
@@ -2651,11 +3111,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children).toEqual([])
   })
 
@@ -2665,11 +3127,13 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots.map((node) => node.id)).toEqual(['root'])
@@ -2688,11 +3152,13 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteEmptySelected()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots.map((node) => node.id)).toEqual(['r2'])
@@ -2707,8 +3173,10 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(nonEmpty, ids('unused'))
+
     await store.initialize()
     store.deleteEmptySelected()
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [{ id: 'a' }] }] } })
 
     const emptyParent = loadedState(
@@ -2716,8 +3184,10 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const parentStore = new EditorStore(emptyParent, ids('unused'))
+
     await parentStore.initialize()
     parentStore.deleteEmptySelected()
+
     expect(parentStore.getSnapshot()).toMatchObject({
       status: 'ready',
       document: { roots: [{ id: 'root' }] },
@@ -2742,11 +3212,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('up', 1)
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
@@ -2765,6 +3237,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('up', 1)
@@ -2782,6 +3255,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('Expected a ready editor.')
@@ -2790,6 +3264,7 @@ describe('EditorStore', () => {
     store.moveSelection('down', 1)
 
     const after = store.getSnapshot()
+
     expect(after.status).toBe('ready')
     if (after.status === 'ready') expect(after.focus).toBe(before.focus)
   })
@@ -2800,6 +3275,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('up', 3)
@@ -2824,6 +3300,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('down', 0)
@@ -2837,6 +3314,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('down', 0)
@@ -2847,16 +3325,22 @@ describe('EditorStore', () => {
   it('groups direct text edits until a structural boundary', async () => {
     vi.useFakeTimers()
     const store = new EditorStore(createServices(), ids('root', 'sibling'))
+
     await store.initialize()
     store.editText('root', 'a')
     store.editText('root', 'ab')
     vi.advanceTimersByTime(5_000)
+
     store.undo()
     let state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('')
+
     store.redo()
     state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('ab')
+
     vi.useRealTimers()
   })
 
@@ -2864,12 +3348,16 @@ describe('EditorStore', () => {
   it('uses image clipboard data in preference to text and keeps it undoable', async () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1, 2]) })
     const store = new EditorStore(services, ids('root', 'image'))
+
     await store.initialize()
     await store.paste('root', 0)
     let state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.attachment?.id).toBe('image')
+
     store.undo()
     state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.attachment).toBeUndefined()
   })
 
@@ -2879,6 +3367,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     expect(await store.copy('root', 2, 2)).toBe(false)
@@ -2888,6 +3377,7 @@ describe('EditorStore', () => {
     services.writeClipboard = async () => {
       throw new Error('clipboard unavailable')
     }
+
     await expect(store.cut('root', 0, 4)).rejects.toThrow('clipboard unavailable')
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'copy me' }] } })
   })
@@ -2908,13 +3398,18 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 0, 4)
+
     store.selectNode('other', 0)
     release!()
+
     await expect(pending).resolves.toBe(true)
+
     const state = store.getSnapshot()
     if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(state.document.roots[0]!.text).toBe('copy me')
   })
 
@@ -2930,11 +3425,14 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 1, 2)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.editText('root', 'Xabc')
     release!()
+
     await expect(pending).resolves.toBe(true)
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
@@ -2957,10 +3455,13 @@ describe('EditorStore', () => {
       })
     }
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 1, 2)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     release!()
+
     await expect(pending).resolves.toBe(true)
     expect(payloads).toEqual([{ text: 'b', html: 'b' }])
     expect(store.getSnapshot()).toMatchObject({
@@ -2968,9 +3469,13 @@ describe('EditorStore', () => {
       document: { roots: [{ text: 'ac' }] },
       focus: { nodeId: 'root', cursor: 1 },
     })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+
     store.redo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'ac' }] } })
   })
 
@@ -2990,13 +3495,18 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 1, 2)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.editText('other', 'changed')
     release!()
+
     await expect(pending).resolves.toBe(true)
+
     const state = store.getSnapshot()
+
     expect(state).toMatchObject({
       status: 'ready',
       document: {
@@ -3022,13 +3532,18 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 1, 2)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.deleteSelected()
     release!()
+
     await expect(pending).resolves.toBe(true)
+
     const state = store.getSnapshot()
+
     expect(state).toMatchObject({ status: 'ready', document: { roots: [{ id: 'other', text: 'other' }] } })
     if (state.status === 'ready') expect(state.operationError).toBeUndefined()
   })
@@ -3044,14 +3559,19 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.cut('root', 1, 2)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.editText('root', 'abcX')
     store.undo()
     release!()
+
     await expect(pending).resolves.toBe(true)
+
     const state = store.getSnapshot()
+
     expect(state).toMatchObject({ status: 'ready', document: { roots: [{ text: 'ac' }] } })
     if (state.status === 'ready') expect(state.operationError).toBeUndefined()
   })
@@ -3060,17 +3580,25 @@ describe('EditorStore', () => {
     const services = createServices()
     services.writeClipboard = async () => undefined
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
 
     store.editText('root', 'hello')
+
     await expect(store.cut('root', 0, 2)).resolves.toBe(true)
+
     store.editText('root', 'lloX')
 
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'llo' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'hello' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
   })
 
@@ -3090,14 +3618,17 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const pending = store.paste('root', 0)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.selectNode('other', 0)
     release!({ kind: 'text', text: 'ignored' })
     await pending
     const state = store.getSnapshot()
     if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(state.document.roots[0]!.text).toBe('')
   })
 
@@ -3118,14 +3649,17 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('attachment'))
+
     await store.initialize()
     const pending = store.paste('root', 0)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     store.selectNode('other', 0)
     release!()
     await pending
     const state = store.getSnapshot()
     if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(state.document.roots[0]!.attachment).toBeUndefined()
   })
 
@@ -3135,11 +3669,13 @@ describe('EditorStore', () => {
       createServices({ kind: 'image', png: new Uint8Array([1]) }),
       ids('root', 'first-image', 'second-image', 'image-node'),
     )
+
     await store.initialize()
     await store.paste('root', 0)
     await store.paste('root', 0)
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots.map((node) => node.attachment?.id)).toEqual(['first-image', 'second-image'])
@@ -3149,13 +3685,16 @@ describe('EditorStore', () => {
 
   it('moves a dragged displayed sibling and keeps it selected', async () => {
     const store = new EditorStore(createServices(), ids('root', 'second'))
+
     await store.initialize()
     store.createSiblingOrFirstChild(0)
+
     store.editText('second', 'second')
     store.selectNode('second', 4)
     store.moveNodeTo('second', 0)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['second', 'root'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('second')
     expect(state.status === 'ready' && state.focus.cursor).toBe(4)
@@ -3175,6 +3714,7 @@ describe('EditorStore', () => {
     await store.initialize()
 
     const snapshot = store.getSnapshot()
+
     expect(snapshot.status).toBe('ready')
     expect(snapshot.status === 'ready' && snapshot.document.roots[0]?.attachment?.id).toBe('missing')
     expect(services.saves).toEqual([])
@@ -3190,11 +3730,13 @@ describe('EditorStore', () => {
       location: { currentParentId: 'parent', selectedNodeId: 'parent' },
     })
     const store = new EditorStore(services, ids('new-image', 'sibling'))
+
     await store.initialize()
 
     await store.paste('parent', 0)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'sibling' })
   })
 
@@ -3214,15 +3756,18 @@ describe('EditorStore', () => {
       location: { currentParentId: 'current', selectedNodeId: 'current' },
     })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.navigateToAncestor('parent')
     let state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'current' })
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'current', cursor: 0 })
 
     store.navigateToAncestor(null)
     state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
   })
 
@@ -3234,6 +3779,7 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'XYZ' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     await store.paste('root', 3)
@@ -3248,6 +3794,7 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: '' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.editText('root', 'abcd')
@@ -3255,7 +3802,9 @@ describe('EditorStore', () => {
     await store.paste('root', 4)
 
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abcd' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
   })
 
@@ -3266,13 +3815,17 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.paste('root', 0)
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ links: [{ url: 'https://example.com' }] }] } })
 
     services.readClipboard = async () => ({ kind: 'text', text: 'example.com' })
+
     await store.paste('root', 19)
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('https://example.comexample.com')
   })
 
@@ -3283,8 +3836,10 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.paste('root', 0)
+
     expect(store.deleteLink('root', 19)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
   })
@@ -3304,6 +3859,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     expect(store.deleteLink('root', 20)).toBe(true)
@@ -3321,12 +3877,16 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.paste('root', 0)
     store.deleteLink('root', 19)
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ links: [{ url: 'https://example.com' }] }] } })
+
     store.redo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
   })
 
@@ -3337,11 +3897,13 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'one\ntwo\nthree' })
     const store = new EditorStore(services, ids('two', 'three'))
+
     await store.initialize()
 
     await store.paste('root', 3)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots.map((node) => node.text)).toEqual([
       'abcone',
       'two',
@@ -3364,11 +3926,13 @@ describe('EditorStore', () => {
       { currentParentId: 'parent', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     expect(store.deleteSelected()).toBe(false)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children[0]!.id).toBe('parent')
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
   })
@@ -3384,11 +3948,13 @@ describe('EditorStore', () => {
       { currentParentId: 'r1', selectedNodeId: 'r1' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     expect(store.deleteSelected()).toBe(false)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['r1', 'r2'])
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'r1', selectedNodeId: 'r1' })
   })
@@ -3410,11 +3976,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteSelected()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('b')
   })
@@ -3436,11 +4004,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.deleteSelected()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['a'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
   })
@@ -3451,11 +4021,13 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('replacement'))
+
     await store.initialize()
 
     store.deleteSelected()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots.map((node) => node.id)).toEqual(['replacement'])
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: null, selectedNodeId: 'replacement' })
   })
@@ -3466,12 +4038,14 @@ describe('EditorStore', () => {
       { currentParentId: 'parent', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('child'))
+
     await store.initialize()
     store.createSiblingOrFirstChild(0)
 
     store.undo()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children[0]!.children).toEqual([])
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
   })
@@ -3482,19 +4056,23 @@ describe('EditorStore', () => {
       throw new Error('disk full')
     }
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
 
     await vi.waitFor(() => {
       const state = store.getSnapshot()
+
       expect(state.status === 'ready' && state.saveError).toContain('disk full')
     })
 
     services.save = async (state) => {
       services.saves.push(state)
     }
+
     store.editText('root', 'recovered')
     await store.flushPersistence()
     const recovered = store.getSnapshot()
+
     expect(recovered).toMatchObject({ status: 'ready' })
     if (recovered.status === 'ready') expect(recovered.saveError).toBeUndefined()
   })
@@ -3505,6 +4083,7 @@ describe('EditorStore', () => {
       throw new Error('cleanup failed')
     }
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
 
     await expect(store.flushPersistence()).rejects.toThrow('cleanup failed')
@@ -3519,6 +4098,7 @@ describe('EditorStore', () => {
         release = resolve
       })
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
 
     let flushed = false
@@ -3526,15 +4106,19 @@ describe('EditorStore', () => {
       flushed = true
     })
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
+
     expect(flushed).toBe(false)
+
     release!()
     await pending
+
     expect(flushed).toBe(true)
   })
 
   it('flushes text typed while a quit save is in flight', async () => {
     const { services, pending } = deferredSaveServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
 
     store.editText('root', 'before quit')
@@ -3550,8 +4134,10 @@ describe('EditorStore', () => {
 
     expect(flushed).toBe(false)
     expect(pending).toHaveLength(2)
+
     pending[1]!.resolve()
     await flush
+
     expect(flushed).toBe(true)
     expect(services.saves.at(-1)).toMatchObject({
       document: { roots: [{ text: 'before quit typed while quit save pending' }] },
@@ -3561,11 +4147,13 @@ describe('EditorStore', () => {
   it('commits a registered pending edit before the flush captures a save', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
     const order: string[] = []
     let committed = false
+
     store.registerPendingEditFinisher(() => {
       order.push('finish')
       if (committed) return false
@@ -3588,10 +4176,12 @@ describe('EditorStore', () => {
   it('retains a pending-edit commit after a failed flush and saves it on retry', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
     let commits = 0
+
     store.registerPendingEditFinisher(() => {
       if (commits > 0) return false
       commits += 1
@@ -3605,7 +4195,9 @@ describe('EditorStore', () => {
     await expect(store.flushPersistence()).rejects.toThrow('disk full')
 
     expect(commits).toBe(1)
+
     const failed = store.getSnapshot()
+
     expect(failed.status === 'ready' && failed.document.roots[0]!.text).toBe('typed')
 
     services.save = async (state) => {
@@ -3621,6 +4213,7 @@ describe('EditorStore', () => {
     const clock = new FakeClock()
     const { store, services } = await lockEditor(clock)
     let commits = 0
+
     store.registerPendingEditFinisher(() => {
       if (commits > 0) return false
       commits += 1
@@ -3638,20 +4231,25 @@ describe('EditorStore', () => {
 
     expect(commits).toBe(1)
     expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'replace commit' }] } })
+
     const recovered = store.getSnapshot()
+
     expect(recovered.status === 'ready' && recovered.persistenceLocked).toBeUndefined()
   })
 
   it('captures a pending edit completed while the flush save is in flight', async () => {
     const { services, pending } = deferredSaveServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
     pending.length = 0
+
     store.editText('root', 'before quit')
     let armed = false
     let committed = false
+
     store.registerPendingEditFinisher(() => {
       if (!armed || committed) return false
       committed = true
@@ -3662,8 +4260,10 @@ describe('EditorStore', () => {
     const flush = store.flushPersistence()
     await vi.waitFor(() => expect(pending).toHaveLength(1))
     armed = true
+
     pending[0]!.resolve()
     await vi.waitFor(() => expect(pending).toHaveLength(2))
+
     pending[1]!.resolve()
     await flush
 
@@ -3674,13 +4274,16 @@ describe('EditorStore', () => {
   it('waits for the immediate save a post-save pending-edit commit requests', async () => {
     const { services, pending } = deferredSaveServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
     pending.length = 0
+
     store.editText('root', 'before')
     let armed = false
     let committed = false
+
     store.registerPendingEditFinisher(() => {
       if (!armed || committed) return false
       committed = true
@@ -3691,6 +4294,7 @@ describe('EditorStore', () => {
     const flush = store.flushPersistence()
     await vi.waitFor(() => expect(pending).toHaveLength(1))
     armed = true
+
     pending[0]!.resolve()
     await vi.waitFor(() => expect(pending).toHaveLength(2))
 
@@ -3698,11 +4302,14 @@ describe('EditorStore', () => {
     void flush.then(() => {
       flushed = true
     })
+
     await tick()
+
     expect(flushed).toBe(false)
 
     pending[1]!.resolve()
     await flush
+
     expect(services.saves.at(-1)).toMatchObject({
       document: { roots: [{ text: 'one two three four five six seven eight nine ten' }] },
     })
@@ -3711,6 +4318,7 @@ describe('EditorStore', () => {
   it('stops invoking a pending-edit finisher after it unregisters', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     const finish = vi.fn(() => false)
@@ -3727,6 +4335,7 @@ describe('EditorStore', () => {
     async (stage) => {
       const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
       const store = new EditorStore(services, ids('root', 'image'))
+
       await store.initialize()
       store.editText('root', 'text')
       store.endTextSession()
@@ -3752,6 +4361,7 @@ describe('EditorStore', () => {
       })
       try {
         await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
         expect(flushed).toBe(false)
       } finally {
         release()
@@ -3762,6 +4372,7 @@ describe('EditorStore', () => {
         stage === 'attachment write'
           ? { text: 'text', attachment: { id: 'image', mimeType: 'image/png' } }
           : { text: stage === 'cut' ? '' : 'pastedtext' }
+
       expect(services.saves.at(-1)).toMatchObject({ document: { roots: [expected] } })
     },
   )
@@ -3769,6 +4380,7 @@ describe('EditorStore', () => {
   it('rejects a flush when a pending attachment write fails and permits a later retry', async () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
     const store = new EditorStore(services, ids('root', 'image'))
+
     await store.initialize()
     await store.flushPersistence()
     let reject!: (error: Error) => void
@@ -3782,22 +4394,27 @@ describe('EditorStore', () => {
     const pasteFailure = expect(paste).rejects.toThrow('attachment failed')
     await vi.waitFor(() => expect(services.writeAttachment).toHaveBeenCalledOnce())
     const flushFailure = expect(store.flushPersistence()).rejects.toThrow('attachment failed')
+
     reject(new Error('attachment failed'))
     await pasteFailure
     await flushFailure
+
     await expect(store.flushPersistence()).resolves.toBeUndefined()
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
   })
 
   it('surfaces operation errors until the next successful command', async () => {
     const store = new EditorStore(createServices(), ids('root'))
+
     await store.initialize()
 
     store.reportError(new Error('clipboard unavailable'))
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: 'clipboard unavailable' })
 
     store.editText('root', 'ok')
     const recovered = store.getSnapshot()
+
     expect(recovered).toMatchObject({ status: 'ready' })
     if (recovered.status === 'ready') expect(recovered.operationError).toBeUndefined()
   })
@@ -3810,9 +4427,11 @@ describe('EditorStore', () => {
       ),
       ids('unused'),
     )
+
     await store.initialize()
 
     store.replaceTextRange('root', 2, 3, '')
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abde' }] } })
 
     store.undo()
@@ -3854,18 +4473,22 @@ describe('EditorStore', () => {
       ),
       ids('unused'),
     )
+
     await store.initialize()
 
     store.deleteEmptySelected()
+
     expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'a', cursor: 5 } })
 
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ children: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] }] },
       focus: { nodeId: 'b', cursor: 0 },
     })
 
     store.redo()
+
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ children: [{ id: 'a' }, { id: 'c' }] }] },
       location: { currentParentId: 'root', selectedNodeId: 'c' },
@@ -3875,6 +4498,7 @@ describe('EditorStore', () => {
 
   it('ignores repeated text and empty undo or redo', async () => {
     const store = new EditorStore(createServices(), ids('root'))
+
     await store.initialize()
 
     store.editText('root', '')
@@ -3882,6 +4506,7 @@ describe('EditorStore', () => {
     store.redo()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('')
   })
 
@@ -3893,31 +4518,42 @@ describe('EditorStore', () => {
       ),
       ids('unused'),
     )
+
     await store.initialize()
     const initial = store.getSnapshot()
+
     expect(initial.status).toBe('ready')
+
     if (initial.status !== 'ready') return
 
     store.undo()
     store.redo()
     store.leave()
+
     expect(store.getSnapshot()).toBe(initial)
 
     store.selectNode('root', 2)
     const reselection = store.getSnapshot()
+
     expect(reselection).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { nodeId: 'root', cursor: 2 } })
+
     if (reselection.status !== 'ready') return
+
     expect(reselection.focus.token).not.toBe(initial.focus.token)
 
     store.moveSelection('up', 2)
     const clamped = store.getSnapshot()
+
     expect(clamped).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { nodeId: 'root', cursor: 0 } })
+
     if (clamped.status !== 'ready') return
+
     expect(clamped.focus.token).not.toBe(reselection.focus.token)
   })
 
   it('ends the editing session after a standalone text edit', async () => {
     const store = new EditorStore(createServices(), ids('root'))
+
     await store.initialize()
 
     store.editText('root', 'a')
@@ -3945,11 +4581,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelectedTo(2)
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.children.map((node) => node.id)).toEqual(['b', 'a'])
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
   })
@@ -3971,16 +4609,19 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.moveSelection('down', 10)
     let state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.location.selectedNodeId).toBe('a')
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
 
     store.selectNode('b', 10)
     store.moveSelection('up', 10)
     state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
   })
 
@@ -4002,11 +4643,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('Expected a ready editor.')
 
     store.moveSelectionBoundary('first', 99)
+
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       location: { currentParentId: 'root', selectedNodeId: 'a' },
@@ -4014,6 +4657,7 @@ describe('EditorStore', () => {
     })
 
     store.moveSelectionBoundary('parent', 99)
+
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       location: { currentParentId: 'root', selectedNodeId: 'root' },
@@ -4022,6 +4666,7 @@ describe('EditorStore', () => {
 
     const after = store.getSnapshot()
     if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(after.document).toBe(before.document)
   })
 
@@ -4043,23 +4688,27 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('Expected a ready editor.')
 
     store.moveSelectionBoundary('last', 99, 1)
+
     expect(store.getSnapshot()).toMatchObject({
       location: { currentParentId: 'root', selectedNodeId: 'a' },
       focus: { nodeId: 'a', cursor: 5 },
     })
 
     store.moveSelectionBoundary('last', 99, 10)
+
     expect(store.getSnapshot()).toMatchObject({
       location: { currentParentId: 'root', selectedNodeId: 'b' },
       focus: { nodeId: 'b', cursor: 1 },
     })
 
     store.moveSelectionBoundary('last', 99)
+
     expect(store.getSnapshot()).toMatchObject({
       location: { currentParentId: 'root', selectedNodeId: 'b' },
       focus: { nodeId: 'b', cursor: 1 },
@@ -4067,6 +4716,7 @@ describe('EditorStore', () => {
 
     const after = store.getSnapshot()
     if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(after.document).toBe(before.document)
   })
 
@@ -4087,17 +4737,21 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     store.toggleExpansion('a')
+
     expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'a1', 'b'])
 
     // G reaches the location's last visible row (Beta), walking past the expanded branch, not
     // Alpha's own last real sibling.
     store.moveSelectionBoundary('last', 99)
+
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { nodeId: 'b', cursor: 4 } })
 
     // A count of 2 reaches the second visible row (the grandchild), not Alpha's own second sibling.
     store.moveSelectionBoundary('last', 99, 2)
+
     expect(store.getSnapshot()).toMatchObject({
       location: { selectedNodeId: 'a1' },
       focus: { nodeId: 'a1', cursor: 10 },
@@ -4106,6 +4760,7 @@ describe('EditorStore', () => {
     // Leaving the branch rightward from its last visible descendant reaches Beta, and entering it
     // leftward from Beta returns to that same descendant.
     store.selectNode('a1', 'Grandchild'.length)
+
     expect(store.moveHorizontal('right', 'Grandchild'.length)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
 
@@ -4133,6 +4788,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     store.toggleExpansion('a')
 
@@ -4140,6 +4796,7 @@ describe('EditorStore', () => {
     // reaches the location's last visible row (Beta), exactly as it did through the old
     // heading-specific `displayedNodes` branch this task removed.
     store.moveSelectionBoundary('last', 99)
+
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { nodeId: 'b', cursor: 4 } })
   })
 
@@ -4160,12 +4817,14 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'a' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     expect(store.moveHorizontal('left', 0)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { cursor: 6 } })
 
     store.selectNode('a', 0)
+
     expect(store.moveHorizontal('right', 5)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'b' }, focus: { cursor: 0 } })
 
@@ -4174,21 +4833,25 @@ describe('EditorStore', () => {
 
     store.selectNode('root', 6)
     store.moveSelection('up', 6)
+
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' }, focus: { cursor: 0 } })
 
     store.selectNode('root', 6)
+
     expect(store.moveHorizontal('right', 6)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'a' }, focus: { cursor: 0 } })
   })
 
   it('does not move horizontally away from a root boundary or from the current parent', async () => {
     const store = new EditorStore(createServices(), ids('root'))
+
     await store.initialize()
 
     expect(store.moveHorizontal('left', 0)).toBe(false)
     expect(store.moveHorizontal('right', 0)).toBe(false)
 
     store.enter()
+
     expect(store.moveHorizontal('left', 0)).toBe(false)
     expect(store.moveHorizontal('right', 0)).toBe(false)
   })
@@ -4199,6 +4862,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.selectNode('missing', 0)
@@ -4212,6 +4876,7 @@ describe('EditorStore', () => {
     })
 
     const blank = new EditorStore(createServices(), ids('root'))
+
     expect(() => blank.deleteSelected()).toThrow('not ready')
   })
 
@@ -4229,11 +4894,13 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.enter()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'child' })
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'child', cursor: 0 })
   })
@@ -4244,6 +4911,7 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.enter()
@@ -4271,8 +4939,10 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'b' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     store.moveNodeTo('b', 0)
+
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       document: { roots: [{ children: [{ id: 'b' }, { id: 'a' }] }] },
@@ -4293,8 +4963,10 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'one\ntwo' })
     const store = new EditorStore(services, ids('two'))
+
     await store.initialize()
     await store.paste('root', 3)
+
     expect(store.getSnapshot()).toMatchObject({
       status: 'ready',
       document: { roots: [{ text: 'abcone' }, { text: 'twodef' }] },
@@ -4319,13 +4991,16 @@ describe('EditorStore', () => {
       { currentParentId: 'root', selectedNodeId: 'parent' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     store.deleteSelected()
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', document: { roots: [{ children: [] }] } })
 
     store.undo()
 
     const state = store.getSnapshot()
+
     expect(state.status).toBe('ready')
     if (state.status === 'ready') {
       expect(state.document.roots[0]!.children[0]!.id).toBe('parent')
@@ -4339,14 +5014,17 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('replacement'))
+
     await store.initialize()
     store.deleteSelected()
     const deleted = store.getSnapshot()
+
     expect(deleted.status === 'ready' && deleted.document.roots[0]!.attachment).toBeUndefined()
 
     store.undo()
 
     const restored = store.getSnapshot()
+
     expect(restored.status === 'ready' && restored.document.roots[0]!.attachment?.id).toBe('image')
   })
 
@@ -4361,6 +5039,7 @@ describe('EditorStore', () => {
       cleanups.push(referencedIds)
     }
     const store = new EditorStore(services, ids('replacement'))
+
     await store.initialize()
 
     store.deleteSelected()
@@ -4376,16 +5055,20 @@ describe('EditorStore', () => {
       cleanups.push([...referencedIds])
     }
     const store = new EditorStore(services, ids('root', 'image'))
+
     await store.initialize()
     await store.paste('root', 0)
     await store.flushPersistence()
+
     expect(cleanups.at(-1)).toContain('image')
 
     store.undo()
     await store.flushPersistence()
+
     expect(cleanups.at(-1)).toContain('image')
 
     cleanups.length = 0
+
     store.editText('root', 'changed')
     await store.flushPersistence()
 
@@ -4398,6 +5081,7 @@ describe('EditorStore', () => {
   it('does not save on every keystroke and saves when ten words have been inserted', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -4408,10 +5092,12 @@ describe('EditorStore', () => {
       store.editText('root', text)
       await new Promise((resolve) => setTimeout(resolve, 0))
     }
+
     expect(services.saves).toEqual([])
 
     store.editText('root', `${text} w9`)
     await store.flushPersistence()
+
     expect(services.saves).toHaveLength(1)
   })
 
@@ -4419,6 +5105,7 @@ describe('EditorStore', () => {
     const services = createServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -4431,9 +5118,11 @@ describe('EditorStore', () => {
 
     store.editText('root', 'a b c')
     clock.runAll()
+
     await expect(store.flushPersistence()).rejects.toThrow('disk full')
 
     fail = false
+
     store.editText('root', 'a b c d e f g h i j')
     await new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -4454,20 +5143,25 @@ describe('EditorStore', () => {
       })
     }
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toHaveLength(1)
 
     store.editText('root', tenWords + tenWords)
     await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toHaveLength(1)
 
     pending[0]!.resolve()
     await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toHaveLength(2)
 
     pending[1]!.reject(new Error('second save failed'))
@@ -4475,6 +5169,7 @@ describe('EditorStore', () => {
 
     store.editText('root', `${tenWords}${tenWords}eleven `)
     await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toHaveLength(3)
   })
 
@@ -4482,18 +5177,22 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
     store.editText('root', tenWords + tenWords)
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     pending[0]!.reject(new Error('first save failed'))
     await tick()
+
     expect(services.saves).toHaveLength(2)
 
     pending[1]!.resolve()
@@ -4501,6 +5200,7 @@ describe('EditorStore', () => {
 
     store.editText('root', `${tenWords}${tenWords}eleven `)
     await tick()
+
     expect(services.saves).toHaveLength(2)
   })
 
@@ -4508,10 +5208,12 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
     store.editText('root', tenWords + tenWords)
@@ -4524,6 +5226,7 @@ describe('EditorStore', () => {
 
     store.editText('root', `${tenWords}${tenWords}eleven `)
     await tick()
+
     expect(services.saves).toHaveLength(3)
 
     pending[2]!.resolve()
@@ -4531,6 +5234,7 @@ describe('EditorStore', () => {
 
     store.editText('root', `${tenWords}${tenWords}eleven twelve `)
     await tick()
+
     expect(services.saves).toHaveLength(3)
   })
 
@@ -4538,10 +5242,12 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
     store.editText('root', tenWords + tenWords)
@@ -4551,10 +5257,12 @@ describe('EditorStore', () => {
     await tick()
     pending[1]!.resolve()
     await tick()
+
     expect(services.saves).toHaveLength(2)
 
     store.editText('root', `${tenWords}${tenWords}eleven `)
     await tick()
+
     expect(services.saves).toHaveLength(2)
   })
 
@@ -4562,26 +5270,31 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
 
     store.editText('root', 'a b c')
     clock.runAll()
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     store.editText('root', 'a b c d e f g h i')
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     pending[0]!.resolve()
     await tick()
     store.editText('root', 'a b c d e f g h i j')
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     store.editText('root', 'a b c d e f g h i j k l m n')
     await tick()
+
     expect(services.saves).toHaveLength(2)
   })
 
@@ -4598,6 +5311,7 @@ describe('EditorStore', () => {
       })
     }
     const store = new EditorStore(services, ids('unused'), new FakeClock())
+
     await store.initialize()
     await store.flushPersistence()
     services.cleanupAttachments = async () => {
@@ -4606,17 +5320,21 @@ describe('EditorStore', () => {
 
     store.deleteSelected()
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     pending[0]!.resolve()
     await tick()
+
     expect(services.saves).toHaveLength(1)
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
 
     store.editText('root', `${tenWords}eleven `)
     await tick()
+
     expect(services.saves).toHaveLength(1)
   })
 
@@ -4624,28 +5342,33 @@ describe('EditorStore', () => {
     const services = createServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     store.editText('root', 'hello')
     await new Promise((resolve) => setTimeout(resolve, 0))
+
     expect(services.saves).toEqual([])
 
     clock.runAll()
     await store.flushPersistence()
+
     expect(services.saves).toHaveLength(1)
   })
 
   it('saves immediately when an image is pasted', async () => {
     const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
     const store = new EditorStore(services, ids('root', 'image'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     await store.paste('root', 0)
     await store.flushPersistence()
+
     expect(services.saves.at(-1)).toMatchObject({
       document: { roots: [{ attachment: { id: 'image', mimeType: 'image/png' } }] },
     })
@@ -4658,12 +5381,14 @@ describe('EditorStore', () => {
     )
     services.readClipboard = async () => ({ kind: 'text', text: 'https://example.com' })
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     await store.paste('root', 0)
     await store.flushPersistence()
+
     expect(services.saves).toHaveLength(1)
   })
 
@@ -4682,6 +5407,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -4699,6 +5425,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -4710,7 +5437,9 @@ describe('EditorStore', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(services.saves).toEqual([])
+
     await store.flushPersistence()
+
     expect(services.saves).toHaveLength(1)
   })
 
@@ -4721,6 +5450,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -4741,7 +5471,9 @@ describe('EditorStore', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(services.saves).toEqual([])
+
     await store.flushPersistence()
+
     expect(services.saves).toHaveLength(1)
   })
 
@@ -4750,17 +5482,24 @@ describe('EditorStore', () => {
     vi.useFakeTimers()
     try {
       const store = new EditorStore(createServices(), ids('root'))
+
       await store.initialize()
       store.editText('root', 'a')
       await vi.advanceTimersByTimeAsync(4_000)
+
       store.editText('root', 'ab')
       await vi.advanceTimersByTimeAsync(4_000)
+
       store.editText('root', 'abc')
       await vi.advanceTimersByTimeAsync(5_000)
+
       store.editText('root', 'abcd')
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
     } finally {
       vi.useRealTimers()
@@ -4770,33 +5509,46 @@ describe('EditorStore', () => {
   // @requirement PRODUCT.md §10
   it.each(['single', 'disjoint'] as const)('keeps a %s replacement separate from following typing', async (kind) => {
     const store = new EditorStore(createServices(), ids('root'), new FakeClock())
+
     await store.initialize()
     store.editText('root', 'abc')
     if (kind === 'single') store.replaceTextRange('root', 1, 2, 'X')
     else store.replaceTextRanges('root', [{ start: 1, end: 2, inserted: 'X' }])
+
     store.editText('root', 'aXcd')
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'aXc' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abc' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+
     store.redo()
     store.redo()
     store.redo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'aXcd' }] } })
   })
 
   // @requirement PRODUCT.md §10
   it('keeps an unchanged disjoint replacement inside the ongoing typing session', async () => {
     const store = new EditorStore(createServices(), ids('root'), new FakeClock())
+
     await store.initialize()
     store.editText('root', 'abc')
     store.replaceTextRanges('root', [{ start: 1, end: 2, inserted: 'b' }])
     store.editText('root', 'abcd')
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
+
     store.redo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'abcd' }] } })
   })
 
@@ -4813,13 +5565,17 @@ describe('EditorStore', () => {
         ids('unused'),
         new FakeClock(),
       )
+
       await store.initialize()
       store.editContent('root', `${text}A`, links ?? [], false)
       const before = store.getSnapshot()
+
       expect(store.deleteLink('root', 2)).toBe(false)
       expect(store.getSnapshot()).toBe(before)
+
       store.editContent('root', `${text}AB`, links ?? [], false)
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text }] } })
     },
   )
@@ -4836,19 +5592,27 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
     store.editContent('root', `${url}A`, links, false)
+
     expect(store.deleteLink('root', url.length)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ text: 'A' }] },
       focus: { nodeId: 'root', cursor: 0 },
     })
+
     store.editText('root', 'AB')
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'A' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: `${url}A`, links }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: url, links }] } })
   })
 
@@ -4858,15 +5622,21 @@ describe('EditorStore', () => {
     async (kind) => {
       const { store, services } = await lockEditor(new FakeClock())
       const before = store.getSnapshot()
+
       expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
+
       if (kind === 'single') store.replaceTextRange('root', 0, 3, 'changed')
       else store.replaceTextRanges('root', [{ start: 0, end: 3, inserted: 'changed' }])
+
       expect(store.getSnapshot()).toBe(before)
+
       services.save = async () => undefined
       await store.flushPersistence()
+
       store.editText('root', 'recovered')
       store.editText('root', 'recovered typing')
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({
         document: { roots: [{ text: 'one two three four five six seven eight nine ten' }] },
       })
@@ -4898,7 +5668,9 @@ describe('EditorStore', () => {
       ids('unused'),
       new FakeClock(),
     )
+
     await store.initialize()
+
     expect(store.deleteLink('root', start + second.length)).toBe(true)
     expect(store.getSnapshot()).toMatchObject({
       document: { roots: [{ text: `A${first} BC`, links: [{ start: 1, end: first.length + 1, url: first }] }] },
@@ -4916,10 +5688,12 @@ describe('EditorStore', () => {
     )
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('unused'), clock)
+
     await store.initialize()
     services.save = async () => {
       throw new Error('disk full')
     }
+
     store.editContent('root', `${url} one two three four five six seven eight nine ten`, links, false)
     await tick()
     clock.runAll()
@@ -4927,6 +5701,7 @@ describe('EditorStore', () => {
     clock.runAll()
     await tick()
     const before = store.getSnapshot()
+
     expect(before).toMatchObject({ status: 'ready', persistenceLocked: true })
     expect(store.deleteLink('root', url.length)).toBe(false)
     expect(store.getSnapshot()).toBe(before)
@@ -4939,6 +5714,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.replaceTextRange('root', 9, 10, 'A')
@@ -4960,6 +5736,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.replaceTextRanges('root', [
@@ -4975,6 +5752,7 @@ describe('EditorStore', () => {
     })
 
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text }] } })
   })
 
@@ -4989,6 +5767,7 @@ describe('EditorStore', () => {
     for (let length = 0; length < 120; length += 1) store.replaceTextRange('root', length, length, 'x')
     for (let length = 119; length >= 0; length -= 1) {
       store.undo()
+
       expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'x'.repeat(length) }] } })
     }
   })
@@ -4999,12 +5778,15 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     store.replaceTextRanges('root', [{ start: 2, end: 2, inserted: '' }])
 
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'plain' }] } })
+
     store.undo()
+
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'plain' }] } })
   })
 
@@ -5014,6 +5796,7 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'root' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
@@ -5037,18 +5820,24 @@ describe('EditorStore', () => {
       order.push('save')
     }
     const store = new EditorStore(services, ids('replacement'))
+
     await store.initialize()
     await store.flushPersistence()
+
     expect(order).toEqual(['cleanup'])
 
     order.length = 0
+
     store.editText('root', 'Changed')
     await store.flushPersistence()
+
     expect(order).toEqual(['save'])
 
     order.length = 0
+
     store.deleteSelected()
     await store.flushPersistence()
+
     expect(order).toEqual(['save', 'cleanup'])
   })
 
@@ -5061,14 +5850,18 @@ describe('EditorStore', () => {
     }
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
+
     await expect(store.flushPersistence()).rejects.toThrow('disk full')
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'disk full' })
 
     fail = false
+
     clock.runAll()
     await store.flushPersistence()
     const recovered = store.getSnapshot()
+
     expect(recovered).toMatchObject({ status: 'ready' })
     if (recovered.status === 'ready') expect(recovered.saveError).toBeUndefined()
     expect(services.saves).toHaveLength(1)
@@ -5089,13 +5882,17 @@ describe('EditorStore', () => {
     store.selectNode('root', 0)
     clock.runAll()
     await tick()
+
     expect(attempts()).toBe(3)
 
     store.editText('root', 'one two three four five six seven eight nine ten eleven')
     clock.runAll()
     await tick()
+
     expect(attempts()).toBe(3)
+
     const locked = store.getSnapshot()
+
     expect(locked.status === 'ready' && locked.document.roots[0]!.text).toBe(
       'one two three four five six seven eight nine ten',
     )
@@ -5116,6 +5913,7 @@ describe('EditorStore', () => {
 
     store.editText('root', 'changed')
     store.createSiblingOrFirstChild(0)
+
     store.deleteSelected()
     store.undo()
     store.redo()
@@ -5123,13 +5921,16 @@ describe('EditorStore', () => {
     await store.cut('root', 0, 1)
 
     expect(readClipboard).not.toHaveBeenCalled()
+
     const after = store.getSnapshot()
     if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(after.document).toBe(before.document)
     expect(after.document.roots).toHaveLength(1)
 
     store.selectNode('root', 1)
     const selected = store.getSnapshot()
+
     expect(selected.status === 'ready' && selected.location.selectedNodeId).toBe('root')
     await expect(store.copy('root', 0, 1)).resolves.toBe(true)
     expect(writes).toHaveLength(1)
@@ -5145,6 +5946,7 @@ describe('EditorStore', () => {
 
     const after = store.getSnapshot()
     if (after.status !== 'ready') throw new Error('Expected a ready editor.')
+
     expect(after.document).toBe(before.document)
     expect(after.location).toEqual(before.location)
     expect(after.focus).toEqual(before.focus)
@@ -5163,8 +5965,10 @@ describe('EditorStore', () => {
       if (cleanupFails) throw new Error('cleanup failed')
     }
     const store = new EditorStore(services, ids('unused'), clock)
+
     await store.initialize()
     await tick()
+
     expect(cleanupAttempts).toBe(1)
 
     clock.runAll()
@@ -5175,16 +5979,22 @@ describe('EditorStore', () => {
     expect(cleanupAttempts).toBe(3)
     expect(services.saves).toEqual([])
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', saveError: 'cleanup failed' })
+
     const locked = store.getSnapshot()
+
     expect(locked.status === 'ready' && locked.persistenceLocked).toBeUndefined()
 
     cleanupFails = false
+
     store.deleteSelected()
     await store.flushPersistence()
+
     await tick()
 
     expect(cleanupAttempts).toBeGreaterThanOrEqual(4)
+
     const recovered = store.getSnapshot()
+
     expect(recovered.status === 'ready' && recovered.saveError).toBeUndefined()
   })
 
@@ -5202,6 +6012,7 @@ describe('EditorStore', () => {
         failCleanup = reject
       })
     const store = new EditorStore(services, ids('unused'), clock)
+
     await store.initialize()
     await tick()
 
@@ -5225,7 +6036,9 @@ describe('EditorStore', () => {
     await expect(store.flushPersistence()).resolves.toBeUndefined()
 
     expect(services.saves).toHaveLength(1)
+
     const recovered = store.getSnapshot()
+
     expect(recovered).toMatchObject({ status: 'ready' })
     if (recovered.status === 'ready') {
       expect(recovered.persistenceLocked).toBeUndefined()
@@ -5242,24 +6055,31 @@ describe('EditorStore', () => {
       services.saves.push(state)
     }
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     fail = true
+
     await tick()
     clock.runAll()
     await tick()
+
     expect(services.saves).toEqual([])
 
     fail = false
+
     clock.runAll()
     await tick()
+
     expect(services.saves).toHaveLength(1)
 
     fail = true
+
     store.editText('root', `${tenWords}eleven twelve `)
     await tick()
     clock.runAll()
@@ -5268,6 +6088,7 @@ describe('EditorStore', () => {
     await tick()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.persistenceLocked).toBeUndefined()
   })
 
@@ -5275,11 +6096,13 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
     store.editText('root', `${tenWords}eleven `)
@@ -5302,6 +6125,7 @@ describe('EditorStore', () => {
     await tick()
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.persistenceLocked).toBe(true)
     expect(services.saves).toHaveLength(3)
     expect(pending).toHaveLength(3)
@@ -5311,11 +6135,13 @@ describe('EditorStore', () => {
     const { services, pending } = deferredSaveServices()
     const clock = new FakeClock()
     const store = new EditorStore(services, ids('root'), clock)
+
     await store.initialize()
     await store.flushPersistence()
     services.saves.length = 0
 
     const tenWords = 'one two three four five six seven eight nine ten '
+
     store.editText('root', tenWords)
     await tick()
     pending[0]!.reject(new Error('first save failed'))
@@ -5330,6 +6156,7 @@ describe('EditorStore', () => {
 
     clock.runAll()
     await tick()
+
     expect(pending).toHaveLength(3)
 
     store.selectNode('root', 0)
@@ -5339,12 +6166,14 @@ describe('EditorStore', () => {
     await tick()
 
     const locked = store.getSnapshot()
+
     expect(locked.status === 'ready' && locked.persistenceLocked).toBe(true)
     expect(services.saves).toHaveLength(3)
     expect(pending).toHaveLength(3)
 
     clock.runAll()
     await tick()
+
     expect(services.saves).toHaveLength(3)
     expect(pending).toHaveLength(3)
   })
@@ -5352,9 +6181,11 @@ describe('EditorStore', () => {
   it('prompts for quit without saving only while locked and dismisses it', async () => {
     const unlockedServices = createServices()
     const unlocked = new EditorStore(unlockedServices, ids('root'), new FakeClock())
+
     await unlocked.initialize()
     unlocked.requestQuitWithoutSavingPrompt()
     const before = unlocked.getSnapshot()
+
     expect(before.status === 'ready' && before.quitWithoutSavingPrompt).toBeUndefined()
 
     const clock = new FakeClock()
@@ -5362,10 +6193,12 @@ describe('EditorStore', () => {
 
     store.requestQuitWithoutSavingPrompt()
     const locked = store.getSnapshot()
+
     expect(locked.status === 'ready' && locked.quitWithoutSavingPrompt).toBe(true)
 
     store.dismissQuitWithoutSavingPrompt()
     const dismissed = store.getSnapshot()
+
     expect(dismissed.status === 'ready' && dismissed.quitWithoutSavingPrompt).toBeUndefined()
   })
 
@@ -5389,11 +6222,15 @@ describe('EditorStore', () => {
       { currentParentId: 'parent', selectedNodeId: 'grandchild' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     const snapshot = store.getSnapshot()
+
     expect(snapshot.status).toBe('ready')
+
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'child' })
     expect(displayedNodes(snapshot.document, snapshot.location.currentParentId).map((node) => node.id)).toContain(
       snapshot.location.selectedNodeId,
@@ -5421,11 +6258,15 @@ describe('EditorStore', () => {
       { currentParentId: null, selectedNodeId: 'grandchild' },
     )
     const store = new EditorStore(services, ids('unused'))
+
     await store.initialize()
 
     const snapshot = store.getSnapshot()
+
     expect(snapshot.status).toBe('ready')
+
     if (snapshot.status !== 'ready') throw new Error('Editor did not load')
+
     expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
     expect(displayedNodes(snapshot.document, snapshot.location.currentParentId).map((node) => node.id)).toContain(
       snapshot.location.selectedNodeId,
@@ -5456,21 +6297,31 @@ describe('EditorStore', () => {
     it('skips empty or unavailable Vim copies and tracks a pending write before paste', async () => {
       const services = textState('copy me')
       const store = new EditorStore(services, ids('unused'))
+
       await store.initialize()
+
       await expect(store.copyVimContent(undefined)).resolves.toBe(false)
       await expect(store.copyVimContent({ kind: 'text', text: 'copy me' })).resolves.toBe(false)
+
       const pending = gate()
       services.writeClipboardContent = vi.fn(() => pending.promise)
       services.readClipboard = vi.fn(async () => ({ kind: 'text' as const, text: 'copied' }))
       const before = store.getSnapshot()
       const copying = store.copyVimContent({ kind: 'text', text: 'copy me' })
+
       expect(store.getSnapshot()).toBe(before)
+
       const pasting = store.paste('root', 0)
       await Promise.resolve()
+
       expect(services.readClipboard).not.toHaveBeenCalled()
+
       pending.open()
+
       await expect(copying).resolves.toBe(true)
+
       await pasting
+
       expect(rootText(store)).toBe('copiedcopy me')
     })
 
@@ -5481,6 +6332,7 @@ describe('EditorStore', () => {
         writes.push(payload)
       }
       const store = new EditorStore(services, ids('unused'))
+
       await store.initialize()
 
       await expect(store.copy('root', 2, 2)).resolves.toBe(false)
@@ -5492,12 +6344,15 @@ describe('EditorStore', () => {
 
     it('refuses a cut without a clipboard writer and leaves the text and history unchanged', async () => {
       const store = new EditorStore(textState('copy me'), ids('unused'))
+
       await store.initialize()
 
       await expect(store.cut('root', 0, 4)).resolves.toBe(false)
 
       expect(rootText(store)).toBe('copy me')
+
       store.undo()
+
       expect(rootText(store)).toBe('copy me')
     })
 
@@ -5522,9 +6377,11 @@ describe('EditorStore', () => {
       }
       services.readClipboard = async () => ({ kind: 'text', text: 'X' })
       const store = new EditorStore(services, ids('unused'))
+
       await store.initialize()
 
       const failed = kind === 'copy' ? store.copy('root', 0, 2) : store.cut('root', 0, 2)
+
       await expect(failed).rejects.toThrow('clipboard unavailable')
       await expect(store.paste('root', 4)).resolves.toBeUndefined()
 
@@ -5544,19 +6401,24 @@ describe('EditorStore', () => {
           return { kind: 'text', text: 'X' }
         }
         const store = new EditorStore(services, ids('unused'))
+
         await store.initialize()
 
         const earlier = first === 'copy' ? store.copy('root', 0, 1) : store.cut('root', 0, 1)
         const later = store.copy('root', 1, 2)
+
         gates[0]!.open()
         await earlier
         const paste = store.paste('root', 0)
+
         await tick()
+
         expect(reads).toBe(0)
 
         gates[1]!.open()
         await later
         await paste
+
         expect(reads).toBe(1)
         expect(rootText(store)).toBe(first === 'copy' ? 'Xabcd' : 'Xbcd')
       },
@@ -5578,13 +6440,16 @@ describe('EditorStore', () => {
           services.writeAttachment = () => release.promise
         }
         const store = new EditorStore(services, ids('image'))
+
         await store.initialize()
         const operation = stage === 'cut' ? store.cut('root', 0, 2) : store.paste('root', 0)
+
         await tick()
 
         services.load = async () => {
           throw new Error('reload failed')
         }
+
         await store.initialize()
         release.open()
 
@@ -5611,6 +6476,7 @@ describe('EditorStore', () => {
       const services = textState('')
       services.readClipboard = async () => ({ kind: 'text', text: 'X' })
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
 
       store.editText('root', 'ab')
@@ -5622,6 +6488,7 @@ describe('EditorStore', () => {
         store.undo()
         texts.push(rootText(store))
       }
+
       expect(texts).toEqual(['abX', 'ab', ''])
     })
 
@@ -5639,6 +6506,7 @@ describe('EditorStore', () => {
         return release.promise
       }
       const store = new EditorStore(services, ids('root', 'image'), clock)
+
       await store.initialize()
       store.editText('root', 'a')
       store.endTextSession()
@@ -5647,9 +6515,11 @@ describe('EditorStore', () => {
 
       const pasting = store.paste('root', 0)
       await vi.waitFor(() => expect(writing).toBe(true))
+
       store.undo()
       clock.runAll()
       await tick()
+
       expect(cleanups).toHaveLength(1)
       expect(cleanups[0]).toContain('image')
 
@@ -5661,6 +6531,7 @@ describe('EditorStore', () => {
       const services = textState('')
       services.readClipboard = async () => ({ kind: 'image', png: new Uint8Array([1]) })
       const store = new EditorStore(services, ids('image'), new FakeClock())
+
       await store.initialize()
       await store.flushPersistence()
       services.saves.length = 0
@@ -5676,6 +6547,7 @@ describe('EditorStore', () => {
       const services = textState('abc')
       services.readClipboard = async () => ({ kind: 'text', text: '', links: [] })
       const store = new EditorStore(services, ids('unused'))
+
       await store.initialize()
 
       store.editText('root', 'abcd')
@@ -5694,6 +6566,7 @@ describe('EditorStore', () => {
       const services = textState(text)
       services.readClipboard = async () => ({ kind: 'text', text: 'w w w w w w w w w w' })
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       await store.flushPersistence()
       services.saves.length = 0
@@ -5708,6 +6581,7 @@ describe('EditorStore', () => {
       const services = textState('')
       services.readClipboard = async () => ({ kind: 'text', text: 'w w w w w w w w w w' })
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       await store.flushPersistence()
       services.saves.length = 0
@@ -5721,6 +6595,7 @@ describe('EditorStore', () => {
 
     it('ends direct typing when undoing so the next edit is a separate undo step', async () => {
       const store = new EditorStore(textState(''), ids('unused'), new FakeClock())
+
       await store.initialize()
 
       store.editText('root', 'a')
@@ -5735,6 +6610,7 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = textState('')
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.editText('root', 'a')
       store.endTextSession()
@@ -5744,12 +6620,14 @@ describe('EditorStore', () => {
       store.undo()
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(1)
       expect(services.saves[0]).toMatchObject({ document: { roots: [{ text: '' }] } })
 
       store.redo()
       clock.runAll()
       await tick()
+
       expect(services.saves).toHaveLength(2)
       expect(services.saves[1]).toMatchObject({ document: { roots: [{ text: 'a' }] } })
     })
@@ -5761,6 +6639,7 @@ describe('EditorStore', () => {
         cleanups.push([...referencedIds])
       }
       const store = new EditorStore(services, ids('root', 'image'))
+
       await store.initialize()
       await store.paste('root', 0)
       await store.flushPersistence()
@@ -5768,11 +6647,13 @@ describe('EditorStore', () => {
 
       store.undo()
       await store.flushPersistence()
+
       expect(cleanups).toHaveLength(before + 1)
       expect(cleanups.at(-1)).toContain('image')
 
       store.redo()
       await store.flushPersistence()
+
       expect(cleanups).toHaveLength(before + 2)
       expect(cleanups.at(-1)).toContain('image')
     })
@@ -5781,10 +6662,12 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = textState('')
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       store.editText('root', 'one')
       store.endTextSession()
       await store.flushPersistence()
+
       store.undo()
       services.save = async () => {
         throw new Error('disk full')
@@ -5798,7 +6681,9 @@ describe('EditorStore', () => {
         clock.runAll()
         await tick()
       }
+
       expect(isLocked()).toBe(true)
+
       const before = store.getSnapshot()
 
       store.redo()
@@ -5813,6 +6698,7 @@ describe('EditorStore', () => {
         { currentParentId: null, selectedNodeId: 'parent' },
       )
       const store = new EditorStore(services, ids('unused'), new FakeClock())
+
       await store.initialize()
       store.toggleExpansion('parent')
       store.selectNode('child', 0)
@@ -5861,17 +6747,21 @@ describe('EditorStore', () => {
         clock.runAll()
         await tick()
       }
+
       expect(isLocked()).toBe(true)
     }
 
     it('commits a pending-edit finisher before the save that an earlier pending change requests', async () => {
       const services = createServices()
       const store = new EditorStore(services, ids('root'), new FakeClock())
+
       await store.initialize()
       await store.flushPersistence()
       services.saves.length = 0
+
       store.editText('root', 'a')
       let committed = false
+
       store.registerPendingEditFinisher(() => {
         if (committed) return false
         committed = true
@@ -5896,6 +6786,7 @@ describe('EditorStore', () => {
         return { kind: 'text', text: 'pasted' }
       }
       const store = new EditorStore(services, ids('unused'))
+
       await store.initialize()
       store.editText('root', 'before')
       let flushed = false
@@ -5907,13 +6798,16 @@ describe('EditorStore', () => {
 
       pending[0]!.resolve()
       await tick()
+
       expect(flushed).toBe(false)
 
       readGate.open()
       await paste
       await vi.waitFor(() => expect(pending).toHaveLength(2))
+
       pending[1]!.resolve()
       await flush
+
       expect(flushed).toBe(true)
       expect(services.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'beforepasted' }] } })
     })
@@ -5921,6 +6815,7 @@ describe('EditorStore', () => {
     it('does not invoke pending-edit finishers before the store is ready and still completes the flush', async () => {
       const store = new EditorStore(createServices(), ids('root'))
       const finish = vi.fn(() => true)
+
       store.registerPendingEditFinisher(finish)
 
       await store.flushPersistence()
@@ -5941,6 +6836,7 @@ describe('EditorStore', () => {
 
       await store.initialize()
       seen.length = 0
+
       store.reportError(new Error('clipboard unavailable'))
 
       expect(seen).toHaveLength(1)
@@ -5952,23 +6848,30 @@ describe('EditorStore', () => {
       const seen = recordEmissions(store)
 
       store.dismissQuitWithoutSavingPrompt()
+
       expect(seen).toEqual([])
 
       store.requestQuitWithoutSavingPrompt()
+
       expect(seen).toHaveLength(1)
       expect(seen[0]).toMatchObject({ quitWithoutSavingPrompt: true })
+
       const shown = store.getSnapshot()
 
       store.requestQuitWithoutSavingPrompt()
+
       expect(seen).toHaveLength(1)
       expect(store.getSnapshot()).toBe(shown)
 
       store.dismissQuitWithoutSavingPrompt()
+
       expect(seen).toHaveLength(2)
       expect(seen[1]).not.toHaveProperty('quitWithoutSavingPrompt')
+
       const dismissed = store.getSnapshot()
 
       store.dismissQuitWithoutSavingPrompt()
+
       expect(seen).toHaveLength(2)
       expect(store.getSnapshot()).toBe(dismissed)
     })
@@ -6010,6 +6913,7 @@ describe('EditorStore', () => {
 
     it('ends typing when the same node is selected again', async () => {
       const store = new EditorStore(textState(''), ids('unused'), new FakeClock())
+
       await store.initialize()
 
       store.editText('root', 'x')
@@ -6032,8 +6936,10 @@ describe('EditorStore', () => {
         rootAt,
       )
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       await store.flushPersistence()
+
       expect(services.saves).toEqual([])
 
       store.selectNode('other', 0)
@@ -6048,6 +6954,7 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = textState('one two three')
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       let open!: () => void
       const written = new Promise<void>((resolve) => {
@@ -6070,6 +6977,7 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = textState('one two three')
       const store = new EditorStore(services, ids('unused'), clock)
+
       await store.initialize()
       let open!: () => void
       const read = new Promise<void>((resolve) => {
@@ -6098,11 +7006,14 @@ describe('EditorStore', () => {
         cleanups.push([...referencedIds])
       }
       const store = new EditorStore(services, ids('root', 'image', 'sibling'))
+
       await store.initialize()
       await store.paste('root', 0)
       await store.flushPersistence()
+
       store.undo()
       await store.flushPersistence()
+
       expect(cleanups.at(-1)).toContain('image')
 
       cleanups.length = 0
@@ -6117,27 +7028,35 @@ describe('EditorStore', () => {
       const clock = new FakeClock()
       const services = createServices()
       const store = new EditorStore(services, ids('root'), clock)
+
       await store.initialize()
       await store.flushPersistence()
+
       store.editText('root', 'a')
       const seen = recordEmissions(store)
 
       await store.flushPersistence()
+
       expect(seen).toEqual([])
 
       services.save = async () => {
         throw new Error('disk full')
       }
+
       store.editText('root', 'ab')
       seen.length = 0
+
       clock.runAll()
       await tick()
+
       expect(store.getSnapshot()).toMatchObject({ saveError: 'disk full' })
+
       seen.length = 0
 
       services.save = async (state) => {
         services.saves.push(state)
       }
+
       clock.runAll()
       await tick()
 
@@ -6156,8 +7075,10 @@ describe('EditorStore', () => {
       }
       const store = new EditorStore(services, ids('root'), clock)
       const seen = recordEmissions(store)
+
       await store.initialize()
       await tick()
+
       expect(attempts).toBe(1)
 
       for (let round = 0; round < 5; round += 1) {

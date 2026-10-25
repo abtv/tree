@@ -34,6 +34,7 @@ describe('creating a dated node from an Agenda day', () => {
     const state = open()
     const result = createDayNodeTransition(document, state, rowsOf(document, state), day(10, 8), () => 'created')
     if (result === undefined || result.kind === 'rejected') throw new Error('Expected a transition')
+
     expect(result.document.roots.map((node) => node.id)).toEqual(['first', 'second', 'created'])
     expect(result.document.roots.at(-1)).toEqual({ id: 'created', text: '2026-10-08 ', children: [] })
     expect(result.document.roots[0]).toBe(document.roots[0])
@@ -51,6 +52,7 @@ describe('creating a dated node from an Agenda day', () => {
     const state = open('first')
     const result = createDayNodeTransition(document, state, rowsOf(document, state), day(10, 9), () => 'created')
     if (result === undefined || result.kind === 'rejected') throw new Error('Expected a transition')
+
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'created'])
     expect(result.location).toEqual({ currentParentId: 'first', selectedNodeId: 'created' })
     expect(result.document.roots[1]).toBe(document.roots[1])
@@ -60,16 +62,21 @@ describe('creating a dated node from an Agenda day', () => {
     const state = { ...open(), collapsed: new Set([dayKey(day(10, 15)), 'node:other']) }
     const result = createDayNodeTransition(document, state, rowsOf(document, state), day(10, 15), () => 'created')
     if (result === undefined || result.kind === 'rejected') throw new Error('Expected a transition')
+
     expect([...result.agenda.collapsed]).toEqual(['node:other'])
     expect(state.collapsed.has(dayKey(day(10, 15)))).toBe(true)
   })
 
   it('reveals a day that lies inside a gap and keeps shown days unchanged', () => {
     const state = open()
+
     const rows = rowsOf(document, state)
+
     expect(rows.some((row) => row.kind === 'day' && row.day === day(10, 14))).toBe(false)
+
     const result = createDayNodeTransition(document, state, rows, day(10, 14), () => 'created')
     if (result === undefined || result.kind === 'rejected') throw new Error('Expected a transition')
+
     expect([...result.agenda.revealed]).toEqual([day(10, 14)])
     expect(state.revealed.size).toBe(0)
     expect(rowsOf(result.document, result.agenda).some((row) => row.key === result.agenda.selectedKey)).toBe(true)
@@ -83,12 +90,15 @@ describe('creating a dated node from an Agenda day', () => {
     const deep: Document = { roots: [node] }
     const state = open(`n${MAX_DOCUMENT_DEPTH - 1}`)
     const createId = vi.fn(() => 'created')
+
     expect(createDayNodeTransition(deep, state, rowsOf(deep, state), today, createId)).toEqual({
       kind: 'rejected',
       message: MAX_DOCUMENT_DEPTH_ERROR,
     })
     expect(createId).not.toHaveBeenCalled()
+
     const shallower = open(`n${MAX_DOCUMENT_DEPTH - 2}`)
+
     expect(createDayNodeTransition(deep, shallower, rowsOf(deep, shallower), today, () => 'created')).toMatchObject({
       location: { selectedNodeId: 'created' },
     })
@@ -98,6 +108,7 @@ describe('creating a dated node from an Agenda day', () => {
     const state = open()
     const first = dayNumberOf({ year: 0, month: 1, day: 1 })
     const createId = vi.fn(() => 'created')
+
     expect(createDayNodeTransition(document, state, [], first - 1, createId)).toBeUndefined()
     expect(createId).not.toHaveBeenCalled()
     expect(createDayNodeTransition(document, state, [], first, createId)).toMatchObject({
@@ -122,6 +133,7 @@ describe('splitting a dated node in Agenda', () => {
   it('gives the new part the displayed date, keeps the caret after it, and activates it', () => {
     const doc = splitDocument('2026-10-14 Prepare release')
     const result = split(doc, '2026-10-14 Prepare'.length)
+
     expect(result.document.roots.map((node) => [node.id, node.text])).toEqual([
       ['a', '2026-10-14 Prepare'],
       ['new', '2026-10-14 release'],
@@ -139,18 +151,21 @@ describe('splitting a dated node in Agenda', () => {
 
   it('adds no date when the new part already holds the displayed day', () => {
     const result = split(splitDocument('Prepare 2026-10-14 now'), 'Prepare'.length)
+
     expect(result.document.roots[1]).toEqual({ id: 'new', text: ' 2026-10-14 now', children: [] })
     expect(result.focus.cursor).toBe(0)
   })
 
   it('inherits only the displayed day and leaves other dates in the new part', () => {
     const result = split(splitDocument('2026-10-14 One 2026-10-20 Two'), '2026-10-14 One'.length)
+
     expect(result.document.roots[1]!.text).toBe('2026-10-14 2026-10-20 Two')
   })
 
   it('inserts a dated empty node before when the caret is at the start of non-empty text', () => {
     const doc = splitDocument('2026-10-14 Prepare')
     const result = split(doc, 0)
+
     expect(result.document.roots.map((node) => [node.id, node.text])).toEqual([
       ['new', '2026-10-14 '],
       ['a', '2026-10-14 Prepare'],
@@ -162,6 +177,7 @@ describe('splitting a dated node in Agenda', () => {
 
   it('splits an empty node into a dated empty node after it', () => {
     const result = split(splitDocument(''), 0)
+
     expect(result.document.roots.map((node) => [node.id, node.text])).toEqual([
       ['a', ''],
       ['new', '2026-10-14 '],
@@ -176,9 +192,11 @@ describe('splitting a dated node in Agenda', () => {
       { start: 3, end: 3 + url.length, url },
       { start: text.length - url.length, end: text.length, url },
     ]
+
     const result = split(splitDocument(text, links), `Go ${url}`.length)
     const left = result.document.roots[0]!
     const right = result.document.roots[1]!
+
     expect(left.text).toBe(`Go ${url}`)
     expect(left.links).toEqual([links[0]])
     expect(right.text).toBe(`2026-10-14 then ${url}`)
@@ -195,6 +213,7 @@ describe('opening a dated sibling beside a dated node', () => {
   ] as const)('creates the sibling %s the node with the displayed date and the caret after it', (position, ids) => {
     const doc = splitDocument('2026-10-14 Prepare')
     const result = openDatedSiblingTransition(doc, at, open(), day(10, 20), position, () => 'new')
+
     expect(result.document.roots.map((node) => node.id)).toEqual(ids)
     expect(result.document.roots.find((node) => node.id === 'new')).toEqual({
       id: 'new',
@@ -219,6 +238,7 @@ describe('opening a dated sibling beside a dated node', () => {
       'after',
       () => 'new',
     )
+
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['kid'])
     expect(result.document.roots.map((node) => node.id)).toEqual(['a', 'new', 'b'])
   })
@@ -254,6 +274,7 @@ describe('moving occurrences between days', () => {
       3,
     )!
     const parent = result.document.roots[0]!
+
     expect(parent.children.map((node) => node.id)).toEqual(['a', 'b'])
     expect(parent.children[0]!.text).toBe('2026-10-15 Prepare 2026-10-20')
     expect(parent.children[0]!.children).toBe(moveDocument.roots[0]!.children[0]!.children)
@@ -270,6 +291,7 @@ describe('moving occurrences between days', () => {
       day(10, 15),
       0,
     )!
+
     expect(result.document.roots[0]!.children[1]!.text).toBe('2026-10-15 Review')
     expect(result.agenda).toMatchObject({
       selectedKey: `node:${day(10, 15)}:b`,
@@ -291,6 +313,7 @@ describe('moving occurrences between days', () => {
       day(10, 16),
       0,
     )!
+
     expect(result.document.roots[0]!.children[0]!.text).toBe('2026-10-16 Prepare 2026-10-20')
     expect(result.document.roots[0]!.children[0]!.children[0]!.text).toBe('2026-10-16 Kid')
     expect(result.agenda.activeOccurrence).toEqual({ nodeId: 'kid', day: day(10, 16) })
@@ -301,6 +324,7 @@ describe('moving occurrences between days', () => {
       ...open(),
       collapsed: new Set([dayKey(day(10, 15)), `node:${day(10, 15)}:parent`, 'node:other']),
     }
+
     const result = moveOccurrencesTransition(
       moveDocument,
       location,
@@ -309,6 +333,7 @@ describe('moving occurrences between days', () => {
       day(10, 15),
       0,
     )!
+
     expect([...result.agenda.collapsed]).toEqual(['node:other'])
     expect(state.collapsed.size).toBe(3)
   })

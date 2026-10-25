@@ -46,10 +46,13 @@ describe('read-only Agenda keyboard', () => {
           const rows = f.store.getAgendaRows()
           f.store.applyAgenda({ kind: 'select', key: rows[start]!.key, cursor: 4 })
         }
+
         fast.press(String(count))
         fast.press(key)
         for (const digit of String(count * 10)) slow.press(digit)
+
         slow.press(key.toLowerCase())
+
         expect(fast.snapshot().agenda).toEqual(slow.snapshot().agenda)
         expect(fast.snapshot().focus).toEqual(slow.snapshot().focus)
         expect(fast.snapshot().document).toEqual(slow.snapshot().document)
@@ -68,18 +71,24 @@ describe('read-only Agenda keyboard', () => {
   ])('ends click-preserved Replace before %s', async (key, options) => {
     const f = await fixture()
     const day = f.store.getAgendaRows().find((row) => row.kind === 'day')!
+
     f.store.applyAgenda({ kind: 'select', key: day.key })
     f.vim.mode = 'replace'
+
     f.press(key as string, options)
+
     expect(f.vim.mode).toBe('normal')
   })
 
   it('ends click-preserved Replace when returning from a focused day', async () => {
     const f = await fixture()
     const day = f.store.getAgendaRows().find((row) => row.kind === 'day')!
+
     f.store.applyAgenda({ kind: 'focus-day', key: day.key, scrollTop: 0 })
     f.vim.mode = 'replace'
+
     f.press(',', { metaKey: true })
+
     expect(f.vim.mode).toBe('normal')
   })
 
@@ -105,17 +114,28 @@ describe('read-only Agenda keyboard', () => {
     })
     try {
       f.press('H')
+
       expect(f.snapshot().focus.cursor).toBe(2)
+
       f.press('M')
+
       expect(f.snapshot().focus).toMatchObject({ nodeId: 'image', cursor: 0 })
+
       f.press('L')
+
       expect(f.snapshot().focus).toMatchObject({ nodeId: 'last', cursor: 3 })
+
       f.press('g')
       f.press('g')
+
       expect(f.snapshot().agenda?.selectionCursor).toBe(0)
+
       f.press('G')
+
       expect(f.snapshot().focus).toMatchObject({ nodeId: 'last', cursor: 3 })
+
       f.press('u', { ctrlKey: true })
+
       expect(f.snapshot().focus).toMatchObject({ nodeId: 'image', cursor: 0 })
     } finally {
       elements.forEach((element) => element.remove())
@@ -151,6 +171,7 @@ describe('read-only Agenda keyboard', () => {
           currentTarget: input,
           preventDefault: vi.fn(),
         } as unknown as KeyboardEvent<HTMLElement>)
+
         expect(f.snapshot().location.selectedNodeId).toBe(destination)
         expect(f.snapshot().focus.cursor).toBe(4)
       } finally {
@@ -162,10 +183,13 @@ describe('read-only Agenda keyboard', () => {
   it('keeps caret and focus token when vertical navigation clamps on an editor', async () => {
     const f = await fixture()
     const last = f.store.getAgendaRows().at(-1)!
+
     f.store.applyAgenda({ kind: 'select', key: last.key, cursor: 5 })
     const before = f.snapshot().focus
+
     f.press('j')
     f.press('j')
+
     expect(f.snapshot().focus).toBe(before)
   })
 
@@ -199,16 +223,23 @@ describe('read-only Agenda keyboard', () => {
       handler({ key, currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
     try {
       press('j')
+
       expect(f.snapshot().agenda?.selectedKey).toBe(image.key)
       expect(caret).toEqual({ cursor: input.value.length, imageActive: true, imageTextReturnCursor: 4 })
+
       press('k')
+
       expect(caret).toEqual({ cursor: 4, imageActive: false })
       expect(getCaret(input)).toBe(4)
+
       press('2')
       press('j')
+
       expect(f.snapshot().location.selectedNodeId).toBe('after')
       expect(f.snapshot().focus.cursor).toBe(input.value.length - 1)
+
       press('k')
+
       expect(f.snapshot().location.selectedNodeId).toBe('image')
       expect(caret.imageActive).toBe(true)
       expect(caret.imageTextReturnCursor).toBe(input.value.length - 1)
@@ -219,10 +250,12 @@ describe('read-only Agenda keyboard', () => {
 
   it('clamps an oversized counted G before resolving its destination caret', async () => {
     const f = await fixture()
+
     f.press('9')
     f.press('9')
     f.press('9')
     f.press('G')
+
     expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows().at(-1)!.key)
   })
 
@@ -230,36 +263,54 @@ describe('read-only Agenda keyboard', () => {
     const f = await fixture()
     const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
     const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+
     f.store.applyAgenda({ kind: 'select', key: gap.key })
     f.press('z')
     f.press('M')
+
     expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+
     f.press('z')
     f.press('R')
+
     expect(f.snapshot().agenda?.collapsed.size).toBe(0)
+
     f.press('z')
     f.press('q')
+
     expect(f.vim.commandState.pending).toBeUndefined()
+
     f.press('a')
+
     expect(f.snapshot().agenda?.revealed.size).toBe(0)
   })
   it('routes Cmd+E and Normal za to occurrence folds and gap reveal with no Tree changes', async () => {
     const f = await fixture()
     const before = f.snapshot()
+
     f.press('G')
     const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+
     f.store.applyAgenda({ kind: 'select', key: day.key })
     f.press('e', { metaKey: true })
+
     expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+
     f.press('z')
     f.press('a')
+
     expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(false)
+
     const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+
     f.store.applyAgenda({ kind: 'select', key: gap.key })
     f.press('z')
     f.press('a')
+
     expect(f.snapshot().agenda?.revealed.size).toBe(3)
+
     f.press('e', { metaKey: true })
+
     expect(f.snapshot().agenda?.revealed.size).toBe(0)
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().expansion).toBe(before.expansion)
@@ -291,16 +342,25 @@ describe('read-only Agenda keyboard', () => {
     })
     try {
       handler({ key: 'H', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[1]!.key)
+
       handler({ key: 'M', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[2]!.key)
+
       handler({ key: 'L', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[3]!.key)
       expect(beforeSelect.mock.calls).toEqual([[true], [true], [true]])
+
       f.store.applyAgenda({ kind: 'select', key: rows[0]!.key })
       handler({ key: 'd', ctrlKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[3]!.key)
+
       handler({ key: 'u', ctrlKey: true, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[0]!.key)
     } finally {
       elements.forEach((element) => element.remove())
@@ -311,19 +371,27 @@ describe('read-only Agenda keyboard', () => {
   it('counts motions and boundaries, clamps, and retains repeat memory', async () => {
     const f = await fixture()
     f.vim.commandState.lastFind = { character: 'x', kind: 'f' }
+
     f.press('2')
     f.press('j')
+
     expect(f.snapshot().agenda?.selectedKey).toBe(`day:${dayNumberOf({ year: 2026, month: 10, day: 10 })}`)
+
     f.press('9')
     f.press('9')
     f.press('j')
+
     expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows().at(-1)!.key)
+
     f.press('g')
     f.press('g')
     f.press('ArrowUp')
+
     expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows()[0]!.key)
+
     f.press('3')
     f.press('G')
+
     expect(f.snapshot().agenda?.selectedKey).toBe(f.store.getAgendaRows()[2]!.key)
     expect(f.vim.commandState.lastFind?.character).toBe('x')
   })
@@ -332,11 +400,15 @@ describe('read-only Agenda keyboard', () => {
     const f = await fixture()
     const before = f.snapshot()
     for (const key of ['i', 'a', 'R', 'd', 'p', 'Enter', 'Backspace', 'Tab', '>', '<']) f.press(key)
+
     f.press('j', { nativeEvent: { isComposing: true } })
     f.press('2')
     f.press('Meta')
+
     expect(f.vim.commandState.pending?.count).toBe('2')
+
     f.press('Escape')
+
     expect(f.vim.commandState.pending).toBeUndefined()
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().agenda?.selectedKey).toBe(before.agenda?.selectedKey)
@@ -350,9 +422,11 @@ describe('read-only Agenda keyboard', () => {
     it('creates a node for the selected day with Normal o and enters Insert', async () => {
       const f = await fixture()
       const before = f.snapshot()
+
       f.press('o')
       const state = f.snapshot()
       const created = state.document.roots.at(-1)!
+
       expect(state.document.roots.slice(0, -1)).toEqual(before.document.roots)
       expect(created.text).toBe('2026-10-08 ')
       expect(state.agenda?.selectedKey).toBe(`node:${october(8)}:${created.id}`)
@@ -360,21 +434,31 @@ describe('read-only Agenda keyboard', () => {
       expect(state.location).toEqual({ currentParentId: null, selectedNodeId: created.id })
       expect(state.focus).toMatchObject({ nodeId: created.id, cursor: 11 })
       expect(f.vim.mode).toBe('insert')
+
       f.store.undo()
+
       expect(f.snapshot().document).toBe(before.document)
     })
     it('creates a node for the preceding day with O and reveals it from a gap', async () => {
       const f = await fixture()
+
       f.press('O')
+
       expect(f.snapshot().document.roots.at(-1)!.text).toBe('2026-10-07 ')
       expect(f.vim.mode).toBe('insert')
+
       f.vim.mode = 'normal'
+
       f.store.undo()
       const fifteenth = f.store.getAgendaRows().find((row) => row.key === `day:${october(15)}`)!
+
       f.store.applyAgenda({ kind: 'select', key: fifteenth.key })
+
       expect(f.store.getAgendaRows().some((row) => row.key === `day:${october(14)}`)).toBe(false)
+
       f.press('O')
       const state = f.snapshot()
+
       expect(state.document.roots.at(-1)!.text).toBe('2026-10-14 ')
       expect(state.agenda?.revealed.has(october(14))).toBe(true)
       expect(state.agenda?.selectedKey).toBe(`node:${october(14)}:${state.document.roots.at(-1)!.id}`)
@@ -383,11 +467,15 @@ describe('read-only Agenda keyboard', () => {
       const f = await fixture()
       const handler = createAgendaKeyDownHandler({ store: f.store })
       const day = f.store.getAgendaRows().find((row) => row.kind === 'day' && row.content)!
+
       f.store.applyAgenda({ kind: 'select', key: day.key })
       f.store.applyAgenda({ kind: 'toggle-fold', key: day.key })
+
       expect(f.snapshot().agenda?.collapsed.has(day.key)).toBe(true)
+
       handler({ key: 'Enter', preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
       const state = f.snapshot()
+
       expect(state.document.roots.at(-1)!.text).toBe('2026-10-15 ')
       expect(state.agenda?.collapsed.has(day.key)).toBe(false)
       expect(state.agenda?.selectedKey).toBe(`node:${october(15)}:${state.document.roots.at(-1)!.id}`)
@@ -395,6 +483,7 @@ describe('read-only Agenda keyboard', () => {
     it('does nothing on Vim Enter, counted or prefixed o, gaps, and real rows', async () => {
       const f = await fixture()
       const before = f.snapshot()
+
       f.press('Enter')
       f.press('2')
       f.press('o')
@@ -403,14 +492,17 @@ describe('read-only Agenda keyboard', () => {
       f.press('o', { ctrlKey: true })
       f.press('Enter', { metaKey: true })
       const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+
       f.store.applyAgenda({ kind: 'select', key: gap.key })
       f.press('o')
       f.press('O')
       const node = f.store.getAgendaRows().find((row) => row.kind === 'node')!
+
       f.store.applyAgenda({ kind: 'select', key: node.key })
       f.press('o')
       f.press('O')
       handlerEnter(f)
+
       expect(f.snapshot().document).toBe(before.document)
       expect(f.vim.mode).toBe('normal')
     })
@@ -424,7 +516,9 @@ describe('read-only Agenda keyboard', () => {
       const f = await fixture()
       const before = f.snapshot()
       const create = vi.spyOn(f.store, 'createAgendaDayNode').mockReturnValue(false)
+
       f.press('o')
+
       expect(create).toHaveBeenCalledWith('selected')
       expect(f.vim.mode).toBe('normal')
       expect(f.snapshot().document).toBe(before.document)
@@ -451,37 +545,49 @@ describe('read-only Agenda keyboard', () => {
 
     it('marks with dd, shows the count, keeps it through navigation, and puts on any day row', async () => {
       const f = await fixture(nested)
+
       select(f, `node:${october(15)}:a`)
       f.press('d')
       f.press('d')
+
       expect(f.snapshot().agenda?.pendingMove).toEqual([{ nodeId: 'a', day: october(15) }])
       expect(f.vim.commandState.pending).toBeUndefined()
+
       f.press('j')
       f.press('k')
       f.press('z')
       f.press('a')
+
       expect(f.snapshot().agenda?.pendingMove).toHaveLength(1)
+
       select(f, `day:${october(9)}`)
       f.press('p')
+
       expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
         '2026-10-09 A',
         '2026-10-15 B',
       ])
       expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
       expect(f.saves).toHaveLength(0)
+
       f.store.undo()
+
       expect(f.snapshot().document.roots[0]!.children[0]!.text).toBe('2026-10-15 A')
     })
 
     it('marks a counted dd and puts with P as with p', async () => {
       const f = await fixture(nested)
+
       select(f, `node:${october(15)}:a`)
       f.press('2')
       f.press('d')
       f.press('d')
+
       expect(f.snapshot().agenda?.pendingMove?.map((source) => source.nodeId)).toEqual(['a', 'b'])
+
       select(f, `node:${october(15)}:parent`)
       f.press('P')
+
       expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
         '2026-10-15 A',
         '2026-10-15 B',
@@ -496,21 +602,27 @@ describe('read-only Agenda keyboard', () => {
         select(f, key)
         f.press('d')
         f.press('d')
+
         expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
       }
     })
 
     it('keeps the move pending when p is pressed on a gap and cancels it with Escape', async () => {
       const f = await fixture(nested)
+
       select(f, `node:${october(15)}:a`)
       f.press('d')
       f.press('d')
       const pending = f.snapshot().agenda?.pendingMove
       const gap = f.store.getAgendaRows().find((row) => row.kind === 'gap')!
+
       select(f, gap.key)
       f.press('p')
+
       expect(f.snapshot().agenda?.pendingMove).toBe(pending)
+
       f.press('Escape')
+
       expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
       expect(f.snapshot().document.roots[0]!.children[0]!.text).toBe('2026-10-15 A')
     })
@@ -518,11 +630,14 @@ describe('read-only Agenda keyboard', () => {
     it('does nothing on p without a pending move and ignores dd outside Normal mode', async () => {
       const f = await fixture(nested)
       const before = f.snapshot().document
+
       select(f, `node:${october(15)}:a`)
       f.press('p')
       f.vim.mode = 'visual'
+
       f.press('d')
       f.press('d')
+
       expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
       expect(f.snapshot().document).toBe(before)
     })
@@ -530,28 +645,38 @@ describe('read-only Agenda keyboard', () => {
     it('leaves the system clipboard and the Vim register untouched', async () => {
       const f = await fixture(nested)
       const write = vi.spyOn(f.store, 'copy')
+
       select(f, `node:${october(15)}:a`)
       f.press('d')
       f.press('d')
       select(f, `day:${october(9)}`)
       f.press('p')
+
       expect(write).not.toHaveBeenCalled()
     })
   })
 
   it('closes at origin and enters Tree only on real rows', async () => {
     const f = await fixture()
+
     f.press('.', { metaKey: true })
+
     expect(f.snapshot().agenda).toBeDefined()
     expect(f.snapshot().agenda?.focusedDay).toBeDefined()
+
     f.press(',', { metaKey: true })
+
     expect(f.snapshot().agenda?.focusedDay).toBeUndefined()
+
     f.press('G')
     f.press('.', { metaKey: true })
+
     expect(f.snapshot().agenda).toBeUndefined()
     expect(f.snapshot().location.currentParentId).toBe('node')
+
     f.store.openAgenda()
     f.press('p', { metaKey: true })
+
     expect(f.snapshot().location.currentParentId).toBe('node')
     expect(f.snapshot().agenda).toBeUndefined()
   })

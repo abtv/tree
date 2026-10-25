@@ -28,8 +28,12 @@ beforeEach(() => {
 
 it('ignores ordinary Makefile edits but requires preparation after build-recipe edits', () => {
   const original = currentDependencyImage()
+
   set('Makefile', 'changed help and test commands')
+
   expect(currentDependencyImage()).toBe(original)
+
   set('scripts/web/chromium-image.mk', 'changed build recipe')
+
   expect(currentDependencyImage()).not.toBe(original)
 })

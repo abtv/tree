@@ -55,12 +55,14 @@ it('recognizes relative dates well below one millisecond, including incremental 
   const firstStart = performance.now()
   const first = suggestDates('two days ago', 12, today)
   const firstMs = performance.now() - firstStart
+
   expect(first?.suggestions[0]?.day).toBe(today - 2)
 
   const completeExpressionSamples: number[] = []
   let completeMatches = 0
   for (const { text, caret, offset } of cases) {
     expect(suggestDates(text, caret, today)?.suggestions[0]?.day).toBe(today + offset)
+
     for (let batch = 0; batch < 20; batch++) {
       const start = performance.now()
       for (let call = 0; call < 50; call++) {
@@ -87,6 +89,7 @@ it('recognizes relative dates well below one millisecond, including incremental 
     }
     samples.push((performance.now() - start) / workloads.length)
   }
+
   samples.sort((a, b) => a - b)
   // Batch means hide isolated slow calls, so the same workloads are also timed one
   // call at a time. Timer overhead (well under a microsecond) is small next to the
@@ -99,6 +102,7 @@ it('recognizes relative dates well below one millisecond, including incremental 
       callSamples.push(performance.now() - start)
     }
   }
+
   callSamples.sort((a, b) => a - b)
   console.log('PERF natural-date', {
     perCallP50Ms: callSamples[Math.floor(callSamples.length * 0.5)],
@@ -111,6 +115,7 @@ it('recognizes relative dates well below one millisecond, including incremental 
     p99Ms: samples[99],
     slowestCompleteExpressionBatchMs: Math.max(...completeExpressionSamples),
   })
+
   expect(matched).toBeGreaterThanOrEqual(cases.length * samples.length)
   expect(completeMatches).toBe(completeExpressionSamples.length * 50)
   expect(firstMs).toBeLessThan(1)

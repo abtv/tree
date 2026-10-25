@@ -22,6 +22,7 @@ describe('editing-mode categories', () => {
       spec('e2e/c.spec.ts', 'independent'),
       spec('e2e/electron/vim-toggle.spec.ts', 'explicit'),
     ]
+
     expect(checkEditingModes({ files })).toEqual({ issues: [], specCount: 4 })
   })
 
@@ -32,6 +33,7 @@ describe('editing-mode categories', () => {
       { path: 'e2e/typo.spec.ts', content: '// @editing-mode: vim\n' },
       { path: 'e2e/trailing.spec.ts', content: '// @editing-modes: vim extra\n' },
     ]
+
     expect(checkEditingModes({ files }).issues).toEqual(
       files.map(({ path }) => `${path}: the first line must be "// @editing-modes: <category>"`),
     )
@@ -77,11 +79,13 @@ describe('editing-mode categories', () => {
 describe('repository discovery', () => {
   it('scans nested specs and skips helpers, diagnostics, and other extensions', () => {
     const root = mkdtempSync(join(tmpdir(), 'tree-editing-modes-'))
+
     roots.push(root)
     const write = (path: string, content: string) => {
       mkdirSync(dirname(join(root, path)), { recursive: true })
       writeFileSync(join(root, path), content)
     }
+
     write('e2e/ok.spec.ts', '// @editing-modes: independent\n')
     write('e2e/nested/bad.spec.ts', 'export {}\n')
     write('e2e/web/browser.spec.mjs', 'export {}\n')
@@ -90,6 +94,7 @@ describe('repository discovery', () => {
     write('e2e/_diagnostic.spec.ts', 'export {}\n')
     write('e2e/electron/fixtures.ts', 'export {}\n')
     write('e2e/notes.spec.txt', 'export {}\n')
+
     expect(runChecks({ rootDirectory: root })).toEqual({
       issues: [
         'e2e/nested/bad.spec.ts: the first line must be "// @editing-modes: <category>"',

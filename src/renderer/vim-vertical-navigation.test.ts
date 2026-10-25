@@ -98,6 +98,7 @@ describe('Vim vertical navigation', () => {
     const applyCaretState = vi.fn()
     const textLineCursor = (_node: TreeNode, cursor: number, entering: boolean) =>
       entering ? 0 : cursor < 8 ? cursor + 4 : undefined
+
     navigateVertically({
       store: navigationStore,
       node: current,
@@ -107,6 +108,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState,
       textLineCursor,
     })
+
     expect(navigationStore.snapshot.location.selectedNodeId).toBe('a')
     expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
       { cursor: 4, imageActive: false },
@@ -120,6 +122,7 @@ describe('Vim vertical navigation', () => {
     const second = { ...node('b', 'hi'), attachment: IMAGE }
     const navigationStore = store({ roots: [first, second] }, 'a', null)
     const applyCaretState = vi.fn()
+
     navigateVertically({
       store: navigationStore,
       node: first,
@@ -129,6 +132,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState,
       textLineCursor: (_node, _cursor, entering) => (entering ? 1 : undefined),
     })
+
     expect(applyCaretState).toHaveBeenLastCalledWith('b', { cursor: 1, imageActive: false }, true)
   })
 
@@ -171,6 +175,7 @@ describe('Vim vertical navigation', () => {
     const withChild = node('parent', 'heading', [node('child', 'child')])
     const childStore = store({ roots: [withChild] }, withChild.id, withChild.id)
     const moveWithChild = vi.spyOn(childStore, 'moveSelection')
+
     navigateVertically({
       store: childStore,
       node: withChild,
@@ -179,11 +184,13 @@ describe('Vim vertical navigation', () => {
       count: 1,
       applyCaretState: vi.fn(),
     })
+
     expect(moveWithChild).toHaveBeenCalledWith('down', 3)
 
     const childless = node('parent', 'heading')
     const emptyStore = store({ roots: [childless] }, childless.id, childless.id)
     const moveEmpty = vi.spyOn(emptyStore, 'moveSelection')
+
     navigateVertically({
       store: emptyStore,
       node: childless,
@@ -192,6 +199,7 @@ describe('Vim vertical navigation', () => {
       count: 1,
       applyCaretState: vi.fn(),
     })
+
     expect(moveEmpty).not.toHaveBeenCalled()
   })
 

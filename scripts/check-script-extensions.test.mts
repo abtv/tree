@@ -13,6 +13,7 @@ it.each([
   'scripts/web-release/nested/cli.mjs',
 ])('rejects an unapproved JavaScript module at %s', async (filePath) => {
   const [result] = await eslint.lintText(source, { filePath })
+
   expect(result!.messages).toEqual([
     expect.objectContaining({
       ruleId: 'no-restricted-syntax',
@@ -24,6 +25,7 @@ it.each([
 
 it('rejects an empty unapproved JavaScript module', async () => {
   const [result] = await eslint.lintText('', { filePath: 'scripts/empty.mjs' })
+
   expect(result!.messages).toEqual([expect.objectContaining({ ruleId: 'no-restricted-syntax', severity: 2 })])
 })
 
@@ -38,5 +40,6 @@ it.each([
   'perf/web/example.spec.mts',
 ])('allows an approved exception or TypeScript module at %s', async (filePath) => {
   const [result] = await eslint.lintText(source, { filePath })
+
   expect(result!.messages).toEqual([])
 })

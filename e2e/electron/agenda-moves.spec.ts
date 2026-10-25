@@ -59,29 +59,39 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
       location: { currentParentId: null, selectedNodeId: 'dated-0' },
     })
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const source = row(window, nodeKey(10, 14, 'dated-0'))
+
     await startRowDrag(window, source.locator('.node-input'))
+
     await expect(source).toHaveClass(/agenda-row-dragging/)
+
     const viewport = window.locator('.scroll-viewport')
     const bounds = await viewport.boundingBox()
     if (bounds === null) throw new Error('Agenda viewport was not rendered.')
     const initialScroll = await viewport.evaluate((element) => element.scrollTop)
+
     await window.mouse.move(bounds.x + 200, bounds.y + bounds.height - 8)
+
     // The pointer stays still while native scrolling replaces the mounted row window.
     await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(initialScroll + 600)
     await expect(source).toHaveClass(/agenda-row-pinned/)
     await expect(row(window, dayKey(10, 15))).toHaveClass(/agenda-row-drop-on/)
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
+
     await window.mouse.up()
 
     const moved = row(window, nodeKey(10, 15, 'dated-0'))
+
     await expect(moved).toHaveAttribute('aria-selected', 'true')
     await expect(moved.locator('.node-input')).toBeFocused()
     await expect(moved.locator('.node-input')).toHaveText('2026-10-15 Item 0')
     await expect(window.locator('.agenda-row-dragging, .agenda-row-drop-on')).toHaveCount(0)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll)
       .toBe('2026-10-15 Item 0')
@@ -93,31 +103,42 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const source = row(window, nodeKey(10, 14, 'first'))
+
     await startRowDrag(window, source.locator('.agenda-text'))
+
     await expect(window.locator('body')).toHaveClass(/node-drag-active/)
     await expect(source).toHaveClass(/agenda-row-dragging/)
 
     const target = await centerOf(window, dayKey(10, 15))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
+
     await expect(window.locator('.agenda-row-drop-on')).toHaveCount(1)
     await expect(row(window, dayKey(10, 15))).toHaveClass(/agenda-row-drop-on/)
+
     await window.mouse.up()
 
     await expect(window.locator('.agenda-row-dragging, .agenda-row-drop-on')).toHaveCount(0)
     await expect(row(window, nodeKey(10, 15, 'first'))).toHaveAttribute('aria-selected', 'true')
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(0)
+
     // Parent, siblings, and order are unchanged; only the moved date differs.
     await fireIdleSave(window)
+
     await expect
       .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-15 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-14 Plan 2026-10-15'])
 
     await window.keyboard.press('Meta+z')
+
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(1)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-14 Plan 2026-10-15'])
@@ -129,17 +150,24 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const source = row(window, nodeKey(10, 14, 'third'))
+
     await startRowDrag(window, source.locator('.agenda-text'))
     const target = await centerOf(window, nodeKey(10, 15, 'second'))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
+
     await expect(row(window, dayKey(10, 15))).toHaveClass(/agenda-row-drop-on/)
+
     await window.mouse.up()
 
     await expect(row(window, nodeKey(10, 15, 'third'))).toHaveAttribute('aria-selected', 'true')
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-15 Plan'])
@@ -149,21 +177,28 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   test('drags the focused editor and restores its focus and caret after the drop', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await row(window, nodeKey(10, 14, 'third'))
       .locator('.agenda-text')
       .click()
     const input = window.getByRole('textbox', { name: 'Agenda node third', exact: true })
+
     await expect(input).toBeFocused()
+
     await startRowDrag(window, input)
     // Oct 13 is an empty day inside the Today neighborhood, so it has a header.
     const target = await centerOf(window, dayKey(10, 13))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
     await window.mouse.up()
+
     await expect(input).toHaveText('2026-10-13 Plan 2026-10-15')
     await expect(input).toBeFocused()
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => persistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-13 Plan 2026-10-15'])
@@ -175,13 +210,16 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await row(window, nodeKey(10, 14, 'third'))
       .locator('.agenda-text')
       .click()
     const input = window.getByRole('textbox', { name: 'Agenda node third', exact: true })
+
     await expect(input).toBeFocused()
+
     const caret = (): Promise<number> =>
       input.evaluate((element) => {
         const selection = element.ownerDocument.defaultView!.getSelection()!
@@ -190,17 +228,23 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
         range.setEnd(selection.anchorNode!, selection.anchorOffset)
         return range.toString().length
       })
+
     await startRowDrag(window, input, { xOffset: 90 })
     await window.keyboard.press('Escape')
     await window.mouse.up()
+
     await expect(input).toBeFocused()
+
     const cancelled = await caret()
+
     expect(cancelled).toBeGreaterThan(0)
 
     await startRowDrag(window, input, { xOffset: 90 })
     const target = await centerOf(window, dayKey(10, 13))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
     await window.mouse.up()
+
     await expect(input).toHaveText('2026-10-13 Plan 2026-10-15')
     await expect(input).toBeFocused()
     expect(await caret()).toBe(cancelled)
@@ -212,33 +256,44 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const context = row(window, nodeKey(10, 14, 'context'))
     const box = await context.boundingBox()
     if (box === null) throw new Error('The contextual ancestor was not rendered.')
+
     await window.mouse.move(box.x + 60, box.y + box.height / 2)
     await window.mouse.down()
     await window.waitForTimeout(700)
+
     await expect(window.locator('.agenda-row-dragging')).toHaveCount(0)
     await expect(window.locator('body')).not.toHaveClass(/node-drag-active/)
+
     await window.mouse.up()
 
     // Pressing the row selects it, which turns a multiply dated node into its editor.
     const source = row(window, nodeKey(10, 14, 'first')).locator('.agenda-text, .node-input')
+
     await startRowDrag(window, source)
     const gap = window.locator('.agenda-row-gap').first()
     const gapBox = await gap.boundingBox()
     if (gapBox === null) throw new Error('The gap was not rendered.')
+
     await window.mouse.move(gapBox.x + 120, gapBox.y + gapBox.height / 2, { steps: 5 })
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.agenda-row-drop-on')).toHaveCount(0)
+
     await window.mouse.up()
 
     await startRowDrag(window, source)
     const same = await centerOf(window, dayKey(10, 14))
+
     await window.mouse.move(same.x, same.y, { steps: 5 })
+
     await expect(window.locator('.agenda-row-drop-on')).toHaveCount(0)
+
     await window.mouse.up()
 
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(1)
@@ -253,15 +308,21 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   test('cancels a drag with Escape', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const source = row(window, nodeKey(10, 14, 'first'))
+
     await startRowDrag(window, source.locator('.agenda-text'))
     const target = await centerOf(window, dayKey(10, 15))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
     await window.keyboard.press('Escape')
+
     await expect(window.locator('.agenda-row-dragging, .agenda-row-drop-on')).toHaveCount(0)
+
     await window.mouse.up()
+
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(1)
   })
 
@@ -269,16 +330,22 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   test('shows the drop outline on the target day header in light and dark appearances', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const source = row(window, nodeKey(10, 14, 'first'))
+
     await startRowDrag(window, source.locator('.agenda-text'))
     const target = await centerOf(window, dayKey(10, 15))
+
     await window.mouse.move(target.x, target.y, { steps: 5 })
+
     await expect(row(window, dayKey(10, 15))).toHaveClass(/agenda-row-drop-on/)
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
+
       await expect(window).toHaveScreenshot(screenshotName(`agenda-drop-${appearance}.png`))
     }
     await window.mouse.up()

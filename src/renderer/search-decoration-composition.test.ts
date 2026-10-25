@@ -14,6 +14,7 @@ it('composes overlapping matches and dates across a link without duplicating tex
     { start: 5, end: 14, className: 'search-match' },
     { start: 8, end: 10, className: 'date-like' },
   ])
+
   expect(readEditableContent(element)).toEqual({ text: node.text, links: node.links })
   expect(element.querySelectorAll('a')).toHaveLength(1)
   expect([...element.querySelectorAll('.search-match')].map((span) => span.textContent).join('')).toBe('e link af')

@@ -76,40 +76,51 @@ test.describe('attachment validation and image failures (mode-independent)', () 
     await firePaste(node(window, 1))
 
     const image = window.getByAltText('Attached image')
+
     await expect(image).toBeVisible()
     expect(await image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
 
     const restarted = await launchTree(userDataDir)
+
     await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
   })
 
   test('opens a document whose stored attachment file is missing', async ({ userDataDir }) => {
     const first = await launchTree(userDataDir)
+
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id)
       .toEqual(expect.any(String))
+
     const attachmentId = readPersisted(userDataDir).document.roots[0]!.attachment!.id
     const closed = new Promise<void>((resolve) => first.app.once('close', resolve))
+
     await clickApplicationMenuQuit(first.app)
     await closed
 
     rmSync(join(userDataDir, 'data', 'attachments', `${attachmentId}.png`))
 
     const restarted = await launchTree(userDataDir)
+
     await expect(restarted.window.getByText('Image could not be loaded.')).toBeVisible()
+
     await typeInto(node(restarted.window, 1), 'still editable')
+
     await expect(node(restarted.window, 1)).toHaveValue('still editable')
   })
 
   test('reports a read failure without disabling the editor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await app.evaluate(() => {
       globalThis.__treeIpc.wrap('tree:read-attachment', () => {
         throw new Error('read blocked')
@@ -120,7 +131,9 @@ test.describe('attachment validation and image failures (mode-independent)', () 
     await firePaste(node(window, 1))
 
     await expect(window.getByText('Image could not be loaded.')).toBeVisible()
+
     await typeInto(node(window, 1), 'still editable')
+
     await expect(node(window, 1)).toHaveValue('still editable')
   })
 
@@ -128,20 +141,29 @@ test.describe('attachment validation and image failures (mode-independent)', () 
     userDataDir,
   }) => {
     const first = await launchTree(userDataDir)
+
     await writeClipboardImage(first.app)
     await firePaste(node(first.window, 1))
+
     await expect(first.window.getByAltText('Attached image')).toBeVisible()
 
     const openButton = first.window.getByRole('button', { name: 'Open image preview' })
+
     await openButton.click()
+
     await expect(first.window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+
     await first.window.keyboard.press('Escape')
+
     await expect(first.window.getByRole('dialog', { name: 'Image preview' })).toBeHidden()
     await expect(node(first.window, 1)).toBeFocused()
 
     const attachmentId = readPersisted(userDataDir).document.roots[0]?.attachment?.id
+
     expect(attachmentId).toEqual(expect.any(String))
+
     const closed = new Promise<void>((resolve) => first.app.once('close', resolve))
+
     await clickApplicationMenuQuit(first.app)
     await closed
 
@@ -151,8 +173,11 @@ test.describe('attachment validation and image failures (mode-independent)', () 
     )
 
     const restarted = await launchTree(userDataDir)
+
     await expect(restarted.window.getByText('Image could not be loaded.')).toBeVisible()
+
     await typeInto(node(restarted.window, 1), 'still editable')
+
     await expect(node(restarted.window, 1)).toHaveValue('still editable')
   })
 })
@@ -161,28 +186,34 @@ describeForEachEditingMode('image-only node presentation', ({ screenshotName }) 
   test('shows an image-only node without a blank text row and keeps it editable', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const editor = node(window, 1)
+
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(editor)
 
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await expect(editor).toHaveClass(/node-input-image-only/)
+
     const row = window.locator('.node-row').first()
+
     await expect(row).toHaveClass(/node-row-image-only/)
     await expect(row).toHaveScreenshot(screenshotName('image-only-node.png'))
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
     const parentEditor = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parentEditor).toHaveClass(/node-input-image-only/)
     await expect(window.getByRole('region', { name: 'Current parent' })).toHaveScreenshot(
       screenshotName('image-only-parent.png'),
     )
 
     await typeInto(parentEditor, 'parent caption')
+
     await expect(parentEditor).toHaveValue('parent caption')
     await expect(parentEditor).not.toHaveClass(/node-input-image-only/)
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
 
     await window.getByRole('button', { name: 'Top level' }).click()
+
     await expect(editor).toHaveValue('parent caption')
     await expect(editor).not.toHaveClass(/node-input-image-only/)
     await expect(row).not.toHaveClass(/node-row-image-only/)
@@ -195,44 +226,62 @@ test.describe('image-only text caret (Vim editing only)', () => {
   test('keeps an image-only text cursor reachable from a blank row click in Normal mode', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const editor = node(window, 1)
+
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(editor)
 
     const row = window.locator('.node-row').first()
+
     await expect(editor).toHaveClass(/node-input-image-only/)
     await expect(editor).toHaveCSS('height', '1px')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await editor.focus()
+
     await expect(editor).toBeFocused()
     await expect(row.getByRole('button', { name: 'Open image preview' })).toHaveClass(/attachment-image-caret/)
     await expect(editor).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)')
     await expect(row).toHaveScreenshot('image-only-normal-focused.png', { caret: 'initial' })
 
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+
     await window.getByRole('button', { name: 'Close image preview' }).click()
+
     await expect(editor).toBeFocused()
     await expect(row.getByRole('button', { name: 'Open image preview' })).toHaveClass(/attachment-image-caret/)
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
     const parentEditor = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(parentEditor).toHaveClass(/node-input-image-only/)
+
     await window.getByRole('region', { name: 'Current parent' }).click({ position: { x: 250, y: 5 } })
+
     await expect(parentEditor).toBeFocused()
+
     await window.keyboard.press('i')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     await expect(parentEditor).toHaveCSS('height', '30px')
+
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(parentEditor).toHaveCSS('height', '1px')
+
     await window.getByRole('button', { name: 'Top level' }).click()
 
     await window.getByRole('button', { name: 'Open image preview' }).click()
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+
     await window.getByRole('button', { name: 'Close image preview' }).click()
 
     const bounds = await row.boundingBox()
     if (bounds === null) throw new Error('The image-only node row is not visible.')
+
     await row.click({ position: { x: Math.floor(bounds.width * 0.8), y: 12 } })
     await window.keyboard.press('i')
 
@@ -240,34 +289,47 @@ test.describe('image-only text caret (Vim editing only)', () => {
     await expect(editor).toHaveCSS('height', '20px')
     await expect(editor).toHaveCSS('caret-color', 'rgb(59, 56, 51)')
     await expect(row).toHaveScreenshot('image-only-insert-empty.png', { caret: 'initial' })
+
     await typeInto(editor, 'typed after row click')
+
     await expect(editor).toHaveValue('typed after row click')
   })
 
   test('moves the Normal-mode caret onto an image with l and opens it with Enter', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const editor = node(window, 1)
+
     await typeInto(editor, 'text before image')
     await editor.press('Escape')
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(editor)
 
     const row = window.locator('.node-row').first()
+
     await expect(row.getByAltText('Attached image')).toBeVisible()
     await expect(editor).toHaveValue('text before image')
+
     await window.keyboard.press('l')
 
     await expect(editor).toBeFocused()
+
     const imageButton = row.getByRole('button', { name: 'Open image preview' })
+
     await expect(imageButton).toHaveClass(/attachment-image-caret/)
     await expect(editor).toHaveClass(/node-input-image-caret/)
     await expect(row).toHaveScreenshot('text-and-image-image-caret.png', { caret: 'initial' })
+
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     await expect(window.getByRole('img', { name: 'Attached image preview' })).toBeVisible()
+
     await window.getByRole('button', { name: 'Close image preview' }).click()
+
     await expect(imageButton).toHaveClass(/attachment-image-caret/)
+
     await window.keyboard.press('h')
+
     await expect(imageButton).not.toHaveClass(/attachment-image-caret/)
   })
 })
@@ -279,31 +341,41 @@ test.describe('image-only blank row click in standard editing', () => {
   test('focuses the editor, shows the insertion line, and accepts typing', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const first = node(window, 1)
+
     await typeInto(first, 'other')
     await window.keyboard.press('Enter')
     const editor = node(window, 2)
+
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(editor)
 
     const row = window.locator('.node-row').nth(1)
+
     await expect(editor).toHaveClass(/node-input-image-only/)
+
     await first.focus()
+
     await expect(first).toBeFocused()
     await expect(editor).toHaveCSS('height', '1px')
 
     const bounds = await row.boundingBox()
     if (bounds === null) throw new Error('The image-only node row is not visible.')
+
     await row.click({ position: { x: Math.floor(bounds.width * 0.8), y: 12 } })
 
     await expect(editor).toBeFocused()
     await expect(editor).toHaveCSS('height', '20px')
     await expect(editor).toHaveCSS('caret-color', 'rgb(59, 56, 51)')
+
     // Keep the native insertion line visible without depending on its blink phase.
     await editor.evaluate((element) => element.style.setProperty('caret-animation', 'manual'))
+
     await expect(editor).toHaveCSS('caret-animation', 'manual')
     await expect(row).toHaveScreenshot('image-only-standard-blank-row.png', { caret: 'initial' })
+
     await editor.evaluate((element) => element.style.removeProperty('caret-animation'))
     await window.keyboard.type('typed after row click')
+
     await expect(editor).toHaveValue('typed after row click')
   })
 })

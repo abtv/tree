@@ -17,6 +17,7 @@ describe('shiftSiblingRange', () => {
   it('moves a range into the end of the preceding sibling and back out again', () => {
     const indented = shiftSiblingRange(document, 'b', 2, 'in')
     if (indented.kind !== 'moved') throw new Error('expected a move')
+
     expect(shape(indented.document.roots)).toEqual([{ a: [{ b: ['b1'] }, 'c'] }, 'd'])
     // Nodes outside the moved path are shared, and moved subtrees are not copied.
     expect(indented.document.roots[1]).toBe(document.roots[3])
@@ -24,13 +25,16 @@ describe('shiftSiblingRange', () => {
 
     const outdented = shiftSiblingRange(indented.document, 'b', 2, 'out')
     if (outdented.kind !== 'moved') throw new Error('expected a move')
+
     expect(outdented.document).toEqual(document)
   })
 
   it('leaves unselected children under the original parent when moving out', () => {
     const nested: Document = { roots: [node('p', [node('x'), node('y'), node('z')]), node('q')] }
+
     const result = shiftSiblingRange(nested, 'y', 1, 'out')
     if (result.kind !== 'moved') throw new Error('expected a move')
+
     expect(shape(result.document.roots)).toEqual([{ p: ['x', 'z'] }, 'y', 'q'])
   })
 
@@ -46,10 +50,13 @@ describe('shiftSiblingRange', () => {
     for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) deep = node(`n${level}`, [deep])
     // `deep` is MAX_DOCUMENT_DEPTH - 1 levels tall, so one more level still fits...
     const fits: Document = { roots: [node('first'), deep] }
+
     expect(shiftSiblingRange(fits, 'n1', 1, 'in').kind).toBe('moved')
+
     // ...but two more levels do not.
     const tooDeep: Document = { roots: [node('first'), node('wrapper', [deep])] }
     const inner: Document = { roots: [node('first', [node('second')]), node('wrapper', [deep])] }
+
     expect(shiftSiblingRange(tooDeep, 'wrapper', 1, 'in').kind).toBe('too-deep')
     expect(shiftSiblingRange(inner, 'wrapper', 1, 'in').kind).toBe('too-deep')
   })
@@ -57,8 +64,10 @@ describe('shiftSiblingRange', () => {
   it('keeps attachment multiplicity and does not mutate the input', () => {
     const attached: Document = { roots: [node('a', [], true), node('b', [node('b1', [], true)])] }
     const before = structuredClone(attached)
+
     const result = shiftSiblingRange(attached, 'b', 1, 'in')
     if (result.kind !== 'moved') throw new Error('expected a move')
+
     expect(attachmentSummary(result.document).get('image')).toBe(2)
     expect(attached).toEqual(before)
   })

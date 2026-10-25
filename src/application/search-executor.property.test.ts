@@ -20,6 +20,7 @@ it('navigates both directions through the same ordered corpus after reorder and 
             const expectedIndex =
               (((originIndex + direction * count) % matches.length) + matches.length) % matches.length
             const expected = matches[expectedIndex]!
+
             const result = searchHarness().run({
               id: 1,
               revision: 1,
@@ -29,6 +30,7 @@ it('navigates both directions through the same ordered corpus after reorder and 
               query: 'x',
               operation: { kind: 'navigate', origin, direction, count },
             })
+
             expect(result).toMatchObject({
               kind: 'navigate',
               ordinal: expectedIndex + 1,

@@ -52,9 +52,11 @@ describeForEachEditingMode('navigation', () => {
     await typeInto(node(window, 2), 'B')
 
     await window.keyboard.press('ArrowUp')
+
     await expect(node(window, 1)).toBeFocused()
 
     await window.keyboard.press('ArrowDown')
+
     await expect(node(window, 2)).toBeFocused()
   })
 
@@ -89,6 +91,7 @@ describeForEachEditingMode('navigation', () => {
     await window.keyboard.press('ArrowDown')
 
     const editor = node(window, 1)
+
     await expect(editor).toBeFocused()
     expect(
       await editor.evaluate((element) => {
@@ -107,6 +110,7 @@ describeForEachEditingMode('navigation', () => {
     await window.keyboard.press('ArrowDown')
 
     const editor = parent(window)
+
     await expect(editor).toBeFocused()
     expect(
       await editor.evaluate((element) => {
@@ -131,6 +135,7 @@ describeForEachEditingMode('navigation', () => {
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
 
     await window.keyboard.press('ArrowDown')
+
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
   })
@@ -150,6 +155,7 @@ describeForEachEditingMode('navigation', () => {
     await window.keyboard.press('ArrowDown')
 
     const child = node(window, 1)
+
     await expect(child).toBeFocused()
     expect(
       await child.evaluate((element) => {
@@ -176,31 +182,37 @@ describeForEachEditingMode('navigation', () => {
 
     await window.keyboard.press('Home')
     await window.keyboard.press('ArrowLeft')
+
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(4)
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowRight')
+
     await expect(node(window, 2)).toBeFocused()
     expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowRight')
+
     await expect(node(window, 2)).toBeFocused()
     expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(8)
 
     await window.keyboard.press('ArrowUp')
     await window.keyboard.press('Home')
     await window.keyboard.press('ArrowUp')
+
     await expect(parent(window)).toBeFocused()
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowUp')
+
     expect(await parent(window).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
 
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowRight')
+
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
   })
@@ -221,9 +233,12 @@ describeForEachEditingMode('navigation', () => {
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
 
     await window.keyboard.press('Enter')
+
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
     await typeInto(node(window, 1), 'Work')
+
     await expect(node(window, 1)).toHaveValue('Work')
   })
 
@@ -237,6 +252,7 @@ describeForEachEditingMode('navigation', () => {
     await typeInto(node(window, 1), 'Work')
 
     await window.keyboard.press('Meta+,')
+
     await expect(node(window, 1)).toHaveValue('Projects')
     await expect(node(window, 1)).toBeFocused()
   })
@@ -256,11 +272,13 @@ describeForEachEditingMode('navigation', () => {
     await expect(window.locator('[aria-label="Current location"]')).toContainText('Work')
 
     await window.getByRole('button', { name: 'Projects' }).click()
+
     await expect(parent(window)).toHaveValue('Projects')
     await expect(node(window, 1)).toHaveValue('Work')
     await expect(node(window, 1)).toBeFocused()
 
     await window.getByRole('button', { name: 'Top level' }).click()
+
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
     await expect(node(window, 1)).toHaveValue('Projects')
     await expect(node(window, 1)).toBeFocused()
@@ -281,11 +299,13 @@ describeForEachEditingMode('navigation', () => {
       const bullet = getComputedStyle(element, '::before')
       return { background: button.backgroundColor, bulletWidth: bullet.width, bulletHeight: bullet.height }
     })
+
     expect(indicatorAppearance.background).not.toBe('rgba(0, 0, 0, 0)')
     expect(indicatorAppearance.bulletWidth).toBe('7px')
     expect(indicatorAppearance.bulletHeight).toBe('7px')
 
     await parentIndicator.click()
+
     await expect(parent(window)).toHaveValue('Parent')
     await expect(node(window, 1)).toHaveValue('Child')
     await expect(node(window, 1)).toBeFocused()
@@ -296,11 +316,13 @@ describeForEachEditingMode('navigation', () => {
       const bullet = getComputedStyle(element, '::before')
       return { background: button.backgroundColor, bulletWidth: bullet.width, bulletHeight: bullet.height }
     })
+
     expect(leafAppearance.background).toBe('rgba(0, 0, 0, 0)')
     expect(leafAppearance.bulletWidth).toBe('7px')
     expect(leafAppearance.bulletHeight).toBe('7px')
 
     await leafIndicator.click()
+
     await expect(parent(window)).toHaveValue('Child')
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(0)
     await expect(parent(window)).toBeFocused()

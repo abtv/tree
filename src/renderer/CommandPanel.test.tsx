@@ -25,6 +25,7 @@ describe('command panel presentation', () => {
     render(<CommandPanel matches={commandRegistry} selected={0} context={context} run={vi.fn()} />)
     const rows = screen.getAllByRole('option')
     const labels = new Map(rows.map((row) => [row.querySelector('.command-name')?.textContent, row]))
+
     expect(labels.get('quit')?.querySelector('.command-shortcut')?.textContent).toBe('⌘Q')
     expect(labels.get('show-tree')?.querySelector('.command-shortcut')?.textContent).toBe('')
   })
@@ -36,6 +37,7 @@ describe('command panel presentation', () => {
       <CommandPanel matches={commandRegistry} selected={0} context={context} run={vi.fn()} shortcuts={shortcuts} />,
     )
     const quit = screen.getAllByRole('option').find((row) => row.id === 'command-quit')!
+
     expect(quit.querySelector('.command-shortcut')?.textContent).toBe('formatted')
   })
 
@@ -51,6 +53,7 @@ describe('command panel presentation', () => {
       />,
     )
     const quit = screen.getAllByRole('option').find((row) => row.id === 'command-quit')!
+
     expect(quit.querySelector('.command-shortcut')?.textContent).toBe('Ctrl+Q')
   })
 })

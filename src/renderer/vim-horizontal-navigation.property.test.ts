@@ -26,6 +26,7 @@ function navigate(nodes: TreeNode[], index: number, cursor: number, direction: '
 describe('counted horizontal navigation', () => {
   it('crosses at the final and first grapheme without spending a step on text end', () => {
     const nodes = [node('a', 'a👩🏽‍🚀'), node('b', '🇫🇷z')]
+
     expect(navigate(nodes, 0, 1, 'right', 1)).toEqual({ node: nodes[1], caret: { cursor: 0, imageActive: false } })
     expect(navigate(nodes, 1, 0, 'left', 1)).toEqual({ node: nodes[0], caret: { cursor: 1, imageActive: false } })
     expect(navigate(nodes, 0, 0, 'right', 3)).toEqual({ node: nodes[1], caret: { cursor: 4, imageActive: false } })
@@ -33,12 +34,14 @@ describe('counted horizontal navigation', () => {
 
   it('counts empty and image-only nodes as one position each', () => {
     const nodes = [node('a', 'ab'), node('empty', ''), node('image', '', true), node('b', 'cd')]
+
     expect(navigate(nodes, 0, 1, 'right', 2)).toEqual({ node: nodes[2], caret: { cursor: 0, imageActive: true } })
     expect(navigate(nodes, 3, 0, 'left', 3)).toEqual({ node: nodes[0], caret: { cursor: 1, imageActive: false } })
   })
 
   it('enters a previous image without reusing the source image return position', () => {
     const nodes = [node('a', 'abc', true), node('b', 'xyz', true)]
+
     const result = horizontalNavigation({
       node: nodes[1]!,
       caret: { cursor: 3, imageActive: true, imageTextReturnCursor: 0 },
@@ -46,6 +49,7 @@ describe('counted horizontal navigation', () => {
       count: 2,
       adjacent: () => nodes[0],
     })
+
     expect(result).toEqual({ node: nodes[0], caret: { cursor: 3, imageActive: true } })
     expect(navigate(nodes, 1, 0, 'left', 2)).toEqual({ node: nodes[0], caret: { cursor: 2, imageActive: false } })
   })
@@ -53,6 +57,7 @@ describe('counted horizontal navigation', () => {
   it('preserves an image return position when clamped and restores it before consuming remaining h steps', () => {
     const current = node('a', 'abcd', true)
     const caret = { cursor: 4, imageActive: true, imageTextReturnCursor: 1 }
+
     expect(
       horizontalNavigation({ node: current, caret, direction: 'right', count: 99, adjacent: () => undefined }).caret,
     ).toEqual(caret)
@@ -64,6 +69,7 @@ describe('counted horizontal navigation', () => {
   it('batches text steps and stops huge counts at the outer boundary', () => {
     const current = node('a', 'x'.repeat(100_000), true)
     const adjacent = vi.fn(() => undefined)
+
     const result = horizontalNavigation({
       node: current,
       caret: { cursor: 0, imageActive: false },
@@ -71,6 +77,7 @@ describe('counted horizontal navigation', () => {
       count: Number.MAX_SAFE_INTEGER,
       adjacent,
     })
+
     expect(result.caret).toEqual({
       cursor: current.text.length,
       imageActive: true,
@@ -101,7 +108,9 @@ describe('counted horizontal navigation', () => {
           const origin = positions[start]!
           const target =
             positions[Math.max(0, Math.min(positions.length - 1, start + (direction === 'right' ? count : -count)))]!
+
           const actual = navigate(nodes, nodes.indexOf(origin.node), origin.cursor, direction, count)
+
           expect(actual.node).toBe(target.node)
           expect(actual.caret.cursor).toBe(target.cursor)
           expect(actual.caret.imageActive).toBe(

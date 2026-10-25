@@ -67,13 +67,17 @@ describe('visual text geometry', () => {
     const rect = vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 40))
     try {
       const geometry = visualTextGeometry(input)
+
       expect(document.body.lastElementChild?.getAttribute('style')).toContain('width: 200px')
       expect(document.body.lastElementChild?.getAttribute('style')).toContain('font-size: 17px')
       expect(geometry.position(8)).toEqual({ left: 20, top: 40 })
       expect(range.toString()).toBe('👩‍💻')
       expect(getSelectionRange(input)).toEqual({ start: 2, end: 4 })
+
       const mirror = document.body.lastElementChild!
+
       geometry.dispose()
+
       expect(mirror.isConnected).toBe(false)
     } finally {
       create.mockRestore()
@@ -90,9 +94,12 @@ describe('visual text geometry', () => {
     const before = document.body.childElementCount
     try {
       const geometry = visualTextGeometry(input)
+
       expect(geometry.position(2)).toEqual({ left: 15, top: 20 })
       expect(range.toString()).toBe('👩‍💻')
+
       geometry.dispose()
+
       expect(document.body.childElementCount).toBe(before)
     } finally {
       create.mockRestore()
@@ -105,11 +112,16 @@ describe('visual text geometry', () => {
     document.body.append(list)
     try {
       const geometry = unmountedNodeGeometry(node('long text'), 3)
+
       expect(geometry).toBeDefined()
+
       const row = list.firstElementChild as HTMLElement
+
       expect(row.style.getPropertyValue('--row-depth')).toBe('3')
       expect(row.getAttribute('aria-hidden')).toBe('true')
+
       geometry?.dispose()
+
       expect(list.children).toHaveLength(0)
     } finally {
       list.remove()
@@ -127,6 +139,7 @@ describe('visual line cursor', () => {
   ])('keeps the column when a line has nonmonotonic character positions: %j', (...left) => {
     const bidiPosition = (offset: number) => ({ top: Math.floor(offset / 4) * 20, left: left[offset % 4]! })
     const column = left.indexOf(20)
+
     expect(visualLineCursor('abcdefgh', bidiPosition, column, 'down', 20)).toBe(column + 4)
     expect(visualLineCursor('abcdefgh', bidiPosition, column + 4, 'up', 20)).toBe(column)
   })
@@ -164,12 +177,16 @@ describe('editor DOM adapters', () => {
     const textarea = document.createElement('textarea')
     textarea.value = 'hello'
     textarea.textContent = 'unused'
+
     expect(nodeTextLength(textarea)).toBe(5)
 
     const editable = document.createElement('div')
     editable.contentEditable = 'true'
+
     expect(nodeTextLength(editable)).toBe(0)
+
     editable.textContent = 'hello'
+
     expect(nodeTextLength(editable)).toBe(5)
   })
 
@@ -177,6 +194,7 @@ describe('editor DOM adapters', () => {
     const textarea = document.createElement('textarea')
     textarea.value = 'hello'
     textarea.setSelectionRange(1, 1 + width)
+
     expect(hasMultiCharacterSelection(textarea)).toBe(width > 1)
   })
 
@@ -202,14 +220,18 @@ describe('editor DOM adapters', () => {
   it('writes editable text to textarea values and contenteditable text', () => {
     const textarea = document.createElement('textarea')
     textarea.textContent = 'default'
+
     setEditableText(textarea, 'updated')
+
     expect(textarea.value).toBe('updated')
     expect(textarea.textContent).toBe('default')
 
     const editable = document.createElement('div')
     editable.contentEditable = 'true'
     editable.innerHTML = '<b>original</b>'
+
     setEditableText(editable, 'updated')
+
     expect(editable.textContent).toBe('updated')
     expect(editable.children).toHaveLength(0)
   })
@@ -253,8 +275,10 @@ describe('editor DOM adapters', () => {
   it('reads a collapsed contenteditable selection and rejects selections outside the element', () => {
     const element = document.createElement('div')
     const text = document.createTextNode('hello')
+
     element.append(text)
     document.body.append(element)
+
     setDomSelection(text, 3)
 
     expect(getCaret(element)).toBe(3)
@@ -263,7 +287,9 @@ describe('editor DOM adapters', () => {
 
     const outside = document.createTextNode('outside')
     document.body.append(outside)
+
     setDomSelection(outside, 2)
+
     expect(getCaret(element)).toBe(0)
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
   })
@@ -336,8 +362,10 @@ describe('editor DOM adapters', () => {
     const element = document.createElement('div')
     const first = document.createTextNode('one')
     const second = document.createTextNode('two')
+
     element.append(first, second)
     document.body.append(element)
+
     setDomSelection(first, 1, second, 2)
 
     expect(getSelectionRange(element)).toEqual({ start: 1, end: 5 })
@@ -351,6 +379,7 @@ describe('editor DOM adapters', () => {
     document.body.append(element)
     const nestedText = element.querySelector('strong')?.firstChild
     if (nestedText === undefined || nestedText === null) throw new Error('Nested text was not created.')
+
     setDomSelection(nestedText, 1)
 
     expect(getCaret(element)).toBe(4)
@@ -373,8 +402,11 @@ describe('editor DOM adapters', () => {
     document.body.append(element)
 
     setCaret(element, 2)
+
     expect(getCaret(element)).toBe(2)
+
     setCaret(element, 99)
+
     expect(getCaret(element)).toBe(5)
   })
 
@@ -384,10 +416,15 @@ describe('editor DOM adapters', () => {
     element.setSelectionRange(0, 3)
 
     setCaret(element, 2)
+
     expect(getSelectionRange(element)).toEqual({ start: 2, end: 2 })
+
     setCaret(element, -4)
+
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 0 })
+
     setCaret(element, 99)
+
     expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
   })
 
@@ -398,7 +435,9 @@ describe('editor DOM adapters', () => {
     setNormalCaret(element, 2)
 
     expect(getSelectionRange(element)).toEqual({ start: 2, end: 3 })
+
     setNormalCaret(element, 99)
+
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
@@ -408,6 +447,7 @@ describe('editor DOM adapters', () => {
     row.dataset.hasAttachment = 'true'
     const element = document.createElement('textarea')
     element.value = 'hello'
+
     row.append(element, document.createElement('button'))
 
     setNormalCaret(element, 5)
@@ -419,9 +459,13 @@ describe('editor DOM adapters', () => {
     const element = document.createElement('div')
     element.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(element)
+
     setNormalCaret(element, 2)
+
     expect(getSelectionRange(element)).toEqual({ start: 2, end: 3 })
+
     setNormalCaret(element, 4)
+
     expect(getSelectionRange(element)).toEqual({ start: 4, end: 5 })
   })
 
@@ -432,12 +476,15 @@ describe('editor DOM adapters', () => {
     document.body.append(element)
 
     setNormalCaret(element, 0)
+
     expect(getSelectionRange(element)).toEqual({ start: 0, end: 1 })
 
     setNormalCaret(element, 1)
+
     expect(getSelectionRange(element)).toEqual({ start: 1, end: 2 })
 
     setNormalCaret(element, 9)
+
     expect(getSelectionRange(element)).toEqual({ start: 9, end: 10 })
   })
 
@@ -447,8 +494,11 @@ describe('editor DOM adapters', () => {
     document.body.append(element)
 
     setCaret(element, 3)
+
     expect(getCaret(element)).toBe(3)
+
     setCaret(element, 4)
+
     expect(getCaret(element)).toBe(4)
   })
 
@@ -458,14 +508,19 @@ describe('editor DOM adapters', () => {
     element.setSelectionRange(1, 4, 'forward')
 
     collapseSelectionToAnchor(element)
+
     expect(getSelectionRange(element)).toEqual({ start: 1, end: 1 })
 
     element.setSelectionRange(2, 5, 'backward')
+
     collapseSelectionToAnchor(element)
+
     expect(getSelectionRange(element)).toEqual({ start: 5, end: 5 })
 
     element.setSelectionRange(3, 3)
+
     collapseSelectionToAnchor(element)
+
     expect(getSelectionRange(element)).toEqual({ start: 3, end: 3 })
   })
 
@@ -473,8 +528,10 @@ describe('editor DOM adapters', () => {
     const element = document.createElement('div')
     const first = document.createTextNode('one')
     const second = document.createTextNode('two')
+
     element.append(first, second)
     document.body.append(element)
+
     setDomSelection(first, 1, second, 2)
 
     collapseSelectionToAnchor(element)
@@ -490,14 +547,18 @@ describe('editor DOM adapters', () => {
     document.body.append(element)
     const outside = document.createTextNode('outside')
     document.body.append(outside)
+
     setDomSelection(outside, 1, outside, 4)
 
     collapseSelectionToAnchor(element)
+
     expect(window.getSelection()?.anchorNode).toBe(outside)
     expect(window.getSelection()?.isCollapsed).toBe(false)
 
     const getSelection = vi.spyOn(globalThis, 'getSelection').mockReturnValue(null)
+
     expect(() => collapseSelectionToAnchor(element)).not.toThrow()
+
     getSelection.mockRestore()
   })
 
@@ -510,10 +571,12 @@ describe('editor DOM adapters', () => {
 
     setDomSelection(element.firstChild!, 0, element.lastChild!, 1)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(true)
 
     setDomSelection(element.firstChild!, 0)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(false)
   })
 
@@ -526,10 +589,12 @@ describe('editor DOM adapters', () => {
 
     setDomSelection(element.firstChild!, 0, element.firstChild!, 1)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(false)
 
     setDomSelection(link.firstChild!, 1, link.firstChild!, 2)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(false)
   })
 
@@ -542,6 +607,7 @@ describe('editor DOM adapters', () => {
 
     setDomSelection(element.firstChild!, 0, link.firstChild!, 3)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(false)
   })
 
@@ -558,10 +624,12 @@ describe('editor DOM adapters', () => {
     // as covering the anchor. See e2e/electron/clipboard.spec.ts "selects linked characters with the mouse".
     setDomSelection(element.firstChild!, 0, label, label.textContent?.length ?? 0)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(false)
 
     setDomSelection(element.firstChild!, 0, element, element.childNodes.length)
     updateSelectedLinks(element)
+
     expect(link.classList.contains('link-selected')).toBe(true)
   })
 
@@ -574,19 +642,26 @@ describe('editor DOM adapters', () => {
     linked.innerHTML = 'a<a href="https://example.test">link</a>z'
     document.body.append(plain, linked)
     const link = linked.querySelector('a')!
+
     setDomSelection(linked.firstChild!, 0, linked.lastChild!, 1)
     updateSelectedLinks(linked)
+
     expect(link.classList.contains('link-selected')).toBe(true)
+
     const createRange = vi.spyOn(document, 'createRange')
     const getRangeAt = vi.spyOn(Selection.prototype, 'getRangeAt')
     try {
       updateSelectedLinks(plain)
+
       expect(createRange).not.toHaveBeenCalled()
       expect(getRangeAt).not.toHaveBeenCalled()
+
       setDomSelection(linked.firstChild!, 0)
       createRange.mockClear()
       getRangeAt.mockClear()
+
       updateSelectedLinks(linked)
+
       expect(link.classList.contains('link-selected')).toBe(false)
       expect(createRange).not.toHaveBeenCalled()
       expect(getRangeAt).not.toHaveBeenCalled()
@@ -614,11 +689,14 @@ describe('editor DOM adapters', () => {
     if (bold === null) throw new Error('The nested element was not created.')
 
     setDomSelection(bold, 0)
+
     expect(getCaret(element)).toBe(2)
 
     const firstSpan = element.querySelector('span')
     if (firstSpan === null) throw new Error('The first span was not created.')
+
     setDomSelection(firstSpan, 0)
+
     expect(getCaret(element)).toBe(0)
   })
 

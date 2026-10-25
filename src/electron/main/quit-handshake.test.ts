@@ -28,10 +28,13 @@ describe('QuitHandshake', () => {
 
     handshake.request()
     handshake.request()
+
     expect(sent).toEqual(['request-1'])
     expect(handshake.confirm('wrong')).toBe(false)
     expect(handshake.confirm('request-1')).toBe(true)
+
     await Promise.resolve()
+
     expect(quit).toHaveBeenCalledOnce()
     expect(handshake.confirm('request-1')).toBe(false)
   })
@@ -51,8 +54,11 @@ describe('QuitHandshake', () => {
 
     handshake.request()
     fire()
+
     expect(onTimeout).toHaveBeenCalledOnce()
+
     handshake.request()
+
     expect(sent).toEqual(['request-1', 'request-2'])
   })
 
@@ -71,12 +77,14 @@ describe('QuitHandshake', () => {
     handshake.request()
     handshake.force()
     await Promise.resolve()
+
     expect(quit).toHaveBeenCalledOnce()
     expect(clock.clearTimeout).toHaveBeenCalled()
 
     handshake.request()
     handshake.force()
     await Promise.resolve()
+
     expect(quit).toHaveBeenCalledOnce()
     expect(sent).toEqual(['request-1'])
   })

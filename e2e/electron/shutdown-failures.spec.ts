@@ -31,7 +31,9 @@ test.describe('shutdown failure handling', () => {
 
   test('keeps the app open after a save failure and quits after a successful retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     allowRendererError(
       /^Changes could not be saved: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|EISDIR|ENOTDIR): /,
     )
@@ -42,24 +44,30 @@ test.describe('shutdown failure handling', () => {
 
     const dataDirectory = join(userDataDir, 'data')
     const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
+
     mkdirSync(temporaryDocumentPath)
 
     // Control renderer save timers independently of the captured main-process quit timer.
     await window.clock.install()
     const initialText = 'unsaved one two three four five six seven eight nine'
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
+
     await typeInto(node(window, 1), initialText)
+
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
     const expireQuitTimer = await captureQuitTimer(app, 'ipc')
 
     await node(window, 1).press('Meta+q')
+
     await expect(window.getByText(/Operation failed:/)).toBeVisible()
     expect(app.process().exitCode).toBeNull()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
+
     await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
@@ -68,7 +76,9 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), recoveryText)
 
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text ?? '', idleSavePoll)
       .toBe(`${initialText}${recoveryText}`)
@@ -80,6 +90,7 @@ test.describe('shutdown failure handling', () => {
 
   test('suppresses duplicate quit requests, reports timeout, and permits retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     allowRendererError(/Operation failed: The application could not finish saving before quit\./)
     allowRendererError(/Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request\./)
     await delaySaveIpc(app, 5_500)
@@ -117,12 +128,17 @@ test.describe('shutdown failure handling', () => {
   // @requirement PRODUCT.md §9.2
   test('flushes pending changes and quits when the window is closed', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     const text = 'window close flush pending'
 
     await typeInto(node(window, 1), text)
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
+
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await closeMainWindow(app)
     await closed
 
@@ -133,17 +149,22 @@ test.describe('shutdown failure handling', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     const text = 'hidden window close flush pending'
 
     await typeInto(node(window, 1), text)
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
 
     // The application is inactive from here on, so the focused-window selector returns null.
     await app.evaluate(({ app: electronApp }) => electronApp.hide())
+
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow() === null)).toBe(true)
 
     const closed = app.waitForEvent('close', { timeout: 10_000 })
+
     await closeMainWindow(app)
     await closed
 
@@ -152,6 +173,7 @@ test.describe('shutdown failure handling', () => {
 
   test('flushes text typed while the quit save is in flight', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
 
     await app.evaluate(() => {
@@ -176,8 +198,10 @@ test.describe('shutdown failure handling', () => {
 
     const beforeQuit = 'before quit'
     const typedWhilePending = ' typed while quit save pending'
+
     await typeInto(node(window, 1), beforeQuit)
     await clickApplicationMenuQuit(app)
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
@@ -186,6 +210,7 @@ test.describe('shutdown failure handling', () => {
 
     await typeInto(node(window, 1), typedWhilePending)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await app.evaluate(() => (globalThis as typeof globalThis & { releaseFirstSave?: () => void }).releaseFirstSave?.())
     await closed
 
@@ -194,18 +219,24 @@ test.describe('shutdown failure handling', () => {
 
   test('persists a pending Replace edit when the application menu quits', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     const editor = node(window, 1)
 
     await typeInto(editor, 'abcd')
     await setCursor(editor, 2)
     await window.keyboard.press('Escape')
     await window.keyboard.press('R')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
     await window.keyboard.type('XY')
+
     await expect(editor).toHaveValue('aXYd')
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
 
@@ -215,7 +246,9 @@ test.describe('shutdown failure handling', () => {
   // @requirement PRODUCT.md §20.2.5
   test('persists a pending Replace edit when Cmd+Q is pressed in the editor', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     const editor = node(window, 1)
 
     await typeInto(editor, 'abcd')
@@ -223,9 +256,11 @@ test.describe('shutdown failure handling', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('R')
     await window.keyboard.type('XY')
+
     await expect(editor).toHaveValue('aXYd')
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await editor.press('Meta+q').catch(() => undefined)
     await closed
 
@@ -237,7 +272,9 @@ test.describe('shutdown failure handling', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     allowRendererError(
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
@@ -246,14 +283,17 @@ test.describe('shutdown failure handling', () => {
     await blockSaves(app)
 
     const editor = node(window, 1)
+
     await typeInto(editor, 'abcd')
     await setCursor(editor, 2)
     await window.keyboard.press('Escape')
     await window.keyboard.press('R')
     await window.keyboard.type('XY')
+
     await expect(editor).toHaveValue('aXYd')
 
     await closeMainWindow(app)
+
     expect(app.process().exitCode).toBeNull()
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
     await expect(
@@ -263,6 +303,7 @@ test.describe('shutdown failure handling', () => {
 
     await restoreSaves(app)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await closeMainWindow(app)
     await closed
 
@@ -271,7 +312,9 @@ test.describe('shutdown failure handling', () => {
 
   test('persists a Replace edit completed while the quit save is in flight', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     await app.evaluate(() => {
       const control = globalThis as typeof globalThis & {
         saveCalls?: number
@@ -293,13 +336,16 @@ test.describe('shutdown failure handling', () => {
     })
 
     const editor = node(window, 1)
+
     await typeInto(editor, 'abcd')
     await window.keyboard.press('Escape')
     await window.keyboard.press('R')
     await window.keyboard.type('X')
+
     await expect(editor).toHaveValue('abcX')
 
     await clickApplicationMenuQuit(app)
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
@@ -309,11 +355,13 @@ test.describe('shutdown failure handling', () => {
 
     await window.keyboard.press('R')
     await window.keyboard.type('Y')
+
     // The committed replacement returned the editor to Normal mode, whose block caret sits on the
     // final character ('X'), so the in-flight replacement overwrites it.
     await expect(editor).toHaveValue('abcY')
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await app.evaluate(() => (globalThis as typeof globalThis & { releaseFirstSave?: () => void }).releaseFirstSave?.())
     await closed
 
@@ -324,7 +372,9 @@ test.describe('shutdown failure handling', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     allowRendererError(
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
@@ -334,25 +384,33 @@ test.describe('shutdown failure handling', () => {
 
     // Exactly ten words trigger one volume save attempt before the window close.
     const initialText = 'window close failure alpha beta gamma delta epsilon zeta eta'
+
     await typeInto(node(window, 1), initialText)
+
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
     const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await closeMainWindow(app)
+
     expect(app.process().exitCode).toBeNull()
     await expect(window.getByText(/Operation failed:.*save blocked/)).toBeVisible()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
+
     await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
 
     await restoreSaves(app)
     const recoveryText = ' recovered one two three four five six seven eight nine ten'
+
     await typeInto(node(window, 1), recoveryText)
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await closeMainWindow(app)
     await closed
 
@@ -363,7 +421,9 @@ test.describe('shutdown failure handling', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     allowRendererError(
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
@@ -373,13 +433,17 @@ test.describe('shutdown failure handling', () => {
     await blockSaves(app)
 
     const text = 'locked window close alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
+
     await typeInto(node(window, 1), text)
+
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
 
     await closeMainWindow(app)
+
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
 
     await window.getByRole('button', { name: 'Cancel' }).click()
+
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toHaveCount(0)
     expect(app.process().exitCode).toBeNull()
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible()
@@ -390,12 +454,16 @@ test.describe('shutdown failure handling', () => {
     ).toBeVisible({ timeout: 7_000 })
 
     await closeMainWindow(app)
+
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
+
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await window.getByRole('button', { name: 'Quit without saving' }).click()
     await closed
 
     const relaunched = await launchTree(userDataDir)
+
     await expect(relaunched.window.locator('main.tree-app')).toBeVisible()
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')
     await expect(node(relaunched.window, 1)).toBeEditable()

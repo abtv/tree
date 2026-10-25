@@ -24,8 +24,10 @@ test('typing in a large dated Tree stays responsive with bounded mounted rows', 
   const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
   const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
   await input.focus()
+
   await expect(input).toBeFocused()
   await expect(input).toHaveText('Child 0 2026-10-14')
+
   await window.keyboard.press('A')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -45,12 +47,14 @@ test('typing in a large dated Tree stays responsive with bounded mounted rows', 
     (window as unknown as { treeDateTyping: number[] }).treeDateTyping.toSorted((a, b) => a - b),
   )
   const mountedRows = await window.locator('.node-row').count()
+
   recordPerfResult({
     kind: 'state',
     scenario: 'tree-10000-dated-typing',
     samples: samples.length,
     metrics: { typingP95Ms: round(samples[28]!), typingMaxMs: round(samples[29]!), mountedRows },
   })
+
   expect(samples[28]).toBeLessThan(50)
   expect(samples[29]).toBeLessThan(100)
   expect(mountedRows).toBeLessThan(100)

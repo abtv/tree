@@ -10,14 +10,18 @@ test.describe('Vim interactions at scale', () => {
     }) => {
       const seed = wideSeed(1_000)
       const children = (seed.document as { roots: { children: { text: string }[] }[] }).roots[0]!.children
+
       children.forEach((node, index) => {
         if (index % 4 === 2) node.text = 'A wrapped synthetic note for navigation. '.repeat(12)
         if (index === 12) node.text = 'A tall synthetic note for navigation. '.repeat(100)
       })
       seedDocument(userDataDir, seed)
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
       await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
+
       const keys = axis === 'vertical' ? ['j', 'k'] : ['l', 'h']
+
       await window.evaluate((keys) => {
         const paints: number[] = []
         ;(window as unknown as { repeatedNavigationPaints: number[] }).repeatedNavigationPaints = paints
@@ -46,11 +50,13 @@ test.describe('Vim interactions at scale', () => {
       )
       const p95 = paints[Math.floor(paints.length * 0.95)]!
       const max = paints[paints.length - 1]!
+
       recordPerfResult({
         kind: 'state',
         scenario: axis === 'vertical' ? 'vim-repeated-wrapped-1000' : 'vim-repeated-horizontal-1000',
         metrics: { paintP95Ms: round(p95), paintMaxMs: round(max) },
       })
+
       expect(p95).toBeLessThan(50)
       expect(max).toBeLessThan(100)
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
@@ -70,7 +76,9 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.evaluate(() => {
       const samples: number[] = []
       ;(window as unknown as { visualPaints: number[] }).visualPaints = samples
@@ -87,22 +95,28 @@ test.describe('Vim interactions at scale', () => {
     await window.keyboard.press('v')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('l')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('h')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
     await window.keyboard.press('Escape')
     await window.waitForFunction(() => (window as unknown as { visualPaints: number[] }).visualPaints.length === 42)
     const samples = await window.evaluate(() =>
       (window as unknown as { visualPaints: number[] }).visualPaints.slice().sort((a, b) => a - b),
     )
+
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
     const paintMaxMs = samples[samples.length - 1]!
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-character-visual-wide-1000',
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
+
     expect(paintP95Ms).toBeLessThan(50)
     expect(paintMaxMs).toBeLessThan(100)
   })
@@ -114,7 +128,9 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.evaluate(() => {
       const samples: number[] = []
       ;(window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints = samples
@@ -131,7 +147,9 @@ test.describe('Vim interactions at scale', () => {
     await window.keyboard.press('V')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('j')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('k')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('Escape')
     await window.waitForFunction(
       () => (window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints.length === 42,
@@ -139,16 +157,20 @@ test.describe('Vim interactions at scale', () => {
     const samples = await window.evaluate(() =>
       (window as unknown as { nodeVisualPaints: number[] }).nodeVisualPaints.slice().sort((a, b) => a - b),
     )
+
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     const paintP95Ms = samples[Math.floor(samples.length * 0.95)]!
     const paintMaxMs = samples[samples.length - 1]!
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-node-visual-wide-1000',
       samples: samples.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
+
     expect(paintP95Ms).toBeLessThan(50)
     expect(paintMaxMs).toBeLessThan(100)
   })
@@ -162,7 +184,9 @@ test.describe('Vim interactions at scale', () => {
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const input = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
       await input.focus()
+
       await expect(input).toBeFocused()
+
       await window.evaluate(() => {
         const samples: number[] = []
         ;(window as unknown as { ddPaints: number[] }).ddPaints = samples
@@ -180,13 +204,16 @@ test.describe('Vim interactions at scale', () => {
       await window.keyboard.press('d')
       await window.waitForFunction(() => (window as unknown as { ddPaints: number[] }).ddPaints.length === 2)
       const deletePaintMs = await window.evaluate(() => (window as unknown as { ddPaints: number[] }).ddPaints[1]!)
+
       await expect(window.locator(`.node-row[data-node-id="c${middle}"]`)).toHaveCount(0)
       await expect(window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })).toBeFocused()
+
       recordPerfResult({
         kind: 'state',
         scenario: `vim-dd-wide-${siblingCount}`,
         metrics: { deletePaintMs: round(deletePaintMs) },
       })
+
       expect(deletePaintMs).toBeLessThan(100)
     })
   }
@@ -198,7 +225,9 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.evaluate(() => {
       const samples: number[] = []
       ;(window as unknown as { countedPaints: number[] }).countedPaints = samples
@@ -217,14 +246,17 @@ test.describe('Vim interactions at scale', () => {
     const deletePaintMs = await window.evaluate(
       () => (window as unknown as { countedPaints: number[] }).countedPaints[1]!,
     )
+
     await expect(window.locator('.node-row[data-node-id="c100"]')).toHaveCount(0)
     await expect(window.locator('.node-row[data-node-id="c199"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(/200/u)
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-counted-dd-wide-10000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
+
     expect(deletePaintMs).toBeLessThan(100)
   })
 
@@ -235,7 +267,9 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.evaluate(() => {
       const samples: number[] = []
       ;(window as unknown as { verticalPaints: number[] }).verticalPaints = samples
@@ -254,15 +288,18 @@ test.describe('Vim interactions at scale', () => {
     const deletePaintMs = await window.evaluate(
       () => (window as unknown as { verticalPaints: number[] }).verticalPaints[1]!,
     )
+
     // The current node and the hundred siblings after it are gone: c100 through c200.
     await expect(window.locator('.node-row[data-node-id="c100"]')).toHaveCount(0)
     await expect(window.locator('.node-row[data-node-id="c200"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(/201/u)
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-vertical-operator-wide-10000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
+
     expect(deletePaintMs).toBeLessThan(100)
   })
 
@@ -273,7 +310,9 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 101', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.evaluate(() => {
       const samples: number[] = []
       ;(window as unknown as { joinPaints: number[] }).joinPaints = samples
@@ -290,29 +329,38 @@ test.describe('Vim interactions at scale', () => {
     for (const key of ['1', '0', '0', 'g', 'J']) await window.keyboard.press(key)
     await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 1)
     const joinPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[0]!)
+
     // The node and the ninety-nine siblings after it are one node: c100 absorbed c101 through c199.
     await expect(window.locator('.node-row[data-node-id="c101"]')).toHaveCount(0)
     await expect(window.locator('.node-row[data-node-id="c199"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 101', exact: true })).toHaveValue(
       /^Child 100Child 101.*Child 199$/u,
     )
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-counted-join-wide-10000',
       metrics: { joinPaintMs: round(joinPaintMs) },
     })
+
     expect(joinPaintMs).toBeLessThan(100)
+
     await window.keyboard.press('u')
+
     await expect(input).toHaveValue('Child 100')
+
     await window.keyboard.press('.')
     await window.waitForFunction(() => (window as unknown as { joinPaints: number[] }).joinPaints.length === 2)
     const repeatPaintMs = await window.evaluate(() => (window as unknown as { joinPaints: number[] }).joinPaints[1]!)
+
     await expect(input).toHaveValue(/^Child 100Child 101.*Child 199$/u)
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-repeat-join-wide-10000',
       metrics: { originalPaintMs: round(joinPaintMs), repeatPaintMs: round(repeatPaintMs) },
     })
+
     // Replay uses the same atomic range transition, so it shares the measured original-command budget.
     expect(repeatPaintMs).toBeLessThan(100)
   })
@@ -323,10 +371,14 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
+
     await window.keyboard.press('V')
     await window.keyboard.press('G')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.evaluate(() => {
       const probe = window as unknown as { joinAllPaintMs?: number }
       document.addEventListener(
@@ -347,16 +399,19 @@ test.describe('Vim interactions at scale', () => {
     await window.keyboard.press('J')
     await window.waitForFunction(() => (window as unknown as { joinAllPaintMs?: number }).joinAllPaintMs !== undefined)
     const joinPaintMs = await window.evaluate(() => (window as unknown as { joinAllPaintMs: number }).joinAllPaintMs)
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-row[data-node-id="c9999"]')).toHaveCount(0)
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue(
       /^Child 0Child 1.*Child 9999$/u,
     )
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-visual-join-all-wide-10000',
       metrics: { joinPaintMs: round(joinPaintMs) },
     })
+
     // Three same-machine runs measured 811-819 ms, of which the join itself is about 4 ms; the rest is
     // laying out one node of about 108,000 characters, so the budget is that baseline plus headroom.
     expect(joinPaintMs).toBeLessThan(100)
@@ -371,7 +426,9 @@ test.describe('Vim interactions at scale', () => {
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const input = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
       await input.focus()
+
       await expect(input).toBeFocused()
+
       await window.evaluate(() => {
         const samples: number[] = []
         ;(window as unknown as { shiftPaints: number[] }).shiftPaints = samples
@@ -388,19 +445,24 @@ test.describe('Vim interactions at scale', () => {
       await window.keyboard.press('V')
       await window.keyboard.press('>')
       await window.waitForFunction(() => (window as unknown as { shiftPaints: number[] }).shiftPaints.length === 1)
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
       await window.keyboard.press('<')
       await window.waitForFunction(() => (window as unknown as { shiftPaints: number[] }).shiftPaints.length === 2)
       const [indentPaintMs, outdentPaintMs] = await window.evaluate(
         () => (window as unknown as { shiftPaints: number[] }).shiftPaints,
       )
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
+
       recordPerfResult({
         kind: 'state',
         scenario: `vim-node-visual-shift-wide-${siblingCount}`,
         metrics: { indentPaintMs: round(indentPaintMs!), outdentPaintMs: round(outdentPaintMs!) },
       })
+
       expect(indentPaintMs).toBeLessThan(100)
       expect(outdentPaintMs).toBeLessThan(100)
     })
@@ -411,11 +473,15 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const source = window.locator('.node-row[data-node-id="c0"]')
     const target = window.locator('.node-row[data-node-id="c1"]')
+
     await startRowDrag(window, source.getByRole('textbox'))
     const targetBox = await target.boundingBox()
     if (targetBox === null) throw new Error('The movement target was not rendered.')
+
     await window.mouse.move(targetBox.x + 8, targetBox.y + targetBox.height - 4, { steps: 5 })
+
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
+
     await window.evaluate(() => {
       document.addEventListener(
         'pointerup',
@@ -432,12 +498,15 @@ test.describe('Vim interactions at scale', () => {
     await window.mouse.up()
     await window.waitForFunction(() => (window as unknown as { movePaintMs?: number }).movePaintMs !== undefined)
     const movePaintMs = await window.evaluate(() => (window as unknown as { movePaintMs: number }).movePaintMs)
+
     await expect(window.locator('.node-row[data-node-id="c0"]')).toHaveAttribute('data-node-index', '1')
+
     recordPerfResult({
       kind: 'state',
       scenario: 'sibling-move-wide-1000',
       metrics: { movePaintMs: round(movePaintMs) },
     })
+
     expect(movePaintMs).toBeLessThan(100)
   })
 
@@ -472,6 +541,7 @@ test.describe('Vim interactions at scale', () => {
       const targetBox = await receiver.boundingBox()
       if (sourceBox === null || targetBox === null)
         throw new Error('The cross-parent performance rows were not rendered.')
+
       expect(await window.locator('.node-row').count()).toBeLessThan(100)
 
       await startRowDrag(window, source)
@@ -508,8 +578,11 @@ test.describe('Vim interactions at scale', () => {
         targetBox.y + (targetKind === 'row' ? targetBox.height / 2 : 2),
         { steps: 5 },
       )
+
       await expect(receiver).toHaveClass(targetKind === 'row' ? /node-row-drop-on/ : /node-row-drop-before/)
+
       await window.waitForFunction(() => (window as unknown as { hoverPaintMs?: number }).hoverPaintMs !== undefined)
+
       await window.mouse.up()
       await window.waitForFunction(
         () => (window as unknown as { crossParentMovePaintMs?: number }).crossParentMovePaintMs !== undefined,
@@ -519,7 +592,9 @@ test.describe('Vim interactions at scale', () => {
         const state = window as unknown as { hoverPaintMs: number; crossParentMovePaintMs: number }
         return { hoverPaintMs: state.hoverPaintMs, crossParentMovePaintMs: state.crossParentMovePaintMs }
       })
+
       await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '1')
+
       recordPerfResult({
         kind: 'state',
         scenario: targetKind === 'row' ? 'cross-parent-row-drag-windowed-1000' : 'cross-parent-drag-windowed-1000',
@@ -528,8 +603,10 @@ test.describe('Vim interactions at scale', () => {
           moveToPaintMs: round(metrics.crossParentMovePaintMs),
         },
       })
+
       expect(metrics.hoverPaintMs).toBeLessThan(100)
       expect(metrics.crossParentMovePaintMs).toBeLessThan(100)
+
       await window.evaluate(() => {
         const observeUndo = (event: KeyboardEvent): void => {
           if (event.key !== 'z') return
@@ -547,15 +624,19 @@ test.describe('Vim interactions at scale', () => {
       await window.waitForFunction(
         () => (window as unknown as { moveUndoPaintMs?: number }).moveUndoPaintMs !== undefined,
       )
+
       await expect(source).toBeFocused()
+
       const undoPaintMs = await window.evaluate(
         () => (window as unknown as { moveUndoPaintMs: number }).moveUndoPaintMs,
       )
+
       recordPerfResult({
         kind: 'state',
         scenario: `cross-parent-${targetKind}-undo-windowed-1000`,
         metrics: { undoToPaintMs: round(undoPaintMs) },
       })
+
       expect(undoPaintMs).toBeLessThan(100)
     })
   }
@@ -574,6 +655,7 @@ test.describe('Vim interactions at scale', () => {
     const input = window.getByRole('textbox', { name: 'Node 501', exact: true })
     await input.focus()
     const session = await window.context().newCDPSession(window)
+
     await session.send('Emulation.setCPUThrottlingRate', { rate: 4 })
     await window.evaluate(() => {
       const samples: number[] = []
@@ -594,13 +676,16 @@ test.describe('Vim interactions at scale', () => {
     await window.waitForFunction(
       () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 40,
     )
+
     await window.keyboard.press('v')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('l')
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('h')
+
     await window.keyboard.press('Escape')
     await window.waitForFunction(
       () => (window as unknown as { throttledPaints: number[] }).throttledPaints.length === 82,
     )
+
     await window.keyboard.press('i')
     await window.keyboard.type('abcdefghijklmnopqrstuvwxyz')
     await window.waitForFunction(
@@ -615,6 +700,7 @@ test.describe('Vim interactions at scale', () => {
       const sorted = phase.slice().sort((a, b) => a - b)
       const paintP95Ms = sorted[Math.floor(sorted.length * 0.95)]!
       const paintMaxMs = sorted[sorted.length - 1]!
+
       recordPerfResult({
         kind: 'state',
         scenario: `vim-throttled-${scenario}-1000`,
@@ -624,11 +710,14 @@ test.describe('Vim interactions at scale', () => {
           paintMaxMs: round(paintMaxMs),
         },
       })
+
       expect(paintP95Ms).toBeLessThan(50)
       expect(paintMaxMs).toBeLessThan(100)
     }
+
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     await expect(input).toBeFocused()
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('d')
     await window.keyboard.press('d')
@@ -638,13 +727,17 @@ test.describe('Vim interactions at scale', () => {
     const deletePaintMs = await window.evaluate(
       () => (window as unknown as { throttledPaints: number[] }).throttledPaints[111]!,
     )
+
     await expect(window.locator('.node-row[data-node-id="c500"]')).toHaveCount(0)
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-throttled-dd-wide-1000',
       metrics: { deletePaintMs: round(deletePaintMs) },
     })
+
     expect(deletePaintMs).toBeLessThan(100)
+
     await session.detach()
   })
 
@@ -654,6 +747,7 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 51', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
 
     await window.evaluate(() => {
@@ -683,12 +777,14 @@ test.describe('Vim interactions at scale', () => {
 
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     recordPerfResult({
       kind: 'state',
       scenario: 'vim-ordinary-100',
       samples: paints.length,
       metrics: { paintP95Ms: round(paintP95Ms), paintMaxMs: round(paintMaxMs) },
     })
+
     expect(paintP95Ms).toBeLessThan(50)
     expect(paintMaxMs).toBeLessThan(100)
   })
@@ -698,6 +794,7 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const source = window.locator('.node-row[data-node-id="r0"]').getByRole('textbox')
     await source.focus()
+
     await expect(source).toBeFocused()
 
     await window.evaluate(() => {
@@ -729,15 +826,20 @@ test.describe('Vim interactions at scale', () => {
     )
 
     const destinationChildren = window.locator('.node-row')
+
     await expect(destinationChildren).toHaveCount(101)
     await expect(destinationChildren.first().getByRole('textbox')).toHaveValue('Root 0')
+
     await window.keyboard.press('g')
     await window.keyboard.press('d')
+
     await expect(window.locator('.node-row').first().getByRole('textbox')).toHaveValue('Node 0.0')
     await expect(window.locator('.node-row').first().getByRole('textbox')).toBeFocused()
     await expect(window.locator('.node-row')).toHaveCount(100)
+
     await window.keyboard.press('Control+o')
     await window.keyboard.press('Control+o')
+
     await expect(window.locator('.node-row')).toHaveCount(99)
     await expect(source).toHaveCount(0)
 
@@ -753,9 +855,11 @@ test.describe('Vim interactions at scale', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
 
     const start = performance.now()
+
     await window.keyboard.press('V')
     for (let index = 0; index < 40; index += 1) await window.keyboard.press('j')
     const selectionMs = performance.now() - start
@@ -788,10 +892,14 @@ test.describe('Vim interactions at scale', () => {
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const middleInput = window.getByRole('textbox', { name: `Node ${middle + 1}`, exact: true })
       await middleInput.focus()
+
       await expect(middleInput).toBeFocused()
+
       if (siblingCount === 1_000) {
         await window.keyboard.press('j')
+
         await expect(middleInput).toBeFocused()
+
         await window.keyboard.press('k')
       }
 
@@ -810,6 +918,7 @@ test.describe('Vim interactions at scale', () => {
       })
 
       const start = performance.now()
+
       await window.keyboard.press('4')
       await window.keyboard.press('0')
       await window.keyboard.press('j')
@@ -829,6 +938,7 @@ test.describe('Vim interactions at scale', () => {
 
       await expect(middleInput).toBeFocused()
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       recordPerfResult({
         kind: 'state',
         scenario: `vim-normal-wide-${siblingCount}`,
@@ -848,26 +958,35 @@ test.describe('Vim interactions at scale', () => {
       if (siblingCount !== 30_000) return
 
       await window.keyboard.press('i')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
       await window.keyboard.press('Escape')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       const modeStart = performance.now()
       for (let index = 0; index < 20; index += 1) {
         await window.keyboard.press('i')
         await window.keyboard.press('Escape')
       }
       const modeSwitchMs = performance.now() - modeStart
+
       await expect(middleInput).toBeFocused()
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       recordPerfResult({
         kind: 'state',
         scenario: 'vim-mode-wide-30000',
         metrics: { modeSwitchMs: round(modeSwitchMs) },
       })
+
       expect(modeSwitchMs).toBeLessThan(300)
 
       await window.keyboard.press('x')
+
       await expect(middleInput).toHaveValue(`hild ${middle}`)
+
       const repeatStart = performance.now()
       for (let index = 1; index <= 20; index += 1) {
         await window.keyboard.press('j')
@@ -875,38 +994,52 @@ test.describe('Vim interactions at scale', () => {
       }
       const repeatMs = performance.now() - repeatStart
       const finalInput = window.getByRole('textbox', { name: `Node ${middle + 21}`, exact: true })
+
       await expect(finalInput).toBeFocused()
       await expect(finalInput).toHaveValue(`hild ${middle + 20}`)
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       const repeatMountedRows = await window.locator('.node-row').count()
+
       recordPerfResult({
         kind: 'state',
         scenario: 'vim-repeat-wide-30000',
         metrics: { repeatMs: round(repeatMs), mountedRows: repeatMountedRows },
       })
+
       expect(repeatMs).toBeLessThan(250)
       expect(repeatMountedRows).toBeLessThan(100)
 
       for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
+
       await expect(window.getByRole('textbox', { name: `Node ${middle + 11}`, exact: true })).toHaveValue(
         `hild ${middle + 10}`,
       )
+
       for (let index = 0; index < 10; index += 1) await window.keyboard.press('k')
+
       await expect(middleInput).toHaveValue(`hild ${middle}`)
 
       const boundaryStart = performance.now()
+
       await window.keyboard.press('G')
+
       await expect(window.getByRole('textbox', { name: `Node ${siblingCount}`, exact: true })).toBeFocused()
+
       await window.keyboard.press('g')
       await window.keyboard.press('g')
+
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
+
       const boundaryMs = performance.now() - boundaryStart
       const boundaryMountedRows = await window.locator('.node-row').count()
+
       recordPerfResult({
         kind: 'state',
         scenario: 'vim-boundary-wide-30000',
         metrics: { boundaryMs: round(boundaryMs), mountedRows: boundaryMountedRows },
       })
+
       expect(boundaryMs).toBeLessThan(100)
       expect(boundaryMountedRows).toBeLessThan(100)
     })

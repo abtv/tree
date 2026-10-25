@@ -41,23 +41,30 @@ it('generated Agenda text edits round-trip through history with valid selection 
         store.applyAgenda({ kind: 'select', key: 'node:100:a' })
         const assertState = () => {
           const state = store.getSnapshot() as ReadySnapshot
+
           expect(state.location.currentParentId).toBe('scope')
           expect(store.getAgendaRows().some((row) => row.key === state.agenda!.selectedKey)).toBe(true)
+
           return state
         }
         for (const dates of edits) {
           store.endTextSession()
           const before = assertState()
           const text = dates.map((day) => formatCanonicalDate(calendarDateOf(day))).join(' ') + ' A'
+
           store.editText('a', text)
           const after = assertState()
           if (after.document === before.document) continue
+
           store.undo()
+
           expect(assertState().document).toBe(before.document)
           expect(assertState().agenda!.collapsed).toBe(before.agenda!.collapsed)
           expect(assertState().agenda!.revealed).toBe(before.agenda!.revealed)
           expect(assertState().expansion).toBe(before.expansion)
+
           store.redo()
+
           expect(assertState().document).toBe(after.document)
           expect(assertState().agenda!.collapsed).toBe(after.agenda!.collapsed)
           expect(assertState().agenda!.revealed).toBe(after.agenda!.revealed)
@@ -102,27 +109,36 @@ it('generated day creations append exactly one dated node each, with one history
           },
           () => `created-${next++}`,
         )
+
         await store.initialize()
         const original = store.getSnapshot() as ReadySnapshot
+
         store.openAgenda()
         let created = 0
         for (const command of commands) {
           const rows = store.getAgendaRows()
           const row = rows[command.target % rows.length]!
+
           store.applyAgenda({ kind: 'select', key: row.key })
           const before = store.getSnapshot() as ReadySnapshot
           const result = store.createAgendaDayNode(command.preceding ? 'preceding' : 'selected')
           const after = store.getSnapshot() as ReadySnapshot
+
           expect(result).toBe(row.kind === 'day')
+
           if (!result) {
             expect(after.document).toBe(before.document)
+
             continue
           }
           created += 1
           const day = (row as Extract<typeof row, { kind: 'day' }>).day - (command.preceding ? 1 : 0)
+
           expect(after.document.roots).toHaveLength(before.document.roots.length + 1)
+
           before.document.roots.forEach((node, index) => expect(after.document.roots[index]).toBe(node))
           const node = after.document.roots.at(-1)!
+
           expect(node).toEqual({
             id: `created-${created - 1}`,
             text: `${formatCanonicalDate(calendarDateOf(day))} `,
@@ -134,9 +150,13 @@ it('generated day creations append exactly one dated node each, with one history
           expect(store.getAgendaRows().some((candidate) => candidate.key === after.agenda!.selectedKey)).toBe(true)
         }
         for (let step = 0; step < created; step += 1) store.undo()
+
         expect((store.getSnapshot() as ReadySnapshot).document).toBe(original.document)
+
         const restored = store.getSnapshot() as ReadySnapshot
+
         expect(store.getAgendaRows().some((candidate) => candidate.key === restored.agenda!.selectedKey)).toBe(true)
+
         await store.flushPersistence()
       },
     ),
@@ -177,28 +197,37 @@ it('generated splits and dated siblings add exactly one node each, dated for the
           },
           () => `created-${next++}`,
         )
+
         await store.initialize()
         const original = store.getSnapshot() as ReadySnapshot
+
         store.openAgenda()
         let applied = 0
         for (const command of commands) {
           const rows = store.getAgendaRows()
           const row = rows[command.target % rows.length]!
+
           store.applyAgenda({ kind: 'select', key: row.key })
           const before = store.getSnapshot() as ReadySnapshot
           const result =
             command.kind === 'split' ? store.splitAgendaNode(command.cursor) : store.createAgendaSibling(command.kind)
           const after = store.getSnapshot() as ReadySnapshot
           const isMatch = row.kind === 'node' && row.role === 'match'
+
           expect(result).toBe(isMatch)
+
           if (!result) {
             expect(after.document).toBe(before.document)
+
             continue
           }
           applied += 1
           const day = (row as Extract<typeof row, { kind: 'node' }>).day
+
           expect(after.document.roots).toHaveLength(before.document.roots.length + 1)
+
           const created = after.document.roots.find((node) => node.id === `created-${applied - 1}`)!
+
           expect(findCanonicalDates(created.text).map((match) => match.day)).toContain(day)
           expect(after.agenda!.activeOccurrence).toEqual({ nodeId: created.id, day })
           expect(after.location.selectedNodeId).toBe(created.id)
@@ -207,7 +236,9 @@ it('generated splits and dated siblings add exactly one node each, dated for the
           if (command.kind !== 'split') expect(created.text).toBe(`${formatCanonicalDate(calendarDateOf(day))} `)
         }
         for (let step = 0; step < applied; step += 1) store.undo()
+
         expect((store.getSnapshot() as ReadySnapshot).document).toBe(original.document)
+
         await store.flushPersistence()
       },
     ),
@@ -250,8 +281,10 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
           },
           () => 'unused',
         )
+
         await store.initialize()
         const original = store.getSnapshot() as ReadySnapshot
+
         store.openAgenda()
         for (const command of commands) {
           if (command.kind === 'open') store.openAgenda()
@@ -262,21 +295,28 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
             store.applyAgenda({ kind: command.kind, key: row?.key ?? 'missing' })
           }
           const state = store.getSnapshot() as ReadySnapshot
+
           expect(state.document).toBe(original.document)
           expect(state.expansion).toBe(original.expansion)
           expect(state.location.currentParentId).toBe(original.location.currentParentId)
+
           if (state.agenda !== undefined) {
             const rows = store.getAgendaRows()
+
             expect(rows.some((row) => row.key === state.agenda!.selectedKey)).toBe(true)
+
             const projection = projectAgenda(state.document, state.agenda.scopeParentId)
             const timeline = buildTimeline({
               contentDays: new Set(projection.map((day) => day.day)),
               today: state.agenda.today,
               revealed: state.agenda.revealed,
             })
+
             expect(rows.filter((row) => row.kind !== 'node')).toMatchObject(timeline)
+
             for (const day of projection) {
               const expected = state.agenda.collapsed.has(`day:${day.day}`) ? [] : day.rows
+
               expect(
                 rows
                   .filter((row) => row.kind === 'node')
@@ -286,9 +326,13 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
             }
           }
         }
+
         store.closeAgenda()
+
         expect((store.getSnapshot() as ReadySnapshot).location).toEqual(original.location)
+
         await store.flushPersistence()
+
         expect(save).not.toHaveBeenCalled()
       },
     ),

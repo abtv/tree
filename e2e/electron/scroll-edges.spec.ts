@@ -41,16 +41,24 @@ test.describe('scroll edges', () => {
   test('fades content toward an edge only while more content lies beyond it', async ({ userDataDir }) => {
     seedRoots(userDataDir, 200)
     const { window: page } = await launchTree(userDataDir)
+
     await expect(page.locator('.node-row')).toHaveCount(200)
 
     await scrollContentTo(page, 'start')
+
     await expect.poll(() => fadeOpacities(page)).toEqual({ top: 0, bottom: 1 })
+
     // Full strength within the first few pixels scrolled away from the start.
     await scrollContentTo(page, 20)
+
     await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 1 })
+
     await scrollContentTo(page, 1500)
+
     await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 1 })
+
     await scrollContentTo(page, 'end')
+
     await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 0 })
   })
 
@@ -58,6 +66,7 @@ test.describe('scroll edges', () => {
   test('shows no fade when the content fits the window', async ({ userDataDir }) => {
     seedRoots(userDataDir, 3)
     const { window: page } = await launchTree(userDataDir)
+
     await expect(page.locator('.node-row')).toHaveCount(3)
     expect(await page.evaluate(() => document.querySelector('.scroll-viewport')!.scrollHeight)).toBe(
       await page.evaluate(() => document.querySelector('.scroll-viewport')!.clientHeight),
@@ -71,8 +80,11 @@ test.describe('scroll edges', () => {
   }) => {
     seedRoots(userDataDir, 200)
     const { window: page } = await launchTree(userDataDir)
+
     await expect(page.locator('.node-row')).toHaveCount(200)
+
     await scrollContentTo(page, 512)
+
     await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 1 })
 
     const geometry = await page.evaluate(() => {
@@ -100,6 +112,7 @@ test.describe('scroll edges', () => {
         ],
       }
     })
+
     expect(geometry.top.top).toBe(geometry.viewportTop)
     expect(geometry.bottom.bottom).toBe(geometry.viewportBottom)
     expect(geometry.top.height).toBeLessThan(geometry.rowHeight)
@@ -119,8 +132,11 @@ test.describe('scroll edges', () => {
       const box = input.getBoundingClientRect()
       return { x: box.left + 4, y, label: input.getAttribute('aria-label') }
     })
+
     expect(target.label).not.toBe('Node 1')
+
     await page.mouse.click(target.x, target.y)
+
     await expect(page.getByRole('textbox', { name: target.label!, exact: true })).toBeFocused()
   })
 
@@ -129,22 +145,28 @@ test.describe('scroll edges', () => {
     test(`renders the cut rows fading into the ${appearance} background`, async ({ userDataDir }) => {
       seedRoots(userDataDir, 200)
       const { window: page, app } = await launchTree(userDataDir, { appearance })
+
       await setMainWindowContentSize(app, screenshotContentSize)
       // Playwright's browser context defaults to light media independently of nativeTheme.
       await page.emulateMedia({ colorScheme: appearance })
+
       await expect(page.locator('.node-row')).toHaveCount(200)
       // The window resize reaches the renderer asynchronously and re-applies the initial selection
       // reveal (PRODUCT.md §20.8) until the scroll below relinquishes it, so settle the geometry first.
       await expect
         .poll(() => page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
         .toEqual({ width: screenshotContentSize.width, height: screenshotContentSize.height + titleStripHeight })
+
       await page.evaluate(
         () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
       )
       // Both edges cut through a row, so the screenshots show the fade over partial text.
       await scrollContentTo(page, 512)
+
       await expect.poll(() => fadeOpacities(page)).toEqual({ top: 1, bottom: 1 })
+
       const size = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
+
       await expect(page).toHaveScreenshot(`scroll-edge-top-${appearance}.png`, {
         clip: { x: 0, y: 0, width: 320, height: 80 },
       })

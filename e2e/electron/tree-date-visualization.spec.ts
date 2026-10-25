@@ -59,6 +59,7 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
           ['future', '2026-10-09'],
         ] as const) {
           const dates = window.locator(`.date-${kind}`)
+
           await expect.poll(() => dates.count()).toBeGreaterThan(0)
           for (const date of await dates.all()) {
             await expect(date).toHaveText(text)
@@ -75,7 +76,9 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
             )
           }
         }
+
         await window.mouse.move(600, 20)
+
         await expect(window).toHaveScreenshot(screenshotName(`temporal-dates-${view}-${appearance}.png`))
       }
     }
@@ -92,9 +95,11 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await setAgendaToday(window)
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+
     await input.click()
     await window.keyboard.press('Meta+Enter')
     for (const view of ['tree', 'agenda'] as const) {
@@ -104,6 +109,7 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
         const dates = window.locator(
           '.node-input-struck .agenda-date-active, .node-input-struck .agenda-date-secondary, .agenda-text-struck .agenda-date-active, .agenda-text-struck .agenda-date-secondary',
         )
+
         await expect.poll(() => dates.count()).toBeGreaterThan(0)
         for (const date of await dates.all()) {
           await expect(date).toHaveCSS(
@@ -111,12 +117,15 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
             await date.evaluate((el) => getComputedStyle(el.closest('.node-input-struck, .agenda-text-struck')!).color),
           )
         }
+
         await window.screenshot({ path: testInfo.outputPath(`${view}-${appearance}.png`) })
       }
     }
+
     await window.keyboard.press('Meta+p')
     await input.click()
     await window.keyboard.press('Meta+Enter')
+
     await expect(input).not.toHaveClass(/node-input-struck/)
     await expect(input.locator('.agenda-date-active').first()).not.toHaveCSS(
       'color',
@@ -149,19 +158,23 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
       location: { currentParentId: 'p', selectedNodeId: 'a' },
     })
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
     const first = window.getByRole('textbox', { name: 'Node 1', exact: true })
     const second = window.getByRole('textbox', { name: 'Node 2', exact: true })
+
     await setAgendaToday(window)
     await first.click()
     await window.keyboard.press('Meta+Enter')
     await window.keyboard.press('Meta+Enter')
+
     await expect(heading.locator('.agenda-date-active')).toHaveText('2026-10-08')
     await expect(first.locator('.agenda-date-active')).toHaveCount(2)
     await expect(
       window.getByRole('textbox', { name: 'Node 3', exact: true }).locator('.agenda-date-active'),
     ).toHaveCount(0)
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await first.click()
@@ -174,21 +187,29 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
       } else {
         await setCursor(first, 0)
       }
+
       await expect(first.locator('.agenda-date-active').first()).toHaveCSS('font-weight', '600')
       if (mode === 'vim') await expect.poll(() => blockCaretAt(first, 0)).toBe(true)
+
       await window.mouse.move(600, 20)
+
       await expect(window).toHaveScreenshot(screenshotName(`tree-dates-${appearance}.png`))
+
       await second.click()
+
       await expect(second).toBeFocused()
       await expect(first.locator('.agenda-date-active')).toHaveCount(2)
+
       if (mode === 'vim') {
         await window.keyboard.press('Escape')
         await window.keyboard.press('V')
+
         await expect(second.locator('.agenda-date-active')).toHaveCSS(
           'color',
           await second.evaluate((el) => getComputedStyle(el).color),
         )
         await expect(window).toHaveScreenshot(screenshotName(`tree-dates-selected-${appearance}.png`))
+
         await window.keyboard.press('Escape')
       }
     }
@@ -202,32 +223,45 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
     })
     const { window } = await launchTree(userDataDir)
     let input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+
     await input.click()
     if (mode === 'vim') {
       await window.keyboard.press('Escape')
       await window.keyboard.press('A')
     }
+
     await setCursor(input, 4)
     await window.keyboard.type('2026-10-14')
     input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+
     await expect(input).toHaveText('Due 2026-10-14')
     await expect(input).toBeFocused()
     await expect(input.locator('.agenda-date-active')).toHaveText('2026-10-14')
+
     await window.keyboard.type('!')
+
     await expect(input).toHaveText('Due 2026-10-14!')
+
     await window.keyboard.press('Backspace')
     await window.keyboard.press('Backspace')
+
     await expect(input).toHaveText('Due 2026-10-1')
     await expect(input.locator('.agenda-date-active')).toHaveCount(0)
     await expect(input).toBeFocused()
+
     await window.keyboard.type('4')
+
     await expect(input.locator('.agenda-date-active')).toHaveText('2026-10-14')
+
     await window.keyboard.press('Meta+a')
     await window.keyboard.type('Plain text')
+
     await expect(input).toHaveText('Plain text')
     await expect(input).toBeFocused()
     await expect(input.locator('.agenda-date-active')).toHaveCount(0)
+
     await window.keyboard.press('Meta+z')
+
     await expect(input.locator('.agenda-date-active')).toHaveText('2026-10-14')
     await expect(input).toBeFocused()
   })

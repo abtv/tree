@@ -37,6 +37,7 @@ it('matches flattened Agenda character positions across contextual, synthetic an
         },
         services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
       })
+
       f.store.openAgenda()
       const rows = f.store.getAgendaRows()
       const textOf = (row: (typeof rows)[number]): string =>
@@ -58,6 +59,7 @@ it('matches flattened Agenda character positions across contextual, synthetic an
       const start = origin % positions.length
       const source = positions[start]!
       const expected = positions[Math.max(0, Math.min(positions.length - 1, start + (key === 'l' ? count : -count)))]!
+
       f.store.applyAgenda({ kind: 'select', key: source.row.key, cursor: source.cursor })
       let rowCaret: RowCaret = { key: source.row.key, anchor: source.cursor, focus: source.cursor }
       let caret: VimCaretState = { cursor: source.cursor, imageActive: source.image }
@@ -93,8 +95,11 @@ it('matches flattened Agenda character positions across contextual, synthetic an
         for (const digit of String(count)) press(digit)
         press(key)
       }
+
       expect(f.snapshot().agenda!.selectedKey).toBe(expected.row.key)
+
       const actual = expected.row.kind === 'node' && expected.row.role === 'match' ? caret.cursor : rowCaret.focus
+
       expect(actual).toBe(expected.cursor)
       if (expected.row.kind === 'node' && expected.row.role === 'match') expect(caret.imageActive).toBe(expected.image)
       expect(f.saves).toHaveLength(0)
@@ -130,6 +135,7 @@ it('carries the original column through a short contextual row during counted na
       try {
         handler({ key: '2', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
         handler({ key: 'j', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+
         expect(f.snapshot().location.selectedNodeId).toBe('second')
         expect(f.snapshot().focus.cursor).toBe(cursor)
         expect(f.saves).toHaveLength(0)
@@ -177,9 +183,12 @@ it('preserves every image entry position through repeated clamped motions and an
         press('j')
         const focus = f.snapshot().focus
         for (let index = 0; index < repeats; index += 1) press('j')
+
         expect(caret).toEqual({ cursor: text.length, imageActive: true, imageTextReturnCursor: cursor })
         expect(f.snapshot().focus).toBe(focus)
+
         press('k')
+
         expect(caret).toEqual({ cursor, imageActive: false })
         expect(f.saves).toHaveLength(0)
         expect(f.snapshot().document.roots[0]!.text).toBe(text)

@@ -59,12 +59,15 @@ describe('application menu template', () => {
     const actions = createActions()
     const template = applicationMenuTemplate({ ...state(), notes: { canExport: true, canImport: false } }, actions)
     const items = submenuItems(template, 'File')
+
     expect(items.map((item) => [item.label, item.enabled, item.accelerator])).toEqual([
       ['Export Notes…', true, undefined],
       ['Import Notes…', false, undefined],
     ])
+
     clickWithChecked(items[0]!, false)
     clickWithChecked(items[1]!, false)
+
     expect(actions.notesCommand.mock.calls).toEqual([['export'], ['import']])
   })
   // @requirement PRODUCT.md §9.3
@@ -89,22 +92,27 @@ describe('application menu template', () => {
   it('uses native symbols for views and notes actions while retaining text and command routing', () => {
     const createSymbol = vi.fn((name: string) => ({ name }) as unknown as NativeImage)
     const icons = createMenuIcons(createSymbol)
+
     expect(createSymbol.mock.calls).toEqual([
       ['point.3.connected.trianglepath.dotted'],
       ['calendar'],
       ['square.and.arrow.up'],
       ['square.and.arrow.down'],
     ])
+
     const actions = createActions()
     const template = applicationMenuTemplate(state(), actions, icons)
     const views = submenuItems(template, 'View')
+
     expect(views.slice(0, 2).map((item) => [item.label, item.icon, item.accelerator])).toEqual([
       ['Tree', icons.tree, undefined],
       ['Agenda', icons.agenda, undefined],
     ])
     expect(submenuItems(template, 'File').map((item) => item.icon)).toEqual([icons.export, icons.import])
+
     clickWithChecked(views[0]!, false)
     clickWithChecked(views[1]!, false)
+
     expect(actions.viewCommand.mock.calls).toEqual([['tree'], ['agenda']])
   })
 
@@ -119,6 +127,7 @@ describe('application menu template', () => {
 
     const vim = submenuItems(template, 'Edit')[0]
     const pin = submenuItems(template, 'Window')[0]
+
     expect([vim?.type, vim?.checked]).toEqual(['checkbox', vimEnabled])
     expect([pin?.type, pin?.checked]).toEqual(['checkbox', alwaysOnTop])
   })
@@ -168,7 +177,9 @@ describe('application menu template', () => {
     const quit = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')[0]!
 
     expect(quit.accelerator).toBe('CommandOrControl+Q')
+
     clickWithChecked(quit, false)
+
     expect(actions.requestQuit).toHaveBeenCalledOnce()
   })
 })

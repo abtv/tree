@@ -93,8 +93,10 @@ function applyDrop(
   target: DropTarget,
 ): { summary: RowSummary[]; expected: RowSummary[]; noOp: boolean } | undefined {
   const result = moveSubtree(document, draggedId, target.parentId, target.index)
+
   // The generated trees are far shallower than the maximum depth, so a move always fits.
   expect(result.kind).toBe('moved')
+
   if (result.kind !== 'moved') return undefined
 
   const lists = childLists(document)
@@ -133,16 +135,21 @@ describe('drop target properties', () => {
           expect(gap).toBeGreaterThan(block.start)
           expect(gap).toBeLessThan(block.end)
           for (const level of [0, 1, 2]) expect(dropTargetAtGap(rows, block, gap, level)).toBeUndefined()
+
           return
         }
+
         expect(levels.min).toBeLessThanOrEqual(levels.max)
         expect(dropTargetAtGap(rows, block, gap, levels.min - 1)).toBeUndefined()
         expect(dropTargetAtGap(rows, block, gap, levels.max + 1)).toBeUndefined()
+
         const level = levels.min + (levelSeed % (levels.max - levels.min + 1))
         const target = dropTargetAtGap(rows, block, gap, level)!
+
         expect(target).toBeDefined()
 
         const applied = applyDrop(value, dragged.node.id, target)!
+
         expect(applied.summary).toEqual(applied.expected)
         expect(isNoOpDrop(rows, block, target)).toBe(applied.noOp)
 
@@ -152,12 +159,17 @@ describe('drop target properties', () => {
         const blockIds = rows.slice(block.start, block.end).map((row) => row.node.id)
         const kept = rows.filter((_, index) => index < block.start || index >= block.end).map((row) => row.node.id)
         const movedAt = finalIds.indexOf(dragged.node.id)
+
         expect(finalIds.slice(movedAt, movedAt + blockIds.length)).toEqual(blockIds)
         expect(applied.summary[movedAt]![1]).toBe(level)
+
         const others = finalIds.filter((id) => !blockIds.includes(id))
+
         expect(others.filter((id) => kept.includes(id))).toEqual(kept)
+
         const position = gap <= block.start ? gap : gap - blockIds.length
         const before = finalIds.slice(0, movedAt).filter((id) => kept.includes(id))
+
         expect(before).toEqual(kept.slice(0, position))
       }),
       { numRuns: propertyRuns(300) },
@@ -175,16 +187,24 @@ describe('drop target properties', () => {
         const target = dropTargetOnRow(rows, block, row)
         if (row >= block.start && row < block.end) {
           expect(target).toBeUndefined()
+
           return
         }
+
         expect(target).toBeDefined()
+
         const applied = applyDrop(value, dragged.node.id, target!)!
+
         expect(applied.summary).toEqual(applied.expected)
         expect(isNoOpDrop(rows, block, target!)).toBe(applied.noOp)
+
         const final = new Map(applied.summary.map(([id, depth, parentId]) => [id, { depth, parentId }]))
+
         expect(final.get(dragged.node.id)!.parentId).toBe(rows[row]!.node.id)
+
         // It is the last child: no later row has the same parent.
         const lastChild = applied.summary.filter(([, , parentId]) => parentId === rows[row]!.node.id).at(-1)!
+
         expect(lastChild[0]).toBe(dragged.node.id)
       }),
       { numRuns: propertyRuns(200) },

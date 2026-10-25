@@ -73,6 +73,7 @@ describe('notes archive export', () => {
     const head = stateWithImages(['b-image', 'a-image', 'b-image'])
     const { writer, entries, isFinished } = recordingWriter()
     const progress: NotesArchiveProgress[] = []
+
     const summary = await exportNotesArchive(
       source(head, { 'a-image': png(3, 7), 'b-image': png(4, 9), unreferenced: png(2) }),
       writer,
@@ -98,7 +99,9 @@ describe('notes archive export', () => {
 
   it('exports a document without images as a single entry', async () => {
     const { writer, entries } = recordingWriter()
+
     const summary = await exportNotesArchive(source(stateWithImages([]), {}), writer)
+
     expect(entries.map((entry) => entry.name)).toEqual(['document.json'])
     expect(summary.imageCount).toBe(0)
   })
@@ -106,6 +109,7 @@ describe('notes archive export', () => {
   it('skips and counts referenced images that are missing or unusable', async () => {
     const head = stateWithImages(['empty', 'missing', 'not-bytes', 'oversized', 'present'])
     const { writer, entries } = recordingWriter()
+
     const summary = await exportNotesArchive(
       source(head, {
         empty: new Uint8Array(0),
@@ -115,6 +119,7 @@ describe('notes archive export', () => {
       }),
       writer,
     )
+
     expect(entries.map((entry) => entry.name)).toEqual(['document.json', 'attachments/present.png'])
     expect(summary).toMatchObject({ imageCount: 1, missingImageCount: 4 })
   })
@@ -126,6 +131,7 @@ describe('notes archive export', () => {
   ])('refuses %s before writing anything', async (_label, head, message) => {
     const { writer, entries, isFinished } = recordingWriter()
     const images = source(head, {})
+
     await expect(exportNotesArchive(images, writer)).rejects.toEqual(new NotesArchiveError(message))
     expect(entries).toEqual([])
     expect(images.reads).toEqual([])
@@ -135,15 +141,18 @@ describe('notes archive export', () => {
   it('refuses a document with more images than archive entries allow', async () => {
     const limits = { ...ARCHIVE_LIMITS, entries: 3 }
     const fits = recordingWriter()
+
     await exportNotesArchive(
       source(stateWithImages(['a', 'b']), { a: png(1), b: png(1) }),
       fits.writer,
       undefined,
       limits,
     )
+
     expect(fits.entries).toHaveLength(3)
 
     const { writer, entries } = recordingWriter()
+
     await expect(
       exportNotesArchive(source(stateWithImages(['a', 'b', 'c']), {}), writer, undefined, limits),
     ).rejects.toThrow(TOO_MANY_IMAGES_MESSAGE)
@@ -154,10 +163,13 @@ describe('notes archive export', () => {
     const head = stateWithImages([])
     const size = new TextEncoder().encode(JSON.stringify(head)).byteLength
     const exact = recordingWriter()
+
     await exportNotesArchive(source(head, {}), exact.writer, undefined, { ...ARCHIVE_LIMITS, documentBytes: size })
+
     expect(exact.entries).toHaveLength(1)
 
     const { writer, entries } = recordingWriter()
+
     await expect(
       exportNotesArchive(source(head, {}), writer, undefined, { ...ARCHIVE_LIMITS, documentBytes: size - 1 }),
     ).rejects.toThrow(DOCUMENT_TOO_LARGE_MESSAGE)
@@ -171,6 +183,7 @@ describe('notes archive export', () => {
     )
     const json = JSON.stringify(head)
     const { writer } = recordingWriter()
+
     await expect(
       exportNotesArchive(source(head, {}), writer, undefined, { ...ARCHIVE_LIMITS, documentBytes: json.length }),
     ).rejects.toThrow(DOCUMENT_TOO_LARGE_MESSAGE)
@@ -180,17 +193,21 @@ describe('notes archive export', () => {
     const head = stateWithImages(['a', 'b'])
     const images = { a: png(100), b: png(100) }
     const complete = recordingWriter()
+
     await exportNotesArchive(source(head, images), complete.writer)
     const finishedBytes = complete.writer.bytesWritten
 
     const exact = recordingWriter()
+
     await exportNotesArchive(source(head, images), exact.writer, undefined, {
       ...ARCHIVE_LIMITS,
       archiveBytes: finishedBytes,
     })
+
     expect(exact.writer.bytesWritten).toBe(finishedBytes)
 
     const { writer, entries, isFinished } = recordingWriter()
+
     await expect(
       exportNotesArchive(source(head, images), writer, undefined, {
         ...ARCHIVE_LIMITS,
@@ -234,6 +251,7 @@ describe('notes archive policy', () => {
   it('accounts for headers, descriptors and the central directory of every entry', () => {
     // document.json (13 bytes) with 10 payload bytes: 30+13+10+16, then 46+13 and 22 at the end.
     const exactly = 30 + 13 + 10 + 16 + 46 + 13 + 22
+
     expect(new ArchiveBudget({ ...ARCHIVE_LIMITS, archiveBytes: exactly }).fits(0, 'document.json', 10)).toBe(true)
     expect(new ArchiveBudget({ ...ARCHIVE_LIMITS, archiveBytes: exactly - 1 }).fits(0, 'document.json', 10)).toBe(false)
 
@@ -241,19 +259,29 @@ describe('notes archive policy', () => {
     const written = 30 + 13 + 10 + 16
     const second = 30 + 5 + 4 + 16 + 46 + 13 + 46 + 5 + 22
     const tight = new ArchiveBudget({ ...ARCHIVE_LIMITS, archiveBytes: written + second - 1 })
+
     tight.add('document.json')
+
     expect(tight.fits(written, 'a.png', 4)).toBe(false)
+
     const roomy = new ArchiveBudget({ ...ARCHIVE_LIMITS, archiveBytes: written + second })
+
     roomy.add('document.json')
+
     expect(roomy.fits(written, 'a.png', 4)).toBe(true)
   })
 
   it('limits the entry count', () => {
     const budget = new ArchiveBudget({ ...ARCHIVE_LIMITS, entries: 2 })
+
     expect(budget.fits(0, 'a', 0)).toBe(true)
+
     budget.add('a')
+
     expect(budget.fits(0, 'b', 0)).toBe(true)
+
     budget.add('b')
+
     expect(budget.fits(0, 'c', 0)).toBe(false)
   })
 

@@ -22,6 +22,7 @@ it('represents each date exactly once and always displays the Today neighborhood
       const entries = buildTimeline({ contentDays: new Set(content), revealed: new Set(revealed), today })
       const start = Math.min(today - 3, ...content)
       const end = Math.max(today + 3, ...content)
+
       expect(covered(entries)).toEqual(Array.from({ length: end - start + 1 }, (_, index) => start + index))
       for (let day = today - 3; day <= today + 3; day++) {
         expect(entries).toContainEqual({ kind: 'day', day, content: content.includes(day), isToday: day === today })
@@ -49,6 +50,7 @@ it('reveals at most seven consecutive days and collapse restores the initial tim
       for (const entry of original) {
         if (entry.kind !== 'gap') continue
         const revealed = revealNext(input.revealed, entry)
+
         expect([...revealed]).toEqual(
           Array.from({ length: Math.min(7, entry.count) }, (_, index) => entry.startDay + index),
         )
@@ -64,16 +66,22 @@ it('new content splits only its containing interval and preserves revealed dates
   fc.assert(
     fc.property(dates, dates, fc.integer({ min: -50, max: 50 }), (content, revealedDays, added) => {
       const input = { contentDays: new Set(content), today: 0, revealed: new Set(revealedDays) }
+
       const original = buildTimeline(input)
       const containing = original.find(
         (entry) => entry.kind === 'gap' && added >= entry.startDay && added <= entry.endDay,
       )
+
       const next = buildTimeline({ ...input, contentDays: new Set([...content, added]) })
+
       expect(next).toContainEqual({ kind: 'day', day: added, content: true, isToday: added === 0 })
+
       for (const entry of original) {
         if (entry.kind !== 'gap' || containing?.kind !== 'gap') continue
+
         if (entry.endDay < containing.startDay || entry.startDay > containing.endDay) expect(next).toContainEqual(entry)
       }
+
       for (const entry of original) {
         if (entry.kind === 'day' && input.revealed.has(entry.day))
           expect(next.some((row) => row.kind === 'day' && row.day === entry.day)).toBe(true)

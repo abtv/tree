@@ -12,6 +12,7 @@ const day = (year: number, month: number, date: number): number => dayNumberOf({
 describe('Agenda labels', () => {
   it('uses weekday and appends only a different year, independently of timezone', () => {
     const today = day(2026, 10, 8)
+
     expect(agendaDateLabel(today, today, true)).toBe('Thu Oct 8')
     expect(agendaDateLabel(day(2027, 1, 1), today, true)).toBe('Fri Jan 1 2027')
     expect(agendaDateLabel(day(2026, 10, 14), today)).toBe('Oct 14')
@@ -21,6 +22,7 @@ describe('Agenda labels', () => {
   // @requirement PRODUCT.md §23.7
   it('shows the invalid-item hint only while an occurrence is pinned', () => {
     const occurrence = { nodeId: 'a', day: 1 }
+
     expect(agendaStatusMessage(undefined)).toBeUndefined()
     expect(agendaStatusMessage({})).toBeUndefined()
     expect(agendaStatusMessage({ pinnedOccurrence: occurrence })).toBe('Add a date to keep this item in Agenda')
@@ -30,6 +32,7 @@ describe('Agenda labels', () => {
   it('shows the pending-move message with the marked count and prefers no other message', () => {
     const one = [{ nodeId: 'a', day: 1 }]
     const two = [...one, { nodeId: 'b', day: 1 }]
+
     expect(agendaStatusMessage({ pendingMove: one })).toBe('Moving 1 item · p to put · Esc to cancel')
     expect(agendaStatusMessage({ pendingMove: two })).toBe('Moving 2 items · p to put · Esc to cancel')
     expect(agendaPendingMoveMessage(12)).toBe('Moving 12 items · p to put · Esc to cancel')
@@ -42,6 +45,7 @@ describe('Agenda labels', () => {
   // @requirement PRODUCT.md §23.7
   it('treats only other-day direct matches of the active node as mirrors', () => {
     const agenda = { activeOccurrence: { nodeId: 'a', day: 1 } }
+
     expect(isAgendaMirror(agenda, { nodeId: 'a', day: 2, role: 'match' })).toBe(true)
     expect(isAgendaMirror(agenda, { nodeId: 'a', day: 1, role: 'match' })).toBe(false)
     expect(isAgendaMirror(agenda, { nodeId: 'b', day: 2, role: 'match' })).toBe(false)

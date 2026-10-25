@@ -61,6 +61,7 @@ describe('requirement section parsing', () => {
   it('ignores fenced headings, comment metadata, and section separators', () => {
     const product =
       '## 1. Parent\n<!-- metadata -->\n---\n### 1.1 Leaf\n```text\n## 2. Fake\n```\n~~~\n### 3. Fake\n~~~\n'
+
     expect(parseSections(product).map(({ id, required }) => [id, required])).toEqual([
       ['1', false],
       ['1.1', true],
@@ -96,6 +97,7 @@ describe('requirement coverage', () => {
       { path: 'src/rule.test.ts', content: marker },
       { path: 'perf/rule.spec.ts', content: marker },
     ]
+
     expect(check(product, files, options).issues).toEqual(['PRODUCT.md §1.1: missing E2E marker'])
     expect(check(product, [...files, { path: 'e2e/rule.spec.ts', content: marker }], options).issues).toEqual([])
   })
@@ -131,6 +133,7 @@ describe('requirement coverage', () => {
 
   it('does not count examples of markers inside strings as comments', () => {
     const content = `const example = '${marker.trim()}'\nconst template = \`\n${marker}\`\n/*\n${marker}*/\n`
+
     expect(check(product, [{ path: 'src/rule.test.ts', content }]).issues).toEqual([
       'PRODUCT.md §1.1: missing test marker',
     ])
@@ -138,6 +141,7 @@ describe('requirement coverage', () => {
 
   it('finds standalone comments inside suites and at the end of a file', () => {
     const content = `describe('rules', () => {\n${marker}it('works', () => {})\n})\n`
+
     expect(check(product, [{ path: 'src/rule.test.ts', content }]).issues).toEqual([])
     expect(check(product, [{ path: 'src/rule.test.ts', content: marker }]).issues).toEqual([])
   })
@@ -146,11 +150,13 @@ describe('requirement coverage', () => {
 describe('repository discovery', () => {
   it('scans source, E2E, performance and browser checks while ignoring production files and other extensions', () => {
     const root = mkdtempSync(join(tmpdir(), 'tree-requirements-'))
+
     roots.push(root)
     const write = (path: string, content: string) => {
       mkdirSync(dirname(join(root, path)), { recursive: true })
       writeFileSync(join(root, path), content)
     }
+
     write('docs/PRODUCT.md', '## 1. One\n## 2. Two\n## 3. Three\n## 4. Four\n## 5. Five\n## 6. Six\n## 7. Seven\n')
     write('src/nested/one.test.tsx', '// @requirement PRODUCT.md §1\n')
     write('src/two.ts', '// @requirement PRODUCT.md §2\n')
@@ -162,6 +168,7 @@ describe('repository discovery', () => {
     write('e2e/web/theme.spec.mjs', '// @requirement PRODUCT.md §6\n')
     write('perf/web/export.spec.mts', '// @requirement PRODUCT.md §6\n')
     write('scripts/release/rules.test.mts', '// @requirement PRODUCT.md §7\n')
+
     expect(runChecks({ rootDirectory: root, exemptions: new Map(), boundarySections: new Set(['2']) })).toEqual({
       issues: ['PRODUCT.md §4: missing test marker'],
       requirementCount: 7,

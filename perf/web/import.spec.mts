@@ -50,28 +50,34 @@ test('imports a large archive without blocking the main thread', async ({ browse
   const target = await browser.newContext({ viewport: { width: 1100, height: 760 } })
   try {
     const page = await target.newPage()
+
     await page.goto(origin)
     await ready(page)
     const stop = await watchMainThread(target, page)
+
     await page.getByRole('button', { name: 'Tree menu', exact: true }).click()
     const choosing = page.waitForEvent('filechooser')
     const started = Date.now()
+
     await page.getByRole('dialog', { name: 'Tree menu' }).getByRole('button', { name: 'Import Notes…' }).click()
     await (await choosing).setFiles(archivePath)
     const dialog = page.getByRole('dialog', { name: 'Replace Current Notes?' })
     await dialog.waitFor({ timeout: 300_000 })
     const prepareMs = Date.now() - started
     const mainThread = await stop()
+
     await expect(dialog.locator('#import-confirm-incoming')).toContainText(
       `contains ${NODE_COUNT.toLocaleString('en-US')} nodes and ${IMAGE_COUNT} images.`,
     )
 
     const replaced = Date.now()
     const reloaded = page.waitForEvent('load')
+
     await dialog.getByRole('button', { name: 'Replace Notes', exact: true }).click()
     await reloaded
     await ready(page)
     const replaceMs = Date.now() - replaced
+
     expect(
       await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document.roots.length),
     ).toBe(NODE_COUNT / 1000)
@@ -86,6 +92,7 @@ test('imports a large archive without blocking the main thread', async ({ browse
         archiveMiB: Math.round(((await stat(archivePath)).size / 1024 / 1024) * 10) / 10,
       },
     })
+
     expect(
       mainThread.maxLongTaskMs,
       'The main thread must not block while the worker reads and stages the archive',

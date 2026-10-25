@@ -47,6 +47,7 @@ async function previous(fixture: { dir: string; manifest: Manifest }) {
   }
   const request = vi.fn(async (path: string, options: ApiOptions = {}) => {
     expect(options?.method ?? 'GET').toBe('GET')
+
     if (path.endsWith('/git/ref/heads/main')) return { object: { sha: 'b'.repeat(40) } }
     if (path.includes('/git/commits/')) return { tree: { sha: 'tree' } }
     if (path.includes('/git/trees/')) return { truncated: false, tree }
@@ -69,6 +70,7 @@ describe('bounded authenticated build retention', () => {
         const remote = await previous(last)
         next.manifest = await preparePackage(next.dir, next.manifestFile, remote)
         const versions = Array.from({ length: Math.min(3, version + 1) }, (_, i) => version - i)
+
         expect(next.manifest.files.map((file) => file.path).sort()).toEqual(
           [
             '.nojekyll',
@@ -78,8 +80,10 @@ describe('bounded authenticated build retention', () => {
           ].sort(),
         )
         await expect(verifyPackage(next.dir, next.manifest)).resolves.toEqual(next.manifest)
+
         last = next
       }
+
       expect(last.manifest.assetGenerations).toHaveLength(3)
     },
   )
@@ -91,6 +95,7 @@ describe('bounded authenticated build retention', () => {
       next.manifest = await preparePackage(next.dir, next.manifestFile, await previous(last))
       last = next
     }
+
     expect(last.manifest.assetGenerations.map((paths) => paths.find((path) => path.endsWith('.js')))).toEqual([
       'assets/app-1.js',
       'assets/app-3.js',
@@ -110,8 +115,10 @@ describe('bounded authenticated build retention', () => {
         next.manifestFile,
         await previous(version === 1 ? legacyBuild : last),
       )
+
       expect(next.manifest.schema).toBe(2)
       expect(next.manifest.files.some((file) => file.path === 'assets/app-legacy.js')).toBe(version < 3)
+
       last = next
     }
   })
@@ -119,6 +126,7 @@ describe('bounded authenticated build retention', () => {
   it('rejects malformed signed retention metadata', async () => {
     const { manifest } = await build(1)
     const assets = manifest.files.filter((file) => file.path.startsWith('assets/')).map((file) => file.path)
+
     for (const generations of [
       [],
       [assets, assets],
@@ -134,10 +142,12 @@ describe('bounded authenticated build retention', () => {
 
   it('leaves the candidate unchanged when a retained file is corrupt', async () => {
     const old = await build(1)
+
     const next = await build(2)
     const remote = await previous(old)
     const entry = remote.tree.find((file) => file.path === 'site/assets/app-1.js')
     remote.blobs.get(entry!.sha)!.content = Buffer.alloc(entry!.size).toString('base64')
+
     await expect(preparePackage(next.dir, next.manifestFile, remote)).rejects.toThrow('authenticated manifest')
     await expect(verifyPackage(next.dir, next.manifest)).resolves.toEqual(next.manifest)
     expect(JSON.parse(await readFile(next.manifestFile, 'utf8'))).toEqual(next.manifest)
@@ -152,11 +162,15 @@ describe('bounded authenticated build retention', () => {
     }
     const remote = await previous(last)
     const evicted = remote.tree.find((file) => file.path === 'site/assets/app-1.js')
+
     remote.blobs.delete(evicted!.sha)
     const next = await build(4)
     next.manifest = await preparePackage(next.dir, next.manifestFile, remote)
+
     expect(remote.request.mock.calls.some(([path]) => path.endsWith(`/git/blobs/${evicted!.sha}`))).toBe(false)
+
     const wrong = { ...next.manifest, assetGenerations: [...next.manifest.assetGenerations].reverse() }
+
     await expect(verifyPackage(next.dir, wrong)).rejects.toThrow('non-current')
   })
 })

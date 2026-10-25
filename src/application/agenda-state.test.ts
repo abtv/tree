@@ -23,6 +23,7 @@ it('keeps recursive and global folds confined to projected branches and preserve
       ],
     },
   ]
+
   const rows = buildAgendaRows(projection, state)
   for (const selectedKey of ['node:100:c', 'node:100:d', 'node:100:e', 'node:110:g', 'day:99']) {
     for (const [key, operation, collapsed, hidden] of [
@@ -47,11 +48,13 @@ it('keeps recursive and global folds confined to projected branches and preserve
       ],
     ] as const) {
       const next = applyAgendaCommand({ ...state, selectedKey }, { kind: 'fold', key, operation }, rows)
+
       expect([...next.collapsed]).toEqual(collapsed)
       expect(next.selectedKey).toBe(hidden)
     }
   }
   const folded = { ...state, collapsed: new Set(['node:100:a', 'node:100:b', 'node:100:d', 'node:110:f']) }
+
   expect([
     ...applyAgendaCommand(folded, { kind: 'fold', key: 'day:100', operation: 'open-recursive' }, rows).collapsed,
   ]).toEqual(['node:110:f'])
@@ -75,6 +78,7 @@ it('applies all fold operations only to the requested projected branch and norma
     },
     { day: 101, rows: [{ nodeId: 'a', depth: 0, role: 'match' as const }] },
   ]
+
   const rows = buildAgendaRows(projection, state)
   const selected = { ...state, selectedKey: 'node:100:c' }
   const fold = (
@@ -82,15 +86,20 @@ it('applies all fold operations only to the requested projected branch and norma
     initial = selected,
   ) => applyAgendaCommand(initial, { kind: 'fold', key: 'node:100:a', operation }, rows)
   const closed = fold('close')
+
   expect([...closed.collapsed]).toEqual(['node:100:a'])
   expect(closed.selectedKey).toBe('node:100:a')
   expect([...fold('open', closed).collapsed]).toEqual([])
   expect([...fold('toggle').collapsed]).toEqual(['node:100:a'])
+
   const recursive = fold('close-recursive')
+
   expect([...recursive.collapsed]).toEqual(['node:100:a', 'node:100:b'])
   expect(recursive.selectedKey).toBe('node:100:a')
   expect([...fold('open-recursive', recursive).collapsed]).toEqual([])
+
   const all = fold('close-all')
+
   expect([...all.collapsed]).toEqual(['day:100', 'node:100:a', 'node:100:b', 'day:101'])
   expect(all.selectedKey).toBe('day:100')
   expect([...fold('open-all', all).collapsed]).toEqual([])
@@ -100,19 +109,24 @@ it('applies all fold operations only to the requested projected branch and norma
 
 it('captures the origin and keeps invalid or inapplicable commands as identity transitions', () => {
   const state = openAgendaState({ currentParentId: 'scope', selectedNodeId: 'origin' }, 7, 100)
+
   expect(state).toMatchObject({
     scopeParentId: 'scope',
     selectedKey: 'day:100',
     today: 100,
     origin: { location: { currentParentId: 'scope', selectedNodeId: 'origin' }, cursor: 7 },
   })
+
   const rows = buildAgendaRows([{ day: 110, rows: [{ nodeId: 'a', depth: 0, role: 'match' }] }], state)
+
   expect(applyAgendaCommand(state, { kind: 'select', key: state.selectedKey }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'select', key: 'missing' }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'select', key: rows[0]!.key }, rows).selectedKey).toBe(rows[0]!.key)
   expect(applyAgendaCommand(state, { kind: 'toggle-gap', key: state.selectedKey }, rows)).toBe(state)
+
   const node = rows.find((row) => row.kind === 'node')!
   const gap = rows.find((row) => row.kind === 'gap')!
+
   expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: node.key }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: gap.key }, rows)).toBe(state)
 })
@@ -120,13 +134,18 @@ it('captures the origin and keeps invalid or inapplicable commands as identity t
 it('reveals the next chunk and collapses the expanded header without changing the origin', () => {
   const state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
   const projection = [{ day: 120, rows: [{ nodeId: 'a', depth: 0, role: 'match' as const }] }]
+
   const rows = buildAgendaRows(projection, state)
   const gap = rows.find((row) => row.kind === 'gap')!
+
   const next = applyAgendaCommand(state, { kind: 'toggle-gap', key: gap.key }, rows)
+
   expect([...next.revealed]).toEqual([104, 105, 106, 107, 108, 109, 110])
   expect(next.selectedKey).toBe(gap.key)
   expect(next.origin).toBe(state.origin)
+
   const restored = applyAgendaCommand(next, { kind: 'toggle-gap', key: gap.key }, buildAgendaRows(projection, next))
+
   expect(restored.revealed.size).toBe(0)
 })
 
@@ -141,6 +160,7 @@ it('selects the expanded region header when a revealed remainder gap disappears'
   for (let reveal = 0; reveal < 2; reveal += 1) {
     const remainder = rowsOf(state).find((row) => row.kind === 'gap' && !row.expanded)!
     state = applyAgendaCommand(state, { kind: 'toggle-gap', key: remainder.key }, rowsOf(state))
+
     // The revealed remainder is replaced by days and a new remainder, so only the header can stay selected.
     expect(rowsOf(state).some((row) => row.key === state.selectedKey)).toBe(true)
     expect(state.selectedKey).toBe(original.key)
@@ -148,6 +168,7 @@ it('selects the expanded region header when a revealed remainder gap disappears'
   // A remainder small enough to reveal completely leaves only the expanded header.
   const last = rowsOf(state).find((row) => row.kind === 'gap' && !row.expanded)
   if (last !== undefined) state = applyAgendaCommand(state, { kind: 'toggle-gap', key: last.key }, rowsOf(state))
+
   expect(rowsOf(state).filter((row) => row.kind === 'gap' && !row.expanded)).toHaveLength(0)
   expect(rowsOf(state).some((row) => row.key === state.selectedKey)).toBe(true)
   expect(state.selectedKey).toBe(original.key)
@@ -164,10 +185,14 @@ it('does not fold an empty day, but a folded content branch leaves the day non-e
       ],
     },
   ]
+
   const rows = buildAgendaRows(projection, state)
+
   expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: 'day:99' }, rows)).toBe(state)
+
   const folded = applyAgendaCommand(state, { kind: 'toggle-fold', key: 'node:100:a' }, rows)
   const nextRows = buildAgendaRows(projection, folded)
+
   expect(nextRows.find((row) => row.key === 'day:100')).toMatchObject({ content: true })
   expect(nextRows.some((row) => row.key === 'node:100:b')).toBe(false)
   expect(applyAgendaCommand(folded, { kind: 'toggle-fold', key: 'day:100' }, nextRows).collapsed.has('day:100')).toBe(
@@ -188,6 +213,7 @@ it('collapses only descendants on the same day and moves a hidden selection to t
     },
     { day: 101, rows: [{ nodeId: 'a', depth: 0, role: 'match' as const }] },
   ]
+
   const rows = buildAgendaRows(projection, state)
   for (const [selectedKey, expected] of [
     ['node:100:b', 'node:100:a'],
@@ -196,10 +222,13 @@ it('collapses only descendants on the same day and moves a hidden selection to t
     ['day:99', 'day:99'],
   ] as const) {
     const next = applyAgendaCommand({ ...state, selectedKey }, { kind: 'toggle-fold', key: 'node:100:a' }, rows)
+
     expect(next.selectedKey).toBe(expected)
   }
   const selected = { ...state, selectedKey: 'node:100:b' }
+
   const folded = applyAgendaCommand(selected, { kind: 'toggle-fold', key: 'day:100' }, rows)
+
   expect(folded.selectedKey).toBe('day:100')
   expect(
     applyAgendaCommand(folded, { kind: 'toggle-fold', key: 'day:100' }, buildAgendaRows(projection, folded)).collapsed

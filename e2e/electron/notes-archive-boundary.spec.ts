@@ -109,11 +109,15 @@ test.describe('desktop notes archive boundary', () => {
   }) => {
     seedNotesWithImage(userDataDir, 'Exported notes', 'picture')
     const exports = join(userDataDir, 'Exports')
+
     mkdirSync(exports)
     const destination = join(exports, 'Tree Notes 2026-10-23.zip')
+
     writeFileSync(destination, 'previous archive')
     const { app, window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue('Exported notes')
+
     await stubPanels(app, { save: destination })
     await window.evaluate(() => {
       const record = globalThis as typeof globalThis & { progress?: unknown[] }
@@ -124,32 +128,43 @@ test.describe('desktop notes archive boundary', () => {
     })
 
     await holdWorkers(app, 'written')
+
     await expect(callNotes(window, 'chooseNotesExportDestination')).resolves.toEqual({
       ok: true,
       fileName: 'Tree Notes 2026-10-23.zip',
     })
+
     const cancelled = callNotes(window, 'startNotesExport')
+
     await expect.poll(() => heldMessages(app)).toBe(1)
+
     // The finished archive waits under a hidden name; the existing file is untouched.
     const [hidden] = entries(exports).filter((name) => name.startsWith('.Tree Notes 2026-10-23.zip.'))
+
     expect(readArchive(new Uint8Array(readFileSync(join(exports, hidden!)))).has('document.json')).toBe(true)
     expect(readFileSync(destination, 'utf8')).toBe('previous archive')
+
     await callNotes(window, 'cancelNotesOperation')
+
     await expect(cancelled).resolves.toEqual({ ok: false, canceled: true })
     expect(entries(exports)).toEqual(['Tree Notes 2026-10-23.zip'])
     expect(readFileSync(destination, 'utf8')).toBe('previous archive')
+
     await releaseWorkers(app)
 
     await callNotes(window, 'chooseNotesExportDestination')
     const result = await callNotes(window, 'startNotesExport')
 
     const archive = new Uint8Array(readFileSync(destination))
+
     expect(result).toEqual({
       ok: true,
       fileName: 'Tree Notes 2026-10-23.zip',
       summary: { imageCount: 1, missingImageCount: 0, archiveBytes: archive.byteLength },
     })
+
     const contents = readArchive(archive)
+
     expect([...contents.keys()]).toEqual(['document.json', 'attachments/picture.png'])
     expect(JSON.parse(new TextDecoder().decode(contents.get('document.json')))).toEqual(readPersisted(userDataDir))
     expect(contents.get('attachments/picture.png')).toEqual(onePixelPng)
@@ -159,6 +174,7 @@ test.describe('desktop notes archive boundary', () => {
       await window.evaluate(() => (globalThis as typeof globalThis & { progress?: unknown[] }).progress),
     ).toContainEqual({ imagesDone: 1, imageCount: 1 })
     expect(await app.evaluate(() => globalThis.__treeArchiveWorkers.started)).toBe(2)
+
     await closeApp(app)
   })
 
@@ -169,14 +185,18 @@ test.describe('desktop notes archive boundary', () => {
   }) => {
     seedNotesWithImage(userDataDir, 'Previous notes', 'old')
     const previous = readFileSync(documentPath(userDataDir))
+
     writeFileSync(join(userDataDir, 'data', 'document.3.json'), previous)
     // Older than the primary, so loading keeps it as a retained generation.
     utimesSync(join(userDataDir, 'data', 'document.3.json'), 1_000, 1_000)
     const archivePath = join(userDataDir, 'Downloads', 'Tree Notes 2026-10-20.zip')
     const archive = await writeBrowserArchive(archivePath)
     const { app, window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue('Previous notes')
+
     const preference = readFileSync(vimPreferencePath(userDataDir))
+
     await stubPanels(app, { open: archivePath })
 
     await expect(callNotes(window, 'chooseNotesImportArchive')).resolves.toEqual({
@@ -191,13 +211,18 @@ test.describe('desktop notes archive boundary', () => {
       current: { nodeCount: 1, imageCount: 1 },
     })
     await expect(callNotes(window, 'commitNotesImport')).resolves.toEqual({ ok: true })
+
     await window.reload()
 
     await expect(node(window, 1)).toHaveValue('Imported notes')
+
     const replacedNotes = join(userDataDir, 'Replaced Notes')
     const [folderName] = entries(replacedNotes)
+
     expect(folderName).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}$/)
+
     const folder = join(replacedNotes, folderName!)
+
     expect(entries(folder)).toEqual(['attachments', 'document.3.json', 'document.json'])
     expect(readFileSync(join(folder, 'document.json'))).toEqual(previous)
     expect(entries(join(folder, 'attachments'))).toEqual(['old.png'])
@@ -213,10 +238,13 @@ test.describe('desktop notes archive boundary', () => {
       join('Replaced Notes', folderName!),
     )
     await expect(callNotes(window, 'takeNotesImportNotice')).resolves.toBeNull()
+
     await callNotes(window, 'showReplacedNotesFolder')
     const shown = await app.evaluate(() => (globalThis as typeof globalThis & { shownFolders?: string[] }).shownFolders)
+
     expect(shown).toHaveLength(1)
     expect(shown![0]!.endsWith(join('Replaced Notes', folderName!))).toBe(true)
+
     await closeApp(app)
   })
 
@@ -224,17 +252,22 @@ test.describe('desktop notes archive boundary', () => {
   test('quitting during an export cancels it and leaves no file', async ({ userDataDir }) => {
     seedNotesWithImage(userDataDir, 'Exported notes', 'picture')
     const exports = join(userDataDir, 'Exports')
+
     mkdirSync(exports)
     const { app, window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue('Exported notes')
+
     await stubPanels(app, { save: join(exports, 'Tree Notes 2026-10-23.zip') })
     await holdWorkers(app, 'written')
     await callNotes(window, 'chooseNotesExportDestination')
     void callNotes(window, 'startNotesExport').catch(() => undefined)
+
     await expect.poll(() => heldMessages(app)).toBe(1)
     expect(entries(exports)).toHaveLength(1)
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
 
@@ -246,18 +279,25 @@ test.describe('desktop notes archive boundary', () => {
     seedNotesWithImage(userDataDir, 'Previous notes', 'old')
     const previous = readFileSync(documentPath(userDataDir), 'utf8')
     const archivePath = join(userDataDir, 'Downloads', 'Tree Notes 2026-10-20.zip')
+
     await writeBrowserArchive(archivePath)
     const { app, window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue('Previous notes')
+
     await stubPanels(app, { open: archivePath })
     await holdWorkers(app, 'prepared')
     await callNotes(window, 'chooseNotesImportArchive')
     void callNotes(window, 'prepareNotesImport').catch(() => undefined)
+
     await expect.poll(() => heldMessages(app)).toBe(1)
+
     const [staging] = entries(join(userDataDir, '.notes-import'))
+
     expect(entries(join(userDataDir, '.notes-import', staging!))).toEqual(['attachments', 'document.json'])
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
 
@@ -269,12 +309,17 @@ test.describe('desktop notes archive boundary', () => {
   test('quitting during Replace Notes completes the replacement', async ({ userDataDir }) => {
     seedNotesWithImage(userDataDir, 'Previous notes', 'old')
     const archivePath = join(userDataDir, 'Downloads', 'Tree Notes 2026-10-20.zip')
+
     await writeBrowserArchive(archivePath)
     const { app, window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue('Previous notes')
+
     await stubPanels(app, { open: archivePath })
     await callNotes(window, 'chooseNotesImportArchive')
+
     await expect(callNotes(window, 'prepareNotesImport')).resolves.toMatchObject({ ok: true })
+
     await app.evaluate((_electron, channel) => {
       globalThis.__treeIpc.wrap(channel, (original, ...args) => {
         ;(globalThis as typeof globalThis & { commitStarted?: boolean }).commitStarted = true
@@ -283,18 +328,24 @@ test.describe('desktop notes archive boundary', () => {
     }, ipcChannels.commitNotesImport)
 
     void callNotes(window, 'commitNotesImport').catch(() => undefined)
+
     await expect
       .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { commitStarted?: boolean }).commitStarted))
       .toBe(true)
+
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Imported notes')
     expect(entries(join(userDataDir, 'Replaced Notes'))).toHaveLength(1)
     expect(entries(join(userDataDir, '.notes-import'))).toEqual([])
+
     const restarted = await launchTree(userDataDir)
+
     await expect(node(restarted.window, 1)).toHaveValue('Imported notes')
+
     await closeApp(restarted.app)
   })
 })

@@ -18,8 +18,11 @@ describe('renderer Electron services', () => {
     try {
       vi.setSystemTime(new Date(2026, 9, 8, 23, 59))
       const services = createElectronEditorServices()
+
       expect(services.today!()).toBe(dayNumberOf({ year: 2026, month: 10, day: 8 }))
+
       vi.setSystemTime(new Date(2026, 9, 9, 0, 1))
+
       expect(services.today!()).toBe(dayNumberOf({ year: 2026, month: 10, day: 9 }))
     } finally {
       vi.useRealTimers()
@@ -69,13 +72,17 @@ describe('renderer Electron services', () => {
     const bytes = new Uint8Array([1, 2, 3])
 
     await expect(services.load()).resolves.toBeNull()
+
     await services.save(state)
+
     await expect(services.readClipboard()).resolves.toEqual({ kind: 'text', text: '' })
+
     await services.writeClipboard?.(payload)
     await services.writeClipboardContent?.({ kind: 'text', text: 'plain' })
     await services.writeClipboardContent?.({ kind: 'image', attachmentId: 'attachment-1' })
     await services.writeAttachment('attachment-1', bytes)
     await services.cleanupAttachments(['attachment-1'])
+
     await expect(readAttachment('attachment-1')).resolves.toEqual(bytes)
 
     expect(api.load).toHaveBeenCalledWith()
@@ -118,13 +125,16 @@ describe('renderer Electron services', () => {
       document: { roots: [{ id: 'root', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
     }
+
     suspendNotesWrites()
     try {
       await expect(services.save(state)).resolves.toBeUndefined()
       await expect(services.writeAttachment('attachment-1', new Uint8Array([1]))).resolves.toBeUndefined()
       await expect(services.cleanupAttachments([])).resolves.toBeUndefined()
+
       // Reads still reach the main process.
       await services.load()
+
       expect(api.save).not.toHaveBeenCalled()
       expect(api.writeAttachment).not.toHaveBeenCalled()
       expect(api.cleanupAttachments).not.toHaveBeenCalled()
@@ -134,6 +144,7 @@ describe('renderer Electron services', () => {
     }
 
     await services.save(state)
+
     expect(api.save).toHaveBeenCalledExactlyOnceWith(state)
   })
 
@@ -179,6 +190,7 @@ describe('renderer Electron services', () => {
     window.treeApi = api
 
     const first = await attachmentImageCache.get('attachment-1')
+
     expect(first).toMatchObject({ url: 'blob:attachment' })
     await expect(attachmentImageCache.get('attachment-1')).resolves.toBe(first)
 
@@ -210,9 +222,11 @@ describe('renderer Electron services', () => {
 
   it('keeps a decoded image until it is released', async () => {
     const image = await decodeAttachmentImage(new Uint8Array([1]))
+
     expect(URL.revokeObjectURL).not.toHaveBeenCalled()
 
     image.release()
+
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:attachment')
   })
 })

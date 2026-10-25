@@ -75,6 +75,7 @@ describe('input bindings callback identity', () => {
   it.each(changes)('changes bindings but keeps controls stable when only $name changes', async ({ name, patch }) => {
     const f = await fixture()
     const before = f.result.current
+
     expect(Object.keys(patch)).toEqual([name])
     expect(patch[name]).not.toBe(f.options[name])
 

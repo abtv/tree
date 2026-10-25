@@ -45,37 +45,49 @@ const twoImageHead = serializeState(
 
 test('restores a backup folder into a browser profile whose storage was cleared', async ({ newContext }) => {
   const context = await newContext()
+
   await installBackupPicker(context)
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   const errors: string[] = []
+
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('/')
   await ready(page)
   const png = await noisePng(page, 16)
   await seedImageNodes(page, [{ id: 'backed-up-image', bytes: png }])
+
   await page.locator('[data-node-id="welcome"] .node-input').pressSequentially('Typed before backing up ')
   await chooseMenuItem(page, 'Back Up to Folder…')
+
   await expect(page.locator('#backup-status')).toHaveText('Backed up to “Tree Backup”.')
+
   const backup = JSON.parse((await readBackup(page))['document.json'])
+
   expect(backup.document.roots[0]!.text).toMatch(/^Typed before backing up /)
 
   // Deleting the database closes this session, which reloads into a clean start.
   const cleared = page.waitForEvent('load')
+
   await page.evaluate(() => {
     indexedDB.deleteDatabase('tree-browser-prototype')
   })
   await cleared
   await ready(page)
+
   await saved(page)
+
   expect(await blobKeys(page)).toEqual([])
   await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
+
   const cleanHead = await readStored(page, 'document', 'head')
 
   await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command' }).fill('restore-from-folder')
   await page.keyboard.press('Enter')
   const dialog = confirmation(page)
+
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused()
   expect(await page.evaluate(() => window.backupPickerOptions)).toEqual({ mode: 'read', id: 'tree-backup' })
   await expect(dialog.locator('#import-confirm-incoming')).toHaveText(
@@ -84,13 +96,17 @@ test('restores a backup folder into a browser profile whose storage was cleared'
   await expect(dialog.locator('#import-confirm-current')).toHaveText(
     'Your current notes have 5 nodes and 0 images. Restoring replaces them, and this cannot be undone.',
   )
+
   await capture(page, 'restore-confirm.png')
+
   expect(await readStored(page, 'document', 'head')).toEqual(cleanHead)
 
   const reloaded = page.waitForEvent('load')
+
   await dialog.getByRole('button', { name: 'Replace Notes', exact: true }).click()
   await reloaded
   await ready(page)
+
   expect(await readStored(page, 'document', 'head')).toEqual(backup)
   expect(await readStored(page, 'blobs', 'backed-up-image')).toEqual(png)
   await expect(page.locator('[data-node-id="welcome"] .node-input')).toHaveValue(/^Typed before backing up /)
@@ -102,12 +118,15 @@ test('restores a backup folder into a browser profile whose storage was cleared'
 
 test('a cancelled or failed restore leaves the notes unchanged', async ({ newContext }) => {
   const context = await newContext()
+
   await installBackupPicker(context)
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   await page.goto('/')
   await ready(page)
   await seedImageNodes(page, [{ id: 'kept', bytes: [...onePixelPng] }])
+
   await saved(page)
   const head = await readStored(page, 'document', 'head')
   const unchanged = async () => {
@@ -120,6 +139,7 @@ test('a cancelled or failed restore leaves the notes unchanged', async ({ newCon
     }, name)
     await chooseMenuItem(page, 'Restore from Folder…')
   }
+
   await writeFolder(page, 'Tree Backup', {
     'document.json': JSON.stringify(folderHead),
     'attachments/new-a.png': [...onePixelPng],
@@ -128,10 +148,14 @@ test('a cancelled or failed restore leaves the notes unchanged', async ({ newCon
 
   // Cancelling the confirmation removes the image that the restore had stored.
   await restoreFrom('Tree Backup')
+
   await expect(confirmation(page)).toBeVisible()
   expect(await blobKeys(page)).toEqual(['kept', 'new-a'])
+
   await page.keyboard.press('Escape')
+
   await expect(confirmation(page)).toBeHidden()
+
   await unchanged()
 
   // Cancelling the picker shows nothing.
@@ -141,15 +165,19 @@ test('a cancelled or failed restore leaves the notes unchanged', async ({ newCon
     }
   })
   await chooseMenuItem(page, 'Restore from Folder…')
+
   await expect(activity(page)).toBeHidden()
+
   await page.reload()
   await ready(page)
 
   await writeFolder(page, 'Empty Folder', { 'notes.txt': 'No notes here.' })
   await restoreFrom('Empty Folder')
+
   await expect(activityText(page)).toHaveText(
     'Restore failed. “Empty Folder” does not contain document.json. Choose the folder that Tree backed up to.',
   )
+
   await capture(page, 'restore-failed.png')
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await unchanged()
@@ -161,19 +189,24 @@ test('a cancelled or failed restore leaves the notes unchanged', async ({ newCon
     'attachments/new-b.png': [1, 2, 3],
   })
   await restoreFrom('Damaged Backup')
+
   await expect(activityText(page)).toHaveText(/^Restore failed\. “attachments\/new-b\.png” is not a usable image\. /)
+
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await unchanged()
 })
 
 test('restores a folder over invalid stored notes', async ({ newContext }) => {
   const context = await newContext()
+
   await installBackupPicker(context)
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   await page.goto('/')
   await ready(page)
   const png = await noisePng(page, 8)
+
   await writeFolder(page, 'Tree Backup', { 'document.json': JSON.stringify(folderHead), 'attachments/new-a.png': png })
   await writeStored(page, 'document', 'head', { invalid: 'stored before the restore' })
   await page.reload()
@@ -181,14 +214,18 @@ test('restores a folder over invalid stored notes', async ({ newContext }) => {
 
   await chooseMenuItem(page, 'Restore from Folder…')
   const dialog = confirmation(page)
+
   await expect(dialog.locator('#import-confirm-current')).toHaveText(
     'The notes saved in this browser are invalid and cannot be opened. Restoring replaces them.',
   )
   await expect(dialog.getByRole('button', { name: 'Export Current Notes First' })).toBeHidden()
+
   const reloaded = page.waitForEvent('load')
+
   await dialog.getByRole('button', { name: 'Replace Notes', exact: true }).click()
   await reloaded
   await ready(page)
+
   expect(await readStored(page, 'document', 'head')).toEqual(folderHead)
   expect(await readStored(page, 'blobs', 'new-a')).toEqual(png)
   await expect(page.locator('[data-node-id="restored"] .node-input')).toHaveValue('Restored notes')

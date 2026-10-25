@@ -35,6 +35,7 @@ describe('renderer lifecycle', () => {
     const { treeApi, store, fireQuit } = createHarness()
 
     const cleanup = startRendererLifecycle(store, treeApi)
+
     fireQuit('request-1')
     await Promise.resolve()
     await Promise.resolve()
@@ -42,6 +43,7 @@ describe('renderer lifecycle', () => {
     expect(store.initialize).toHaveBeenCalledOnce()
     expect(store.flushPersistence).toHaveBeenCalledOnce()
     expect(treeApi.quit).toHaveBeenCalledWith('request-1')
+
     cleanup()
   })
 
@@ -96,16 +98,21 @@ describe('renderer lifecycle', () => {
 
       fireQuit('pending-image')
       await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
       expect(treeApi.quit).not.toHaveBeenCalled()
+
       release()
       await paste
       if (fail) {
         await vi.waitFor(() => expect(store.getSnapshot()).toMatchObject({ operationError: 'attachment failed' }))
+
         expect(treeApi.quit).not.toHaveBeenCalled()
+
         fireQuit('retry')
         await vi.waitFor(() => expect(treeApi.quit).toHaveBeenCalledWith('retry'))
       } else {
         await vi.waitFor(() => expect(treeApi.quit).toHaveBeenCalledWith('pending-image'))
+
         expect(services.save).toHaveBeenLastCalledWith(
           expect.objectContaining({
             document: {

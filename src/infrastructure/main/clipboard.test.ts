@@ -5,6 +5,7 @@ describe('readClipboard', () => {
   it('rejects an oversized image before reading its bytes or falling back to text', async () => {
     const arrayBuffer = vi.fn(async () => new ArrayBuffer(1))
     const readText = vi.fn(async () => 'fallback')
+
     await expect(
       readClipboard({
         read: async () => [
@@ -19,6 +20,7 @@ describe('readClipboard', () => {
 
   it('reads image bytes when the reported size is exactly the attachment limit', async () => {
     const arrayBuffer = vi.fn(async () => new Uint8Array([1]).buffer)
+
     await expect(
       readClipboard({
         read: async () => [{ types: ['image/png'], getType: async () => ({ size: 25 * 1024 * 1024, arrayBuffer }) }],
@@ -135,6 +137,7 @@ describe('readClipboard', () => {
 
   it('returns plain text when the HTML clipboard representation exceeds its size bound', async () => {
     const html = `<a href="https://example.com">link</a>${' '.repeat(1_048_576)}`
+
     await expect(
       readClipboard({
         read: async () => [],
@@ -161,6 +164,7 @@ describe('readClipboard', () => {
 
   it('writes both plain text and HTML clipboard representations atomically', async () => {
     const calls: Array<{ text: string; html: string }> = []
+
     await writeClipboard(
       {
         read: async () => [],
@@ -171,6 +175,7 @@ describe('readClipboard', () => {
       },
       { text: 'https://example.com', html: '<a href="https://example.com">https://example.com</a>' },
     )
+
     expect(calls).toEqual([
       { text: 'https://example.com', html: '<a href="https://example.com">https://example.com</a>' },
     ])
@@ -178,6 +183,7 @@ describe('readClipboard', () => {
 
   it('falls back to separate clipboard representations when atomic writing is unavailable', async () => {
     const calls: string[] = []
+
     await writeClipboard(
       {
         read: async () => [],
@@ -187,6 +193,7 @@ describe('readClipboard', () => {
       },
       { text: 'text', html: '<p>text</p>' },
     )
+
     expect(calls).toEqual(['text:text', 'html:<p>text</p>'])
   })
 })

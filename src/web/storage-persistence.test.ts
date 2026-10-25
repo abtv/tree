@@ -4,17 +4,21 @@ import { requestPersistentStorage, storageProtectionText } from './storage-persi
 describe('persistent storage request', () => {
   it('does not ask again when storage is already persistent', async () => {
     const persist = vi.fn(async () => true)
+
     await expect(requestPersistentStorage({ persisted: async () => true, persist })).resolves.toBe('protected')
     expect(persist).not.toHaveBeenCalled()
   })
 
   it('asks exactly once and reports the browser decision', async () => {
     const granted = vi.fn(async () => true)
+
     await expect(requestPersistentStorage({ persisted: async () => false, persist: granted })).resolves.toBe(
       'protected',
     )
     expect(granted).toHaveBeenCalledTimes(1)
+
     const denied = vi.fn(async () => false)
+
     await expect(requestPersistentStorage({ persisted: async () => false, persist: denied })).resolves.toBe(
       'unprotected',
     )

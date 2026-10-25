@@ -21,7 +21,9 @@ describe('actual publisher workflow permission boundary', () => {
       return new Response('{}', { status: 201 })
     })
     vi.stubGlobal('fetch', fetch)
+
     const result = assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request: api, token: 'secret' })
+
     if (accepted) await expect(result).resolves.toBeUndefined()
     else await expect(result).rejects.toThrow('GitHub API PUT failed (403)')
     expect(fetch.mock.calls.map(([, options]) => options!.method)).toEqual(['POST', 'PUT', 'PUT', 'DELETE'])
@@ -36,6 +38,7 @@ describe('actual publisher workflow permission boundary', () => {
         throw error
       }
     })
+
     await expect(
       assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request, token: 'secret' }),
     ).rejects.toThrow('Unrelated API failure')
@@ -51,11 +54,14 @@ describe('actual publisher workflow permission boundary', () => {
         throw error
       }
     })
+
     await expect(
       assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request, token: 'secret' }),
     ).resolves.toBeUndefined()
     expect(request.mock.calls.map(([, options]) => options!.method)).toEqual(['POST', 'PUT', 'PUT', 'DELETE'])
+
     const creation = request.mock.calls[0]![1]!.body as { ref: string; sha: string }
+
     expect(creation.ref).toBe('refs/heads/tree-publisher-permission-probe-123-2')
     expect(creation.sha).toBe('a'.repeat(40))
     expect((request.mock.calls[1]![1]!.body as { branch: string }).branch).not.toBe('main')
@@ -63,7 +69,9 @@ describe('actual publisher workflow permission boundary', () => {
     expect((request.mock.calls[2]![1]!.body as { branch: string }).branch).toBe(
       (request.mock.calls[1]![1]!.body as { branch: string }).branch,
     )
+
     const workflow = Buffer.from((request.mock.calls[2]![1]!.body as { content: string }).content, 'base64').toString()
+
     expect(workflow).toContain('on: workflow_dispatch')
     expect(workflow).not.toContain('push:')
     expect(request.mock.calls.at(-1)![0]).toBe(`${root}/git/refs/heads/tree-publisher-permission-probe-123-2`)
@@ -71,6 +79,7 @@ describe('actual publisher workflow permission boundary', () => {
 
   it('refuses an overprivileged token and still removes only its probe branch', async () => {
     const request = vi.fn<Request>(async () => undefined)
+
     await expect(
       assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request, token: 'secret' }),
     ).rejects.toThrow('can write workflows')
@@ -94,6 +103,7 @@ describe('actual publisher workflow permission boundary', () => {
           throw error
         }
       })
+
       await expect(
         assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request, token: 'secret' }),
       ).rejects.toThrow('API unavailable')
@@ -111,6 +121,7 @@ describe('actual publisher workflow permission boundary', () => {
         throw error
       }
     })
+
     await expect(
       assertWorkflowWriteDenied(root, 'a'.repeat(40), manifest, { request, token: 'secret' }),
     ).rejects.toThrow('Contents write denied')

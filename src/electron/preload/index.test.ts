@@ -55,11 +55,13 @@ describe('preload bridge', () => {
     await treeApi.load()
     await treeApi.save(state)
     await treeApi.readClipboard()
+
     await treeApi.writeClipboard?.(payload)
     await treeApi.writeClipboardContent?.({ kind: 'text', text: 'plain' })
     await treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'attachment-1' })
     await treeApi.writeAttachment('attachment-1', bytes)
     await treeApi.readAttachment('attachment-1')
+
     await treeApi.cleanupAttachments(['attachment-1'])
     await treeApi.getAlwaysOnTop()
     await treeApi.setAlwaysOnTop(true)
@@ -119,6 +121,7 @@ describe('preload bridge', () => {
     const removeFailed = treeApi.onQuitFailed(failed)
     const requestedHandler = mocks.on.mock.calls[0]?.[1] as (event: unknown, requestId: string) => void
     const failedHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, message: string) => void
+
     requestedHandler({}, 'request-1')
     failedHandler({}, 'quit failed')
     removeRequested()
@@ -139,12 +142,15 @@ describe('preload bridge', () => {
 
     const removeAlwaysOnTop = treeApi.onAlwaysOnTopChanged?.(alwaysOnTop)
     const removeVimEnabled = treeApi.onVimEnabledChanged?.(vimEnabled)
+
     expect(mocks.on.mock.calls.map((call) => call[0])).toEqual([
       ipcEvents.alwaysOnTopChanged,
       ipcEvents.vimEnabledChanged,
     ])
+
     const alwaysOnTopHandler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: boolean) => void
     const vimEnabledHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, value: boolean) => void
+
     alwaysOnTopHandler({}, true)
     vimEnabledHandler({}, false)
     removeAlwaysOnTop?.()
@@ -161,13 +167,21 @@ describe('preload bridge', () => {
     mocks.invoke.mockRejectedValueOnce(new Error('save failed'))
 
     await expect(treeApi.load()).rejects.toThrow('save failed')
+
     mocks.invoke.mockRejectedValueOnce(new Error('history failed'))
+
     await expect(treeApi.setCommandHistory(['set-theme-dark'])).rejects.toThrow('history failed')
+
     mocks.invoke.mockResolvedValueOnce('dark')
+
     await expect(treeApi.getAppearance()).resolves.toBe('dark')
+
     mocks.invoke.mockResolvedValueOnce(['set-theme-dark'])
+
     await expect(treeApi.getCommandHistory()).resolves.toEqual(['set-theme-dark'])
+
     mocks.invoke.mockRejectedValueOnce(new Error('clipboard failed'))
+
     await expect(treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'picture' })).rejects.toThrow(
       'clipboard failed',
     )
@@ -180,10 +194,15 @@ it('delivers appearance notifications and removes the listener', async () => {
   mocks.on.mockClear()
   const remove = treeApi.onAppearanceChanged?.(listener)
   const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
+
   expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.appearanceChanged)
+
   handler({}, 'dark')
+
   expect(listener).toHaveBeenCalledExactlyOnceWith('dark')
+
   remove?.()
+
   expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appearanceChanged, handler)
 })
 
@@ -193,9 +212,12 @@ it('delivers notes progress and removes the listener', async () => {
   mocks.on.mockClear()
 
   const remove = treeApi.onNotesProgress?.(listener)
+
   expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.notesProgress)
   expect(ipcEvents.notesProgress).toBe('tree:notes-progress')
+
   const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: unknown) => void
+
   handler({}, { imagesDone: 2, imageCount: 5 })
   remove?.()
 
@@ -209,14 +231,20 @@ it('delivers notes menu commands and preserves menu-state errors', async () => {
   const listener = vi.fn()
   mocks.on.mockClear()
   const remove = treeApi.onNotesMenuCommand?.(listener)
+
   expect(ipcEvents.notesMenuCommand).toBe('tree:notes-menu-command')
   expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.notesMenuCommand)
+
   const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
+
   handler({}, 'export')
   remove?.()
+
   expect(listener).toHaveBeenCalledExactlyOnceWith('export')
   expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.notesMenuCommand, handler)
+
   mocks.invoke.mockRejectedValueOnce(new Error('Menu failed'))
+
   await expect(treeApi.setNotesMenuState?.({ canExport: false, canImport: false })).rejects.toThrow('Menu failed')
 })
 
@@ -227,13 +255,19 @@ it('delivers only supported view commands and removes the exact menu listener', 
   mocks.on.mockClear()
   mocks.removeListener.mockClear()
   const remove = treeApi.onViewMenuCommand?.(listener)
+
   expect(ipcEvents.viewMenuCommand).toBe('tree:view-menu-command')
   expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.viewMenuCommand)
+
   const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: unknown) => void
+
   handler({}, 'tree')
   handler({}, 'agenda')
   for (const value of ['export', '', undefined, null, {}, ['tree']]) handler({}, value)
+
   expect(listener.mock.calls).toEqual([['tree'], ['agenda']])
+
   remove?.()
+
   expect(mocks.removeListener).toHaveBeenCalledExactlyOnceWith(ipcEvents.viewMenuCommand, handler)
 })

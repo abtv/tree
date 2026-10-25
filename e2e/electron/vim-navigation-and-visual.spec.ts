@@ -75,16 +75,24 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const second = window.getByRole('textbox', { name: 'Node 2', exact: true })
     const last = window.getByRole('textbox', { name: 'Node 301', exact: true })
     await linked.focus()
+
     await window.keyboard.type('$l')
+
     await expect(second).toBeFocused()
     await expect(second).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('h')
+
     await expect(linked).toBeFocused()
     await expect.poll(() => caretOffset(linked)).toBe(url.length - 1)
+
     await window.keyboard.type('300l')
+
     await expect(last).toBeFocused()
     await expect(last).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.type('300h')
+
     await expect(linked).toBeFocused()
     await expect.poll(() => caretOffset(linked)).toBe(url.length - 1)
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -106,40 +114,63 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.type('$l')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('h')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
+
     await window.keyboard.type('za')
     await window.keyboard.press('l')
+
     await expect(node(window, 2)).toHaveValue('cd')
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.type('2l')
+
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.type('2h')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.press('h')
+
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.type('gd')
     await node(window, 1).focus()
+
     await window.keyboard.press('0')
     await window.keyboard.press('h')
+
     await expect(parent(window)).toBeFocused()
     await expect(parent(window)).toHaveJSProperty('selectionStart', 1)
+
     await window.keyboard.press('l')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
+
     await window.keyboard.type('$vl')
+
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('Escape')
     await window.keyboard.type('dl')
+
     await expect(node(window, 1)).toHaveValue('c')
     await expect(parent(window)).toHaveValue('ab')
+
     await window.keyboard.press('0')
     await window.keyboard.type('dh')
+
     await expect(node(window, 1)).toHaveValue('c')
     await expect(node(window, 1)).toBeFocused()
   })
@@ -160,6 +191,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         location: { currentParentId: null, selectedNodeId: 'bidi' },
       })
       const { app, window } = await launchTree(userDataDir)
+
       await setMainWindowBounds(app, { width: 680, height: 640 })
       const first = node(window, 1)
       await first.focus()
@@ -186,10 +218,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         .map((position, offset) => ({ ...position, offset }))
         .filter((position) => Math.abs(position.top - nextTop) < 1)
         .sort((a, b) => Math.abs(a.left - origin.left) - Math.abs(b.left - origin.left))
+
       await setCursor(first, start)
       await window.keyboard.press('j')
+
       await expect.poll(() => caretOffset(first)).toBe(candidates[0]!.offset)
+
       await window.keyboard.press('k')
+
       await expect.poll(() => caretOffset(first)).toBe(start)
     })
 
@@ -216,54 +252,90 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           location: { currentParentId: null, selectedNodeId: 'wrapped' },
         })
         const { app, window } = await launchTree(userDataDir)
+
         await setMainWindowBounds(app, { width: 540, height: 640 })
         const first = node(window, 1)
+
         expect(await first.evaluate((element) => element instanceof HTMLTextAreaElement)).toBe(!rich)
+
         await first.focus()
+
         await setCursor(first, 0)
         await window.keyboard.press('j')
+
         await expect(first).toBeFocused()
+
         const secondLine = await caretOffset(first)
+
         expect(secondLine).toBeGreaterThan(0)
+
         await window.keyboard.press('ArrowUp')
+
         await expect.poll(() => caretOffset(first)).toBe(0)
+
         await window.keyboard.press('ArrowDown')
+
         await expect.poll(() => caretOffset(first)).toBe(secondLine)
+
         await window.screenshot({ path: testInfo.outputPath('wrapped-second-line.png') })
         await window.keyboard.press('k')
+
         await expect.poll(() => caretOffset(first)).toBe(0)
+
         const narrowWidth = await first.evaluate((element) => element.getBoundingClientRect().width)
+
         await setMainWindowBounds(app, { width: 1100, height: 640 })
+
         await expect
           .poll(() => first.evaluate((element) => element.getBoundingClientRect().width))
           .toBeGreaterThan(narrowWidth)
+
         await window.keyboard.press('j')
+
         expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+
         await window.keyboard.press('k')
+
         await expect.poll(() => caretOffset(first)).toBe(0)
+
         await setMainWindowBounds(app, { width: 640, height: 640 })
+
         await expect.poll(() => first.evaluate((element) => element.getBoundingClientRect().width)).toBe(narrowWidth)
+
         await window.keyboard.press('j')
+
         await expect.poll(() => caretOffset(first)).toBe(secondLine)
+
         await window.keyboard.press('k')
         await setCursor(first, 10)
         await window.keyboard.press('j')
+
         expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+
         await window.keyboard.press('k')
+
         await expect.poll(() => caretOffset(first)).toBe(10)
+
         await setCursor(first, 0)
         await window.keyboard.press('2')
         await window.keyboard.press('j')
+
         await expect(first).toBeFocused()
         expect(await caretOffset(first)).toBeGreaterThan(secondLine)
+
         await window.keyboard.press('2')
         await window.keyboard.press('k')
+
         await expect.poll(() => caretOffset(first)).toBe(0)
+
         await window.keyboard.press('9')
         await window.keyboard.press('9')
         await window.keyboard.press('j')
+
         await expect(node(window, 2)).toBeFocused()
+
         await window.keyboard.press('k')
+
         await expect(first).toBeFocused()
         expect(await caretOffset(first)).toBeGreaterThan(secondLine)
       })
@@ -285,18 +357,30 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         location: { currentParentId: null, selectedNodeId: 'n0' },
       })
       const { app, window } = await launchTree(userDataDir)
+
       await setMainWindowBounds(app, { width: 680, height: 640 })
       await node(window, 1).focus()
+
       await expect(node(window, 101)).toHaveCount(0)
+
       await window.keyboard.type('101j')
+
       await expect(node(window, 101)).toBeFocused()
+
       const secondLine = await caretOffset(node(window, 101))
+
       expect(secondLine).toBeGreaterThan(0)
+
       await window.keyboard.press('k')
+
       await expect.poll(() => caretOffset(node(window, 101))).toBe(0)
+
       await window.keyboard.press('k')
+
       await expect(node(window, 100)).toBeFocused()
+
       await window.keyboard.type('2j')
+
       await expect(node(window, 101)).toBeFocused()
       await expect.poll(() => caretOffset(node(window, 101))).toBe(secondLine)
       await expect(window.locator('.node-list > [aria-hidden="true"].node-row')).toHaveCount(0)
@@ -317,17 +401,26 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         location: { currentParentId: 'heading', selectedNodeId: 'heading' },
       })
       const { app, window } = await launchTree(userDataDir)
+
       await setMainWindowBounds(app, { width: 680, height: 640 })
       await parent(window).focus()
+
       await setCursor(parent(window), 0)
       await window.keyboard.press('j')
+
       await expect(parent(window)).toBeFocused()
       expect(await caretOffset(parent(window))).toBeGreaterThan(0)
+
       await window.keyboard.press('k')
+
       await expect.poll(() => caretOffset(parent(window))).toBe(0)
+
       await window.keyboard.type('99j')
+
       await expect(node(window, 1)).toBeFocused()
+
       await window.keyboard.press('k')
+
       await expect(parent(window)).toBeFocused()
       expect(await caretOffset(parent(window))).toBeGreaterThan(0)
     })
@@ -349,23 +442,36 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
       const { window } = await launchTree(userDataDir)
       await node(window, 1).focus()
+
       await setCursor(node(window, 1), 20)
       await window.keyboard.press('j')
+
       await expect.poll(() => caretOffset(node(window, 2))).toBe(3)
+
       await window.keyboard.press('j')
+
       await expect.poll(() => caretOffset(node(window, 3))).toBe(20)
+
       await window.keyboard.press('k')
+
       await expect.poll(() => caretOffset(node(window, 2))).toBe(3)
+
       await window.keyboard.press('k')
+
       await expect.poll(() => caretOffset(node(window, 1))).toBe(20)
+
       await window.keyboard.press('j')
       await window.keyboard.press('h')
       await window.keyboard.press('j')
+
       await expect.poll(() => caretOffset(node(window, 3))).toBe(2)
+
       await window.keyboard.press('k')
       await node(window, 2).click({ position: { x: 7, y: 8 } })
       const clicked = await caretOffset(node(window, 2))
+
       await window.keyboard.press('j')
+
       await expect.poll(() => caretOffset(node(window, 3))).toBe(clicked)
     })
   })
@@ -382,39 +488,58 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     seedDocument(userDataDir, { document: { roots }, location: { currentParentId: null, selectedNodeId: 'n0' } })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 4)
     await pressShifted(window, 'J')
+
     await expect(node(window, 11)).toBeFocused()
     await expect(node(window, 11)).toHaveJSProperty('selectionStart', 4)
+
     await pressShifted(window, 'K')
+
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('2')
     await pressShifted(window, 'J')
+
     await expect(node(window, 21)).toBeFocused()
+
     await pressShifted(window, 'V')
     await pressShifted(window, 'K')
+
     await expect(node(window, 11)).toBeFocused()
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(11)
+
     await window.screenshot({ path: testInfo.outputPath('fast-visual.png') })
     await pressShifted(window, 'K')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(21)
+
     await pressShifted(window, 'K')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(21)
+
     await pressShifted(window, 'J')
+
     await expect(node(window, 11)).toBeFocused()
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(11)
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('2')
     await pressShifted(window, 'K')
+
     await expect(node(window, 1)).toBeFocused()
+
     await window.screenshot({ path: testInfo.outputPath('fast-normal.png') })
     await window.keyboard.press('v')
     await window.keyboard.press('l')
     const start = await node(window, 1).evaluate((field) => (field as HTMLTextAreaElement).selectionStart)
     const end = await node(window, 1).evaluate((field) => (field as HTMLTextAreaElement).selectionEnd)
+
     await pressShifted(window, 'J')
     await pressShifted(window, 'K')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', start)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', end)
@@ -437,10 +562,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         await window.keyboard.type(keys)
         if (exitKey === 'Escape' && endpoint === 3) {
           await window.screenshot({ path: 'test-results/vc2-tree-visual.png' })
+
           await expect(window).toHaveScreenshot('vim-visual-active-endpoint.png')
         }
+
         await window.keyboard.press(exitKey)
+
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
         const offset = await editor.evaluate((element) => {
           if (element instanceof HTMLTextAreaElement) {
             return {
@@ -454,11 +583,15 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           range.setEnd(selection.anchorNode!, selection.anchorOffset)
           return { cursor: range.toString().length, selected: selection.toString() }
         })
+
         expect(offset).toEqual({ cursor: endpoint, selected: 'abcdef'[endpoint] })
+
         if (exitKey === 'Escape' && endpoint === 3) {
           await window.screenshot({ path: 'test-results/vc2-tree-normal.png' })
+
           await expect(window).toHaveScreenshot('vim-normal-active-endpoint.png')
         }
+
         await expect(editor).toHaveValue('abcdef')
       }
     }
@@ -478,23 +611,36 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
     for (const key of ['2', 'd', 'd']) await window.keyboard.press(key)
+
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+
     // The original counted deletion is one undo step, independently of its later dot replay.
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'C', 'D', 'E'])
+
     await window.keyboard.press('Control+r')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+
     await window.keyboard.press('3')
     await window.keyboard.press('.')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['E'])
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'E'])
+
     // `p` on C would put the register into C's own children, which is rejected; `P` puts it before.
     await pressShifted(window, 'P')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['C', 'D', 'C', 'D', 'E'])
+
     await window.keyboard.press('z')
     await pressShifted(window, 'R')
+
     await expect
       .poll(() => outline(window))
       .toEqual(['C', '  C child', 'D', '  D child', 'C', '  C child', 'D', '  D child', 'E', '  E child'])
@@ -509,41 +655,61 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { app, window } = await launchTree(userDataDir)
     await node(window, 3).focus()
+
     await pressShifted(window, 'V')
     await window.keyboard.press('k')
     await pressShifted(window, '>')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  C', 'D'])
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await node(window, 2).focus()
+
     await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+
     await expect(window.getByLabel('Vim mode')).toHaveCount(0)
+
     await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await node(window, 2).focus()
+
     await window.keyboard.press('3')
     await window.keyboard.press('.')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  C', 'D'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-shift-light.png')
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'C', 'D'])
+
     // The original join clamps to three siblings. Dot requires all three, rather than a partial join.
     await node(window, 2).focus()
+
     await window.keyboard.press('9')
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await window.keyboard.press('3')
     await window.keyboard.press('.')
+
     await expect.poll(() => outline(window)).toEqual(['ABC', 'D'])
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'C', 'D'])
+
     await window.keyboard.press('Control+r')
+
     await expect.poll(() => outline(window)).toEqual(['ABC', 'D'])
   })
 
@@ -554,34 +720,48 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 2).focus()
+
     await window.keyboard.press('2')
     await window.keyboard.press('g')
     await window.keyboard.press('p')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C'])
     await expect(node(window, 5)).toBeFocused()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await window.keyboard.press('.')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C', 'A', 'A'])
     await expect(node(window, 7)).toBeFocused()
+
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C'])
+
     // gP retains the original target as its destination, even across several dot iterations.
     await node(window, 5).focus()
+
     await window.keyboard.press('2')
     await window.keyboard.press('g')
     await pressShifted(window, 'P')
+
     await expect(node(window, 7)).toBeFocused()
+
     await window.keyboard.press('2')
     await window.keyboard.press('.')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'B', 'A', 'A', 'C', 'C', 'C', 'C', 'C', 'C', 'C'])
     await expect(node(window, 11)).toBeFocused()
+
     await window.keyboard.press('u')
+
     await expect(window.locator('.node-row')).toHaveCount(9)
   })
 
@@ -603,24 +783,35 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 2).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('o')
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', 'B'])
     await expect(node(window, 2)).toBeFocused()
+
     // The repeated put follows the same rule: a leaf receives a sibling after it.
     await node(window, 4).focus()
+
     await window.keyboard.press('.')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', '  B', 'B'])
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', 'B'])
+
     // P keeps the sibling-before put.
     await node(window, 1).focus()
+
     await pressShifted(window, 'P')
+
     await expect.poll(() => outline(window)).toEqual(['B', 'A', '  B', '  A1', '  A2', 'B'])
   })
 
@@ -640,52 +831,74 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const location = await window.getByLabel('Current location').innerText()
     await node(window, 2).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 1).focus()
+
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+
     await window.screenshot({ path: testInfo.outputPath('folded-put-after.png') })
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B'])
+
     await window.keyboard.press('Control+r')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
+
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await pressShifted(window, 'P')
+
     await expect.poll(() => outline(window)).toEqual(['B', 'A', 'B'])
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await window.keyboard.press('o')
+
     await expect.poll(() => outline(window)).toEqual(['A', '', 'B'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await pressShifted(window, 'O')
+
     await expect.poll(() => outline(window)).toEqual(['', 'A', 'B'])
     await expect(node(window, 1)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('o')
     // A new p targets children once the branch is expanded.
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', 'B'])
     await expect(node(window, 2)).toBeFocused()
+
     await window.screenshot({ path: testInfo.outputPath('expanded-put-child.png') })
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('c')
     await window.keyboard.press('.')
+
     await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Current location')).toHaveText(location)
@@ -706,28 +919,37 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.press('0')
     await pressShifted(window, 'Y')
     await node(window, 2).focus()
+
     await window.keyboard.press('0')
     await window.keyboard.press('v')
     await pressShifted(window, '$')
     await window.keyboard.press('2')
     await window.keyboard.press('p')
+
     await expect(node(window, 2)).toHaveValue('redred')
+
     await node(window, 3).focus()
+
     await window.keyboard.press('0')
     await pressShifted(window, 'Y')
     await window.keyboard.press('.')
+
     await expect(node(window, 3)).toHaveValue('redred')
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 5)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-repeat-visual-put-light.png')
+
     await node(window, 4).focus()
+
     await window.keyboard.press('0')
     await window.keyboard.press('g')
     await pressShifted(window, 'U')
     await window.keyboard.press('w')
     await node(window, 5).focus()
+
     await window.keyboard.press('0')
     await window.keyboard.press('g')
     await pressShifted(window, 'U')
@@ -735,16 +957,23 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await pressShifted(window, 'Y')
     await window.keyboard.press('w')
     await window.keyboard.press('.')
+
     await expect(node(window, 5)).toHaveValue('THREE FOUR')
+
     await node(window, 4).focus()
+
     await window.keyboard.press('c')
     await window.keyboard.press('j')
     await typeInto(node(window, 4), 'changed')
     await window.keyboard.press('Escape')
     await node(window, 5).focus()
+
     await window.keyboard.press('.')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['red', 'redred', 'redred', 'changed', 'changed'])
+
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['red', 'redred', 'redred', 'changed', 'last', 'end'])
   })
 
@@ -761,6 +990,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const parent = window.getByRole('textbox', { name: 'Current parent' })
       await parent.focus()
+
       await window.keyboard.press('o')
       await typeInto(node(window, 1), 'Child')
       await window.keyboard.press('Escape')
@@ -788,15 +1018,22 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await window.keyboard.press('3')
     await window.keyboard.press('j')
+
     await expect(countedNode(4)).toBeFocused()
+
     await window.keyboard.press('l')
+
     await expect(countedNode(4)).toHaveJSProperty('selectionStart', 1)
+
     await window.keyboard.press('5')
     await window.keyboard.press('k')
+
     await expect(countedNode(1)).toBeFocused()
+
     await window.keyboard.press('1')
     await window.keyboard.press('0')
     await window.keyboard.press('G')
+
     await expect(countedNode(10)).toBeFocused()
 
     await window.keyboard.press('g')
@@ -807,6 +1044,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('y')
     await window.keyboard.press('3')
     await window.keyboard.press('p')
+
     await expect(window.locator('.node-row')).toHaveCount(18)
   })
 
@@ -822,6 +1060,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const heading = window.getByRole('textbox', { name: 'Current parent' })
       await heading.focus()
+
       await window.keyboard.press('O')
 
       await expect(heading).toHaveValue('Parent')
@@ -847,6 +1086,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
       const { window } = await launchTree(userDataDir)
       await node(window, 2).focus()
+
       await window.keyboard.press('g')
       await window.keyboard.press('g')
 
@@ -872,8 +1112,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           location: { currentParentId: nested ? 'p' : null, selectedNodeId: 'c60' },
         })
         const { window } = await launchTree(userDataDir)
+
         await expect(window.getByRole('textbox', { name: 'Node 61', exact: true })).toBeFocused()
+
         const viewport = window.locator('.scroll-viewport')
+
         await viewport.evaluate((element) => {
           element.setAttribute('data-wheel-scroll-ended', 'false')
           element.addEventListener(
@@ -892,6 +1135,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         })
         await window.mouse.move(400, 300)
         await window.mouse.wheel(0, 3000)
+
         // Native wheel scrolling must finish before gg starts a new navigation reveal.
         await expect(viewport).toHaveAttribute('data-wheel-scroll-ended', 'true')
         await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(1000)
@@ -902,6 +1146,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         const target = nested
           ? window.getByRole('textbox', { name: 'Current parent' })
           : window.getByRole('textbox', { name: 'Node 1', exact: true })
+
         await expect(target).toBeFocused()
         await expect(target).toBeInViewport({ ratio: 1 })
       })
@@ -916,15 +1161,19 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 6)
     await window.keyboard.press('v')
     await window.keyboard.press('i')
     await pressShifted(window, '(')
+
     await expect(editor).toHaveJSProperty('selectionStart', 5)
     await expect(editor).toHaveJSProperty('selectionEnd', 8)
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('P')
+
     await expect(editor).toHaveValue('one (twotwo)')
   })
 
@@ -941,21 +1190,28 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await window.keyboard.press('G')
     await window.keyboard.press('p')
     const firstCopyId = await window.locator('.node-row').last().getAttribute('data-node-id')
+
     await window.keyboard.press('.')
+
     await expect(node(window, 5)).toHaveValue('A')
+
     const secondCopyId = await window.locator('.node-row').last().getAttribute('data-node-id')
+
     expect(secondCopyId).not.toBe(firstCopyId)
+
     await window.keyboard.press('g')
     await window.keyboard.press('g')
     await window.keyboard.press('d')
     await window.keyboard.press('d')
     await window.keyboard.press('.')
+
     await expect(node(window, 1)).toHaveValue('C')
   })
 
@@ -975,15 +1231,25 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('j')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
     await window.keyboard.press('d')
+
     await expect(node(window, 1)).toHaveValue('C')
+
     await window.keyboard.press('.')
+
     await expect(node(window, 1)).toHaveValue('E')
+
     await window.keyboard.press('u')
+
     await expect(node(window, 1)).toHaveValue('C')
     await expect(node(window, 2)).toHaveValue('D')
   })
@@ -999,6 +1265,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await window.keyboard.press('V')
       const wholeNodeBackground = await window
         .locator('.node-row-visual-selected')
@@ -1011,7 +1278,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         const style = element.ownerDocument.defaultView?.getComputedStyle(element)
         return { background: style?.backgroundColor, color: style?.color }
       })
+
       expect(visualNodeLabelColors).toEqual(wholeNodeColors)
+
       await window.keyboard.press('Escape')
       await window.keyboard.press('v')
       const characterSelectionBackground = await editor.evaluate(
@@ -1022,12 +1291,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         const style = element.ownerDocument.defaultView?.getComputedStyle(element)
         return { background: style?.backgroundColor, color: style?.color }
       })
+
       expect(characterSelectionBackground).toBe(wholeNodeBackground)
       expect(visualLabelColors).toEqual(wholeNodeColors)
       await expect(editor).toHaveScreenshot('vim-visual-selection-yellow-light.png')
       await expect(visualLabel).toHaveScreenshot('vim-visual-label-yellow-light.png')
 
       await window.emulateMedia({ colorScheme: 'dark' })
+
       await expect(editor).toHaveScreenshot('vim-visual-selection-yellow-dark.png')
       await expect(visualLabel).toHaveScreenshot('vim-visual-label-yellow-dark.png')
     })
@@ -1046,22 +1317,29 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('k')
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('G')
     await window.keyboard.press('P')
+
     await expect(node(window, 3)).toHaveValue('A')
     await expect(node(window, 4)).toHaveValue('B')
+
     const firstCopyId = await window.locator('.node-row').nth(2).getAttribute('data-node-id')
+
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await window.keyboard.press('p')
+
     await expect(node(window, 3)).toHaveValue('A')
     await expect(node(window, 4)).toHaveValue('B')
     expect(await window.locator('.node-row').nth(2).getAttribute('data-node-id')).not.toBe(firstCopyId)
+
     await window.keyboard.press('.')
+
     await expect(node(window, 3)).toHaveValue('A')
     await expect(node(window, 4)).toHaveValue('B')
   })
@@ -1087,17 +1365,25 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const parent = window.getByRole('textbox', { name: 'Current parent' })
       await parent.focus()
+
       await window.keyboard.press('V')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       await node(window, 1).focus()
+
       await window.keyboard.press('V')
       await window.keyboard.press('j')
       await window.keyboard.press('U')
+
       await expect(node(window, 1)).toHaveValue('ONE')
       await expect(node(window, 2)).toHaveValue('TWO')
+
       await node(window, 1).focus()
+
       await window.keyboard.press('g')
       await window.keyboard.press('d')
+
       await expect(node(window, 1)).toHaveValue('MIXED')
     })
   })
@@ -1109,6 +1395,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
@@ -1116,13 +1403,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('d')
     allowRendererError(exactMessage('Operation failed: Cannot paste a node into one of its descendants.'))
     await window.keyboard.press('p')
+
     await expect(window.getByText('Operation failed: Cannot paste a node into one of its descendants.')).toBeVisible()
     await expect(node(window, 1)).toHaveValue('Child')
+
     await window.keyboard.press('Control+o')
     await window.keyboard.press('o')
     await typeInto(node(window, 2), 'New')
     await window.keyboard.press('Escape')
     await window.keyboard.press('.')
+
     await expect(node(window, 2)).toHaveValue('New')
     await expect(node(window, 3)).toHaveValue('New')
   })
@@ -1139,11 +1429,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await window.keyboard.press('o')
     await typeInto(node(window, 2), 'Opened')
     await node(window, 3).click()
     await window.keyboard.press('Escape')
     await window.keyboard.press('.')
+
     await expect(node(window, 2)).toHaveValue('Opened')
     await expect(node(window, 3)).toHaveValue('bee')
     await expect.poll(() => nodeTexts(window)).toEqual(['A', 'Opened', 'bee'])
@@ -1159,25 +1451,33 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
       const { app, window } = await launchTree(userDataDir)
       await node(window, 1).focus()
+
       await window.keyboard.press('x')
+
       await expect(node(window, 1)).toHaveValue('BC')
+
       await window.keyboard.press('o')
       const opened = node(window, 2)
+
       await window.keyboard.type('Opened')
       await opened.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 2))
       await writeClipboardText(app, 'P')
       if (command === 'native-paste') await firePaste(opened)
       else await window.keyboard.press(command)
+
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
       if (command === 'Meta+a') {
         await expect(opened).toHaveValue('Opened')
         await expect(opened).toHaveJSProperty('selectionStart', 0)
         await expect(opened).toHaveJSProperty('selectionEnd', 6)
       } else await expect(opened).toHaveValue(command === 'Meta+x' ? 'ened' : 'POpened')
+
       await window.keyboard.press('Escape')
       await node(window, 1).focus()
+
       await setCursor(node(window, 1), 0)
       await window.keyboard.press('.')
+
       await expect(node(window, 1)).toHaveValue('C')
       await expect(window.locator('.node-row')).toHaveCount(2)
     })
@@ -1194,17 +1494,22 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
       const { window } = await launchTree(userDataDir)
       await node(window, 1).focus()
+
       await window.keyboard.press('x')
       if (command === 'c' || command === 's') await pressShifted(window, 'V')
       if (command === 'O') await pressShifted(window, 'O')
       else await window.keyboard.press(command)
       const editor = node(window, command === 'o' ? 2 : 1)
+
       await window.keyboard.type('Opened')
       await editor.click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
       await window.keyboard.press('Escape')
       await setCursor(editor, 0)
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('pened')
       await expect(window.locator('.node-row')).toHaveCount(command === 'o' || command === 'O' ? 2 : 1)
     })
@@ -1286,6 +1591,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       // still before moving: neither the block nor a later render may turn it into a native text drag
       // or move its anchor.
       await dragSelectText(window, first, 6, 70, 300)
+
       expect(
         await first.evaluate((element) => [
           (element as HTMLTextAreaElement).selectionStart,
@@ -1297,24 +1603,29 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(first).toHaveScreenshot('vim-normal-text-selection-light.png')
 
       await window.emulateMedia({ colorScheme: 'dark' })
+
       expect(await selectionColors(first)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
       await expect(first).toHaveScreenshot('vim-normal-text-selection-dark.png')
+
       await window.emulateMedia({ colorScheme: 'light' })
 
       // Moving focus keeps the unfocused selection on the highlight while the newly focused row
       // shows its ink block caret.
       await second.focus()
+
       await expect(second).not.toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(second)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
       expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
 
       // Collapsing back to the block caret removes the deliberate-selection highlight.
       await first.click({ position: { x: 20, y: 10 } })
+
       await expect(first).not.toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
 
       // Select-all is also a deliberate selection, not the one-character block caret.
       await window.keyboard.press('Meta+a')
+
       await expect(first).toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
     })
@@ -1345,19 +1656,28 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
 
     await editor.focus()
+
     await editor.press('0')
     await editor.press(String(start))
     await editor.press('l')
+
     expect(await caret()).toBe(start)
+
     await editor.press('l')
+
     expect(await caret()).toBe(start + 1)
 
     await editor.press('h')
+
     expect(await caret()).toBe(start)
+
     await editor.press('$')
+
     expect(await caret()).toBe(text.length - 1)
+
     await setCursor(editor, end - 1)
     await editor.press('l')
+
     expect(await caret()).toBe(end)
   })
 
@@ -1398,33 +1718,49 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         before.setEnd(range.startContainer, range.startOffset)
         return before.toString().length
       })
+
     await expect(empty).toBeFocused()
+
     await empty.press('j')
+
     await expect(linked).toBeFocused()
     await expect(window.locator('.node-row').nth(1).locator('.node-focus-marker')).toHaveCount(1)
     await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(0)
 
     await linked.press('l')
+
     expect(await caret()).toBe(1)
+
     await setCursor(linked, firstStart)
     await linked.press('h')
+
     await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart - 1)
+
     await linked.press('l')
+
     await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart)
+
     await linked.press('l')
+
     await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart + 1)
+
     await linked.press('h')
+
     await expect(links.first()).not.toHaveClass(/link-selected/)
     expect(await caret()).toBe(firstStart)
     await expect(empty).not.toBeFocused()
+
     await linked.press('k')
+
     await expect(empty).toBeFocused()
     await expect(links.first()).not.toHaveClass(/link-selected/)
+
     await empty.press('j')
+
     await expect(linked).toBeFocused()
     await expect(links.first()).not.toHaveClass(/link-selected/)
   })
@@ -1440,6 +1776,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         location: { currentParentId: null, selectedNodeId: 'root' },
       })
       const { window } = await launchTreeBase(userDataDir, { initialMode: 'normal' })
+
       await window.emulateMedia({ colorScheme: 'dark' })
       const editor = node(window, 1)
       const link = editor.getByRole('link')
@@ -1473,17 +1810,20 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const link = editor.getByRole('link')
 
     await editor.focus()
+
     await setCursor(editor, 0)
     await window.keyboard.press('v')
     await window.keyboard.press('$')
 
     await expect(link).toHaveClass(/link-selected/)
+
     const linkBackground = await link.evaluate(
       (element) => element.ownerDocument.defaultView?.getComputedStyle(element).backgroundColor,
     )
     const textSelectionBackground = await editor.evaluate(
       (element) => element.ownerDocument.defaultView?.getComputedStyle(element, '::selection').backgroundColor,
     )
+
     expect(linkBackground).toBe(textSelectionBackground)
   })
 
@@ -1504,6 +1844,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const link = editor.getByRole('link')
 
       await editor.focus()
+
       await setCursor(editor, start)
       await window.keyboard.press('v')
       await window.keyboard.press('l')
@@ -1518,6 +1859,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(editor).toHaveScreenshot('vim-visual-link-selection-light.png')
 
       await window.emulateMedia({ colorScheme: 'dark' })
+
       expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
       expect(await selectionColors(link)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
       await expect(editor).toHaveScreenshot('vim-visual-link-selection-dark.png')
@@ -1538,6 +1880,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const link = editor.getByRole('link')
 
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('v')
       await window.keyboard.press('l')
@@ -1559,6 +1902,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-light.png')
 
       await window.emulateMedia({ colorScheme: 'dark' })
+
       expect(await selectionColors(editor)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
       expect(await selectionColors(link)).toEqual({ background: 'rgb(43, 43, 43)', color: 'rgb(240, 223, 175)' })
       await expect(editor).toHaveScreenshot('vim-visual-spanning-selection-dark.png')
@@ -1600,20 +1944,25 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await first.press('6')
     await first.press('l')
+
     expect(await first.evaluate(hasLinkedSelection)).toBe(true)
     expect(await second.evaluate(hasLinkedSelection)).toBe(false)
 
     await second.focus()
+
     await second.press('0')
     await second.press('5')
     await second.press('l')
+
     expect(await first.evaluate(hasLinkedSelection)).toBe(false)
     expect(await second.evaluate(hasLinkedSelection)).toBe(true)
 
     await first.focus()
+
     await first.press('0')
     await first.press('6')
     await first.press('l')
+
     expect(await first.evaluate(hasLinkedSelection)).toBe(true)
     expect(await second.evaluate(hasLinkedSelection)).toBe(false)
   })
@@ -1653,16 +2002,22 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       expect(await firstLink.evaluate((link) => link.getClientRects().length)).toBeGreaterThan(1)
       expect(await selectedCharacter()).toMatchObject({ text: 'h' })
       expect((await selectedCharacter())?.width).toBeGreaterThan(0)
+
       await first.press('$')
+
       expect(await selectedCharacter()).toMatchObject({ text: '-' })
       expect((await selectedCharacter())?.width).toBeGreaterThan(0)
 
       await second.focus()
+
       await expect(second).toBeFocused()
+
       await first.focus()
+
       await window.emulateMedia({ colorScheme: 'dark' })
       await first.press('$')
       await setMainWindowBounds(app, { width: 680 })
+
       await expect.poll(async () => (await selectedCharacter())?.width ?? 0).toBeGreaterThan(0)
       expect((await selectedCharacter())?.height).toBeLessThanOrEqual(21)
     })
@@ -1679,6 +2034,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
       await expect(node(window, 1)).toHaveValue('Child')
+
       await node(window, 1).focus()
 
       await window.keyboard.press('Control+o')
@@ -1706,30 +2062,50 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await window.keyboard.press('g')
     await window.keyboard.press('g')
+
     await expect(node(window, 1)).toBeFocused()
 
     await window.keyboard.press('G')
+
     await expect(node(window, 5)).toBeFocused()
+
     await window.keyboard.press('H')
+
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('M')
+
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.press('L')
+
     await expect(node(window, 5)).toBeFocused()
+
     await window.keyboard.press('2')
     await window.keyboard.press('H')
+
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.press('2')
     await window.keyboard.press('L')
+
     await expect(node(window, 4)).toBeFocused()
+
     await window.keyboard.press('9')
     await window.keyboard.press('H')
+
     await expect(node(window, 5)).toBeFocused()
+
     await window.keyboard.press('L')
+
     await expect(node(window, 5)).toBeFocused()
+
     await window.keyboard.press('Control+u')
+
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.press('Control+d')
+
     await expect(node(window, 5)).toBeFocused()
   })
 
@@ -1743,6 +2119,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const row = (index: number) => window.getByRole('textbox', { name: `Node ${index}`, exact: true })
     await row(1).focus()
+
     // Scroll by half a row, so the first row is clipped at the top.
     await window.evaluate(() => {
       const viewport = document.querySelector('.scroll-viewport')!
@@ -1762,9 +2139,12 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     // Row 1 is clipped and row 2 lies within the 25 px edge context (PRODUCT.md §20.8), so H skips both.
     await window.keyboard.press('H')
+
     await expect(row(3)).toBeFocused()
     expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
+
     await window.keyboard.press('L')
+
     expect(await focusedRowFit()).toEqual({ fits: true, scrollTop })
   })
 
@@ -1796,7 +2176,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           view: [view.top, view.bottom],
         }
       })
+
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
+
     const start = await focusedRow()
     const rowsPerScreen = Math.floor((start.view[1]! - start.view[0]!) / start.height)
 
@@ -1805,16 +2187,21 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     for (let step = 0; step < rowsPerScreen + 2 && scrolledBy === 0; step += 1) {
       await window.keyboard.press('j')
       const state = await focusedRow()
+
       expect(state.top).toBeGreaterThanOrEqual(0)
       expect(state.bottom).toBeGreaterThanOrEqual(0)
+
       scrolledBy = state.scrollTop
       if (scrolledBy > 0) {
         expect(scrolledBy).toBeLessThanOrEqual(state.height * 3)
+
         const caret = await caretGeometry(window)
+
         expect(caret.bottom).toBeGreaterThanOrEqual(state.height * 0.9)
         expect(caret.bottom).toBeLessThanOrEqual(state.height * 1.1)
       }
     }
+
     expect(scrolledBy).toBeGreaterThan(0)
 
     // Walking back up scrolls the same way at the top edge: the row lands one row height below it.
@@ -1824,10 +2211,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     for (let step = 0; step < rowsPerScreen * 2; step += 1) {
       await window.keyboard.press('k')
       const state = await focusedRow()
+
       expect(state.top).toBeGreaterThanOrEqual(0)
+
       if (state.scrollTop < before) {
         expect(state.top).toBeGreaterThanOrEqual(state.height * 0.9)
         expect(state.top).toBeLessThanOrEqual(state.height * 1.1)
+
         return
       }
     }
@@ -1875,10 +2265,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     }) => {
       seedDocument(userDataDir, longNestedSeed())
       const { window } = await launchTree(userDataDir)
+
       await expect(window.locator('.node-input:focus')).toHaveCount(1)
+
       for (const key of ['j', 'k']) {
         for (let step = 0; step < 125; step += 1) {
           await window.keyboard.press(key)
+
           await expect
             .poll(async () => {
               const { top, bottom, scroll, max } = await caretGeometry(window)
@@ -1893,7 +2286,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     test('reaches the same scroll position at the document edges by walking, gg, and G', async ({ userDataDir }) => {
       seedDocument(userDataDir, longNestedSeed())
       const { window } = await launchTree(userDataDir)
+
       await expect(window.locator('.node-input:focus')).toHaveCount(1)
+
       const settled = async (): Promise<Awaited<ReturnType<typeof selectedRowGeometry>>> => {
         let previous = await selectedRowGeometry(window)
         for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -1908,11 +2303,15 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       // From the top: G first, then a walk down from the top, then the same from the other direction.
       await window.keyboard.press('G')
       const lastByG = await settled()
+
       await window.keyboard.type('gg')
       const firstByGg = await settled()
       for (let step = 0; step < 125; step += 1) await window.keyboard.press('j')
+
       expect(await settled()).toEqual(lastByG)
+
       for (let step = 0; step < 125; step += 1) await window.keyboard.press('k')
+
       expect(await settled()).toEqual(firstByGg)
       expect(firstByGg.scrollTop).toBe(0)
       expect(lastByG.scrollTop).toBe(lastByG.max)
@@ -1922,20 +2321,30 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     test('H and L choose rows clear of the edge context and do not scroll', async ({ userDataDir }) => {
       seedDocument(userDataDir, longNestedSeed())
       const { window } = await launchTree(userDataDir)
+
       await expect(window.locator('.node-input:focus')).toHaveCount(1)
+
       await window.keyboard.type('30j')
+
       await expect.poll(async () => (await selectedRowGeometry(window)).scrollTop).toBeGreaterThan(0)
+
       const resting = await selectedRowGeometry(window)
 
       await window.keyboard.press('H')
+
       await expect.poll(async () => (await selectedRowGeometry(window)).top).toBeLessThan(resting.top)
+
       const afterH = await selectedRowGeometry(window)
+
       expect(afterH.top).toBeGreaterThanOrEqual(25)
       expect(afterH.scrollTop).toBe(resting.scrollTop)
 
       await window.keyboard.press('L')
+
       await expect.poll(async () => (await selectedRowGeometry(window)).top).toBeGreaterThan(afterH.top)
+
       const afterL = await selectedRowGeometry(window)
+
       expect(afterL.gap).toBeGreaterThanOrEqual(25)
       expect(afterL.scrollTop).toBe(resting.scrollTop)
     })
@@ -1944,7 +2353,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     test('a click on a fully visible row near the edge does not move the content', async ({ userDataDir }) => {
       seedDocument(userDataDir, longNestedSeed())
       const { window } = await launchTree(userDataDir)
+
       await expect(window.locator('.node-input:focus')).toHaveCount(1)
+
       await window.keyboard.type('30j')
       // Bring the focused row's neighbour to 10 px above the bottom edge: fully visible, inside the context.
       const target = await window.evaluate(() => {
@@ -1961,8 +2372,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const scrollTop = (): Promise<number> =>
         window.evaluate(() => Math.round(document.querySelector('.scroll-viewport')!.scrollTop))
       const before = await scrollTop()
+
       await window.locator(`.node-row[data-node-id="${target}"] .node-input`).click()
       await window.waitForTimeout(150)
+
       expect(await scrollTop()).toBe(before)
     })
   })
@@ -1976,12 +2389,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('o')
     await window.keyboard.type('below')
+
     await expect(node(window, 1)).toHaveValue('middle')
     await expect(node(window, 2)).toHaveValue('below')
 
     await window.keyboard.press('Escape')
     await window.keyboard.press('O')
     await window.keyboard.type('above')
+
     await expect(node(window, 1)).toHaveValue('middle')
     await expect(node(window, 2)).toHaveValue('above')
     await expect(node(window, 3)).toHaveValue('below')
@@ -1999,7 +2414,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('l')
     await lockSystemClipboard()
     await window.keyboard.press('y')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('$')
     await window.keyboard.press('P')
 
@@ -2011,6 +2428,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
   }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
+
     await editor.press('i')
     await typeInto(editor, 'red blue')
     await setCursor(editor, 0)
@@ -2025,11 +2443,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('v')
     await window.keyboard.press('e')
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('red red')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     // The register now holds the replaced `blue`.
     await window.keyboard.press('$')
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('red redblue')
 
     // `P` replaces with the register but keeps it, so the same text can be put again.
@@ -2038,15 +2459,21 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('l')
     await window.keyboard.press('l')
     await pressShifted(window, 'P')
+
     await expect(editor).toHaveValue('blue redblue')
+
     await window.keyboard.press('$')
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('blue redblueblue')
 
     // One edit per put: three undos return through the document states in reverse.
     await window.keyboard.press('u')
+
     await expect(editor).toHaveValue('blue redblue')
+
     await window.keyboard.press('u')
+
     await expect(editor).toHaveValue('red redblue')
   })
 
@@ -2055,6 +2482,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
   }) => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
+
     await editor.press('i')
     await typeInto(editor, 'x yz')
     await setCursor(editor, 0)
@@ -2062,8 +2490,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // An empty register changes nothing and keeps the Visual selection.
     await window.keyboard.press('v')
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('x yz')
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
     await window.keyboard.press('Escape')
 
     await window.keyboard.press('$')
@@ -2074,11 +2504,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('v')
     await window.keyboard.press('3')
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('zzz yz')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     // The caret is on the final inserted character, and the register holds the replaced `x`.
     await expect(editor).toHaveJSProperty('selectionStart', 2)
+
     await window.keyboard.press('p')
+
     await expect(editor).toHaveValue('zzzx yz')
   })
 
@@ -2097,32 +2530,43 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
 
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('2')
     await window.keyboard.press('p')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Alpha', 'Charlie'])
+
     // The register now holds `Bravo`: a Normal put inserts it after the first copy.
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
 
     // `P` replaces but keeps the register, so the same `Bravo` replaces another node afterwards.
     await node(window, 1).focus()
+
     await window.keyboard.press('V')
     await pressShifted(window, 'P')
+
     await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
+
     await node(window, 5).focus()
+
     await window.keyboard.press('V')
     await pressShifted(window, 'P')
+
     await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Bravo'])
 
     // Each command was one undo step.
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['Bravo', 'Alpha', 'Bravo', 'Alpha', 'Charlie'])
   })
 
@@ -2154,13 +2598,18 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('y')
       // `p` on Child would put it into its own children, so put after the leaf sibling instead.
       await node(window, 2).focus()
+
       await window.keyboard.press('p')
+
       await expect(node(window, 3)).toHaveValue('Child')
 
       await window.keyboard.press('P')
+
       await expect(node(window, 3)).toHaveValue('Child')
+
       await window.keyboard.press('g')
       await window.keyboard.press('d')
+
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Child')
       await expect(node(window, 1)).toHaveValue('Grandchild')
     })
@@ -2190,10 +2639,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('y')
       await window.keyboard.press('y')
       const heading = window.getByRole('textbox', { name: 'Current parent' })
+
       await heading.click()
+
       await expect(heading).toBeFocused()
 
       await window.keyboard.press('P')
+
       await expect(heading).toBeFocused()
       await expect(heading).toHaveValue('Root')
       await expect(node(window, 1)).toHaveValue('Child')
@@ -2201,24 +2653,32 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(node(window, 3)).toHaveCount(0)
 
       await window.keyboard.press('p')
+
       await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Sibling'])
       await expect(node(window, 1)).toBeFocused()
       await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
       await expect(heading).toHaveValue('Root')
+
       await window.screenshot({ path: testInfo.outputPath('heading-first-child-put.png') })
       await window.keyboard.press('u')
+
       await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Sibling'])
+
       await heading.click()
       await window.keyboard.type('2gp')
+
       await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Child', 'Sibling'])
       await expect(node(window, 3)).toBeFocused()
+
       await window.keyboard.press('u')
       await heading.click()
       await window.keyboard.press('.')
+
       await expect.poll(() => nodeTexts(window)).toEqual(['Child', 'Child', 'Child', 'Sibling'])
       await expect(node(window, 3)).toBeFocused()
 
       await window.keyboard.press('Meta+,')
+
       await expect.poll(() => nodeTexts(window)).toEqual(['Root'])
     })
   })
@@ -2234,10 +2694,12 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('v')
     await window.keyboard.press('h')
     await window.keyboard.press('d')
+
     await expect(editor).toHaveValue('c')
 
     await window.keyboard.press('$')
     await window.keyboard.press('x')
+
     await expect(editor).toHaveValue('')
   })
 
@@ -2246,6 +2708,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     test('changes, replaces, swaps, and cases a Visual selection', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'AbCd')
       await setCursor(editor, 0)
@@ -2254,13 +2717,17 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('l')
       await window.keyboard.press('o')
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('abCd')
       // Vim leaves the caret at the start of the operated range for a Visual-mode case change.
       await expect(editor).toHaveJSProperty('selectionStart', 0)
       await expect(editor).toHaveJSProperty('selectionEnd', 1)
       await expect(editor).toHaveScreenshot('vim-visual-case-caret-light.png')
+
       await window.emulateMedia({ colorScheme: 'dark' })
+
       await expect(editor).toHaveScreenshot('vim-visual-case-caret-dark.png')
+
       await window.emulateMedia({ colorScheme: 'light' })
 
       await setCursor(editor, 0)
@@ -2272,6 +2739,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('v')
       await window.keyboard.press('h')
       await window.keyboard.press('p')
+
       await expect(editor).toHaveValue('abab')
 
       await setCursor(editor, 0)
@@ -2280,6 +2748,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('c')
       await window.keyboard.type('Z')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('Zab')
     })
   })
@@ -2296,6 +2765,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
+
     await expect(editor.getByRole('link')).toHaveCount(1)
 
     await setCursor(editor, start + 2)
@@ -2307,7 +2777,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await pressShifted(window, ')')
 
     await expect(editor).toHaveText(`see (${url}) now`)
+
     const link = editor.getByRole('link')
+
     await expect(link).toHaveCount(1)
     await expect(link).toHaveAttribute('href', url)
     await expect(link).toHaveText(url)
@@ -2329,40 +2801,58 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const alpha = node(window, 1)
     await alpha.focus()
+
     await setCursor(alpha, 0)
 
     // A focus-changing shortcut during character Visual mode keeps the mode but drops the stale
     // endpoints, so the next motion anchors at the reached node's caret instead of the old focus.
     await window.keyboard.press('v')
     await window.keyboard.press('l')
+
     await expect(alpha).toHaveJSProperty('selectionStart', 0)
     await expect(alpha).toHaveJSProperty('selectionEnd', 2)
 
     await window.keyboard.press('Meta+.')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
     const heading = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(heading).toHaveValue('Alpha')
+
     await window.keyboard.press('l')
+
     await expect(heading).toHaveJSProperty('selectionStart', 0)
     await expect(heading).toHaveJSProperty('selectionEnd', 2)
 
     // A whole-node Visual g prefix must not survive Escape and turn the next Normal d into gd.
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('Meta+,')
+
     await expect(heading).toHaveCount(0)
+
     const alphaAgain = node(window, 1)
+
     await expect(alphaAgain).toHaveValue('Alpha')
+
     await alphaAgain.focus()
+
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('g')
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     await expect(window.locator('.node-row')).toHaveCount(2)
     await expect(node(window, 1)).toHaveValue('Bravo')
   })
@@ -2378,6 +2868,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const alpha = node(window, 1)
     await alpha.focus()
+
     await setCursor(alpha, 0)
 
     // Cmd+A replaces the selection but runs on the same input, so it must drop a pending operator
@@ -2385,12 +2876,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('d')
     await window.keyboard.press('Meta+a')
     await window.keyboard.press('w')
+
     await expect(alpha).toHaveValue('one two three')
 
     // The undo shortcut also runs on the same input without blurring.
     await window.keyboard.press('d')
     await window.keyboard.press('Meta+z')
     await window.keyboard.press('$')
+
     await expect(alpha).toHaveValue('one two three')
   })
 
@@ -2413,12 +2906,15 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const nested = ['Alpha', '  Bravo', '  Charlie', 'Delta']
     const bravo = node(window, 2)
     await bravo.focus()
+
     await setCursor(bravo, 0)
     await window.keyboard.press('V')
     await window.keyboard.press('j')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
 
     await pressShifted(window, '>')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
     // Alpha opened to show the moved range; Bravo stays collapsed, so its child is still hidden.
@@ -2426,6 +2922,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     // The range kept its direction: `<` moves the same two nodes back out after Alpha.
     await pressShifted(window, '<')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
     await expect.poll(() => outline(window)).toEqual(flat)
@@ -2433,18 +2930,24 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // Neither a first sibling nor a root can move: nothing changes and no error is shown.
     await window.keyboard.press('Escape')
     await node(window, 1).focus()
+
     await window.keyboard.press('V')
     await pressShifted(window, '>')
     await pressShifted(window, '<')
+
     await expect(window.getByRole('alert')).toHaveCount(0)
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     expect(await outline(window)).toEqual(flat)
+
     await window.keyboard.press('Escape')
 
     // Each shift is one undo step, and undo is not blocked by the failed attempts above.
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(nested)
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(flat)
   })
 
@@ -2463,21 +2966,27 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const bravo = node(window, 2)
     await bravo.focus()
+
     await setCursor(bravo, 0)
     await window.keyboard.press('V')
     // Three levels are impossible (Alpha1 has no child to receive Bravo a third time).
     await window.keyboard.press('3')
     await pressShifted(window, '>')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.getByRole('alert')).toHaveCount(0)
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
     expect(await outline(window)).toEqual(['Alpha', 'Bravo'])
+
     await window.keyboard.press('2')
     await pressShifted(window, '>')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', '    Bravo'])
+
     // Both levels are one undo step.
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha1', 'Bravo'])
   })
 
@@ -2496,55 +3005,76 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const before = ['Alpha  ', '  Bravo', 'Charlie', 'Delta']
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 0)
 
     // `gJ` keeps whitespace and the first ID, and puts the caret on the first appended character.
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', 'Charlie', 'Delta'])
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
     await expect(window.getByRole('alert')).toHaveCount(0)
+
     // Both nodes' children now follow under the retained node, in sibling order.
     await window.keyboard.press('z')
     await window.keyboard.press('o')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', '  A1', '  B1', 'Charlie', 'Delta'])
+
     await window.keyboard.press('u')
+
     // The fold choice is not part of the document history, so Alpha stays open after the undo.
     await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  A1', '  Bravo', 'Charlie', 'Delta'])
+
     await window.keyboard.press('z')
     await window.keyboard.press('c')
+
     await expect.poll(() => outline(window)).toEqual(before)
 
     // `gJ` concatenates the texts unchanged.
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 0)
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', 'Charlie', 'Delta'])
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(before)
 
     // A count joins that many siblings as one undo step, clamped at the last sibling.
     await node(window, 1).focus()
+
     await window.keyboard.press('3')
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha    BravoCharlie', 'Delta'])
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(before)
+
     await node(window, 3).focus()
+
     await window.keyboard.press('9')
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
 
     // The last sibling has nothing to join: no change and no error.
     await node(window, 3).focus()
+
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(window.getByRole('alert')).toHaveCount(0)
     expect(await outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
   })
@@ -2558,12 +3088,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 3).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('k')
     await window.keyboard.press('k')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(3)
+
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
     await expect.poll(() => outline(window)).toEqual(['Alpha  BravoCharlie', 'Delta'])
@@ -2571,20 +3105,26 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 6)
 
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha ', ' Bravo', 'Charlie', 'Delta'])
+
     await node(window, 1).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect.poll(() => outline(window)).toEqual(['Alpha  Bravo', 'Charlie', 'Delta'])
 
     // A one-node range has nothing to join: the mode and the selection stay.
     await node(window, 3).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('g')
     await pressShifted(window, 'J')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
     await expect(window.getByRole('alert')).toHaveCount(0)
@@ -2603,15 +3143,19 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const mode = window.getByLabel('Vim mode')
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await window.keyboard.press('Escape')
+
     await expect(mode).toHaveText('NORMAL')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
 
     await node(window, 4).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(mode).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
     await expect(node(window, 3)).toBeFocused()
@@ -2620,20 +3164,26 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('o')
     await window.keyboard.press('Escape')
     await node(window, 4).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
     await expect(node(window, 2)).toBeFocused()
 
     // Deleting a remembered node invalidates the memory: `gv` changes nothing.
     await window.keyboard.press('Escape')
     await node(window, 2).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Charlie', 'Delta'])
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(mode).toHaveText('NORMAL')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
   })
@@ -2653,26 +3203,34 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const mode = window.getByLabel('Vim mode')
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 0)
     await window.keyboard.press('v')
     await window.keyboard.press('l')
     await window.keyboard.press('l')
     await window.keyboard.press('o')
     await window.keyboard.press('Escape')
+
     await expect(mode).toHaveText('NORMAL')
 
     await node(window, 2).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(mode).toHaveText('VISUAL')
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 3)
+
     // The anchor stayed at the right end, so moving the focus right shortens the selection.
     await window.keyboard.press('l')
+
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 1)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 3)
+
     await window.keyboard.press('d')
+
     await expect(node(window, 1)).toHaveValue('f bar')
   })
 
@@ -2699,28 +3257,37 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const editor = node(window, 1)
       const selectedText = () => editor.evaluate(() => globalThis.getSelection()?.toString())
       await editor.focus()
+
       await window.keyboard.press('v')
       await window.keyboard.press('l')
       await window.keyboard.press('l')
       await window.keyboard.press('o')
       // Give document selection observers time to run before testing the anchored end.
       await window.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 100)))
+
       await expect.poll(selectedText).toBe('foo')
+
       await window.locator('.node-list').screenshot({ path: test.info().outputPath('backward-rich-visual-light.png') })
       await window.emulateMedia({ colorScheme: 'dark' })
       await window.locator('.node-list').screenshot({ path: test.info().outputPath('backward-rich-visual-dark.png') })
       await window.emulateMedia({ colorScheme: 'light' })
       await window.keyboard.press('Escape')
       await node(window, 2).focus()
+
       await window.locator('.node-list').screenshot({ path: test.info().outputPath('rich-focus-neighbor.png') })
       await window.keyboard.press('g')
       await window.keyboard.press('v')
+
       await expect(editor).toBeFocused()
       await expect.poll(selectedText).toBe('foo')
+
       await window.keyboard.press('l')
+
       await expect.poll(selectedText).toBe('oo')
+
       await lockSystemClipboard()
       await window.keyboard.press('d')
+
       await expect(editor).toHaveText('f bar')
     })
   })
@@ -2735,31 +3302,42 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const mode = window.getByLabel('Vim mode')
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Alpha', 'Delta'])
+
     await node(window, 3).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(mode).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(1)
     await expect(node(window, 2)).toBeFocused()
 
     await window.keyboard.press('Escape')
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await pressShifted(window, '>')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', '  Alpha', '  Delta'])
+
     await window.keyboard.press('Escape')
     await node(window, 1).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('v')
+
     await expect(mode).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
   })
@@ -2786,17 +3364,24 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     // `dj` takes Alpha and Bravo with its child; the descendant row is not a separate member.
     await window.keyboard.press('d')
     await window.keyboard.press('j')
+
     await expect.poll(() => outline(window)).toEqual(['Charlie', 'Delta'])
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(before)
 
     // `d2j` covers the current node and the following two siblings; one undo restores all three.
     await node(window, 1).focus()
+
     await window.keyboard.press('d')
     await window.keyboard.press('2')
     await window.keyboard.press('j')
+
     await expect.poll(() => outline(window)).toEqual(['Delta'])
+
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(before)
 
     // `dk` from Charlie removes Bravo and Charlie, and the register keeps them in ascending order.
@@ -2804,24 +3389,35 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('k')
     await window.keyboard.press('d')
     await window.keyboard.press('k')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Delta'])
+
     await window.keyboard.press('p')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Delta', 'Bravo', 'Charlie'])
+
     await window.keyboard.press('u')
     await window.keyboard.press('u')
+
     await expect.poll(() => outline(window)).toEqual(before)
 
     // `yj` changes nothing in the document; `cj` replaces the pair with one empty node in Insert mode.
     await node(window, 1).focus()
+
     await lockSystemClipboard()
     await window.keyboard.press('y')
     await window.keyboard.press('j')
+
     await expect.poll(() => outline(window)).toEqual(before)
+
     await window.keyboard.press('c')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.keyboard.type('New')
     await window.keyboard.press('Escape')
+
     await expect.poll(() => outline(window)).toEqual(['New', 'Charlie', 'Delta'])
   })
 
@@ -2834,14 +3430,20 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
     const { window } = await launchTree(userDataDir)
     await node(window, 2).focus()
+
     await window.keyboard.press('V')
     await window.keyboard.press('2')
     await window.keyboard.press('j')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(3)
+
     await window.keyboard.press('9')
     await window.keyboard.press('k')
+
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
     await window.keyboard.press('d')
+
     await expect.poll(() => outline(window)).toEqual(['Charlie', 'Delta'])
   })
 
@@ -2861,13 +3463,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const charlie = node(window, 3)
     await charlie.focus()
+
     await setCursor(charlie, 0)
     await window.keyboard.press('v')
     await window.keyboard.press('l')
     await window.keyboard.press('l')
+
     await expect(charlie).toHaveJSProperty('selectionEnd', 3)
 
     await pressShifted(window, '>')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Bravo', '  Charlie'])
     await expect(node(window, 3)).toBeFocused()
@@ -2875,6 +3480,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 3)
 
     await pressShifted(window, '<')
+
     await expect.poll(() => outline(window)).toEqual(['Alpha', 'Bravo', 'Charlie'])
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
     await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 3)
@@ -2902,12 +3508,15 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const one = node(window, 1)
       await one.focus()
+
       await setCursor(one, 0)
       await window.keyboard.press('V')
       await window.keyboard.press('j')
+
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Bravo')
 
       await pressShifted(window, '<')
+
       await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveCount(0)
       await expect.poll(() => nodeTexts(window)).toEqual(['Bravo', 'One', 'Two'])
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
@@ -2929,29 +3538,37 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { window } = await launchTree(userDataDir)
     const alpha = node(window, 1)
     await alpha.focus()
+
     await setCursor(alpha, 0)
 
     await window.keyboard.press('V')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
 
     // The range belongs to the displayed level, so entering the focused node must end the mode
     // instead of leaving a range that the new level cannot resolve.
     await window.keyboard.press('Meta+.')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Bravo')
 
     await window.keyboard.press('Meta+,')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
     await expect(node(window, 1)).toHaveValue('Alpha')
 
     // Cmd+A also ends whole-node Visual, and the full selection it applies must survive the exit.
     await node(window, 1).focus()
+
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('Meta+a')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 5)
@@ -2979,24 +3596,31 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const child = node(window, 1)
       await child.focus()
+
       await setCursor(child, 0)
 
       await window.keyboard.press('V')
       await window.keyboard.press('j')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
 
       // A breadcrumb click changes the displayed level, so the level-relative range must not survive.
       await window.getByRole('button', { name: 'Top level' }).click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
       await expect(node(window, 1)).toHaveValue('Root')
 
       // The node's own enter control changes the level too.
       await node(window, 1).focus()
+
       await window.keyboard.press('V')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
       await window.getByRole('button', { name: 'Enter node 1' }).click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
     })
@@ -3017,30 +3641,42 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const child = node(window, 1)
       await child.focus()
+
       await setCursor(child, 0)
 
       await window.keyboard.press('v')
       await window.keyboard.press('l')
+
       await expect(child).toHaveJSProperty('selectionStart', 0)
       await expect(child).toHaveJSProperty('selectionEnd', 2)
 
       // Character Visual keeps its mode across a level change but must drop the stale endpoints so
       // the next motion anchors at the reached caret.
       await window.getByRole('button', { name: 'Top level' }).click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
       const root = node(window, 1)
+
       await expect(root).toHaveValue('Root')
+
       await window.keyboard.press('l')
+
       await expect(root).toHaveJSProperty('selectionStart', 0)
       await expect(root).toHaveJSProperty('selectionEnd', 2)
 
       // The enter control drops the endpoints the same way while the mode stays active. Entering a
       // node with children focuses its first child, so the next motion anchors there.
       await window.getByRole('button', { name: 'Enter node 1' }).click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
       const entered = node(window, 1)
+
       await expect(entered).toHaveValue('Child')
+
       await window.keyboard.press('l')
+
       await expect(entered).toHaveJSProperty('selectionStart', 0)
       await expect(entered).toHaveJSProperty('selectionEnd', 2)
     })
@@ -3055,12 +3691,15 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { app, window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 0)
     await window.keyboard.press('v')
     await window.keyboard.press('l')
     await window.keyboard.press('l')
+
     await expect(editor).toHaveJSProperty('selectionStart', 0)
     await expect(editor).toHaveJSProperty('selectionEnd', 3)
+
     await writeClipboardText(app, 'PASTED')
     await window.evaluate(() => {
       document.addEventListener('paste', (event) => event.preventDefault(), true)
@@ -3070,9 +3709,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await expect(editor).toHaveValue('PASTEDAlpha')
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
     // The paste drops the stale endpoints, so the next motion anchors at the paste end rather than
     // re-selecting from the pre-paste anchor.
     await window.keyboard.press('l')
+
     await expect(editor).toHaveJSProperty('selectionStart', 6)
     await expect(window.locator('.node-list')).toHaveScreenshot('vim-visual-paste-anchor-light.png')
   })
@@ -3091,11 +3732,14 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     const { app, window } = await launchTree(userDataDir)
     const alpha = node(window, 1)
     await alpha.focus()
+
     await setCursor(alpha, 0)
     await window.keyboard.press('V')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
     await writeClipboardText(app, 'X')
 
     await window.keyboard.press('Meta+v')
@@ -3105,7 +3749,9 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
     await expect(node(window, 2)).toHaveValue('XBravo')
+
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
@@ -3123,29 +3769,40 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         })
         const { app, window } = await launchTree(userDataDir)
         const editor = node(window, 1)
+
         await setCursor(editor, 0)
         await lockSystemClipboard()
         if (selection === 'character') {
           await editor.press('v')
           await editor.press('l')
           await editor.press('y')
+
           await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('PO')
+
           await editor.press('x')
+
           await expect(editor).toHaveValue('OISON')
         } else {
           await editor.press('x')
+
           await expect(editor).toHaveValue('OISON')
+
           await editor.press('y')
           await editor.press('y')
+
           await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('OISON')
         }
+
         await editor.press(selection === 'character' ? 'v' : 'V')
         await window.keyboard.press(selection === 'character' ? 'l' : 'j')
         const expectedMode = selection === 'character' ? 'VISUAL' : 'VISUAL NODE'
+
         await expect(window.getByLabel('Vim mode')).toHaveText(expectedMode)
+
         await window.keyboard.press('Escape')
         await window.keyboard.press('g')
         await window.keyboard.press('v')
+
         await expect(window.getByLabel('Vim mode')).toHaveText(expectedMode)
         if (selection === 'whole-node') {
           await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
@@ -3164,15 +3821,19 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         })
         const { app, window } = await launchTree(userDataDir)
         const editor = node(window, 1)
+
         await expect(editor).toBeFocused()
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
         await writeClipboardText(app, '')
         for (const command of ['p', 'P', '.', 'u', 'gv']) {
           for (const key of command) await editor.press(key)
+
           await expect(nodeTexts(window)).resolves.toEqual(['abc', 'def'])
           await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
           await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
         }
+
         await expect(editor).toBeFocused()
         await expect(editor).toHaveJSProperty('selectionStart', 0)
         await expect(editor).toHaveJSProperty('selectionEnd', 1)

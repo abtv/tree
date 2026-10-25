@@ -132,16 +132,26 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('first', 'Alpha'), node('second', 'Bravo'), node('third', 'Charlie')] },
     })
     f.input().focus()
+
     f.press('ArrowDown')
+
     expect(f.snapshot().location.selectedNodeId).toBe('second')
+
     f.press('ArrowUp')
+
     expect(f.snapshot().location.selectedNodeId).toBe('first')
+
     f.press('ArrowUp')
+
     expect(f.snapshot().location.selectedNodeId).toBe('first')
+
     f.press('2')
     f.press('ArrowDown')
+
     expect(f.snapshot().location.selectedNodeId).toBe('third')
+
     f.press('ArrowDown')
+
     expect(f.snapshot().location.selectedNodeId).toBe('third')
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['Alpha', 'Bravo', 'Charlie'])
@@ -157,6 +167,7 @@ describe('useNodeInputBindings', () => {
     })
     const stale = f.input('parent')
     const editor = f.input('child')
+
     act(() => f.store.openAgenda())
     const mounted = new Map<string, HTMLElement>()
     for (const row of f.store.getAgendaRows()) {
@@ -168,6 +179,7 @@ describe('useNodeInputBindings', () => {
       mounted.set(row.key, element)
     }
     const childKey = `node:${day}:child`
+
     editor.classList.add('node-input')
     mounted.get(childKey)!.append(editor)
     const prompt = document.createElement('input')
@@ -175,13 +187,18 @@ describe('useNodeInputBindings', () => {
     for (const key of [`day:${day}`, `node:${day}:parent`, childKey]) {
       act(() => f.store.applyAgenda({ kind: 'select', key, cursor: 2 }))
       prompt.focus()
+
       act(() => f.result.current.restoreSearchFocus())
+
       expect(document.activeElement).toBe(key === childKey ? editor : mounted.get(key))
       expect(document.activeElement).not.toBe(stale)
     }
+
     mounted.get(childKey)!.removeAttribute('data-agenda-key')
     prompt.focus()
+
     act(() => f.result.current.restoreSearchFocus())
+
     expect(document.activeElement).toBe(editor)
   })
 
@@ -190,17 +207,24 @@ describe('useNodeInputBindings', () => {
     const input = f.input()
     input.focus()
     input.setSelectionRange(1, 1)
+
     f.press('j')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     f.press('/')
     const prompt = document.createElement('input')
     document.body.append(prompt)
     prompt.focus()
+
     act(() => f.store.search.cancelDraft())
     act(() => f.result.current.restoreSearchFocus())
+
     expect(document.activeElement).toBe(input)
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     f.press('k')
+
     expect(input.selectionStart).toBe(1)
   })
 
@@ -208,22 +232,28 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('parent', 'parent', [node('child', 'apple')])] } })
     const parent = f.input('parent')
     const child = f.input('child')
+
     act(() => {
       f.store.toggleExpansion('parent')
       f.store.selectNode('child', 2)
     })
     child.focus()
+
     f.press('/')
     const prompt = document.createElement('input')
     document.body.append(prompt)
     prompt.focus()
+
     act(() => f.store.toggleExpansion('parent'))
+
     expect(f.snapshot().location.selectedNodeId).toBe('parent')
     expect(document.activeElement).toBe(prompt)
+
     act(() => {
       f.store.search.cancelDraft()
       f.result.current.restoreSearchFocus()
     })
+
     expect(document.activeElement).toBe(parent)
     expect(parent.selectionStart).toBe(0)
   })
@@ -245,6 +275,7 @@ describe('useNodeInputBindings', () => {
       })
       const input = f.input()
       input.focus()
+
       f.type(fragment)
       const count = f.result.current.completionPopup!.popup.suggestions.length
       for (const key of ['Meta', 'Control', 'Alt', 'Shift']) {
@@ -254,26 +285,39 @@ describe('useNodeInputBindings', () => {
           altKey: key === 'Alt',
           shiftKey: key === 'Shift',
         })
+
         expect(f.result.current.completionPopup?.popup.selected).toBe(0)
       }
+
       f.press('ArrowDown')
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+
       f.press('ArrowUp')
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+
       f.press('ArrowUp')
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(count - 1)
+
       f.press('ArrowDown')
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(0)
       expect(f.snapshot().location.selectedNodeId).toBe('node')
       expect(getCaret(input)).toBe(fragment.length)
       expect(f.node().text).toBe(fragment)
       expect(f.result.current.vimMode).toBe('insert')
+
       f.press('Escape')
+
       expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.result.current.vimMode).toBe('insert')
       expect(getCaret(input)).toBe(fragment.length)
       expect(input).toBe(document.activeElement)
+
       f.press('Escape')
+
       expect(f.result.current.vimMode).toBe(vimEnabled ? 'normal' : 'insert')
     },
   )
@@ -285,20 +329,27 @@ describe('useNodeInputBindings', () => {
       const f = await fixture({ mode: 'insert', document: { roots: [node('node', 'Plan '), node('peer', 'Other')] } })
       const input = f.input()
       input.focus()
+
       f.type('Plan next wee')
       // A pending native selection observation must not turn popup handling
       // into a node command in the same keydown.
       input.setSelectionRange(0, 0)
       const preventDefault = vi.fn()
       const stopPropagation = vi.fn()
+
       act(() => f.bindings().onKeyDown({ currentTarget: input, key, preventDefault, stopPropagation } as never))
+
       expect(preventDefault).toHaveBeenCalledOnce()
       expect(stopPropagation).toHaveBeenCalledOnce()
       expect(f.snapshot().location.selectedNodeId).toBe('node')
       expect(f.result.current.vimMode).toBe('insert')
+
       f.type('Plan next wee')
+
       expect(f.result.current.completionPopup).toBeDefined()
+
       f.press('a', { metaKey: true })
+
       expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.node().text).toBe('Plan next wee')
     },
@@ -315,15 +366,24 @@ describe('useNodeInputBindings', () => {
         document: { roots: [node('node', ''), node('peer', 'Other')] },
       })
       f.input().focus()
+
       f.type('next wee')
       const count = f.result.current.completionPopup!.popup.suggestions.length
+
       f.press('Control', { ctrlKey: true })
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+
       f.press('n', { ctrlKey: true })
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+
       f.press('p', { ctrlKey: true })
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+
       f.press('p', { ctrlKey: true })
+
       expect(f.result.current.completionPopup?.popup.selected).toBe(count - 1)
       expect(f.snapshot().agenda).toBeUndefined()
       expect(f.node().text).toBe('next wee')
@@ -338,10 +398,14 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('node', 'Plan '), node('peer', 'Other')] },
     })
     f.input().focus()
+
     f.type('Plan next wee')
     f.press('a', { metaKey: true })
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     f.press('a', { ctrlKey: true })
+
     expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe('Plan next wee')
   })
@@ -352,17 +416,27 @@ describe('useNodeInputBindings', () => {
   it.each(['next wee', ':roc'])('keeps one Insert session across dismissal of %s', async (fragment) => {
     const f = await fixture({ document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.press('i')
     f.type(fragment)
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     f.press('Escape')
+
     expect(f.result.current.vimMode).toBe('insert')
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type(`${fragment}!`)
+
     expect(f.node().text).toBe(`${fragment}!`)
+
     f.press('Escape')
+
     expect(f.result.current.vimMode).toBe('normal')
+
     f.press('u')
+
     expect(f.node().text).toBe('')
   })
 
@@ -373,10 +447,12 @@ describe('useNodeInputBindings', () => {
     row.tabIndex = 0
     document.body.append(row)
     row.focus()
+
     act(() => {
       if (path === 'outside') document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
       else globalThis.dispatchEvent(new Event('blur'))
     })
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 
@@ -386,11 +462,14 @@ describe('useNodeInputBindings', () => {
       const f = await fixture({
         document: { roots: [node('node', '2026-10-14 First'), node('peer', '2026-10-14 Other')] },
       })
+
       act(() => f.store.openAgenda())
       const key = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'node')!.key
+
       act(() => f.store.applyAgenda({ kind: 'select', key }))
       const source = f.input('node')
       source.focus()
+
       setCaret(source, 11)
       f.press('R')
       if (pending) f.press('X')
@@ -399,6 +478,7 @@ describe('useNodeInputBindings', () => {
       day.dataset.agendaKey = 'day'
       day.tabIndex = 0
       document.body.append(day)
+
       act(() => day.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
       act(() => {
         day.focus()
@@ -406,12 +486,16 @@ describe('useNodeInputBindings', () => {
         day.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
         vi.advanceTimersByTime(1)
       })
+
       expect(f.result.current.vimMode).toBe('replace')
       expect(f.node('node').text).toBe(`2026-10-14 ${pending ? 'X' : 'F'}irst`)
+
       const destination = f.input('peer')
       const row = destination.parentElement!
+
       row.classList.add('agenda-row')
       row.dataset.agendaKey = 'peer'
+
       destination.classList.add('node-input')
       act(() => row.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
       act(() => {
@@ -423,8 +507,11 @@ describe('useNodeInputBindings', () => {
         vi.advanceTimersByTime(1)
       })
       f.press('Y', {}, 'peer')
+
       expect(destination.value).toBe('2026-10-14 Yther')
+
       f.press('Escape', {}, 'peer')
+
       expect(f.node('peer').text).toBe('2026-10-14 Yther')
     },
   )
@@ -439,8 +526,10 @@ describe('useNodeInputBindings', () => {
       row.className = 'agenda-row'
       row.dataset.agendaKey = 'day'
       document.body.append(row)
+
       act(() => row.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })))
       if (release === 'drag') act(() => f.result.current.dragFreeze.begin('node', 7))
+
       act(() => f.bindings().onBlur())
       act(() => {
         if (release === 'outside') document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
@@ -448,6 +537,7 @@ describe('useNodeInputBindings', () => {
         else globalThis.dispatchEvent(new Event(release))
         vi.advanceTimersByTime(1)
       })
+
       expect(f.result.current.vimMode).toBe('normal')
     },
   )
@@ -458,24 +548,38 @@ describe('useNodeInputBindings', () => {
       const f = await fixture({ document: { roots: [node('node', 'one word tail')] } })
       const input = f.input()
       input.focus()
+
       setCaret(input, 0)
       f.press('R')
       if (pending) f.press('X')
+
       act(() => f.bindings().onMouseDown({ currentTarget: input, button: 0, detail: 2 } as never))
       input.setSelectionRange(4, 8)
+
       act(() => f.bindings().onMouseUp({ currentTarget: input, button: 0, detail: 2 } as never))
+
       expect([input.selectionStart, input.selectionEnd]).toEqual([4, 8])
       expect(f.result.current.vimMode).toBe('replace')
+
       f.press('Y')
+
       expect(input.value).toBe(`${pending ? 'X' : 'o'}ne Y tail`)
+
       f.press('Z')
+
       expect(input.value).toBe(`${pending ? 'X' : 'o'}ne YZtail`)
+
       f.press('Escape')
+
       expect(f.node().text).toBe(input.value)
+
       f.press('z', { metaKey: true })
+
       expect(f.node().text).toBe(`${pending ? 'X' : 'o'}ne word tail`)
+
       if (pending) {
         f.press('z', { metaKey: true })
+
         expect(f.node().text).toBe('one word tail')
       }
     },
@@ -486,8 +590,10 @@ describe('useNodeInputBindings', () => {
     const text = '2026-10-15 Image'
     const f = await fixture({ document: { roots: [image(text)] } })
     const input = f.input()
+
     input.classList.add('node-input')
     input.focus()
+
     act(() => {
       f.store.openAgenda()
       const row = f.store.getAgendaRows().find((row) => row.kind === 'node')!
@@ -503,14 +609,18 @@ describe('useNodeInputBindings', () => {
       )
       f.sync()
     }
+
     press('j')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
     expect(f.result.current.vimTextCommandState.getCaretState!('node', text.length, true).imageTextReturnCursor).toBe(3)
     expect(f.result.current.vimTextCommandState.getCaretState!('other', 2, false)).toEqual({
       cursor: 2,
       imageActive: false,
     })
+
     press('k')
+
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(getCaret(input)).toBe(3)
   })
@@ -521,21 +631,27 @@ describe('useNodeInputBindings', () => {
     vi.setSystemTime(new Date(2026, 9, 8, 12))
     const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.type('Plan next wee')
     f.press('n', { ctrlKey: true })
     f.type('Plan next week')
     const popup = f.result.current.completionPopup!.popup
+
     expect(popup.suggestions[popup.selected]).toEqual({
       id: `date:${dayNumberOf({ year: 2026, month: 10, day: 13 })}:next week`,
       replacement: '2026-10-13',
       label: '2026-10-13',
       description: 'Tue · next week',
     })
+
     f.press('Enter')
+
     expect(f.node().text).toBe('Plan 2026-10-13')
     expect(f.result.current.completionPopup).toBeUndefined()
+
     act(() => f.store.undo())
     f.sync()
+
     expect(f.node().text).toBe('Plan next week')
     expect(f.result.current.completionPopup).toBeUndefined()
   })
@@ -546,18 +662,30 @@ describe('useNodeInputBindings', () => {
     vi.setSystemTime(new Date(2026, 9, 8, 12))
     const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.type('Plan in September')
+
     expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+
     f.press('n', { ctrlKey: true })
+
     expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+
     f.type('Plan in Septembe')
+
     expect(f.result.current.completionPopup?.popup.selected).toBe(0)
+
     f.type('Plan in Se')
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type('Plan in September')
+
     expect(f.result.current.completionPopup?.popup.selected).toBe(1)
+
     f.press('n', { ctrlKey: true })
     f.press('Enter')
+
     expect(f.node().text).toBe('Plan 2026-09-01')
     expect(getCaret(f.input())).toBe('Plan 2026-09-01'.length)
     expect(f.result.current.completionPopup).toBeUndefined()
@@ -569,23 +697,31 @@ describe('useNodeInputBindings', () => {
     async (vimEnabled) => {
       const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
       f.input().focus()
+
       f.type(':woman_techn')
+
       expect(f.result.current.completionPopup?.popup.suggestions).toContainEqual({
         id: 'emoji:woman_technologist',
         replacement: '👩‍💻',
         label: '👩‍💻',
         description: ':woman_technologist:',
       })
+
       f.press('Enter')
+
       expect(f.node().text).toBe('👩‍💻')
       expect(getCaret(f.input())).toBe('👩‍💻'.length)
       expect(f.result.current.vimMode).toBe('insert')
+
       act(() => f.store.undo())
       f.sync()
+
       expect(f.node().text).toBe(':woman_techn')
       expect(f.result.current.completionPopup).toBeUndefined()
+
       f.type(':roc')
       f.type(':roc ')
+
       expect(f.node().text).toBe(':roc ')
       expect(f.result.current.completionPopup).toBeUndefined()
     },
@@ -596,28 +732,44 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
     const input = f.input()
     input.focus()
+
     f.type(':roc')
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type(':rocke')
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     input.setSelectionRange(0, 3)
+
     act(() => f.bindings().onSelect({ currentTarget: input } as never))
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type(':roc')
     act(() => f.bindings().onBlur())
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type(':roc')
     input.value = ':rocke'
     input.setSelectionRange(6, 6)
+
     act(() =>
       f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
     )
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type(':roc')
     act(() => f.store.editText('node', 'external'))
+
     expect(f.result.current.completionPopup).toBeUndefined()
   })
 
@@ -626,17 +778,27 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
     const input = f.input()
     input.focus()
+
     f.type('tomor')
+
     expect(f.result.current.completionPopup?.popup.suggestions).toHaveLength(1)
+
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type('tomorrow')
     f.press('Enter')
+
     expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe('tomorrow')
+
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
+
     expect(f.result.current.completionPopup?.popup.text).toBe('tomorrow')
+
     act(() => f.bindings().onBlur())
+
     expect(f.result.current.completionPopup).toBeUndefined()
   })
 
@@ -645,9 +807,13 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
     const input = f.input()
     input.focus()
+
     f.type('tomor')
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     f.press('Enter')
+
     expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).not.toBe('tomor')
     expect(f.node().text).toMatch(/\d{4}-\d{2}-\d{2}/)
@@ -668,24 +834,35 @@ describe('useNodeInputBindings', () => {
         location: { currentParentId: null, selectedNodeId: 'b' },
       })
       f.input().focus()
+
       f.type(fragment)
+
       expect(f.result.current.completionPopup).toBeDefined()
+
       f.press('ArrowDown')
       const popup = f.result.current.completionPopup!.popup
       const replacement = popup.suggestions[popup.selected]!.replacement
+
       f.press('Tab')
+
       expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.snapshot().document.roots.map((root) => root.id)).toEqual(['a', 'b'])
       expect(f.node('b').text).toBe(replacement)
       expect(f.input()).toBe(document.activeElement)
       expect(f.result.current.vimMode).toBe('insert')
+
       f.press('Tab')
+
       expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
       expect(f.node('b').text).toBe(replacement)
       expect(f.result.current.vimMode).toBe('insert')
+
       f.type(fragment)
+
       expect(f.result.current.completionPopup).toBeDefined()
+
       f.press('Tab', { shiftKey: true })
+
       expect(f.result.current.completionPopup).toBeUndefined()
       expect(f.snapshot().document.roots.map((root) => root.id)).toEqual(['a', 'b'])
       expect(f.node('b').text).toBe(fragment)
@@ -698,8 +875,10 @@ describe('useNodeInputBindings', () => {
   it.each(['ctrlKey', 'altKey', 'metaKey'] as const)('does not accept completion with %s+Tab', async (modifier) => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.type(':roc')
     f.press('Tab', { [modifier]: true })
+
     expect(f.node().text).toBe(':roc')
     expect(f.result.current.completionPopup).toBeUndefined()
   })
@@ -709,8 +888,10 @@ describe('useNodeInputBindings', () => {
   it.each([false, true])('keeps Cmd+Enter separate from acceptance (Vim %s)', async (vimEnabled) => {
     const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.type(':roc')
     f.press('Enter', { metaKey: true })
+
     expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe(':roc')
     expect(f.node().struckThrough).toBe(true)
@@ -722,9 +903,11 @@ describe('useNodeInputBindings', () => {
   it.each([false, true])('creates a sibling with Escape then Enter (Vim %s)', async (vimEnabled) => {
     const f = await fixture({ mode: 'insert', vimEnabled, document: { roots: [node('node', '')] } })
     f.input().focus()
+
     f.type(':rocke')
     f.press('Escape')
     f.press('Enter')
+
     expect(f.node('node').text).toBe(':rocke')
     expect(f.snapshot().document.roots).toHaveLength(2)
     expect(f.node().text).toBe('')
@@ -738,12 +921,17 @@ describe('useNodeInputBindings', () => {
     input.focus()
     input.value = 'tomorrow'
     input.setSelectionRange(8, 8)
+
     act(() =>
       f.bindings().onTextChange({ currentTarget: input, nativeEvent: { inputType: 'insertFromPaste' } } as never),
     )
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type('tomor')
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     act(() =>
       f.bindings().onKeyDown({
         currentTarget: input,
@@ -752,17 +940,28 @@ describe('useNodeInputBindings', () => {
         preventDefault: () => undefined,
       } as never),
     )
+
     expect(f.result.current.completionPopup).toBeUndefined()
     expect(f.node().text).toBe('tomor')
+
     f.type('tomorr')
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     act(() => f.result.current.setVimMode('normal'))
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     act(() => f.result.current.setVimMode('insert'))
+
     expect(f.result.current.completionPopup).toBeUndefined()
+
     f.type('tomorro')
+
     expect(f.result.current.completionPopup).toBeDefined()
+
     act(() => f.store.undo())
+
     expect(f.result.current.completionPopup).toBeUndefined()
   })
 
@@ -779,20 +978,30 @@ describe('useNodeInputBindings', () => {
 
     expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
     expect(f.snapshot().focus.cursor).toBe(1)
+
     act(() => vi.runOnlyPendingTimers())
+
     expect(input.selectionStart).toBe(1)
     expect(input.selectionEnd).toBe(3)
   })
 
   it('turns a typed URL into a link only once the typed word is a valid URL', async () => {
     const f = await fixture({ document: { roots: [node('node', '')] } })
+
     f.type('see http:/')
+
     expect(f.node().links ?? []).toEqual([])
+
     f.type('see http://w')
+
     expect(f.node().links).toEqual([{ start: 4, end: 12, url: 'http://w' }])
+
     f.type('see http://www.x.com')
+
     expect(f.node().links).toEqual([{ start: 4, end: 20, url: 'http://www.x.com' }])
+
     f.type('see http://www.x.com y')
+
     expect(f.node().links).toEqual([{ start: 4, end: 20, url: 'http://www.x.com' }])
   })
 
@@ -801,35 +1010,47 @@ describe('useNodeInputBindings', () => {
     const element = f.input()
     element.value = 'http://w'
     element.setSelectionRange(8, 8)
+
     act(() => f.bindings().onTextChange({ currentTarget: element, nativeEvent: { isComposing: true } } as never))
+
     expect(f.node().text).toBe('http://w')
     expect(f.node().links ?? []).toEqual([])
+
     f.type('http://wx')
+
     expect(f.node().links).toEqual([{ start: 0, end: 9, url: 'http://wx' }])
   })
 
   it('leaves ordinary typed text without links', async () => {
     const f = await fixture({ document: { roots: [node('node', '')] } })
+
     f.type('plain text')
     f.type('ftp://example.com and mailto:a@b.c')
+
     expect(f.node().links ?? []).toEqual([])
   })
 
   it('projects a native insertion position after a change command edits the text', async () => {
     const f = await fixture({ document: { roots: [image('one two')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 0))
     f.press('c')
     f.press('w')
+
     expect(f.node().text).toBe(' two')
     expect(f.result.current.vimMode).toBe('insert')
     expect(getCaret(input)).toBe(0)
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
+
     f.type('X two')
     f.press('Escape')
     f.press('u')
+
     expect(f.node().text).toBe(' two')
+
     f.press('u')
+
     expect(f.node().text).toBe('one two')
   })
 
@@ -840,12 +1061,16 @@ describe('useNodeInputBindings', () => {
     async (attached) => {
       const f = await fixture({ document: { roots: [attached ? image('qqqqq') : node('node', 'qqqqq')] } })
       f.input().setSelectionRange(0, 0)
+
       f.press('2')
       f.press('r')
       f.press('q')
+
       expect(f.node().text).toBe('qqqqq')
       expect(getCaret(f.input())).toBe(1)
+
       f.press('x')
+
       expect(f.node().text).toBe('qqqq')
       expect(getCaret(f.input())).toBe(1)
     },
@@ -855,9 +1080,12 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('node', '"abc" x')] } })
     f.input().setSelectionRange(2, 2)
     for (const key of ['c', 's', '"', '"']) f.press(key)
+
     expect(f.node().text).toBe('"abc" x')
     expect(getCaret(f.input())).toBe(0)
+
     f.press('x')
+
     expect(f.node().text).toBe('abc" x')
   })
 
@@ -866,11 +1094,16 @@ describe('useNodeInputBindings', () => {
     vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 1))
+
     expect(tasks.length).toBeGreaterThan(0)
+
     input.setSelectionRange(2, 5)
+
     act(() => f.bindings().onMouseUp({ currentTarget: input } as never))
     act(() => tasks.splice(0).forEach((task) => task()))
+
     expect(input.selectionStart).toBe(2)
     expect(input.selectionEnd).toBe(5)
   })
@@ -880,13 +1113,17 @@ describe('useNodeInputBindings', () => {
     vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
     const f = await fixture({ document: { roots: [image('abcdef')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 1))
     f.press('j')
     f.press('k')
     f.press('l')
     act(() => tasks.splice(0).forEach((task) => task()))
+
     expect(getCaret(input)).toBe(2)
+
     f.press('x')
+
     expect(f.node().text).toBe('abdef')
   })
 
@@ -895,10 +1132,14 @@ describe('useNodeInputBindings', () => {
     vi.stubGlobal('queueMicrotask', (task: () => void) => tasks.push(task))
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 1))
     f.press('a')
+
     expect(getCaret(input)).toBe(2)
+
     act(() => tasks.splice(0).forEach((task) => task()))
+
     expect(f.result.current.vimMode).toBe('insert')
     expect(getCaret(input)).toBe(2)
   })
@@ -908,14 +1149,18 @@ describe('useNodeInputBindings', () => {
     async ({ attached, finish }) => {
       const f = await fixture({ document: { roots: [attached ? image('abcd') : node('node', 'abcd')] } })
       f.input().setSelectionRange(2, 2)
+
       f.press('R')
       f.press('c')
       if (finish === 'escape') f.press('Escape')
       else f.press('z', { metaKey: true, shiftKey: finish === 'redo' })
+
       expect(f.node().text).toBe('abcd')
       expect(f.result.current.vimMode).toBe('normal')
       expect(getCaret(f.input())).toBe(2)
+
       f.press('x')
+
       expect(f.node().text).toBe('abd')
     },
   )
@@ -931,6 +1176,7 @@ describe('useNodeInputBindings', () => {
   )('uses the resolved Replace destination for the next edit: %j', async ({ attached, cursor, typed, finish }) => {
     const f = await fixture({ document: { roots: [attached ? image('abcd') : node('node', 'abcd')] } })
     f.input().setSelectionRange(cursor, cursor)
+
     f.press('R')
     if (typed) f.press('X')
     if (finish === 'escape') f.press('Escape')
@@ -940,10 +1186,13 @@ describe('useNodeInputBindings', () => {
     // A fresh Replace commit clears redo. Undo restores the edit's start; Escape and the
     // unavailable redo retreat a changed session, while an empty session keeps its position.
     const expectedCursor = Math.min(cursor, attached ? expectedText.length : expectedText.length - 1)
+
     expect(f.node().text).toBe(expectedText)
     expect(f.result.current.vimMode).toBe('normal')
     expect(getCaret(f.input())).toBe(expectedCursor)
+
     f.press('x')
+
     expect(f.node().text).toBe(expectedText.slice(0, expectedCursor) + expectedText.slice(expectedCursor + 1))
   })
 
@@ -951,19 +1200,24 @@ describe('useNodeInputBindings', () => {
     'uses the image-only Replace destination for the next command: %j',
     async ({ typed, finish }) => {
       const f = await fixture({ document: { roots: [image('')] } })
+
       f.press('R')
       if (typed) f.press('X')
       if (finish === 'escape') f.press('Escape')
       else f.press('z', { metaKey: true, shiftKey: finish === 'redo' })
       const text = typed && finish !== 'undo' ? 'X' : ''
+
       expect(f.node().text).toBe(text)
       expect(f.result.current.vimMode).toBe('normal')
       expect(getCaret(f.input())).toBe(0)
+
       if (text === '') {
         f.press('Enter')
+
         expect(f.preview).toHaveBeenCalledWith('image')
       } else {
         f.press('x')
+
         expect(f.node().text).toBe('')
         expect(f.node().attachment?.id).toBe('image')
       }
@@ -982,17 +1236,27 @@ describe('useNodeInputBindings', () => {
       f.input('upper')
       f.input('lower').focus()
       if (text !== '') f.press('j')
+
       f.press('k')
+
       expect(f.result.current.imageCaretNodeId).toBe('upper')
       expect(getCaret(f.input('upper'))).toBe(upper.text.length)
+
       f.press('Enter')
+
       expect(f.preview).toHaveBeenCalledWith('image')
+
       f.press('k')
+
       expect(f.result.current.imageCaretNodeId).toBeUndefined()
       expect(getCaret(f.input('upper'))).toBe(Math.min(text.length, upper.text.length - 1))
+
       f.press('j')
+
       expect(getCaret(f.input('upper'))).toBe(upper.text.length)
+
       f.press('Enter')
+
       expect(f.preview).toHaveBeenCalledTimes(2)
     },
   )
@@ -1018,7 +1282,9 @@ describe('useNodeInputBindings', () => {
       vi.spyOn(input.parentElement!, 'getBoundingClientRect').mockReturnValue({ top, bottom: top + 30 } as DOMRect)
     }
     f.input('b').setSelectionRange(2, 2)
+
     f.press(key, { ctrlKey })
+
     expect(f.snapshot().location.selectedNodeId).toBe(expected)
     expect(f.snapshot().focus).toMatchObject({ nodeId: expected, cursor: column })
     expect(f.result.current.vimMode).toBe('normal')
@@ -1049,7 +1315,9 @@ describe('useNodeInputBindings', () => {
       } as DOMRect)
     }
     for (const digit of String(count)) f.press(digit)
+
     f.press(key)
+
     expect(f.snapshot().location.selectedNodeId).toBe(expected)
   })
 
@@ -1068,7 +1336,9 @@ describe('useNodeInputBindings', () => {
         bottom: top + 30,
       } as DOMRect)
     }
+
     f.press('H')
+
     expect(f.snapshot().location.selectedNodeId).toBe('a')
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(getCaret(f.input('a'))).toBe(2)
@@ -1089,9 +1359,13 @@ describe('useNodeInputBindings', () => {
         bottom: top + 30,
       } as DOMRect)
     }
+
     f.press('H')
+
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 2 })
+
     f.press('M')
+
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'b', cursor: 0 })
   })
 
@@ -1110,7 +1384,9 @@ describe('useNodeInputBindings', () => {
         bottom: top + 30,
       } as DOMRect)
     }
+
     f.press(key, { ctrlKey: true })
+
     expect(f.snapshot().location.selectedNodeId).toBe(key === 'd' ? 'b' : 'a')
   })
 
@@ -1136,7 +1412,9 @@ describe('useNodeInputBindings', () => {
         bottom: top + 30,
       } as DOMRect)
     }
+
     f.press(key)
+
     expect(f.snapshot().location.selectedNodeId).toBe(expected)
   })
 
@@ -1150,7 +1428,9 @@ describe('useNodeInputBindings', () => {
       top: 2000,
       bottom: 2030,
     } as DOMRect)
+
     f.press('L')
+
     expect(f.snapshot().location.selectedNodeId).toBe('a')
   })
 
@@ -1158,7 +1438,9 @@ describe('useNodeInputBindings', () => {
     const f = await fixture()
     vi.spyOn(f.input().parentElement!, 'getBoundingClientRect').mockReturnValue({ top: 2000, bottom: 2030 } as DOMRect)
     const before = f.snapshot().focus
+
     f.press('H')
+
     expect(f.snapshot().focus).toBe(before)
   })
 
@@ -1167,13 +1449,19 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', 'a'), node('b', 'b'), node('c', 'c')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
+
     f.press('V')
     f.press('g')
     f.press('g')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'a' })
+
     f.press('G')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'c' })
+
     f.press('U')
+
     expect(f.result.current.selection).toBeUndefined()
     expect(f.snapshot().focus.nodeId).toBe('b')
   })
@@ -1183,13 +1471,17 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', 'a'), node('b', 'b', [node('b1', 'b1')]), node('c', 'c'), node('d', 'd')] },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('c', 0))
     f.press('V')
     f.press('k')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
+
     f.press('>')
+
     expect(f.snapshot().document.roots.map((item) => [item.id, item.children.map((child) => child.id)])).toEqual([
       ['a', ['b', 'c']],
       ['d', []],
@@ -1197,16 +1489,22 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
     expect(f.snapshot().location.selectedNodeId).toBe('b')
+
     f.press('<')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
     expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
+
     act(() => f.store.undo())
     act(() => f.store.undo())
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
+
     // The register still holds the earlier `yy` of `a`: neither shift replaced it.
     f.press('Escape')
     act(() => f.store.selectNode('d', 0))
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'b', 'c', 'd', 'a'])
   })
 
@@ -1215,13 +1513,18 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', 'a', [node('a1', 'a1')]), node('b', 'b')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
+
     f.press('V')
     const before = f.snapshot().document
+
     f.press('3')
     f.press('>')
+
     expect(f.snapshot().document).toBe(before)
+
     f.press('2')
     f.press('>')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a'])
     expect(f.node('a1').children.map((child) => child.id)).toEqual(['b'])
     expect(f.result.current.vimMode).toBe('visual-node')
@@ -1234,26 +1537,36 @@ describe('useNodeInputBindings', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
+
     f.press('d')
     f.press('j')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['c', 'd', 'e'])
     expect(f.snapshot().location.selectedNodeId).toBe('c')
+
     act(() => f.store.undo())
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
     expect(f.node('b').children.map((child) => child.id)).toEqual(['b1'])
+
     act(() => f.store.selectNode('b', 0))
     f.press('d')
     f.press('2')
     f.press('j')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'e'])
+
     act(() => f.store.undo())
     act(() => f.store.selectNode('c', 0))
     f.press('d')
     f.press('k')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'd', 'e'])
+
     // The removed forest is the register, in ascending order, with the folded descendants.
     act(() => f.store.selectNode('e', 0))
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'd', 'e', 'b', 'c'])
     expect(f.snapshot().document.roots[3]!.children.map((child) => child.text)).toEqual(['b1'])
   })
@@ -1263,25 +1576,32 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', 'a', [node('a1', 'a1'), node('a2', 'a2')]), node('b', 'b')] },
       location: { currentParentId: 'a', selectedNodeId: 'a2' },
     })
+
     f.press('d')
     f.press('9')
     f.press('k')
+
     expect(f.node('a').children).toEqual([])
+
     act(() => f.store.undo())
     act(() => f.store.selectNode('a', 0))
     const before = f.snapshot().document
+
     f.press('d')
     f.press('j')
     f.press('y')
     f.press('j')
     f.press('c')
     f.press('j')
+
     expect(f.snapshot().document).toBe(before)
     expect(f.result.current.vimMode).toBe('normal')
+
     // At the last sibling, `dj` covers only that node.
     act(() => f.store.selectNode('a2', 0))
     f.press('d')
     f.press('j')
+
     expect(f.node('a').children.map((child) => child.id)).toEqual(['a1'])
   })
 
@@ -1291,16 +1611,22 @@ describe('useNodeInputBindings', () => {
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
     const before = f.snapshot().document
+
     f.press('y')
     f.press('j')
+
     expect(f.snapshot().document).toBe(before)
+
     act(() => f.store.selectNode('c', 0))
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['a', 'b', 'c', 'a', 'b'])
+
     act(() => f.store.undo())
     act(() => f.store.selectNode('b', 0))
     f.press('c')
     f.press('k')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['', 'c'])
     expect(f.result.current.vimMode).toBe('insert')
     expect(f.snapshot().location.selectedNodeId).toBe(f.snapshot().document.roots[0]!.id)
@@ -1311,38 +1637,53 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', 'a'), node('b', 'b'), node('c', 'c'), node('d', 'd'), node('e', 'e')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
+
     f.press('V')
     f.press('2')
     f.press('j')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'd' })
+
     f.press('9')
     f.press('k')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'a' })
+
     f.press('3')
     f.press('j')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'd' })
+
     f.press('9')
     f.press('j')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'e' })
     expect(f.result.current.vimMode).toBe('visual-node')
   })
 
   it('moves the current subtree for character Visual > and keeps the character selection', async () => {
     const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'one two')] } })
+
     act(() => f.store.selectNode('b', 0))
     const input = f.input('b')
     input.setSelectionRange(0, 0)
+
     f.press('v')
     f.press('l')
     f.press('l')
+
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(3)
+
     f.press('>')
+
     expect(f.node('a').children.map((child) => child.id)).toEqual(['b'])
     expect(f.result.current.vimMode).toBe('visual')
     expect(f.snapshot().location.selectedNodeId).toBe('b')
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 3])
+
     f.press('<')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b'])
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 3])
   })
@@ -1351,11 +1692,14 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('a', 'one two')] } })
     const input = f.input('a')
     input.setSelectionRange(0, 0)
+
     f.press('v')
     f.press('l')
     const before = f.snapshot()
+
     f.press('>')
     f.press('<')
+
     expect(f.snapshot()).toBe(before)
     expect(f.result.current.vimMode).toBe('visual')
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
@@ -1363,68 +1707,90 @@ describe('useNodeInputBindings', () => {
 
   it.each(['o', 'O'] as const)('repeats sibling opening with %s and captured text', async (key) => {
     const f = await fixture({ document: { roots: [node('a', 'A')] } })
+
     f.press(key)
     f.type('New')
     f.press('Escape')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(
       key === 'o' ? ['A', 'New', 'New'] : ['New', 'New', 'A'],
     )
+
     act(() => f.store.undo())
+
     expect(f.snapshot().document.roots).toHaveLength(2)
   })
 
   it('repeats subtree and forest puts with fresh identities and repeats structural deletion', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     f.press('p')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'B', 'C'])
     expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(5)
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
     f.press('y')
     f.press('p')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'B', 'C', 'B', 'B', 'C', 'C'])
+
     f.press('d')
     f.press('d')
     f.press('.')
+
     expect(f.snapshot().document.roots).toHaveLength(7)
   })
 
   it('does not repeat a whole-node mutation when its sibling span is unavailable', async () => {
     const f = await fixture({ document: { roots: [node('a', 'alpha'), node('b', 'beta'), node('c', 'gamma')] } })
+
     f.press('V')
     f.press('j')
     f.press('U')
+
     expect(f.node('a').text).toBe('ALPHA')
     expect(f.node('b').text).toBe('BETA')
+
     act(() => f.store.selectNode('c', 0))
     const before = f.snapshot().document
+
     f.press('.')
+
     expect(f.snapshot().document).toBe(before)
   })
 
   it('replays a reverse Visual shift with its original span and stops at the first impossible level', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C'), node('d', 'D')] } })
+
     act(() => f.store.selectNode('c', 0))
     f.press('V')
     f.press('k')
     f.press('>')
+
     expect(f.node('a').children.map((item) => item.id)).toEqual(['b', 'c'])
+
     f.press('Escape')
     f.press('u')
     act(() => f.store.selectNode('b', 0))
     const shift = vi.spyOn(f.store, 'shiftNodeVisual')
+
     f.press('3')
     f.press('.')
+
     expect(f.node('a').children.map((item) => item.id)).toEqual(['b', 'c'])
     expect(shift).toHaveBeenCalledTimes(2)
     expect(f.result.current.vimMode).toBe('normal')
+
     f.press('u')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
@@ -1433,6 +1799,7 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('a', ' A '), node('b', ' B '), node('c', ' C '), node('d', ' D ')] },
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
+
     f.press('9')
     f.press('g')
     f.press('J')
@@ -1440,47 +1807,63 @@ describe('useNodeInputBindings', () => {
     act(() => f.store.selectNode('a', 0))
     f.press('3')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual([' A  B  C ', ' D '])
+
     f.press('u')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
   it.each(['p', 'P', 'gp', 'gP'])('replays the original counted subtree %s in one history entry', async (key) => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
     f.press('2')
     for (const part of key) f.press(part)
+
     expect(f.snapshot().document.roots).toHaveLength(4)
+
     // Change the register without replacing the saved put.
     act(() => f.store.selectNode('b', 0))
     f.press('y')
     f.press('y')
     f.press('.')
+
     expect(f.snapshot().document.roots).toHaveLength(6)
     expect(f.snapshot().document.roots.filter((item) => item.text === 'A')).toHaveLength(5)
     expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(6)
+
     f.press('u')
+
     expect(f.snapshot().document.roots).toHaveLength(4)
   })
 
   it('replays counted dd with the original clamped span and exchanges the complete removed forest', async () => {
     const f = await fixture({ document: { roots: ['a', 'b', 'c', 'd', 'e'].map((id) => node(id, id)) } })
+
     f.press('2')
     f.press('d')
     f.press('d')
     f.press('3')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['e'])
+
     f.press('u')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['c', 'd', 'e'])
+
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['c', 'c', 'd', 'd', 'e'])
   })
 
   it('keeps a case descriptor through yank, motion, unchanged case, and a rejected join', async () => {
     const f = await fixture({ document: { roots: [node('a', 'one two'), node('b', 'THREE four')] } })
+
     f.press('0')
     f.press('g')
     f.press('U')
@@ -1495,6 +1878,7 @@ describe('useNodeInputBindings', () => {
     f.press('J')
     f.press('w')
     f.press('.')
+
     expect(f.node('b').text).toBe('THREE FOUR')
   })
 
@@ -1502,6 +1886,7 @@ describe('useNodeInputBindings', () => {
     'replays character Visual %s with captured incoming text after a register exchange',
     async (key) => {
       const f = await fixture({ document: { roots: [node('a', 'red'), node('b', 'blue'), node('c', 'grey')] } })
+
       f.press('0')
       f.press('Y')
       act(() => f.store.selectNode('b', 0))
@@ -1510,31 +1895,40 @@ describe('useNodeInputBindings', () => {
       f.press('$')
       f.press('2')
       f.press(key)
+
       expect(f.node('b').text).toBe('redred')
+
       act(() => f.store.selectNode('c', 0))
       f.press('0')
       f.press('Y')
       f.press('.')
+
       expect(f.node('c').text).toBe('redred')
       expect(f.result.current.vimMode).toBe('normal')
+
       f.press('u')
+
       expect(f.node('c').text).toBe('grey')
     },
   )
 
   it('replays a character Visual shift with its original level count and keeps the caret on an image', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A', [node('x', 'X')]), image('ab')] } })
+
     act(() => f.store.selectNode('node', 1))
     f.press('v')
     f.press('2')
     f.press('>')
+
     expect(f.node('x').children[0]?.id).toBe('node')
+
     f.press('Escape')
     f.press('u')
     act(() => f.store.selectNode('node', 0))
     f.press('$')
     f.press('l')
     f.press('.')
+
     expect(f.node('x').children[0]?.id).toBe('node')
     expect(f.result.current.imageCaretNodeId).toBe('node')
     expect(getCaret(f.input())).toBe(2)
@@ -1554,6 +1948,7 @@ describe('useNodeInputBindings', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'c' },
     })
+
     f.press('V')
     f.press('k')
     f.press('g')
@@ -1562,14 +1957,18 @@ describe('useNodeInputBindings', () => {
     act(() => f.store.selectNode('d', 0))
     const before = f.snapshot()
     const join = vi.spyOn(f.store, 'joinNodes')
+
     f.press('3')
     f.press('.')
+
     expect(join).toHaveBeenCalledTimes(1)
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().focus).toBe(before.focus)
     expect(f.snapshot().operationError).toBe('Cannot join nodes that both have attachments')
+
     act(() => f.store.selectNode('a', 0))
     f.press('.')
+
     expect(f.node('a').text).toBe('ab')
   })
 
@@ -1577,6 +1976,7 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({
       document: { roots: [node('a', 'A', [node('a1', 'child')]), node('b', 'B'), node('c', 'C')] },
     })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
@@ -1585,14 +1985,18 @@ describe('useNodeInputBindings', () => {
     f.press('p')
     act(() => f.store.selectNode('c', 0))
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'A', 'A'])
     expect(f.snapshot().document.roots.every((item) => item.children[0]?.text === 'child')).toBe(true)
+
     f.press('u')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
   })
 
   it('stops a repeated put on ancestry rejection without changing focus, register, or history', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A', [node('child', 'child')]), node('b', 'B')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
@@ -1604,16 +2008,20 @@ describe('useNodeInputBindings', () => {
     })
     const before = f.snapshot()
     const paste = vi.spyOn(f.store, 'pasteNodeForest')
+
     f.press('3')
     f.press('.')
+
     expect(paste).toHaveBeenCalledTimes(1)
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().focus).toBe(before.focus)
     expect(f.snapshot().operationError).toBe('Cannot paste a node into one of its descendants.')
+
     // Returning to the root makes the same descriptor valid; the failed attempt did not replace it.
     act(() => f.store.leave())
     act(() => f.store.selectNode('b', 0))
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'A'])
   })
 
@@ -1621,6 +2029,7 @@ describe('useNodeInputBindings', () => {
     let branch = node('deep-parent', 'deep', [node('x', 'X'), node('y', 'Y')])
     for (let level = 18; level > 0; level -= 1) branch = node(`level${level}`, 'level', [branch])
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), branch] } })
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('>')
@@ -1633,8 +2042,10 @@ describe('useNodeInputBindings', () => {
     })
     const before = f.snapshot()
     const shift = vi.spyOn(f.store, 'shiftNodeVisual')
+
     f.press('3')
     f.press('.')
+
     expect(shift).toHaveBeenCalledTimes(1)
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().focus).toBe(before.focus)
@@ -1646,6 +2057,7 @@ describe('useNodeInputBindings', () => {
       document: { roots: [node('parent', 'Parent', [node('a', 'A'), node('b', 'B')]), node('tail', 'Tail')] },
       location: { currentParentId: 'parent', selectedNodeId: 'a' },
     })
+
     f.press('V')
     f.press('j')
     f.press('<')
@@ -1653,19 +2065,26 @@ describe('useNodeInputBindings', () => {
     f.press('u')
     act(() => f.store.selectNode('parent', 0))
     const before = f.snapshot()
+
     f.press('.')
+
     expect(f.snapshot()).toBe(before)
+
     act(() => f.store.selectNode('a', 0))
     f.press('.')
+
     expect(f.snapshot().location.currentParentId).toBeNull()
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['parent', 'a', 'b', 'tail'])
     expect(f.snapshot().location.selectedNodeId).toBe('a')
+
     f.press('u')
+
     expect(f.node('parent').children.map((item) => item.id)).toEqual(['a', 'b'])
   })
 
   it('replays the count and post-put destination of a captured multi-node forest', async () => {
     const f = await fixture({ document: { roots: ['a', 'b', 'c'].map((id) => node(id, id)) } })
+
     f.press('2')
     f.press('y')
     f.press('y')
@@ -1673,11 +2092,14 @@ describe('useNodeInputBindings', () => {
     f.press('2')
     f.press('g')
     f.press('P')
+
     expect(f.snapshot().location.selectedNodeId).toBe('c')
+
     f.press('y')
     f.press('y')
     f.press('2')
     f.press('.')
+
     expect(f.snapshot().location.selectedNodeId).toBe('c')
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual([
       'a',
@@ -1685,9 +2107,13 @@ describe('useNodeInputBindings', () => {
       ...Array.from({ length: 6 }, () => ['a', 'b']).flat(),
       'c',
     ])
+
     f.press('u')
+
     expect(f.snapshot().document.roots).toHaveLength(11)
+
     f.press('u')
+
     expect(f.snapshot().document.roots).toHaveLength(7)
   })
 
@@ -1698,40 +2124,51 @@ describe('useNodeInputBindings', () => {
       document: { roots: [root] },
       location: { currentParentId: 'heading', selectedNodeId: 'heading' },
     })
+
     f.press('o')
     f.type('captured')
     f.press('Escape')
     const before = f.snapshot()
     const open = vi.spyOn(f.store, 'createChildWithText')
+
     f.press('3')
     f.press('.')
+
     expect(open).toHaveBeenCalledTimes(1)
     expect(f.snapshot().document).toBe(before.document)
     expect(f.snapshot().focus).toBe(before.focus)
     expect(f.snapshot().operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)
+
     f.press('u')
     act(() => f.store.selectNode('heading', 0))
     f.press('.')
+
     expect(f.node().text).toBe('captured')
   })
 
   it('joins a whole-node Visual range with gJ and returns to Normal mode', async () => {
     const f = await fixture({ document: { roots: [node('a', 'alpha '), node('b', ' beta'), node('c', 'gamma')] } })
+
     f.press('V')
     f.press('j')
     f.press('g')
     f.press('J')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha  beta', 'gamma'])
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.snapshot().location.selectedNodeId).toBe('a')
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'a', cursor: 6 })
+
     f.press('u')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha ', ' beta', 'gamma'])
+
     // After the undo, the same range joins without touching its whitespace for gJ.
     f.press('V')
     f.press('j')
     f.press('g')
     f.press('J')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['alpha  beta', 'gamma'])
     expect(f.result.current.vimMode).toBe('normal')
   })
@@ -1747,13 +2184,17 @@ describe('useNodeInputBindings', () => {
       },
     })
     const before = f.snapshot().document
+
     f.press('V')
     f.press('g')
     f.press('J')
+
     expect(f.result.current.vimMode).toBe('visual-node')
+
     f.press('j')
     f.press('g')
     f.press('J')
+
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.snapshot().document).toBe(before)
     expect(f.snapshot().operationError).toBe('Cannot join nodes that both have attachments')
@@ -1762,24 +2203,34 @@ describe('useNodeInputBindings', () => {
   it('keeps whole-node Visual active when an empty register cannot replace the range', async () => {
     const f = await fixture()
     const before = f.snapshot().document
+
     f.press('V')
     f.press('p')
+
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.snapshot().document).toBe(before)
   })
 
   it('uses boundary motions and folds through the real store', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A', [node('child', 'Child')]), node('b', 'B')] } })
+
     f.press('G')
+
     expect(f.snapshot().location.selectedNodeId).toBe('b')
+
     f.press('g')
     f.press('g')
+
     expect(f.snapshot().location.selectedNodeId).toBe('a')
+
     f.press('z')
     f.press('o')
+
     expect(f.store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'child', 'b'])
+
     f.press('z')
     f.press('c')
+
     expect(f.store.getVisibleRows().map((row) => row.node.id)).toEqual(['a', 'b'])
   })
 
@@ -1790,27 +2241,36 @@ describe('useNodeInputBindings', () => {
     input.tabIndex = 0
     input.textContent = 'Beta'
     document.body.append(input)
+
     f.bindings('b').inputRef(input)
     setCaret(input, 2)
     act(() => f.bindings('b').onFocus({ currentTarget: input } as never))
+
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'b', cursor: 2 })
     expect(document.activeElement).toBe(input)
     expect(getCaret(input)).toBe(2)
+
     input.textContent = 'Beta!'
+
     setCaret(input, 5)
     act(() => f.bindings('b').onContentInput({ currentTarget: input } as never))
+
     expect(f.node('b').text).toBe('Beta!')
     expect(getCaret(input)).toBe(5)
+
     act(() => f.result.current.setVimMode('normal'))
+
     expect(getCaret(input)).toBe(4)
   })
 
   it('groups edits before native Cut separately from the following edit', async () => {
     const f = await fixture({ mode: 'insert' })
+
     f.type('helloX')
     act(() => f.bindings().onCut())
     f.type('hello')
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('helloX')
   })
 
@@ -1819,7 +2279,9 @@ describe('useNodeInputBindings', () => {
     async (mode) => {
       const f = await fixture({ document: { roots: [image()] }, mode })
       f.input().setSelectionRange(2, 2)
+
       act(() => f.bindings().onMouseUp({ currentTarget: f.input() } as never))
+
       expect(f.result.current.imageCaretNodeId).toBe(mode === 'normal' ? 'node' : undefined)
     },
   )
@@ -1833,6 +2295,7 @@ describe('useNodeInputBindings', () => {
         },
       },
     })
+
     await act(async () => {
       if (path === 'menu') {
         window.treeApi = {
@@ -1848,6 +2311,7 @@ describe('useNodeInputBindings', () => {
         } as never)
       } else f.bindings().onPaste({ currentTarget: f.input(), preventDefault: () => undefined } as never)
     })
+
     expect(f.snapshot().operationError).toBe('test failure')
     expect(f.node().text).toBe('hello')
   })
@@ -1861,6 +2325,7 @@ describe('useNodeInputBindings', () => {
       },
     })
     window.treeApi = {} as Window['treeApi']
+
     act(() => f.bindings().onContextMenu({ currentTarget: f.input(), preventDefault: () => undefined } as never))
     f.type('changed')
     for (let attempt = 0; attempt < 3; attempt += 1)
@@ -1871,42 +2336,63 @@ describe('useNodeInputBindings', () => {
           /* Expected injected save failure. */
         }
       })
+
     expect(f.snapshot().persistenceLocked).toBe(true)
+
     const preventDefault = vi.fn()
+
     act(() => f.bindings().onContextMenu({ currentTarget: f.input(), preventDefault } as never))
+
     expect(preventDefault).not.toHaveBeenCalled()
     expect(f.bindings().disabled).toBe(true)
   })
 
   it('tracks whole-node Visual endpoints and routes a sibling-range yank to a later put', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+
     f.press('V')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
+
     f.press('j')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
     expect(f.snapshot().location.selectedNodeId).toBe('b')
+
     f.press('y')
+
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\nB' })
+
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'A', 'B'])
     expect(new Set(f.snapshot().document.roots.map((item) => item.id)).size).toBe(4)
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('k')
     f.press('o')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
+
     f.press('c')
+
     expect(f.result.current.vimMode).toBe('insert')
+
     f.type('Changed')
     f.press('Escape')
     const changedId = f.node().id
+
     act(() => f.store.selectNode(f.snapshot().document.roots[1]!.id, 0))
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['Changed', 'Changed'])
     expect(f.snapshot().document.roots[0]!.id).toBe(changedId)
+
     act(() => f.store.enter())
     f.press('V')
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 
@@ -1919,49 +2405,67 @@ describe('useNodeInputBindings', () => {
       document: { roots: [a, b, c, d] },
       location: { currentParentId: null, selectedNodeId: 'd' },
     })
+
     f.press('V')
     f.press('3')
     f.press('k')
     f.press('y')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\n\n\nD' })
     expect(f.result.current.vimMode).toBe('normal')
   })
 
   it('uses text priority for one Visual node and otherwise copies its image or preserves the clipboard', async () => {
     const f = await fixture({ document: { roots: [image('Text')] } })
+
     f.press('j')
     f.press('V')
     f.press('y')
+
     expect(f.clipboard.content).toEqual({ kind: 'text', text: 'Text' })
+
     const imageOnly = await fixture({ document: { roots: [image('')] } })
+
     imageOnly.press('V')
     imageOnly.press('y')
+
     expect(imageOnly.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
+
     const empty = await fixture({ document: { roots: [node('empty', '')] } })
+
     empty.press('V')
     empty.press('y')
+
     expect(empty.clipboard.content).toBeUndefined()
   })
 
   // @requirement PRODUCT.md §20.2.26
   it('does not export vertical-operator yanks or text deletes to the system clipboard', async () => {
     const f = await fixture({ document: { roots: [node('a', 'ABC'), node('b', 'B')] } })
+
     f.press('y')
     f.press('j')
+
     expect(f.clipboard.content).toBeUndefined()
+
     f.press('v')
     f.press('l')
     f.press('d')
+
     expect(f.clipboard.content).toBeUndefined()
   })
 
   it('resyncs the image caret after a whole-node Visual command keeps the same node selected', async () => {
     const f = await fixture({ document: { roots: [image('AB')] } })
     f.input().setSelectionRange(1, 1)
+
     f.press('l')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     f.press('V')
     f.press('u')
+
     expect(f.node().text).toBe('ab')
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'node', cursor: 0 })
     expect(f.result.current.vimMode).toBe('normal')
@@ -1987,6 +2491,7 @@ describe('useNodeInputBindings', () => {
       const authority = f.result.current.vimTextCommandState.getCaretState!('node', cursor, attached)
       for (const keys of [['j'], ['k'], ['9', '9', 'j'], ['9', '9', 'k'], ['g', 'g'], ['G']]) {
         for (const key of keys) f.press(key)
+
         expect(f.snapshot()).toBe(before)
         expect(f.result.current.selection).toBe(selection)
         expect(f.result.current.vimMode).toBe('visual-node')
@@ -1997,6 +2502,7 @@ describe('useNodeInputBindings', () => {
       f.press('Escape')
       if (kind === 'image') {
         f.press('k')
+
         expect(f.input().selectionStart).toBe(1)
         expect(f.result.current.imageCaretNodeId).toBeUndefined()
       }
@@ -2006,22 +2512,31 @@ describe('useNodeInputBindings', () => {
   it('keeps a non-final image return position across commands without a new focus intent', async () => {
     const f = await fixture({ document: { roots: [image('abcd')] } })
     f.input().setSelectionRange(1, 1)
+
     f.press('j')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     const focus = f.snapshot().focus
+
     f.press('u')
     f.press('r', { ctrlKey: true })
     f.press('o', { ctrlKey: true })
     f.press('V')
     f.press('Escape')
+
     expect(f.snapshot().focus).toEqual(focus)
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     f.press('k')
+
     expect(f.input().selectionStart).toBe(1)
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
+
     f.press('j')
     act(() => f.store.selectNode('node', 0))
     f.press('u')
+
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
   })
 
@@ -2031,7 +2546,9 @@ describe('useNodeInputBindings', () => {
       document: { roots: [parent] },
       location: { currentParentId: 'parent', selectedNodeId: 'child' },
     })
+
     f.press('k')
+
     expect(f.snapshot().location).toEqual({ currentParentId: 'parent', selectedNodeId: 'parent' })
     expect(f.snapshot().focus).toMatchObject({ nodeId: 'parent', cursor: 'child'.length })
     expect(f.result.current.imageCaretNodeId).toBe('parent')
@@ -2043,13 +2560,17 @@ describe('useNodeInputBindings', () => {
       location: { currentParentId: 'a', selectedNodeId: 'a' },
     })
     f.input('a')
+
     f.press('o')
     const childId = f.node().id
+
     expect(f.result.current.vimMode).toBe('insert')
+
     act(() => f.bindings('a').onBlur())
     f.type('Opened')
     f.press('Escape')
     f.press('.')
+
     expect(f.node('a').children.map((item) => item.text)).toEqual(['Opened'])
     expect(f.node(childId).children.map((item) => item.text)).toEqual(['Opened'])
     expect(f.node().id).not.toBe(childId)
@@ -2059,8 +2580,10 @@ describe('useNodeInputBindings', () => {
   it.each(['a', 'b'])('discards structural recording when a pointer click lands on %s', async (targetId) => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'bee')] } })
     f.input('a')
+
     f.press('o')
     const openedId = f.node().id
+
     f.type('Opened', openedId)
     act(() => f.bindings(targetId).onMouseDown({ currentTarget: f.input(targetId), button: 0 } as never))
     act(() => f.bindings(openedId).onBlur())
@@ -2068,6 +2591,7 @@ describe('useNodeInputBindings', () => {
     act(() => f.store.selectNode('a', 0))
     f.press('.')
     const texts = f.snapshot().document.roots.map((item) => item.text)
+
     expect(texts.filter((text) => text === 'Opened').length).toBe(1)
     expect(texts.filter((text) => text === 'bee').length).toBe(1)
   })
@@ -2075,12 +2599,15 @@ describe('useNodeInputBindings', () => {
   // @requirement PRODUCT.md §20.2.19
   it('discards structural recording after a same-node pointer interruption without blur', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A')] } })
+
     f.press('o')
     const openedId = f.node().id
+
     f.type('Opened', openedId)
     act(() => f.bindings(openedId).onMouseDown({ currentTarget: f.input(openedId), button: 0 } as never))
     f.press('Escape')
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'Opened'])
   })
 
@@ -2090,16 +2617,21 @@ describe('useNodeInputBindings', () => {
     async (command) => {
       const f = await fixture({ document: { roots: [node('a', 'ABC'), node('b', 'bee')] } })
       f.input('a').setSelectionRange(0, 0)
+
       f.press('x')
       if (command === 'c' || command === 's') f.press('V')
+
       f.press(command)
       const createdId = f.node().id
+
       f.type('Opened')
       act(() => f.bindings(createdId).onMouseDown({ currentTarget: f.input(createdId), button: 0 } as never))
       f.press('Escape')
       f.input(createdId).setSelectionRange(0, 0)
       const roots = f.snapshot().document.roots.length
+
       f.press('.')
+
       expect(f.node(createdId).text).toBe('pened')
       expect(f.snapshot().document.roots).toHaveLength(roots)
       expect(f.node('b').text).toBe('bee')
@@ -2110,29 +2642,40 @@ describe('useNodeInputBindings', () => {
   it.each(['a', 'x', 'v'])('keeps the previous repeat after Cmd+%s interrupts structural Insert', async (key) => {
     const f = await fixture({ document: { roots: [node('a', 'ABC')] } })
     f.input('a').setSelectionRange(0, 0)
+
     f.press('x')
+
     expect(f.node('a').text).toBe('BC')
+
     f.press('o')
     f.type('Opened')
     f.input().setSelectionRange(0, 2)
+
     f.press(key, { metaKey: true })
+
     expect(f.result.current.vimMode).toBe('insert')
+
     f.press('Escape')
     act(() => f.store.selectNode('a', 0))
     f.press('.')
+
     expect(f.node('a').text).toBe('C')
     expect(f.snapshot().document.roots).toHaveLength(2)
   })
 
   it.each(['blur', 'pointer'])('does not record a plain Insert session finished by %s', async (finish) => {
     const f = await fixture({ document: { roots: [node('a', 'a')] } })
+
     f.press('i')
     f.type('aX')
     if (finish === 'blur') act(() => f.bindings().onBlur())
     else act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
+
     expect(f.result.current.vimMode).toBe('insert')
+
     f.press('Escape')
     f.press('.')
+
     // The interrupted session is discarded, so `.` does not insert a second X.
     expect(f.node('a').text).toBe('aX')
   })
@@ -2140,13 +2683,18 @@ describe('useNodeInputBindings', () => {
   it('replays a completed Insert session at another node caret', async () => {
     const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
     f.input().setSelectionRange(0, 0)
+
     f.press('i')
     f.type('Xa')
     f.press('Escape')
+
     expect(f.node('a').text).toBe('Xa')
+
     f.input('b').setSelectionRange(0, 0)
+
     act(() => f.store.selectNode('b', 0))
     f.press('.')
+
     expect(f.node('a').text).toBe('Xa')
     expect(f.node('b').text).toBe('Xb')
   })
@@ -2154,53 +2702,72 @@ describe('useNodeInputBindings', () => {
   it('replays a completed change in another node', async () => {
     const f = await fixture({ document: { roots: [node('a', 'one two'), node('b', 'three four')] } })
     f.input().setSelectionRange(0, 0)
+
     f.press('c')
     f.press('w')
     f.type('X two')
     f.press('Escape')
+
     expect(f.node('a').text).toBe('X two')
+
     f.input('b').setSelectionRange(0, 0)
+
     act(() => f.store.selectNode('b', 0))
     f.press('.')
+
     expect(f.node('b').text).toBe('X four')
   })
 
   it('replays a completed substitute in another node', async () => {
     const f = await fixture({ document: { roots: [node('a', 'abc'), node('b', 'xyz')] } })
     f.input().setSelectionRange(0, 0)
+
     f.press('s')
     f.type('Qbc')
     f.press('Escape')
+
     expect(f.node('a').text).toBe('Qbc')
+
     f.input('b').setSelectionRange(0, 0)
+
     act(() => f.store.selectNode('b', 0))
     f.press('.')
+
     expect(f.node('b').text).toBe('Qyz')
   })
 
   it('replays a completed deletion-only Insert session in another node', async () => {
     const f = await fixture({ document: { roots: [node('a', 'abcd'), node('b', 'xyz')] } })
     f.input().setSelectionRange(1, 1)
+
     f.press('i')
     f.type('acd')
     f.press('Escape')
+
     expect(f.node('a').text).toBe('acd')
+
     f.input('b').setSelectionRange(0, 0)
+
     act(() => f.store.selectNode('b', 0))
     f.press('.')
+
     expect(f.node('b').text).toBe('yz')
   })
 
   it('keeps the previous repeatable change when a blur interrupts an Insert session', async () => {
     const f = await fixture({ document: { roots: [node('a', 'abcd')] } })
     f.input().setSelectionRange(0, 0)
+
     f.press('x')
+
     expect(f.node('a').text).toBe('bcd')
+
     f.press('i')
     f.type('Zbcd')
     act(() => f.bindings().onBlur())
     f.press('Escape')
     f.press('.')
+
     // The prior `x` repeats; the interrupted insert is not recorded.
     expect(f.node('a').text).toBe('Zbc')
   })
@@ -2208,18 +2775,22 @@ describe('useNodeInputBindings', () => {
   it('does not capture an Escape delivered to a node other than the session origin', async () => {
     const f = await fixture({ document: { roots: [node('a', 'a'), node('b', 'b')] } })
     f.input('a').setSelectionRange(0, 0)
+
     f.press('i', {}, 'a')
     f.type('Xa', 'a')
     // The session's own input never blurs here, so the origin-node check is the only guard.
     f.input('b').setSelectionRange(0, 0)
+
     f.press('Escape', {}, 'b')
     f.press('.', {}, 'b')
+
     expect(f.node('a').text).toBe('Xa')
     expect(f.node('b').text).toBe('b')
   })
 
   it('does not record a plain Insert session ended by a shutdown flush', async () => {
     const f = await fixture({ document: { roots: [node('a', 'a')] } })
+
     f.press('i')
     f.type('aX')
     await act(async () => {
@@ -2227,6 +2798,7 @@ describe('useNodeInputBindings', () => {
     })
     f.press('Escape')
     f.press('.')
+
     expect(f.node('a').text).toBe('aX')
   })
 
@@ -2236,10 +2808,15 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [{ ...node('node', text), links }] }, mode: 'insert' })
     const input = document.createElement('div')
     input.textContent = text
+
     act(() => f.bindings().onContentChange({ currentTarget: input } as never))
+
     expect(f.node()).toMatchObject({ text, links })
+
     input.textContent = 'x'
+
     act(() => f.bindings().onContentChange({ currentTarget: input } as never))
+
     expect(f.node().text).toBe('x')
     expect(f.node().links ?? []).toEqual([])
   })
@@ -2251,11 +2828,16 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [{ ...node('node', original), links }] }, mode: 'insert' })
     const input = document.createElement('div')
     input.textContent = edited
+
     act(() => f.bindings().onContentInput({ currentTarget: input } as never))
+
     expect(f.node().text).toBe(edited)
     expect(f.node().links ?? []).toEqual([])
+
     input.textContent = original
+
     act(() => f.bindings().onContentInput({ currentTarget: input } as never))
+
     expect(f.node()).toMatchObject({ text: original, links })
   })
 
@@ -2267,13 +2849,19 @@ describe('useNodeInputBindings', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null),
       preventDefault = vi.fn()
     const event = (metaKey: boolean) => ({ target: input.firstChild, currentTarget: input, metaKey, preventDefault })
+
     f.bindings().onClick(event(false) as never)
+
     expect(open).not.toHaveBeenCalled()
+
     f.bindings().onClick(event(true) as never)
+
     expect(open).toHaveBeenCalledWith(url, '_blank')
     expect(preventDefault).toHaveBeenCalledTimes(2)
+
     f.bindings().onClick({ ...event(true), target: document.createElement('a') } as never)
     f.bindings().onClick({ ...event(true), target: input } as never)
+
     expect(open).toHaveBeenCalledTimes(1)
   })
 
@@ -2297,15 +2885,19 @@ describe('useNodeInputBindings', () => {
         }
         act(() => f.bindings().onSelect({ currentTarget: input } as never))
       }
+
       f.type('helloX')
       select(1, 1)
       f.type('helloXY')
       act(() => f.store.undo())
+
       expect(f.node().text).toBe('hello')
+
       f.type('helloX')
       select(0, 2)
       f.type('helloXY')
       act(() => f.store.undo())
+
       expect(f.node().text).toBe('helloX')
     },
   )
@@ -2316,9 +2908,11 @@ describe('useNodeInputBindings', () => {
     window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
     f.input().setSelectionRange(1, 4)
     const preventDefault = vi.fn()
+
     await act(async () => {
       f.bindings().onContextMenu({ currentTarget: f.input(), clientX: 10, clientY: 20, preventDefault } as never)
     })
+
     expect(preventDefault).toHaveBeenCalledOnce()
     expect(showEditorContextMenu).toHaveBeenCalledWith({
       x: 10,
@@ -2336,6 +2930,7 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
     f.clipboard.current = { kind: 'text', text: '!' }
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     f.press('X')
     await act(async () => {
@@ -2351,11 +2946,16 @@ describe('useNodeInputBindings', () => {
         } as never)
       }
     })
+
     expect(f.node().text).toBe('abX!d')
     expect(f.result.current.vimMode).toBe('normal')
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('abXd')
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('abcd')
   })
 
@@ -2363,14 +2963,19 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
     window.treeApi = { showEditorContextMenu: async () => 'cut' } as unknown as Window['treeApi']
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     f.press('X')
     f.press('a', { metaKey: true })
+
     expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 4])
+
     act(() =>
       f.bindings().onMouseDown({ currentTarget: f.input(), button: 2, preventDefault: () => undefined } as never),
     )
+
     expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 4])
+
     await act(async () => {
       f.bindings().onContextMenu({
         currentTarget: f.input(),
@@ -2379,6 +2984,7 @@ describe('useNodeInputBindings', () => {
         preventDefault: () => undefined,
       } as never)
     })
+
     expect(f.node().text).toBe('')
     expect(f.clipboard.written?.text).toBe('abXd')
     expect(f.result.current.vimMode).toBe('normal')
@@ -2387,69 +2993,93 @@ describe('useNodeInputBindings', () => {
   it('commits a pending Replace session exactly once when the store re-enters the finish path', async () => {
     const f = await fixture({ document: { roots: [node('node', 'ab')] } })
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     f.press('X')
     // A real store notification can synchronously blur while the first commit is on the stack.
     const unregister = f.store.subscribe(() => f.bindings().onBlur())
+
     f.press('Escape')
     unregister()
+
     expect(f.node().text).toBe('abX')
     expect(f.result.current.vimMode).toBe('normal')
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('ab')
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('ab')
   })
 
   it('reads the register written directly by the keyboard handler through the shared owner', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     f.press('V')
     f.press('j')
     f.press('d')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['C'])
+
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['C', 'A', 'B'])
   })
 
   it('uses the keyboard subtree register to replace a whole-node Visual range', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A'])
     expect(f.node().id).not.toBe('a')
     expect(f.result.current.vimMode).toBe('normal')
+
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A'])
   })
 
   it('exchanges the register on whole-node Visual p, keeps it on P, and applies the count to both', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('2')
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
     expect(f.result.current.vimMode).toBe('normal')
+
     // The replaced `B` is now the register, so a Normal put inserts it after the first copy.
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'B', 'A', 'C'])
+
     // Both the put and the exchange were single undoable commands.
     act(() => f.store.undo())
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+
     act(() => f.store.undo())
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'C'])
   })
 
   it('keeps the incoming register on whole-node Visual P so it can replace repeatedly', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
@@ -2458,24 +3088,30 @@ describe('useNodeInputBindings', () => {
     act(() => f.store.selectNode('c', 0))
     f.press('V')
     f.press('P')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A'])
   })
 
   it('repeats a counted whole-node Visual put with the same count', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B'), node('c', 'C')] } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('2')
     f.press('P')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'C'])
+
     f.press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'A', 'A', 'C'])
   })
 
   it('captures structural and Replace sessions from a contenteditable input', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A')] } })
+
     f.press('o')
     const openedId = f.node().id
     const input = document.createElement('div')
@@ -2483,6 +3119,7 @@ describe('useNodeInputBindings', () => {
     input.tabIndex = 0
     input.textContent = 'Opened'
     document.body.append(input)
+
     f.bindings(openedId).inputRef(input)
     act(() => f.bindings(openedId).onContentInput({ currentTarget: input } as never))
     setCaret(input, 6)
@@ -2497,20 +3134,26 @@ describe('useNodeInputBindings', () => {
           preventDefault: () => undefined,
         } as never),
       )
+
     press('Escape')
     press('.')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'Opened', 'Opened'])
+
     const repeatedId = f.node().id
+
     f.bindings(repeatedId).inputRef(input)
     setCaret(input, 0)
     press('R')
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
     input.textContent = 'あOpened'
+
     act(() => f.bindings().onContentInput({ currentTarget: input } as never))
     setCaret(input, 1)
     act(() => f.bindings().onCompositionEnd({ currentTarget: input } as never))
     press('X')
     press('Escape')
+
     expect(f.node().text).toBe('あXpened')
     expect(f.result.current.vimMode).toBe('normal')
   })
@@ -2525,16 +3168,19 @@ describe('useNodeInputBindings', () => {
     input.textContent = url
     document.body.append(input)
     const range = document.createRange()
+
     range.selectNodeContents(input)
     getSelection()!.removeAllRanges()
     getSelection()!.addRange(range)
     const showEditorContextMenu = vi.fn(async () => 'copy' as const)
     window.treeApi = { showEditorContextMenu } as unknown as Window['treeApi']
+
     await act(async () =>
       f
         .bindings()
         .onContextMenu({ currentTarget: input, clientX: 1, clientY: 2, preventDefault: () => undefined } as never),
     )
+
     expect(showEditorContextMenu).toHaveBeenCalledWith({
       x: 1,
       y: 2,
@@ -2545,15 +3191,19 @@ describe('useNodeInputBindings', () => {
       canSelectAll: true,
     })
     expect(f.clipboard.written).toEqual({ text: url, html: `<a href="${url}">${url}</a>` })
+
     act(() => f.store.createSibling('after'))
     await act(async () => f.store.paste(f.node().id, 0))
+
     expect(f.node()).toMatchObject({ text: url, links: [{ start: 0, end: url.length, url }] })
   })
 
   it.each([0, 2])('preserves the expected native pointer behavior for button %s', async (button) => {
     const f = await fixture(),
       preventDefault = vi.fn()
+
     act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button, preventDefault } as never))
+
     expect(preventDefault).toHaveBeenCalledTimes(button === 2 ? 1 : 0)
   })
 
@@ -2561,8 +3211,10 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
     const input = f.input('a')
     input.focus()
+
     act(() => f.store.selectNode('b', 0))
     await act(async () => {})
+
     expect(document.activeElement).toBe(input)
     expect(f.snapshot().location.selectedNodeId).toBe('b')
   })
@@ -2570,8 +3222,10 @@ describe('useNodeInputBindings', () => {
   it.each(['insert', 'normal'] as const)('focuses registered inputs with the %s caret', async (mode) => {
     const f = await fixture({ mode }),
       input = f.input()
+
     act(() => f.store.selectNode('node', 3))
     await act(async () => {})
+
     expect(document.activeElement).toBe(input)
     expect([input.selectionStart, input.selectionEnd]).toEqual(mode === 'normal' ? [3, 4] : [3, 3])
   })
@@ -2579,60 +3233,84 @@ describe('useNodeInputBindings', () => {
   it('collapses the Normal caret on an attached node at its terminal image position', async () => {
     const f = await fixture({ document: { roots: [image('hello')] } }),
       input = f.input()
+
     act(() => f.store.selectNode('node', 5))
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     act(() => f.bindings().onFocus({ currentTarget: input } as never))
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
 
   it('clears an unfinished Vim operator on blur and composition start', async () => {
     const f = await fixture(),
       before = f.snapshot().document
+
     f.press('d')
     act(() => f.bindings().onBlur())
     f.press('d')
+
     expect(f.snapshot().document).toEqual(before)
+
     act(() => f.bindings().onCompositionStart({ currentTarget: f.input() } as never))
     f.press('d')
+
     expect(f.snapshot().document).toEqual(before)
+
     act(() => f.bindings().onCompositionEnd({ currentTarget: f.input() } as never))
     f.press('d')
+
     expect(f.snapshot().document).toEqual(before)
   })
 
   it('overwrites and appends in Replace mode, then commits one repeatable range edit', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     f.press('X')
     f.press('Y')
     f.press('Z')
+
     expect(f.input().value).toBe('abXYZ')
     expect(f.node().text).toBe('abcd')
+
     f.press('Backspace')
+
     expect(f.input().value).toBe('abXY')
+
     f.press('Escape')
+
     expect(f.node().text).toBe('abXY')
     expect(f.result.current.vimMode).toBe('normal')
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe('abcd')
+
     act(() => f.store.redo())
     f.input().setSelectionRange(0, 0)
+
     f.press('.')
+
     expect(f.node().text).toBe('XYXY')
   })
 
   it('resumes Replace mode after native text composition', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     act(() => f.bindings().onCompositionStart({ currentTarget: f.input() } as never))
     f.type('abあcd')
     f.input().setSelectionRange(3, 3)
+
     act(() => f.bindings().onCompositionEnd({ currentTarget: f.input() } as never))
     f.press('X')
     f.press('Escape')
+
     expect(f.node().text).toBe('abあXd')
     expect(f.result.current.vimMode).toBe('normal')
   })
@@ -2641,10 +3319,14 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('node', 'abc')] } })
     const input = f.input()
     input.setSelectionRange(3, 3)
+
     f.press('R')
     f.press('X')
+
     expect(getCaret(input)).toBe(4)
+
     act(() => f.bindings().onCompositionStart({ currentTarget: input } as never))
+
     expect(f.node().text).toBe('abcX')
     expect(f.result.current.vimMode).toBe('replace')
     expect(input.selectionStart).toBe(4)
@@ -2662,18 +3344,24 @@ describe('useNodeInputBindings', () => {
     const { unmount } = renderHook(() =>
       useNodeInputBindings({ store, vimEnabled: true, onPreviewAttachment: () => undefined }),
     )
+
     expect(registerPendingEditFinisher).toHaveBeenCalledOnce()
     expect(finish).toBeTypeOf('function')
+
     unmount()
+
     expect(unregister).toHaveBeenCalledOnce()
   })
 
   it.each([false, true])('flushes a Replace session once, with typed content: %s', async (typed) => {
     const f = await fixture({ document: { roots: [node('node', 'abcd')] } })
     f.input().setSelectionRange(2, 2)
+
     f.press('R')
     if (typed) f.press('X')
+
     await act(async () => f.store.flushPersistence())
+
     expect(f.node().text).toBe(typed ? 'abXd' : 'abcd')
     expect(f.result.current.vimMode).toBe('normal')
     if (typed) {
@@ -2681,11 +3369,16 @@ describe('useNodeInputBindings', () => {
       expect(f.input().selectionStart).toBe(3)
     }
     if (typed) expect(f.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'abXd' }] } })
+
     const before = f.snapshot().document
+
     await act(async () => f.store.flushPersistence())
+
     expect(f.snapshot().document).toBe(before)
+
     if (typed) {
       act(() => f.store.undo())
+
       expect(f.node().text).toBe('abcd')
     }
   })
@@ -2695,12 +3388,14 @@ describe('useNodeInputBindings', () => {
     async (path) => {
       const f = await fixture({ document: { roots: [image()] } })
       f.input().setSelectionRange(2, 2)
+
       f.press('R')
       f.press('X')
       act(() => {
         if (path === 'blur') f.bindings().onBlur()
         else f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never)
       })
+
       expect(f.node().text).toBe('abX')
       expect(f.result.current.imageCaretNodeId).toBe('node')
     },
@@ -2715,8 +3410,11 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('a', text)] } })
     f.input().setSelectionRange(cursor, cursor)
     for (const key of keys) f.press(key)
+
     expect(f.node().text).toBe(expected)
+
     act(() => f.store.undo())
+
     expect(f.node().text).toBe(text)
   })
 
@@ -2725,7 +3423,9 @@ describe('useNodeInputBindings', () => {
     f.input().setSelectionRange(0, 0)
     for (const key of ['y', 's', 'i', 'w', ']']) f.press(key)
     f.input().setSelectionRange(6, 6)
+
     f.press('.')
+
     expect(f.node().text).toBe('[one] [two]')
   })
 
@@ -2739,6 +3439,7 @@ describe('useNodeInputBindings', () => {
       before = f.snapshot().document
     f.input().setSelectionRange(0, 0)
     for (const key of keys) f.press(key)
+
     expect(f.snapshot().document).toBe(before)
   })
 
@@ -2752,24 +3453,30 @@ describe('useNodeInputBindings', () => {
       ['c', 's', ')', '"'],
     ]) {
       for (const key of sequence) f.press(key)
+
       expect(f.snapshot().document).toBe(before)
     }
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 
   it('surrounds character Visual selection with S and returns to Normal mode', async () => {
     const f = await fixture({ document: { roots: [node('a', 'foo bar')] } })
     f.input().setSelectionRange(0, 0)
+
     f.press('v')
     f.press('l')
     f.press('l')
     f.press('S')
     f.press('z')
+
     expect(f.node().text).toBe('foo bar')
     expect(f.result.current.vimMode).toBe('visual')
     expect([f.input().selectionStart, f.input().selectionEnd]).toEqual([0, 3])
+
     f.press('S')
     f.press('}')
+
     expect(f.node().text).toBe('{foo} bar')
     expect(f.result.current.vimMode).toBe('normal')
   })
@@ -2779,6 +3486,7 @@ describe('useNodeInputBindings', () => {
     async (path) => {
       const f = await fixture({ document: { roots: [node('a', 'Alpha')] } })
       f.input().setSelectionRange(0, 0)
+
       f.press('v')
       if (path === 'pointer') {
         f.input().setSelectionRange(3, 3)
@@ -2788,10 +3496,14 @@ describe('useNodeInputBindings', () => {
         f.input().setSelectionRange(0, 0)
       } else {
         f.press('.', { metaKey: true })
+
         expect(f.snapshot().location.currentParentId).toBe('a')
+
         f.input('a').setSelectionRange(0, 0)
       }
+
       f.press('l', {}, 'a')
+
       expect(f.result.current.vimMode).toBe('visual')
       expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual(path === 'pointer' ? [3, 5] : [0, 2])
     },
@@ -2799,12 +3511,16 @@ describe('useNodeInputBindings', () => {
 
   it('clears the whole-node Visual g prefix when a whole-node command exits', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
+
     f.press('V')
     f.press('g')
     f.press('y')
+
     expect(f.result.current.selection).toBeUndefined()
+
     f.press('d')
     f.press('d')
+
     expect(f.snapshot().location.currentParentId).toBeNull()
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['b'])
   })
@@ -2813,9 +3529,11 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
     f.input('a')
     f.input('b')
+
     f.press('V')
     f.press('j')
     act(() => f.bindings('a').onBlur())
+
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'b' })
     expect(f.snapshot().location.selectedNodeId).toBe('b')
@@ -2840,15 +3558,24 @@ describe('useNodeInputBindings', () => {
     const notify = () =>
       act(() => callback?.([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver))
     input.setSelectionRange(0, input.value.length)
+
     notify()
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 5])
+
     input.setSelectionRange(1, 1)
+
     notify()
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 2])
+
     act(() => f.result.current.setVimMode('insert'))
     input.setSelectionRange(2, 2)
+
     notify()
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+
     f.bindings().inputRef(null)
   })
 
@@ -2871,19 +3598,27 @@ describe('useNodeInputBindings', () => {
     // The block caret is a one-character native selection; a press collapses it so the native press
     // places a caret instead of dragging that character.
     input.setSelectionRange(2, 3)
+
     act(() => {
       input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     })
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+
     // The press then extends a native selection as the pointer drags; redrawing the block caret
     // mid-press would replace it.
     input.setSelectionRange(3, 3)
+
     act(() => callback?.([{ target: input } as unknown as ResizeObserverEntry], {} as ResizeObserver))
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([3, 3])
+
     act(() => {
       input.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0 }))
     })
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([3, 4])
+
     f.bindings().inputRef(null)
   })
 
@@ -2902,29 +3637,39 @@ describe('useNodeInputBindings', () => {
       })
       return selection
     }
+
     // A right-click keeps the block for the context menu, Shift extends from it, and a deliberate
     // selection stays draggable.
     expect(press({ button: 2 }, 1, 2)).toEqual([1, 2])
     expect(press({ button: 0, shiftKey: true }, 1, 2)).toEqual([1, 2])
     expect(press({ button: 0 }, 0, 5)).toEqual([0, 5])
+
     // A press elsewhere, such as on a row control that keeps focus in the editor, leaves the block.
     input.setSelectionRange(1, 2)
+
     act(() => {
       document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     })
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 2])
+
     act(() => {
       globalThis.dispatchEvent(new Event('blur'))
     })
     act(() => f.result.current.setVimMode('insert'))
+
     expect(press({ button: 0 }, 2, 3)).toEqual([2, 3])
+
     // A release without a press, or with focus outside the editors, draws nothing.
     act(() => f.result.current.setVimMode('normal'))
     input.setSelectionRange(2, 2)
+
     act(() => {
       globalThis.dispatchEvent(new MouseEvent('pointerup'))
     })
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
+
     act(() => {
       document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     })
@@ -2932,6 +3677,7 @@ describe('useNodeInputBindings', () => {
     act(() => {
       globalThis.dispatchEvent(new MouseEvent('pointerup'))
     })
+
     expect([input.selectionStart, input.selectionEnd]).toEqual([2, 2])
   })
 
@@ -2948,6 +3694,7 @@ describe('useNodeInputBindings', () => {
         input.setSelectionRange(start, end)
         document.dispatchEvent(new Event('selectionchange'))
       })
+
       expect(input.classList.contains('node-input-text-selected')).toBe(expected)
     }
   })
@@ -2956,8 +3703,10 @@ describe('useNodeInputBindings', () => {
 describe('Vim editing switch', () => {
   it('switches without a focused editor using the store caret', async () => {
     const f = await fixture({ document: { roots: [image('abc')] } })
+
     act(() => f.store.selectNode('node', 3))
     act(() => f.result.current.setVimEditing(true))
+
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.result.current.imageCaretNodeId).toBe('node')
 
@@ -2971,10 +3720,12 @@ describe('Vim editing switch', () => {
   it('moves a focused image caret to the end of the text when Vim editing is disabled', async () => {
     const f = await fixture({ document: { roots: [image('ab')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 0))
     act(() => input.focus())
     f.press('$')
     f.press('l')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
 
     act(() => f.result.current.setVimEditing(false))
@@ -2989,11 +3740,15 @@ describe('Vim editing switch', () => {
   it('discards structural recording when Vim editing is disabled', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abc')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 0))
     act(() => input.focus())
     f.press('o')
+
     expect(f.result.current.vimMode).toBe('insert')
+
     const opened = f.snapshot().location.selectedNodeId
+
     f.type('new', opened)
     act(() => f.input(opened).focus())
 
@@ -3008,6 +3763,7 @@ describe('Vim editing switch', () => {
   it('keeps a multi-character selection when Vim editing is enabled', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] }, mode: 'insert' })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 0))
     act(() => input.focus())
     input.setSelectionRange(1, 4)
@@ -3038,8 +3794,11 @@ describe('Vim editing switch', () => {
     })
 
     act(() => hook.result.current.setVimEditing(false))
+
     expect(hook.result.current.vimMode).toBe('insert')
+
     act(() => hook.result.current.setVimEditing(true))
+
     expect(hook.result.current.vimMode).toBe('normal')
   })
 })
@@ -3051,12 +3810,14 @@ describe('drag caret freeze', () => {
     const peer = f.input('peer')
     source.focus()
     source.setSelectionRange(2, 2)
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => {
       f.result.current.dragFreeze.end(7)
       f.store.selectNode('peer', 1)
     })
     await act(async () => undefined)
+
     expect(document.activeElement).toBe(peer)
     expect([peer.selectionStart, peer.selectionEnd]).toEqual([1, 2])
   })
@@ -3066,14 +3827,19 @@ describe('drag caret freeze', () => {
     const input = f.input()
     input.focus()
     input.setSelectionRange(2, 2)
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.result.current.dragFreeze.end(7))
     input.setSelectionRange(3, 3)
+
     act(() => f.result.current.dragFreeze.begin('node', 8))
     f.rerender()
     await act(async () => undefined)
+
     expect(document.activeElement).not.toBe(input)
+
     act(() => f.result.current.dragFreeze.end(8))
+
     expect(document.activeElement).toBe(input)
     expect(input.selectionStart).toBe(3)
   })
@@ -3081,19 +3847,25 @@ describe('drag caret freeze', () => {
   it('retains the image caret and saved text return position through a move focus intent', async () => {
     const f = await fixture({ document: { roots: [image('hello'), node('peer', 'Other')] } })
     const input = f.input()
+
     act(() => f.store.selectNode('node', 4))
     f.press('l')
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => {
       f.store.moveNodeToParent('node', 'peer', 0)
       f.result.current.dragFreeze.end(7)
     })
     await act(async () => undefined)
+
     expect(document.activeElement).toBe(input)
     expect(f.result.current.imageCaretNodeId).toBe('node')
     expect(input.selectionStart).toBe(5)
+
     f.press('h')
+
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(input.selectionStart).toBe(4)
   })
@@ -3103,10 +3875,14 @@ describe('drag caret freeze', () => {
       input = f.input()
     input.focus()
     input.setSelectionRange(1, 3)
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
+
     expect(document.activeElement).not.toBe(input)
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
+
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(document.activeElement).toBe(input)
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
   })
@@ -3117,9 +3893,12 @@ describe('drag caret freeze', () => {
   ] as const)('%s', async (_name, dragged, expected) => {
     const f = await fixture({ mode: 'replace' })
     f.input().focus()
+
     act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
     if (dragged) act(() => f.result.current.dragFreeze.begin('node', 7))
+
     act(() => f.bindings().onBlur())
+
     expect(f.result.current.vimMode).toBe(expected)
   })
 
@@ -3128,10 +3907,12 @@ describe('drag caret freeze', () => {
     async (type) => {
       const f = await fixture({ mode: 'replace' })
       f.input().focus()
+
       act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
       globalThis.dispatchEvent(new Event(type))
       act(() => vi.advanceTimersByTime(1))
       act(() => f.bindings().onBlur())
+
       expect(f.result.current.vimMode).toBe('normal')
     },
   )
@@ -3141,14 +3922,21 @@ describe('drag caret freeze', () => {
       input = f.input()
     input.focus()
     input.setSelectionRange(2, 2)
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.result.current.dragFreeze.end(8))
+
     expect(document.activeElement).not.toBe(input)
+
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(document.activeElement).toBe(input)
+
     input.setSelectionRange(3, 3)
+
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(input.selectionStart).toBe(3)
   })
 
@@ -3157,12 +3945,14 @@ describe('drag caret freeze', () => {
       input = f.input()
     input.focus()
     input.setSelectionRange(2, 2)
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => {
       if (path === 'unspecified') f.result.current.dragFreeze.end()
       else if (path === 'cancel') fireEvent.pointerCancel(window, { pointerId: 7 })
       else fireEvent.pointerUp(window, { pointerId: 7 })
     })
+
     expect(document.activeElement).toBe(input)
     expect(input.selectionStart).toBe(2)
   })
@@ -3171,9 +3961,11 @@ describe('drag caret freeze', () => {
     const f = await fixture(),
       input = f.input()
     input.focus()
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     f.unmount()
     fireEvent.pointerUp(window, { pointerId: 7 })
+
     expect(document.activeElement).not.toBe(input)
   })
 
@@ -3181,9 +3973,11 @@ describe('drag caret freeze', () => {
     const f = await fixture(),
       input = f.input()
     input.setSelectionRange(1, 3)
+
     act(() => f.result.current.dragFreeze.begin('missing', 7))
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(document.activeElement).not.toBe(input)
     expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3])
   })
@@ -3192,14 +3986,19 @@ describe('drag caret freeze', () => {
     const f = await fixture(),
       input = f.input()
     input.focus()
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     input.focus()
     input.setSelectionRange(3, 3)
+
     act(() => f.result.current.dragFreeze.begin('node', 8))
     fireEvent.pointerUp(window, { pointerId: 7 })
+
     expect(document.activeElement).not.toBe(input)
+
     act(() => f.bindings().inputRef(null))
     act(() => f.result.current.dragFreeze.end(8))
+
     expect(document.activeElement).not.toBe(input)
   })
 
@@ -3207,9 +4006,11 @@ describe('drag caret freeze', () => {
     const f = await fixture({ mode }),
       input = f.input()
     input.focus()
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.bindings().onBlur())
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.result.current.imageCaretNodeId).toBeUndefined()
     expect(document.activeElement).toBe(input)
@@ -3222,17 +4023,22 @@ describe('drag caret freeze', () => {
     input.tabIndex = 0
     input.textContent = 'hello'
     document.body.append(input)
+
     f.bindings().inputRef(input)
     input.focus()
     const selection = getSelection()!,
       range = document.createRange()
+
     range.setStart(input.firstChild!, 1)
     range.setEnd(input.firstChild!, 3)
     selection.removeAllRanges()
     selection.addRange(range)
     act(() => f.result.current.dragFreeze.begin('node', 7))
+
     expect(document.activeElement).not.toBe(input)
+
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(document.activeElement).toBe(input)
     expect(selection.isCollapsed).toBe(true)
     expect(selection.anchorOffset).toBe(1)
@@ -3241,10 +4047,14 @@ describe('drag caret freeze', () => {
   it('restores the caret across an attached image without rewriting the image indicator', async () => {
     const f = await fixture({ document: { roots: [image('hello')] } }),
       input = f.input()
+
     act(() => f.store.selectNode('node', 5))
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
+
     act(() => f.result.current.dragFreeze.begin('node', 7))
     act(() => f.result.current.dragFreeze.end(7))
+
     expect(f.result.current.imageCaretNodeId).toBe('node')
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
@@ -3255,6 +4065,7 @@ describe('gv', () => {
 
   it('restores a whole-node range in both directions after Escape', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
@@ -3262,50 +4073,64 @@ describe('gv', () => {
     act(() => f.store.selectNode('d', 0))
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('visual-node')
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'c' })
     expect(f.snapshot().location.selectedNodeId).toBe('c')
+
     f.press('o')
     f.press('Escape')
     act(() => f.store.selectNode('d', 0))
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'b' })
     expect(f.snapshot().location.selectedNodeId).toBe('b')
   })
 
   it('does nothing without a remembered selection and from a Visual mode', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.result.current.selection).toBeUndefined()
+
     f.press('V')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'a', focusId: 'a' })
   })
 
   it('selects the incoming nodes after a whole-node Visual put', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     f.press('y')
     f.press('y')
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'A', 'D'])
+
     const incoming = f.snapshot().document.roots[1]!.id
+
     expect(incoming).not.toBe('b')
+
     act(() => f.store.selectNode('d', 0))
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: incoming, focusId: incoming })
     expect(f.snapshot().location.selectedNodeId).toBe(incoming)
   })
 
   it('selects the whole incoming forest for a counted put', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     f.press('V')
     f.press('j')
     f.press('y')
@@ -3313,34 +4138,43 @@ describe('gv', () => {
     f.press('V')
     f.press('2')
     f.press('p')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'B', 'C', 'A', 'B', 'A', 'B'])
+
     const ids = f
       .snapshot()
       .document.roots.slice(3)
       .map((item) => item.id)
+
     act(() => f.store.selectNode('a', 0))
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: ids[0], focusId: ids[3] })
   })
 
   it('keeps the moved range after a shift', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
     f.press('>')
+
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'd'])
+
     f.press('Escape')
     act(() => f.store.selectNode('d', 0))
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'c' })
     expect(f.snapshot().location.selectedNodeId).toBe('c')
   })
 
   it('is invalid after the range lost, replaced, or gained a node', async () => {
     const f = await fixture({ document: { roots: siblings() } })
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('j')
@@ -3352,17 +4186,23 @@ describe('gv', () => {
     f.press('Escape')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'b', focusId: 'c' })
+
     f.press('Escape')
     act(() => f.store.selectNode('b', 0))
     f.press('o')
     f.type('N')
     f.press('Escape')
+
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['A', 'M', 'B', 'N', 'C', 'D'])
+
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
     expect(f.result.current.selection).toBeUndefined()
+
     // A new Visual selection replaces the invalid memory; deleting its nodes invalidates it again.
     act(() => f.store.selectNode('c', 0))
     f.press('V')
@@ -3372,10 +4212,13 @@ describe('gv', () => {
     f.press('d')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
+
     f.press('u')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'c', focusId: 'c' })
   })
 
@@ -3383,6 +4226,7 @@ describe('gv', () => {
     const f = await fixture({
       document: { roots: [node('a', 'A', [node('a1', 'A1'), node('a2', 'A2')]), node('b', 'B')] },
     })
+
     f.press('z')
     f.press('o')
     act(() => f.store.selectNode('a1', 0))
@@ -3394,16 +4238,20 @@ describe('gv', () => {
     f.press('c')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
+
     f.press('z')
     f.press('o')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.selection).toEqual({ anchorId: 'a1', focusId: 'a2' })
   })
 
   it('does nothing after the displayed location changed', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A', [node('a1', 'A1')]), node('b', 'B')] } })
+
     act(() => f.store.selectNode('b', 0))
     f.press('V')
     f.press('Escape')
@@ -3411,12 +4259,14 @@ describe('gv', () => {
     act(() => f.store.enter())
     f.press('g', {}, 'a1')
     f.press('v', {}, 'a1')
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 
   it('restores a character selection with its direction and live endpoints in another node', async () => {
     const f = await fixture({ document: { roots: [node('a', 'foo bar'), node('b', 'xyz')] } })
     f.input('a').setSelectionRange(0, 0)
+
     f.press('v')
     f.press('l')
     f.press('l')
@@ -3424,53 +4274,70 @@ describe('gv', () => {
     f.press('Escape')
     act(() => f.store.selectNode('b', 0))
     f.input('b').setSelectionRange(0, 0)
+
     f.press('g', {}, 'b')
     f.press('v', {}, 'b')
+
     expect(f.result.current.vimMode).toBe('visual')
     expect(f.snapshot().location.selectedNodeId).toBe('a')
     expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual([0, 3])
+
     // The anchor is the right end after `o`, so moving the focus right shortens the selection.
     f.press('l', {}, 'a')
+
     expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual([1, 3])
   })
 
   it('does nothing after the remembered character was deleted and left the node empty', async () => {
     const f = await fixture({ document: { roots: [node('a', 'x')] } })
     f.input('a').setSelectionRange(0, 0)
+
     f.press('v')
     f.press('d')
+
     expect(f.node('a').text).toBe('')
+
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 
   it('selects the incoming text after a character Visual put and ignores a stale offset', async () => {
     const f = await fixture({ document: { roots: [node('a', 'red blue')] } })
     f.input('a').setSelectionRange(0, 0)
+
     f.press('v')
     f.press('l')
     f.press('l')
     f.press('y')
     f.input('a').setSelectionRange(4, 4)
+
     f.press('v')
     f.press('3')
     f.press('l')
     f.press('p')
+
     expect(f.node('a').text).toBe('red red')
+
     f.press('Escape')
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('visual')
     expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual([4, 7])
+
     f.press('Escape')
     f.press('x')
     f.press('x')
     f.press('x')
     f.press('x')
+
     expect(f.node('a').text).toBe('red')
+
     f.press('g')
     f.press('v')
+
     expect(f.result.current.vimMode).toBe('normal')
   })
 })

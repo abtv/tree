@@ -47,6 +47,7 @@ describe('drop-zone spacing', () => {
 
     const start = computed('.drop-zone-start')
     const end = computed('.drop-zone-end')
+
     expect(start).toEqual({ height: 40, marginTop: -40, marginBottom: 0 })
     expect(end).toEqual({ height: 64, marginTop: 0, marginBottom: -64 })
     expect(start.height + start.marginTop).toBe(0)

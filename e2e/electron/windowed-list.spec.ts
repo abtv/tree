@@ -99,28 +99,40 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
   test('keeps an unfocused drag source mounted while the viewport scrolls away', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
     const { app, window } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     const source = window.locator('.node-row[data-node-id="c2"]')
+
     // The free gutter starts a row drag without moving focus from c0 to the source input.
     await startRowDrag(window, source, { xOffset: 1 })
+
     await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
+
     await window.evaluate(() => {
       document.querySelector('.scroll-viewport')!.scrollTop = 7500
     })
+
     await expect(source).toHaveClass(/node-row-pinned/)
     await expect(source).toHaveClass(/node-row-dragging/)
     await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
     expect(await window.locator('.node-row').count()).toBeLessThan(100)
     expect(await rowTilingProblems(window)).toEqual([])
+
     const receivingRow = window.locator('.node-row[data-node-id="c302"]')
     const receivingBox = await receivingRow.boundingBox()
     if (receivingBox === null) throw new Error('The row under the scrolled drag was not rendered.')
+
     await window.mouse.move(receivingBox.x + 30, receivingBox.y + receivingBox.height / 2)
+
     await expect(receivingRow).toHaveClass(/node-row-drop-on/)
+
     const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
+
     await expect(window).toHaveScreenshot(screenshotName('windowed-unfocused-drag-scrolled.png'), { clip })
+
     await window.keyboard.press('Escape')
     await window.mouse.up()
+
     await expect(window.locator('.node-row[data-node-id="c0"] .node-focus-marker')).toHaveCount(1)
     await expect(source).toHaveCount(0)
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
@@ -131,7 +143,9 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
     const { window } = await launchTree(userDataDir)
 
     await row(window, 1).focus()
+
     await expect(row(window, 1)).toBeFocused()
+
     for (let index = 0; index < 60; index += 1) await window.keyboard.press('ArrowDown')
 
     await expect(row(window, 61)).toBeFocused()
@@ -147,19 +161,23 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
     const { window } = await launchTree(userDataDir)
 
     for (let index = 0; index < 40; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 41)).toBeFocused()
     await expect
       .poll(() => window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0))
       .toBeGreaterThan(0)
 
     await window.keyboard.type('y')
+
     await expect(row(window, 41)).toHaveValue(/y/)
 
     await window.keyboard.press('Meta+z')
+
     await expect(row(window, 41)).toBeFocused()
     await expect(row(window, 41)).toHaveValue('Child 40')
 
     await window.keyboard.press('Meta+Shift+z')
+
     await expect(row(window, 41)).toBeFocused()
     await expect(row(window, 41)).toHaveValue(/y/)
   })
@@ -178,18 +196,23 @@ test.describe('windowed node list (mode-independent)', () => {
     const x = box.x + box.width / 2
 
     await startRowDrag(window, source, { xOffset: box.width / 2 })
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     await window.mouse.move(x, box.y + box.height, { steps: 5 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })
 
     await expect
       .poll(() => window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0))
       .toBeGreaterThan(500)
+
     const dropRow = window.locator('.node-row').nth(20)
     const dropBox = await dropRow.boundingBox()
     if (dropBox === null) throw new Error('The windowed drop row was not rendered after scrolling.')
+
     await window.mouse.move(x, dropBox.y + 1, { steps: 5 })
     const scrollY = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
+
     await window.mouse.up()
 
     await expect
@@ -216,18 +239,25 @@ test.describe('windowed node list (mode-independent)', () => {
     if (box === null) throw new Error('The source row was not rendered.')
     const innerHeight = await window.evaluate(() => globalThis.innerHeight)
     const x = box.x + box.width / 2
+
     expect(await window.locator('.node-row').count()).toBeGreaterThan(100)
 
     await startRowDrag(window, source, { xOffset: box.width / 2 })
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
     await window.mouse.move(x, box.y + box.height, { steps: 5 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })
+
     await expect.poll(scrollTop).toBeGreaterThan(300)
 
     await window.mouse.move(x, 70, { steps: 10 })
+
     await expect.poll(scrollTop).toBeLessThan(50)
+
     await window.keyboard.press('Escape')
     await window.mouse.up()
+
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
   })
 
@@ -247,14 +277,17 @@ test.describe('windowed node list (mode-independent)', () => {
     await startRowDrag(window, source, { xOffset: box.width / 2 })
     await window.mouse.move(x, box.y + box.height, { steps: 5 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })
+
     await expect.poll(scrollTop).toBeGreaterThan(300)
 
     // A single jump, so no intermediate pointer event passes through the top edge margin.
     const toolbar = await window.locator('.location-bar').boundingBox()
     if (toolbar === null) throw new Error('The location toolbar was not rendered.')
+
     await window.mouse.move(x, toolbar.y + toolbar.height / 2)
     const resting = await scrollTop()
     await window.waitForTimeout(300)
+
     expect(await scrollTop()).toBe(resting)
 
     await window.keyboard.press('Escape')
@@ -274,7 +307,9 @@ test.describe('windowed node list (mode-independent)', () => {
     await startRowDrag(window, source, { xOffset: box.width / 2 })
     await window.mouse.move(x, innerHeight - 8, { steps: 10 })
     await window.waitForTimeout(300)
+
     expect(await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)).toBe(0)
+
     await window.keyboard.press('Escape')
     await window.mouse.up()
   })
@@ -288,10 +323,13 @@ test.describe('windowed node list (mode-independent)', () => {
 
     await row(window, 1).focus()
     for (let index = 0; index < 20; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 21)).toBeFocused()
+
     const heightBeforeResize = await rowHeight(window, 21)
 
     await setMainWindowBounds(app, { width: 640 })
+
     await expect.poll(() => window.evaluate(() => globalThis.innerWidth)).toBeLessThan(700)
     await expect.poll(() => rowHeight(window, 21)).toBeGreaterThan(heightBeforeResize)
 
@@ -300,6 +338,7 @@ test.describe('windowed node list (mode-independent)', () => {
     expect(await rowTilingProblems(window)).toEqual([])
 
     for (let index = 0; index < 5; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 26)).toBeFocused()
     await expect(row(window, 26)).toBeInViewport()
     expect(await rowTilingProblems(window)).toEqual([])
@@ -311,7 +350,9 @@ test.describe('windowed node list (mode-independent)', () => {
 
     const listHeightBefore = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollHeight ?? 0)
     const baseRowHeight = await rowHeight(window, 1)
+
     await row(window, 3).fill(wrappedRowText)
+
     await expect.poll(() => rowHeight(window, 3)).toBeGreaterThan(30)
 
     await expect
@@ -324,6 +365,7 @@ test.describe('windowed node list (mode-independent)', () => {
 
     await row(window, 3).focus()
     for (let index = 0; index < 60; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 63)).toBeFocused()
     await expect(row(window, 63)).toBeInViewport()
     expect(await rowTilingProblems(window)).toEqual([])
@@ -340,6 +382,7 @@ test.describe('windowed node list (mode-independent)', () => {
     const listHeightBefore = await window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollHeight ?? 0)
     const baseRowHeight = await rowHeight(window, 1)
     for (let index = 0; index < 40; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 41)).toBeFocused()
 
     await expect(window.getByAltText('Attached image')).toBeVisible()
@@ -356,6 +399,7 @@ test.describe('windowed node list (mode-independent)', () => {
 
     await row(window, 41).focus()
     for (let index = 0; index < 5; index += 1) await window.keyboard.press('ArrowDown')
+
     await expect(row(window, 46)).toBeFocused()
     await expect(row(window, 46)).toBeInViewport()
     expect(await rowTilingProblems(window)).toEqual([])

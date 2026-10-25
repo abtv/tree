@@ -14,11 +14,14 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
     shortcode: 'woman_technologist',
     emoji: '👩‍💻',
   })
+
   for (const text of [':', 'Plan :', '\n:', ':r']) {
     const match = suggestEmoji(text, text.length)
+
     expect(match).toMatchObject({ start: text.lastIndexOf(':'), end: text.length })
     expect(match!.suggestions.length).toBeGreaterThan(8)
   }
+
   for (const text of ['https://roc', 'https://1', '12:100', '12:roc', 'word:roc', ':roc ', ':no_such_emoji', '(:roc']) {
     expect(suggestEmoji(text, text.length)).toBeUndefined()
   }
@@ -36,6 +39,7 @@ it('includes every ordered subsequence and preserves catalog order for an empty 
       for (const letter of shortcode) if (letter === query[position]) position++
       return position === query.length
     })
+
     expect(suggestions.map((entry) => entry.shortcode).toSorted()).toEqual(expected.toSorted())
     if (query === '') expect(suggestions.map((entry) => entry.shortcode)).toEqual(expected)
   }
@@ -45,6 +49,7 @@ it('includes every ordered subsequence and preserves catalog order for an empty 
 it('prioritizes exact names and prefixes while finding English abbreviations without correcting typos', () => {
   const names = (query: string): string[] =>
     suggestEmoji(`:${query}`, query.length + 1)?.suggestions.map(({ shortcode }) => shortcode) ?? []
+
   expect(names('cat').slice(0, 2)).toEqual(['cat', 'cat2'])
   expect(names('cat')).toContain('joy_cat')
   expect(names('rkt')).toContain('rocket')
@@ -55,8 +60,10 @@ it('prioritizes exact names and prefixes while finding English abbreviations wit
   expect(names('rocekt')).not.toContain('rocket')
   expect(names('raket')).not.toContain('rocket')
   expect(names('ракета')).toEqual([])
+
   const c = names('c')
   const prefixes = Object.keys(catalog).filter((name) => name.startsWith('c'))
+
   expect(c.slice(0, prefixes.length)).toEqual(prefixes)
   expect(c.indexOf('joy_cat')).toBeLessThan(c.indexOf('rocket'))
 })
@@ -68,6 +75,7 @@ it.each(Array.from({ length: Math.ceil(Object.keys(catalog).length / 50) }, (_, 
     for (const [shortcode, emoji] of Object.entries(catalog).slice(batch * 50, (batch + 1) * 50)) {
       for (let length = 1; length <= shortcode.length; length++) {
         const text = `Plan :${shortcode.slice(0, length)}`
+
         expect(suggestEmoji(text, text.length)?.suggestions).toContainEqual({ shortcode, emoji })
       }
     }

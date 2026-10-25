@@ -15,15 +15,19 @@ describe('useLeftCommandKey', () => {
     const { result } = renderHook(() => useLeftCommandKey())
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'MetaRight' })))
+
     expect(result.current).toBe(false)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'MetaLeft' })))
+
     expect(result.current).toBe(true)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'MetaRight' })))
+
     expect(result.current).toBe(true)
 
     act(() => window.dispatchEvent(new Event('blur')))
+
     expect(result.current).toBe(false)
   })
 
@@ -32,25 +36,32 @@ describe('useLeftCommandKey', () => {
     const { result } = renderHook(() => useLeftCommandKey(OTHER_SHORTCUTS))
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'MetaLeft' })))
+
     expect(result.current).toBe(false)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlRight' })))
+
     expect(result.current).toBe(false)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' })))
+
     expect(result.current).toBe(true)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ControlRight' })))
+
     expect(result.current).toBe(true)
 
     act(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ControlLeft' })))
+
     expect(result.current).toBe(false)
   })
 
   // @requirement PRODUCT.md §1.5
   it('ignores the left Control key on the Apple profile', () => {
     const { result } = renderHook(() => useLeftCommandKey(APPLE_SHORTCUTS))
+
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft' })))
+
     expect(result.current).toBe(false)
   })
 })

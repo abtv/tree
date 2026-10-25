@@ -91,6 +91,7 @@ describe('parseArguments', () => {
 describe('collectFixHistory', () => {
   it('includes fixes inside the window, including the boundary, and excludes one before it', () => {
     const root = createRepository()
+
     commit(root, 'fix(vim): old', '2026-09-14T23:59:59Z', { 'src/a.ts': 'old\n' })
     commit(root, 'fix(vim): boundary', '2026-09-15T00:00:00Z', { 'src/a.ts': 'boundary\n' })
     commit(root, 'fix(vim): inside', '2026-09-20T12:00:00Z', { 'src/a.ts': 'inside\n' })
@@ -108,6 +109,7 @@ describe('collectFixHistory', () => {
 
   it('excludes HEAD itself from the listed fixes', () => {
     const root = createRepository()
+
     commit(root, 'fix(vim): first', '2026-09-20T12:00:00Z', { 'src/a.ts': 'one\n' })
     commit(root, 'fix(vim): second', '2026-09-21T12:00:00Z', { 'src/a.ts': 'two\n' })
     commit(root, 'fix(vim): head', '2026-09-22T12:00:00Z', { 'src/a.ts': 'three\n' })
@@ -121,6 +123,7 @@ describe('collectFixHistory', () => {
 
   it('selects the production files changed in a fix commit at HEAD', () => {
     const root = createRepository()
+
     commit(root, 'fix(vim): repair', '2026-09-20T12:00:00Z', {
       'src/a.ts': 'one\n',
       'src/a.test.ts': 'test\n',
@@ -136,6 +139,7 @@ describe('collectFixHistory', () => {
 
   it('selects modified production files from the working-tree diff', () => {
     const root = createRepository()
+
     commit(root, 'feat(vim): add', '2026-09-20T12:00:00Z', { 'src/a.ts': 'one\n', 'src/b.ts': 'one\n' })
     write(root, 'src/a.ts', 'two\n')
     write(root, 'docs/note.md', 'doc\n')
@@ -148,6 +152,7 @@ describe('collectFixHistory', () => {
 
   it('reports a possible shared cause when a file has three or more fixes', () => {
     const root = createRepository()
+
     commit(root, 'fix(vim): one', '2026-09-20T12:00:00Z', { 'src/a.ts': 'one\n' })
     commit(root, 'fix(vim): two', '2026-09-21T12:00:00Z', { 'src/a.ts': 'two\n' })
     commit(root, 'fix(vim): three', '2026-09-22T12:00:00Z', { 'src/a.ts': 'three\n' })
@@ -163,6 +168,7 @@ describe('collectFixHistory', () => {
 
   it('reports no matches for a file without fixes', () => {
     const root = createRepository()
+
     commit(root, 'feat(vim): add', '2026-09-20T12:00:00Z', { 'src/a.ts': 'one\n' })
 
     const report = collectFixHistory({ rootDirectory: root, paths: ['src/a.ts'], since: '2026-09-01T00:00:00Z' })

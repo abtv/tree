@@ -100,6 +100,7 @@ describe('recordPerfResult', () => {
     })
 
     const artifact = readArtifact(path)
+
     expect(Object.keys(artifact.metrics)).toEqual(['typing:wide-1000', 'state:large-10000'])
     expect(artifact.metrics['typing:wide-1000']).toEqual({ paintP95Ms: 30 })
     expect(artifact.metrics['state:large-10000']).toEqual({ typingMs: 200, 'launchMs.min': 1, 'launchMs.max': 2 })
@@ -108,6 +109,7 @@ describe('recordPerfResult', () => {
 
   it('fails when a metric exceeds the baseline tolerance', () => {
     const baselinePath = temporaryPath('baseline.json')
+
     writeBaseline(baselinePath, { paintP95Ms: 10 })
     process.env['PERF_RESULTS'] = temporaryPath('perf-results.json')
     process.env['PERF_BASELINE'] = baselinePath
@@ -119,6 +121,7 @@ describe('recordPerfResult', () => {
 
   it('fails when a metric is missing from the baseline', () => {
     const baselinePath = temporaryPath('baseline.json')
+
     writeBaseline(baselinePath, { paintP95Ms: 10 })
     process.env['PERF_RESULTS'] = temporaryPath('perf-results.json')
     process.env['PERF_BASELINE'] = baselinePath
@@ -130,6 +133,7 @@ describe('recordPerfResult', () => {
 
   it('fails when the baseline has no entry for the scenario', () => {
     const baselinePath = temporaryPath('baseline.json')
+
     writeBaseline(baselinePath, { paintP95Ms: 10 })
     process.env['PERF_RESULTS'] = temporaryPath('perf-results.json')
     process.env['PERF_BASELINE'] = baselinePath
@@ -142,6 +146,7 @@ describe('recordPerfResult', () => {
   it('passes when metrics stay within the baseline tolerance', () => {
     const baselinePath = temporaryPath('baseline.json')
     const resultsPath = temporaryPath('perf-results.json')
+
     writeBaseline(baselinePath, { paintP95Ms: 10 })
     process.env['PERF_RESULTS'] = resultsPath
     process.env['PERF_BASELINE'] = baselinePath
@@ -155,6 +160,7 @@ describe('recordPerfResult', () => {
 describe('readArtifact', () => {
   it('rejects invalid artifacts', () => {
     const path = temporaryPath('invalid.json')
+
     writeFileSync(path, '{"metrics":{}}')
 
     expect(() => readArtifact(path)).toThrow(/is invalid/)

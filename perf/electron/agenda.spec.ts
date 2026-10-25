@@ -28,11 +28,13 @@ for (const navigation of ['Visual', 'horizontal'] as const) {
   }) => {
     seedDocument(userDataDir, agendaSeed(3000))
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await installSaveProbe(app)
     await window.keyboard.press('Meta+p')
     await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
     await window.keyboard.press(navigation === 'Visual' ? 'V' : '$')
     const keys = navigation === 'Visual' ? ['j', 'k'] : ['l', 'h']
+
     await window.evaluate((keys) => {
       const probe = { motion: [] as number[] }
       ;(window as unknown as { agendaVisualProbe: typeof probe }).agendaVisualProbe = probe
@@ -57,6 +59,7 @@ for (const navigation of ['Visual', 'horizontal'] as const) {
     )
     const saves = await readSaves(app)
     const sorted = probe.motion.toSorted((a, b) => a - b)
+
     recordPerfResult({
       kind: 'state',
       scenario:
@@ -66,6 +69,7 @@ for (const navigation of ['Visual', 'horizontal'] as const) {
       samples: sorted.length,
       metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
     })
+
     expect(sorted[38]).toBeLessThan(50)
     expect(sorted[39]).toBeLessThan(100)
     expect(saves).toBe(0)
@@ -78,12 +82,16 @@ for (const navigation of ['Visual', 'horizontal'] as const) {
 test('Agenda Replace row clicks stay responsive with bounded mounted rows and no saves', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await installSaveProbe(app)
   await window.keyboard.press('Meta+p')
   const destination = window.locator('.agenda-row[data-node-id="dated-0"]').first()
+
   await destination.click()
   const input = window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })
+
   await expect(input).toBeFocused()
+
   await window.keyboard.press('R')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -99,6 +107,7 @@ test('Agenda Replace row clicks stay responsive with bounded mounted rows and no
   for (let index = 0; index < 10; index += 1) {
     await window.locator('.agenda-row-day').first().click()
     await destination.locator('.node-enter-control').click()
+
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
   }
@@ -109,12 +118,14 @@ test('Agenda Replace row clicks stay responsive with bounded mounted rows and no
     (window as unknown as { agendaReplaceClicks: number[] }).agendaReplaceClicks.toSorted((a, b) => a - b),
   )
   const saves = await readSaves(app)
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-replace-clicks',
     samples: samples.length,
     metrics: { clickP95Ms: round(samples[18]!), clickMaxMs: round(samples[19]!), saves },
   })
+
   expect(samples[18]).toBeLessThan(50)
   expect(samples[19]).toBeLessThan(100)
   expect(saves).toBe(0)
@@ -125,10 +136,13 @@ test('Agenda Replace row clicks stay responsive with bounded mounted rows and no
 test('Agenda typing keeps mounted rows bounded and stays within the interactive budget', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await window.keyboard.press('Meta+p')
   await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
   const input = window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })
+
   await expect(input).toBeFocused()
+
   await window.keyboard.press('A')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -147,12 +161,14 @@ test('Agenda typing keeps mounted rows bounded and stays within the interactive 
   const samples = await window.evaluate(() =>
     (window as unknown as { agendaTyping: number[] }).agendaTyping.toSorted((a, b) => a - b),
   )
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-typing',
     samples: samples.length,
     metrics: { typingP95Ms: round(samples[28]!), typingMaxMs: round(samples[29]!) },
   })
+
   expect(samples[28]).toBeLessThan(50)
   expect(samples[29]).toBeLessThan(100)
   expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
@@ -165,11 +181,14 @@ test('Agenda keystrokes that change date recognition stay within the interactive
 }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await installSaveProbe(app)
   await window.keyboard.press('Meta+p')
   await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
   const input = window.getByRole('textbox', { name: 'Agenda node dated-0', exact: true })
+
   await expect(input).toBeFocused()
+
   await window.keyboard.press('A')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -196,12 +215,14 @@ test('Agenda keystrokes that change date recognition stay within the interactive
     (window as unknown as { agendaDateEdit: number[] }).agendaDateEdit.toSorted((a, b) => a - b),
   )
   const saves = await readSaves(app)
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-date-edit',
     samples: samples.length,
     metrics: { dateEditP95Ms: round(samples[28]!), dateEditMaxMs: round(samples[29]!), saves },
   })
+
   expect(samples[28]).toBeLessThan(50)
   expect(samples[29]).toBeLessThan(100)
   // Recognition changes must not save per keystroke: 150 keystrokes make no more than a handful of saves.
@@ -214,12 +235,17 @@ test('Agenda keystrokes that change date recognition stay within the interactive
 test('Agenda mirror updates keep focus and stay within the interactive budget', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000, true))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await window.keyboard.press('Meta+p')
   const occurrences = window.locator('.agenda-row[data-node-id="pair"]')
+
   await expect(occurrences).toHaveCount(2)
+
   await occurrences.first().click()
   const input = window.getByRole('textbox', { name: 'Agenda node pair', exact: true })
+
   await expect(input).toBeFocused()
+
   await window.keyboard.press('A')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -238,12 +264,14 @@ test('Agenda mirror updates keep focus and stay within the interactive budget', 
   const samples = await window.evaluate(() =>
     (window as unknown as { agendaMirror: number[] }).agendaMirror.toSorted((a, b) => a - b),
   )
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-mirror-update',
     samples: samples.length,
     metrics: { mirrorP95Ms: round(samples[28]!), mirrorMaxMs: round(samples[29]!) },
   })
+
   expect(samples[28]).toBeLessThan(50)
   expect(samples[29]).toBeLessThan(100)
   // Both occurrences show the typed text while the active one keeps focus.
@@ -260,13 +288,16 @@ test('Agenda group move of a Visual selection completes within budget as one sav
 }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await installSaveProbe(app)
   await window.keyboard.press('Meta+p')
   await window.locator('.agenda-row[data-node-id="dated-0"]').first().click()
   await window.keyboard.press('V')
   await window.keyboard.type('99j')
   await window.keyboard.press('d')
+
   await expect(window.locator('.agenda-row-pending').first()).toBeVisible()
+
   await window.evaluate(() => {
     const probe = { move: [] as number[], undo: [] as number[] }
     ;(window as unknown as { agendaMove: typeof probe }).agendaMove = probe
@@ -286,25 +317,31 @@ test('Agenda group move of a Visual selection completes within budget as one sav
   await window.waitForFunction(
     () => (window as unknown as { agendaMove: { move: number[] } }).agendaMove.move.length === 1,
   )
+
   await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
   // A cancelled move would never save, so a save here shows that the dates were changed.
   await expect.poll(() => readSaves(app), { timeout: 20000 }).toBeGreaterThanOrEqual(1)
+
   await window.keyboard.press('Escape')
   await window.keyboard.press('u')
   await window.waitForFunction(
     () => (window as unknown as { agendaMove: { undo: number[] } }).agendaMove.undo.length === 1,
   )
+
   await expect.poll(() => readSaves(app), { timeout: 20000 }).toBeGreaterThanOrEqual(2)
+
   const probe = await window.evaluate(
     () => (window as unknown as { agendaMove: { move: number[]; undo: number[] } }).agendaMove,
   )
   const saves = await readSaves(app)
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-group-move',
     samples: 2,
     metrics: { moveMs: round(probe.move[0]!), undoMs: round(probe.undo[0]!), saves },
   })
+
   // Ten runs without forced GC after making selection measurement read-only measured
   // 17-34.3 ms for the move and 30.9-41.7 ms for Undo (including two animation frames).
   // The Undo ceiling leaves over twice the measured maximum without allowing the old pauses.
@@ -318,6 +355,7 @@ test('Agenda group move of a Visual selection completes within budget as one sav
 test('Agenda open, scroll and vertical motion stay responsive on a large dated document', async ({ userDataDir }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await installSaveProbe(app)
   await window.evaluate(() => {
     const probe = { open: [] as number[], motion: [] as number[] }
@@ -334,8 +372,10 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
     )
   })
   await window.keyboard.press('Meta+p')
+
   await expect(window.getByRole('grid', { name: 'Agenda timeline' })).toBeVisible()
   await expect(window.locator('.agenda-row[aria-selected="true"]')).toBeFocused()
+
   await window.waitForFunction(
     () => (window as unknown as { agendaProbe: { open: number[] } }).agendaProbe.open.length === 1,
   )
@@ -354,6 +394,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   await window.waitForFunction(
     () => (window as unknown as { agendaProbe: { motion: number[] } }).agendaProbe.motion.length === 40,
   )
+
   await window.keyboard.type('99j')
   await window.keyboard.type('99k')
   await window.waitForFunction(
@@ -365,6 +406,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   const saves = await readSaves(app)
   const sorted = probe.motion.slice(0, 40).toSorted((a, b) => a - b)
   const countedMotionMs = Math.max(...probe.motion.slice(40))
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences',
@@ -378,6 +420,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
       saves,
     },
   })
+
   expect(probe.open[0]).toBeLessThan(100)
   expect(scroll).toBeLessThan(100)
   expect(countedMotionMs).toBeLessThan(100)
@@ -395,11 +438,15 @@ test('Agenda caret motion over a row without an editor stays within the interact
 }) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
   await installSaveProbe(app)
   await window.keyboard.press('Meta+p')
   const day = window.locator('.agenda-row-day').first()
+
   await day.click()
+
   await expect(day).toHaveAttribute('aria-selected', 'true')
+
   await window.evaluate(() => {
     const probe = { motion: [] as number[] }
     ;(window as unknown as { agendaCaretProbe: typeof probe }).agendaCaretProbe = probe
@@ -423,12 +470,14 @@ test('Agenda caret motion over a row without an editor stays within the interact
   )
   const saves = await readSaves(app)
   const sorted = probe.motion.toSorted((a, b) => a - b)
+
   recordPerfResult({
     kind: 'state',
     scenario: 'agenda-6000-occurrences-row-caret',
     samples: sorted.length,
     metrics: { motionP95Ms: round(sorted[38]!), motionMaxMs: round(sorted[39]!), saves },
   })
+
   expect(sorted[38]).toBeLessThan(50)
   expect(sorted[39]).toBeLessThan(100)
   expect(saves).toBe(0)

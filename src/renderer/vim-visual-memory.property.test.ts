@@ -50,9 +50,11 @@ it('only restores a whole-node memory whose nodes are still exactly one contiguo
         const anchorId = originalIds[Math.min(rawAnchor, count - 1)]!
         const focusId = originalIds[Math.min(rawFocus, count - 1)]!
         const state = createVimCommandState()
+
         rememberNodeRange(state, documentOf(originalIds.map((id) => node(id))), anchorId, focusId)
         const memory = state.lastVisual
         const rememberedIds = memory?.kind === 'nodes' ? memory.ids : []
+
         const editedIds = applyEdits(originalIds, edits)
         const edited = documentOf(editedIds.map((id) => node(id)))
         const restored = resolveVisualMemory(
@@ -65,11 +67,16 @@ it('only restores a whole-node memory whose nodes are still exactly one contiguo
         const to = editedIds.indexOf(focusId)
         const expected = from < 0 || to < 0 ? undefined : editedIds.slice(Math.min(from, to), Math.max(from, to) + 1)
         const unchanged = expected !== undefined && expected.join() === rememberedIds.join()
+
         expect(restored !== undefined).toBe(unchanged)
+
         if (restored !== undefined) {
           expect(restored).toEqual({ kind: 'nodes', anchorId, focusId })
+
           const afterEdits = createVimCommandState()
+
           rememberNodeRange(afterEdits, edited, anchorId, focusId)
+
           expect(afterEdits.lastVisual).toEqual(memory)
         }
       },
@@ -85,6 +92,7 @@ it('only restores a character memory whose offsets still exist in the text', () 
       fc.integer({ min: 0, max: 24 }),
       (anchor, focus, length) => {
         const text = 'x'.repeat(length)
+
         const restored = resolveVisualMemory(
           { kind: 'text', nodeId: 'n', anchor, focus, hadText: length > 0 },
           documentOf([{ id: 'n', text, children: [] }]),
@@ -92,6 +100,7 @@ it('only restores a character memory whose offsets still exist in the text', () 
           () => true,
         )
         const last = Math.max(0, length - 1)
+
         expect(restored !== undefined).toBe(anchor <= last && focus <= last)
       },
     ),

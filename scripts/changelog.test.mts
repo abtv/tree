@@ -30,6 +30,7 @@ describe('generateChangelog', () => {
       { hash: 'def5678', subject: 'fix: repair a thing' },
       { hash: 'aaa0000', subject: 'Legacy descriptive commit' },
     ])
+
     expect(changelog).toContain('### Added')
     expect(changelog).toContain('- add a thing (`abc1234`)')
     expect(changelog).toContain('### Fixed')

@@ -48,8 +48,10 @@ it('coalesces arbitrary saved versions and eventually writes the last one withou
         backup.saved()
       }
       await vi.advanceTimersByTimeAsync(20_020)
+
       expect(written).toBe(version)
       expect(maximumInFlight).toBe(1)
+
       backup.stop()
       vi.useRealTimers()
     }),

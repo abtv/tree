@@ -11,14 +11,19 @@ it('keeps history bounded, unique and valid and matching stable under arbitrary 
       fc.string(),
       (history, query) => {
         const normalized = normalizeCommandHistory(history)
+
         expect(normalized.length).toBeLessThanOrEqual(100)
         expect(new Set(normalized).size).toBe(normalized.length)
         expect(normalizeCommandHistory(normalized)).toEqual(normalized)
         expect(normalized.every((name) => known.includes(name) && name !== 'quit')).toBe(true)
+
         const remembered = rememberCommand(normalized, 'set-theme-dark')
+
         expect(remembered[0]).toBe('set-theme-dark')
         expect(remembered.slice(1)).toEqual(normalized.filter((name) => name !== 'set-theme-dark'))
+
         const matches = matchCommands(query, history)
+
         expect(new Set(matches).size).toBe(matches.length)
         expect(
           matchCommands(query, normalized)

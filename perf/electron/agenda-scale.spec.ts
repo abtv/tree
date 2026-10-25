@@ -56,6 +56,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
         await profiler.send('Profiler.enable')
         await profiler.send('Profiler.start')
       }
+
       await app.evaluate(() => {
         const control = globalThis as typeof globalThis & { scaleSaves: number }
         control.scaleSaves = 0
@@ -81,7 +82,9 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
         )
       })
       await window.keyboard.press('Meta+p')
+
       await expect(window.getByRole('grid', { name: 'Agenda timeline' })).toBeVisible()
+
       if (profiler !== undefined) {
         const { profile } = await profiler.send('Profiler.stop')
         const counts = new Map<string, number>()
@@ -113,26 +116,39 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       const navigationSaves = await app.evaluate(
         () => (globalThis as typeof globalThis & { scaleSaves: number }).scaleSaves,
       )
+
       expect(navigationSaves).toBe(0)
+
       // The first dated node is visible even with nineteen contextual ancestors.
       const targetId = dense ? 'scale-0' : 'scale-19'
+
       await window.locator(`.agenda-row[data-node-id="${targetId}"]`).first().click()
       const input = window.getByRole('textbox', { name: `Agenda node ${targetId}`, exact: true })
+
       await expect(input).toBeFocused()
+
       await window.keyboard.press('A')
       for (let index = 0; index < 30; index += 1) await window.keyboard.press('a')
+
       await expect(input).toContainText('a'.repeat(30))
+
       for (let index = 0; index < 15; index += 1) {
         await window.keyboard.type(' 2099-01-05')
         for (let character = 0; character < 11; character += 1) await window.keyboard.press('Backspace')
       }
+
       await expect(input).toBeFocused()
+
       await window.keyboard.press('Escape')
       await window.keyboard.type('100dd')
+
       await expect(window.locator('.agenda-row-pending').first()).toBeVisible()
+
       await window.keyboard.press('G')
       await window.keyboard.press('p')
+
       await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
+
       await window.keyboard.press('Escape')
       await window.keyboard.press('u')
       await window.waitForFunction(
@@ -164,9 +180,11 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       const motion = [...samples.j!, ...samples.k!].toSorted((a, b) => a - b)
       const typing = samples.a!.toSorted((a, b) => a - b)
       const dates = samples['5']!.toSorted((a, b) => a - b)
+
       expect(motion).toHaveLength(40)
       expect(typing).toHaveLength(30)
       expect(dates).toHaveLength(15)
+
       const metrics = {
         openPaintMs: round(samples.open![0]!),
         scrollPaintMs: round(scrollMs),
@@ -179,14 +197,18 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
         undoMs: round(samples.u![0]!),
         navigationSaves,
       }
+
       recordPerfResult({ kind: 'state', scenario, samples: 85, metrics })
+
       // Opening materializes every projected row (about 200,000 in these shapes, far fewer in the sparse wide
       // and mixed ones), so it keeps its own ceiling; the Product Owner accepted this extreme case.
       expect.soft(metrics.openPaintMs).toBeLessThan(dense || shape === 'deep' ? 150 : 100)
       expect.soft(metrics.scrollPaintMs).toBeLessThan(100)
       expect.soft(metrics.motionP95Ms).toBeLessThan(50)
       expect.soft(metrics.motionMaxMs).toBeLessThan(100)
+
       const editP95LimitMs = 75
+
       expect.soft(metrics.typingP95Ms).toBeLessThan(editP95LimitMs)
       expect.soft(metrics.typingMaxMs).toBeLessThan(100)
       expect.soft(metrics.dateEditP95Ms).toBeLessThan(editP95LimitMs)

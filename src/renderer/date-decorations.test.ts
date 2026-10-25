@@ -19,10 +19,12 @@ describe('date-like decorations', () => {
   })
   it('skips hyperlink text', () => {
     const text = '2026-02-31 link'
+
     expect(treeDecorations(node(text, [{ start: 0, end: 10, url: 'https://example.com' }]))).toBeUndefined()
   })
   it('orders Agenda decorations by position across valid and resembling dates', () => {
     const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
+
     expect(agendaDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'), day, day)).toEqual([
       { start: 0, end: 10, className: DATE_LIKE_CLASS },
       { start: 13, end: 23, className: 'agenda-date-active date-today' },
@@ -45,6 +47,7 @@ describe('Tree date visualization', () => {
   it('compares calendar days across year boundaries independently of the Agenda occurrence', () => {
     const today = dayNumberOf({ year: 2027, month: 1, day: 1 })
     const value = node('2026-12-31 2027-01-01 2027-01-02')
+
     expect(treeDecorations(value, today)?.map((item) => item.className)).toEqual([
       'agenda-date-active date-past',
       'agenda-date-active date-today',
@@ -77,8 +80,11 @@ describe('date-like underline caret rule', () => {
 
   it('shows every underline while the element is not focused', () => {
     const input = editor('x 2026-10-1 y')
+
     updateDateLikeUnderline(input)
+
     expect(marked(input)).toBe(false)
+
     input.remove()
   })
   it('hides the token the caret is in or adjacent to and shows it elsewhere', () => {
@@ -94,7 +100,9 @@ describe('date-like underline caret rule', () => {
       [15, false],
     ] as const) {
       setSelectionRange(input, caret, caret)
+
       updateDateLikeUnderline(input)
+
       expect(marked(input), `caret ${caret}`).toBe(hidden)
     }
     input.remove()
@@ -111,7 +119,9 @@ describe('date-like underline caret rule', () => {
       [13, false],
     ] as const) {
       setSelectionRange(input, block, block + 1)
+
       updateDateLikeUnderline(input)
+
       expect(marked(input), `block ${block}`).toBe(hidden)
     }
     input.remove()
@@ -120,22 +130,33 @@ describe('date-like underline caret rule', () => {
     const input = editor('ab 2026-10-1 cd')
     input.focus()
     setSelectionRange(input, 0, 3)
+
     updateDateLikeUnderline(input)
+
     expect(marked(input)).toBe(true)
+
     setSelectionRange(input, 0, 2)
+
     updateDateLikeUnderline(input)
+
     expect(marked(input)).toBe(false)
+
     input.remove()
   })
   it('shows the underline again when focus leaves', () => {
     const input = editor('2026-10-1')
     input.focus()
     setSelectionRange(input, 4, 4)
+
     updateDateLikeUnderline(input)
+
     expect(marked(input)).toBe(true)
+
     input.blur()
     updateDateLikeUnderline(input)
+
     expect(marked(input)).toBe(false)
+
     input.remove()
   })
 })

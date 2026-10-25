@@ -12,9 +12,12 @@ function writeArchive(entries: { name: string; bytes: Uint8Array; deflate?: bool
     if (deflate) writer.addDeflated(name, bytes)
     else writer.addStored(name, bytes)
   }
+
   writer.finish()
   const archive = concat(chunks)
+
   expect(writer.bytesWritten).toBe(archive.byteLength)
+
   return archive
 }
 
@@ -42,6 +45,7 @@ describe('ZIP writer', () => {
       { name: 'attachments/a.png', bytes: image },
     ])
     const entries = listCentralEntries(archive)
+
     expect(entries.map(({ name, method }) => [name, method])).toEqual([
       ['document.json', 8],
       ['attachments/a.png', 0],
@@ -60,11 +64,15 @@ describe('ZIP writer', () => {
     const document = new TextEncoder().encode(
       JSON.stringify(Array.from({ length: 70_000 }, (_, index) => ({ id: `n${index}`, text: `Note ${index}` }))),
     )
+
     expect(document.byteLength).toBeGreaterThan(2 * 1024 * 1024)
+
     const chunks: Uint8Array[] = []
     const writer = createZipWriter((chunk) => chunks.push(chunk.slice()))
+
     writer.addDeflated('document.json', document)
     writer.finish()
+
     // Header, one output block per slice, descriptor and central directory.
     expect(chunks.length).toBeGreaterThan(4)
     expect(sameBytes(readArchive(concat(chunks)).get('document.json'), document)).toBe(true)
@@ -85,22 +93,28 @@ describe('ZIP writer', () => {
     const source = { readHead: async () => head, readImage: async () => payloadWith([1, 2, 3, 4]) }
     const exportWith = async (archiveBytes: number) => {
       const chunks: Uint8Array[] = []
+
       const summary = await exportNotesArchive(
         source,
         createZipWriter((chunk) => chunks.push(chunk.slice())),
         undefined,
         { ...ARCHIVE_LIMITS, archiveBytes },
       )
+
       expect(concat(chunks).byteLength).toBe(summary.archiveBytes)
+
       return summary
     }
+
     const { archiveBytes } = await exportWith(ARCHIVE_LIMITS.archiveBytes)
+
     expect((await exportWith(archiveBytes)).imageCount).toBe(2)
     await expect(exportWith(archiveBytes - 1)).rejects.toThrow(ARCHIVE_TOO_LARGE_MESSAGE)
   })
 
   it('writes an empty deflated entry', () => {
     const archive = writeArchive([{ name: 'document.json', bytes: new Uint8Array(0), deflate: true }])
+
     expect(readArchive(archive).get('document.json')).toEqual(new Uint8Array(0))
   })
 
@@ -134,6 +148,7 @@ describe('ZIP writer', () => {
       } catch (error) {
         streamed = error
       }
+
       if (misread) expect(streamed).not.toEqual(expected)
       else expect(streamed).toEqual(expected)
     })

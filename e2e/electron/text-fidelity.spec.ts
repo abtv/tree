@@ -100,6 +100,7 @@ async function drawBoth(window: Page, source: Locator, text: string): Promise<vo
     },
     [ID_SHAPED, ID_REFERENCE],
   )
+
   expect(geometry).toEqual({ separated: true, visible: true, unclipped: true })
 }
 
@@ -140,6 +141,7 @@ async function expectDrawnCharacterByCharacter(window: Page, source: Locator, na
   for (let index = 0; index < RISKY_TEXT.length; index += 4) {
     const group = RISKY_TEXT.slice(index, index + 4)
     const matches = await drawingsMatch(window, source, group.join('\n'), index === 0 ? name : undefined)
+
     if (!matches) {
       // Keep the original per-string diagnosis without paying its capture cost on a passing run.
       for (const text of group) {
@@ -163,6 +165,7 @@ async function expectLigaturesDetected(window: Page, source: Locator, name: stri
       styled.style.fontVariantLigatures = 'normal'
       styled.style.fontFeatureSettings = '"liga" 1, "clig" 1, "calt" 1, "dlig" 1, "hlig" 1'
     })
+
     expect(await drawingsMatch(window, source, RISKY_TEXT.slice(0, 4).join('\n'), `${name}-enabled-ligatures`)).toBe(
       false,
     )
@@ -188,6 +191,7 @@ test.describe('text fidelity', () => {
       location: { currentParentId: null, selectedNodeId: 'plain' },
     })
     const { window } = await launchTree(userDataDir)
+
     await expect(node(window, 2)).toHaveAttribute('contenteditable', 'true')
     await expectDrawnCharacterByCharacter(window, node(window, 1), 'plain')
     await expectDrawnCharacterByCharacter(window, node(window, 2), 'linked')

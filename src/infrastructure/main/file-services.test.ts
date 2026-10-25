@@ -84,6 +84,7 @@ describe('file services', () => {
   it('serializes a concurrent load behind the save that is rotating the primary document', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     const next = stateWithoutImage('Next')
     await services.save(previous)
     await ageFile(join(directory, 'document.json'), 10)
@@ -104,6 +105,7 @@ describe('file services', () => {
     })
 
     const save = services.save(next)
+
     await expect(save).resolves.toBeUndefined()
     await expect(load).resolves.toEqual(next)
     await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
@@ -113,6 +115,7 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const first = stateWithoutImage('First')
     const second = stateWithoutImage('Second')
+
     await services.save(first)
     await services.save(second)
 
@@ -121,7 +124,9 @@ describe('file services', () => {
 
     const restarted = createFileServices(directory)
     const third = stateWithoutImage('Third')
+
     await restarted.save(third)
+
     expect(JSON.parse(await readFile(join(directory, 'document.2.json'), 'utf8'))).toEqual(second)
   })
 
@@ -129,6 +134,7 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const first = stateWithoutImage('First')
     const second = stateWithoutImage('Second')
+
     await services.save(first)
     await services.save(second)
     await writeFile(join(directory, 'document.json'), '{ damaged')
@@ -142,6 +148,7 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const first = stateWithoutImage('First')
     const second = stateWithoutImage('Second')
+
     await services.save(first)
     await services.save(second)
     await writeFile(join(directory, 'document.json'), '{ damaged')
@@ -156,9 +163,11 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const older = stateWithoutImage('Older')
     const newer = stateWithoutImage('Newer')
+
     await writeFile(join(directory, 'document.1.json'), JSON.stringify(older), 'utf8')
     await writeFile(join(directory, 'document.2.json'), JSON.stringify(newer), 'utf8')
     const when = new Date(Date.now() - 1_000)
+
     await utimes(join(directory, 'document.1.json'), when, when)
     await utimes(join(directory, 'document.2.json'), when, when)
     await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
@@ -171,6 +180,7 @@ describe('file services', () => {
   it('loads a legacy backup as a recovery candidate', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     await writeFile(join(directory, 'document.json.bak'), JSON.stringify(previous), 'utf8')
     await writeFile(join(directory, 'document.json'), '{ damaged')
 
@@ -182,6 +192,7 @@ describe('file services', () => {
     const { directory, services } = await servicesForTest()
     const committed = stateWithoutImage('Committed')
     const interrupted = stateWithoutImage('Interrupted')
+
     await writeFile(join(directory, 'document.json'), JSON.stringify(committed), 'utf8')
     await ageFile(join(directory, 'document.json'), 60)
     await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(interrupted), 'utf8')
@@ -194,6 +205,7 @@ describe('file services', () => {
   it('recovers a valid generation when the primary is structurally invalid', async () => {
     const { directory, services } = await servicesForTest()
     const recovered = stateWithoutImage('Recovered')
+
     await writeFile(join(directory, 'document.1.json'), JSON.stringify(recovered), 'utf8')
     await writeFile(
       join(directory, 'document.json'),
@@ -211,6 +223,7 @@ describe('file services', () => {
 
   it('keeps referenced attachments and removes unreferenced files', async () => {
     const { services } = await servicesForTest()
+
     await services.writeAttachment('keep', new Uint8Array([1]))
     await services.writeAttachment('remove', new Uint8Array([2]))
 
@@ -223,6 +236,7 @@ describe('file services', () => {
   it('retains an attachment referenced only by a retained generation', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([9, 9, 9])
+
     await services.writeAttachment('generation-image', bytes)
     await services.save(stateWithImage('generation-image'))
     await services.save(stateWithoutImage())
@@ -230,6 +244,7 @@ describe('file services', () => {
     const generation = JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8')) as {
       document: { roots: { attachment?: { id: string } }[] }
     }
+
     expect(generation.document.roots[0]?.attachment?.id).toBe('generation-image')
 
     await services.cleanupAttachments([])
@@ -240,6 +255,7 @@ describe('file services', () => {
   it('retains an attachment referenced only by the primary document', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([8, 8, 8, 8])
+
     await services.writeAttachment('primary-image', bytes)
     await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithImage('primary-image')), 'utf8')
 
@@ -251,6 +267,7 @@ describe('file services', () => {
   it('retains an attachment referenced only by the temporary recovery document', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([7, 7])
+
     await services.writeAttachment('temporary-image', bytes)
     await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(stateWithImage('temporary-image')), 'utf8')
 
@@ -262,6 +279,7 @@ describe('file services', () => {
   it('retains an attachment referenced by both the caller and a recovery document', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([5])
+
     await services.writeAttachment('shared', bytes)
     await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(stateWithImage('shared')), 'utf8')
     await writeFile(join(directory, 'document.json.bak'), JSON.stringify(stateWithImage('shared')), 'utf8')
@@ -273,6 +291,7 @@ describe('file services', () => {
 
   it('deletes an attachment referenced by neither the caller nor a recovery document', async () => {
     const { services } = await servicesForTest()
+
     await services.writeAttachment('orphan', new Uint8Array([1]))
 
     await services.cleanupAttachments([])
@@ -282,6 +301,7 @@ describe('file services', () => {
 
   it('releases an attachment after pruning removes the generation that referenced it', async () => {
     const { directory, services } = await servicesForTest()
+
     await services.writeAttachment('rotated', new Uint8Array([3]))
     for (let index = 1; index <= 22; index += 1) {
       const path = join(directory, `document.${index}.json`)
@@ -290,6 +310,7 @@ describe('file services', () => {
     }
 
     await services.cleanupAttachments([])
+
     expect(await services.readAttachment('rotated')).not.toBeNull()
 
     await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
@@ -307,6 +328,7 @@ describe('file services', () => {
       await writeFile(path, JSON.stringify(stateWithoutImage(`State ${index}`)), 'utf8')
       await ageFile(path, 23 - index)
     }
+
     await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
 
     await services.save(stateWithoutImage('Final'))
@@ -328,6 +350,7 @@ describe('file services', () => {
     for (let index = 1; index <= 26; index += 1) {
       await ageFile(join(directory, `document.${index}.json`), index <= 5 ? 46 - index : 27 - index)
     }
+
     await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage('Primary')), 'utf8')
 
     await services.save(stateWithoutImage('Final'))
@@ -339,9 +362,11 @@ describe('file services', () => {
 
   it('ignores absent, malformed, and unsupported recovery documents without rewriting them', async () => {
     const { directory, services } = await servicesForTest()
+
     await services.writeAttachment('ignored', new Uint8Array([4]))
     const malformed = '{ not valid json'
     const unsupported = '{"version":999}'
+
     await writeFile(join(directory, 'document.json.tmp'), malformed, 'utf8')
     await writeFile(join(directory, 'document.json.bak'), unsupported, 'utf8')
 
@@ -355,6 +380,7 @@ describe('file services', () => {
   it('aborts cleanup before deleting anything when a recovery document cannot be read', async () => {
     const { directory, services } = await servicesForTest()
     const bytes = new Uint8Array([6])
+
     await services.writeAttachment('untouched', bytes)
     await mkdir(join(directory, 'document.json.bak'))
 
@@ -365,6 +391,7 @@ describe('file services', () => {
 
   it('reads one JSON recovery candidate per path and never reads attachment contents during cleanup', async () => {
     const { directory, services } = await servicesForTest()
+
     await services.writeAttachment('backup-image', new Uint8Array([1]))
     const roots = Array.from({ length: 200 }, (_, rootIndex) => ({
       id: `r${rootIndex}`,
@@ -379,6 +406,7 @@ describe('file services', () => {
         children: [],
       })),
     }))
+
     await writeFile(
       join(directory, 'document.json.bak'),
       JSON.stringify({
@@ -393,6 +421,7 @@ describe('file services', () => {
     await services.cleanupAttachments([])
 
     const paths = vi.mocked(readFile).mock.calls.map(([path]) => String(path))
+
     expect(paths).toEqual([
       join(directory, 'document.json'),
       join(directory, 'document.json.tmp'),
@@ -404,11 +433,13 @@ describe('file services', () => {
 
   it('returns null when no document has been saved yet', async () => {
     const { services } = await servicesForTest()
+
     expect(await services.load()).toBeNull()
   })
 
   it('propagates malformed document data instead of hiding it', async () => {
     const { directory, services } = await servicesForTest()
+
     await writeFile(join(directory, 'document.json'), '{ not valid json', 'utf8')
 
     await expect(services.load()).rejects.toThrow()
@@ -443,6 +474,7 @@ describe('file services', () => {
       document: { roots: [{ id: 'recovered', text: 'Recovered', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'recovered' },
     }
+
     await writeFile(join(directory, 'document.json.tmp'), JSON.stringify(state), 'utf8')
 
     expect(await services.load()).toEqual(state)
@@ -484,6 +516,7 @@ describe('file services', () => {
       const primary = '{ damaged'
       const temporary = JSON.stringify(candidate)
       const backup = '{ also damaged'
+
       await writeFile(join(directory, 'document.json'), primary)
       await writeFile(join(directory, 'document.json.tmp'), temporary)
       await writeFile(join(directory, 'document.json.bak'), backup)
@@ -503,6 +536,7 @@ describe('file services', () => {
       document: { roots: [{ id: 'root', text: 'Recovered', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
     }
+
     await writeFile(join(directory, 'document.json'), '{ damaged')
     await writeFile(join(directory, 'document.json.tmp'), '{"version":999}')
     await writeFile(join(directory, 'document.json.bak'), JSON.stringify(backup))
@@ -522,6 +556,7 @@ describe('file services', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     }
     const bytes = JSON.stringify(candidate)
+
     await writeFile(join(directory, 'document.json.tmp'), bytes)
 
     await expect(services.load()).resolves.toEqual(candidate)
@@ -530,6 +565,7 @@ describe('file services', () => {
 
   it('serializes attachment writes and cleanup so overlapping cleanup cannot report ENOENT', async () => {
     const { services } = await servicesForTest()
+
     await services.writeAttachment('remove', new Uint8Array([1]))
 
     await expect(Promise.all([services.cleanupAttachments([]), services.cleanupAttachments([])])).resolves.toEqual([
@@ -541,6 +577,7 @@ describe('file services', () => {
   it('logs operation names, paths, and failures', async () => {
     const events: Array<{ operation: string; paths: string[]; phase: string; error?: string }> = []
     const directory = await mkdtemp(join(tmpdir(), 'tree-file-services-'))
+
     temporaryDirectories.push(directory)
     const services = createFileServices(directory, (event) => events.push(event))
 
@@ -549,6 +586,7 @@ describe('file services', () => {
       document: { roots: [{ id: 'root', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
+
     await expect(services.readAttachment('missing')).resolves.toBeNull()
     await expect(services.writeAttachment('bad/id', new Uint8Array())).rejects.toThrow('Attachment IDs')
 
@@ -573,10 +611,13 @@ describe('file services', () => {
       document: { roots: [{ id: 'root', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
+
     expect(info).not.toHaveBeenCalled()
 
     process.env['TREE_PERSISTENCE_DEBUG'] = '1'
+
     await services.cleanupAttachments([])
+
     expect(info).toHaveBeenCalledWith(expect.stringContaining('[persistence] cleanupAttachments start'))
 
     if (previousDebug === undefined) delete process.env['TREE_PERSISTENCE_DEBUG']
@@ -586,6 +627,7 @@ describe('file services', () => {
 
   it('rejects unsafe attachment IDs on read and write', async () => {
     const { services } = await servicesForTest()
+
     await services.writeAttachment('present', new Uint8Array([1]))
 
     await expect(services.writeAttachment('bad/id', new Uint8Array([1]))).rejects.toThrow('Attachment IDs')
@@ -710,6 +752,7 @@ describe('document save durability', () => {
     ])
 
     events.length = 0
+
     await services.save(stateWithoutImage('Second'))
 
     expect(events).toEqual([
@@ -726,6 +769,7 @@ describe('document save durability', () => {
   it('rejects the save when the data-directory flush fails and retries safely', async () => {
     const { directory, services } = await servicesForTest()
     const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+
     const next = stateWithoutImage('Next')
     let failDirectoryFlush = true
     vi.mocked(open).mockImplementation(async (path, flags) => {
@@ -753,6 +797,7 @@ describe('document save durability', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
 
     const retry = stateWithoutImage('Retry')
+
     await expect(services.save(retry)).resolves.toBeUndefined()
     expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(next)
     await expect(services.load()).resolves.toEqual(retry)
@@ -763,6 +808,7 @@ describe('save interruption recovery', () => {
   it('keeps the committed document when the temporary write is interrupted after real bytes land', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     const next = stateWithoutImage('Next')
     await services.save(previous)
 
@@ -780,15 +826,18 @@ describe('save interruption recovery', () => {
     await expect(services.save(next)).rejects.toThrow('simulated interruption during temporary write')
 
     const temporary = await readFile(join(directory, 'document.json.tmp'), 'utf8')
+
     expect(() => JSON.parse(temporary)).toThrow()
 
     const restarted = createFileServices(directory)
+
     await expect(restarted.load()).resolves.toEqual(previous)
   })
 
   it('recovers the newer interrupted save when the generation rotation is interrupted', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     const next = stateWithoutImage('Next')
     await services.save(previous)
 
@@ -799,9 +848,11 @@ describe('save interruption recovery', () => {
     await expect(services.save(next)).rejects.toThrow('simulated interruption during generation rotation')
 
     const temporaryPath = join(directory, 'document.json.tmp')
+
     expect(await readFile(temporaryPath, 'utf8')).toBe(JSON.stringify(next, null, 2))
 
     const restarted = createFileServices(directory)
+
     await expect(restarted.load()).resolves.toEqual(next)
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
     await expect(readFile(temporaryPath)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -810,6 +861,7 @@ describe('save interruption recovery', () => {
   it('recovers the next document when the replacement rename is interrupted after the generation is preserved', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     const next = stateWithoutImage('Next')
     await services.save(previous)
 
@@ -824,10 +876,12 @@ describe('save interruption recovery', () => {
     await expect(services.save(next)).rejects.toThrow('simulated interruption during replacement rename')
 
     const generation = JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))
+
     expect(generation).toEqual(previous)
     await expect(readFile(join(directory, 'document.json'))).rejects.toMatchObject({ code: 'ENOENT' })
 
     const restarted = createFileServices(directory)
+
     await expect(restarted.load()).resolves.toEqual(next)
     expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(JSON.stringify(next, null, 2))
   })
@@ -837,6 +891,7 @@ describe('save interruption recovery', () => {
     async (withPrimary) => {
       const { directory, services } = await servicesForTest()
       const previous = stateWithoutImage('Previous')
+
       const next = stateWithoutImage('Next')
       if (withPrimary) await services.save(previous)
 
@@ -847,6 +902,7 @@ describe('save interruption recovery', () => {
       await expect(services.save(next)).rejects.toThrow('simulated interruption during replacement rename')
 
       const restarted = createFileServices(directory)
+
       await expect(restarted.load()).resolves.toEqual(next)
       expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
     },
@@ -855,18 +911,22 @@ describe('save interruption recovery', () => {
   it('saves normally again after an interrupted generation rotation', async () => {
     const { directory, services } = await servicesForTest()
     const previous = stateWithoutImage('Previous')
+
     await services.save(previous)
     vi.mocked(rename).mockImplementationOnce(async () => {
       throw new Error('simulated interruption during generation rotation')
     })
+
     await expect(services.save(stateWithoutImage('Next'))).rejects.toThrow(
       'simulated interruption during generation rotation',
     )
 
     const final = stateWithoutImage('Final')
+
     await services.save(final)
 
     const restarted = createFileServices(directory)
+
     await expect(restarted.load()).resolves.toEqual(final)
     await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -897,6 +957,7 @@ describe('notes export and import support', () => {
 
   it('replaces the notes and blocks the old session until the next load', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
+
     await services.load()
     await services.writeAttachment('old', new Uint8Array([1]))
     await services.save(stateWithImage('old'))
@@ -912,13 +973,18 @@ describe('notes export and import support', () => {
       'The notes were replaced. Reload the window to continue.',
     )
     await expect(services.writeAttachment('stale', new Uint8Array([1]))).rejects.toThrow('The notes were replaced.')
+
     await services.cleanupAttachments([])
+
     expect(await readdir(join(directory, 'attachments'))).toEqual(['new.png'])
 
     const reloaded = create()
+
     await expect(reloaded.load()).resolves.toEqual(imported)
+
     await services.load()
     await services.save(imported)
+
     // The imported notes start without the replaced generations.
     expect(await generationFiles(directory)).toEqual(['document.1.json'])
     expect(services.takeRecoveredReplacement()).toBeUndefined()
@@ -926,16 +992,19 @@ describe('notes export and import support', () => {
 
   it('completes an interrupted replacement on load and reports it once', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
+
     await services.load()
     await services.save(stateWithoutImage('Old'))
     const imported = stateWithImage('new')
     const staging = await stageImport(services, imported, 'new')
+
     await writeFile(
       join(userData, '.notes-import', 'commit.json'),
       JSON.stringify({ staging: basename(staging), replaced: 'interrupted' }),
     )
 
     const restarted = create()
+
     await expect(restarted.load()).resolves.toEqual(imported)
 
     expect(restarted.takeRecoveredReplacement()).toEqual({
@@ -947,10 +1016,12 @@ describe('notes export and import support', () => {
 
   it('never opens the replaced notes when the imported document is damaged', async () => {
     const { userData, services, create } = await archiveServicesForTest()
+
     await services.load()
     await services.save(stateWithoutImage('Old'))
     await services.save(stateWithoutImage('Older generation exists'))
     const staging = await services.createStagingDirectory()
+
     await writeFile(join(staging, 'document.json'), '{"version":2,"document":')
     await writeFile(
       join(userData, '.notes-import', 'commit.json'),
@@ -962,6 +1033,7 @@ describe('notes export and import support', () => {
 
   it('fails the load without changing files when the journal is damaged', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
+
     await services.load()
     const saved = stateWithoutImage('Kept')
     await services.save(saved)
@@ -983,7 +1055,9 @@ describe('notes export and import support', () => {
 
     expect(await readdir(join(userData, '.notes-import'))).toEqual([basename(running)])
     await expect(stat(abandoned)).rejects.toMatchObject({ code: 'ENOENT' })
+
     await services.discardStagingDirectory(running)
+
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
     await expect(services.discardStagingDirectory(abandoned)).rejects.toThrow(
       'The directory was not created by this application session.',
@@ -992,10 +1066,12 @@ describe('notes export and import support', () => {
 
   it('leaves the notes unchanged and staging in place when replacement fails before its journal', async () => {
     const { directory, services } = await archiveServicesForTest()
+
     await services.load()
     const saved = stateWithoutImage('Kept')
     await services.save(saved)
     const staging = await services.createStagingDirectory()
+
     await writeFile(join(staging, 'document.json'), JSON.stringify(stateWithoutImage('New')))
     vi.mocked(rename).mockImplementationOnce(async () => {
       throw new Error('disk full')
@@ -1004,18 +1080,21 @@ describe('notes export and import support', () => {
     await expect(services.replaceNotes(staging)).rejects.toThrow('disk full')
 
     await services.save(saved)
+
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(saved)
     await expect(stat(join(staging, 'document.json'))).resolves.toBeDefined()
   })
 
   it('snapshots the document files so a later save cannot change what export reads', async () => {
     const { userData, directory, services } = await archiveServicesForTest()
+
     await services.load()
     const exported = stateWithoutImage('Exported')
     await services.save(stateWithoutImage('Earlier'))
     await services.save(exported)
 
     const snapshot = await services.snapshotDocuments()
+
     await services.save(stateWithoutImage('After the snapshot'))
 
     expect((await readdir(snapshot)).sort()).toEqual(['document.1.json', 'document.json'])
@@ -1023,14 +1102,19 @@ describe('notes export and import support', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8')).document.roots[0].text).toBe(
       'After the snapshot',
     )
+
     await services.load()
+
     expect(await readdir(join(userData, '.notes-export'))).toEqual([basename(snapshot)])
+
     await services.releaseSnapshot(snapshot)
+
     expect(await readdir(join(userData, '.notes-export'))).toEqual([])
   })
 
   it('blocks the old session after a failure past the journal until a load completes the replacement', async () => {
     const { directory, services } = await archiveServicesForTest()
+
     await services.load()
     await services.save(stateWithoutImage('Old'))
     const imported = stateWithImage('new')
@@ -1042,11 +1126,14 @@ describe('notes export and import support', () => {
     })
 
     await expect(services.replaceNotes(staging, 'Tree Notes 2026-10-20.zip')).rejects.toThrow('interrupted')
+
     vi.mocked(rename).mockImplementation(real.rename)
 
     await expect(services.save(stateWithoutImage('Stale'))).rejects.toThrow('The notes were replaced.')
     await expect(services.writeAttachment('stale', new Uint8Array([1]))).rejects.toThrow('The notes were replaced.')
+
     await services.cleanupAttachments([])
+
     expect(await readdir(join(directory, 'attachments'))).toEqual(['new.png'])
     await expect(services.replaceNotes(staging)).rejects.toThrow(
       'The directory was not created by this application session.',
@@ -1061,6 +1148,7 @@ describe('notes export and import support', () => {
       replacedFolder: join(dirname(directory), 'Replaced Notes', '2026-10-23 14-05-09'),
       archive: 'Tree Notes 2026-10-20.zip',
     })
+
     await services.save(imported)
   })
 
@@ -1077,12 +1165,15 @@ describe('notes export and import support', () => {
 
   it('copies an interrupted save into the snapshot, because the next save rewrites it in place', async () => {
     const { directory, services } = await archiveServicesForTest()
+
     await services.load()
     await services.save(stateWithoutImage('Saved'))
     const leftover = JSON.stringify(stateWithoutImage('Interrupted save'))
+
     await writeFile(join(directory, 'document.json.tmp'), leftover)
 
     const snapshot = await services.snapshotDocuments()
+
     await services.save(stateWithoutImage('Next save'))
 
     expect(await readFile(join(snapshot, 'document.json.tmp'), 'utf8')).toBe(leftover)
@@ -1106,6 +1197,7 @@ describe('notes export and import support', () => {
 
   it('removes a partial snapshot when the document files cannot be listed', async () => {
     const { userData, directory, services } = await archiveServicesForTest()
+
     await services.load()
     await services.save(stateWithoutImage('Saved'))
     const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
@@ -1117,20 +1209,24 @@ describe('notes export and import support', () => {
     await expect(services.snapshotDocuments()).rejects.toThrow('listing failed')
 
     mocks.readdir.mockImplementation((path) => real.readdir(path))
+
     expect(await readdir(join(userData, '.notes-export'))).toEqual([])
   })
 
   it('keeps pinned images during cleanup until they are released', async () => {
     const { directory, services } = await archiveServicesForTest()
+
     await services.load()
     await services.writeAttachment('pinned', new Uint8Array([1]))
     const unpin = services.pinAttachments(['pinned'])
 
     await services.cleanupAttachments([])
+
     expect(await readdir(join(directory, 'attachments'))).toEqual(['pinned.png'])
 
     unpin()
     await services.cleanupAttachments([])
+
     expect(await readdir(join(directory, 'attachments'))).toEqual([])
   })
 })

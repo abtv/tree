@@ -40,6 +40,7 @@ describe('collectChangedFiles', () => {
 
   it('includes staged, unstaged, and non-ignored untracked files', () => {
     const root = createRepository()
+
     write(root, 'tracked.js', 'const value = 2\n')
     write(root, 'staged file.md', '# Staged\n')
     execFileSync('git', ['add', 'staged file.md'], { cwd: root })
@@ -51,15 +52,19 @@ describe('collectChangedFiles', () => {
 
   it('excludes deleted files', () => {
     const root = createRepository()
+
     unlinkSync(join(root, 'deleted.md'))
+
     expect(collectChangedFiles({ rootDirectory: root })).toEqual([])
   })
 
   it('deduplicates a file with staged and unstaged changes', () => {
     const root = createRepository()
+
     write(root, 'tracked.js', 'const value = 2\n')
     execFileSync('git', ['add', 'tracked.js'], { cwd: root })
     write(root, 'tracked.js', 'const value = 3\n')
+
     expect(collectChangedFiles({ rootDirectory: root })).toEqual(['tracked.js'])
   })
 
@@ -71,7 +76,9 @@ describe('collectChangedFiles', () => {
       '--write',
       '-odd.js',
     ])
+
     let receivedArguments: string[] | undefined
+
     const status = runFormatCheck({
       rootDirectory: '/repository',
       files: ['--write'],
@@ -80,6 +87,7 @@ describe('collectChangedFiles', () => {
         return { status: 0 }
       },
     })
+
     expect(status).toBe(0)
     expect(receivedArguments!.slice(-2)).toEqual(['--', '--write'])
   })

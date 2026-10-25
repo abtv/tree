@@ -38,6 +38,7 @@ describe('incremental executor', () => {
   })
   it('keeps 100 exact and never matches across node boundaries', () => {
     const harness = searchHarness()
+
     expect(harness.run({ ...base, document: { roots: [{ id: 'a', text: 'aa '.repeat(100), children: [] }] } })).toEqual(
       { kind: 'count', total: 100, capped: false },
     )
@@ -57,6 +58,7 @@ describe('incremental executor', () => {
   it('caps counts at 101 but navigates beyond the cap and wraps large prefixes', () => {
     const harness = searchHarness()
     const request = { ...base, document: { roots: [{ id: 'a', text: 'aa '.repeat(150), children: [] }] } }
+
     expect(harness.run(request)).toEqual({ kind: 'count', total: 100, capped: true })
     expect(
       harness.run({
@@ -100,6 +102,7 @@ describe('incremental executor', () => {
 
   it('counts empty/no-match queries and refuses a removed origin', () => {
     const harness = searchHarness()
+
     expect(harness.run({ ...base, query: '' })).toEqual({ kind: 'count', total: 0, capped: false })
     expect(harness.run({ ...base, query: 'absent' })).toEqual({ kind: 'count', total: 0, capped: false })
     expect(
@@ -125,18 +128,22 @@ describe('incremental executor', () => {
     const publish = vi.fn()
     const cancel = harness.executor.execute(base, publish)
     harness.flush()
+
     expect(publish).toHaveBeenCalledOnce()
     expect(() => {
       cancel()
       cancel()
     }).not.toThrow()
     expect(harness.pending()).toBe(0)
+
     harness.flush()
+
     expect(publish).toHaveBeenCalledOnce()
   })
 
   it('returns an empty count without enumerating the document', () => {
     const roots = vi.fn(() => base.document.roots)
+
     expect(
       searchHarness().run({
         ...base,
@@ -173,7 +180,9 @@ describe('incremental executor', () => {
         return () => undefined
       },
     })
+
     executor.execute(base, publish)()
+
     expect(callbacks).toHaveLength(1)
     expect(() => callbacks[0]!()).not.toThrow()
     expect(callbacks).toHaveLength(1)
@@ -192,11 +201,13 @@ describe('incremental executor', () => {
       },
       operation: { kind: 'navigate', origin: { nodeId: 'a', day: 1 as DayNumber, offset: 6 }, direction: 1, count: 1 },
     }
+
     expect(searchHarness().run(request)).toMatchObject({ destination: { nodeId: 'a', day: 2, start: 0 }, total: 6 })
   })
 
   it('snaps only the selected destination to its containing grapheme', () => {
     const text = '👩‍💻a\u0301'
+
     expect(searchCaret(text, 3)).toBe(0)
     expect(searchCaret(text, 6)).toBe(5)
     expect(searchCaret(text, text.length)).toBe(text.length)
@@ -223,13 +234,20 @@ describe('incremental executor', () => {
       const harness = searchHarness(16)
       const publish = vi.fn()
       const cancel = harness.executor.execute(request, publish)
+
       expect(publish).not.toHaveBeenCalled()
+
       harness.tick()
+
       expect(publish).not.toHaveBeenCalled()
       expect(harness.pending()).toBe(1)
+
       cancel()
+
       expect(harness.pending()).toBe(0)
+
       harness.flush()
+
       expect(publish).not.toHaveBeenCalled()
     }
   })
@@ -237,8 +255,10 @@ describe('incremental executor', () => {
   it('cancels before the first slice and validates slice budgets', () => {
     const harness = searchHarness()
     const publish = vi.fn()
+
     harness.executor.execute(base, publish)()
     harness.flush()
+
     expect(publish).not.toHaveBeenCalled()
     expect(() => createSearchExecutor(harness.scheduler, 0)).toThrow('Invalid search slice budget')
     expect(searchHarness(1).run(base)).toEqual({ kind: 'count', total: 3, capped: false })
@@ -248,11 +268,15 @@ describe('incremental executor', () => {
     vi.useFakeTimers()
     try {
       const publish = vi.fn()
+
       searchScheduler.schedule(publish)()
       vi.runAllTimers()
+
       expect(publish).not.toHaveBeenCalled()
+
       createSearchExecutor().execute(base, publish)
       vi.runAllTimers()
+
       expect(publish).toHaveBeenCalledWith({ kind: 'count', total: 3, capped: false })
     } finally {
       vi.useRealTimers()

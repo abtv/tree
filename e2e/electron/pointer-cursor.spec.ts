@@ -40,6 +40,7 @@ describeForEachEditingMode('pointer cursor', ({ mode }) => {
       location: { currentParentId: 'parent', selectedNodeId: 'child' },
     })
     const { window: page } = await launchTree(userDataDir)
+
     // The breadcrumb has an ancestor link and the non-clickable current segment, and in Vim editing
     // the status bar shows the mode indicator, so every kind of non-editable text in the editor view
     // is present. Standard editing has no indicator.

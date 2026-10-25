@@ -69,7 +69,9 @@ function job(storage: ImportJobStorage) {
     (message) => {
       // Every message must survive structured cloning into the page and stay small.
       structuredClone(message)
+
       expect(JSON.stringify(message).length).toBeLessThan(500)
+
       messages.push(message)
     },
   )
@@ -83,11 +85,13 @@ const tricky = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x50, 0x4b, 0x07, 0x08, 0
 describe('archive worker import job', () => {
   it('prepares an exported archive, reports both note counts, then replaces the head', async () => {
     const incoming = headWithImages(['a', 'b', 'missing'], 'Imported')
+
     const archive = await exportArchive(incoming, { a: tricky, b: new Uint8Array([2]) })
     const storage = memoryStorage(headWithImages(['b', 'old']), { b: new Uint8Array([2]), old: new Uint8Array([3]) })
     const { importJob, messages } = job(storage)
 
     await importJob.prepare(memoryFile(archive))
+
     expect(messages).toEqual([
       { type: 'progress', imagesDone: 0, imageCount: 3 },
       { type: 'progress', imagesDone: 1, imageCount: 3 },
@@ -104,6 +108,7 @@ describe('archive worker import job', () => {
     expect(storage.images.get('a')).toEqual(tricky)
 
     await importJob.commit()
+
     expect(messages.at(-1)).toEqual({ type: 'committed' })
     expect(storage.head).toEqual(incoming)
     expect([...storage.images.keys()].sort()).toEqual(['a', 'b', 'old'])
@@ -116,7 +121,9 @@ describe('archive worker import job', () => {
       [{ invalid: true }, 'invalid'],
     ] as const) {
       const { importJob, messages } = job(memoryStorage(head))
+
       await importJob.prepare(memoryFile(archive))
+
       expect(messages.at(-1)).toEqual({
         type: 'prepared',
         incoming: { nodeCount: 1, imageCount: 0, missingImageCount: 0 },
@@ -131,11 +138,17 @@ describe('archive worker import job', () => {
       throw new Error('The transaction was aborted.')
     }
     const { importJob, messages } = job(storage)
+
     await importJob.commit()
+
     expect(messages).toEqual([])
+
     await importJob.prepare(memoryFile(await exportArchive(headWithImages(['a']), { a: tricky })))
+
     expect(storage.images.has('a')).toBe(true)
+
     await importJob.commit()
+
     expect(messages.at(-1)).toEqual({
       type: 'error',
       message: 'Your notes could not be replaced: The transaction was aborted.',
@@ -147,15 +160,20 @@ describe('archive worker import job', () => {
   it('reports archive problems and storage failures', async () => {
     const storage = memoryStorage(undefined)
     const { importJob, messages } = job(storage)
+
     await importJob.prepare(memoryFile(new Uint8Array(30)))
+
     expect(messages.at(-1)).toEqual({
       type: 'error',
       message: 'The file is not a Tree notes archive, or it is damaged.',
     })
+
     storage.readHead = async () => {
       throw new Error('Storage is unavailable.')
     }
+
     await importJob.prepare(memoryFile(await exportArchive(headWithImages([]), {})))
+
     expect(messages.at(-1)).toEqual({
       type: 'error',
       message: 'The archive could not be imported: Storage is unavailable.',
@@ -167,23 +185,28 @@ describe('archive worker import job', () => {
     const storage = memoryStorage(undefined)
     const { importJob, messages } = job(storage)
     const document = new TextEncoder().encode(JSON.stringify(headWithImages(['a'])))
+
     await importJob.prepare({
       size: document.byteLength + 1,
       readDocument: async () => document,
       readImage: async () => tricky,
     })
+
     expect(messages.at(-1)).toEqual({
       type: 'prepared',
       incoming: { nodeCount: 2, imageCount: 1, missingImageCount: 0 },
       current: 'none',
       sourceBytes: document.byteLength + 1,
     })
+
     const full = memoryStorage(undefined)
     full.writeImage = async () => {
       throw new DOMException('The quota was exceeded.', 'QuotaExceededError')
     }
     const failing = job(full)
+
     await failing.importJob.prepare({ readDocument: async () => document, readImage: async () => tricky })
+
     expect(failing.messages.at(-1)).toEqual({
       type: 'error',
       message: 'The notes could not be restored: The quota was exceeded.',
@@ -212,13 +235,16 @@ describe('notes archive Deflate input', () => {
   it('stops a Deflate bomb at its declared size', async () => {
     // 8 MiB of zeros compress to about 8 KiB; the declared size makes any output beyond 1,000 bytes fatal.
     const bomb = new Uint8Array(8 * 1024 * 1024)
+
     const archive = buildZip([{ name: 'document.json', method: 8, data: deflateSync(bomb), crc32: 0, size: 1000 }])
+
     expect(archive.byteLength).toBeLessThan(20_000)
     await expect(prepare(archive)).rejects.toThrow(damagedEntryMessage('document.json'))
   })
 
   it('rejects a truncated or corrupt Deflate stream', async () => {
     const compressed = deflateSync(head)
+
     await expect(prepare(deflatedDocument(head, { data: compressed.slice(0, -4) }))).rejects.toThrow(
       damagedEntryMessage('document.json'),
     )
@@ -248,6 +274,7 @@ describe('notes archive Deflate input', () => {
               validateImage: async () => {},
               images: storage,
             })
+
             // A mutation the reader accepts left the checked content intact.
             expect(prepared.head).toEqual(source)
             for (const [id, bytes] of storage.images) expect(bytes).toEqual(images[id as 'a' | 'b'])

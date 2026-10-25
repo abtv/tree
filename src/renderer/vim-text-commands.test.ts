@@ -389,6 +389,7 @@ describe('Vim text changes beyond deletion', () => {
     const url = 'https://Example.test'
     const links = [{ start: 2, end: 2 + url.length, url }]
     const text = `ß ${url} ß`
+
     expect(caseEdits(text, links, 0, text.length, 'upper')).toEqual([
       { start: 0, end: 2, inserted: 'SS ' },
       { start: 2 + url.length, end: text.length, inserted: ' SS' },

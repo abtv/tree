@@ -22,6 +22,7 @@ it('agrees with forward literal nonoverlapping search for arbitrary ASCII text',
           offset = source.indexOf(query, offset + query.length)
         }
       }
+
       expect([...searchText(text, pattern(query))].filter((match) => match !== undefined)).toEqual(expected)
     }),
   )
@@ -39,8 +40,10 @@ it('keeps DFS identity and order after moving branches without mutating nodes', 
       const moved = { roots: [...roots].reverse() }
       for (const current of [document, moved]) {
         const rows = [...searchScope(current, { kind: 'tree', parentId: null })].filter((row) => row !== undefined)
+
         expect(rows.map((row) => row.nodeId)).toEqual(current.roots.flatMap((root) => [root.id, root.children[0]!.id]))
       }
+
       expect(document.roots).toBe(roots)
     }),
   )

@@ -32,6 +32,7 @@ describeForEachEditingMode('creating nodes with Enter', () => {
 
   test('Cmd+A and Cmd+C copy all text from a link-free node', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const source = node(window, 1)
 
@@ -43,6 +44,7 @@ describeForEachEditingMode('creating nodes with Enter', () => {
     await firePaste(node(window, 2))
 
     await expect(node(window, 2)).toHaveValue('Plain text')
+
     await app.close()
   })
 
@@ -86,6 +88,7 @@ describeForEachEditingMode('creating nodes with Enter', () => {
 
   test('keeps plain text selected after Cmd+C', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const editor = node(window, 1)
 
@@ -125,6 +128,7 @@ describeForEachEditingMode('creating nodes with Enter', () => {
 
   test('pastes copied plain text with Cmd+V after typing in the target node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const source = node(window, 1)
 
@@ -141,6 +145,7 @@ describeForEachEditingMode('creating nodes with Enter', () => {
 
   test('pastes copied plain text after typing a space in the copied node', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const editor = node(window, 1)
 
@@ -163,7 +168,9 @@ describeForEachEditingMode('creating nodes with Enter', () => {
     await expect(node(window, 2)).toHaveValue('')
     await expect(node(window, 2)).toBeFocused()
     expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
     await typeInto(node(window, 2), 'Next')
+
     await expect(node(window, 1)).toHaveValue('Current')
     await expect(node(window, 2)).toHaveValue('Next')
   })
@@ -195,7 +202,9 @@ describeForEachEditingMode('creating nodes with Enter', () => {
     await expect(node(window, 2)).toHaveValue('')
     await expect(node(window, 2)).toBeFocused()
     expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
     await typeInto(node(window, 2), 'Next')
+
     await expect(node(window, 1)).toContainText('https://example.com')
     await expect(node(window, 2)).toHaveValue('Next')
   })

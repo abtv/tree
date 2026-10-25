@@ -5,6 +5,7 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
   const context = await newContext()
   const opener = await context.newPage()
   const dialogs: string[] = []
+
   context.on('page', (page) => {
     page.on('dialog', async (dialog) => {
       dialogs.push(dialog.message())
@@ -30,12 +31,16 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
     })
     await closed
   }
+
   await input().fill('Quit must save this pending edit')
   await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command', exact: true }).fill('quit')
   await pressToClose('Enter')
+
   expect(dialogs, 'A successful quit must not show an informational alert').toEqual([])
+
   page = await open()
+
   expect(await input().inputValue()).toBe('Quit must save this pending edit')
 
   await page.locator('#tree-menu-button').click()
@@ -46,10 +51,14 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
   await input().press('R')
   await input().press('Z')
   const bufferedText = await input().inputValue()
+
   expect(await page.locator('#prototype-save-status').textContent()).toBe('Editing — not saved yet')
+
   await pressToClose(`${primaryKey}+q`)
   page = await open()
+
   expect(await input().inputValue(), 'Keyboard quit must flush the pending Replace buffer').toBe(bufferedText)
+
   await page.locator('#tree-menu-button').click()
   await page.locator('#prototype-vim').click()
 
@@ -66,16 +75,24 @@ test('flushes quit edits and recovers from failed or refused close', async ({ ne
     window.close = () => window.quitCloseCalls++
   })
   await page.evaluate(() => window.treeApi.quit())
+
   expect(await page.evaluate(() => window.quitCloseCalls)).toBe(0)
+
   await page.getByRole('alert').filter({ hasText: 'Synthetic quit flush failure' }).waitFor()
+
   expect(page.isClosed()).toBe(false)
+
   await page.evaluate(() => window.restoreQuitFlush())
   await input().fill('Retry saves without a success dialog')
   await page.evaluate(() => window.treeApi.quit())
+
   expect(await page.evaluate(() => window.quitCloseCalls)).toBe(1)
   expect(dialogs, 'A browser refusing close must remain modal-free').toEqual([])
+
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
   expect(await input().inputValue()).toBe('Retry saves without a success dialog')
+
   await capture(page, 'quit-without-alert.png')
 })

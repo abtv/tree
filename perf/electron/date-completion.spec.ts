@@ -20,8 +20,10 @@ for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
     await input.focus()
+
     await expect(input).toBeFocused()
     await expect(input).toHaveValue(prefix)
+
     if (vimEnabled) await window.keyboard.press('A')
     else await window.keyboard.press('Meta+ArrowRight')
 
@@ -64,9 +66,12 @@ for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
       // Month prefixes may already qualify after Backspace. Dismiss before the
       // measured edit so every sample still measures creating the popup DOM.
       if (month && (await popup.count()) > 0) await window.keyboard.press('Escape')
+
       await window.keyboard.press(key)
+
       await expect(popup.getByRole('option')).toHaveCount(month ? 3 : 1)
       await expect(popup.getByRole('option', { selected: true })).toContainText(expectedDate)
+
       await window.waitForFunction(
         (count) =>
           (window as unknown as { dateCompletionProbe: { paints: number[] } }).dateCompletionProbe.paints.length ===
@@ -85,6 +90,7 @@ for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
     )
     const sorted = probe.paints.toSorted((a, b) => a - b)
     const insertedSorted = probe.inserted.toSorted((a, b) => a - b)
+
     recordPerfResult({
       kind: 'typing',
       scenario: `${month ? 'adjacent-month' : 'relative-date'}-10000-${vimEnabled ? 'vim' : 'standard'}`,
@@ -97,6 +103,7 @@ for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
         popupInsertMaxMs: round(insertedSorted[29]!),
       },
     })
+
     expect(probe.completed.every(Boolean)).toBe(true)
     expect(probe.inserted).toHaveLength(30)
     // The paint metric waits two animation frames (about 33 ms at 60 Hz), so these
@@ -108,7 +115,9 @@ for (const { vimEnabled, month } of [true, false].flatMap((vimEnabled) =>
     await expect(input).toHaveValue(`${prefix}${key}`)
     await expect(input).toBeFocused()
     await expect(heading).toHaveValue('Root')
+
     await window.keyboard.press('Enter')
+
     await expect
       .poll(() =>
         input.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent)),

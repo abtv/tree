@@ -55,6 +55,7 @@ it('takes the last begun structural session exactly once without touching the ot
       for (const session of sessions) beginSession(state, session)
 
       const last = sessions.at(-1)
+
       if (last === undefined) {
         expect(takeStructuralInsert(state)).toBeUndefined()
       } else {
@@ -79,6 +80,7 @@ it('maps every structural session to its complete repeat-change descriptor', () 
           : session.kind === 'child-open'
             ? { kind: 'structural-child-open' as const, text }
             : { kind: 'structural-visual' as const, command: session.command, span: session.span, text }
+
       expect(structuralRepeatChange(session, text)).toEqual(expected)
     }),
   )

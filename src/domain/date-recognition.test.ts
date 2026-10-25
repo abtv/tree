@@ -38,6 +38,7 @@ describe('date-like token recognition', () => {
   })
   it('flags every token, keeps touching non-digits, and skips excluded ranges', () => {
     const text = '2026-10-1a2026-2-3 2026-10-14'
+
     expect(findDateLikeTokens(text)).toEqual([
       { start: 0, end: 9 },
       { start: 10, end: 18 },
@@ -66,6 +67,7 @@ describe('canonical date recognition', () => {
   })
   it('keeps repeated occurrences and accepts touching non-digits', () => {
     const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
+
     expect(findCanonicalDates('2026-10-14a2026-10-14')).toEqual([
       { start: 0, end: 10, day },
       { start: 11, end: 21, day },
@@ -74,7 +76,9 @@ describe('canonical date recognition', () => {
   })
   it('returns UTF-16 offsets and excludes any overlapping hyperlink range', () => {
     const text = '😀2026-10-14 2026-10-15'
+
     const matches = findCanonicalDates(text)
+
     expect(matches.map(({ start, end }) => [start, end])).toEqual([
       [2, 12],
       [13, 23],

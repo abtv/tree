@@ -16,13 +16,21 @@ it('focuses an import result once and restores the editor when the result closes
       <DataActivityPanel text={text} action="OK" onAction={() => {}} onShowFolder={() => {}} focusAction />
     </>
   )
+
   view.rerender(result('Imported notes.'))
+
   expect(document.activeElement).toBe(screen.getByRole('button', { name: 'OK' }))
+
   editor.focus()
+
   view.rerender(result('Imported “Notes.zip”.'))
+
   expect(document.activeElement).toBe(editor)
+
   screen.getByRole('button', { name: 'Show in Finder' }).focus()
+
   view.rerender(<input aria-label="Editor" />)
+
   expect(document.activeElement).toBe(editor)
 })
 
@@ -37,8 +45,11 @@ it('announces progress, dispatches the action and leaves editor focus available'
   )
   const input = screen.getByLabelText('Editor')
   input.focus()
+
   expect(screen.getByRole('status').textContent).toBe('Exporting Notes… 1 of 2 images')
+
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
   expect(action).toHaveBeenCalledOnce()
   expect(document.activeElement).toBe(input)
 })
@@ -54,6 +65,8 @@ it('returns keyboard focus to the latest editor when the focused panel closes', 
   const input = screen.getByLabelText('Editor')
   input.focus()
   screen.getByRole('button', { name: 'OK' }).focus()
+
   view.rerender(<input aria-label="Editor" />)
+
   expect(document.activeElement).toBe(input)
 })

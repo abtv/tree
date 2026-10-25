@@ -30,8 +30,10 @@ async function measureTyping(
       ? undefined
       : window.getByRole('textbox', { name: target.parentLabel, exact: true })
   await expected.focus()
+
   await expect(expected).toBeFocused()
   await expect(expected).toHaveValue(target.initialText)
+
   const parentBefore = parentHeading === undefined ? undefined : await parentHeading.inputValue()
 
   await expected.evaluate((element) => {
@@ -48,6 +50,7 @@ async function measureTyping(
   })
 
   const typingStart = performance.now()
+
   await window.keyboard.type(TYPED)
   const typingMs = performance.now() - typingStart
   await window.waitForFunction(
@@ -85,6 +88,7 @@ async function measureTyping(
   expect(measured.paints.length).toBeGreaterThanOrEqual(100)
   expect(paint.p95).toBeLessThan(50)
   expect(paint.max).toBeLessThan(100)
+
   return typingMs
 }
 
@@ -103,6 +107,7 @@ test.describe('typing latency', () => {
       initialText: 'Child 0',
       parentLabel: 'Current parent',
     })
+
     expect(typingMs).toBeLessThan(1_000)
   })
 
@@ -112,6 +117,7 @@ test.describe('typing latency', () => {
       initialText: 'Child 0',
       parentLabel: 'Current parent',
     })
+
     expect(typingMs).toBeLessThan(1_000)
   })
 
@@ -128,6 +134,7 @@ test.describe('typing latency', () => {
       },
       false,
     )
+
     expect(typingMs).toBeLessThan(1_000)
   })
 
@@ -146,6 +153,7 @@ test.describe('typing latency', () => {
       initialText: 'Node 315.315',
       parentLabel: 'Current parent',
     })
+
     expect(typingMs).toBeLessThan(1_000)
   })
 })

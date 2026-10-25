@@ -64,22 +64,35 @@ describe('useScrollRestoration', () => {
     const { rerender } = renderHook(({ ready }) => useScrollRestoration(f.store, ready), {
       initialProps: { ready: false },
     })
+
     expect(g.position.top).toBe(300)
+
     rerender({ ready: true })
+
     expect(g.position.top).toBe(80)
     expect(observer.observed.has(document.documentElement)).toBe(true)
+
     g.position.top = 240
+
     observer.notify()
+
     expect(g.position.top).toBe(80)
+
     window.dispatchEvent(new Event('scroll'))
     await f.store.flushPersistence()
+
     expect(f.saves).toHaveLength(0)
+
     f.store.editText('node', 'changed')
     await f.store.flushPersistence()
+
     expect(f.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 80 } })
+
     rerender({ ready: false })
     g.position.top = 200
+
     rerender({ ready: true })
+
     expect(g.position.top).toBe(200)
   })
 
@@ -91,6 +104,7 @@ describe('useScrollRestoration', () => {
     const f = await createRealStoreHarness({ selectedRowTop: top }),
       g = geometry({ height })
     renderHook(() => useScrollRestoration(f.store, true))
+
     expect(g.position.top).toBe(expected)
   })
 
@@ -101,6 +115,7 @@ describe('useScrollRestoration', () => {
       }),
       g = geometry({ heading: true })
     renderHook(() => useScrollRestoration(f.store, true))
+
     expect(g.position.top).toBe(100)
   })
 
@@ -109,12 +124,17 @@ describe('useScrollRestoration', () => {
       observer = resizeObserver()
     vi.stubGlobal('scrollBy', () => undefined)
     renderHook(() => useScrollRestoration(f.store, true))
+
     observer.notify()
     f.store.editText('node', 'changed')
     await f.store.flushPersistence()
+
     expect(f.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 70 } })
+
     const g = geometry()
+
     observer.notify()
+
     expect(g.position.top).toBe(70)
   })
 
@@ -125,12 +145,17 @@ describe('useScrollRestoration', () => {
         g = geometry(),
         observer = resizeObserver()
       renderHook(() => useScrollRestoration(f.store, true))
+
       window.dispatchEvent(new Event(event))
       g.position.top = 230
+
       observer.notify()
+
       expect(g.position.top).toBe(230)
+
       window.dispatchEvent(new Event('scroll'))
       await f.store.flushPersistence()
+
       expect(f.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 230 } })
     },
   )
@@ -140,19 +165,25 @@ describe('useScrollRestoration', () => {
       g = geometry()
     vi.stubGlobal('ResizeObserver', undefined)
     renderHook(() => useScrollRestoration(f.store, true))
+
     expect(g.position.top).toBe(300)
+
     window.dispatchEvent(new Event('wheel'))
     g.position.top = top
+
     window.dispatchEvent(new Event('scroll'))
     await f.store.flushPersistence()
+
     expect(f.saves.at(-1)).toMatchObject({ view: { selectedRowTop: top < 0 ? 0 : 460 } })
   })
 
   it('keeps saves usable when there is no restored top and no rendered row', async () => {
     const f = await createRealStoreHarness()
     renderHook(() => useScrollRestoration(f.store, true))
+
     f.store.editText('node', 'changed')
     await f.store.flushPersistence()
+
     expect(f.saves.at(-1)).toMatchObject({ document: { roots: [{ text: 'changed' }] } })
   })
 
@@ -161,15 +192,22 @@ describe('useScrollRestoration', () => {
       g = geometry(),
       observer = resizeObserver()
     const { unmount } = renderHook(() => useScrollRestoration(f.store, true))
+
     unmount()
+
     expect(observer.disconnected()).toBe(true)
+
     g.position.top = 200
+
     window.dispatchEvent(new Event('wheel'))
     window.dispatchEvent(new Event('scroll'))
     await f.store.flushPersistence()
+
     expect(f.saves).toHaveLength(0)
+
     f.store.editText('node', 'changed')
     await f.store.flushPersistence()
+
     expect(f.saves.at(-1)).toMatchObject({ view: { selectedRowTop: 80 } })
   })
 })

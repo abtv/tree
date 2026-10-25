@@ -28,6 +28,7 @@ for (const rich of [false, true]) {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await setMainWindowContentSize(app, { width: 680, height: 520 })
     let previous = await caretGeometry(window)
     let captured = false
@@ -36,12 +37,16 @@ for (const rich of [false, true]) {
         await window.keyboard.down(key)
         await window.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
         const current = await caretGeometry(window)
+
         expect(current.top >= 24 || current.scroll === 0, JSON.stringify(current)).toBe(true)
         expect(current.bottom >= 24 || current.scroll >= current.max - 1, JSON.stringify(current)).toBe(true)
+
         const delta = current.scroll - previous.scroll
+
         expect(key === 'j' ? delta : -delta).toBeGreaterThanOrEqual(-1)
         // One display line or a single-line row; document-edge snapping may add two contexts.
         expect(Math.abs(delta)).toBeLessThanOrEqual(76)
+
         if (!captured && key === 'j' && current.id === 'n12' && current.offset > 2000) {
           await window.screenshot({ path: testInfo.outputPath('oversized-caret-visible.png') })
           captured = true
@@ -50,27 +55,34 @@ for (const rich of [false, true]) {
       }
       await window.keyboard.up(key)
     }
+
     expect(captured).toBe(true)
     expect(previous.id).toBe('n0')
     expect(previous.offset).toBe(0)
+
     await window.keyboard.press('8')
     await window.keyboard.press('0')
     await window.keyboard.press('0')
     await window.keyboard.press('j')
     await window.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
     const counted = await caretGeometry(window)
+
     expect(counted.id).not.toBe('n0')
     expect(counted.top).toBeGreaterThanOrEqual(24)
     expect(counted.bottom).toBeGreaterThanOrEqual(24)
+
     await setMainWindowContentSize(app, { width: 600, height: 460 })
+
     await expect
       .poll(async () => {
         const resized = await caretGeometry(window)
         return resized.top >= 24 && resized.bottom >= 24
       })
       .toBe(true)
+
     for (const key of ['J', 'K']) {
       await window.keyboard.press(key)
+
       await expect
         .poll(async () => {
           const moved = await caretGeometry(window)
@@ -78,6 +90,7 @@ for (const rich of [false, true]) {
         })
         .toBe(true)
     }
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 }

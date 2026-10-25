@@ -91,6 +91,7 @@ describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
     const leaf = await gutterAlignment(window, 0)
+
     expect(leaf.triangleCenter).toBeNull()
     expect(Math.abs(leaf.enterControlCenter - leaf.textCenter)).toBeLessThanOrEqual(1)
     expect(leaf.focusMarkerCenter).not.toBeNull()
@@ -99,14 +100,18 @@ describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
 
     await window.locator('.node-row').nth(1).click()
     const unfocused = await gutterAlignment(window, 0)
+
     expect(unfocused.focusMarkerCenter).toBeNull()
+
     const newlyFocused = await gutterAlignment(window, 1)
+
     expect(newlyFocused.focusMarkerCenter).not.toBeNull()
     expect(Math.abs((newlyFocused.focusMarkerCenter as number) - newlyFocused.enterControlCenter)).toBeLessThanOrEqual(
       1,
     )
 
     const parent = await gutterAlignment(window, 1)
+
     expect(parent.triangleCenter).not.toBeNull()
     expect(Math.abs(parent.enterControlCenter - parent.textCenter)).toBeLessThanOrEqual(1)
     expect(Math.abs((parent.triangleCenter as number) - parent.textCenter)).toBeLessThanOrEqual(1)
@@ -114,20 +119,25 @@ describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
     // The wrapped node's row grows taller than its first line, so this also proves the gutter
     // tracks the first line rather than centering on the whole multi-line text block.
     const wrapped = await gutterAlignment(window, 2)
+
     expect(Math.abs(wrapped.enterControlCenter - wrapped.textCenter)).toBeLessThanOrEqual(1)
     expect(Math.abs((wrapped.triangleCenter as number) - wrapped.textCenter)).toBeLessThanOrEqual(1)
 
     // An inline-expanded child row is indented by depth; its gutter and focus marker must stay on
     // the first text line there too.
     await window.locator('.node-row').nth(1).locator('.node-disclosure-triangle').click()
+
     await expect(window.locator('.node-row').nth(2).locator('.node-input')).toHaveText('Child')
+
     const child = await gutterAlignment(window, 2)
+
     expect(child.triangleCenter).toBeNull()
     expect(child.focusMarkerCenter).toBeNull()
     expect(Math.abs(child.enterControlCenter - child.textCenter)).toBeLessThanOrEqual(1)
 
     await window.locator('.node-row').nth(2).click()
     const focusedChild = await gutterAlignment(window, 2)
+
     expect(focusedChild.focusMarkerCenter).not.toBeNull()
     expect(Math.abs((focusedChild.focusMarkerCenter as number) - focusedChild.enterControlCenter)).toBeLessThanOrEqual(
       1,
@@ -186,23 +196,28 @@ test.describe('node gutter alignment (Vim editing only)', () => {
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const editor = node(window, 2)
     await editor.focus()
+
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(editor)
+
     await expect(window.locator('.node-row').nth(1)).toHaveClass(/node-row-image-only/)
 
     await editor.focus()
     const text = await gutterAlignment(window, 0)
     const imageOnly = await gutterAlignment(window, 1)
+
     expect(text.focusMarkerCenter).toBeNull()
     expect(imageOnly.focusMarkerCenter).not.toBeNull()
 
     // Same offset from the row top as a single-line text row, for the bullet and the focus marker.
     const textOffset = text.enterControlCenter - text.rowTop
+
     expect(Math.abs(imageOnly.enterControlCenter - imageOnly.rowTop - textOffset)).toBeLessThanOrEqual(1)
     expect(Math.abs((imageOnly.focusMarkerCenter as number) - imageOnly.enterControlCenter)).toBeLessThanOrEqual(1)
 
     // That position sits beside the image's top edge: within the image, above its middle.
     const imageTop = imageOnly.imageTop as number
+
     expect(imageOnly.enterControlCenter).toBeGreaterThanOrEqual(imageTop)
     expect(imageOnly.enterControlCenter).toBeLessThan(imageOnly.imageCenter as number)
   })

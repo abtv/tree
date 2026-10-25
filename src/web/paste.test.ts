@@ -21,6 +21,7 @@ describe('browser paste event clipboard', () => {
     const transfer = data([], 'Example', '<a href="https://example.com">Example</a>')
     const read = capturePasteClipboard(transfer)
     transfer.getData = () => ''
+
     await expect(read()).resolves.toEqual({
       kind: 'text',
       text: 'Example',
@@ -33,6 +34,7 @@ describe('browser paste event clipboard', () => {
     const transfer = data([file], 'fallback')
     const read = capturePasteClipboard(transfer)
     Object.defineProperty(transfer, 'files', { value: [] })
+
     await expect(read()).resolves.toEqual({ kind: 'image', png: new Uint8Array([1, 2, 3]) })
   })
 
@@ -40,12 +42,14 @@ describe('browser paste event clipboard', () => {
     const file = new File([], 'large.png', { type: 'image/png' })
     Object.defineProperty(file, 'size', { value: MAX_ATTACHMENT_BYTES + 1 })
     const readBytes = vi.spyOn(file, 'arrayBuffer')
+
     await expect(capturePasteClipboard(data([file], 'fallback'))()).rejects.toThrow('maximum 25 MiB')
     expect(readBytes).not.toHaveBeenCalled()
   })
 
   it('does not reinterpret other file types as PNG attachments', async () => {
     const file = new File([], 'photo.jpg', { type: 'image/jpeg' })
+
     await expect(capturePasteClipboard(data([file], 'fallback'))()).resolves.toMatchObject({
       kind: 'text',
       text: 'fallback',
@@ -55,6 +59,7 @@ describe('browser paste event clipboard', () => {
   it('propagates an image read failure without falling back to text', async () => {
     const file = new File([], 'image.png', { type: 'image/png' })
     vi.spyOn(file, 'arrayBuffer').mockRejectedValue(new Error('Image read failed'))
+
     await expect(capturePasteClipboard(data([file], 'fallback'))()).rejects.toThrow('Image read failed')
   })
 })

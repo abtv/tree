@@ -62,8 +62,11 @@ describe('handleRendererProtocol', () => {
 
   function install(readFile: (path: string) => Promise<Uint8Array>): Handler {
     const protocol = { handle: vi.fn() }
+
     handleRendererProtocol(protocol as unknown as Pick<Protocol, 'handle'>, root, readFile)
+
     expect(protocol.handle).toHaveBeenCalledWith(rendererScheme, expect.any(Function))
+
     return protocol.handle.mock.calls[0]![1] as Handler
   }
 

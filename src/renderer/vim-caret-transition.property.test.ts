@@ -16,6 +16,7 @@ it('keeps counted horizontal caret transitions inside the active node', () => {
         const state = { cursor, imageActive }
         for (const direction of ['left', 'right'] as const) {
           const next = horizontalCaretTransition(state, direction, count, 'x'.repeat(textLength), hasAttachment)
+
           expect(next.cursor).toBeGreaterThanOrEqual(0)
           expect(next.cursor).toBeLessThanOrEqual(maximum)
           expect(next.imageActive).toBe(hasAttachment && next.cursor === textLength)
@@ -47,7 +48,9 @@ it('keeps an edit-result caret within the node and consistent with its image-act
           imageActive,
           imageTextReturnCursor: imageActive && textLength > 0 ? Math.min(priorReturnSeed, textLength - 1) : undefined,
         }
+
         const next = editCaretTransition(priorState, rawCursor, textLength, hasAttachment)
+
         expect(next.cursor).toBeGreaterThanOrEqual(0)
         expect(next.cursor).toBeLessThanOrEqual(hasAttachment ? textLength : Math.max(0, textLength - 1))
         expect(next.imageActive).toBe(hasAttachment && next.cursor === textLength)

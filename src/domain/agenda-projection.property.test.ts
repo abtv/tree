@@ -29,6 +29,7 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
         }
       })
       const roots: TreeNode[] = []
+
       nodes.forEach((node, index) => {
         const parent = entries[index]!.parent % (index + 1)
         if (parent === index) roots.push(node)
@@ -41,6 +42,7 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
         preorder.push({ node, ancestors })
         node.children.forEach((child) => walk(child, [...ancestors, node]))
       }
+
       scopedRoots.forEach((root) => walk(root, []))
       const days = [...new Set(preorder.flatMap(({ node }) => entries[Number(node.id)]!.dates))].sort((a, b) => a - b)
       const expected = days.map((date) => {
@@ -57,6 +59,7 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
             })),
         }
       })
+
       expect(projectAgenda({ roots }, scope === nodes.length ? null : String(scope))).toEqual(expected)
     }),
     { numRuns: propertyRuns(300) },
@@ -92,10 +95,14 @@ it('rescans only the replaced root path after a text edit, independent of siblin
         const projection = projectAgenda(document, null)
         scan.mockClear()
         const changed = { roots: [edit(document.roots[0]!)] }
+
         const edited = projectAgenda(changed, null, { document, projection })
+
         expect(scan).toHaveBeenCalledTimes(depth)
         expect(edited).toEqual(projectAgenda(changed, null))
+
         const unchangedDay = projection.find((entry) => entry.day === day(20))
+
         if (unchangedDay !== undefined) expect(edited.find((entry) => entry.day === day(20))).toBe(unchangedDay)
         expect(edited.some((entry) => entry.day === day(14))).toBe(false)
         expect(edited.find((entry) => entry.day === day(15))!.rows.at(-1)).toEqual({

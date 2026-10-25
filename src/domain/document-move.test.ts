@@ -31,33 +31,39 @@ const document: Document = {
 describe('moveSubtree', () => {
   it('nests a node as the last child of a sibling', () => {
     const next = moved(moveSubtree(document, 'c', 'b', 1))
+
     expect(shape(next.roots)).toEqual([{ a: ['a1', { a2: ['a21'] }] }, { b: ['b1', 'c'] }, 'd'])
     assertDocument(next)
   })
 
   it('inserts at the requested index among the new parent children', () => {
     const next = moved(moveSubtree(document, 'c', 'a', 1))
+
     expect(shape(next.roots)).toEqual([{ a: ['a1', 'c', { a2: ['a21'] }] }, { b: ['b1'] }, 'd'])
   })
 
   it('outdents a node to the document root', () => {
     const next = moved(moveSubtree(document, 'a1', null, 4))
+
     expect(shape(next.roots)).toEqual([{ a: [{ a2: ['a21'] }] }, { b: ['b1'] }, 'c', 'd', 'a1'])
   })
 
   it('outdents a node to a position between the roots', () => {
     const next = moved(moveSubtree(document, 'b1', null, 1))
+
     expect(shape(next.roots)).toEqual([{ a: ['a1', { a2: ['a21'] }] }, 'b1', 'b', 'c', 'd'])
   })
 
   it('moves a node with its subtree to a distant parent', () => {
     const next = moved(moveSubtree(document, 'a2', 'b', 0))
+
     expect(shape(next.roots)).toEqual([{ a: ['a1'] }, { b: [{ a2: ['a21'] }, 'b1'] }, 'c', 'd'])
     expect(next.roots[1]!.children[0]).toBe(document.roots[0]!.children[1])
   })
 
   it('moves a node under its own former sibling subtree and into a deeper descendant', () => {
     const next = moved(moveSubtree(document, 'd', 'a21', 0))
+
     expect(shape(next.roots)).toEqual([{ a: ['a1', { a2: [{ a21: ['d'] }] }] }, { b: ['b1'] }, 'c'])
   })
 
@@ -106,15 +112,20 @@ describe('moveSubtree', () => {
     for (let level = MAX_DOCUMENT_DEPTH - 2; level >= 1; level -= 1) deep = node(`n${level}`, [deep])
     // `deep` is MAX_DOCUMENT_DEPTH - 1 levels tall: it fits one level down, not two.
     const fits: Document = { roots: [node('first'), deep] }
+
     expect(moveSubtree(fits, 'n1', 'first', 0).kind).toBe('moved')
+
     const tooDeep: Document = { roots: [node('first', [node('second')]), deep] }
+
     expect(moveSubtree(tooDeep, 'n1', 'second', 0)).toEqual({ kind: 'too-deep' })
     expect(tooDeep.roots[0]!.children[0]!.children).toEqual([])
   })
 
   it('does not mutate the input and shares the subtrees it does not touch', () => {
     const before = structuredClone(document)
+
     const next = moved(moveSubtree(document, 'c', 'b', 1))
+
     expect(document).toEqual(before)
     expect(next.roots[2]).toBe(document.roots[3])
     expect(next.roots[0]).toBe(document.roots[0])
@@ -124,7 +135,9 @@ describe('moveSubtree', () => {
 
   it('keeps the attachment summary', () => {
     const attached: Document = { roots: [node('a', [], true), node('b', [node('b1', [], true)])] }
+
     const next = moved(moveSubtree(attached, 'b', 'a', 0))
+
     expect(attachmentSummary(next).get('image')).toBe(2)
   })
 })

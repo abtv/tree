@@ -31,7 +31,9 @@ describe('Vim character-cursor invariants with attachments', () => {
         (length, arbitraryCursor, count) => {
           const cursor = arbitraryCursor % length
           if (moveCharacterCursor(cursor, 'right', 'x'.repeat(length), true, count) !== length) return
+
           const restored = imageTextReturnCursor(cursor, count, 'x'.repeat(length))
+
           expect(restored).toBeGreaterThanOrEqual(cursor)
           expect(restored).toBeLessThan(length)
           expect(restored).toBe(length - 1)
@@ -50,8 +52,10 @@ describe('Vim character-cursor invariants with attachments', () => {
         (length, cursor, hasImage, count) => {
           const maximum = hasImage ? length : Math.max(0, length - 1)
           const start = Math.min(cursor, maximum)
+
           const right = moveCharacterCursor(start, 'right', 'x'.repeat(length), hasImage, count)
           const left = moveCharacterCursor(start, 'left', 'x'.repeat(length), hasImage, count)
+
           expect(right).toBeGreaterThanOrEqual(0)
           expect(right).toBeLessThanOrEqual(maximum)
           expect(left).toBeGreaterThanOrEqual(0)
@@ -80,6 +84,7 @@ describe('Vim character-cursor invariants with attachments', () => {
             throw new Error('The final text character must be editable')
           const deletionCursor = normalEditCursor(deleted.nextCursor, deleted.nextText.length, hasImage)
           const caseCursor = normalEditCursor(toggled.nextCursor, toggled.nextText.length, hasImage)
+
           expect(deletionCursor).toBe(hasImage ? deleted.nextText.length : Math.max(0, deleted.nextText.length - 1))
           expect(caseCursor).toBe(hasImage ? toggled.nextText.length : toggled.nextText.length - 1)
         },
@@ -101,6 +106,7 @@ describe('Vim character-cursor invariants with attachments', () => {
             true,
           )
           if (replayed === undefined || replayed.kind !== 'edit') throw new Error('The replay must edit text')
+
           expect(normalEditCursor(replayed.nextCursor, replayed.nextText.length, false)).toBe(cursor - 1)
         },
       ),
@@ -113,6 +119,7 @@ describe('Vim word-motion invariants', () => {
     fc.assert(
       fc.property(fc.string(), fc.nat(), (text, arbitraryCursor) => {
         const cursor = Math.min(arbitraryCursor, Math.max(0, text.length - 1))
+
         const forward = moveWordForward(text, cursor)
         const backward = moveWordBackward(text, cursor)
         const end = moveWordEnd(text, cursor)
@@ -120,6 +127,7 @@ describe('Vim word-motion invariants', () => {
         const wordBackward = moveWORDBackward(text, cursor)
         const wordEnd = moveWORDEnd(text, cursor)
         const previousEnd = moveWordEndBackward(text, cursor)
+
         expect(forward).toBeGreaterThanOrEqual(cursor)
         expect(forward).toBeLessThanOrEqual(text.length)
         expect(backward).toBeGreaterThanOrEqual(0)
@@ -152,10 +160,12 @@ describe('Vim text-object invariants', () => {
           const around = textObjectRange(text, cursor, 'a', object, count)
           for (const range of [inner, around]) {
             if (range === undefined) continue
+
             expect(range.start).toBeGreaterThanOrEqual(0)
             expect(range.end).toBeGreaterThanOrEqual(range.start)
             expect(range.end).toBeLessThanOrEqual(text.length)
           }
+
           if (inner !== undefined && around !== undefined) {
             expect(inner.start).toBeGreaterThanOrEqual(around.start)
             expect(inner.end).toBeLessThanOrEqual(around.end)

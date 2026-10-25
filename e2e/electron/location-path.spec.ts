@@ -30,24 +30,31 @@ test.describe('location path overflow', () => {
     await expect(currentSegment).toBeVisible()
 
     const shortOverflow = await shortSegment.evaluate((element) => element.scrollWidth - element.clientWidth)
+
     expect(shortOverflow).toBeLessThanOrEqual(2)
 
     const longOverflow = await longSegment.evaluate((element) => element.scrollWidth - element.clientWidth)
+
     expect(longOverflow).toBeGreaterThan(1)
 
     const currentOverflow = await currentSegment.evaluate((element) => element.scrollWidth - element.clientWidth)
+
     expect(currentOverflow).toBeGreaterThan(1)
 
     const barOverflow = await bar.evaluate((element) => element.scrollWidth - element.clientWidth)
+
     expect(barOverflow).toBeLessThanOrEqual(1)
 
     const pageOverflow = await window.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     )
+
     expect(pageOverflow).toBeLessThanOrEqual(1)
 
     await expect(parent(window)).toHaveValue(longCurrent)
+
     const headingHeight = await parent(window).evaluate((element) => element.getBoundingClientRect().height)
+
     expect(headingHeight).toBeGreaterThan(40)
   })
 })

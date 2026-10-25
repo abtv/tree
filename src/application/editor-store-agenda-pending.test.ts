@@ -63,20 +63,26 @@ const twoKey = `node:${day(10, 14)}:two`
 describe('starting a pending move', () => {
   it('marks the selected direct match without touching the document, the clipboard, or the disk', async () => {
     const { store, save, readClipboard } = await harness()
+
     select(store, oneKey)
     const before = ready(store)
+
     expect(store.startAgendaMove()).toBe(true)
     expect(ready(store).agenda!.pendingMove).toEqual([{ nodeId: 'one', day: day(10, 14) }])
     expect(ready(store).document).toBe(before.document)
+
     await store.flushPersistence()
+
     expect(save).not.toHaveBeenCalled()
     expect(readClipboard).not.toHaveBeenCalled()
   })
 
   it('marks the following direct matches of the day for a count', async () => {
     const { store } = await harness()
+
     select(store, oneKey)
     store.startAgendaMove(2)
+
     expect(ready(store).agenda!.pendingMove!.map((source) => source.nodeId)).toEqual(['one', 'two'])
   })
 
@@ -91,6 +97,7 @@ describe('starting a pending move', () => {
     for (const key of keys) {
       select(store, key)
       const before = ready(store)
+
       expect(store.startAgendaMove()).toBe(false)
       expect(ready(store)).toBe(before)
     }
@@ -98,13 +105,18 @@ describe('starting a pending move', () => {
 
   it('is unavailable while persistence is locked and outside Agenda', async () => {
     const { store } = await harness()
+
     select(store, oneKey)
     const runtime = (store as unknown as { runtime: EditorRuntimeState }).runtime
+
     runtime.replaceReady({ ...ready(store), persistenceLocked: true })
+
     expect(store.startAgendaMove()).toBe(false)
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
+
     runtime.replaceReady({ ...ready(store), persistenceLocked: false })
     store.closeAgenda()
+
     expect(store.startAgendaMove()).toBe(false)
   })
 })
@@ -137,7 +149,9 @@ describe('pending move lifecycle (D4)', () => {
     it(`keeps the move through ${name}`, async () => {
       const { store } = await marked()
       const pending = ready(store).agenda!.pendingMove
+
       act(store)
+
       expect(ready(store).agenda!.pendingMove).toBe(pending)
     })
 
@@ -150,24 +164,33 @@ describe('pending move lifecycle (D4)', () => {
   for (const [name, act] of cancelled)
     it(`cancels the move through ${name}`, async () => {
       const { store } = await marked()
+
       act(store)
+
       expect(ready(store).agenda!.pendingMove).toBeUndefined()
     })
 
   it('cancels the move through Undo and Redo without adding a history entry', async () => {
     const { store } = await harness()
+
     store.editContent('three', '2026-10-16 Three!', [], false)
     store.endTextSession()
     select(store, oneKey)
     const edited = ready(store).document
+
     store.startAgendaMove()
     store.undo()
+
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
+
     const undone = ready(store).document
+
     expect(undone).not.toBe(edited)
+
     select(store, oneKey)
     store.startAgendaMove()
     store.redo()
+
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
     expect(ready(store).document).toBe(edited)
   })
@@ -176,7 +199,9 @@ describe('pending move lifecycle (D4)', () => {
     for (const command of ['undo', 'redo'] as const) {
       const { store } = await marked()
       const document = ready(store).document
+
       store[command]()
+
       expect(ready(store).agenda!.pendingMove).toBeUndefined()
       expect(ready(store).document).toBe(document)
     }
@@ -184,8 +209,10 @@ describe('pending move lifecycle (D4)', () => {
 
   it('cannot mark a temporarily invalid item', async () => {
     const { store } = await harness()
+
     select(store, oneKey)
     store.editContent('one', 'One', [], false)
+
     expect(ready(store).agenda!.pinnedOccurrence).toBeDefined()
     expect(store.startAgendaMove()).toBe(false)
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
@@ -193,15 +220,19 @@ describe('pending move lifecycle (D4)', () => {
 
   it('leaves no pending move after Agenda closes and opens again', async () => {
     const { store } = await marked()
+
     store.closeAgenda()
     store.openAgenda()
+
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
   })
 
   it('cancelling without a pending move changes nothing', async () => {
     const { store } = await harness()
     const before = ready(store)
+
     store.cancelAgendaMove()
+
     expect(ready(store)).toBe(before)
   })
 })
@@ -210,10 +241,13 @@ describe('pending move lifecycle (D4)', () => {
 describe('putting a pending move', () => {
   it('moves the marked occurrences to the day of a day container as one undoable, persisted change', async () => {
     const { store, save } = await harness()
+
     select(store, oneKey)
     store.startAgendaMove(2)
     const before = ready(store).document
+
     select(store, `day:${day(10, 16)}`)
+
     expect(store.putAgendaMove()).toBe(true)
     expect(text(store, 'one')).toBe('2026-10-16 One')
     expect(text(store, 'two')).toBe('2026-10-16 Two')
@@ -223,20 +257,28 @@ describe('putting a pending move', () => {
       selectedKey: `node:${day(10, 16)}:one`,
       activeOccurrence: { nodeId: 'one', day: day(10, 16) },
     })
+
     store.undo()
+
     expect(ready(store).document).toBe(before)
+
     store.redo()
+
     expect(text(store, 'two')).toBe('2026-10-16 Two')
+
     await store.flushPersistence()
+
     expect(save).toHaveBeenCalledTimes(1)
   })
 
   it('puts on a direct match and on a contextual ancestor of the target day', async () => {
     for (const key of [`node:${day(10, 16)}:three`, `node:${day(10, 16)}:scope`]) {
       const { store } = await harness()
+
       select(store, oneKey)
       store.startAgendaMove()
       select(store, key)
+
       expect(store.putAgendaMove()).toBe(true)
       expect(text(store, 'one')).toBe('2026-10-16 One')
     }
@@ -244,21 +286,26 @@ describe('putting a pending move', () => {
 
   it('uses the lower-case and upper-case put identically through the same store operation', async () => {
     const { store } = await harness()
+
     select(store, twoKey)
     store.startAgendaMove()
     select(store, `day:${day(10, 15)}`)
     store.putAgendaMove()
+
     expect(text(store, 'two')).toBe('2026-10-15 Two')
     expect(text(store, 'one')).toBe('2026-10-14 One')
   })
 
   it('leaves the move pending on a gap', async () => {
     const { store } = await harness()
+
     select(store, oneKey)
     store.startAgendaMove()
     const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
+
     select(store, gap.key)
     const before = ready(store)
+
     expect(store.putAgendaMove()).toBe(false)
     expect(ready(store)).toBe(before)
     expect(ready(store).agenda!.pendingMove).toBeDefined()
@@ -266,23 +313,32 @@ describe('putting a pending move', () => {
 
   it('only ends the pending state when the target is the marked occurrence’s own day', async () => {
     const { store, save } = await harness()
+
     select(store, oneKey)
     store.startAgendaMove()
     const document = ready(store).document
+
     select(store, twoKey)
+
     expect(store.putAgendaMove()).toBe(true)
     expect(ready(store).document).toBe(document)
     expect(ready(store).agenda!.pendingMove).toBeUndefined()
+
     store.undo()
+
     expect(ready(store).document).toBe(document)
+
     await store.flushPersistence()
+
     expect(save).not.toHaveBeenCalled()
   })
 
   it('does nothing without a pending move or while persistence is locked', async () => {
     const { store } = await harness()
+
     select(store, `day:${day(10, 16)}`)
     const before = ready(store)
+
     expect(store.putAgendaMove()).toBe(false)
     expect(ready(store)).toBe(before)
 
@@ -290,8 +346,10 @@ describe('putting a pending move', () => {
     store.startAgendaMove()
     select(store, `day:${day(10, 16)}`)
     const runtime = (store as unknown as { runtime: EditorRuntimeState }).runtime
+
     runtime.replaceReady({ ...ready(store), persistenceLocked: true })
     const locked = ready(store)
+
     expect(store.putAgendaMove()).toBe(false)
     expect(ready(store)).toBe(locked)
   })

@@ -118,17 +118,24 @@ it('drags a direct match onto another day after the hold and changes only that d
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
+
   expect(source).not.toHaveClass('agenda-row-dragging')
+
   hold()
+
   expect(source).toHaveClass('agenda-row-dragging')
   expect(document.body).toHaveClass('node-drag-active')
   expect(ctx.freeze.begin).toHaveBeenCalledWith('first', 1)
 
   const header = `day:${day(10, 15)}`
+
   move(source, ctx.centerOf(header))
+
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
   expect(document.body).not.toHaveClass('node-drag-invalid')
+
   up(source, ctx.centerOf(header))
 
   expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
@@ -137,7 +144,9 @@ it('drags a direct match onto another day after the hold and changes only that d
   expect(document.body).not.toHaveClass('node-drag-active')
   expect(ctx.container.querySelector('.agenda-row-dragging, .agenda-row-drop-on')).toBeNull()
   expect(ctx.freeze.end).toHaveBeenCalledWith(1)
+
   act(() => ctx.store.undo())
+
   expect(textOf(ctx, 'first')).toBe('2026-10-14 Prepare 2026-10-20')
 })
 
@@ -146,12 +155,17 @@ it('drops on any row of the target day, including a node row', async () => {
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const target = `node:${day(10, 15)}:second`
+
   move(source, ctx.centerOf(target))
+
   expect(ctx.element(`day:${day(10, 15)}`)).toHaveClass('agenda-row-drop-on')
+
   up(source, ctx.centerOf(target))
+
   expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
 })
 
@@ -161,13 +175,18 @@ it('changes nothing when dropped on its own day, and shows no outline there', as
   const ctx = await setup()
   const before = ctx.snapshot().document
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const header = `day:${day(10, 14)}`
+
   move(source, ctx.centerOf(header))
+
   expect(ctx.container.querySelector('.agenda-row-drop-on')).toBeNull()
   expect(document.body).not.toHaveClass('node-drag-invalid')
+
   up(source, ctx.centerOf(header))
+
   expect(ctx.snapshot().document).toBe(before)
 })
 
@@ -178,12 +197,16 @@ it('marks a gap as an invalid drop and changes nothing there', async () => {
   const before = ctx.snapshot().document
   const gap = ctx.rows.find((row) => row.kind === 'gap')!
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   move(source, ctx.centerOf(gap.key))
+
   expect(document.body).toHaveClass('node-drag-invalid')
   expect(ctx.container.querySelector('.agenda-row-drop-on')).toBeNull()
+
   up(source, ctx.centerOf(gap.key))
+
   expect(ctx.snapshot().document).toBe(before)
   expect(document.body).not.toHaveClass('node-drag-invalid')
 })
@@ -195,9 +218,11 @@ it('never drags contextual ancestors, day headers, gaps, or from the chevron', a
   const context = `node:${day(10, 14)}:context`
   const gap = ctx.rows.find((row) => row.kind === 'gap')!
   for (const key of [context, `day:${day(10, 14)}`, gap.key]) down(ctx.element(key), ctx.centerOf(key))
+
   down(ctx.element(firstKey).querySelector('.node-enter-control')!, ctx.centerOf(firstKey))
   hold()
   act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
   expect(ctx.container.querySelector('.agenda-row-dragging')).toBeNull()
   expect(document.body).not.toHaveClass('node-drag-active')
 })
@@ -207,10 +232,12 @@ it('ignores secondary buttons and touch pointers on text', async () => {
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey), { button: 2 })
   down(source, ctx.centerOf(firstKey), { isPrimary: false })
   down(source.querySelector('.node-input, .agenda-text')!, ctx.centerOf(firstKey), { pointerType: 'touch' })
   hold()
+
   expect(ctx.container.querySelector('.agenda-row-dragging')).toBeNull()
 })
 
@@ -220,16 +247,23 @@ it('drags from an empty touch surface and ignores another finger before dropping
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source.querySelector('.node-touch-drag-surface')!, ctx.centerOf(firstKey), { pointerType: 'touch' })
   hold()
+
   expect(source).toHaveClass('agenda-row-dragging')
+
   const header = `day:${day(10, 15)}`
+
   move(source, ctx.centerOf(header))
   fireEvent.pointerUp(source, { pointerId: 2, clientY: ctx.centerOf(firstKey) })
   fireEvent.pointerCancel(source, { pointerId: 2 })
+
   expect(source).toHaveClass('agenda-row-dragging')
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+
   up(source, ctx.centerOf(header))
+
   expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
 })
 
@@ -239,11 +273,15 @@ it('does not start before the hold elapses and a quick release moves nothing', a
   const ctx = await setup()
   const before = ctx.snapshot().document
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS - 1))
+
   expect(source).not.toHaveClass('agenda-row-dragging')
+
   up(source, ctx.centerOf(firstKey))
   act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
   expect(source).not.toHaveClass('agenda-row-dragging')
   expect(ctx.snapshot().document).toBe(before)
 })
@@ -253,9 +291,11 @@ it('cancels when the pointer leaves the source row or moves too far before the h
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   move(source, ctx.centerOf(firstKey) + ROW * 3)
   hold()
+
   expect(source).not.toHaveClass('agenda-row-dragging')
 })
 
@@ -265,14 +305,18 @@ it('cancels a pending hold when the held pointer leaves the list, but not a rese
   const ctx = await setup()
   const source = ctx.element(firstKey)
   const list = ctx.container.querySelector('.agenda-list')!
+
   down(source, ctx.centerOf(firstKey))
   fireEvent.pointerLeave(list, { pointerId: 1, buttons: 0 })
   hold()
+
   expect(source).toHaveClass('agenda-row-dragging')
+
   up(source, ctx.centerOf(firstKey))
   down(source, ctx.centerOf(firstKey))
   fireEvent.pointerLeave(list, { pointerId: 1, buttons: 1 })
   hold()
+
   expect(source).not.toHaveClass('agenda-row-dragging')
 })
 
@@ -280,14 +324,18 @@ it('cancels a pending hold when the held pointer leaves the list, but not a rese
 it('does not scroll-anchor to the source row after dropping the active occurrence', async () => {
   vi.useFakeTimers()
   const ctx = await setup()
+
   act(() => ctx.store.applyAgenda({ kind: 'select', key: firstKey }))
   scrollBy.mockClear()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const header = `day:${day(10, 15)}`
+
   move(source, ctx.centerOf(header))
   up(source, ctx.centerOf(header))
+
   expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
   expect(scrollBy).not.toHaveBeenCalled()
 })
@@ -298,13 +346,17 @@ it('cancels on Escape without moving or saving', async () => {
   const ctx = await setup()
   const before = ctx.snapshot().document
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   move(source, ctx.centerOf(`day:${day(10, 15)}`))
   act(() => void fireEvent.keyDown(globalThis as unknown as Window, { key: 'Escape' }))
+
   expect(source).not.toHaveClass('agenda-row-dragging')
   expect(document.body).not.toHaveClass('node-drag-active')
+
   up(source, ctx.centerOf(`day:${day(10, 15)}`))
+
   expect(ctx.snapshot().document).toBe(before)
 })
 
@@ -313,16 +365,25 @@ it('follows and drops a pointer that leaves the list when native capture is unav
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const header = `day:${day(10, 15)}`
+
   fireEvent.pointerMove(document.body, { pointerId: 1, clientX: 100, clientY: ctx.centerOf(header) })
+
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+
   fireEvent.pointerMove(document.body, { pointerId: 2, clientX: 100, clientY: ctx.centerOf(`day:${day(10, 14)}`) })
+
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+
   fireEvent.pointerUp(document.body, { pointerId: 2, clientX: 100, clientY: ctx.centerOf(header) })
+
   expect(source).toHaveClass('agenda-row-dragging')
+
   fireEvent.pointerUp(document.body, { pointerId: 1, clientX: 100, clientY: ctx.centerOf(header) })
+
   expect(textOf(ctx, 'first')).toBe('2026-10-15 Prepare 2026-10-20')
   expect(document.body).not.toHaveClass('node-drag-active')
 })
@@ -335,6 +396,7 @@ it.each(['pointercancel on the list', 'pointercancel outside', 'window blur', 'l
     const ctx = await setup()
     const before = ctx.snapshot().document
     const source = ctx.element(firstKey)
+
     down(source, ctx.centerOf(firstKey))
     hold()
     move(source, ctx.centerOf(`day:${day(10, 15)}`))
@@ -344,9 +406,12 @@ it.each(['pointercancel on the list', 'pointercancel outside', 'window blur', 'l
       else if (ending === 'window blur') fireEvent.blur(globalThis as unknown as Window)
       else fireEvent.lostPointerCapture(source, { pointerId: 1 })
     })
+
     expect(source).not.toHaveClass('agenda-row-dragging')
     expect(document.body).not.toHaveClass('node-drag-active')
+
     up(source, ctx.centerOf(`day:${day(10, 15)}`))
+
     expect(ctx.snapshot().document).toBe(before)
   },
 )
@@ -356,13 +421,19 @@ it('keeps tracking the drop target while the list scrolls under a stationary poi
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const header = `day:${day(10, 15)}`
+
   move(source, ctx.centerOf(header))
+
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+
   act(() => void fireEvent.scroll(globalThis as unknown as Window))
+
   expect(ctx.element(header)).toHaveClass('agenda-row-drop-on')
+
   up(source, ctx.centerOf(header))
 })
 
@@ -371,8 +442,10 @@ it('does not drag while persistence is locked', async () => {
   vi.useFakeTimers()
   const ctx = await setup(true)
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
+
   expect(source).not.toHaveClass('agenda-row-dragging')
 })
 
@@ -381,12 +454,16 @@ it('suppresses the click that follows a completed drag', async () => {
   vi.useFakeTimers()
   const ctx = await setup()
   const source = ctx.element(firstKey)
+
   down(source, ctx.centerOf(firstKey))
   hold()
   const header = ctx.element(`day:${day(10, 15)}`)
+
   move(source, ctx.centerOf(`day:${day(10, 15)}`))
   up(source, ctx.centerOf(`day:${day(10, 15)}`))
   const selected = ctx.snapshot().agenda!.selectedKey
+
   fireEvent.click(header)
+
   expect(ctx.snapshot().agenda!.selectedKey).toBe(selected)
 })

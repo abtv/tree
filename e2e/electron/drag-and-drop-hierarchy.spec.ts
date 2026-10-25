@@ -170,16 +170,22 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       seedAttachmentImage(userDataDir, 'image')
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const row = window.locator('.node-row[data-node-id="x"]')
+
       await startRowDrag(window, focused ? row.locator('.node-input') : row, { xOffset: focused ? 8 : 1 })
       await hoverBreadcrumb(window, '.location-root')
+
       await expect(window.locator('.location-root')).toHaveClass(/location-drop-target/)
+
       await window.mouse.up()
       const input = row.locator('.node-input')
+
       await expect(input).toBeFocused()
       await expect(window.getByAltText('Attached image')).toBeVisible()
       await expect(window.locator('.location-current')).toHaveCount(0)
       if (mode === 'vim') await expect(input).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('Meta+z')
+
       await expect(input).toBeFocused()
       await expect(window.locator('.location-current')).toHaveText('Parent')
     })
@@ -189,22 +195,32 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     seedDocument(userDataDir, breadcrumbSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const source = window.locator('.node-row[data-node-id="x"] .node-input')
+
     await startRowDrag(window, source)
     await hoverBreadcrumb(window, '.location-root')
     await window.mouse.up()
     await window.locator('.node-row[data-node-id="tail"] .node-enter-control').click()
+
     await expect(window.locator('.location-current')).toHaveText('Last root')
+
     await window.keyboard.press(mode === 'vim' ? 'u' : 'Meta+z')
+
     await expect(window.locator('.location-current')).toHaveText('Parent')
     await expect(source).toBeFocused()
+
     await window.keyboard.press(mode === 'vim' ? 'Control+r' : 'Meta+Shift+z')
+
     await expect(window.locator('.location-current')).toHaveCount(0)
     await expect(source).toBeFocused()
+
     await startRowDrag(window, source)
     await hoverBreadcrumb(window, '.location-root')
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.location-drop-target')).toHaveCount(0)
+
     await window.mouse.up()
+
     await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
   })
   for (const destination of ['ancestor', 'root']) {
@@ -218,14 +234,21 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       seedDocument(userDataDir, breadcrumbSeed(expanded))
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const source = window.locator('.node-row[data-node-id="x"] .node-input')
+
       await startRowDrag(window, source, { xOffset: mode === 'vim' ? 24 : 8 })
       const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+
       if (mode === 'vim') expect(frozenCursor).toBeGreaterThan(0)
+
       const selector = destination === 'root' ? '.location-root' : '.location-segment[data-breadcrumb-id="r"]'
+
       await hoverBreadcrumb(window, selector)
+
       await expect(window.locator('.location-drop-target')).toHaveCount(1)
       await expect(window.locator('.node-row-drop-before, .node-row-drop-after, .node-row-drop-on')).toHaveCount(0)
+
       await window.mouse.up()
+
       await expect(source).toBeFocused()
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
       expect(await selectionOffsets(source)).toEqual([frozenCursor, frozenCursor + (mode === 'vim' ? 1 : 0)])
@@ -233,7 +256,9 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       await expect(source).toHaveValue('Moved')
       await expect(window.locator('.node-row').last()).toHaveAttribute('data-node-id', 'x')
       await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
+
       await window.keyboard.press('Meta+z')
+
       await expect(source).toBeFocused()
       if (expanded) {
         await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
@@ -243,7 +268,9 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
         )
       } else await expect(window.locator('.location-current')).toHaveText('Parent')
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+
       await window.keyboard.press('Meta+Shift+z')
+
       await expect(source).toBeFocused()
       // A redone root is hidden from the old parent's location; a visible ancestor location stays.
       await expect(window.locator('.location-current')).toHaveText(destination === 'root' ? [] : 'Ancestor')
@@ -270,25 +297,35 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const source = window.locator('.node-row[data-node-id="x"] .node-input')
+
     await expect(source).toHaveAttribute('contenteditable', 'true')
+
     await startRowDrag(window, source, { xOffset: 24 })
     const frozen = await selectionOffsets(source)
     if (frozen === null) throw new Error('The rich drag source had no selection.')
+
     expect(frozen[0]).toBeGreaterThan(0)
+
     await hoverBreadcrumb(window, '.location-root')
     await window.mouse.up()
+
     await expect(source).toBeFocused()
     await expect(window.locator('.location-current')).toHaveCount(0)
     await expect(source).toHaveText(text)
     await expect(source.getByRole('link')).toHaveAttribute('href', url)
     await expect.poll(() => selectionOffsets(source)).toEqual([frozen[0], frozen[0]! + (mode === 'vim' ? 1 : 0)])
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await window.screenshot({ path: test.info().outputPath(`rich-drop-caret-${mode}-${appearance}.png`) })
     }
+
     await window.keyboard.press(mode === 'vim' ? 'l' : 'ArrowRight')
+
     await expect.poll(() => selectionOffsets(source)).toEqual([frozen[0]! + 1, frozen[0]! + (mode === 'vim' ? 2 : 1)])
+
     await window.keyboard.press('Meta+z')
+
     await expect(window.locator('.location-current')).toHaveText('Parent')
     await expect(source).toBeFocused()
     await expect.poll(() => selectionOffsets(source)).toEqual([0, mode === 'vim' ? 1 : 0])
@@ -300,24 +337,37 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     seedDocument(userDataDir, breadcrumbSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const source = window.locator('.node-row[data-node-id="x"] .node-input')
+
     await startRowDrag(window, source)
     await hoverBreadcrumb(window, '.location-segment[data-breadcrumb-id="p"]')
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.location-drop-target')).toHaveCount(0)
+
     await window.mouse.up()
+
     await expect(window.locator('.location-current')).toHaveText('Parent')
+
     await startRowDrag(window, source)
     await hoverBreadcrumb(window, '.location-root')
+
     await expect(window.locator('.location-drop-target')).toHaveCount(1)
+
     const toolbar = await window.locator('.location-bar').boundingBox()
     if (toolbar === null) throw new Error('The toolbar was not rendered.')
+
     await window.mouse.move(toolbar.x + toolbar.width - 2, toolbar.y + toolbar.height / 2)
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.location-drop-target')).toHaveCount(0)
+
     await hoverBreadcrumb(window, '.location-root')
     await window.keyboard.press('Escape')
+
     await expect(window.locator('.location-drop-target')).toHaveCount(0)
+
     await window.mouse.up()
+
     await expect(source).toBeFocused()
     await expect(window.locator('.location-current')).toHaveText('Parent')
   })
@@ -330,20 +380,27 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     const toolbar = window.locator('.location-bar')
     const ancestor = window.locator('.location-segment[data-breadcrumb-id="r"]')
     const before = await ancestor.boundingBox()
+
     await startRowDrag(window, window.locator('.node-row[data-node-id="x"] .node-input'))
     await hoverBreadcrumb(window, '.location-segment[data-breadcrumb-id="r"]')
+
     await expect(ancestor).toHaveClass(/location-drop-target/)
     expect(await ancestor.boundingBox()).toEqual(before)
+
     const geometry = await ancestor.evaluate((element) => {
       const bar = element.closest('.location-bar')!.getBoundingClientRect()
       const segment = element.getBoundingClientRect()
       return { top: segment.top - bar.top, bottom: bar.bottom - segment.bottom }
     })
+
     expect(geometry.top).toBe(0)
     expect(geometry.bottom).toBeLessThanOrEqual(1)
     await expect(toolbar).toHaveScreenshot(`breadcrumb-target-${mode}-light.png`)
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(toolbar).toHaveScreenshot(`breadcrumb-target-${mode}-dark.png`)
+
     await window.keyboard.press('Escape')
     await window.mouse.up()
   })
@@ -361,10 +418,13 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
         if (state === 'visual-node') await window.keyboard.press('V')
       }
       if (state === 'replace' || state === 'insert') await window.keyboard.type('x')
+
       await startRowDrag(window, source)
       const cursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+
       await hoverBreadcrumb(window, '.location-root')
       await window.mouse.up()
+
       await expect(source).toBeFocused()
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(cursor)
       if (mode === 'vim')
@@ -394,19 +454,26 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
         if (state === 'visual-node') await window.keyboard.press('V')
       }
       if (state === 'replace' || state === 'insert') await window.keyboard.type('x')
+
       await startRowDrag(window, source)
       const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
       const parent = await window.locator('.node-row[data-node-id="a"]').boundingBox()
       if (parent === null) throw new Error('The target row was not rendered.')
+
       await window.mouse.move(parent.x + 30, parent.y + parent.height / 2)
+
       await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
+
       await window.mouse.up()
+
       await expect(source).toBeFocused()
       await expect(window.locator('.node-row[data-node-id="b"]')).toHaveAttribute('data-depth', '1')
       await expect(source).toHaveValue(state === 'replace' ? 'xravo' : state === 'insert' ? 'xBravo' : 'Bravo')
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
+
       if (mode === 'vim') {
         const expectedMode = state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : 'NORMAL'
+
         await expect(window.getByLabel('Vim mode')).toHaveText(expectedMode)
       }
     })
@@ -417,12 +484,15 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     seed.location = { currentParentId: null, selectedNodeId: 'c' }
     seedDocument(userDataDir, seed)
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await startRowDrag(window, window.locator('.node-row[data-node-id="b"]'), { xOffset: 1 })
     const parent = await window.locator('.node-row[data-node-id="a"]').boundingBox()
     if (parent === null) throw new Error('The target row was not rendered.')
+
     await window.mouse.move(parent.x + 30, parent.y + parent.height / 2)
     await window.mouse.up()
     const source = window.locator('.node-row[data-node-id="b"] .node-input')
+
     await expect(source).toBeFocused()
     expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
     await expect(window.locator('.node-row[data-node-id="b"] .node-focus-marker')).toHaveCount(1)
@@ -436,19 +506,28 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       if (expanded) await openAlpha(window)
       const source = window.locator('.node-row[data-node-id="b"] .node-input')
+
       await startRowDrag(window, source, { xOffset: mode === 'vim' ? 24 : 8 })
       const frozenCursor = await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+
       if (mode === 'vim') expect(frozenCursor).toBeGreaterThan(0)
+
       const targetBox = await window.locator('.node-row[data-node-id="a"]').boundingBox()
       if (targetBox === null) throw new Error('The receiving row was not rendered.')
+
       await window.mouse.move(targetBox.x + 30, targetBox.y + targetBox.height / 2, { steps: 5 })
       const parent = window.locator('.node-row[data-node-id="a"]')
+
       await expect(parent).toHaveClass(/node-row-drop-on/)
+
       await window.mouse.up()
+
       await expect
         .poll(() => nodeTexts(window))
         .toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo', 'Charlie'])
+
       const moved = window.locator('.node-row[data-node-id="b"]')
+
       await expect(moved).toHaveAttribute('data-depth', '1')
       await expect(moved.locator('.node-input')).toBeFocused()
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(frozenCursor)
@@ -456,9 +535,13 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       expect(await selectionOffsets(source)).toEqual([frozenCursor, frozenCursor + (mode === 'vim' ? 1 : 0)])
       if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(parent.locator('.node-disclosure-triangle')).toHaveAttribute('aria-expanded', 'true')
+
       await window.keyboard.press('Meta+z')
+
       await expect(moved).toHaveAttribute('data-depth', '0')
+
       await window.keyboard.press('Meta+Shift+z')
+
       await expect(moved).toHaveAttribute('data-depth', '1')
     })
   }
@@ -472,34 +555,50 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     const before = await target.boundingBox()
     if (before === null) throw new Error('The leaf row was not rendered.')
     if (mode === 'vim') await window.keyboard.press('V')
+
     await dragOntoRow(window, 'b', 'c')
+
     await expect(target).toHaveClass(/node-row-drop-on/)
     await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
     expect(await target.boundingBox()).toEqual(before)
+
     const captureNodeList = async (appearance: 'light' | 'dark') => {
       const bounds = await window.locator('.node-list').boundingBox()
       if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+
       await expect(window).toHaveScreenshot(`hierarchy-row-target-${mode}-${appearance}.png`, { clip: bounds })
     }
+
     await captureNodeList('light')
     await window.emulateMedia({ colorScheme: 'dark' })
     const darkBox = await target.boundingBox()
     if (darkBox === null) throw new Error('The dark receiving row was not rendered.')
+
     await window.mouse.move(darkBox.x + 30, darkBox.y + darkBox.height / 2)
+
     await expect(target).toHaveClass(/node-row-drop-on/)
+
     await captureNodeList('dark')
+
     await expect(target).toHaveClass(/node-row-drop-on/)
+
     await window.emulateMedia({ colorScheme: 'light' })
 
     const edgeBox = await target.boundingBox()
     if (edgeBox === null) throw new Error('The receiving row was not rendered after appearance switching.')
+
     await window.mouse.move(edgeBox.x + 30, edgeBox.y + 2)
+
     await expect(target).toHaveClass(/node-row-drop-before/)
     await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+
     await window.mouse.move(edgeBox.x + 30, edgeBox.y + edgeBox.height / 2)
+
     await expect(target).toHaveClass(/node-row-drop-on/)
+
     await window.mouse.up()
+
     await expect(window.locator('.node-row[data-node-id="b"]')).toHaveAttribute('data-depth', '1')
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Charlie', 'Bravo'])
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -510,23 +609,36 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
     const before = await nodeTexts(window)
+
     await startRowDrag(window, window.locator('.node-row[data-node-id="a"] .node-input'))
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
+
     const child = await window.locator('.node-row[data-node-id="a1"]').boundingBox()
     if (child === null) throw new Error('The descendant row was not rendered.')
+
     await window.mouse.move(child.x + 30, child.y + child.height / 2)
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+
     await window.mouse.up()
+
     expect(await nodeTexts(window)).toEqual(before)
 
     await dragOntoRow(window, 'b', 'a')
+
     await expect(window.locator('.node-row[data-node-id="a"]')).toHaveClass(/node-row-drop-on/)
+
     await window.keyboard.press('Escape')
+
     await expect(window.locator('.node-row-drop-on')).toHaveCount(0)
+
     await window.mouse.up()
+
     expect(await nodeTexts(window)).toEqual(before)
     await expect(window.locator('.node-row[data-node-id="b"] .node-input')).toBeFocused()
   })
@@ -546,16 +658,22 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       await window.locator(`.node-row[data-node-id="depth-${depth}"] .node-disclosure-triangle`).click()
     }
     const message = `Operation failed: Nodes cannot be nested deeper than ${MAX_DOCUMENT_DEPTH} levels.`
+
     allowRendererError(exactMessage(message))
     const target = window.locator(`.node-row[data-node-id="depth-${MAX_DOCUMENT_DEPTH}"]`)
+
     await dragOntoRow(window, 'source', `depth-${MAX_DOCUMENT_DEPTH}`)
     await settleAtViewportEnd(window)
     const settled = await target.boundingBox()
     if (settled === null) throw new Error('The receiving row was not rendered after auto-scroll.')
+
     await window.mouse.move(settled.x + 30, settled.y + settled.height / 2)
+
     await expect(target).toHaveClass(/node-row-drop-on/)
     await expect(window.locator('.node-row-drop-on')).toHaveCount(1)
+
     await window.mouse.up()
+
     await expect(window.getByRole('alert')).toHaveText(message)
     await expect(window.locator('.node-row[data-node-id="source"]')).toHaveAttribute('data-depth', '0')
   })
@@ -563,18 +681,24 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   test('nests at the selected gap level, supports undo and redo, and survives restart', async ({ userDataDir }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
 
     await node(window, 4).focus()
     if (mode === 'vim') await window.keyboard.press('V')
+
     await dragToGap(window, 'b', 'b', 'top', 1)
     const movedRow = window.locator('.node-row[data-node-id="b"]')
+
     await expect(movedRow).toHaveClass(/node-row-drop-before/)
+
     const captureNodeList = async (appearance: 'light' | 'dark') => {
       const bounds = await window.locator('.node-list').boundingBox()
       if (bounds === null) throw new Error('The node list was not visible for its screenshot.')
+
       await expect(window).toHaveScreenshot(`hierarchy-level-marker-${mode}-${appearance}.png`, { clip: bounds })
     }
+
     await captureNodeList('light')
 
     const geometry = await movedRow.evaluate((row) => {
@@ -583,7 +707,9 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
       const left = Number.parseFloat(getComputedStyle(row, '::before').left)
       return { listLeft: listBox.left, rowLeft: rowBox.left, markerLeft: left }
     })
+
     expect(geometry.rowLeft + geometry.markerLeft).toBeCloseTo(geometry.listLeft + 48, 0)
+
     await window.emulateMedia({ colorScheme: 'dark' })
     await captureNodeList('dark')
     await window.emulateMedia({ colorScheme: 'light' })
@@ -591,20 +717,27 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
 
     await expect(movedRow).toHaveAttribute('data-depth', '1')
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('Meta+z')
+
     await expect(movedRow).toHaveAttribute('data-depth', '0')
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect(movedRow).toHaveAttribute('data-depth', '1')
 
     await closeApp(app)
     const reopened = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(reopened.window)
+
     await expect(reopened.window.locator('.node-row[data-node-id="b"]')).toHaveAttribute('data-depth', '1')
   })
 
   test('outdents a visible child to the root at the selected gap level', async ({ userDataDir }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
 
     await dragToGap(window, 'a1', 'c', 'bottom', -1)
@@ -619,6 +752,7 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   test('moves a distant root node into the expanded branch after its hidden sibling block', async ({ userDataDir }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
 
     await dragToGap(window, 'c', 'b', 'top', 1)
@@ -635,12 +769,15 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
     const before = await nodeTexts(window)
 
     await dragToGap(window, 'a', 'a1', 'top', 0)
+
     await expect(window.locator('body')).toHaveClass(/node-drag-invalid/)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
+
     await window.mouse.up()
 
     expect(await nodeTexts(window)).toEqual(before)
@@ -650,10 +787,13 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   test('Escape cancels a gap move without changing hierarchy', async ({ userDataDir }) => {
     seedDocument(userDataDir, hierarchySeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await openAlpha(window)
 
     await dragToGap(window, 'b', 'b', 'top', 1)
+
     await expect(window.locator('.node-row[data-node-id="b"]')).toHaveClass(/node-row-drop-before/)
+
     await window.keyboard.press('Escape')
     await window.mouse.up()
 
@@ -675,7 +815,9 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     if (mode === 'vim') {
       await node(window, 2).focus()
+
       await window.keyboard.press('V')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     }
 
@@ -704,6 +846,7 @@ test.describe('hierarchy drag depth limit', () => {
     for (let depth = 1; depth < 20; depth += 1) {
       await window.locator(`.node-row[data-node-id="level-${depth}"] .node-disclosure-triangle`).click()
     }
+
     allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
 
     const last = window.locator('.node-row[data-node-id="level-20"]')
@@ -711,13 +854,17 @@ test.describe('hierarchy drag depth limit', () => {
     const sourceBox = await source.boundingBox()
     const lastBox = await last.boundingBox()
     if (sourceBox === null || lastBox === null) throw new Error('The depth-limit drag rows were not rendered.')
+
     await startRowDrag(window, source, { xOffset: 8 })
     await window.mouse.move(sourceBox.x + 8 + 20 * 20, lastBox.y + lastBox.height - 2, { steps: 5 })
     await settleAtViewportEnd(window)
     const settledBox = await last.boundingBox()
     if (settledBox === null) throw new Error('The last depth-limit row was not rendered after auto-scroll.')
+
     await window.mouse.move(sourceBox.x + 8 + 20 * 20, settledBox.y + settledBox.height - 2)
+
     await expect(window.locator('.node-row-drop-after')).toHaveCount(1)
+
     await window.mouse.up()
 
     await expect(window.getByRole('alert')).toHaveText(

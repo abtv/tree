@@ -39,9 +39,11 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     seedDocument(userDataDir, tasksSeed())
     const first = await launchTree(userDataDir)
     const alpha = node(first.window, 1)
+
     await setCursor(alpha, 2)
 
     await first.window.keyboard.press('Meta+Enter')
+
     await expect(alpha).toHaveClass(/node-input-struck/)
     await expect(node(first.window, 2)).not.toHaveClass(/node-input-struck/)
     await expect(alpha).toBeFocused()
@@ -50,19 +52,24 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
 
     // The text stays editable and keeps its strikethrough.
     await first.window.keyboard.type('X')
+
     await expect(alpha).toHaveValue('AlXpha')
     await expect(alpha).toHaveClass(/node-input-struck/)
 
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
+
     expect(persisted.version).toBe(4)
     expect(persisted.document.roots[0]).toMatchObject({ id: 'a', text: 'AlXpha', struckThrough: true })
     expect(persisted.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
     expect(persisted.document.roots[1]).not.toHaveProperty('struckThrough')
 
     const second = await launchTree(userDataDir)
+
     await expect(node(second.window, 1)).toHaveClass(/node-input-struck/)
+
     await second.window.keyboard.press('Meta+Enter')
+
     await expect(node(second.window, 1)).not.toHaveClass(/node-input-struck/)
   })
 
@@ -72,12 +79,17 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     await node(window, 2).focus()
 
     await window.keyboard.press('Meta+Enter')
+
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
+
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
     await expect(node(window, 2)).toBeFocused()
     expect(await caret(node(window, 2))).toBe(0)
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
     await expect(node(window, 2)).toHaveValue('Bravo')
   })
@@ -112,6 +124,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
       location: { currentParentId: null, selectedNodeId: 'b' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await window.getByRole('button', { name: 'Expand node 3' }).click()
     await node(window, 2).focus()
 
@@ -120,12 +133,15 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
       const normal = getComputedStyle(element.closest('.node-list')!.querySelectorAll('.node-input')[1]!)
       return { line: style.textDecorationLine, color: style.color, normalColor: normal.color }
     })
+
     expect(struck.line).toBe('line-through')
     expect(struck.color).not.toBe(struck.normalColor)
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('strikethrough-light.png'))
 
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('strikethrough-dark.png'))
+
     await window.emulateMedia({ colorScheme: 'light' })
   })
 })
@@ -155,8 +171,10 @@ test.describe('struck-through nodes: Vim editing only', () => {
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await pressShifted(window, 'V')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
 
     const colors = await window.locator('.node-input').evaluateAll((inputs) =>
@@ -165,19 +183,25 @@ test.describe('struck-through nodes: Vim editing only', () => {
         return { color: style.color, line: style.textDecorationLine }
       }),
     )
+
     expect(colors[0]!.color).toBe(colors[1]!.color)
     expect(colors[0]!.line).toBe('line-through')
     expect(colors[1]!.line).toBe('none')
     await expect(window.locator('.node-list')).toHaveScreenshot('strikethrough-visual-node-light.png')
+
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-list')).toHaveScreenshot('strikethrough-visual-node-dark.png')
+
     await window.emulateMedia({ colorScheme: 'light' })
   })
 
   test('keeps a Normal-mode select-all highlighted across a toggle', async ({ userDataDir }) => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await window.keyboard.press('Meta+a')
+
     await expect(node(window, 1)).toHaveClass(/node-input-text-selected/)
 
     await window.keyboard.press('Meta+Enter')
@@ -190,8 +214,10 @@ test.describe('struck-through nodes: Vim editing only', () => {
   test('commits a pending Replace edit before toggling and returns to Normal mode', async ({ userDataDir }) => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await pressShifted(window, 'R')
     await window.keyboard.type('Ze')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
     await window.keyboard.press('Meta+Enter')
@@ -199,11 +225,15 @@ test.describe('struck-through nodes: Vim editing only', () => {
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveValue('Zepha')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     // The replacement is one edit of its own: undo removes the toggle first, then the replacement.
     await window.keyboard.press('u')
+
     await expect(node(window, 1)).not.toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveValue('Zepha')
+
     await window.keyboard.press('u')
+
     await expect(node(window, 1)).toHaveValue('Alpha')
   })
 
@@ -211,16 +241,22 @@ test.describe('struck-through nodes: Vim editing only', () => {
     seedDocument(userDataDir, tasksSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await node(window, 2).focus()
+
     await window.keyboard.press('Meta+Enter')
+
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
 
     // A mixed range becomes struck through; the same range again returns to normal.
     await node(window, 1).focus()
+
     await pressShifted(window, 'V')
     await window.keyboard.press('j')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('Meta+Enter')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     for (const index of [1, 2, 3]) await expect(node(window, index)).toHaveClass(/node-input-struck/)
 
@@ -228,12 +264,16 @@ test.describe('struck-through nodes: Vim editing only', () => {
     await window.keyboard.press('k')
     await window.keyboard.press('k')
     await window.keyboard.press('Meta+Enter')
+
     for (const index of [1, 2, 3]) await expect(node(window, index)).not.toHaveClass(/node-input-struck/)
 
     await window.keyboard.press('v')
     await window.keyboard.press('l')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
     await window.keyboard.press('Meta+Enter')
+
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
     await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')

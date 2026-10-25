@@ -16,6 +16,7 @@ describe('Agenda projection', () => {
         ]),
       ],
     }
+
     expect(projectAgenda(document, null)).toEqual([
       {
         day: day(14),
@@ -40,6 +41,7 @@ describe('Agenda projection', () => {
 
   it('can match a parent on one day and use it as context on another', () => {
     const document = { roots: [node('release', '2026-10-15 Release', [node('prepare', '2026-10-14 Prepare')])] }
+
     expect(projectAgenda(document, null)).toEqual([
       {
         day: day(14),
@@ -60,6 +62,7 @@ describe('Agenda projection', () => {
         node('b', '2026-10-14', [node('c', '2026-10-14')]),
       ],
     }
+
     expect(projectAgenda(document, null)).toEqual([
       {
         day: day(14),
@@ -81,6 +84,7 @@ describe('Agenda projection', () => {
         node('invalid', '2026-02-31 2026-10-1 tomorrow'),
       ],
     }
+
     expect(projectAgenda(document, null)).toEqual([
       { day: day(15), rows: [{ nodeId: 'link', depth: 0, role: 'match' }] },
     ])
@@ -88,6 +92,7 @@ describe('Agenda projection', () => {
 
   it('does not scan the scope parent or other branches; empty scopes have no days', () => {
     const document = { roots: [node('scope', '2026-10-14', [node('empty', '')]), node('outside', '2026-10-20')] }
+
     expect(projectAgenda(document, 'scope')).toEqual([])
     expect(projectAgenda(document, 'empty')).toEqual([])
     expect(projectAgenda({ roots: [] }, null)).toEqual([])
@@ -100,8 +105,11 @@ describe('Agenda projection', () => {
       const url = 'https://example.test/2026-10-14'
       const leaf = Object.freeze(node('leaf', url))
       const document = { roots: [leaf] }
+
       expect(projectAgenda(document, null)).toHaveLength(1)
+
       scan.mockClear()
+
       expect(projectAgenda(document, null)).toHaveLength(1)
       expect(scan).not.toHaveBeenCalled()
       expect(projectAgenda({ roots: [{ ...leaf, links: [{ start: 0, end: url.length, url }] }] }, null)).toEqual([])

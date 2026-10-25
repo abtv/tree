@@ -16,6 +16,7 @@ describe('whole-node Visual transitions', () => {
       root = { id: `ancestor-${depth}`, text: '', children: [root] }
     }
     let nextId = 0
+
     const result = pasteNodeForestTransition(
       { roots: [root] },
       {
@@ -28,6 +29,7 @@ describe('whole-node Visual transitions', () => {
       () => `new-${++nextId}`,
       3,
     )
+
     expect(result).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
     expect(nextId).toBe(0)
   })
@@ -36,10 +38,13 @@ describe('whole-node Visual transitions', () => {
     let nextId = 0
     const createId = (): string => `new-${++nextId}`
     const yank = nodeVisualTransition(document, location, 'y', 'a', 'a', undefined, '', true, createId)
+
     expect(yank.kind).toBe('yank')
     expect(nextId).toBe(0)
     expect(isPasteIntoSourceDescendant(document, 'child', ['a'])).toBe(true)
+
     const childLocation: Location = { currentParentId: 'a', selectedNodeId: 'child' }
+
     expect(
       nodeVisualTransition(
         document,
@@ -91,6 +96,7 @@ describe('whole-node Visual transitions', () => {
       node = { id: `n${index}`, text: '', children: [node] }
     const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
     let nextId = 0
+
     expect(
       pasteNodeForestTransition(
         { roots: [node] },
@@ -124,6 +130,7 @@ describe('whole-node Visual transitions', () => {
       2,
     )
     if (!('document' in transition)) throw new Error('Expected an accepted transition.')
+
     expect(transition.document.roots.map((node) => `${node.id}:${node.text}`)).toEqual([
       'new-1:X',
       'new-2:Y',
@@ -163,6 +170,7 @@ describe('whole-node Visual transitions', () => {
       if (!('document' in transition)) throw new Error('Expected an accepted transition.')
       return transition
     }
+
     // After `a`, `b` follows the forest; after `b`, nothing does, so the last copy is selected.
     expect(run('a', 'after', 1).location.selectedNodeId).toBe('b')
     expect(run('b', 'after', 2).location.selectedNodeId).toBe('new-4')
@@ -186,6 +194,7 @@ describe('whole-node Visual transitions', () => {
       () => 'copy',
     )
     if (!('document' in transition)) throw new Error('Expected an accepted transition.')
+
     expect(transition.document.roots.map((node) => node.id)).toEqual(['a', 'copy'])
     expect(transition.document.roots[1]?.attachment?.id).toBe('png')
     expect(transition.location.selectedNodeId).toBe('copy')
@@ -195,10 +204,13 @@ describe('whole-node Visual transitions', () => {
     const document: Document = { roots: [{ id: 'a', text: 'ABC', children: [] }] }
     let id = 0
     const createId = (): string => `new-${++id}`
+
     expect(nodeVisualTransition(document, location, 'U', 'a', 'a', undefined, '', true, createId)).toEqual({
       kind: 'none',
     })
+
     const deletion = nodeVisualTransition(document, location, 'd', 'a', 'a', undefined, '', true, createId)
+
     expect(deletion.kind).toBe('changed')
     if (deletion.kind === 'changed')
       expect(deletion.transition.document.roots.map((node) => node.id)).toEqual(['new-1'])
@@ -231,16 +243,21 @@ describe('whole-node Visual transitions', () => {
     const rootLevelLocation: Location = { currentParentId: null, selectedNodeId: 'root' }
 
     const yank = nodeVisualTransition(document, rootLevelLocation, 'y', 'c1', 'c2', undefined, '', true, createId)
+
     expect(yank.kind).toBe('yank')
     if (yank.kind === 'yank') expect(yank.register.sourceIds).toEqual(['c1', 'c2'])
 
     // Deleting both of mid's children empties its own sibling array; the fallback selection must be
     // mid itself (the real parent), not the unrelated root-level `currentParentId`.
     const deletion = nodeVisualTransition(document, rootLevelLocation, 'd', 'c1', 'c2', undefined, '', true, createId)
+
     expect(deletion.kind).toBe('changed')
+
     if (deletion.kind === 'changed') {
       expect(deletion.transition.location.selectedNodeId).toBe('mid')
+
       const mid = deletion.transition.document.roots[0]?.children[0]
+
       expect(mid?.id).toBe('mid')
       expect(mid?.children).toEqual([])
     }
@@ -271,8 +288,10 @@ describe('whole-node Visual transitions', () => {
     it('places a forest before or after the target and selects its first copy', () => {
       const document = siblings()
       const before = pasteNodeForestTransition(document, location, 'b', 'before', forest, () => 'copy')
+
       const after = pasteNodeForestTransition(document, location, 'b', 'after', forest, () => 'copy')
       if (!('document' in before) || !('document' in after)) throw new Error('Expected accepted transitions.')
+
       expect(idsOf(before.document)).toEqual(['a', 'copy', 'b', 'c', 'd'])
       expect(idsOf(after.document)).toEqual(['a', 'b', 'copy', 'c', 'd'])
       expect(before.location).toEqual({ currentParentId: null, selectedNodeId: 'copy' })
@@ -284,6 +303,7 @@ describe('whole-node Visual transitions', () => {
       const createId = counter()
       const run = (anchor: string, focus: string, canMutate: boolean) =>
         nodeVisualTransition(siblings(), location, 'd', anchor, focus, undefined, '', canMutate, createId)
+
       expect(run('missing', 'a', true)).toEqual({ kind: 'none' })
       expect(run('a', 'missing', true)).toEqual({ kind: 'none' })
       // With the last sibling as anchor, an unchecked -1 focus would still slice a non-empty range.
@@ -295,6 +315,7 @@ describe('whole-node Visual transitions', () => {
     it.each(['p', 'P'] as const)('does nothing for %s without a register or with an empty one', (command) => {
       const run = (source: Parameters<typeof nodeVisualTransition>[5]) =>
         nodeVisualTransition(siblings(), location, command, 'b', 'b', source, '', true, counter())
+
       expect(run(undefined)).toEqual({ kind: 'none' })
       expect(run({ nodes: [], sourceIds: [] })).toEqual({ kind: 'none' })
       expect(run(forest).kind).toBe('changed')
@@ -303,6 +324,7 @@ describe('whole-node Visual transitions', () => {
     it.each(['p', 'P'] as const)('rejects %s into a source descendant and over the depth limit', (command) => {
       const nested: Document = { roots: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'C', children: [] }] }] }
       const childLocation: Location = { currentParentId: 'a', selectedNodeId: 'child' }
+
       expect(
         nodeVisualTransition(
           nested,
@@ -324,6 +346,7 @@ describe('whole-node Visual transitions', () => {
       for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1)
         deep = { id: `n${index}`, text: '', children: [deep] }
       const deepId = `n${MAX_DOCUMENT_DEPTH - 1}`
+
       expect(
         nodeVisualTransition(
           { roots: [deep] },
@@ -354,6 +377,7 @@ describe('whole-node Visual transitions', () => {
           true,
           counter(),
         )
+
         expect(result.kind).toBe('changed')
       }
       let deep: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
@@ -364,6 +388,7 @@ describe('whole-node Visual transitions', () => {
         nodes: [{ id: 'x', text: 'X', children: [{ id: 'y', text: 'Y', children: [] }] }],
         sourceIds: [],
       }
+
       expect(
         nodeVisualTransition(
           { roots: [deep] },
@@ -389,6 +414,7 @@ describe('whole-node Visual transitions', () => {
       ['u', false],
     ] as const)('reports cleanup for %s as %s and registers the selected range', (command, cleanup) => {
       const result = changed(command, 'b', 'c', forest, 'typed')
+
       expect(result.cleanup).toBe(cleanup)
       expect(result.register.sourceIds).toEqual(['b', 'c'])
       expect(result.register.nodes.map((node) => node.text)).toEqual(['B', 'C'])
@@ -397,10 +423,13 @@ describe('whole-node Visual transitions', () => {
     it('deletes with d and x, selecting the node that takes the deleted range’s place', () => {
       for (const command of ['d', 'x'] as const) {
         const middle = changed(command, 'b', 'c')
+
         expect(idsOf(middle.transition.document)).toEqual(['a', 'd'])
         expect(middle.transition.location.selectedNodeId).toBe('d')
         expect(middle.transition.focus).toEqual({ nodeId: 'd', cursor: 0 })
+
         const tail = changed(command, 'c', 'd')
+
         expect(idsOf(tail.transition.document)).toEqual(['a', 'b'])
         expect(tail.transition.location.selectedNodeId).toBe('b')
       }
@@ -409,6 +438,7 @@ describe('whole-node Visual transitions', () => {
     it('replaces the range with one typed node for c and s and selects it', () => {
       for (const command of ['c', 's'] as const) {
         const result = changed(command, 'b', 'c', undefined, 'typed')
+
         expect(result.transition.document.roots.map((node) => node.text)).toEqual(['A', 'typed', 'D'])
         expect(result.transition.location.selectedNodeId).toBe('new-1')
         expect(result.transition.document.roots[1]).toEqual({ id: 'new-1', text: 'typed', children: [] })
@@ -418,6 +448,7 @@ describe('whole-node Visual transitions', () => {
     it('puts the register over the range for p and P with fresh IDs and selects the first copy', () => {
       for (const command of ['p', 'P'] as const) {
         const result = changed(command, 'b', 'c', forest)
+
         expect(idsOf(result.transition.document)).toEqual(['a', 'new-1', 'd'])
         expect(result.transition.location.selectedNodeId).toBe('new-1')
         expect(result.transition.document.roots[1]?.text).toBe('S1')
@@ -435,6 +466,7 @@ describe('whole-node Visual transitions', () => {
       for (const command of ['p', 'P'] as const) {
         const result = nodeVisualTransition(siblings(), location, command, 'c', 'b', two, '', true, counter(), 2)
         if (result.kind !== 'changed') throw new Error(`Expected a change, received ${result.kind}.`)
+
         // Fresh IDs for every copy and descendant, in whole-forest order, with the range gone.
         expect(result.transition.document.roots.map((node) => `${node.id}:${node.text}`)).toEqual([
           'a:A',
@@ -457,6 +489,7 @@ describe('whole-node Visual transitions', () => {
       const document: Document = {
         roots: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'C', children: [] }] }],
       }
+
       expect(
         nodeVisualTransition(
           document,
@@ -471,10 +504,12 @@ describe('whole-node Visual transitions', () => {
           3,
         ),
       ).toEqual({ kind: 'rejected', message: 'Cannot paste a node into one of its descendants.' })
+
       let deep: TreeNode = { id: `n${MAX_DOCUMENT_DEPTH - 1}`, text: '', children: [] }
       for (let index = MAX_DOCUMENT_DEPTH - 2; index >= 0; index -= 1)
         deep = { id: `n${index}`, text: '', children: [deep] }
       const deepestId = `n${MAX_DOCUMENT_DEPTH - 1}`
+
       expect(
         nodeVisualTransition(
           { roots: [deep] },
@@ -504,8 +539,11 @@ describe('whole-node Visual transitions', () => {
         ],
       }
       const upper = nodeVisualTransition(document, location, 'U', 'a', 'a', undefined, '', true, counter())
+
       expect(upper.kind).toBe('changed')
+
       if (upper.kind !== 'changed') return
+
       expect(upper.transition.document.roots[0]).toEqual({
         id: 'a',
         text: 'AB',
@@ -514,14 +552,17 @@ describe('whole-node Visual transitions', () => {
       })
       expect(upper.transition.document.roots[0]).not.toHaveProperty('links')
       expect(upper.cleanup).toBe(false)
+
       const lower = nodeVisualTransition(document, location, 'u', 'a', 'a', undefined, '', true, counter())
       if (lower.kind !== 'changed') throw new Error('Expected a change.')
+
       expect(lower.transition.document.roots[0]?.text).toBe('ab')
       expect(lower.transition.document.roots[0]).toHaveProperty('attachment')
     })
 
     it('keeps a node without an attachment free of an attachment property', () => {
       const result = changed('u', 'a', 'a')
+
       expect(result.transition.document.roots[0]).toEqual({ id: 'a', text: 'a', children: [] })
       expect(result.transition.document.roots[0]).not.toHaveProperty('attachment')
       expect(result.transition.document.roots[0]).not.toHaveProperty('struckThrough')
@@ -534,6 +575,7 @@ describe('whole-node Visual transitions', () => {
       }
       const upper = nodeVisualTransition(document, location, 'U', 'a', 'a', undefined, '', true, counter())
       if (upper.kind !== 'changed') throw new Error('Expected a change.')
+
       expect(upper.transition.document.roots[0]).toEqual({
         id: 'a',
         text: 'AB',
@@ -548,7 +590,9 @@ describe('whole-node Visual transitions', () => {
     const document: Document = {
       roots: [{ id: 'a', text, links: [{ start: 1, end: text.length, url: 'https://a.com' }], children: [] }],
     }
+
     const result = nodeVisualTransition(document, location, 'u', 'a', 'a', undefined, '', true, () => 'unused')
+
     expect(result.kind).toBe('changed')
     if (result.kind === 'changed') {
       expect(result.transition.document.roots[0]?.text).toBe('i̇https://a.com')

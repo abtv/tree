@@ -33,7 +33,9 @@ describeForEachEditingMode('screenshot rasterization stability', () => {
         location: { currentParentId: null, selectedNodeId: 'a' },
       })
       const { app, window } = await launchTree(userDataDir, { initialDeviceScaleFactor })
+
       expect(await app.evaluate(({ app }) => app.commandLine.getSwitchValue('force-device-scale-factor'))).toBe('1')
+
       scales.push(await window.evaluate(() => devicePixelRatio))
       const list = window.locator('.node-list')
       for (const appearance of ['light', 'dark'] as const) {
@@ -45,20 +47,25 @@ describeForEachEditingMode('screenshot rasterization stability', () => {
             await test
               .info()
               .attach(`scale-${initialDeviceScaleFactor}-${appearance}`, { body: actual, contentType: 'image/png' })
+
           expect(
             actual.equals(references.get(appearance)!),
             `${appearance}, startup scale ${initialDeviceScaleFactor}, capture ${sample}`,
           ).toBe(true)
         }
       }
+
       // The exact image guard must still detect a real glyph-placement change.
       await node(window, 1).evaluate((element) => {
         ;(element as HTMLElement).style.translate = '1px 0'
       })
       const shifted = await list.screenshot({ caret: 'hide', animations: 'disabled', scale: 'css' })
+
       expect(shifted.equals(references.get('dark')!)).toBe(false)
+
       await closeApp(app)
     }
+
     expect(scales).toEqual([1, 1, 1])
   })
 })

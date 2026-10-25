@@ -172,18 +172,26 @@ describe('NodeList', () => {
         breadcrumbTargets: new Map(ending === 'invalid' ? [] : [[null, { parentId: null, index: 2 }]]),
         onBreadcrumbTarget,
       })
+
       activate(rowElements(container)[0]!, 50)
       pointerMoveAt(root, 15)
+
       expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(ending === 'invalid' ? undefined : null)
+
       if (ending === 'cancel') fireEvent.pointerCancel(root, { pointerId: 1 })
       else pointerUpAt(root, 15)
+
       if (ending === 'release') expect(onMove).toHaveBeenCalledExactlyOnceWith('a', { parentId: null, index: 2 })
       else expect(onMove).not.toHaveBeenCalled()
+
       if (ending === 'release') {
         const click = createEvent.click(rowElements(container)[0]!)
+
         fireEvent(rowElements(container)[0]!, click)
+
         expect(click.defaultPrevented).toBe(false)
       }
+
       expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(undefined)
     },
   )
@@ -203,10 +211,13 @@ describe('NodeList', () => {
         onBreadcrumbTarget,
       })
       const row = rowElements(container)[0]!
+
       activate(row, 50)
       pointerMoveAt(row, 1)
+
       expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(null)
       expect(container.querySelector('.node-row-drop-before, .node-row-drop-on')).toBeNull()
+
       if (ending === 'release') pointerUpAt(row, 1)
       if (ending === 'escape') fireEvent.keyDown(window, { key: 'Escape' })
       if (ending === 'cancel') fireEvent.pointerCancel(row, { pointerId: 1 })
@@ -224,6 +235,7 @@ describe('NodeList', () => {
             onBreadcrumbTarget={onBreadcrumbTarget}
           />,
         )
+
       expect(onBreadcrumbTarget).toHaveBeenLastCalledWith(undefined)
       if (ending === 'release') expect(onMove).toHaveBeenCalledWith('a', { parentId: null, index: 2 })
       else expect(onMove).not.toHaveBeenCalled()
@@ -274,14 +286,17 @@ describe('NodeList', () => {
 
     const parentButton = getByRole('button', { name: 'Enter node 1' })
     const leafButton = getByRole('button', { name: 'Enter node 2' })
+
     expect(parentButton.className).toContain('node-enter-control-has-children')
     expect(leafButton.className).not.toContain('node-enter-control-has-children')
 
     fireEvent.mouseDown(parentButton)
     fireEvent.click(parentButton)
+
     expect(onEnter).toHaveBeenLastCalledWith(parentNode)
 
     fireEvent.click(leafButton)
+
     expect(onEnter).toHaveBeenLastCalledWith(nodes[0])
   })
 
@@ -301,17 +316,20 @@ describe('NodeList', () => {
     )
 
     const { container, rerender } = render(element('p'))
+
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('.node-focus-marker')).toHaveAttribute('aria-hidden', 'true')
     expect(container.querySelector('[data-node-id="p"] .node-focus-marker')).not.toBeNull()
     expect(container.querySelector('[data-node-id="a"] .node-focus-marker')).toBeNull()
 
     rerender(element('b'))
+
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('[data-node-id="b"] .node-focus-marker')).not.toBeNull()
     expect(container.querySelector('[data-node-id="p"] .node-focus-marker')).toBeNull()
 
     rerender(element(undefined))
+
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(0)
   })
 })
@@ -328,6 +346,7 @@ describe('NodeList inline expansion', () => {
     renderRows({ list: [parentNode, ...nodes] })
 
     const triangle = screen.getByRole('button', { name: 'Expand node 1' })
+
     expect(triangle).toHaveAttribute('aria-expanded', 'false')
   })
 
@@ -335,15 +354,21 @@ describe('NodeList inline expansion', () => {
     const parentNode: TreeNode = { id: 'p', text: 'Parent', children: [{ id: 'c', text: 'Child', children: [] }] }
     const { container } = renderRows({ list: [parentNode, ...nodes], renderInput: (node) => <span>{node.text}</span> })
     const parentText = container.querySelector('[data-node-id="p"] span')
+
     expect(parentText).not.toBeNull()
+
     const range = document.createRange()
+
     range.selectNodeContents(parentText!)
     const selection = globalThis.getSelection()
+
     selection?.addRange(range)
+
     expect(selection?.rangeCount).toBe(1)
 
     const triangle = screen.getByRole('button', { name: 'Expand node 1' })
     const event = createEvent.mouseDown(triangle)
+
     fireEvent(triangle, event)
 
     expect(event.defaultPrevented).toBe(true)
@@ -355,6 +380,7 @@ describe('NodeList inline expansion', () => {
     const { container } = renderRows({ list: [parentNode, ...nodes], isExpanded: (id) => id === 'p' })
 
     const rows = rowElements(container)
+
     expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['p', 'c', 'a', 'b'])
     expect(screen.getByRole('button', { name: 'Collapse node 1' })).toHaveAttribute('aria-expanded', 'true')
   })
@@ -397,13 +423,17 @@ describe('NodeList inline expansion', () => {
       list: [parentNode, { id: 'b', text: 'B', children: [] }],
       isExpanded: (id) => id === 'a' || id === 'p1',
     })
+
     const rows = rowElements(container)
+
     expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['a', 'p1', 'p1a', 'p2', 'b'])
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
+
     expect(document.body).toHaveClass('node-drag-invalid')
     expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 2 + 5)
 
     expect(onMove).not.toHaveBeenCalled()
@@ -424,12 +454,16 @@ describe('NodeList inline expansion', () => {
       list: [parentNode, { id: 'b', text: 'B', children: [] }],
       isExpanded: (id) => id === 'a',
     })
+
     const rows = rowElements(container)
+
     expect(rows.map((row) => row.getAttribute('data-node-id'))).toEqual(['a', 'p1', 'p2', 'b'])
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 3)
+
     expect(rows[3]).toHaveClass('node-row-drop-before')
+
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 3)
 
     expect(onMove).toHaveBeenCalledWith('p1', { parentId: 'a', index: 1 })
@@ -463,22 +497,29 @@ describe('NodeList drag interaction', () => {
         ],
         isExpanded: () => kind === 'expanded',
       })
+
       const rows = rowElements(container)
       const source = rows.at(-1)!
+
       activate(source, (rows.length - 1) * ROW_HEIGHT_ESTIMATE + 13)
+
       expect(document.body).toHaveClass('node-drag-invalid')
 
       pointerMoveAt(source, 13)
+
       expect(rows[0]).toHaveClass('node-row-drop-on')
       expect(document.body).not.toHaveClass('node-drag-invalid')
       expect(container.querySelectorAll('.node-row-drop-on')).toHaveLength(1)
       expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
 
       pointerMoveAt(source, 2)
+
       expect(rows[0]).toHaveClass('node-row-drop-before')
       expect(container.querySelector('.node-row-drop-on')).toBeNull()
+
       pointerMoveAt(source, 13)
       pointerUpAt(source, 13)
+
       expect(onMove).toHaveBeenCalledExactlyOnceWith('source', { parentId: 'parent', index: children.length })
       expect(container.querySelector('.node-row-drop-on')).toBeNull()
     },
@@ -491,18 +532,25 @@ describe('NodeList drag interaction', () => {
       list: [{ id: 'a', text: 'A', children: [{ id: 'child', text: 'Child', children: [] }] }],
       isExpanded: () => true,
     })
+
     const rows = rowElements(container)
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+
     expect(document.body).toHaveClass('node-drag-invalid')
     expect(container.querySelector('.node-row-drop-on')).toBeNull()
+
     pointerUpAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+
     expect(onMove).not.toHaveBeenCalled()
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 13)
     pointerMoveAt(rows[1]!, 13)
+
     expect(rows[0]).toHaveClass('node-row-drop-on')
+
     pointerUpAt(rows[1]!, 13)
+
     expect(onMove).not.toHaveBeenCalled()
   })
 
@@ -510,10 +558,13 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const view = renderRows()
+
     const rows = rowElements(view.container)
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, ROW_HEIGHT_ESTIMATE + 13)
+
     expect(rows[1]).toHaveClass('node-row-drop-on')
+
     view.rerender(
       <NodeList
         dragFreeze={view.dragFreeze}
@@ -524,9 +575,12 @@ describe('NodeList drag interaction', () => {
         onDrop={view.onMove}
       />,
     )
+
     expect(view.container.querySelector('.node-row-drop-on')).toBeNull()
     expect(document.body).not.toHaveClass('node-drag-active', 'node-drag-invalid')
+
     pointerUpAt(view.container.querySelector('.node-list')!, ROW_HEIGHT_ESTIMATE + 13)
+
     expect(view.onMove).not.toHaveBeenCalled()
   })
 
@@ -542,13 +596,16 @@ describe('NodeList drag interaction', () => {
       list: [parent, { id: 'b', text: 'B', children: [] }],
       isExpanded: (id) => id === 'a',
     })
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[2]!, 65)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     pointerMoveAt(rows[2]!, ROW_HEIGHT_ESTIMATE * 2 - 1, 120)
+
     expect(rows[2]).toHaveClass('node-row-drop-before')
     expect(rows[2]).toHaveStyle({ '--drop-level': '1' })
+
     pointerUpAt(rows[2]!, ROW_HEIGHT_ESTIMATE * 2 - 1, 120)
 
     expect(onMove).toHaveBeenCalledWith('b', { parentId: 'a', index: 1 })
@@ -566,13 +623,16 @@ describe('NodeList drag interaction', () => {
       list: [parent, { id: 'b', text: 'B', children: [] }],
       isExpanded: (id) => id === 'a',
     })
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 1, 80)
+
     expect(rows[2]).toHaveClass('node-row-drop-after')
     expect(rows[2]).toHaveStyle({ '--drop-level': '0' })
+
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * 3 - 1, 80)
 
     expect(onMove).toHaveBeenCalledWith('a1', { parentId: null, index: 2 })
@@ -582,20 +642,24 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 13)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS - 1))
+
     expect(rows[0]).not.toHaveClass('node-row-dragging')
     expect(document.body).not.toHaveClass('node-drag-active')
 
     act(() => vi.advanceTimersByTime(1))
+
     expect(rows[0]).toHaveClass('node-row-dragging')
     expect(rows[1]).not.toHaveClass('node-row-dragging')
     expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
     expect(document.body).toHaveClass('node-drag-active')
 
     pointerUpAt(rows[0]!, 13)
+
     expect(rows[0]).not.toHaveClass('node-row-dragging')
     expect(document.body).not.toHaveClass('node-drag-active')
   })
@@ -604,6 +668,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, getByRole } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 13, { button: 2 })
@@ -618,6 +683,7 @@ describe('NodeList drag interaction', () => {
 
   it('prevents the secondary pointer down from selecting text across rows', () => {
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     expect(
@@ -635,6 +701,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 13)
@@ -651,6 +718,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 13)
@@ -667,12 +735,14 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 10)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
     pointerMoveAt(rows[0]!, 12)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
     expect(rows[0]).toHaveClass('node-row-dragging')
 
     pointerUpAt(rows[0]!, 12)
@@ -680,6 +750,7 @@ describe('NodeList drag interaction', () => {
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS / 2))
     pointerMoveAt(rows[0]!, 40)
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
     expect(container.querySelector('.node-row-dragging')).toBeNull()
   })
 
@@ -687,6 +758,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 10)
@@ -703,6 +775,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     // The press lands 2px below the row's top edge and the pointer moves 3px up: within the 4px
@@ -721,6 +794,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 10)
@@ -740,6 +814,7 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 10)
@@ -761,10 +836,15 @@ describe('NodeList drag interaction', () => {
     mockRowRects()
     const { container } = renderRows()
     const row = rowElements(container)[0]!
+
     expect(fireEvent.dragStart(row)).toBe(true)
+
     activate(row, 13)
+
     expect(fireEvent.dragStart(row)).toBe(false)
+
     pointerUpAt(row, 13)
+
     expect(fireEvent.dragStart(row)).toBe(true)
   })
 
@@ -772,16 +852,23 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, dragFreeze } = renderRows()
+
     const rows = rowElements(container)
 
     pointerDownAt(rows[0]!, 13)
+
     expect(dragFreeze.end).toHaveBeenCalledWith()
+
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS - 1))
+
     expect(dragFreeze.begin).not.toHaveBeenCalled()
+
     act(() => vi.advanceTimersByTime(1))
+
     expect(dragFreeze.begin).toHaveBeenCalledWith('a', 1)
 
     pointerUpAt(rows[0]!, 13)
+
     expect(dragFreeze.end).toHaveBeenCalledWith(1)
   })
 
@@ -789,15 +876,18 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, dragFreeze } = renderRows()
+
     const rows = rowElements(container)
 
     activate(rows[0]!, 13)
     const releasesBeforeCancel = dragFreeze.end.mock.calls.length
+
     fireEvent.keyDown(window, { key: 'Escape' })
 
     expect(dragFreeze.end).toHaveBeenCalledTimes(releasesBeforeCancel)
 
     pointerUpAt(rows[0]!, 40)
+
     expect(dragFreeze.end).toHaveBeenLastCalledWith(1)
   })
 
@@ -806,7 +896,9 @@ describe('NodeList drag interaction', () => {
     mockRowRects()
     const view = renderRows({ list: buildNodes(2) })
     const row = rowElements(view.container)[0]!
+
     activate(row, 13)
+
     expect(document.body).toHaveClass('node-drag-active')
 
     view.rerender(
@@ -829,10 +921,12 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, 47)
+
     expect(rows[1]).toHaveClass('node-row-drop-after')
     expect(container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')).toHaveLength(1)
 
@@ -847,10 +941,12 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     activate(rows[1]!, 40)
     pointerMoveAt(rows[1]!, 5)
+
     expect(rows[0]).toHaveClass('node-row-drop-before')
 
     pointerUpAt(rows[1]!, 5)
@@ -862,15 +958,18 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
 
     activate(rows[0]!, 20)
     pointerUpAt(rows[0]!, 20)
+
     expect(onMove).not.toHaveBeenCalled()
 
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, 5)
     pointerUpAt(rows[0]!, 5)
+
     expect(onMove).not.toHaveBeenCalled()
   })
 
@@ -878,15 +977,20 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container } = renderRows()
+
     const rows = rowElements(container)
 
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, 47)
+
     expect(rows[1]).toHaveClass('node-row-drop-after')
+
     pointerUpAt(rows[0]!, 47)
 
     activate(rows[0]!, 13)
+
     expect(container.querySelector('.node-row-drop-before, .node-row-drop-after')).toBeNull()
+
     pointerUpAt(rows[0]!, 13)
   })
 
@@ -924,8 +1028,10 @@ describe('NodeList drag interaction', () => {
       for (const { label, cancel } of cases) {
         const { container, onMove, unmount } = renderRows()
         const row = rowElements(container)[0]!
+
         activate(row, 13)
         pointerMoveAt(row, targetY)
+
         expect(container.querySelector(marker), label).not.toBeNull()
 
         cancel(row, container)
@@ -936,8 +1042,11 @@ describe('NodeList drag interaction', () => {
           label,
         ).toBeNull()
         expect(document.body, label).not.toHaveClass('node-drag-active')
+
         pointerUpAt(row, targetY)
+
         expect(onMove, label).not.toHaveBeenCalled()
+
         unmount()
       }
     },
@@ -947,11 +1056,13 @@ describe('NodeList drag interaction', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows()
+
     const rows = rowElements(container)
     const list = container.querySelector('.node-list')!
 
     activate(rows[0]!, 13)
     pointerMoveAt(rows[0]!, 47)
+
     expect(rows[1]).toHaveClass('node-row-drop-after')
 
     // A release from another pointer, another pointer's lost capture, the source row's hover
@@ -982,6 +1093,7 @@ describe('NodeList drag interaction', () => {
     mockRowRects()
     const first = renderRows()
     const row = rowElements(first.container)[0]!
+
     pointerDownAt(row, 13)
     first.rerender(
       <NodeList
@@ -994,11 +1106,14 @@ describe('NodeList drag interaction', () => {
       />,
     )
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
     expect(first.container.querySelector('.node-row-dragging')).toBeNull()
+
     first.unmount()
 
     const second = renderRows({ list: buildNodes(4) })
     const secondRow = rowElements(second.container)[0]!
+
     pointerDownAt(secondRow, 13)
     second.rerender(
       <NodeList
@@ -1010,6 +1125,7 @@ describe('NodeList drag interaction', () => {
       />,
     )
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
     expect(second.container.querySelector('.node-row-dragging')).toBeNull()
   })
 
@@ -1024,17 +1140,20 @@ describe('NodeList drag interaction', () => {
     const input = row.querySelector('textarea')!
 
     fireEvent.click(input)
+
     expect(onClick).toHaveBeenCalledTimes(1)
 
     activate(row, 13)
     pointerMoveAt(row, 47)
     pointerUpAt(row, 47)
     fireEvent.click(input)
+
     expect(onClick).toHaveBeenCalledTimes(1)
 
     pointerDownAt(row, 13)
     pointerUpAt(row, 13)
     fireEvent.click(input)
+
     expect(onClick).toHaveBeenCalledTimes(2)
   })
 })
@@ -1048,6 +1167,7 @@ describe('NodeList windowing', () => {
   it('renders every row without spacers at the threshold', () => {
     mockRows(0)
     const { container } = renderList(WINDOWING_THRESHOLD)
+
     expect(container.querySelectorAll('.node-row')).toHaveLength(WINDOWING_THRESHOLD)
     expect(container.querySelectorAll('.node-list-spacer')).toHaveLength(0)
   })
@@ -1056,9 +1176,12 @@ describe('NodeList windowing', () => {
     mockRows(0)
     const { container } = renderList(600)
     const rows = container.querySelectorAll('.node-row')
+
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.length).toBeLessThan(100)
+
     const spacers = container.querySelectorAll<HTMLElement>('.node-list-spacer')
+
     expect(spacers).toHaveLength(2)
     expect(spacers[0]!.style.height).toBe('0px')
     expect(Number.parseFloat(spacers[1]!.style.height)).toBeGreaterThan(0)
@@ -1071,6 +1194,7 @@ describe('NodeList windowing', () => {
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
     const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+
     const initialHeight = Number.parseFloat(trailingSpacer.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -1089,6 +1213,7 @@ describe('NodeList windowing', () => {
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
     const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+
     const initialHeight = Number.parseFloat(trailingSpacer.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -1107,11 +1232,13 @@ describe('NodeList windowing', () => {
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
     const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+
     const initialHeight = Number.parseFloat(trailingSpacer.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
     })
+
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
     const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -1132,19 +1259,25 @@ describe('NodeList windowing', () => {
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
     const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+
     const initialHeight = Number.parseFloat(trailingSpacer.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
     const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
 
     act(() => globalThis.dispatchEvent(new Event('resize')))
+
     expect(Number.parseFloat(trailingSpacer.style.height)).toBe(measuredHeight)
 
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: originalWidth + 1 })
+
     expect(globalThis.innerWidth).toBe(originalWidth + 1)
     expect(window.innerWidth).toBe(originalWidth + 1)
+
     fireEvent.resize(window)
     act(() => globalThis.dispatchEvent(new Event('resize')))
+
     expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight)
 
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 3)])
@@ -1155,15 +1288,20 @@ describe('NodeList windowing', () => {
   it('mounts the focused row even when it is outside the window', () => {
     mockRows(0)
     renderList(600, 'n550')
+
     expect(screen.getByRole('textbox', { name: 'Node 551' })).toBeInTheDocument()
   })
 
   it('moves the window when the page scrolls', () => {
     mockRows(0)
     renderList(600)
+
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toBeInTheDocument()
+
     mockRows(-ROW_HEIGHT_ESTIMATE * 200)
+
     fireEvent.scroll(window)
+
     expect(screen.queryByRole('textbox', { name: 'Node 1' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 201' })).toBeInTheDocument()
   })
@@ -1174,8 +1312,10 @@ describe('NodeList windowing', () => {
     const input = screen.getByRole('textbox', { name: 'Node 551' })
     input.focus()
     mockRows(-ROW_HEIGHT_ESTIMATE * 540)
+
     fireEvent.scroll(window)
     const later = screen.getByRole('textbox', { name: 'Node 551' })
+
     expect(later).toBe(input)
     expect(later).toHaveFocus()
   })
@@ -1184,30 +1324,40 @@ describe('NodeList windowing', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows({ list: buildNodes(600) })
+
     const rows = rowElements(container)
     const mountedCount = rows.length
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, -10)
+
     expect(rows[0]).toHaveClass('node-row-drop-before')
+
     pointerUpAt(rows[1]!, -10)
+
     expect(onMove).toHaveBeenLastCalledWith('n1', { parentId: null, index: 0 })
 
     activate(rows[1]!, ROW_HEIGHT_ESTIMATE + 12)
     pointerMoveAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
+
     expect(rows[mountedCount - 1]).toHaveClass('node-row-drop-after')
+
     pointerUpAt(rows[1]!, ROW_HEIGHT_ESTIMATE * mountedCount + 10)
+
     expect(onMove).toHaveBeenLastCalledWith('n1', { parentId: null, index: mountedCount - 1 })
   })
 
   it('keeps the caret marker on the pinned row while the caret row is outside the window', () => {
     mockRows(0)
     const { container } = renderList(600, 'n550')
+
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('.node-row-pinned .node-focus-marker')).not.toBeNull()
 
     mockRows(-ROW_HEIGHT_ESTIMATE * 540)
+
     fireEvent.scroll(window)
+
     expect(container.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(container.querySelector('.node-row-pinned')).toBeNull()
     expect(container.querySelector('[data-node-id="n550"] .node-focus-marker')).not.toBeNull()
@@ -1218,9 +1368,11 @@ describe('NodeList windowing', () => {
     mockRowRects()
     const { container, onMove } = renderRows({ list: buildNodes(600), focusedNodeId: 'n550' })
     const source = container.querySelector('[data-node-id="n0"]')!
+
     activate(source, 13)
 
     mockRows(-ROW_HEIGHT_ESTIMATE * 300)
+
     fireEvent.scroll(window)
 
     expect(container.querySelector('[data-node-id="n0"]')).toBe(source)
@@ -1230,6 +1382,7 @@ describe('NodeList windowing', () => {
     expect(container.querySelectorAll('.node-row').length).toBeLessThan(100)
 
     fireEvent.keyDown(window, { key: 'Escape' })
+
     expect(container.querySelector('[data-node-id="n0"]')).toBeNull()
     expect(onMove).not.toHaveBeenCalled()
   })
@@ -1238,6 +1391,7 @@ describe('NodeList windowing', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows({ list: buildNodes(600), focusedNodeId: 'n550' })
+
     const rows = rowElements(container)
     const pinned = container.querySelector('.node-row-pinned')
     if (pinned === null) throw new Error('The pinned row was not rendered.')
@@ -1246,10 +1400,12 @@ describe('NodeList windowing', () => {
     pointerMoveAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + ROW_HEIGHT_ESTIMATE - 1)
 
     const markers = container.querySelectorAll('.node-row-drop-before, .node-row-drop-after')
+
     expect(markers).toHaveLength(1)
     expect(pinned).toHaveClass('node-row-drop-after')
 
     pointerUpAt(rows[0]!, 550 * ROW_HEIGHT_ESTIMATE + ROW_HEIGHT_ESTIMATE - 1)
+
     expect(onMove).toHaveBeenCalledWith('n0', { parentId: null, index: 550 })
   })
 
@@ -1269,15 +1425,20 @@ describe('NodeList windowing', () => {
     const row = rowElements(container)[0]!
 
     pointerMoveAt(row, globalThis.innerHeight - 1)
+
     expect(frames).toHaveLength(0)
 
     activate(row, 13)
     pointerMoveAt(row, globalThis.innerHeight - 1)
+
     expect(frames).toHaveLength(1)
+
     frames[0]!(0)
+
     expect(scrollBy).toHaveBeenCalledWith(0, EDGE_SCROLL_STEP)
 
     pointerUpAt(row, globalThis.innerHeight - 1)
+
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
   })
 
@@ -1302,14 +1463,17 @@ describe('NodeList windowing', () => {
     activate(row, 50)
     // Inside the top edge margin of the content area, away from the toolbar: scrolling starts.
     pointerMoveAt(row, 50)
+
     expect(frames).toHaveLength(1)
 
     pointerMoveAt(root, 15)
+
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
     expect(frames).toHaveLength(1)
 
     // Leaving the toolbar for the content area resumes scrolling.
     pointerMoveAt(row, 50)
+
     expect(frames).toHaveLength(2)
   })
 
@@ -1328,16 +1492,21 @@ describe('NodeList windowing', () => {
 
     activate(row, 13)
     pointerMoveAt(row, globalThis.innerHeight - 1)
+
     expect(frames).toHaveLength(1)
 
     mockRowRects(-ROW_HEIGHT_ESTIMATE * 400 - 8)
+
     fireEvent.scroll(window)
 
     const list = container.querySelector('.node-list')
     if (list === null) throw new Error('The node list was not rendered.')
     const marker = container.querySelector('.node-row-drop-before, .node-row-drop-after')
+
     expect(marker).not.toBeNull()
+
     pointerUpAt(list, globalThis.innerHeight - 1)
+
     expect(onMove).toHaveBeenCalledWith('n0', { parentId: null, index: 430 })
   })
 
@@ -1354,21 +1523,28 @@ describe('NodeList windowing', () => {
     vi.stubGlobal('scrollBy', scrollBy)
     mockRowRects()
     const { container, onMove } = renderRows({ list: buildNodes(10) })
+
     const rows = rowElements(container)
 
     activate(rows[5]!, 13)
     pointerMoveAt(rows[5]!, 2)
+
     expect(frames).toHaveLength(1)
+
     frames[0]!(0)
+
     expect(scrollBy).toHaveBeenCalledWith(0, -EDGE_SCROLL_STEP)
     expect(rows[0]).toHaveClass('node-row-drop-before')
 
     mockRowRects(-2 * ROW_HEIGHT_ESTIMATE)
+
     fireEvent.scroll(window)
+
     expect(rows[0]).not.toHaveClass('node-row-drop-before')
     expect(rows[2]).toHaveClass('node-row-drop-before')
 
     pointerUpAt(rows[5]!, 2)
+
     expect(onMove).toHaveBeenCalledWith('n5', { parentId: null, index: 2 })
     expect(cancelAnimationFrame).toHaveBeenCalled()
   })
@@ -1385,10 +1561,13 @@ describe('NodeList windowing', () => {
     // timer must not arm against the missing element, and a later pointer move must cancel the
     // pending hold instead of reading bounds from it.
     mockRowRects(-ROW_HEIGHT_ESTIMATE * 300)
+
     fireEvent.scroll(window)
+
     expect(container.contains(pressedRow)).toBe(false)
 
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS * 2))
+
     expect(container.querySelector('.node-row-dragging')).toBeNull()
     expect(document.body).not.toHaveClass('node-drag-active')
     expect(dragFreeze.begin).not.toHaveBeenCalled()

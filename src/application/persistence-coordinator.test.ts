@@ -39,6 +39,7 @@ describe('PersistenceCoordinator', () => {
     })
     try {
       await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+
       expect(flushed).toBe(false)
     } finally {
       release()
@@ -69,6 +70,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     await vi.waitFor(() => expect(releaseSave).toBeDefined())
+
     coordinator.requestAttachmentCleanup()
     releaseSave?.()
     await coordinator.flush()
@@ -123,11 +125,14 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestAttachmentCleanup()
     await coordinator.flush()
+
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     pending = false
+
     coordinator.requestSave()
     await coordinator.flush()
+
     expect(cleanupAttachments).toHaveBeenCalledOnce()
   })
 
@@ -149,17 +154,21 @@ describe('PersistenceCoordinator', () => {
     )
 
     coordinator.requestSave()
+
     await expect(coordinator.flush()).rejects.toThrow('disk full')
     expect(onResult).toHaveBeenLastCalledWith(failure, 'save')
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).rejects.toThrow('disk full')
     expect(onResult).toHaveBeenLastCalledWith(failure)
     expect(save).toHaveBeenCalledOnce()
 
     save.mockResolvedValue(undefined)
+
     coordinator.requestSave()
+
     await expect(coordinator.flush()).resolves.toBeUndefined()
     expect(onResult).toHaveBeenLastCalledWith(undefined)
   })
@@ -182,11 +191,14 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).rejects.toThrow('disk full')
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     save.mockResolvedValue(undefined)
+
     coordinator.requestSave()
+
     await expect(coordinator.flush()).resolves.toBeUndefined()
     expect(cleanupAttachments).toHaveBeenCalledOnce()
   })
@@ -239,6 +251,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
 
     expect(onSaveCaptured).toHaveBeenCalledOnce()
@@ -263,8 +276,11 @@ describe('PersistenceCoordinator', () => {
     )
 
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
+
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).resolves.toBeUndefined()
     expect(save).not.toHaveBeenCalled()
     expect(onResult).toHaveBeenLastCalledWith(undefined)
@@ -293,6 +309,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
+
     coordinator.requestSave()
     coordinator.requestAttachmentCleanup()
     coordinator.discardPendingSaves()
@@ -327,6 +344,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     await vi.waitFor(() => expect(save).toHaveBeenCalledOnce())
+
     coordinator.requestSave()
     coordinator.discardPendingSaves()
     resolveSave()
@@ -379,6 +397,7 @@ describe('PersistenceCoordinator', () => {
     )
 
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).rejects.toThrow('cleanup failed')
     await expect(coordinator.flush()).resolves.toBeUndefined()
 
@@ -405,6 +424,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestAttachmentCleanup()
     await coordinator.flush()
+
     expect(cleanupAttachments).not.toHaveBeenCalled()
 
     pending = false
@@ -434,6 +454,7 @@ describe('PersistenceCoordinator', () => {
 
     coordinator.requestSave()
     coordinator.requestAttachmentCleanup()
+
     await expect(coordinator.flush()).resolves.toBeUndefined()
 
     expect(save).not.toHaveBeenCalled()
@@ -442,8 +463,10 @@ describe('PersistenceCoordinator', () => {
     expect(onResult).not.toHaveBeenCalled()
 
     available = true
+
     coordinator.requestSave()
     await coordinator.flush()
+
     expect(save).toHaveBeenCalledOnce()
     expect(onResult).toHaveBeenLastCalledWith(undefined)
   })

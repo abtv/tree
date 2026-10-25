@@ -31,27 +31,35 @@ describe('EditorTextSession', () => {
     const session = new EditorTextSession(manualClock().clock)
 
     expect(session.isActive('a')).toBe(false)
+
     session.begin('a')
+
     expect(session.isActive('a')).toBe(true)
     expect(session.isActive('b')).toBe(false)
+
     session.end()
+
     expect(session.isActive('a')).toBe(false)
   })
 
   it('ends the session when the boundary timer fires', () => {
     const time = manualClock()
     const session = new EditorTextSession(time.clock)
+
     session.begin('a')
     session.scheduleBoundary()
 
     expect(session.isActive('a')).toBe(true)
+
     time.fire()
+
     expect(session.isActive('a')).toBe(false)
   })
 
   it('cancels an armed boundary timer when the session ends', () => {
     const time = manualClock()
     const session = new EditorTextSession(time.clock)
+
     session.begin('a')
     session.scheduleBoundary()
 
@@ -59,13 +67,16 @@ describe('EditorTextSession', () => {
 
     expect(time.armed()).toBe(0)
     expect(time.cleared).toEqual([1])
+
     session.end()
+
     expect(time.cleared).toEqual([1])
   })
 
   it('does not cancel anything when no boundary timer is armed', () => {
     const time = manualClock()
     const session = new EditorTextSession(time.clock)
+
     session.begin('a')
 
     session.end()
@@ -77,6 +88,7 @@ describe('EditorTextSession', () => {
   it('replaces the previous boundary timer when a new one is scheduled', () => {
     const time = manualClock()
     const session = new EditorTextSession(time.clock)
+
     session.begin('a')
     session.scheduleBoundary()
     session.scheduleBoundary()
@@ -87,21 +99,26 @@ describe('EditorTextSession', () => {
 
   it('ends the session once after the next edit is marked standalone', () => {
     const session = new EditorTextSession(manualClock().clock)
+
     session.begin('a')
     session.markNextEditStandalone()
 
     expect(session.isActive('a')).toBe(false)
+
     session.begin('a')
     session.endIfStandalone()
+
     expect(session.isActive('a')).toBe(false)
 
     session.begin('a')
     session.endIfStandalone()
+
     expect(session.isActive('a')).toBe(true)
   })
 
   it('does nothing in endIfStandalone when no standalone edit was requested', () => {
     const session = new EditorTextSession(manualClock().clock)
+
     session.begin('a')
 
     session.endIfStandalone()

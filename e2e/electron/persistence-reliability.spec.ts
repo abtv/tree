@@ -63,7 +63,9 @@ test.describe('persistence reliability regressions', () => {
 
     await expect(window.getByRole('alert')).toContainText('The saved document has an unsupported format.')
     await expect(window.getByRole('textbox')).toHaveCount(0)
+
     await closeApp(app)
+
     for (const [path, bytes] of files) expect(readFileSync(path, 'utf8')).toBe(bytes)
   })
 
@@ -91,6 +93,7 @@ test.describe('persistence reliability regressions', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     const backup = readFileSync(documentPath(userDataDir))
+
     writeFileSync(`${documentPath(userDataDir)}.bak`, backup)
     writeFileSync(documentPath(userDataDir), '{ damaged')
     writeFileSync(`${documentPath(userDataDir)}.tmp`, '{"version":999}')
@@ -112,8 +115,10 @@ test.describe('persistence reliability regressions', () => {
       document: { roots: [{ id: 'root', text: 'Interrupted', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
+
     writeFileSync(`${documentPath(userDataDir)}.tmp`, interrupted)
     const past = new Date(Date.now() - 60_000)
+
     utimesSync(documentPath(userDataDir), past, past)
 
     const { window } = await launchTree(userDataDir)
@@ -129,8 +134,10 @@ test.describe('persistence reliability regressions', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     const generationPath = join(userDataDir, 'data', 'document.1.json')
+
     writeFileSync(generationPath, readFileSync(documentPath(userDataDir)))
     const past = new Date(Date.now() - 60_000)
+
     utimesSync(generationPath, past, past)
     writeFileSync(
       documentPath(userDataDir),
@@ -155,6 +162,7 @@ test.describe('persistence reliability regressions', () => {
     const dataDirectory = join(userDataDir, 'data')
     const olderPath = join(dataDirectory, 'document.1.json')
     const newerPath = join(dataDirectory, 'document.2.json')
+
     writeFileSync(
       olderPath,
       JSON.stringify({
@@ -172,6 +180,7 @@ test.describe('persistence reliability regressions', () => {
       }),
     )
     const tied = new Date()
+
     utimesSync(olderPath, tied, tied)
     utimesSync(newerPath, tied, tied)
     writeFileSync(documentPath(userDataDir), '{ damaged')
@@ -190,6 +199,7 @@ test.describe('persistence reliability regressions', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     const candidate = readFileSync(documentPath(userDataDir))
+
     writeFileSync(`${documentPath(userDataDir)}.tmp`, candidate)
     writeFileSync(documentPath(userDataDir), '{ damaged')
 
@@ -201,7 +211,9 @@ test.describe('persistence reliability regressions', () => {
 
   test('keeps a failed save visible and runs deferred cleanup after a successful save', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+
     allowRendererError(/^Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked$/)
     allowRendererError(/^Operation failed: Error invoking remote method 'tree:write-attachment': Error: image blocked$/)
     allowRendererError(/^Operation failed: Error invoking remote method 'tree:save': Error: save blocked$/)
@@ -230,8 +242,11 @@ test.describe('persistence reliability regressions', () => {
     })
     const initialText = 'unsaved one two three four five six seven eight nine'
     const recoveryText = ' recovered ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen'
+
     await typeInto(node(window, 1), initialText)
+
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+
     // The startup persistence cycle always runs one attachment cleanup, and the serialized
     // persistence queue orders it before this save failure. Reset the count once the failure is
     // visible so the assertion below proves no cleanup runs after the failure becomes visible,
@@ -242,46 +257,62 @@ test.describe('persistence reliability regressions', () => {
     })
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect(window.getByText(/Operation failed:.*image blocked/)).toBeVisible()
+
     unlockSystemClipboard()
+
     expect(
       await app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0),
     ).toBe(0)
 
     const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await clickApplicationMenuQuit(app)
+
     await expect(window.getByText(/^Operation failed:.*save blocked$/)).toBeVisible()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
+
     await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
+
     await app.evaluate(() => (globalThis as typeof globalThis & { restoreSave?: () => void }).restoreSave?.())
     await typeInto(node(window, 1), recoveryText)
+
     await expect(window.getByText(/Changes could not be saved:/)).toHaveCount(0)
     await expect
       .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0))
       .toBeGreaterThan(0)
+
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${initialText}${recoveryText}`)
   })
 
   test('waits for an image paste before menu quit and restores the image on restart', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+
     await holdAttachmentWrite(app)
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { attachmentStarted?: boolean }).attachmentStarted),
       )
       .toBe(true)
+
     await window.evaluate(() => {
       const control = globalThis as typeof globalThis & {
         quitRequested?: boolean
@@ -292,20 +323,25 @@ test.describe('persistence reliability regressions', () => {
       })
     })
     await clickApplicationMenuQuit(app)
+
     await expect
       .poll(() => window.evaluate(() => (globalThis as typeof globalThis & { quitRequested?: boolean }).quitRequested))
       .toBe(true)
     expect(app.process().exitCode).toBeNull()
+
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await app.evaluate(() =>
       (globalThis as typeof globalThis & { releaseAttachment?: () => void }).releaseAttachment?.(),
     )
     await closed
     const attachment = readPersisted(userDataDir).document.roots[0]?.attachment
+
     expect(attachment?.id).toEqual(expect.any(String))
     expect(attachmentFiles(userDataDir)).toContain(`${attachment?.id}.png`)
 
     const restarted = await launchTree(userDataDir)
+
     await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
   })
 
@@ -313,6 +349,7 @@ test.describe('persistence reliability regressions', () => {
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
+
     allowRendererError(
       /^Operation failed: Error invoking remote method 'tree:write-attachment': Error: attachment failed$/,
     )
@@ -320,11 +357,13 @@ test.describe('persistence reliability regressions', () => {
     await holdAttachmentWrite(app, true)
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { attachmentStarted?: boolean }).attachmentStarted),
       )
       .toBe(true)
+
     // The attachment handler has received the image bytes; the delayed write no longer reads
     // the clipboard. Let other workers use it while this test exercises quit failure.
     unlockSystemClipboard()
@@ -338,30 +377,40 @@ test.describe('persistence reliability regressions', () => {
       })
     })
     await clickApplicationMenuQuit(app)
+
     await expect
       .poll(() => window.evaluate(() => (globalThis as typeof globalThis & { quitRequested?: boolean }).quitRequested))
       .toBe(true)
+
     await app.evaluate(() =>
       (globalThis as typeof globalThis & { releaseAttachment?: () => void }).releaseAttachment?.(),
     )
+
     await expect(window.getByText(/Operation failed:.*attachment failed/)).toBeVisible()
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
+
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
+
     unlockSystemClipboard()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
+
     expect(readPersisted(userDataDir).document.roots[0]?.attachment?.id).toEqual(expect.any(String))
   })
 
   test('retries the volume save for words inserted after an earlier successful snapshot', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+
     allowRendererError(/^Changes could not be saved: .*second save failed$/)
 
     await app.evaluate(() => {
@@ -387,7 +436,9 @@ test.describe('persistence reliability regressions', () => {
     })
 
     const tenWords = 'one two three four five six seven eight nine ten'
+
     await typeInto(node(window, 1), `${tenWords} `)
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { firstSaveStarted?: boolean }).firstSaveStarted),
@@ -400,42 +451,57 @@ test.describe('persistence reliability regressions', () => {
     await expect(window.getByText(/Changes could not be saved: .*second save failed/)).toBeVisible()
 
     await typeInto(node(window, 1), 'eleven ')
+
     await expect
       .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { saveCalls?: number }).saveCalls ?? 0))
       .toBeGreaterThanOrEqual(3)
 
     const expectedText = await node(window, 1).inputValue()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(expectedText)
 
     const restarted = await launchTree(userDataDir)
+
     await expect(node(restarted.window, 1)).toHaveValue(expectedText)
   })
 
   test('restores a completed image paste after abrupt process termination', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.id ?? null, { timeout: 10_000 })
       .not.toBeNull()
+
     const attachmentId = readPersisted(userDataDir).document.roots[0]?.attachment?.id
+
     expect(attachmentId).toEqual(expect.any(String))
+
     const attachmentPath = join(userDataDir, 'data', 'attachments', `${attachmentId}.png`)
+
     await expect.poll(() => existsSync(attachmentPath)).toBe(true)
+
     const stored = readFileSync(attachmentPath)
 
     const child = app.process()
     const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+
     child.kill('SIGKILL')
     await exited
+
     await closeApp(app)
 
     const restarted = await launchTree(userDataDir)
+
     await expect(restarted.window.getByAltText('Attached image')).toBeVisible()
     expect(readPersisted(userDataDir).document.roots[0]?.attachment?.id).toBe(attachmentId)
     expect(readFileSync(attachmentPath)).toEqual(stored)
@@ -443,7 +509,9 @@ test.describe('persistence reliability regressions', () => {
 
   test('keeps an image referenced by a save that is edited while its flush is pending', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await expect(() => expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('')).toPass({ timeout: 10_000 })
+
     await app.evaluate(() => {
       const control = globalThis as typeof globalThis & {
         cleanupCount?: number
@@ -471,33 +539,45 @@ test.describe('persistence reliability regressions', () => {
 
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect
       .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { saveStarted?: boolean }).saveStarted))
       .toBe(true)
+
     const attachmentId = await app.evaluate(
       () => (globalThis as typeof globalThis & { savedAttachmentId?: string }).savedAttachmentId,
     )
+
     expect(attachmentId).toEqual(expect.any(String))
+
     const attachmentPath = join(userDataDir, 'data', 'attachments', `${attachmentId}.png`)
+
     await expect.poll(() => existsSync(attachmentPath)).toBe(true)
     await expect(window.getByAltText('Attached image')).toBeVisible()
 
     await node(window, 1).focus()
+
     await window.keyboard.press('Meta+z')
+
     await expect(window.getByAltText('Attached image')).toHaveCount(0)
+
     await typeInto(node(window, 1), 'after undo')
     await window.keyboard.press('Meta+Shift+z')
+
     await expect(window.getByAltText('Attached image')).toHaveCount(0)
+
     await app.evaluate(() => (globalThis as typeof globalThis & { releaseSave?: () => void }).releaseSave?.())
     const cleanupsBefore = await app.evaluate(
       () => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0,
     )
 
     await typeInto(node(window, 1), ' one two three four five six seven eight nine ten')
+
     await expect
       .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { cleanupCount?: number }).cleanupCount ?? 0))
       .toBeGreaterThan(cleanupsBefore)
     expect(existsSync(attachmentPath)).toBe(true)
+
     await closeApp(app)
   })
 })

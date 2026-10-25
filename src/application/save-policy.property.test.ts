@@ -19,6 +19,7 @@ describe('save policy word counting', () => {
         const start = Math.min(first % (text.length + 1), second % (text.length + 1))
         const end = Math.max(first % (text.length + 1), second % (text.length + 1))
         const remaining = text.slice(0, start) + text.slice(end)
+
         expect(countInsertedWords(text, remaining)).toBe(0)
       }),
     )
@@ -42,6 +43,7 @@ describe('save policy word counting', () => {
           count += countInsertedWords(text, next)
           text = next
         }
+
         expect(count).toBe(2)
       }),
     )

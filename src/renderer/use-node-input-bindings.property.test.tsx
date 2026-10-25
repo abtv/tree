@@ -175,7 +175,9 @@ async function assertHookSequence(
   // the preview exactly when the model says the image is the active character.
   const assertCommandTarget = (context: string): void => {
     const before = preview.mock.calls.length
+
     press('Enter')
+
     expect(preview.mock.calls.length - before, `${context} Enter preview`).toBe(expected.image ? 1 : 0)
     expect(
       harness.snapshot().document.roots.map((node) => node.text),
@@ -185,6 +187,7 @@ async function assertHookSequence(
 
   try {
     assertState('initial')
+
     for (const [step, { event, flush: flushAfter }] of steps.entries()) {
       expectedStep(expected, specs, event)
       if (event.kind === 'focus') {
@@ -219,9 +222,12 @@ async function assertHookSequence(
         press(event.kind === 'delete' ? 'x' : event.key)
       }
       const context = `step ${step}: ${JSON.stringify(event)}`
+
       assertState(context)
+
       if (flushAfter) {
         flush()
+
         assertState(`${context} after deferred work`)
         // Enter on an active image republishes the caret, which cancels queued work, so the probe
         // runs only once that work has been flushed.
@@ -230,6 +236,7 @@ async function assertHookSequence(
     }
     // Work still queued from earlier steps must not override the final intent.
     flush()
+
     assertState('final deferred work')
     assertCommandTarget('final')
   } finally {

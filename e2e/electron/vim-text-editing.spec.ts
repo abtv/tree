@@ -43,22 +43,28 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 6)
       await window.keyboard.press('d')
       await window.keyboard.press('i')
       await window.keyboard.press('w')
+
       await expect(editor).toHaveValue('one () "three"')
+
       await setCursor(editor, 5)
       await window.keyboard.press('d')
       await window.keyboard.press('a')
       await pressShifted(window, '(')
+
       await expect(editor).toHaveValue('one  "three"')
+
       await setCursor(editor, 7)
       await window.keyboard.press('c')
       await window.keyboard.press('i')
       await window.keyboard.press('"')
       await typeInto(editor, 'four')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('one  "four"')
     })
 
@@ -71,19 +77,26 @@ test.describe('Vim editing: text editing', () => {
       await typeInto(editor, 'one two')
       await setCursor(editor, 0)
       await window.keyboard.press('Escape')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(editor).toHaveJSProperty('selectionStart', 0)
       await expect(editor).toHaveJSProperty('selectionEnd', 1)
+
       await window.keyboard.press('Backspace')
+
       await expect(editor).toHaveValue('one two')
 
       await window.keyboard.press('w')
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('one wo')
 
       await window.keyboard.press('i')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
       await window.keyboard.type('T')
+
       await expect(editor).toHaveValue('one Two')
     })
 
@@ -96,26 +109,33 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
 
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('abde')
       await expect(editor).toHaveJSProperty('selectionStart', 2)
 
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('abcde')
       await expect(editor).toHaveJSProperty('selectionStart', 2)
       await expect(editor).toHaveJSProperty('selectionEnd', 3)
 
       await window.keyboard.press('Control+r')
+
       await expect(editor).toHaveValue('abde')
       await expect(editor).toHaveJSProperty('selectionStart', 2)
       await expect(editor).toHaveJSProperty('selectionEnd', 3)
 
       // The caret jumps back to the change even when it moved away first, as Vim's undo does.
       await window.keyboard.press('0')
+
       await expect(editor).toHaveJSProperty('selectionStart', 0)
+
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('abcde')
       await expect(editor).toHaveJSProperty('selectionStart', 2)
       await expect(editor).toHaveJSProperty('selectionEnd', 3)
@@ -141,14 +161,19 @@ test.describe('Vim editing: text editing', () => {
     })
     const { window } = await launchTree(userDataDir)
     const heading = window.getByRole('textbox', { name: 'Current parent' })
+
     await expect(heading).toHaveValue('alpha')
+
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 2)
     await window.keyboard.press('x')
+
     await expect(node(window, 1)).toHaveValue('abde')
 
     // Leave the level the edit was made on, so undo has to come back to it.
     await window.keyboard.press('Control+o')
+
     await expect(heading).toHaveValue('Parent')
     await expect(node(window, 1)).toHaveValue('alpha')
 
@@ -176,9 +201,11 @@ test.describe('Vim editing: text editing', () => {
       await editor.press('i')
       await typeInto(editor, 'abc')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('abc')
 
       await window.keyboard.press('Control+h')
+
       await expect(editor).toHaveValue('abc')
     })
 
@@ -190,31 +217,42 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
 
       await editor.press('x')
+
       await expect(editor).toHaveValue('bcd')
+
       await editor.press('u')
+
       await expect(editor).toHaveValue('abcd')
 
       // A count is not a repeat for undo or redo, so it makes both commands no-ops instead of
       // applying to the next one.
       await editor.press('3')
       await editor.press('Control+r')
+
       await expect(editor).toHaveValue('abcd')
+
       await editor.press('2')
       await editor.press('u')
+
       await expect(editor).toHaveValue('abcd')
 
       // An unfinished operator aborts the same way, and the next motion starts a new command.
       await editor.press('d')
       await editor.press('Control+r')
+
       await expect(editor).toHaveValue('abcd')
+
       await editor.press('l')
+
       await expect(editor).toHaveJSProperty('selectionStart', 1)
 
       // Redo still works once nothing is pending.
       await editor.press('Control+r')
+
       await expect(editor).toHaveValue('bcd')
     })
 
@@ -226,21 +264,30 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
 
       await editor.press('r')
       await editor.press('q')
+
       await expect(editor).toHaveValue('qb')
+
       await editor.press('l')
       await editor.press('r')
       await pressShifted(window, 'Z')
+
       await expect(editor).toHaveValue('qZ')
 
       await editor.press('u')
+
       await expect(editor).toHaveValue('qb')
+
       await editor.press('u')
+
       await expect(editor).toHaveValue('ab')
+
       await editor.press('Control+r')
+
       await expect(editor).toHaveValue('qb')
     })
 
@@ -307,36 +354,48 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('2')
       await window.keyboard.press('d')
       await window.keyboard.press('w')
+
       await expect(editor).toHaveValue('three')
+
       await window.keyboard.press('g')
       await window.keyboard.press('d')
+
       await expect(node(window, 1)).toHaveValue('Child')
     })
 
     test('changes words, finds characters, and repeats the completed change', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'one.two three')
       await setCursor(editor, 0)
       await window.keyboard.press('Escape')
       await window.keyboard.press('w')
+
       await expect(editor).toHaveJSProperty('selectionStart', 3)
+
       await window.keyboard.press('f')
       await window.keyboard.press('o')
+
       await expect(editor).toHaveJSProperty('selectionStart', 6)
+
       await window.keyboard.press('b')
       await window.keyboard.press('c')
       await window.keyboard.press('w')
       await window.keyboard.type('NEW')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('one.NEW three')
+
       await window.keyboard.press('w')
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('one.NEW NEW')
     })
 
@@ -345,23 +404,31 @@ test.describe('Vim editing: text editing', () => {
     test('replaces, substitutes, and changes through the end of node text', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'abc def')
       await setCursor(editor, 0)
       await window.keyboard.press('Escape')
       await window.keyboard.press('r')
       await window.keyboard.press('X')
+
       await expect(editor).toHaveValue('Xbc def')
+
       await window.keyboard.press('s')
       await window.keyboard.type('Y')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('Ybc def')
+
       await window.keyboard.press('w')
       await window.keyboard.press('C')
       await window.keyboard.type('tail')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('Ybc tail')
+
       await window.keyboard.press('D')
+
       await expect(editor).toHaveValue('Ybc tai')
     })
 
@@ -369,18 +436,24 @@ test.describe('Vim editing: text editing', () => {
     test('repeats inserted text and honors a count before dot', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'abcdef')
       await setCursor(editor, 0)
       await window.keyboard.press('Escape')
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('bcdef')
+
       for (const key of ['2', '.']) await window.keyboard.press(key)
+
       await expect(editor).toHaveValue('def')
+
       await window.keyboard.press('i')
       await window.keyboard.type('Q')
       await window.keyboard.press('Escape')
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('QQdef')
     })
 
@@ -392,15 +465,18 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('i')
       await editor.press('Delete')
       await editor.press('Escape')
+
       await expect(editor).toHaveValue('acd')
       await expect(editor).toHaveJSProperty('selectionStart', 0)
 
       await editor.press('l')
       await editor.press('.')
+
       await expect(editor).toHaveValue('ad')
       await expect(editor).toHaveJSProperty('selectionStart', 0)
       await expect(editor).toHaveJSProperty('selectionEnd', 1)
@@ -419,16 +495,20 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const first = node(window, 1)
       await first.focus()
+
       await setCursor(first, 0)
       await first.press('i')
       await typeInto(first, 'X')
       await window.keyboard.press('Escape')
+
       await expect(first).toHaveValue('Xa')
 
       const second = node(window, 2)
       await second.focus()
+
       await setCursor(second, 0)
       await window.keyboard.press('.')
+
       await expect(second).toHaveValue('Xb')
       await expect(first).toHaveValue('Xa')
     })
@@ -446,27 +526,35 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const first = node(window, 1)
       await first.focus()
+
       await setCursor(first, 0)
       await window.keyboard.press('c')
       await window.keyboard.press('w')
       await typeInto(first, 'X')
       await window.keyboard.press('Escape')
+
       await expect(first).toHaveValue('X two')
 
       const second = node(window, 2)
       await second.focus()
+
       await setCursor(second, 0)
       await window.keyboard.press('.')
+
       await expect(second).toHaveValue('X four')
 
       await setCursor(second, 0)
       await second.press('s')
       await typeInto(second, 'Q')
       await window.keyboard.press('Escape')
+
       await expect(second).toHaveValue('Q four')
+
       await first.focus()
+
       await setCursor(first, 0)
       await window.keyboard.press('.')
+
       await expect(first).toHaveValue('Q two')
     })
 
@@ -483,13 +571,16 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const first = node(window, 1)
       await first.focus()
+
       await setCursor(first, 0)
       await first.press('i')
       await typeInto(first, 'X')
       const second = node(window, 2)
+
       await second.click()
       await window.keyboard.press('Escape')
       await window.keyboard.press('.')
+
       // The pointer focus interrupted the session, so `.` records nothing and both nodes are unchanged.
       await expect(second).toHaveValue('b')
       await expect(first).toHaveValue('Xa')
@@ -505,65 +596,85 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await window.keyboard.press('c')
       await window.keyboard.press('c')
       await window.keyboard.type('new')
       await window.keyboard.press('Escape')
       await window.keyboard.press('g')
       await window.keyboard.press('d')
+
       await expect(node(window, 1)).toHaveValue('child')
+
       await window.keyboard.press('Control+o')
 
       await setCursor(node(window, 1), 2)
       await window.keyboard.press('X')
+
       await expect(node(window, 1)).toHaveValue('nw')
+
       await setCursor(node(window, 1), 0)
       await window.keyboard.press('v')
       await lockSystemClipboard()
       await window.keyboard.press('y')
       await window.keyboard.press('3')
       await window.keyboard.press('p')
+
       await expect(node(window, 1)).toHaveValue('nnnnw')
     })
 
     test('uses WORD, ge, and repeated character-find motions', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'foo.bar  baz.baz')
       await setCursor(editor, 0)
       await window.keyboard.press('Escape')
       await window.keyboard.press('W')
+
       await expect(editor).toHaveJSProperty('selectionStart', 9)
+
       await window.keyboard.press('f')
       await window.keyboard.press('.')
       await window.keyboard.press(';')
+
       await expect(editor).toHaveJSProperty('selectionStart', 12)
+
       await window.keyboard.press(',')
+
       await expect(editor).toHaveJSProperty('selectionStart', 3)
+
       await window.keyboard.press('W')
       await window.keyboard.press('g')
       await window.keyboard.press('e')
+
       await expect(editor).toHaveJSProperty('selectionStart', 6)
     })
 
     test('replaces text in Replace mode and repeats the completed session', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'abcd')
       await setCursor(editor, 2)
       await window.keyboard.press('Escape')
       await window.keyboard.press('R')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.type('XY')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('aXYd')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(editor).toHaveJSProperty('selectionStart', 2)
       await expect(editor).toHaveJSProperty('selectionEnd', 3)
+
       await setCursor(editor, 0)
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('XYYd')
     })
 
@@ -580,9 +691,11 @@ test.describe('Vim editing: text editing', () => {
           const { window } = await launchTree(userDataDir)
           const editor = node(window, 1)
           await editor.focus()
+
           await setCursor(editor, 0)
           await window.keyboard.press('R')
           if (pending) await window.keyboard.type('X')
+
           await editor.dblclick({ position: { x: 55, y: 8 } })
           const selectedWord = () =>
             editor.evaluate((element) =>
@@ -590,22 +703,33 @@ test.describe('Vim editing: text editing', () => {
                 ? element.value.slice(element.selectionStart, element.selectionEnd)
                 : document.getSelection()?.toString(),
             )
+
           await expect.poll(selectedWord).toBe('word')
           await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
           if (rich && pending)
             await expect(window.locator('.node-list')).toHaveScreenshot('vim-replace-word-selection.png')
+
           await window.keyboard.type('Y')
           const text = () =>
             editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent))
+
           await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne Y tail${suffix}`)
+
           await window.keyboard.type('Z')
+
           await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne YZtail${suffix}`)
+
           await window.keyboard.press('Escape')
+
           await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
           await window.keyboard.press('Meta+z')
+
           await expect.poll(text).toBe(`${pending ? 'X' : 'o'}ne word tail${suffix}`)
+
           if (pending) {
             await window.keyboard.press('Meta+z')
+
             await expect.poll(text).toBe(`one word tail${suffix}`)
           }
         })
@@ -629,14 +753,19 @@ test.describe('Vim editing: text editing', () => {
         const { window } = await launchTree(userDataDir)
         const source = node(window, 1)
         await source.focus()
+
         await setCursor(source, 0)
         await window.keyboard.press('R')
         await window.keyboard.type('X')
         const destination = node(window, 2)
+
         await destination.dblclick({ position: { x: 55, y: 8 } })
+
         await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
         await expect(source).toHaveValue('Xtart')
+
         await window.keyboard.type('YZ')
+
         await expect
           .poll(() =>
             destination.evaluate((element) =>
@@ -644,8 +773,10 @@ test.describe('Vim editing: text editing', () => {
             ),
           )
           .toBe(`one YZtail${suffix}`)
+
         await window.keyboard.press('Escape')
         await window.keyboard.press('Meta+z')
+
         await expect
           .poll(() =>
             destination.evaluate((element) =>
@@ -653,7 +784,9 @@ test.describe('Vim editing: text editing', () => {
             ),
           )
           .toBe(`one word tail${suffix}`)
+
         await window.keyboard.press('Meta+z')
+
         await expect(source).toHaveValue('start')
       })
     }
@@ -669,9 +802,12 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('j')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('R')
       await window.keyboard.type('XY')
       await window.keyboard.press('Escape')
@@ -681,9 +817,13 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).not.toHaveClass(/node-input-image-caret/)
       await expect(editor).toHaveJSProperty('selectionStart', 5)
       await expect(editor).toHaveJSProperty('selectionEnd', 6)
+
       await editor.press('l')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await editor.press('h')
+
       await expect(editor).not.toHaveClass(/node-input-image-caret/)
       await expect(editor).toHaveJSProperty('selectionStart', 5)
       await expect(editor).toHaveJSProperty('selectionEnd', 6)
@@ -700,19 +840,28 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
       await editor.click({ position: { x: 1, y: 8 } })
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.type('Y')
+
       await expect(editor).toHaveValue('YbXdef')
 
       await window.keyboard.press('Escape')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       await window.keyboard.press('Meta+z')
+
       await expect(editor).toHaveValue('abXdef')
+
       await window.keyboard.press('Meta+z')
+
       await expect(editor).toHaveValue('abcdef')
     })
 
@@ -730,17 +879,22 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
       await node(window, 2).click({ position: { x: 1, y: 8 } })
+
       await expect(node(window, 2)).toBeFocused()
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.type('Y')
 
       await expect(editor).toHaveValue('Xbcd')
       await expect(node(window, 2)).toHaveValue('Yeer')
+
       await window.keyboard.press('Escape')
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(node(window, 2)).toHaveValue('Yeer')
     })
@@ -759,6 +913,7 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('R')
       await node(window, 2).click({ position: { x: 1, y: 8 } })
@@ -783,11 +938,13 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
       const box = await node(window, 2).boundingBox()
       if (box === null) throw new Error('The peer node was not rendered.')
+
       await window.mouse.move(box.x + 2, box.y + box.height / 2)
       await window.mouse.down()
       await window.mouse.move(box.x + 60, box.y + box.height / 2, { steps: 5 })
@@ -811,6 +968,7 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('j')
       await window.keyboard.press('R')
@@ -841,9 +999,12 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('j')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('R')
       await window.keyboard.type('X')
       await editor.click()
@@ -852,12 +1013,16 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveValue('abcdX')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       const nodeList = window.locator('.node-list')
       const nodeListBounds = await nodeList.boundingBox()
+
       expect(nodeListBounds).not.toBeNull()
       await expect(window).toHaveScreenshot('vim-replace-click-image-caret-light.png', { clip: nodeListBounds! })
+
       await window.emulateMedia({ colorScheme: 'dark' })
       const darkNodeListBounds = await nodeList.boundingBox()
+
       expect(darkNodeListBounds).not.toBeNull()
       await expect(window).toHaveScreenshot('vim-replace-click-image-caret-dark.png', { clip: darkNodeListBounds! })
     })
@@ -876,11 +1041,15 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('j')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('R')
       await window.keyboard.type('XY')
+
       await expect(editor).toHaveValue('abcdXY')
 
       await window.keyboard.press('Meta+z')
@@ -890,12 +1059,16 @@ test.describe('Vim editing: text editing', () => {
       // The undone replacement started at offset 4, which is this node's image character, so the
       // caret lands back on the image the replacement was typed from.
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       const restoredList = window.locator('.node-list')
       const lightBounds = await restoredList.boundingBox()
+
       expect(lightBounds).not.toBeNull()
       await expect(window).toHaveScreenshot('vim-replace-undo-light.png', { clip: lightBounds! })
+
       await window.emulateMedia({ colorScheme: 'dark' })
       const darkBounds = await restoredList.boundingBox()
+
       expect(darkBounds).not.toBeNull()
       await expect(window).toHaveScreenshot('vim-replace-undo-dark.png', { clip: darkBounds! })
     })
@@ -915,9 +1088,12 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 1)
       await editor.press('j')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await window.keyboard.press('R')
       await window.keyboard.type('XY')
 
@@ -928,9 +1104,13 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).not.toHaveClass(/node-input-image-caret/)
       await expect(editor).toHaveJSProperty('selectionStart', 5)
       await expect(editor).toHaveJSProperty('selectionEnd', 6)
+
       await editor.press('l')
+
       await expect(editor).toHaveClass(/node-input-image-caret/)
+
       await editor.press('h')
+
       await expect(editor).not.toHaveClass(/node-input-image-caret/)
       await expect(editor).toHaveJSProperty('selectionStart', 5)
       await expect(editor).toHaveJSProperty('selectionEnd', 6)
@@ -948,6 +1128,7 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
@@ -955,6 +1136,7 @@ test.describe('Vim editing: text editing', () => {
       await window.getByRole('button', { name: 'Enter node 1' }).click()
 
       const parent = window.getByRole('textbox', { name: 'Current parent' })
+
       await expect(parent).toHaveValue('Xb')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     })
@@ -972,14 +1154,17 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
 
       await window.keyboard.press('Meta+Backspace')
+
       await expect(node(window, 1)).toHaveValue('peer')
 
       await window.keyboard.press('Meta+z')
+
       await expect(node(window, 1)).toHaveValue('Xb')
     })
 
@@ -992,10 +1177,13 @@ test.describe('Vim editing: text editing', () => {
       const { app, window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
+
       await expect(editor).toHaveValue('abXd')
+
       await writeClipboardText(app, 'PASTED')
       // Suppress Chromium's native paste so only the application's command can change the text.
       await window.evaluate(() => {
@@ -1017,10 +1205,13 @@ test.describe('Vim editing: text editing', () => {
       const { app, window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
+
       await expect(editor).toHaveValue('abXd')
+
       await writeClipboardText(app, 'PASTED')
 
       await firePaste(editor)
@@ -1037,9 +1228,11 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
+
       await expect(editor).toHaveValue('abXd')
 
       await window.keyboard.press('Meta+a')
@@ -1062,10 +1255,13 @@ test.describe('Vim editing: text editing', () => {
       const { app, window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 2)
       await window.keyboard.press('R')
       await window.keyboard.type('X')
+
       await expect(editor).toHaveValue('abXd')
+
       await window.keyboard.press('Meta+a')
       // Suppress Chromium's native cut so the clipboard payload can only come from the application.
       await window.evaluate(() => {
@@ -1082,6 +1278,7 @@ test.describe('Vim editing: text editing', () => {
     test('repeats a deletion made inside an Insert session', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await editor.press('i')
       await typeInto(editor, 'abcd')
       await setCursor(editor, 2)
@@ -1089,21 +1286,26 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('i')
       await window.keyboard.press('Backspace')
       await window.keyboard.press('Escape')
+
       await expect(editor).toHaveValue('bcd')
+
       await window.keyboard.press('l')
       await window.keyboard.press('l')
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('bd')
     })
 
     test('does not record an Insert session interrupted by Enter as repeatable', async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
+
       await node(window, 1).press('i')
       await typeInto(node(window, 1), 'one')
       await window.keyboard.press('Enter')
       await typeInto(node(window, 2), 'two')
       await window.keyboard.press('Escape')
       await window.keyboard.press('.')
+
       await expect(node(window, 1)).toHaveValue('one')
       await expect(node(window, 2)).toHaveValue('two')
     })
@@ -1119,6 +1321,7 @@ test.describe('Vim editing: text editing', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
       await editor.focus()
+
       await setCursor(editor, 0)
       await editor.press('i')
       await window.keyboard.type('X')
@@ -1126,11 +1329,16 @@ test.describe('Vim editing: text editing', () => {
       await window.getByRole('button', { name: 'Enter node 1' }).click()
 
       const childEditor = node(window, 1)
+
       await expect(childEditor).toHaveValue('child')
+
       await window.keyboard.press('Escape')
       await window.keyboard.press('.')
+
       await expect(childEditor).toHaveValue('child')
+
       const parent = window.getByRole('textbox', { name: 'Current parent' })
+
       await expect(parent).toHaveValue('Xab')
     })
   })
@@ -1148,6 +1356,7 @@ test.describe('Vim editing: text editing', () => {
     const { window } = await launchTree(userDataDir)
     const editor = node(window, 1)
     await editor.focus()
+
     await setCursor(editor, 0)
     await editor.press('i')
     await window.keyboard.type('X')
@@ -1155,9 +1364,12 @@ test.describe('Vim editing: text editing', () => {
     await window.getByRole('button', { name: 'Top level' }).click()
 
     const rootEditor = node(window, 1)
+
     await expect(rootEditor).toHaveValue('Root')
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('.')
+
     await expect(rootEditor).toHaveValue('Root')
   })
 
@@ -1181,6 +1393,7 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('i')
       await window.keyboard.press('w')
       await window.keyboard.press('"')
+
       await expect(editor).toHaveValue('one "two" three')
 
       await setCursor(editor, 5)
@@ -1188,12 +1401,14 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('s')
       await window.keyboard.press('"')
       await pressShifted(window, ')')
+
       await expect(editor).toHaveValue('one (two) three')
 
       await setCursor(editor, 5)
       await window.keyboard.press('d')
       await window.keyboard.press('s')
       await pressShifted(window, ')')
+
       await expect(editor).toHaveValue('one two three')
 
       // The opening bracket pads the inside; its closing counterpart does not.
@@ -1204,6 +1419,7 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('i')
       await window.keyboard.press('w')
       await pressShifted(window, '{')
+
       await expect(editor).toHaveValue('one { two } three')
 
       // Deleting with the opening key strips that padding again.
@@ -1211,6 +1427,7 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('d')
       await window.keyboard.press('s')
       await pressShifted(window, '{')
+
       await expect(editor).toHaveValue('one two three')
     })
 
@@ -1229,9 +1446,11 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('s')
       await window.keyboard.press('s')
       await pressShifted(window, ')')
+
       await expect(editor).toHaveValue('(alpha beta)')
 
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('alpha beta')
 
       await setCursor(editor, 0)
@@ -1241,15 +1460,18 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('i')
       await window.keyboard.press('w')
       await window.keyboard.press(']')
+
       await expect(editor).toHaveValue('[alpha] beta')
 
       // The repeat re-derives the word at the new caret instead of replaying fixed offsets.
       await setCursor(editor, 8)
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('[alpha] [beta]')
 
       // One surround is one undoable change.
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('[alpha] beta')
     })
 
@@ -1268,6 +1490,7 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('l')
       await window.keyboard.press('S')
       await window.keyboard.press('"')
+
       await expect(editor).toHaveValue('"see" it now')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     })
@@ -1302,6 +1525,7 @@ test.describe('Vim editing: text editing', () => {
         await expect(editor.getByRole('link')).toHaveAttribute('href', url)
         await expect(editor.getByRole('link')).toHaveText(url)
       }
+
       await expectText(text)
 
       // The whole-node forms rewrite everything around the link and leave its URL text alone.
@@ -1309,32 +1533,42 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('g')
       await pressShifted(window, 'U')
       await pressShifted(window, 'U')
+
       await expectText(`ALPHA ${url} BETA GAMMA`)
       await expect(mode).toHaveText('NORMAL')
+
       await window.keyboard.press('g')
       await window.keyboard.press('u')
       await window.keyboard.press('u')
+
       await expectText(text)
+
       await window.keyboard.press('g')
       await pressShifted(window, '~')
       await pressShifted(window, '~')
+
       await expectText(`ALPHA ${url} BETA GAMMA`)
 
       // A motion or a text object covers its own range; each command is one undoable change.
       await window.keyboard.press('u')
       await window.keyboard.press('u')
       await window.keyboard.press('u')
+
       await expectText(text)
+
       await setCursor(editor, 0)
       await window.keyboard.press('g')
       await pressShifted(window, 'U')
       await window.keyboard.press('w')
+
       await expectText(`ALPHA ${url} beta gamma`)
+
       await setCursor(editor, 2)
       await window.keyboard.press('g')
       await window.keyboard.press('u')
       await window.keyboard.press('i')
       await window.keyboard.press('w')
+
       await expectText(text)
 
       // Visual `~` toggles the selection and returns to Normal mode.
@@ -1342,11 +1576,13 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('v')
       await window.keyboard.press('e')
       await pressShifted(window, '~')
+
       await expectText(`ALPHA ${url} beta gamma`)
       await expect(mode).toHaveText('NORMAL')
 
       // One undo restores the previous text.
       await window.keyboard.press('u')
+
       await expectText(text)
     })
 
@@ -1367,12 +1603,17 @@ test.describe('Vim editing: text editing', () => {
       await setCursor(editor, 0)
       await window.keyboard.press('g')
       await window.keyboard.press('p')
+
       await expect(editor).toHaveValue('otwone two')
+
       // The caret is on `n`, the character after the put text, so `x` removes it.
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('otwoe two')
+
       await window.keyboard.press('u')
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('one two')
 
       // `P` is typed with Shift after the `g` prefix; the caret lands on the character that followed.
@@ -1382,8 +1623,11 @@ test.describe('Vim editing: text editing', () => {
       await setCursor(editor, 0)
       await window.keyboard.press('g')
       await pressShifted(window, 'P')
+
       await expect(editor).toHaveValue('twoone two')
+
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('twone two')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     })
@@ -1409,19 +1653,25 @@ test.describe('Vim editing: text editing', () => {
       await window.keyboard.press('y')
       // Put on the leaf B, since `p` on A would put the copy into A's own children.
       await node(window, 2).focus()
+
       await window.keyboard.press('g')
       await window.keyboard.press('p')
+
       // Folds are closed, so the rows are A, B, the copy of A, and C. C follows the copy and is selected.
       await expect(node(window, 4)).toHaveValue('C')
       await expect(node(window, 4)).toBeFocused()
+
       await window.keyboard.press('u')
+
       await expect(node(window, 3)).toHaveValue('C')
 
       // After the last sibling nothing follows, so the last inserted copy is selected.
       await node(window, 3).focus()
+
       await window.keyboard.press('2')
       await window.keyboard.press('g')
       await window.keyboard.press('p')
+
       await expect(node(window, 5)).toHaveValue('A')
       await expect(node(window, 5)).toBeFocused()
     })
@@ -1440,22 +1690,30 @@ test.describe('Vim editing: text editing', () => {
       // `Y` copies from the caret through the end of the text and leaves the text alone.
       await setCursor(editor, 4)
       await pressShifted(window, 'Y')
+
       await expect(editor).toHaveValue('one two three')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       await setCursor(editor, 0)
       await pressShifted(window, 'P')
+
       await expect(editor).toHaveValue('two threeone two three')
+
       await window.keyboard.press('u')
+
       await expect(editor).toHaveValue('one two three')
 
       // The yank did not replace the saved `x`, so dot still deletes one character.
       await setCursor(editor, 0)
       await window.keyboard.press('x')
+
       await expect(editor).toHaveValue('ne two three')
+
       await setCursor(editor, 3)
       await pressShifted(window, 'Y')
       await setCursor(editor, 0)
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue('e two three')
     })
   })
@@ -1472,16 +1730,22 @@ test.describe('Vim editing: text editing', () => {
         const { app, window } = await launchTree(userDataDir)
         const editor = node(window, 1)
         await editor.focus()
+
         await setCursor(editor, 0)
         await editor.press('v')
         await editor.press('l')
         await lockSystemClipboard()
         await editor.press('y')
+
         await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('PO')
+
         await editor.press('x')
+
         await expect(editor).toHaveValue('OISON')
+
         await editor.press(mode === 'Visual' ? 'v' : 'R')
         if (mode === 'Replace') await window.keyboard.type('X')
+
         await expect(window.getByLabel('Vim mode')).toHaveText(mode.toUpperCase())
       })
 
@@ -1492,14 +1756,21 @@ test.describe('Vim editing: text editing', () => {
         })
         const { app, window } = await launchTree(userDataDir)
         const editor = node(window, 1)
+
         await expect(editor).toBeFocused()
         await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
         await writeClipboardText(app, '')
         await editor.press('p')
+
         await expect(editor).toHaveValue('abc')
+
         await editor.press('.')
+
         await expect(editor).toHaveValue('abc')
+
         await editor.press('u')
+
         await expect(editor).toHaveValue('abc')
         await expect(editor).toHaveJSProperty('selectionStart', 0)
         await expect(editor).toHaveJSProperty('selectionEnd', 1)

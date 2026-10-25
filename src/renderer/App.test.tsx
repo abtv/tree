@@ -218,6 +218,7 @@ describe('App breadcrumb move matrix', () => {
               throw new Error('Moving a subtree must preserve node identities.')
             },
           )
+
           await act(async () => {
             await store.initialize()
           })
@@ -227,6 +228,7 @@ describe('App breadcrumb move matrix', () => {
           mockAppDragRects()
           vi.useFakeTimers()
           const input = (): HTMLTextAreaElement => document.querySelector('.node-row[data-node-id="x"] textarea')!
+
           act(() => vi.advanceTimersByTime(32))
           act(() => {
             input().focus()
@@ -242,25 +244,33 @@ describe('App breadcrumb move matrix', () => {
             clientY: 60,
           })
           act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
           expect(document.body).toHaveClass('node-drag-active')
           expect(input()).not.toHaveFocus()
+
           const clientX = destination === 'root' ? 20 : 60
+
           fireEvent.pointerMove(input(), { pointerId: 1, clientX, clientY: 12 })
+
           expect(document.querySelector('.location-drop-target')).toHaveAttribute(
             'data-breadcrumb-id',
             destination === 'root' ? '' : 'r',
           )
+
           fireEvent.pointerUp(input(), { pointerId: 1, clientX, clientY: 12 })
 
           const assertState = (tree: typeof original, currentParentId: string | null, cursor: number): void => {
             act(() => vi.advanceTimersByTime(32))
+
             expect(store.getSnapshot()).toMatchObject({
               status: 'ready',
               location: { currentParentId, selectedNodeId: 'x' },
               focus: { nodeId: 'x', cursor: 0 },
             })
+
             const snapshot = store.getSnapshot()
             if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+
             expect(snapshot.document).toEqual(tree)
             expect(input()).toHaveFocus()
             expect(input().selectionStart).toBe(cursor)
@@ -271,15 +281,20 @@ describe('App breadcrumb move matrix', () => {
             if (vim) expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
           }
           const destinationId = destination === 'root' ? null : 'r'
+
           assertState(expected, destinationId, 0)
           expect(Array.from(document.querySelectorAll('.node-row')).at(-1)).toHaveAttribute('data-node-id', 'x')
+
           fireEvent.keyDown(input(), { key: 'z', metaKey: true })
+
           assertState(original, expanded ? destinationId : 'p', 0)
           expect(input().closest('.node-row')).toHaveAttribute(
             'data-depth',
             expanded ? (destination === 'root' ? '2' : '1') : '0',
           )
+
           fireEvent.keyDown(input(), { key: 'z', metaKey: true, shiftKey: true })
+
           assertState(expected, destinationId, 0)
           expect(document.body).not.toHaveClass('node-drag-active')
           expect(document.querySelector('.location-drop-target')).toBeNull()
@@ -319,6 +334,7 @@ describe('App drag editing-state matrix', () => {
         vi.useFakeTimers()
         const input = (): HTMLTextAreaElement => document.querySelector('.node-row[data-node-id="x"] textarea')!
         const row = (): HTMLElement => input().closest('.node-row')!
+
         act(() => vi.advanceTimersByTime(32))
         act(() => input().focus())
         if (state === 'standard') act(() => input().setSelectionRange(2, 2))
@@ -333,16 +349,19 @@ describe('App drag editing-state matrix', () => {
         if (state === 'replace') {
           fireEvent.keyDown(input(), { key: 'R' })
           fireEvent.keyDown(input(), { key: 'X' })
+
           expect(input()).toHaveValue('BrXvo')
           expect(store.getSnapshot()).toMatchObject({ document: original })
         }
         if (state === 'visual') {
           fireEvent.keyDown(input(), { key: 'v' })
           fireEvent.keyDown(input(), { key: 'l' })
+
           expect([input().selectionStart, input().selectionEnd]).toEqual([2, 4])
         }
         if (state === 'visual-node') {
           fireEvent.keyDown(input(), { key: 'V' })
+
           expect(row()).toHaveClass('node-row-visual-selected')
         }
         const edited = state === 'standard' || state === 'insert' || state === 'replace'
@@ -371,6 +390,7 @@ describe('App drag editing-state matrix', () => {
             original.roots[1]!,
           ],
         }
+
         fireEvent.pointerDown(input(), {
           pointerId: 1,
           button: 0,
@@ -381,41 +401,56 @@ describe('App drag editing-state matrix', () => {
         })
         fireEvent.mouseDown(input(), { button: 0 })
         act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
         expect(document.body).toHaveClass('node-drag-active')
         expect(input()).not.toHaveFocus()
+
         const frozenCursor = edited ? 3 : 2
+
         expect(input().selectionStart).toBe(frozenCursor)
+
         const point =
           route === 'breadcrumb' ? { clientX: 60, clientY: 12 } : { clientX: 100, clientY: route === 'row' ? 84 : 100 }
         // Toolbar events deliberately originate outside the list, exercising the fallback listener.
         const releaseTarget =
           route === 'breadcrumb' ? document.querySelector('.location-segment[data-breadcrumb-id="r"]')! : input()
+
         fireEvent.pointerMove(releaseTarget, { pointerId: 1, ...point })
+
         if (route === 'breadcrumb') expect(releaseTarget).toHaveClass('location-drop-target')
         else
           expect(document.querySelector(route === 'row' ? '.node-row-drop-on' : '.node-row-drop-after')).not.toBeNull()
+
         fireEvent.pointerUp(releaseTarget, { pointerId: 1, ...point })
         fireEvent.mouseUp(releaseTarget, { button: 0 })
         act(() => vi.advanceTimersByTime(32))
 
         const assertDocument = (tree: Document, currentParentId: string): void => {
           const snapshot = store.getSnapshot()
+
           expect(snapshot).toMatchObject({ status: 'ready', location: { currentParentId, selectedNodeId: 'x' } })
+
           if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+
           expect(snapshot.document).toEqual(tree)
           expect(input()).toHaveFocus()
         }
         const destination = route === 'breadcrumb' ? 'r' : 'p'
+
         assertDocument(expected, destination)
         expect(input()).toHaveValue(text)
+
         const normalCaret = state === 'normal' || state === 'replace' || (state === 'visual-node' && route !== 'gap')
+
         expect([input().selectionStart, input().selectionEnd]).toEqual([
           frozenCursor,
           frozenCursor + (normalCaret ? 1 : 0),
         ])
         expect(row()).toHaveAttribute('data-depth', route === 'row' ? '1' : '0')
+
         const mode =
           state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : route === 'gap' ? 'VISUAL NODE' : 'NORMAL'
+
         if (state !== 'standard') expect(screen.getByLabelText('Vim mode')).toHaveTextContent(mode)
         expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(route === 'gap' ? 1 : 0)
         expect(document.body).not.toHaveClass('node-drag-active')
@@ -425,36 +460,51 @@ describe('App drag editing-state matrix', () => {
           fireEvent.keyDown(input(), { key: 'z', metaKey: true, shiftKey })
           act(() => vi.advanceTimersByTime(32))
         }
+
         history()
+
         assertDocument(editedOriginal, 'p')
         expect(input().selectionStart).toBe(0)
+
         if (route === 'gap') {
           // Sibling reordering puts Undo/Redo on the first changed sibling (§10).
           history()
+
           assertDocument(original, 'p')
+
           history(true)
           const snapshot = store.getSnapshot()
+
           expect(snapshot).toMatchObject({
             location: { currentParentId: 'p', selectedNodeId: 't' },
             focus: { nodeId: 't', cursor: 0 },
           })
+
           if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+
           expect(snapshot.document).toEqual(expected)
           expect(document.querySelector('.node-row[data-node-id="t"] textarea')).toHaveFocus()
+
           return
         }
         if (edited) {
           history()
+
           assertDocument(original, 'p')
           expect(input().selectionStart).toBe(2)
+
           history(true)
+
           assertDocument(editedOriginal, 'p')
           expect(input().selectionStart).toBe(2)
         } else {
           history()
+
           assertDocument(original, 'p')
         }
+
         history(true)
+
         assertDocument(expected, route === 'breadcrumb' ? 'r' : 'p')
         expect(input().selectionStart).toBe(0)
       })
@@ -476,17 +526,21 @@ describe('App strikethrough', () => {
     renderReact(<App initialVimEnabled store={store} />)
     const alpha = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
     const bravo = screen.getByRole('textbox', { name: 'Node 2' })
+
     expect(alpha).not.toHaveClass('node-input-struck')
     expect(bravo).toHaveClass('node-input-struck')
+
     act(() => alpha.setSelectionRange(2, 2))
 
     fireEvent.keyDown(alpha, { key: 'Enter', metaKey: true })
+
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
     expect(alpha.value).toBe('Alpha')
     expect(alpha.selectionStart).toBe(2)
     expect(document.activeElement).toBe(alpha)
 
     fireEvent.keyDown(alpha, { key: 'Enter', metaKey: true })
+
     expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
   })
 
@@ -505,6 +559,7 @@ describe('App strikethrough', () => {
     const store = await createSeededStore(tasks, { currentParentId: null, selectedNodeId: 'a' })
     renderReact(<App initialVimEnabled store={store} />)
     const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
     fireEvent.keyDown(alpha, { key: 'V' })
     fireEvent.keyDown(alpha, { key: 'j' })
     const bravo = screen.getByRole('textbox', { name: 'Node 2' })
@@ -520,13 +575,16 @@ describe('App strikethrough', () => {
 describe('App', () => {
   it('starts in Normal mode with an empty caret position', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
 
     expect(screen.getByText('NORMAL')).toBeInTheDocument()
+
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     expect(root.selectionStart).toBe(0)
     expect(root.selectionEnd).toBe(0)
     expect(root).toHaveClass('node-input-empty')
@@ -536,6 +594,7 @@ describe('App', () => {
   // @requirement PRODUCT.md §20
   it('renders the initial editable root and splits it with Enter', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -544,6 +603,7 @@ describe('App', () => {
 
     fireEvent.change(root, { target: { value: 'Current' } })
     root.setSelectionRange(3, 3)
+
     fireEvent.keyDown(root, { key: 'Enter' })
 
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Cur')
@@ -577,9 +637,11 @@ describe('App', () => {
       const store = await createSeededStore(original, { currentParentId: null, selectedNodeId: 'current' })
       vi.useFakeTimers()
       renderReact(<App initialVimEnabled={vim} store={store} />)
+
       act(() => vi.advanceTimersByTime(32))
       const current = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       if (vim) fireEvent.keyDown(current, { key: 'i' })
+
       act(() => {
         current.focus()
         current.setSelectionRange(0, 0)
@@ -590,31 +652,42 @@ describe('App', () => {
         act(() => vi.advanceTimersByTime(32))
         const snapshot = store.getSnapshot()
         if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+
         expect(snapshot.document).toEqual(expected)
         expect(snapshot.location).toEqual({ currentParentId: null, selectedNodeId })
         expect(snapshot.focus).toMatchObject({ nodeId: selectedNodeId, cursor: 0 })
+
         const input = document.querySelector<HTMLTextAreaElement>(
           `.node-row[data-node-id="${selectedNodeId}"] textarea`,
         )!
+
         expect(input).toHaveFocus()
         expect([input.selectionStart, input.selectionEnd]).toEqual([0, 0])
         if (vim) expect(screen.getByLabelText('Vim mode')).toHaveTextContent('INSERT')
       }
+
       assertState(original, 'current')
+
       fireEvent.keyDown(current, { key: 'Enter' })
 
       const inserted: Document = { roots: [{ id: 'created-0', text: '', children: [] }, ...original.roots] }
+
       assertState(inserted, 'created-0')
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('Current')
+
       fireEvent.keyDown(document.activeElement!, { key: 'z', metaKey: true })
+
       assertState(original, 'current')
+
       fireEvent.keyDown(document.activeElement!, { key: 'z', metaKey: true, shiftKey: true })
+
       assertState(inserted, 'created-0')
     },
   )
 
   it('deletes an empty node and focuses the previous node on Backspace', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -632,6 +705,7 @@ describe('App', () => {
 
   it('keeps consecutive text edits in one undo session when the caret advances', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -651,6 +725,7 @@ describe('App', () => {
 
   it('ends the text session when the user selects text within the node', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -660,6 +735,7 @@ describe('App', () => {
     fireEvent.change(root, { target: { value: 'Fir' } })
     await act(async () => undefined)
     root.setSelectionRange(0, 3)
+
     fireEvent.select(root)
     fireEvent.change(root, { target: { value: 'First' } })
 
@@ -671,6 +747,7 @@ describe('App', () => {
   // @requirement PRODUCT.md §17.1
   it('opens the image preview with Cmd+Y and closes it on Escape, restoring focus', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
+
     await act(async () => {
       await store.initialize()
     })
@@ -682,15 +759,18 @@ describe('App', () => {
     await screen.findByRole('button', { name: 'Open image preview' })
 
     fireEvent.keyDown(node, { key: 'y', metaKey: true })
+
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
     fireEvent.keyDown(window, { key: 'Escape' })
+
     expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
     expect(node).toHaveFocus()
   })
 
   it('collapses the empty text row for an image node while keeping it editable', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -698,12 +778,16 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     const input = screen.getByRole('textbox', { name: 'Node 1' })
+
     expect(input).toHaveClass('node-input-empty', 'node-input-image-only')
     expect(input.closest('.node-row')).toHaveClass('node-row-image-only')
 
     fireEvent.click(input.closest('.node-row')!)
+
     expect(input).toHaveFocus()
+
     fireEvent.keyDown(input, { key: 'i' })
+
     expect(screen.getByText('INSERT')).toBeInTheDocument()
 
     fireEvent.change(input, { target: { value: 'caption' } })
@@ -711,13 +795,16 @@ describe('App', () => {
     expect(input).toHaveValue('caption')
     expect(input).not.toHaveClass('node-input-image-only')
     expect(input.closest('.node-row')).not.toHaveClass('node-row-image-only')
+
     const snapshot = store.getSnapshot()
     if (snapshot.status !== 'ready') throw new Error('The editor did not finish loading.')
+
     expect(snapshot.document.roots[0]?.attachment?.mimeType).toBe('image/png')
   })
 
   it('opens the image preview by clicking the image and closes it with the close button', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
+
     await act(async () => {
       await store.initialize()
     })
@@ -727,9 +814,11 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Open image preview' }))
+
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Close image preview' }))
+
     expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
   })
 
@@ -737,6 +826,7 @@ describe('App', () => {
     const readAttachment = vi.fn(async () => attachmentBytes)
     window.treeApi.readAttachment = readAttachment
     const store = createStore({ kind: 'image', png: attachmentBytes })
+
     await act(async () => {
       await store.initialize()
     })
@@ -746,6 +836,7 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
     const node = screen.getByRole('textbox', { name: 'Node 1' })
     await screen.findByRole('button', { name: 'Open image preview' })
+
     fireEvent.keyDown(node, { key: 'y', metaKey: true })
     await screen.findByAltText('Attached image preview')
 
@@ -754,6 +845,7 @@ describe('App', () => {
 
   it('opens the image preview from the current parent with Cmd+Y', async () => {
     const store = createStore({ kind: 'image', png: attachmentBytes })
+
     await act(async () => {
       await store.initialize()
     })
@@ -773,6 +865,7 @@ describe('App', () => {
 
   it('does nothing on Cmd+Y when the node has no image', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -785,6 +878,7 @@ describe('App', () => {
 
   it('renders a pasted HTTP URL as a clickable styled link', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -792,6 +886,7 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     const link = screen.getByRole('link', { name: 'https://example.com' })
+
     expect(link).toHaveAttribute('href', 'https://example.com')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveStyle({ textDecoration: 'underline' })
@@ -799,6 +894,7 @@ describe('App', () => {
 
   it('keeps linked text visibly selected after copying all text', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -806,10 +902,12 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
+
     await act(async () => {
       fireEvent.keyDown(editor, { key: 'a', metaKey: true })
       await Promise.resolve()
     })
+
     expect(editor).toHaveClass('select-all')
 
     fireEvent.keyDown(editor, { key: 'c', metaKey: true })
@@ -819,6 +917,7 @@ describe('App', () => {
 
   it('visually marks hyperlinks when node content is selected', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -829,6 +928,7 @@ describe('App', () => {
 
     const selection = window.getSelection()!
     const range = document.createRange()
+
     range.selectNodeContents(editor)
     selection.removeAllRanges()
     selection.addRange(range)
@@ -839,6 +939,7 @@ describe('App', () => {
 
   it('preserves the caret after typing in a linked node', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -847,9 +948,11 @@ describe('App', () => {
 
     const editor = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLDivElement
     const addedText = document.createTextNode('x')
+
     editor.append(addedText)
     const selection = window.getSelection()!
     const range = document.createRange()
+
     range.setStart(addedText, 1)
     range.collapse(true)
     selection.removeAllRanges()
@@ -858,12 +961,14 @@ describe('App', () => {
 
     await act(async () => undefined)
     const caret = window.getSelection()!.getRangeAt(0)
+
     expect(caret.startContainer.textContent).toBe('https://example.comx')
     expect(caret.startOffset).toBeGreaterThan(0)
   })
 
   it('updates linked content through the contenteditable boundary and ends a selected edit session', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -872,12 +977,15 @@ describe('App', () => {
     const editor = screen.getByRole('textbox', { name: 'Node 1' })
 
     fireEvent.focus(editor)
+
     fireEvent.mouseDown(editor)
     editor.textContent = 'edited text'
     fireEvent.input(editor)
+
     fireEvent.change(editor)
     const selection = window.getSelection()!
     const range = document.createRange()
+
     range.selectNodeContents(editor)
     selection.removeAllRanges()
     selection.addRange(range)
@@ -892,6 +1000,7 @@ describe('App', () => {
 
   it('places a linked caret at the requested character', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -902,18 +1011,21 @@ describe('App', () => {
     await act(async () => {
       store.selectNode('root', 9)
     })
+
     expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor.querySelector('a')?.firstChild)
     expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(9)
 
     await act(async () => {
       store.selectNode('root', 10)
     })
+
     expect(window.getSelection()!.getRangeAt(0).startContainer).toBe(editor.querySelector('a')?.firstChild)
     expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(10)
   })
 
   it('moves the caret to a new sibling after Enter at the end of linked text', async () => {
     const store = createStore({ kind: 'text', text: 'https://example.com' })
+
     await act(async () => {
       await store.initialize()
       await store.paste('root', 0)
@@ -928,7 +1040,9 @@ describe('App', () => {
 
     expect(screen.getByRole('link', { name: 'https://example.com' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('')
+
     const newEditor = screen.getByRole('textbox', { name: 'Node 2' })
+
     expect(newEditor).toHaveFocus()
     expect((newEditor as HTMLTextAreaElement).selectionStart).toBe(0)
   })
@@ -936,13 +1050,16 @@ describe('App', () => {
   // @requirement PRODUCT.md §2
   it('renders and edits the current parent after entering an empty node', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
+
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
 
     const parent = screen.getByRole('textbox', { name: 'Current parent' })
+
     fireEvent.change(parent, { target: { value: 'Projects' } })
 
     expect(parent).toHaveValue('Projects')
@@ -951,6 +1068,7 @@ describe('App', () => {
 
   it('renders an enter control for a childless node and enters it without changing the document', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -958,6 +1076,7 @@ describe('App', () => {
     const before = store.getSnapshot()
     if (before.status !== 'ready') throw new Error('The editor is not ready.')
     const button = screen.getByRole('button', { name: 'Enter node 1' })
+
     expect(button.className).not.toContain('node-enter-control-has-children')
 
     fireEvent.mouseDown(button)
@@ -965,6 +1084,7 @@ describe('App', () => {
 
     const after = store.getSnapshot()
     if (after.status !== 'ready') throw new Error('The editor is not ready.')
+
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Node 1' })).not.toBeInTheDocument()
     expect(after.location).toEqual({ currentParentId: 'root', selectedNodeId: 'root' })
@@ -973,6 +1093,7 @@ describe('App', () => {
 
   it('shows a child-bearing indicator and enters the node when clicked', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -982,7 +1103,9 @@ describe('App', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: ',', metaKey: true })
     const disclosure = screen.getByRole('button', { name: 'Enter node 1' })
+
     expect(disclosure.className).toContain('node-enter-control-has-children')
+
     fireEvent.mouseDown(disclosure)
     fireEvent.click(disclosure)
 
@@ -1008,6 +1131,7 @@ describe('App', () => {
         },
         () => 'unused',
       )
+
       await act(async () => {
         await store.initialize()
       })
@@ -1030,6 +1154,7 @@ describe('App', () => {
       const noteViewportChange = vi.spyOn(store, 'noteViewportChange')
 
       renderReact(<App initialVimEnabled store={store} />)
+
       // The row sits 40px from the top after focus; it moves down to its saved 180px.
       expect(calls.indexOf('focus')).toBeGreaterThanOrEqual(0)
       expect(calls.indexOf('scrollBy:-140')).toBeGreaterThan(calls.indexOf('focus'))
@@ -1037,21 +1162,28 @@ describe('App', () => {
 
       // Programmatic scrolling before any user input is not a change, and a save keeps the saved value.
       fireEvent.scroll(window)
+
       expect(noteViewportChange).not.toHaveBeenCalled()
+
       fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Root edited' } })
       await act(async () => {
         await store.flushPersistence()
       })
+
       expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: 180 } })
 
       // After user input, scrolling is a change and a save measures the row where it now is.
       fireEvent.wheel(window)
       rowTop = 75
+
       fireEvent.scroll(window)
+
       expect(noteViewportChange).toHaveBeenCalledOnce()
+
       await act(async () => {
         await store.flushPersistence()
       })
+
       expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: 75 } })
       expect(scrollBy).toHaveBeenCalledOnce()
     })
@@ -1073,6 +1205,7 @@ describe('App', () => {
         },
         () => 'unused',
       )
+
       await act(async () => {
         await store.initialize()
       })
@@ -1086,12 +1219,14 @@ describe('App', () => {
 
       renderReact(<App initialVimEnabled store={store} />)
       const lowest = window.innerHeight - 20
+
       expect(scrollBy).toHaveBeenCalledWith(0, 40 - lowest)
 
       fireEvent.change(screen.getByRole('textbox', { name: 'Node 1' }), { target: { value: 'Root edited' } })
       await act(async () => {
         await store.flushPersistence()
       })
+
       expect(save.mock.calls.at(-1)?.[0]).toMatchObject({ view: { selectedRowTop: lowest } })
     })
 
@@ -1109,6 +1244,7 @@ describe('App', () => {
       const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
 
       renderReact(<App initialVimEnabled store={store} />)
+
       expect(scrollBy).not.toHaveBeenCalled()
     })
   })
@@ -1136,6 +1272,7 @@ describe('App', () => {
 
     it('expands a node’s children inline without changing the current location or the caret', async () => {
       const store = await buildRootWithChild()
+
       expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
@@ -1174,18 +1311,22 @@ describe('App', () => {
 
       expect(screen.getByText('NORMAL')).toBeInTheDocument()
       expect(texts()).toEqual(['Alpha', 'Bravo'])
+
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 2' }))
+
       expect(texts()).toEqual(expandedTexts)
       expect(readySnapshot(store).location.currentParentId).toBeNull()
       expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
+
       expect(texts()).toEqual(['Alpha', 'Bravo'])
       expect(readySnapshot(store).location.currentParentId).toBeNull()
       expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
       expect(texts()).toEqual(expandedTexts)
       expect(readySnapshot(store).location.currentParentId).toBeNull()
       expect(screen.queryByRole('textbox', { name: 'Current parent' })).not.toBeInTheDocument()
@@ -1194,6 +1335,7 @@ describe('App', () => {
     it('collapses a node’s children again from the same disclosure control', async () => {
       await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
@@ -1205,13 +1347,16 @@ describe('App', () => {
       const store = await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
+
       expect(readySnapshot(store).location.selectedNodeId).toBe('child')
 
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
 
       const snapshot = store.getSnapshot()
       if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+
       expect(snapshot.location.selectedNodeId).toBe('root')
       expect(snapshot.focus?.cursor).toBe(0)
     })
@@ -1219,7 +1364,9 @@ describe('App', () => {
     it('leaves selection unchanged when the caret is on the collapsing node itself', async () => {
       const store = await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
       expect(readySnapshot(store).location.selectedNodeId).toBe('root')
+
       const focusBefore = store.getSnapshot().status === 'ready' ? store.getSnapshot() : undefined
 
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
@@ -1232,9 +1379,11 @@ describe('App', () => {
       const store = await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
       fireEvent.keyDown(child, { key: 'Escape' })
       fireEvent.keyDown(child, { key: 'V' })
+
       expect(screen.getByText('VISUAL NODE')).toBeInTheDocument()
       expect(readySnapshot(store).location.selectedNodeId).toBe('child')
 
@@ -1242,8 +1391,10 @@ describe('App', () => {
 
       expect(screen.queryByText('VISUAL NODE')).not.toBeInTheDocument()
       expect(screen.getByText('NORMAL')).toBeInTheDocument()
+
       const snapshot = store.getSnapshot()
       if (snapshot.status !== 'ready') throw new Error('The editor is not ready.')
+
       expect(snapshot.location.selectedNodeId).toBe('root')
       expect(snapshot.focus?.cursor).toBe(0)
     })
@@ -1252,6 +1403,7 @@ describe('App', () => {
       const store = await buildRootWithChild()
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'Escape' })
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'V' })
+
       expect(screen.getByText('VISUAL NODE')).toBeInTheDocument()
 
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
@@ -1264,6 +1416,7 @@ describe('App', () => {
     it('keeps a node expanded after entering it and leaving again', async () => {
       await buildRootWithChild()
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
 
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: '.', metaKey: true })
@@ -1328,16 +1481,20 @@ describe('App', () => {
     it('closes, opens, and toggles the selected node’s own fold without moving the caret', async () => {
       const store = await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       expect(texts()).toEqual(['Alpha', 'Bravo'])
 
       fold(alpha, 'a')
+
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
       expect(readySnapshot(store).location.selectedNodeId).toBe('root')
 
       fold(alpha, 'c')
+
       expect(texts()).toEqual(['Alpha', 'Bravo'])
 
       fold(alpha, 'o')
+
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
       expect(readySnapshot(store).location.selectedNodeId).toBe('root')
     })
@@ -1345,39 +1502,51 @@ describe('App', () => {
     it('clears nested choices with zC and opens the whole subtree with zO', async () => {
       await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fold(alpha, 'a')
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
       fold(child, 'a')
+
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
 
       act(() => alpha.focus())
       fold(alpha, 'C')
+
       expect(texts()).toEqual(['Alpha', 'Bravo'])
 
       // zC discarded the nested choice, so reopening the root shows only its direct children.
       fold(alpha, 'o')
+
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
 
       fold(alpha, 'O')
+
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
     })
 
     it('closes every fold with zM and selects the displayed ancestor of a hidden caret', async () => {
       const store = await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fold(alpha, 'a')
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
       fold(child, 'a')
       const grandchild = screen.getByRole('textbox', { name: 'Node 3' })
+
       act(() => grandchild.focus())
+
       expect(readySnapshot(store).location.selectedNodeId).toBe('grandchild')
 
       fold(grandchild, 'M')
 
       expect(texts()).toEqual(['Alpha', 'Bravo'])
+
       const snapshot = readySnapshot(store)
+
       expect(snapshot.location.selectedNodeId).toBe('root')
       expect(snapshot.focus?.cursor).toBe(0)
       expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
@@ -1400,14 +1569,18 @@ describe('App', () => {
       )
       renderReact(<App initialVimEnabled store={store} />)
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fold(alpha, 'a')
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
+
       expect(child).toHaveClass('node-input-image-caret')
 
       fold(child, 'M')
 
       const destination = screen.getByRole('textbox', { name: 'Node 1' })
+
       expect(destination).toHaveFocus()
       expect(destination).not.toHaveClass('node-input-image-caret')
       expect(readySnapshot(store).focus?.cursor).toBe(0)
@@ -1416,14 +1589,18 @@ describe('App', () => {
     it('opens every fold with zR while the caret stays on the focused descendant', async () => {
       const store = await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fold(alpha, 'a')
       const child = screen.getByRole('textbox', { name: 'Node 2' })
+
       act(() => child.focus())
 
       fold(child, 'R')
 
       expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
+
       const snapshot = readySnapshot(store)
+
       expect(snapshot.location.selectedNodeId).toBe('child')
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveFocus()
     })
@@ -1431,23 +1608,30 @@ describe('App', () => {
     it('does nothing for fold commands on a leaf', async () => {
       await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fold(alpha, 'a')
       const leaf = screen.getByRole('textbox', { name: 'Node 3' })
+
       act(() => leaf.focus())
 
       for (const key of ['c', 'o', 'a', 'C', 'O']) {
         fold(leaf, key)
+
         expect(texts()).toEqual(['Alpha', 'Alpha child', 'Alpha leaf', 'Bravo'])
       }
+
       expect(leaf).toHaveFocus()
     })
 
     it('does nothing for per-node fold commands on the editable current-parent heading', async () => {
       const store = await renderNested()
       const alpha = screen.getByRole('textbox', { name: 'Node 1' })
+
       fireEvent.keyDown(alpha, { key: '.', metaKey: true })
       const heading = screen.getByRole('textbox', { name: 'Current parent' })
+
       act(() => heading.focus())
+
       expect(readySnapshot(store).location.selectedNodeId).toBe('root')
 
       for (const key of ['c', 'o', 'a', 'C', 'O']) fold(heading, key)
@@ -1469,23 +1653,31 @@ describe('App', () => {
       })
       const edited = readySnapshot(store).document
       const savesAfterEdit = save.mock.calls.length
+
       // The edit itself persists; the assertions below attribute any further save to expansion.
       expect(savesAfterEdit).toBeGreaterThan(0)
 
       // docs/PRODUCT.md §2.4: expansion is view state. The disclosure triangle, `za`, and `zR` must
       // not edit the document or add an undo entry; the choices are saved with the document.
       fireEvent.click(screen.getByRole('button', { name: 'Expand node 1' }))
+
       expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha leaf', 'Bravo'])
+
       fireEvent.click(screen.getByRole('button', { name: 'Collapse node 1' }))
       fold(alpha, 'a')
+
       expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha leaf', 'Bravo'])
+
       fold(alpha, 'R')
+
       expect(texts()).toEqual(['Alpha edited', 'Alpha child', 'Alpha grandchild', 'Alpha leaf', 'Bravo'])
 
       expect(readySnapshot(store).document).toEqual(edited)
+
       await act(async () => {
         await store.flushPersistence()
       })
+
       expect(save).toHaveBeenCalledTimes(savesAfterEdit + 1)
       expect(save.mock.calls.at(-1)?.[0]).toMatchObject({
         document: edited,
@@ -1496,15 +1688,19 @@ describe('App', () => {
       // has nothing left to remove.
       press(alpha, 'u')
       const undone = readySnapshot(store)
+
       expect(undone.document).toEqual(beforeEdit.document)
       expect(undone.location).toEqual({ currentParentId: null, selectedNodeId: 'root' })
+
       press(alpha, 'u')
+
       expect(readySnapshot(store).document).toEqual(beforeEdit.document)
     })
   })
 
   it('marks the node containing the caret and never the current-parent heading', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -1518,19 +1714,23 @@ describe('App', () => {
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     const child = screen.getByRole('textbox', { name: 'Node 1' })
+
     expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(1)
     expect(child.closest('.node-row')?.querySelector('.node-focus-marker')).not.toBeNull()
     expect(document.querySelector('.current-parent .node-focus-marker')).toBeNull()
 
     fireEvent.keyDown(child, { key: 'ArrowUp' })
+
     expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(0)
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'ArrowDown' })
+
     expect(document.querySelectorAll('.node-focus-marker')).toHaveLength(1)
   })
 
   it('navigates through the location path and selects the child on the previous path', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -1541,30 +1741,37 @@ describe('App', () => {
     fireEvent.keyDown(root, { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     const child = screen.getByRole('textbox', { name: 'Node 1' })
+
     fireEvent.change(child, { target: { value: 'Child' } })
     fireEvent.keyDown(child, { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Root' }))
+
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toHaveValue('Root')
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Child')
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
 
     fireEvent.click(screen.getByRole('button', { name: 'Top level' }))
+
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('Root')
     expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveFocus()
   })
 
   it('keeps the text select-all after Cmd+A exits whole-node Visual mode', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(input, { target: { value: 'Project' } })
     input.focus()
+
     fireEvent.keyDown(input, { key: 'V' })
+
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
 
     fireEvent.keyDown(input, { key: 'a', metaKey: true })
@@ -1576,15 +1783,19 @@ describe('App', () => {
 
   it('commits a pending Replace edit before Cmd+V pastes at the typed end', async () => {
     const store = createStore({ kind: 'text', text: 'PASTED' })
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
+
     fireEvent.keyDown(input, { key: 'R' })
     fireEvent.keyDown(input, { key: 'X' })
+
     expect(input).toHaveValue('abXd')
 
     fireEvent.keyDown(input, { key: 'v', metaKey: true })
@@ -1599,13 +1810,16 @@ describe('App', () => {
   it('commits a pending Replace edit before Cmd+A and Cmd+X cut the visible selection', async () => {
     const writeClipboard = vi.fn(async () => undefined)
     const store = createStore({ kind: 'text', text: '' }, writeClipboard)
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
+
     fireEvent.keyDown(input, { key: 'R' })
     fireEvent.keyDown(input, { key: 'X' })
     fireEvent.keyDown(input, { key: 'a', metaKey: true })
@@ -1622,13 +1836,16 @@ describe('App', () => {
 
   it('commits a pending Replace edit before the native paste fallback', async () => {
     const store = createStore({ kind: 'text', text: 'PASTED' })
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(2, 2)
+
     fireEvent.keyDown(input, { key: 'R' })
     fireEvent.keyDown(input, { key: 'X' })
 
@@ -1643,16 +1860,20 @@ describe('App', () => {
 
   it('keeps character Visual mode and re-anchors the next motion after Cmd+V', async () => {
     const store = createStore({ kind: 'text', text: 'PASTED' })
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(input, { target: { value: 'abcd' } })
     input.setSelectionRange(0, 0)
+
     fireEvent.keyDown(input, { key: 'v' })
     fireEvent.keyDown(input, { key: 'l' })
     fireEvent.keyDown(input, { key: 'l' })
+
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(3)
 
@@ -1660,23 +1881,29 @@ describe('App', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
+
     expect(input).toHaveValue('PASTEDabcd')
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL')
 
     fireEvent.keyDown(input, { key: 'l' })
+
     expect(input.selectionStart).toBe(6)
   })
 
   it('keeps whole-node Visual mode and its range after Cmd+V', async () => {
     const store = createStore({ kind: 'text', text: 'X' })
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(root, { target: { value: 'A' } })
     root.focus()
+
     fireEvent.keyDown(root, { key: 'V' })
+
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
     expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
 
@@ -1692,18 +1919,23 @@ describe('App', () => {
 
   it('exits whole-node Visual mode when the enter control enters the node', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const input = screen.getByRole('textbox', { name: 'Node 1' })
+
     fireEvent.change(input, { target: { value: 'Root' } })
     input.focus()
+
     fireEvent.keyDown(input, { key: 'V' })
+
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
     expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
 
     const button = screen.getByRole('button', { name: 'Enter node 1' })
+
     fireEvent.mouseDown(button)
     fireEvent.click(button)
 
@@ -1713,23 +1945,29 @@ describe('App', () => {
 
   it('exits whole-node Visual mode when a breadcrumb click changes the level', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' })
+
     fireEvent.change(root, { target: { value: 'Root' } })
     fireEvent.keyDown(root, { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     const child = screen.getByRole('textbox', { name: 'Node 1' })
+
     fireEvent.change(child, { target: { value: 'Child' } })
     fireEvent.keyDown(child, { key: '.', metaKey: true })
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Current parent' }), { key: 'Enter' })
     const leaf = screen.getByRole('textbox', { name: 'Node 1' })
 
     fireEvent.keyDown(leaf, { key: 'Escape' })
+
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+
     fireEvent.keyDown(leaf, { key: 'V' })
+
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
     expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(1)
 
@@ -1741,6 +1979,7 @@ describe('App', () => {
 
   it('toggles the always-on-top setting from the status bar', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -1748,15 +1987,19 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     const toggle = await screen.findByRole('button', { name: 'Pin window on top' })
+
     expect(toggle.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Pin window on top')
     expect(toggle.closest('footer.status-bar')).not.toBeNull()
     expect(toggle.closest('.location-bar')).toBeNull()
     expect(screen.getByLabelText('Vim mode').nextElementSibling).toBe(toggle.parentElement)
     expect(toggle.closest('footer.status-bar')?.lastElementChild).toBe(toggle.parentElement)
+
     fireEvent.click(toggle)
 
     expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
+
     const unpin = await screen.findByRole('button', { name: 'Unpin window from top' })
+
     expect(unpin.parentElement?.querySelector('.status-tooltip')).toHaveTextContent('Unpin window from top')
   })
 
@@ -1773,8 +2016,10 @@ describe('App', () => {
     root.setSelectionRange(1, 2)
 
     const toggle = screen.getByRole('button', { name: 'Pin window on top' })
+
     // Preventing the default mouse-down keeps the browser from moving focus to the button.
     expect(fireEvent.mouseDown(toggle)).toBe(false)
+
     fireEvent.click(toggle)
 
     expect(setAlwaysOnTop).toHaveBeenCalledWith(true)
@@ -1818,8 +2063,11 @@ describe('App', () => {
       renderReact(<App initialVimEnabled store={store} />)
 
       menu.alwaysOnTop(true)
+
       expect(screen.getByRole('button', { name: 'Unpin window from top' })).toHaveAttribute('aria-pressed', 'true')
+
       menu.alwaysOnTop(false)
+
       expect(screen.getByRole('button', { name: 'Pin window on top' })).toHaveAttribute('aria-pressed', 'false')
       expect(setAlwaysOnTop).not.toHaveBeenCalled()
     })
@@ -1835,12 +2083,16 @@ describe('App', () => {
       renderReact(<App initialVimEnabled={false} store={store} />)
       const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       root.focus()
+
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
 
       menu.vimEnabled(true)
+
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
       expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
+
       menu.vimEnabled(false)
+
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
       expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(setVimEnabled).not.toHaveBeenCalled()
@@ -1883,15 +2135,19 @@ describe('App', () => {
 
       expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
+
       root.focus()
       root.setSelectionRange(1, 1)
+
       // Vim keys and Escape reach native text entry instead of running Vim commands.
       expect(fireEvent.keyDown(root, { key: 'x' })).toBe(true)
       expect(fireEvent.keyDown(root, { key: 'Escape' })).toBe(true)
       expect(fireEvent.keyDown(root, { key: 'd', ctrlKey: true })).toBe(true)
       expect(rootText(store)).toBe('abc')
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
+
       fireEvent.keyDown(root, { key: 'Enter' })
+
       expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveValue('a')
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('bc')
     })
@@ -1913,7 +2169,9 @@ describe('App', () => {
       expect(screen.queryByRole('button', { name: /Vim editing/ })).toBeNull()
       expect(document.activeElement).toBe(root)
       expect([root.selectionStart, root.selectionEnd]).toEqual([1, 2])
+
       fireEvent.keyDown(root, { key: 'x' })
+
       expect(rootText(store)).toBe('ac')
     })
 
@@ -1925,9 +2183,13 @@ describe('App', () => {
       const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       root.focus()
       root.setSelectionRange(0, 1)
+
       fireEvent.keyDown(root, { key: 'R' })
+
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('REPLACE')
+
       fireEvent.keyDown(root, { key: 'X' })
+
       expect(rootText(store)).toBe('abc')
 
       changeVimEditingFromMenu(false)
@@ -1936,7 +2198,9 @@ describe('App', () => {
       expect(rootText(store)).toBe('Xbc')
       expect(root).toHaveValue('Xbc')
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
+
       act(() => store.undo())
+
       expect(rootText(store)).toBe('abc')
     })
 
@@ -1946,20 +2210,26 @@ describe('App', () => {
       renderReact(<App initialVimEnabled store={store} />)
       const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       root.focus()
+
       fireEvent.keyDown(root, { key: 'V' })
+
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL NODE')
       expect(document.querySelector('.node-row-visual-selected')).not.toBeNull()
 
       changeVimEditingFromMenu(false)
+
       expect(document.querySelector('.node-row-visual-selected')).toBeNull()
+
       changeVimEditingFromMenu(true)
 
       expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+
       fireEvent.keyDown(root, { key: 'd' })
       changeVimEditingFromMenu(false)
       changeVimEditingFromMenu(true)
       // A `d` left pending before the switch would turn this `d` into `dd` and delete the node.
       fireEvent.keyDown(root, { key: 'd' })
+
       expect(rootText(store)).toBe('abc')
     })
 
@@ -1972,14 +2242,18 @@ describe('App', () => {
       )
       renderReact(<App initialVimEnabled={false} store={store} />)
       const root = screen.getByRole('textbox', { name: 'Node 1' })
+
       act(() => root.focus())
+
       expect(root).not.toHaveClass('node-input-image-caret')
       expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
 
       changeVimEditingFromMenu(true)
+
       expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-image-caret')
 
       changeVimEditingFromMenu(false)
+
       expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-image-caret')
       expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
     })
@@ -1990,6 +2264,7 @@ describe('App', () => {
       vi.spyOn(window.treeApi, 'setVimEnabled').mockRejectedValue(new Error('write failed'))
       renderReact(<App initialVimEnabled store={store} />)
       const root = screen.getByRole('textbox', { name: 'Node 1' })
+
       await act(async () => {
         root.focus()
         await Promise.resolve()
@@ -2016,6 +2291,7 @@ describe('App', () => {
     // @requirement PRODUCT.md §20.2.2
     it('starts in Insert mode with the caret when Vim editing is disabled', async () => {
       const store = createStore()
+
       await act(async () => {
         await store.initialize()
       })
@@ -2023,8 +2299,10 @@ describe('App', () => {
 
       expect(document.querySelector('main.tree-app')).toHaveClass('vim-state-insert')
       expect(screen.queryByLabelText('Vim mode')).toBeNull()
+
       const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
       root.focus()
+
       expect(root.selectionStart).toBe(0)
       expect(root.selectionEnd).toBe(0)
     })
@@ -2032,6 +2310,7 @@ describe('App', () => {
     // @requirement PRODUCT.md §20.2.2
     it('leaves the text and undo grouping unchanged on Escape when Vim editing is disabled', async () => {
       const store = createStore()
+
       await act(async () => {
         await store.initialize()
       })
@@ -2047,13 +2326,16 @@ describe('App', () => {
       // Vim leaves Insert on Escape and ends the text session; standard editing leaves the native
       // key alone, so the session survives and the next Cmd+Z still undoes the whole run.
       expect(fireEvent.keyDown(root, { key: 'Escape' })).toBe(true)
+
       fireEvent.keyDown(root, { key: 'z', metaKey: true })
+
       expect(root).toHaveValue('')
     })
 
     // @requirement PRODUCT.md §17.1
     it('opens and closes the image preview from a text caret when Vim editing is disabled', async () => {
       const store = createStore({ kind: 'image', png: attachmentBytes })
+
       await act(async () => {
         await store.initialize()
       })
@@ -2065,9 +2347,11 @@ describe('App', () => {
       await screen.findByRole('button', { name: 'Open image preview' })
 
       fireEvent.keyDown(node, { key: 'y', metaKey: true })
+
       expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
       fireEvent.keyDown(window, { key: 'Escape' })
+
       expect(screen.queryByRole('dialog', { name: 'Image preview' })).not.toBeInTheDocument()
       expect(node).toHaveFocus()
     })
@@ -2086,23 +2370,28 @@ describe('App', () => {
       renderReact(<App initialVimEnabled={false} store={store} />)
 
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 2' }), { key: 'Backspace', metaKey: true })
+
       expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
 
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'z', metaKey: true })
+
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('beta')
     })
   })
 
   it('reorders siblings through a press-and-hold drag into a between-row gap', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+
     fireEvent.change(second, { target: { value: 'B' } })
     fireEvent.keyDown(second, { key: 'Enter' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'C' } })
@@ -2122,6 +2411,7 @@ describe('App', () => {
       clientY: 60,
     })
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
     expect(third).toHaveClass('node-row-dragging')
 
     fireEvent.pointerMove(third, { pointerId: 1, clientX: 100, clientY: 4 })
@@ -2160,14 +2450,17 @@ describe('App', () => {
 
   it('keeps the caret and mode through a cancelled drag', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+
     fireEvent.change(second, { target: { value: 'Bravo' } })
     fireEvent.keyDown(second, { key: 'Enter' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'Charlie' } })
@@ -2179,6 +2472,7 @@ describe('App', () => {
     if (source === undefined) throw new Error('The third row was not rendered.')
     const input = source.querySelector('textarea')
     if (input === null) throw new Error('The third input was not rendered.')
+
     act(() => {
       input.focus()
       input.setSelectionRange(2, 2)
@@ -2193,11 +2487,15 @@ describe('App', () => {
       clientY: 60,
     })
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+
     expect(source).toHaveClass('node-row-dragging')
+
     const frozen = [input.selectionStart, input.selectionEnd]
+
     expect(document.activeElement).not.toBe(input)
 
     fireEvent.keyDown(window, { key: 'Escape' })
+
     expect(document.activeElement).not.toBe(input)
 
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 100, clientY: 60 })
@@ -2210,11 +2508,13 @@ describe('App', () => {
 
   it('keeps the source input blurred after a cancelled drag until the pointer is released', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 2' }), { target: { value: 'Bravo' } })
@@ -2226,6 +2526,7 @@ describe('App', () => {
     if (source === undefined) throw new Error('The first row was not rendered.')
     const input = source.querySelector('textarea')
     if (input === null) throw new Error('The first input was not rendered.')
+
     act(() => input.focus())
     act(() => input.setSelectionRange(2, 2))
 
@@ -2239,6 +2540,7 @@ describe('App', () => {
     })
     act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
     fireEvent.keyDown(window, { key: 'Escape' })
+
     expect(document.activeElement).not.toBe(input)
 
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 100, clientY: 13 })
@@ -2250,18 +2552,22 @@ describe('App', () => {
 
   it('keeps the mode and restores the caret when a drag starts on an unfocused row', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'Alpha' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const second = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+
     fireEvent.change(second, { target: { value: 'Bravo' } })
     fireEvent.keyDown(second, { key: 'Enter' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Node 3' }), { target: { value: 'Charlie' } })
     const firstInput = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     act(() => firstInput.focus())
 
     mockAppRowRects()
@@ -2271,6 +2577,7 @@ describe('App', () => {
     if (source === undefined) throw new Error('The third row was not rendered.')
     const input = source.querySelector('textarea')
     if (input === null) throw new Error('The third input was not rendered.')
+
     expect(document.activeElement).not.toBe(input)
 
     // A real press first arms the pending hold, then the browser's default mousedown focuses the
@@ -2302,6 +2609,7 @@ describe('App', () => {
 
   it('shows a loading state before the document is ready', () => {
     render(<App initialVimEnabled store={createStore()} />)
+
     expect(screen.getByText('Loading document…')).toBeInTheDocument()
   })
 
@@ -2316,6 +2624,7 @@ describe('App', () => {
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')
+
     await act(async () => {
       await store.initialize()
     })
@@ -2327,6 +2636,7 @@ describe('App', () => {
 
   it('shows operation failures in the visible red error message', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -2348,6 +2658,7 @@ describe('App', () => {
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')
+
     await act(async () => {
       await store.initialize()
     })
@@ -2370,9 +2681,11 @@ describe('App', () => {
     expect(input.readOnly).toBe(true)
 
     const before = store.getSnapshot()
+
     fireEvent.change(input, { target: { value: 'changed' } })
     const after = store.getSnapshot()
     if (before.status !== 'ready' || after.status !== 'ready') throw new Error('The editor is not ready.')
+
     expect(after.document).toBe(before.document)
   })
 
@@ -2384,35 +2697,46 @@ describe('App', () => {
     input.focus()
 
     act(() => store.requestQuitWithoutSavingPrompt())
+
     expect(screen.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeInTheDocument()
+
     const cancel = screen.getByRole('button', { name: 'Cancel' })
     const quit = screen.getByRole('button', { name: 'Quit without saving' })
+
     expect(cancel).toHaveFocus()
 
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+
     expect(quit).toHaveFocus()
+
     fireEvent.keyDown(document, { key: 'Tab' })
+
     expect(cancel).toHaveFocus()
 
     fireEvent.keyDown(document, { key: 'Escape' })
+
     expect(screen.queryByText(QUIT_WITHOUT_SAVING_PROMPT)).not.toBeInTheDocument()
     expect(quitWithoutSaving).not.toHaveBeenCalled()
     expect(input).toHaveFocus()
 
     act(() => store.requestQuitWithoutSavingPrompt())
     fireEvent.click(screen.getByRole('button', { name: 'Quit without saving' }))
+
     expect(quitWithoutSaving).toHaveBeenCalledOnce()
   })
 
   it('selects a node when its input receives focus', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'child' } })
 
     fireEvent.focus(screen.getByRole('textbox', { name: 'Node 1' }))
@@ -2422,6 +2746,7 @@ describe('App', () => {
 
   it('ignores keys during composition', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -2430,15 +2755,18 @@ describe('App', () => {
 
     fireEvent.compositionStart(node)
     fireEvent.keyDown(node, { key: 'Enter' })
+
     expect(screen.queryByRole('textbox', { name: 'Node 2' })).not.toBeInTheDocument()
 
     fireEvent.compositionEnd(node)
     fireEvent.keyDown(node, { key: 'Enter' })
+
     expect(screen.getByRole('textbox', { name: 'Node 2' })).toBeInTheDocument()
   })
 
   it('handles cut as a standalone text edit', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -2455,6 +2783,7 @@ describe('App', () => {
 
   it('pastes at the cursor', async () => {
     const store = createStore({ kind: 'text', text: 'XY' })
+
     await act(async () => {
       await store.initialize()
     })
@@ -2463,6 +2792,7 @@ describe('App', () => {
 
     fireEvent.change(first, { target: { value: 'ab' } })
     first.setSelectionRange(1, 1)
+
     await act(async () => {
       fireEvent.paste(first)
     })
@@ -2472,24 +2802,31 @@ describe('App', () => {
 
   it('dispatches navigation keys', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
     const second = screen.getByRole('textbox', { name: 'Node 2' })
 
     fireEvent.keyDown(second, { key: 'ArrowUp' })
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'root' } })
+
     fireEvent.keyDown(first, { key: 'ArrowDown' })
+
     expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'child' } })
+
     fireEvent.keyDown(first, { key: 'ArrowLeft' })
   })
 
   it('dispatches undo and redo keys', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -2498,8 +2835,11 @@ describe('App', () => {
 
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'z', metaKey: true })
+
     expect(first).toHaveValue('')
+
     fireEvent.keyDown(first, { key: 'z', metaKey: true, shiftKey: true })
+
     expect(first).toHaveValue('A')
   })
 
@@ -2513,15 +2853,19 @@ describe('App', () => {
       cleanupAttachments: async () => undefined,
     }
     const store = new EditorStore(services, () => 'root')
+
     await act(async () => {
       await store.initialize()
     })
     renderReact(<App initialVimEnabled store={store} />)
     const root = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(root, { target: { value: 'abcd' } })
     root.setSelectionRange(2, 2)
+
     fireEvent.keyDown(root, { key: 'R' })
     fireEvent.keyDown(root, { key: 'X' })
+
     expect(root).toHaveValue('abXd')
 
     await act(async () => {
@@ -2529,6 +2873,7 @@ describe('App', () => {
     })
 
     const state = store.getSnapshot()
+
     expect(state.status === 'ready' && state.document.roots[0]!.text).toBe('abXd')
     expect(save).toHaveBeenLastCalledWith(
       expect.objectContaining({ document: { roots: [{ id: 'root', text: 'abXd', children: [] }] } }),
@@ -2538,6 +2883,7 @@ describe('App', () => {
 
   it('quits the application when Cmd+Q is pressed in an editable node', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
@@ -2547,16 +2893,19 @@ describe('App', () => {
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Node 1' }), { key: 'q', metaKey: true })
 
     await act(async () => undefined)
+
     expect(quit).toHaveBeenCalledOnce()
   })
 
   it('deletes the selected node with Cmd+Backspace', async () => {
     const store = createStore()
+
     await act(async () => {
       await store.initialize()
     })
     render(<App initialVimEnabled store={store} />)
     const first = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+
     fireEvent.change(first, { target: { value: 'A' } })
     fireEvent.keyDown(first, { key: 'Enter' })
 

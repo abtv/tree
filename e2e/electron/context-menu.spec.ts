@@ -42,47 +42,62 @@ async function lastEditorMenuLabels(app: ElectronApplication): Promise<(string |
 describeForEachEditingMode('editable node context menu', () => {
   test('routes Copy and Paste through the editor store path', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const editor = node(window, 1)
+
     await typeInto(editor, 'Context menu text')
     await window.keyboard.press('Meta+a')
     await chooseEditorMenuItem(app, 'Copy')
     await editor.click({ button: 'right' })
+
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Context menu text')
 
     await writeClipboardText(app, 'pasted')
     await editor.press('End')
     await chooseEditorMenuItem(app, 'Paste')
     await editor.click({ button: 'right' })
+
     await expect(editor).toHaveValue('Context menu textpasted')
+
     await app.close()
   })
 
   test('does not extend a text selection when the next node is right-clicked', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const first = node(window, 1)
+
     await writeClipboardText(app, 'https://first.example')
     await firePaste(first)
+
     await expect(window.getByRole('link', { name: 'https://first.example' })).toBeVisible()
+
     await setCursor(first, 0)
     await window.keyboard.press('Enter')
 
     const second = node(window, 2)
+
     await writeClipboardText(app, 'https://second.example')
     await second.focus()
+
     await firePaste(second)
+
     await expect(window.getByRole('link', { name: 'https://second.example' })).toBeVisible()
+
     await setCursor(first, 0)
     await chooseEditorMenuItem(app, 'Copy')
     await second.click({ button: 'right' })
 
     await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
+
     await app.close()
   })
 
   test('clears document selection when the disclosure circle is right-clicked', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await typeInto(node(window, 1), 'Parent')
     await window.keyboard.press('End')
     await window.keyboard.press('Enter')
@@ -96,6 +111,7 @@ describeForEachEditingMode('editable node context menu', () => {
     await window.getByRole('button', { name: 'Enter node 4' }).click({ button: 'right' })
 
     await expect.poll(() => window.evaluate(() => document.defaultView?.getSelection()?.toString() ?? '')).toBe('')
+
     await app.close()
   })
 })
@@ -114,34 +130,43 @@ test.describe('editable node context menu (mode-independent)', () => {
       const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const editor = node(window, 1)
       await editor.focus()
+
       await window.keyboard.press('x')
       await window.keyboard.press('i')
       await window.keyboard.type('Z')
+
       await expect(editor).toHaveValue('ZBC')
+
       await editor.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 1))
       await writeClipboardText(app, 'P')
       await chooseEditorMenuItem(app, command)
       await editor.click({ button: 'right' })
+
       await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
       await expect(editor).toHaveValue(command === 'Cut' ? 'BC' : command === 'Paste' ? 'PZBC' : 'ZBC')
+
       await window.keyboard.press('Escape')
       await setCursor(editor, 0)
       await window.keyboard.press('.')
+
       await expect(editor).toHaveValue(command === 'Cut' ? 'C' : command === 'Paste' ? 'ZBC' : 'BC')
     })
   }
 
   test('bounds long selections in the native Look Up menu label', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     const selection = 'long selection '.repeat(25)
     const editor = node(window, 1)
+
     await typeInto(editor, selection)
     await window.keyboard.press('Meta+a')
     await chooseEditorMenuItem(app, 'Copy')
     await editor.click({ button: 'right' })
 
     const labels = await lastEditorMenuLabels(app)
+
     expect(labels).toEqual([
       `Look Up “${'long selection '.repeat(17).slice(0, 255)}…”`,
       'Search with Google',
@@ -151,6 +176,7 @@ test.describe('editable node context menu (mode-independent)', () => {
       'Paste',
       'Select All',
     ])
+
     await app.close()
   })
 })

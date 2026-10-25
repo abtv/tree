@@ -17,18 +17,24 @@ test.describe('unexpected renderer errors', () => {
     // Quit flushes the document deterministically, so the last saved document is a known baseline.
     const first = await launchTree(userDataDir)
     const savedText = 'saved before reload'
+
     await typeInto(node(first.window, 1), savedText)
     const firstClosed = new Promise<void>((resolve) => first.app.once('close', resolve))
+
     await clickApplicationMenuQuit(first.app)
     await firstClosed
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(savedText)
 
     const { window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveValue(savedText)
 
     const unsavedTail = ' unsaved tail'
+
     await setCursor(node(window, 1), savedText.length)
     await typeInto(node(window, 1), unsavedTail)
+
     await expect(node(window, 1)).toHaveValue(`${savedText}${unsavedTail}`)
 
     await forceRenderFailure(window)
@@ -61,6 +67,7 @@ test.describe('unexpected renderer errors', () => {
       closed,
       new Promise<string>((resolve) => setTimeout(() => resolve('still running'), 10_000)),
     ])
+
     expect(outcome).toBe('closed')
   })
 })

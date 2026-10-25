@@ -41,6 +41,7 @@ describe('editor clipboard transitions', () => {
         },
       ],
     }
+
     expect(clipboardSelectionTransition(document, 'root', 0, 13)?.payload).toEqual({
       text: 'say "hi"\nnext',
       html: '<a href="https://example.com/?q=&quot;x&quot;">say</a> &quot;hi&quot;<br>next',
@@ -57,6 +58,7 @@ describe('editor clipboard transitions', () => {
       { kind: 'text', text: 'one\ntwo\nthree\nfour' },
       () => ['n1', 'n2', 'n3'],
     )
+
     expect(transition.document.roots.map((node) => [node.id, node.text])).toEqual([
       ['root', 'abcone'],
       ['n1', 'two'],
@@ -69,6 +71,7 @@ describe('editor clipboard transitions', () => {
 
   it('inserts a single pasted text value and positions focus after it', () => {
     const document: Document = { roots: [{ id: 'root', text: 'abcdef', children: [] }] }
+
     expect(
       textPasteTransition(
         document,
@@ -128,8 +131,10 @@ describe('editor clipboard transitions', () => {
       { id: 'new', mimeType: 'image/png' },
       () => 'unused',
     )
+
     expect(inPlace.document.roots[0]).toMatchObject({ id: 'empty', attachment: { id: 'new' } })
     expect(inPlace.focus).toEqual({ nodeId: 'empty', cursor: 5 })
+
     const sibling = imagePasteTransition(
       document,
       { currentParentId: 'occupied', selectedNodeId: 'occupied' },
@@ -137,6 +142,7 @@ describe('editor clipboard transitions', () => {
       { id: 'new', mimeType: 'image/png' },
       () => 'sibling',
     )
+
     expect(sibling.document.roots.map((node) => node.id)).toEqual(['empty', 'occupied', 'sibling'])
     expect(sibling.document.roots[2]).toEqual({
       id: 'sibling',

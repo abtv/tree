@@ -89,15 +89,18 @@ describe('structural dot replay invariants', () => {
           const f = await harness(initial)
           try {
             const span = Math.min(size, requestedSpan)
+
             f.count(requestedSpan)
             f.press('g')
             f.press('J')
             f.press('u')
             const completed = Math.min(repetitions, Math.floor((size - 1) / (span - 1)))
+
             f.count(repetitions)
             f.press('.')
             const joined = 1 + completed * (span - 1)
             const result = f.snapshot().document.roots
+
             expect(result).toHaveLength(size - completed * (span - 1))
             expect(result[0]!.id).toBe('n0')
             expect(result[0]!.children.map((child) => child.id)).toEqual(
@@ -110,9 +113,13 @@ describe('structural dot replay invariants', () => {
                 .join(''),
             )
             expect(result.slice(1)).toEqual(initial.slice(joined))
+
             for (let index = 0; index < completed; index += 1) f.press('u')
+
             expect(f.snapshot().document.roots).toEqual(initial)
+
             for (let index = 0; index < completed; index += 1) act(() => f.store.redo())
+
             expect(f.snapshot().document.roots).toEqual(result)
           } finally {
             f.dispose()
@@ -138,6 +145,7 @@ describe('structural dot replay invariants', () => {
             act(() => f.store.selectNode('n1', 0))
             f.count(copies)
             if (past) f.press('g')
+
             // `P`: every generated node has children, and `p` on such a node puts into them.
             f.press('P')
             f.press('u')
@@ -146,14 +154,23 @@ describe('structural dot replay invariants', () => {
             f.count(repetitions)
             f.press('.')
             const result = f.snapshot().document.roots
+
             expect(result).toHaveLength(2 + copies * repetitions)
+
             const ids = result.flatMap((item) => [item.id, ...item.children.map((child) => child.id)])
+
             expect(new Set(ids).size).toBe(ids.length)
+
             const inserted = result.filter((item) => item.id !== 'n0' && item.id !== 'n1')
+
             expect(inserted.every((item) => item.text === 'text0' && item.children[0]?.text === 'folded')).toBe(true)
+
             for (let index = 0; index < repetitions; index += 1) f.press('u')
+
             expect(f.snapshot().document.roots).toEqual(initial)
+
             for (let index = 0; index < repetitions; index += 1) act(() => f.store.redo())
+
             expect(f.snapshot().document.roots).toEqual(result)
           } finally {
             f.dispose()

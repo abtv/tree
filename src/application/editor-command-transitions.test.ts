@@ -74,6 +74,7 @@ describe('editor command transitions', () => {
       children: [{ id: 'child', text: 'Child', children: [] }],
     }
     const input: Document = { roots: [{ id: 'empty', text: '', children: [] }, current] }
+
     expect(deletePreviousEmptyTransition(input, { currentParentId: null, selectedNodeId: 'current' }, 0)).toEqual({
       document: { roots: [current] },
       location: { currentParentId: null, selectedNodeId: 'current' },
@@ -88,6 +89,7 @@ describe('editor command transitions', () => {
     { id: 'previous', text: '', children: [{ id: 'child', text: '', children: [] }] },
   ])('retains a preceding row that has content or children: %j', (previous) => {
     const input: Document = { roots: [previous, { id: 'current', text: 'Current', children: [] }] }
+
     expect(
       deletePreviousEmptyTransition(input, { currentParentId: null, selectedNodeId: 'current' }, 0),
     ).toBeUndefined()
@@ -101,6 +103,7 @@ describe('editor command transitions', () => {
       ],
     }
     const location = { currentParentId: null, selectedNodeId: 'current' }
+
     expect(deletePreviousEmptyTransition(input, location, 0)).toBeUndefined()
     expect(deletePreviousEmptyTransition(input, location, 0, () => true)?.document.roots).toEqual([
       { id: 'parent', text: 'Parent', children: [] },
@@ -171,6 +174,7 @@ describe('editor command transitions', () => {
       () => `copy-${nextId++}`,
     )
     if (!('document' in accepted)) throw new Error('Expected an accepted transition.')
+
     expect(() => assertDocument(accepted.document)).not.toThrow()
   })
 
@@ -181,6 +185,7 @@ describe('editor command transitions', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 
     const rows = rowsFor(document, childLocation)
+
     expect(moveSelectionTransition(document, childLocation, rows, 'up', 4)).toEqual({ nodeId: 'root', cursor: 4 })
     expect(moveSelectionTransition(document, childLocation, rows, 'down', 99)).toEqual({ nodeId: 'second', cursor: 6 })
     expect(moveHorizontalTransition(document, childLocation, rows, 'left', 0)).toEqual({ nodeId: 'root', cursor: 4 })
@@ -190,6 +195,7 @@ describe('editor command transitions', () => {
 
   it('resolves first and last displayed nodes while clamping the cursor', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
+
     const rows = rowsFor(document, childLocation)
     const rootRows = rowsFor(document, { currentParentId: null })
 
@@ -303,6 +309,7 @@ describe('editor command transitions', () => {
     }
     const afterIds = ['copy', 'copy-child']
     const beforeIds = ['before-copy', 'before-child']
+
     const after = pasteSubtreeTransition(
       document,
       { currentParentId: 'root', selectedNodeId: 'first' },
@@ -334,6 +341,7 @@ describe('editor command transitions', () => {
     const nested = {
       roots: [{ id: 'outer', text: 'Outer', children: [{ id: 'parent', text: 'Parent', children: [] }] }],
     }
+
     expect(
       deleteSelectedTransition(nested, { currentParentId: 'parent', selectedNodeId: 'parent' }, () => 'new'),
     ).toBeUndefined()
@@ -341,6 +349,7 @@ describe('editor command transitions', () => {
 
   it('selects the real parent without changing the location when the only visible descendant is deleted', () => {
     const location = { currentParentId: null, selectedNodeId: 'alpha1a' }
+
     expect(deleteSelectedTransition(nestedDocument, location, () => 'new')).toMatchObject({
       location: { currentParentId: null, selectedNodeId: 'alpha1' },
       focus: { nodeId: 'alpha1', cursor: 0 },
@@ -360,6 +369,7 @@ describe('editor command transitions', () => {
         },
       ],
     }
+
     expect(deleteEmptySelectedTransition(empty, { currentParentId: null, selectedNodeId: 'alpha1a' })).toMatchObject({
       location: { currentParentId: null, selectedNodeId: 'alpha1' },
       focus: { nodeId: 'alpha1', cursor: 3 },
@@ -394,12 +404,14 @@ describe('editor command transitions', () => {
           { id: 'empty', text: '', children: [] },
         ],
       }
+
       const result = deleteEmptySelectedTransition(
         input,
         { currentParentId: null, selectedNodeId: 'empty' },
         (id) => id === 'previous' || (nestedOpen && id === 'child'),
       )
       const target = nestedOpen ? 'last' : 'child'
+
       expect(result).toEqual({
         document: { roots: [input.roots[0]] },
         location: { currentParentId: null, selectedNodeId: target },
@@ -423,6 +435,7 @@ describe('editor command transitions', () => {
         },
       ],
     }
+
     expect(deleteEmptySelectedTransition(empty, { currentParentId: 'root', selectedNodeId: 'empty' })).toMatchObject({
       location: { currentParentId: 'root', selectedNodeId: 'previous' },
       focus: { nodeId: 'previous', cursor: 8 },
@@ -443,6 +456,7 @@ describe('editor command transitions', () => {
       () => 'before',
     )
     if (!('document' in before)) throw new Error('Expected an accepted transition.')
+
     expect(before.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['before', ''],
       ['first', 'First'],
@@ -458,6 +472,7 @@ describe('editor command transitions', () => {
       () => 'split',
     )
     if (!('document' in split)) throw new Error('Expected an accepted transition.')
+
     expect(split.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['first', 'Fi'],
       ['split', 'rst'],
@@ -472,6 +487,7 @@ describe('editor command transitions', () => {
       () => 'child',
     )
     if (!('document' in child)) throw new Error('Expected an accepted transition.')
+
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'child' })
   })
@@ -485,6 +501,7 @@ describe('editor command transitions', () => {
     const location = { currentParentId: null, selectedNodeId: 'root' }
     const result = createSiblingOrFirstChildTransition(document, location, cursor, () => 'created', expanded)
     if (!('document' in result)) throw new Error('Expected creation.')
+
     expect(result.document.roots.map((node) => node.id)).toEqual(
       child
         ? ['root', 'other-root']
@@ -492,7 +509,9 @@ describe('editor command transitions', () => {
           ? ['created', 'root', 'other-root']
           : ['root', 'created', 'other-root'],
     )
+
     const original = result.document.roots.find((node) => node.id === 'root')!
+
     expect(original.children.map((node) => node.id)).toEqual(
       child ? ['created', 'first', 'second'] : ['first', 'second'],
     )
@@ -517,6 +536,7 @@ describe('editor command transitions', () => {
       true,
     )
     if (!('document' in result)) throw new Error('Expected creation.')
+
     expect(result.document.roots[0]).toEqual({
       ...original,
       children: [{ id: 'new', text: '', children: [] }, ...original.children],
@@ -532,6 +552,7 @@ describe('editor command transitions', () => {
       'before',
       () => 'before-empty',
     )
+
     expect(before.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['before-empty', ''],
       ['first', 'First'],
@@ -545,6 +566,7 @@ describe('editor command transitions', () => {
       'after',
       () => 'after-empty',
     )
+
     expect(after.document.roots[0]!.children.map((node) => [node.id, node.text])).toEqual([
       ['first', 'First'],
       ['after-empty', ''],
@@ -561,6 +583,7 @@ describe('editor command transitions', () => {
     )
 
     if (!('document' in child)) throw new Error('Expected an accepted transition.')
+
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: 'root', selectedNodeId: 'new-child' })
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
@@ -587,6 +610,7 @@ describe('editor command transitions', () => {
           ? openBelowTransition(input, location, () => 'new')
           : createSiblingOrFirstChildTransition(input, location, 0, () => 'new')
       if (!('document' in result)) throw new Error('Expected creation.')
+
       expect(result.document.roots).toHaveLength(1)
       expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['empty', 'new', 'next'])
       expect(result.document.roots[0]!.children[0]).toBe(input.roots[0]!.children[0])
@@ -619,6 +643,7 @@ describe('editor command transitions', () => {
           ? openBelowTransition(input, location, createId)
           : createSiblingOrFirstChildTransition(input, location, 0, createId)
       if (!('document' in result)) throw new Error('Expected a move.')
+
       expect(createId).not.toHaveBeenCalled()
       expect(result.document.roots.map((node) => node.id)).toEqual(['parent', 'empty', 'after'])
       expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['text'])
@@ -645,7 +670,9 @@ describe('editor command transitions', () => {
       ],
     }
     const location = { currentParentId: null, selectedNodeId: 'empty' }
+
     const result = openBelowTransition(input, location, () => 'unused')
+
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['child', 'empty', 'next'])
     expect(result.document.roots[0]!.children[0]!.children).toEqual([])
   })
@@ -660,6 +687,7 @@ describe('editor command transitions', () => {
         ? openBelowTransition(input, location, () => 'created')
         : createSiblingOrFirstChildTransition(input, location, 0, () => 'created')
     if (!('document' in result)) throw new Error('Expected creation.')
+
     expect(result.document.roots).toHaveLength(1)
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['empty', 'created'])
     expect(result.location).toEqual({ currentParentId: 'parent', selectedNodeId: 'created' })
@@ -688,6 +716,7 @@ describe('editor command transitions', () => {
         ? openBelowTransition(input, location, () => 'created')
         : createSiblingOrFirstChildTransition(input, location, 0, () => 'created')
     if (!('document' in result)) throw new Error('Expected creation.')
+
     expect(result.document.roots).toHaveLength(1)
     expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['image', 'created'])
   })
@@ -701,6 +730,7 @@ describe('editor command transitions', () => {
     )
 
     if (!('document' in child)) throw new Error('Expected an accepted transition.')
+
     expect(child.document.roots[0]!.children.map((node) => node.id)).toEqual(['new-child', 'first', 'second'])
     expect(child.location).toEqual({ currentParentId: null, selectedNodeId: 'new-child' })
     expect(child.focus).toEqual({ nodeId: 'new-child', cursor: 0 })
@@ -714,6 +744,7 @@ describe('editor command transitions', () => {
       true,
     )
     if (!('document' in sibling)) throw new Error('Expected an accepted transition.')
+
     expect(sibling.document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'below', 'second'])
     expect(sibling.location).toEqual({ currentParentId: 'root', selectedNodeId: 'below' })
     expect(sibling.expandId).toBeUndefined()
@@ -721,6 +752,7 @@ describe('editor command transitions', () => {
 
   it('opens a sibling after a collapsed subtree without changing its children or expansion', () => {
     const result = openBelowTransition(document, { currentParentId: null, selectedNodeId: 'root' }, () => 'below')
+
     expect(result.document.roots.map((node) => node.id)).toEqual(['root', 'below', 'other-root'])
     expect(result.document.roots[0]).toBe(document.roots[0])
     expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'below' })
@@ -730,6 +762,7 @@ describe('editor command transitions', () => {
 
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
     const moved = moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 2, 3)
+
     expect(moved?.document.roots[0]!.children.map((node) => node.id)).toEqual(['second', 'first'])
     expect(moved?.location).toEqual({ currentParentId: 'root', selectedNodeId: 'first' })
     expect(moved?.focus).toEqual({ nodeId: 'first', cursor: 3 })
@@ -749,6 +782,7 @@ describe('editor command transitions', () => {
     ).toBeUndefined()
 
     const singleRoot: Document = { roots: [{ id: 'only', text: 'Only', children: [] }] }
+
     expect(moveNodeTransition(singleRoot, { currentParentId: null, selectedNodeId: 'only' }, 'only', 2)).toBeUndefined()
   })
 
@@ -773,6 +807,7 @@ describe('editor command transitions', () => {
 
     it('nests a node as the last child, opens the receiving fold, selects the node, and keeps the caret', () => {
       const result = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'beta', 'alpha', 2, 4))
+
       expect(ids(result.transition.document.roots)).toEqual(['alpha'])
       expect(ids(result.transition.document.roots[0]!.children)).toEqual(['alpha1', 'alpha2', 'beta'])
       expect(result.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'beta' })
@@ -782,6 +817,7 @@ describe('editor command transitions', () => {
 
     it('outdents to the displayed level without opening a fold or moving the location', () => {
       const result = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha1a', null, 1))
+
       expect(ids(result.transition.document.roots)).toEqual(['alpha', 'alpha1a', 'beta'])
       expect(result.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'alpha1a' })
       expect(result.expandIds).toEqual([])
@@ -797,8 +833,10 @@ describe('editor command transitions', () => {
           0,
         ),
       )
+
       expect(result.transition.location).toEqual({ currentParentId: 'alpha', selectedNodeId: 'alpha2' })
       expect(result.expandIds).toEqual(['alpha1', 'alpha1a'])
+
       const deeper = moved(
         moveNodeToParentTransition(
           nestedDocument,
@@ -808,8 +846,11 @@ describe('editor command transitions', () => {
           0,
         ),
       )
+
       expect(deeper.expandIds).toEqual(['alpha1a'])
+
       const fromRoot = moved(moveNodeToParentTransition(nestedDocument, rootLocation, 'beta', 'alpha1a', 0))
+
       expect(fromRoot.expandIds).toEqual(['alpha', 'alpha1', 'alpha1a'])
     })
 
@@ -823,8 +864,10 @@ describe('editor command transitions', () => {
           0,
         ),
       )
+
       expect(result.transition.location).toEqual({ currentParentId: 'alpha', selectedNodeId: 'alpha1a' })
       expect(result.expandIds).toEqual([])
+
       const toRoot = moved(
         moveNodeToParentTransition(
           nestedDocument,
@@ -834,12 +877,15 @@ describe('editor command transitions', () => {
           2,
         ),
       )
+
       expect(toRoot.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'alpha1a' })
     })
 
     it('reorders within one parent like moveNodeTransition does', () => {
       const location = { currentParentId: 'root', selectedNodeId: 'first' }
+
       const result = moved(moveNodeToParentTransition(document, location, 'first', 'root', 1))
+
       expect(ids(result.transition.document.roots[0]!.children)).toEqual(['second', 'first'])
       expect(result.transition.document).toEqual(moveNodeTransition(document, location, 'first', 2)!.document)
       expect(result.expandIds).toEqual([])
@@ -848,7 +894,9 @@ describe('editor command transitions', () => {
     it('changes nothing for an unknown node, the displayed parent, or a destination inside the node', () => {
       expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'missing', null, 0)).toEqual({ kind: 'none' })
       expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'missing', 0)).toEqual({ kind: 'none' })
+
       const heading = { currentParentId: 'alpha', selectedNodeId: 'alpha' }
+
       expect(moveNodeToParentTransition(nestedDocument, heading, 'alpha', null, 1)).toEqual({ kind: 'none' })
       expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'alpha', 0)).toEqual({ kind: 'none' })
       expect(moveNodeToParentTransition(nestedDocument, rootLocation, 'alpha', 'alpha1a', 0)).toEqual({ kind: 'none' })
@@ -871,6 +919,7 @@ describe('editor command transitions', () => {
         roots: [{ id: 'first', text: '', children: [{ id: 'second', text: '', children: [] }] }, chain],
       }
       const location = { currentParentId: null, selectedNodeId: 'n1' }
+
       // `n1` is one level short of the limit: it fits under `first`, but not under `second`.
       expect(moveNodeToParentTransition(deep, location, 'n1', 'first', 1).kind).toBe('moved')
       expect(moveNodeToParentTransition(deep, location, 'n1', 'second', 0)).toEqual({
@@ -882,7 +931,9 @@ describe('editor command transitions', () => {
 
   it('does not route horizontal text movement from a heading to its child', () => {
     const heading = { currentParentId: 'root', selectedNodeId: 'root' }
+
     const rows = rowsFor(document, heading)
+
     expect(moveHorizontalTransition(document, heading, rows, 'left', 4)).toBeUndefined()
     expect(moveHorizontalTransition(document, heading, rows, 'right', 2)).toBeUndefined()
     expect(moveHorizontalTransition(document, heading, rows, 'right', 4)).toEqual({ nodeId: 'first', cursor: 0 })
@@ -890,10 +941,13 @@ describe('editor command transitions', () => {
 
   it('moves the caret within a heading or final row when vertical navigation has no adjacent row', () => {
     const heading = { currentParentId: 'second', selectedNodeId: 'second' }
+
     expect(moveSelectionTransition(document, heading, [], 'up', 3)).toEqual({ nodeId: 'second', cursor: 0 })
     expect(moveSelectionTransition(document, heading, [], 'down', 3)).toEqual({ nodeId: 'second', cursor: 6 })
     expect(moveSelectionTransition(document, heading, [], 'down', 6)).toBeUndefined()
+
     const final = { currentParentId: 'root', selectedNodeId: 'second' }
+
     expect(moveSelectionTransition(document, final, rowsFor(document, final), 'down', 2)).toEqual({
       nodeId: 'second',
       cursor: 6,
@@ -906,28 +960,34 @@ describe('editor command transitions', () => {
 
   it('ignores horizontal navigation from a node absent from the visible rows', () => {
     const location = { currentParentId: 'root', selectedNodeId: 'second' }
+
     const rows = rowsFor(document, location).slice(0, 1)
+
     expect(moveHorizontalTransition(document, location, rows, 'left', 0)).toBeUndefined()
   })
 
   it('keeps a leftward text motion inside a child when the caret is not at its beginning', () => {
     const location = { currentParentId: 'root', selectedNodeId: 'second' }
+
     expect(moveHorizontalTransition(document, location, rowsFor(document, location), 'left', 2)).toBeUndefined()
   })
 
   it('ignores downward movement from a node absent from the visible rows', () => {
     const location = { currentParentId: 'root', selectedNodeId: 'missing' }
+
     expect(moveSelectionTransition(document, location, rowsFor(document, location), 'down', 2)).toBeUndefined()
   })
 
   it('leaves an empty heading without a last-row boundary target', () => {
     const location = { currentParentId: 'second', selectedNodeId: 'second' }
+
     expect(moveSelectionBoundaryTransition(document, location, [], 'last', 0)).toBeUndefined()
     expect(moveSelectionBoundaryTransition(document, location, [], 'first', 0)).toBeUndefined()
   })
 
   it('rejects ancestor navigation to an unrelated or missing node', () => {
     const location = { currentParentId: 'root', selectedNodeId: 'first' }
+
     expect(ancestorNavigationTransition(document, location, 'other-root')).toBeUndefined()
     expect(ancestorNavigationTransition(document, location, 'missing')).toBeUndefined()
   })
@@ -941,6 +1001,7 @@ describe('editor command transitions', () => {
   describe('sibling-relative commands at descendant depth (inline expansion)', () => {
     it('moves in both directions through the flattened visible rows', () => {
       const rows = rowsFor(nestedDocument, rootLocation, ['alpha', 'alpha1'])
+
       expect(moveSelectionTransition(nestedDocument, rootLocation, rows, 'down', 0)).toEqual({
         nodeId: 'alpha1',
         cursor: 0,
@@ -961,6 +1022,7 @@ describe('editor command transitions', () => {
 
     it('returns no target when a boundary motion would keep the same caret state', () => {
       const rows = rowsFor(nestedDocument, rootLocation)
+
       expect(moveSelectionTransition(nestedDocument, rootLocation, rows, 'up', 0)).toBeUndefined()
       expect(
         moveSelectionTransition(
@@ -998,6 +1060,7 @@ describe('editor command transitions', () => {
       const location = { currentParentId: 'parent' }
       const collapsedRows = rowsFor(nested, location)
       const atGrandchild = { currentParentId: 'parent', selectedNodeId: 'grand' }
+
       // gg (boundary 'parent') must stay anchored to the current-parent heading regardless of how
       // deep the focused descendant is, never generalized to the descendant's own real parent.
       expect(moveSelectionBoundaryTransition(nested, atGrandchild, collapsedRows, 'parent', 99)).toEqual({
@@ -1011,9 +1074,11 @@ describe('editor command transitions', () => {
         nodeId: 'child2',
         cursor: 9,
       })
+
       // Expanding child1 makes grand a visible row; G still reaches the location's last visible row
       // (child2), walking past the expanded branch instead of stopping inside it.
       const expandedRows = rowsFor(nested, location, ['child1'])
+
       expect(moveSelectionBoundaryTransition(nested, atGrandchild, expandedRows, 'last', 99)).toEqual({
         nodeId: 'child2',
         cursor: 9,
@@ -1027,6 +1092,7 @@ describe('editor command transitions', () => {
 
     it('crosses an expanded branch boundary with the left and right transitions', () => {
       const rows = rowsFor(nestedDocument, rootLocation, ['alpha', 'alpha1'])
+
       // Leaving the branch downward: alpha1a (the branch's last visible descendant) to alpha2 (the
       // next visible row after the whole branch), not alpha1's own actual next sibling — there is
       // none, since alpha1a is alpha1's child, not its sibling.
@@ -1070,6 +1136,7 @@ describe('editor command transitions', () => {
       // alpha2) must land it there among alpha's children, never among the top-level roots.
       const moved = moveNodeTransition(nestedDocument, rootLocation, 'alpha1', 2)
       const alpha = moved?.document.roots.find((node) => node.id === 'alpha')
+
       expect(alpha?.children.map((node) => node.id)).toEqual(['alpha2', 'alpha1'])
       expect(moved?.document.roots.map((node) => node.id)).toEqual(['alpha', 'beta'])
     })
@@ -1085,6 +1152,7 @@ describe('editor command transitions', () => {
 
     it('removes the range with its descendants, clamps the count and selects the next sibling', () => {
       const result = deleteSiblingRangeTransition(document, at('b'), 2, () => 'unused')
+
       expect(ids(result!.removed)).toEqual(['b', 'c'])
       expect(result!.removed[0]!.children.map((node) => node.id)).toEqual(['b1'])
       expect(ids(result!.transition.document.roots[0]!.children)).toEqual(['a', 'd'])
@@ -1094,14 +1162,18 @@ describe('editor command transitions', () => {
 
     it('selects the previous sibling, then the parent, when no sibling follows the range', () => {
       const tail = deleteSiblingRangeTransition(document, at('c'), 2, () => 'unused')
+
       expect(tail!.transition.location.selectedNodeId).toBe('b')
+
       const only = deleteSiblingRangeTransition(document, at('q1', 'q'), 3, () => 'unused')
+
       expect(only!.transition.location.selectedNodeId).toBe('q')
       expect(only!.transition.document.roots[1]!.children).toEqual([])
     })
 
     it('creates a fresh root when every root is removed and ignores the current-parent heading', () => {
       const result = deleteSiblingRangeTransition(document, at('p', null), 5, () => 'fresh')
+
       expect(ids(result!.removed)).toEqual(['p', 'q'])
       expect(result!.transition.document.roots.map((node) => node.id)).toEqual(['fresh'])
       expect(result!.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'fresh' })

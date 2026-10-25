@@ -59,6 +59,7 @@ test.describe('clipboard (mode-independent)', () => {
   }) => {
     const { app, window } = await launchTree(userDataDir)
     const editor = node(window, 1)
+
     await typeInto(editor, 'original')
     await writeClipboardImageAndText(app)
     allowRendererError(
@@ -90,8 +91,11 @@ test.describe('clipboard (mode-independent)', () => {
       }
     })
     await firePaste(editor)
+
     await expect(window.getByRole('alert')).toContainText('Clipboard image is too large (maximum 25 MiB).')
+
     await window.screenshot({ path: test.info().outputPath('oversized-clipboard.png') })
+
     await expect(editor).toHaveValue('original')
     await expect(window.getByAltText('Attached image')).toHaveCount(0)
     expect(attachmentFiles(userDataDir)).toEqual([])
@@ -103,6 +107,7 @@ test.describe('clipboard (mode-independent)', () => {
 
     await writeClipboardImage(app)
     await firePaste(editor)
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
     await expect(editor).toHaveValue('original')
   })
@@ -125,17 +130,24 @@ test.describe('clipboard (mode-independent)', () => {
     await firePaste(node(window, 1))
 
     const link = window.getByRole('link', { name: 'https://example.com' })
+
     await expect(link).toHaveAttribute('href', 'https://example.com')
     await expect(link).toHaveAttribute('target', '_blank')
     await expect(node(window, 1)).toHaveCSS('cursor', 'text')
     await expect(link).toHaveCSS('cursor', 'default')
+
     await window.keyboard.down('Meta')
+
     await expect(link).toHaveCSS('cursor', 'pointer')
+
     await window.keyboard.up('Meta')
+
     await expect(link).toHaveCSS('cursor', 'default')
+
     await window.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     })
+
     await expect(node(window, 1)).toHaveCSS('cursor', 'default')
   })
 
@@ -172,17 +184,26 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
     await first.pressSequentially('See ')
     await writeClipboardText(app, 'https://example.com')
     await firePaste(first)
+
     await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
+
     await first.focus()
+
     await first.press('End')
     await first.pressSequentially(' now')
+
     await expect(first).toContainText('See https://example.com now')
+
     await window.keyboard.press('Meta+a')
+
     await expect(first).toHaveClass(/select-all/)
+
     await window.keyboard.press('Meta+x')
+
     await expect(window.getByRole('link')).toHaveCount(0)
 
     await node(window, 1).focus()
+
     await window.keyboard.press('Enter')
     await firePaste(node(window, 2))
 
@@ -197,16 +218,24 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
     await first.pressSequentially('See ')
     await writeClipboardText(app, 'https://example.com')
     await firePaste(first)
+
     await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
+
     await first.focus()
+
     await first.press('End')
     await first.pressSequentially(' now')
+
     await expect(first).toContainText('See https://example.com now')
+
     await window.keyboard.press('Meta+a')
+
     await expect(first).toHaveClass(/select-all/)
+
     await window.keyboard.press('Meta+c')
 
     await first.focus()
+
     await first.press('End')
     await window.keyboard.press('Enter')
     await firePaste(node(window, 2))
@@ -221,6 +250,7 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
 
     await writeClipboardText(app, 'https://example.com')
     const editor = node(window, 1)
+
     await firePaste(editor)
     await editor.press('End')
     await editor.press('x')
@@ -236,6 +266,7 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
     await writeClipboardText(app, 'https://example.com')
     await firePaste(editor)
     const link = window.getByRole('link', { name: 'https://example.com' })
+
     await expect(link).toHaveCount(1)
 
     await editor.click()
@@ -252,6 +283,7 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
         endY: last.top + last.height / 2,
       }
     })
+
     await window.mouse.move(points.startX, points.startY)
     await window.mouse.down()
     await window.mouse.move(points.endX, points.endY, { steps: 10 })
@@ -268,6 +300,7 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
 
     await writeClipboardText(app, 'https://example.com')
     const editor = node(window, 1)
+
     await firePaste(editor)
     await editor.press('Backspace')
 
@@ -279,6 +312,7 @@ describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
     const { app, window } = await launchTree(userDataDir)
 
     const editor = node(window, 1)
+
     await typeInto(editor, 'A')
     await setCursor(editor, 1)
     await writeClipboardText(app, 'https://example.com')
@@ -339,9 +373,11 @@ test.describe('clipboard (mode-independent, second part)', () => {
 
     await writeClipboardImage(app)
     await firePaste(node(window, 1))
+
     await expect(window.getByAltText('Attached image')).toHaveCount(1)
 
     await firePaste(node(window, 1))
+
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
     await expect(window.getByAltText('Attached image')).toHaveCount(2)
     await expect.poll(() => attachmentFiles(userDataDir)).toHaveLength(2)
@@ -349,6 +385,7 @@ test.describe('clipboard (mode-independent, second part)', () => {
 
   test('cancels a cut when the node changes during the clipboard write', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     await lockSystemClipboard()
     allowRendererError(/^Operation failed: The cut could not finish because the text changed\.$/)
     const editor = node(window, 1)
@@ -371,6 +408,7 @@ test.describe('clipboard (mode-independent, second part)', () => {
     })
     await holdClipboardWrite(app)
     await window.keyboard.press('Meta+x')
+
     await expect
       .poll(() =>
         app.evaluate(() => (globalThis as typeof globalThis & { clipboardStarted?: boolean }).clipboardStarted),
@@ -379,16 +417,20 @@ test.describe('clipboard (mode-independent, second part)', () => {
 
     await setCursor(editor, 0)
     await editor.pressSequentially('X')
+
     await expect(editor).toHaveValue('Xabc')
 
     await app.evaluate(() => (globalThis as typeof globalThis & { releaseClipboard?: () => void }).releaseClipboard?.())
+
     await expect(editor).toHaveValue('Xabc')
     await expect(window.getByText('Operation failed: The cut could not finish because the text changed.')).toBeVisible()
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('b')
 
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
+
     await clickApplicationMenuQuit(app)
     await closed
+
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Xabc')
   })
 })

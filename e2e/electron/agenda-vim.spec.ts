@@ -45,6 +45,7 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
     document: { roots: [{ ...node('shared', text), attachment: { id: 'image', mimeType: 'image/png' } }] },
     location: { currentParentId: null, selectedNodeId: 'shared' },
   })
+
   mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
   writeFileSync(
     attachmentPath(userDataDir, 'image'),
@@ -54,38 +55,59 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
     ),
   )
   const { window } = await launchTree(userDataDir)
+
   await openAndSelect(window, nodeKey(10, 14, 'shared'))
   const firstRow = row(window, nodeKey(10, 14, 'shared'))
   const secondRow = row(window, nodeKey(10, 15, 'shared'))
+
   await window.keyboard.type('0l')
   await window.keyboard.press('j')
+
   await expect(firstRow.locator('.node-input')).toHaveClass(/node-input-image-caret/)
+
   await window.keyboard.press('l')
   const day = row(window, dayKey(10, 15))
+
   await expect(day).toHaveAttribute('aria-selected', 'true')
   await expect(firstRow.locator('.node-input-image-caret')).toHaveCount(0)
+
   const headerLength = (await day.locator('.agenda-label').innerText()).length
+
   await window.keyboard.type(`${headerLength}l`)
   const second = secondRow.locator('.node-input')
+
   await expect(second).toBeFocused()
   await expect.poll(() => caretOffset(second)).toBe(0)
+
   await window.keyboard.type('$l')
+
   await expect(second).toHaveClass(/node-input-image-caret/)
+
   await window.keyboard.press('h')
+
   await expect.poll(() => caretOffset(second)).toBe(text.length - 1)
+
   await window.keyboard.press('l')
   await window.keyboard.press('l')
+
   await expect(second).toHaveClass(/node-input-image-caret/)
+
   await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-mirror-image.png') })
   await day.click()
   await window.keyboard.press('Meta+.')
   const heading = window.locator('.agenda-focused-heading')
+
   await window.keyboard.type('$l')
+
   await expect(second).toBeFocused()
   await expect.poll(() => caretOffset(second)).toBe(0)
+
   await window.keyboard.press('h')
+
   await expect(heading.locator('.agenda-caret')).toHaveCount(1)
+
   const label = await heading.innerText()
+
   await expect(heading.locator('.agenda-caret')).toHaveText(label.at(-1)!)
 })
 
@@ -93,43 +115,67 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
 test('continues h and l through Agenda editors, contextual text, dates and gaps', async ({ userDataDir }, testInfo) => {
   seedPending(userDataDir)
   const { window } = await launchTree(userDataDir)
+
   await openAndSelect(window, nodeKey(10, 14, 'plan'))
   const plan = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
   const other = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+
   await window.keyboard.type('$l')
+
   await expect(other).toBeFocused()
   await expect.poll(() => caretOffset(other)).toBe(0)
+
   await window.keyboard.press('h')
+
   await expect(plan).toBeFocused()
   await expect.poll(() => caretOffset(plan)).toBe('2026-10-14 Prepare'.length - 1)
+
   await window.keyboard.type('0h')
   const context = row(window, nodeKey(10, 14, 'context'))
+
   await expect(context).toHaveAttribute('aria-selected', 'true')
   await expect(context.locator('.agenda-caret')).toHaveText('t')
+
   await window.keyboard.type('0h')
   const day = row(window, dayKey(10, 14))
+
   await expect(day).toHaveAttribute('aria-selected', 'true')
+
   await window.keyboard.press('l')
+
   await expect(context).toHaveAttribute('aria-selected', 'true')
   await expect(context.locator('.agenda-caret')).toHaveText('C')
+
   await window.keyboard.type('8l')
+
   await expect(plan).toBeFocused()
   await expect.poll(() => caretOffset(plan)).toBe(1)
+
   await window.keyboard.type('2h')
+
   await expect(context).toHaveAttribute('aria-selected', 'true')
   await expect(context.locator('.agenda-caret')).toHaveText('t')
+
   await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-context.png') })
   const gap = row(window, gapKey)
+
   await gap.click()
   await window.keyboard.type('$l')
+
   await expect(row(window, dayKey(12, 1))).toHaveAttribute('aria-selected', 'true')
+
   await window.keyboard.press('h')
+
   await expect(gap).toHaveAttribute('aria-selected', 'true')
   await expect(gap.locator('.agenda-caret')).toHaveCount(1)
+
   await window.keyboard.type('$vl')
+
   await expect(gap).toHaveAttribute('aria-selected', 'true')
+
   await window.keyboard.press('Escape')
   await window.keyboard.type('dl')
+
   await expect(gap).toHaveAttribute('aria-selected', 'true')
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 })
@@ -144,16 +190,25 @@ test('J and K navigate Agenda labels and matches and extend whole-node Visual by
     location: { currentParentId: null, selectedNodeId: 'n0' },
   })
   const { window } = await launchTree(userDataDir)
+
   await openAndSelect(window, nodeKey(10, 14, 'n0'))
   await window.keyboard.press('Shift+J')
+
   await expect(row(window, nodeKey(10, 14, 'n10')).locator('.node-input')).toBeFocused()
+
   await window.keyboard.press('Shift+K')
+
   await expect(row(window, nodeKey(10, 14, 'n0')).locator('.node-input')).toBeFocused()
+
   await row(window, dayKey(10, 14)).locator('.agenda-label').click()
   await window.keyboard.press('Shift+J')
+
   await expect(row(window, nodeKey(10, 14, 'n9')).locator('.node-input')).toBeFocused()
+
   await window.keyboard.press('Shift+K')
+
   await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+
   await row(window, nodeKey(10, 14, 'n0'))
     .locator('.node-input')
     .click()
@@ -161,11 +216,15 @@ test('J and K navigate Agenda labels and matches and extend whole-node Visual by
   await window.keyboard.press('Shift+V')
   await window.keyboard.press('2')
   await window.keyboard.press('Shift+J')
+
   await expect(row(window, nodeKey(10, 14, 'n20')).locator('.node-input')).toBeFocused()
   await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(21)
+
   await window.keyboard.press('Shift+K')
+
   await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(11)
   await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
   await window.screenshot({ path: testInfo.outputPath('fast-agenda-visual.png') })
 })
 const message = (window: Page) => window.locator('.status-bar-message')
@@ -219,6 +278,7 @@ test.describe('Agenda Vim commands', () => {
     test(`ends read-only Replace before keyboard command ${command}`, async ({ userDataDir }) => {
       seedPending(userDataDir)
       const { window } = await launchTree(userDataDir)
+
       await openAndSelect(window, nodeKey(10, 14, 'plan'))
       if (command === 'Meta+,') {
         await row(window, dayKey(10, 14)).click()
@@ -228,15 +288,22 @@ test.describe('Agenda Vim commands', () => {
           .locator('.node-input')
           .focus()
       }
+
       await window.keyboard.press('R')
       await row(window, command === 'ArrowDown' ? nodeKey(10, 14, 'context') : dayKey(10, 14)).click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.press(command)
+
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
       if (command === 'ArrowDown') {
         await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toBeFocused()
+
         await window.keyboard.press('i')
         await window.keyboard.type('Q')
+
         await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toContainText('Q')
       }
     })
@@ -248,39 +315,64 @@ test.describe('Agenda Vim commands', () => {
     }) => {
       seedPending(userDataDir)
       const { window } = await launchTree(userDataDir)
+
       await openAndSelect(window, nodeKey(10, 14, 'plan'))
       const editor = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
+
       await setCursor(editor, 11)
       await window.keyboard.press('R')
       if (pending) await window.keyboard.type('X')
+
       await row(window, dayKey(10, 14)).locator('.agenda-label').click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
       await expect(row(window, dayKey(10, 14))).toBeFocused()
+
       await window.keyboard.type('ZY')
+
       await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+
       await row(window, nodeKey(10, 14, 'context'))
         .locator('.agenda-text')
         .click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.type('Z')
+
       await expect(row(window, nodeKey(10, 14, 'context')).locator('.agenda-text')).toHaveText('Context')
       if (pending) await expect(window.locator('.agenda-list')).toHaveScreenshot('agenda-replace-readonly-row.png')
+
       await row(window, gapKey).locator('.agenda-label').click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       await window.keyboard.type('X')
+
       await expect(row(window, gapKey)).toHaveAttribute('aria-selected', 'true')
+
       const destination = row(window, nodeKey(10, 14, 'other'))
+
       await destination.locator('.node-enter-control').click()
+
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
       const nextInput = destination.locator('.node-input')
+
       await expect(nextInput).toBeFocused()
       if (pending) await expect(window.locator('.agenda-list')).toHaveScreenshot('agenda-replace-editable-row.png')
+
       await window.keyboard.type('Y')
+
       await expect(nextInput).toHaveText('Y026-10-14 Other')
+
       await window.keyboard.press('Escape')
       await window.keyboard.press('Meta+z')
+
       await expect(destination.locator('.node-input')).toHaveText('2026-10-14 Other')
+
       await row(window, nodeKey(10, 14, 'plan')).click()
+
       await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toHaveText(
         `2026-10-14 ${pending ? 'X' : 'P'}repare`,
       )
@@ -295,40 +387,62 @@ test.describe('Agenda Vim commands', () => {
       location: { currentParentId: null, selectedNodeId: 'multi' },
     })
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'multi'))
     await window.keyboard.press('R')
     await row(window, nodeKey(10, 16, 'multi'))
       .locator('.node-enter-control')
       .click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
     const active = row(window, nodeKey(10, 16, 'multi')).locator('.node-input')
+
     await expect(active).toBeFocused()
+
     await window.keyboard.type('X')
+
     await expect(active).toHaveText('X026-10-14 2026-10-16 Shared')
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('Meta+z')
     await row(window, dayKey(10, 14)).click()
     await window.keyboard.press('Meta+.')
     const editor = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+
     await row(window, nodeKey(10, 14, 'other')).click()
     await editor.focus()
+
     await window.keyboard.press('R')
     await row(window, dayKey(10, 14)).click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
     await window.keyboard.type('Z')
+
     await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+
     await row(window, nodeKey(10, 14, 'other'))
       .locator('.node-enter-control')
       .click()
+
     await expect(editor).toBeFocused()
+
     await window.keyboard.type('Y')
+
     await expect(editor).toHaveText('Y026-10-14 Other')
+
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('R')
     await row(window, dayKey(10, 14)).click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
     await window.getByLabel('Vim mode').click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
@@ -339,6 +453,7 @@ test.describe('Agenda Vim commands', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'image' },
     })
+
     mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
     writeFileSync(
       attachmentPath(userDataDir, 'image'),
@@ -348,10 +463,12 @@ test.describe('Agenda Vim commands', () => {
       ),
     )
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'image'))
     await row(window, dayKey(10, 14)).click()
     await window.keyboard.press('Meta+.')
     const editor = row(window, nodeKey(10, 14, 'image')).locator('.node-input')
+
     await editor.click()
     await window.keyboard.press('Escape')
     const cursor = () =>
@@ -365,14 +482,19 @@ test.describe('Agenda Vim commands', () => {
     for (const keys of [['G'], ['L'], ['Control+d']]) {
       await setCursor(editor, 8)
       for (const key of keys) await window.keyboard.press(key)
+
       await expect(editor).toBeFocused()
       await expect.poll(cursor).toBe(2)
       await expect(editor).not.toHaveClass(/node-input-image-caret/)
     }
+
     await window.keyboard.press('g')
     await window.keyboard.press('g')
+
     await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.press('Control+d')
+
     await expect(editor).toBeFocused()
     await expect.poll(cursor).toBe(2)
   })
@@ -391,6 +513,7 @@ test.describe('Agenda Vim commands', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'before' },
     })
+
     mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
     writeFileSync(
       attachmentPath(userDataDir, 'image'),
@@ -400,6 +523,7 @@ test.describe('Agenda Vim commands', () => {
       ),
     )
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'image'))
     const imageRow = row(window, nodeKey(10, 14, 'image'))
     const input = imageRow.locator('.node-input')
@@ -413,27 +537,43 @@ test.describe('Agenda Vim commands', () => {
         range.setEnd(selection.anchorNode!, selection.anchorOffset)
         return range.toString().length
       })
+
     await window.keyboard.type('05l')
+
     expect(await offset()).toBe(5)
+
     await window.keyboard.press('j')
+
     await expect(image).toHaveClass(/attachment-image-caret/)
     await expect(imageRow).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.press('k')
+
     await expect(image).not.toHaveClass(/attachment-image-caret/)
     expect(await offset()).toBe(5)
+
     await window.keyboard.type('2j')
+
     await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.press('k')
+
     await expect(image).toHaveClass(/attachment-image-caret/)
+
     await window.keyboard.press('k')
+
     await expect(image).not.toHaveClass(/attachment-image-caret/)
     expect(await offset()).toBe('2026-10-14 Image'.length - 1)
+
     await window.keyboard.press('G')
+
     await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.type('07l')
     await window.keyboard.press('j')
     await window.keyboard.press('j')
     const afterInput = row(window, nodeKey(10, 14, 'after')).locator('.node-input')
+
     expect(
       await afterInput.evaluate((element) => {
         const range = document.createRange()
@@ -443,19 +583,30 @@ test.describe('Agenda Vim commands', () => {
         return range.toString().length
       }),
     ).toBe(7)
+
     await window.keyboard.type('2k')
+
     await expect(row(window, nodeKey(10, 14, 'before'))).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.type('2j')
+
     await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+
     const imageIndex = await imageRow.evaluate((element) =>
       [...document.querySelectorAll('.agenda-row')].indexOf(element),
     )
+
     await window.keyboard.type(`${imageIndex + 1}G`)
+
     await expect(image).not.toHaveClass(/attachment-image-caret/)
     expect(await offset()).toBe(0)
+
     await window.keyboard.press('j')
+
     await expect(image).toHaveClass(/attachment-image-caret/)
+
     await window.keyboard.press('L')
+
     await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -478,6 +629,7 @@ test.describe('Agenda Vim commands', () => {
       },
       location: { currentParentId: null, selectedNodeId: 'linked' },
     })
+
     mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
     writeFileSync(
       attachmentPath(userDataDir, 'image'),
@@ -487,6 +639,7 @@ test.describe('Agenda Vim commands', () => {
       ),
     )
     const { window, app } = await launchTree(userDataDir)
+
     await app.evaluate(({ shell }) => {
       const state = globalThis as typeof globalThis & { agendaOpenedUrls?: string[] }
       state.agendaOpenedUrls = []
@@ -496,24 +649,34 @@ test.describe('Agenda Vim commands', () => {
     })
     await openAndSelect(window, nodeKey(10, 14, 'linked'))
     const input = row(window, nodeKey(10, 14, 'linked')).locator('.node-input')
+
     await setCursor(input, 12)
     await window.keyboard.press('Enter')
+
     await expect
       .poll(() => app.evaluate(() => (globalThis as { agendaOpenedUrls?: string[] }).agendaOpenedUrls))
       .toEqual(['https://example.com/'])
     await expect(input).toBeFocused()
+
     await window.keyboard.press('2')
     await window.keyboard.press('Enter')
+
     expect(await app.evaluate(() => (globalThis as { agendaOpenedUrls?: string[] }).agendaOpenedUrls)).toHaveLength(1)
+
     await window.keyboard.press('$')
     await window.keyboard.press('l')
+
     await expect(
       row(window, nodeKey(10, 14, 'linked')).getByRole('button', { name: 'Open image preview' }),
     ).toHaveClass(/attachment-image-caret/)
+
     await window.keyboard.press('Enter')
+
     await expect(window.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     await expect(window.getByRole('img', { name: 'Attached image preview' })).toBeVisible()
+
     await window.keyboard.press('Escape')
+
     await expect(input).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.agenda-list')).toBeVisible()
@@ -539,12 +702,16 @@ test.describe('Agenda Vim commands', () => {
       location: { currentParentId: null, selectedNodeId: 'left' },
     })
     const { window, app } = await launchTree(userDataDir)
+
     await writeClipboardText(app, 'clipboard before')
     await openAndSelect(window, nodeKey(10, 14, 'a'))
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
     await window.keyboard.press('2')
     await window.keyboard.press('j')
+
     await expect(row(window, nodeKey(10, 14, 'c')).locator('.node-input')).toBeFocused()
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(3)
     for (const id of ['a', 'b', 'c'])
@@ -552,33 +719,48 @@ test.describe('Agenda Vim commands', () => {
     for (const id of ['left', 'right', 'child'])
       await expect(row(window, nodeKey(10, 14, id))).not.toHaveClass(/agenda-row-visual-selected/)
     await expect(row(window, nodeKey(10, 20, 'a'))).not.toHaveClass(/agenda-row-visual-selected/)
+
     // Unsupported range edits cannot reach Tree operations.
     for (const key of ['>', '<', 'c', 'y', 'p', 'Meta+Enter']) await window.keyboard.press(key)
+
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(3)
+
     await window.keyboard.press('o')
+
     await expect(row(window, nodeKey(10, 14, 'a')).locator('.node-input')).toBeFocused()
+
     await window.keyboard.press('g')
     await window.keyboard.press('g')
     await window.keyboard.press('G')
+
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(1)
+
     await window.keyboard.press('g')
     await window.keyboard.press('g')
+
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(3)
+
     await window.keyboard.press('d')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.locator('.agenda-row-pending')).toHaveCount(3)
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(0)
+
     await row(window, dayKey(10, 16)).locator('.agenda-label').click()
     await window.keyboard.press('p')
     const texts = () =>
       tryReadPersisted(userDataDir)?.document.roots.flatMap((root) => root.children.map((child) => child.text)) ?? null
+
     await fireIdleSave(window)
+
     await expect.poll(texts, idleSavePoll).toEqual(['2026-10-16 A 2026-10-20', '2026-10-16 B', '2026-10-16 C'])
     expect(readPersisted(userDataDir).document.roots[0]!.children[0]!.children[0]!.text).toBe('2026-10-14 Child')
     await expect(row(window, nodeKey(10, 16, 'a'))).toHaveAttribute('aria-selected', 'true')
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await fireIdleSave(window)
+
     await expect.poll(texts, idleSavePoll).toEqual(['2026-10-14 A 2026-10-20', '2026-10-14 B', '2026-10-14 C'])
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('clipboard before')
   })
@@ -589,22 +771,31 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seedPending(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     await window.keyboard.press('V')
     await window.keyboard.press('j')
     await window.keyboard.press('Escape')
+
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(0)
+
     await window.keyboard.press('V')
     await row(window, dayKey(10, 16)).locator('.agenda-label').click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await row(window, nodeKey(10, 14, 'plan'))
       .locator('.node-input')
       .click()
     await window.keyboard.press('V')
     await row(window, dayKey(10, 14)).locator('.node-disclosure-triangle').click()
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await row(window, dayKey(10, 14)).locator('.node-disclosure-triangle').click()
     await row(window, nodeKey(10, 14, 'plan'))
       .locator('.node-input')
@@ -613,9 +804,12 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('d')
     await window.keyboard.press('V')
     await window.keyboard.press('Escape')
+
     await expect(message(window)).toHaveCount(0)
+
     await window.keyboard.press('V')
     await window.keyboard.press('Meta+p')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })
 
@@ -631,13 +825,17 @@ test.describe('Agenda Vim commands', () => {
       location: { currentParentId: null, selectedNodeId: 'left' },
     })
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await openAndSelect(window, nodeKey(10, 14, 'a'))
     await window.keyboard.press('V')
     await window.keyboard.press('G')
+
     await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(3)
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
+
       await expect(window).toHaveScreenshot(`agenda-visual-selection-${appearance}.png`)
     }
   })
@@ -648,18 +846,24 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.locator('.agenda-row[data-node-id="plan"]').first().click()
     await window.keyboard.press('Escape')
     await window.keyboard.press('o')
     const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
+
     await expect(created).toBeFocused()
     await expect(created).toHaveText('2026-10-14 ')
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.keyboard.type('After')
+
     await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(4)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 Other'])
@@ -667,20 +871,26 @@ test.describe('Agenda Vim commands', () => {
     expect(readPersisted(userDataDir).document.roots[0]!.children[0]!.children.map((entry) => entry.id)).toEqual([
       'step',
     ])
+
     await window.keyboard.press('Escape')
     await window.locator('.agenda-row[data-node-id="other"]').first().click()
     await window.keyboard.press('Escape')
     await window.keyboard.press('O')
+
     await expect(created).toBeFocused()
     await expect(created).toHaveText('2026-10-14 ')
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 ', '2026-10-14 Other'])
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 After', '2026-10-14 Other'])
@@ -692,16 +902,21 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const context = window.locator('.agenda-row[data-node-id="context"]').first()
+
     await context.click()
     for (const key of ['o', 'O', 'Enter']) await window.keyboard.press(key)
+
     await expect(context).toBeFocused()
+
     await window.locator('.agenda-row[data-node-id="plan"]').first().click()
     await window.keyboard.press('Escape')
     await window.keyboard.press('2')
     await window.keyboard.press('o')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await expect(window.getByRole('textbox', { name: 'Agenda node plan', exact: true })).toBeFocused()
     expect(readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.id)).toEqual(['plan', 'other'])
@@ -713,10 +928,12 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seedPending(userDataDir)
     const { window, app } = await launchTree(userDataDir)
+
     await writeClipboardText(app, 'clipboard before')
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     await expect(window.locator('.agenda-row-pending')).toHaveCount(1)
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveClass(/agenda-row-pending/)
     await expect(message(window)).toHaveText('Moving 1 item · p to put · Esc to cancel')
@@ -733,22 +950,27 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('o')
     await row(window, gapKey).locator('.agenda-label').click()
     await window.keyboard.press('Meta+e')
+
     await expect(row(window, dayKey(10, 17))).toHaveCount(1)
     await expect(message(window)).toHaveText('Moving 1 item · p to put · Esc to cancel')
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveClass(/agenda-row-pending/)
 
     // A gap is not a day: p leaves the move pending.
     await window.keyboard.press('p')
+
     await expect(message(window)).toHaveCount(1)
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveCount(1)
 
     await row(window, dayKey(10, 16)).locator('.agenda-label').click()
     await window.keyboard.press('p')
+
     await expect(row(window, nodeKey(10, 16, 'plan'))).toHaveAttribute('aria-selected', 'true')
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveCount(0)
     await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
     await expect(message(window)).toHaveCount(0)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryPersistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-16 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
@@ -760,6 +982,7 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryPersistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
@@ -772,26 +995,34 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seedPending(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     await window.keyboard.press('2')
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     await expect(message(window)).toHaveText('Moving 2 items · p to put · Esc to cancel')
     await expect(window.locator('.agenda-row-pending')).toHaveCount(2)
+
     // Clicking another direct match selects it and keeps Normal mode, so the move stays pending.
     await row(window, nodeKey(10, 16, 'later'))
       .locator('.node-input')
       .click()
+
     await expect(message(window)).toHaveText('Moving 2 items · p to put · Esc to cancel')
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('P')
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryPersistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-16 Prepare', '2026-10-16 Other', '2026-10-16 Later'])
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('u')
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryPersistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
@@ -803,15 +1034,18 @@ test.describe('Agenda Vim commands', () => {
   }) => {
     seedPending(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     const mark = async (): Promise<void> => {
       await window.keyboard.press('d')
       await window.keyboard.press('d')
+
       await expect(message(window)).toHaveCount(1)
     }
 
     await mark()
     await window.keyboard.press('Escape')
+
     await expect(message(window)).toHaveCount(0)
     await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
 
@@ -819,16 +1053,22 @@ test.describe('Agenda Vim commands', () => {
     await mark()
     await window.keyboard.press('A')
     await window.keyboard.type('!')
+
     await expect(message(window)).toHaveCount(0)
+
     await window.keyboard.press('Escape')
     await fireIdleSave(window)
+
     await expect.poll(() => tryPersistedTexts(userDataDir), idleSavePoll).toContain('2026-10-14 Prepare!')
 
     // Undo cancels a move and reverts only the earlier edit.
     await mark()
     await window.keyboard.press('u')
+
     await expect(message(window)).toHaveCount(0)
+
     await fireIdleSave(window)
+
     await expect
       .poll(() => tryPersistedTexts(userDataDir), idleSavePoll)
       .toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
@@ -840,8 +1080,11 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('Escape')
     await mark()
     await window.keyboard.press('Meta+p')
+
     await expect(window.locator('.agenda-list')).toHaveCount(0)
+
     await window.keyboard.press('Meta+p')
+
     await expect(window.locator('.agenda-list')).toHaveCount(1)
     await expect(message(window)).toHaveCount(0)
 
@@ -851,8 +1094,11 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('Escape')
     await mark()
     await window.keyboard.press('Meta+.')
+
     await expect(window.locator('.agenda-list')).toHaveCount(0)
+
     await window.keyboard.press('Meta+p')
+
     await expect(message(window)).toHaveCount(0)
     expect(persistedTexts(userDataDir)).toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
   })
@@ -861,11 +1107,13 @@ test.describe('Agenda Vim commands', () => {
   test('p without a pending move changes nothing on a day and with a node register', async ({ userDataDir }) => {
     seedPending(userDataDir)
     const { window } = await launchTree(userDataDir)
+
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     await window.keyboard.press('p')
     await window.keyboard.press('P')
     await row(window, dayKey(10, 16)).locator('.agenda-label').click()
     await window.keyboard.press('p')
+
     await expect(message(window)).toHaveCount(0)
     expect(persistedTexts(userDataDir)).toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
     await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveCount(1)
@@ -875,22 +1123,28 @@ test.describe('Agenda Vim commands', () => {
   test('dims a pending source and shows the status message in light and dark appearances', async ({ userDataDir }) => {
     seedPending(userDataDir)
     const { window, app } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     await openAndSelect(window, nodeKey(10, 14, 'plan'))
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     await expect(message(window)).toHaveText('Moving 1 item · p to put · Esc to cancel')
+
     // The marked node's text, bullet, and chevron are dimmed; the unmarked neighbor is not.
     const opacity = (key: string, selector: string): Promise<string> =>
       row(window, key)
         .locator(selector)
         .first()
         .evaluate((element) => getComputedStyle(element).opacity)
+
     expect(await opacity(nodeKey(10, 14, 'plan'), '.node-input')).toBe('0.38')
     expect(await opacity(nodeKey(10, 14, 'plan'), '.node-enter-control')).toBe('0.38')
     expect(await opacity(nodeKey(10, 14, 'other'), '.node-input, .agenda-text')).toBe('1')
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
+
       await expect(window).toHaveScreenshot(`agenda-pending-move-${appearance}.png`)
     }
   })

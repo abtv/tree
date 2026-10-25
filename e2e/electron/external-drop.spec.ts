@@ -15,9 +15,11 @@ describeForEachEditingMode('external drops', () => {
       location: { currentParentId: null, selectedNodeId: 'rich' },
     })
     const { window } = await launchTree(userDataDir)
+
     await expect(node(window, 1)).toHaveAttribute('contenteditable', 'true')
     await expectExternalDropBlocked(window, node(window, 1))
     await expectExternalDropBlocked(window, node(window, 2))
+
     await window.screenshot({ path: testInfo.outputPath('external-drop-rejected.png') })
   })
 })

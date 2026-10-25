@@ -78,6 +78,7 @@ async function runImport({ archive, current = {}, decodable = () => true }: Setu
       if (message.type === 'validate-image') {
         // A request carries exactly the image's bytes, not a larger buffer it views.
         expect(message.bytes.byteLength).toBe(message.bytes.buffer.byteLength)
+
         decoded.push(message.bytes)
         reply = { type: 'image-validated', decodable: decodable(message.bytes) }
       } else if (message.type === 'staged') {
@@ -123,6 +124,7 @@ describe('desktop import job', () => {
       [{ 'document.json': '{' }, 'invalid'],
     ] as const) {
       const { messages } = await runImport({ archive, current })
+
       expect(finalMessage(messages)).toMatchObject({ type: 'prepared', current: expected })
     }
   })
@@ -168,6 +170,7 @@ describe('desktop import job', () => {
       ],
     ] as const) {
       const { messages, staging } = await runImport({ archive })
+
       expect(finalMessage(messages)).toEqual({ type: 'error', message })
       expect(await readdir(staging)).toEqual(['attachments'])
     }
@@ -194,9 +197,12 @@ describe('desktop import job', () => {
     const descriptor = openSync(path, 'r')
     try {
       const file = descriptorArchiveFile(descriptor)
+
       expect(file.size).toBe(6)
       expect(await file.read(2, 3)).toEqual(new Uint8Array([3, 4, 5]))
+
       truncateSync(path, 4)
+
       await expect(file.read(2, 3)).rejects.toThrow('The file changed while it was being read.')
     } finally {
       closeSync(descriptor)

@@ -13,7 +13,9 @@ describeForEachEditingMode('deleting nodes', () => {
     await typeInto(node(window, 3), 'C')
 
     await window.keyboard.press('ArrowUp')
+
     await expect(node(window, 2)).toHaveValue('B')
+
     await window.keyboard.press('Meta+Backspace')
 
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
@@ -41,6 +43,7 @@ describeForEachEditingMode('deleting nodes', () => {
     await typeInto(node(window, 1), 'Work')
 
     await parent(window).focus()
+
     await window.keyboard.press('Meta+Backspace')
 
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)

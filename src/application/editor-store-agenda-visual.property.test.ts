@@ -41,33 +41,47 @@ it('property: Visual moves change only selected source dates and one Undo restor
         () => 'created',
         { setTimeout: () => 0, clearTimeout: () => undefined },
       )
+
       await store.initialize()
       const initial = store.getSnapshot()
       if (initial.status !== 'ready') throw new Error('Expected ready editor')
       const before = initial.document
+
       store.openAgenda()
       const anchor = a % size
       const focus = b % size
+
       store.applyAgenda({ kind: 'select', key: `node:${source}:n${focus}` })
+
       expect(store.startAgendaMove(1, { anchorId: `n${anchor}`, focusId: `n${focus}` })).toBe(true)
+
       await store.flushPersistence()
+
       expect(save).not.toHaveBeenCalled()
+
       store.applyAgenda({ kind: 'select', key: `day:${target}` })
+
       expect(store.putAgendaMove()).toBe(true)
+
       const state = store.getSnapshot()
       if (state.status !== 'ready') throw new Error('Expected ready editor')
+
       state.document.roots.forEach((root, index) => {
         const selected = index >= Math.min(anchor, focus) && index <= Math.max(anchor, focus)
+
         expect(root.children[0]!.text).toBe(`${selected ? '2026-10-16' : '2026-10-14'} Item ${index} 2026-10-20`)
         expect(root.children[0]!.children).toBe(before.roots[index]!.children[0]!.children)
         expect(root.id).toBe(before.roots[index]!.id)
         if (!selected) expect(root).toBe(before.roots[index])
       })
       await store.flushPersistence()
+
       expect(save).toHaveBeenCalledTimes(1)
+
       store.undo()
       const undone = store.getSnapshot()
       if (undone.status !== 'ready') throw new Error('Expected ready editor')
+
       expect(undone.document).toBe(before)
     }),
     { numRuns: 40 },

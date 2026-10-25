@@ -20,7 +20,9 @@ describe('pending caret mode compatibility', () => {
     (mode) => {
       for (const normal of [true, false]) {
         const request = { ...pending, normal, refocus: true }
+
         const result = pendingCaretAfterModeChange(request, mode, 4)
+
         if (normal === (mode === 'normal')) {
           expect(result).toEqual({ ...request, revision: 4 })
           expect(result).not.toBe(request)
@@ -40,6 +42,7 @@ describe('drawn Normal caret', () => {
     const input = document.createElement('textarea')
     input.value = 'abcd'
     input.setSelectionRange(start, end)
+
     expect(normalCaretIsDrawn(input, { kind: 'block', start: 1, end: 2 })).toBe(matches)
   })
 
@@ -51,6 +54,7 @@ describe('drawn Normal caret', () => {
     const input = document.createElement('textarea')
     input.value = 'abcd'
     input.setSelectionRange(start, end)
+
     expect(normalCaretIsDrawn(input, { kind: 'collapsed', position: 2 })).toBe(matches)
   })
 
@@ -72,6 +76,7 @@ describe('pending caret currency', () => {
 
   it('returns the current connected input with or without a recorded element', async () => {
     const { state, input, request } = await fixture()
+
     expect(currentPendingCaretInput(request, state, 3, input)).toBe(input)
     expect(currentPendingCaretInput({ ...request, input }, state, 3, input)).toBe(input)
   })
@@ -79,11 +84,13 @@ describe('pending caret currency', () => {
   it.each(['loading', 'error'] as const)('rejects a %s store', async (status) => {
     const { input, request } = await fixture()
     const state = status === 'loading' ? { status } : { status, message: 'unavailable' }
+
     expect(currentPendingCaretInput(request, state, 3, input)).toBeUndefined()
   })
 
   it('rejects a different selected node', async () => {
     const { state, input, request } = await fixture()
+
     expect(
       currentPendingCaretInput(
         request,
@@ -96,27 +103,33 @@ describe('pending caret currency', () => {
 
   it('rejects a different focus token', async () => {
     const { state, input, request } = await fixture()
+
     expect(currentPendingCaretInput({ ...request, focusToken: state.focus.token + 1 }, state, 3, input)).toBeUndefined()
   })
 
   it('rejects a superseded revision', async () => {
     const { state, input, request } = await fixture()
+
     expect(currentPendingCaretInput(request, state, 4, input)).toBeUndefined()
   })
 
   it('rejects an unregistered input', async () => {
     const { state, request } = await fixture()
+
     expect(currentPendingCaretInput(request, state, 3, undefined)).toBeUndefined()
   })
 
   it('rejects a disconnected input', async () => {
     const { state, input, request } = await fixture()
+
     input.remove()
+
     expect(currentPendingCaretInput(request, state, 3, input)).toBeUndefined()
   })
 
   it('rejects a replaced recorded element', async () => {
     const { state, input, request } = await fixture()
+
     expect(
       currentPendingCaretInput({ ...request, input: document.createElement('textarea') }, state, 3, input),
     ).toBeUndefined()
@@ -128,12 +141,17 @@ describe('pending caret currency', () => {
     const removed = document.createElement('textarea')
     const rich = document.createElement('div')
     document.body.append(rich)
+
     expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, rich)).toBe(rich)
+
     document.body.append(removed)
+
     expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, rich)).toBeUndefined()
+
     removed.remove()
     const otherTextarea = document.createElement('textarea')
     document.body.append(otherTextarea)
+
     expect(currentPendingCaretInput({ ...request, input: removed }, state, 3, otherTextarea)).toBeUndefined()
     expect(currentPendingCaretInput({ ...request, input: rich }, state, 3, otherTextarea)).toBeUndefined()
   })

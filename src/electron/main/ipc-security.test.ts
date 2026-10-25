@@ -54,6 +54,7 @@ describe('IPC security validation', () => {
       canPaste: false,
       canSelectAll: true,
     }
+
     expect(validateEditorContextMenuRequest(request)).toEqual(request)
     expect(() => validateEditorContextMenuRequest({ ...request, x: Number.NaN })).toThrow('Editor context menu request')
     expect(() => validateEditorContextMenuRequest({ ...request, y: Number.POSITIVE_INFINITY })).toThrow(
@@ -65,6 +66,7 @@ describe('IPC security validation', () => {
 
     const longSelection = '😀'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS + 20)
     const bounded = validateEditorContextMenuRequest({ ...request, selectionText: longSelection }).selectionText
+
     expect(Array.from(bounded)).toHaveLength(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS)
     expect(bounded).toBe('😀'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1) + '…')
     expect(validateEditorContextMenuRequest({ ...request, selectionText: 'x'.repeat(100) }).selectionText).toBe(
@@ -95,6 +97,7 @@ describe('IPC security validation', () => {
       137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0,
       0, 0, 0, 0, 73, 69, 78, 68, 0, 0, 0, 0,
     ])
+
     expect(() => validateAttachmentBytes(invalidPng, decodePngWithZlib)).toThrow('PNG')
   })
 
@@ -116,6 +119,7 @@ describe('IPC security validation', () => {
 
     const badCrc = Uint8Array.from(onePixelPng)
     badCrc[32] = badCrc[32]! ^ 0xff
+
     expect(() => validateAttachmentBytes(badCrc, decodePngWithZlib)).toThrow('PNG')
 
     const zeroWidth = [...validIhdr]
@@ -123,6 +127,7 @@ describe('IPC security validation', () => {
     zeroWidth[1] = 0
     zeroWidth[2] = 0
     zeroWidth[3] = 0
+
     expect(() =>
       validateAttachmentBytes(
         pngWith([
@@ -145,6 +150,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(() => validateAttachmentBytes(corrupt, decodePngWithZlib)).toThrow('decodable')
     expect(() => validateAttachmentBytes(onePixelPng, () => false)).toThrow('decodable')
   })
@@ -156,6 +162,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(() => validateAttachmentBytes(oversizedPixels, decode)).toThrow('image is too large')
 
     const oversizedSide = pngWith([
@@ -163,6 +170,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(() => validateAttachmentBytes(oversizedSide, decode)).toThrow('image is too large')
 
     const oversizedHeight = pngWith([
@@ -170,6 +178,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(() => validateAttachmentBytes(oversizedHeight, decode)).toThrow('image is too large')
 
     const justOverPixels = pngWith([
@@ -177,6 +186,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(() => validateAttachmentBytes(justOverPixels, decode)).toThrow('image is too large')
 
     expect(decode).not.toHaveBeenCalled()
@@ -189,6 +199,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(validateAttachmentBytes(exactPixels, decode)).toBe(exactPixels)
 
     const tallWithinBudget = pngWith([
@@ -196,6 +207,7 @@ describe('IPC security validation', () => {
       ['IDAT', [1, 2, 3]],
       ['IEND', []],
     ])
+
     expect(validateAttachmentBytes(tallWithinBudget, decode)).toBe(tallWithinBudget)
 
     expect(decode).toHaveBeenCalledTimes(2)
@@ -203,6 +215,7 @@ describe('IPC security validation', () => {
 
   it('accepts typed-array views and rejects invalid byte values', () => {
     const buffer = new ArrayBuffer(onePixelPng.byteLength + 2)
+
     new Uint8Array(buffer, 1, onePixelPng.byteLength).set(onePixelPng)
 
     expect(validateAttachmentBytes(new DataView(buffer, 1, onePixelPng.byteLength), decodePngWithZlib)).toEqual(

@@ -83,11 +83,13 @@ describeForEachEditingMode('typed input', ({ screenshotName }) => {
       })
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
+
       await typeInto(editor, '')
       await setCursor(editor, entry.caret)
       await editor.pressSequentially(entry.typed)
 
       const expected = `${entry.seedText.slice(0, entry.caret)}${entry.typed}${entry.seedText.slice(entry.caret)}`
+
       await expect(editor).toHaveText(expected)
       await expect(editor.getByRole('link')).toHaveCount(entry.links)
       await expect(editor).toBeFocused()

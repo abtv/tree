@@ -85,22 +85,33 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
       location: { currentParentId: null, selectedNodeId: 'empty' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await window.getByRole('button', { name: 'Expand node 2' }).click()
     await node(window, 4).focus()
+
     await window.keyboard.press('Backspace')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child'])
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 10)
     await expect(node(window, 3)).toHaveJSProperty('selectionEnd', 10)
+
     await window.keyboard.type('!')
+
     await expect(node(window, 3)).toHaveValue('Last child!')
+
     await window.screenshot({ path: test.info().outputPath(`backspace-expanded-${mode}.png`) })
     await window.keyboard.press('Meta+z')
+
     await expect(node(window, 3)).toHaveValue('Last child')
+
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child', ''])
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Bugfixes', 'Child', 'Last child'])
   })
 
@@ -110,35 +121,50 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
     const locationBefore = await window.getByLabel('Current location').innerText()
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 'Alpha'.length)
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+
     await window.screenshot({ path: test.info().outputPath(`enter-collapsed-${mode}.png`) })
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 'Alpha'.length)
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', '', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
     await expect(node(window, 2)).toHaveJSProperty('selectionEnd', 0)
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     const bounds = await Promise.all([1, 2, 3].map((index) => node(window, index).boundingBox()))
+
     expect(bounds[1]!.x).toBe(bounds[2]!.x)
     expect(bounds[1]!.x).toBeGreaterThan(bounds[0]!.x)
     expect(bounds[1]!.y).toBeLessThan(bounds[2]!.y)
     expect(await window.getByLabel('Current location').innerText()).toBe(locationBefore)
+
     await window.screenshot({ path: test.info().outputPath(`enter-expanded-${mode}.png`) })
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', '', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.type('New child')
+
     await expect(node(window, 2)).toHaveValue('New child')
   })
 
@@ -160,23 +186,34 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
       location: { currentParentId: null, selectedNodeId: 'blank' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).focus()
+
     await window.keyboard.press('Enter')
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
     await expect(node(window, 4)).toBeFocused()
     await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
     if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     const bounds = await Promise.all([2, 3, 4, 5].map((index) => node(window, index).boundingBox()))
+
     expect(bounds.map((box) => box!.x)).toEqual(Array(4).fill(bounds[0]!.x))
+
     await window.screenshot({ path: test.info().outputPath(`empty-before-sibling-${mode}.png`) })
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
     await expect(node(window, 4)).toBeFocused()
+
     await window.keyboard.type('New task')
+
     await expect(node(window, 4)).toHaveValue('New task')
   })
 
@@ -184,28 +221,42 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   test('creates one empty child then moves that empty node one level left with Enter', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).focus()
+
     await setCursor(node(window, 2), 'something'.length)
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect(node(window, 3)).toBeFocused()
+
     const childX = (await node(window, 3).boundingBox())!.x
+
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+
     const bounds = await Promise.all([1, 3].map((index) => node(window, index).boundingBox()))
+
     expect(bounds[1]!.x).toBe(bounds[0]!.x)
     expect(bounds[1]!.x).toBeLessThan(childX)
+
     await window.screenshot({ path: test.info().outputPath(`empty-node-enter-${mode}.png`) })
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(childX)
+
     await window.keyboard.press('Meta+Shift+z')
+
     await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(bounds[0]!.x)
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.type('new sibling')
+
     await expect(node(window, 3)).toHaveValue('new sibling')
   })
 
@@ -213,13 +264,17 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     seedDocument(userDataDir, emptyCreationSeed(true))
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
     await node(window, 1).focus()
+
     await setCursor(node(window, 1), 'something'.length)
     await window.keyboard.press('Enter')
     await window.keyboard.press('Enter')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['something', '', ''])
     await expect(parent(window)).toHaveValue('Test')
     await expect(node(window, 3)).toBeFocused()
+
     const bounds = await Promise.all([1, 2, 3].map((index) => node(window, index).boundingBox()))
+
     expect(bounds.map((box) => box!.x)).toEqual([bounds[0]!.x, bounds[0]!.x, bounds[0]!.x])
   })
 
@@ -231,6 +286,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     const locationBefore = await window.getByLabel('Current location').innerText()
 
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
 
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
@@ -238,6 +294,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await expect(node(window, 1)).toBeFocused()
 
     await window.getByRole('button', { name: 'Collapse node 1' }).click()
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
   })
 
@@ -250,7 +307,9 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await node(window, 1).click()
     // Vim editing starts in Normal mode; ArrowDown follows the same visible-row order in Insert mode.
     if (mode === 'vim') await window.keyboard.press('i')
+
     await window.keyboard.press('ArrowDown')
+
     await expect(node(window, 2)).toBeFocused()
   })
 
@@ -262,6 +321,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).click()
+
     await expect(node(window, 2)).toBeFocused()
 
     await window.getByRole('button', { name: 'Collapse node 1' }).click()
@@ -278,22 +338,29 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await node(window, 1).focus()
 
     await window.keyboard.press('Meta+e')
+
     await expect(node(window, 2)).toHaveValue('Alpha child one')
     await expect(node(window, 1)).toBeFocused()
+
     await window.keyboard.press('Meta+e')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
     await expect(node(window, 1)).toBeFocused()
 
     // A leaf has no fold, so Cmd+E does nothing there.
     await node(window, 2).focus()
+
     await window.keyboard.press('Meta+e')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
 
     // Typing continues after the toggle; Vim editing enters Insert mode first.
     await node(window, 1).focus()
     if (mode === 'vim') await window.keyboard.press('i')
+
     await window.keyboard.press('Meta+e')
     await window.keyboard.type('X')
+
     await expect(node(window, 1)).toHaveValue('XAlpha')
     await expect(node(window, 2)).toHaveValue('Alpha child one')
   })
@@ -305,6 +372,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     // Bravo is a's own next real sibling, not one of the children hidden by collapsing "a".
     await node(window, 4).click()
+
     await expect(node(window, 4)).toBeFocused()
 
     await window.getByRole('button', { name: 'Collapse node 1' }).click()
@@ -320,6 +388,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await window.getByRole('button', { name: 'Expand node 2' }).click()
+
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',
@@ -330,9 +399,11 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
     await node(window, 1).click()
     await window.keyboard.press('Meta+.')
+
     await expect(parent(window)).toHaveValue('Alpha')
     // The entered location shows the child's remembered expansion.
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
+
     await window.keyboard.press('Meta+,')
 
     await expect(node(window, 1)).toBeFocused()
@@ -353,12 +424,14 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
     await node(window, 3).click()
     await window.keyboard.press('Meta+Backspace')
+
     // The only child is gone; its own parent is selected and nothing was entered.
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
 
     await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
     await expect(node(window, 3)).toBeFocused()
     await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
@@ -374,10 +447,12 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await first.window.getByRole('button', { name: 'Expand node 1' }).click()
     await first.window.getByRole('button', { name: 'Expand node 2' }).click()
     await node(first.window, 3).click()
+
     await expect(node(first.window, 3)).toHaveValue('Alpha grandchild')
 
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
+
     expect(persisted.version).toBe(4)
     expect(persisted.location).toEqual({ currentParentId: null, selectedNodeId: 'a1a' })
     expect(new Set(persisted.view?.expandedIds)).toEqual(new Set(['a', 'a1']))
@@ -420,6 +495,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await node(window, 3).click()
     await window.keyboard.press('End')
     await window.keyboard.press('ArrowRight')
+
     await expect(node(window, 4)).toBeFocused()
     expect(await node(window, 4).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
 
@@ -427,6 +503,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     // not Alpha child one's own actual sibling head.
     await window.keyboard.press('Home')
     await window.keyboard.press('ArrowLeft')
+
     await expect(node(window, 3)).toBeFocused()
     expect(await node(window, 3).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(
       'Alpha grandchild'.length,
@@ -441,10 +518,13 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await window.getByRole('button', { name: 'Expand node 2' }).click()
+
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-nested-light.png'))
 
     await window.emulateMedia({ colorScheme: 'dark' })
+
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-nested-dark.png'))
+
     await window.emulateMedia({ colorScheme: 'light' })
   })
 
@@ -489,11 +569,14 @@ test.describe('inline node expansion (mode-independent)', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
 
     await node(window, 1).click()
     await window.keyboard.press('Meta+.')
+
     await expect(parent(window)).toBeVisible()
+
     await window.getByRole('button', { name: 'Top level' }).click()
 
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
@@ -506,13 +589,17 @@ test.describe('inline node expansion (mode-independent)', () => {
 
     await node(first.window, 1).click()
     await first.window.keyboard.press('Meta+.')
+
     await expect(parent(first.window)).toHaveValue('Alpha')
+
     await first.window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(first.window, 2).click()
+
     await expect(node(first.window, 2)).toHaveValue('Alpha grandchild')
 
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
+
     expect(persisted.location).toEqual({ currentParentId: 'a', selectedNodeId: 'a1a' })
     expect(persisted.view?.expandedIds).toEqual(['a1'])
 
@@ -523,8 +610,10 @@ test.describe('inline node expansion (mode-independent)', () => {
       .poll(() => nodeTexts(second.window))
       .toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
     await expect(node(second.window, 2)).toBeFocused()
+
     // 'Alpha' itself was never expanded, so it stays collapsed at the top level.
     await second.window.getByRole('button', { name: 'Top level' }).click()
+
     await expect.poll(() => nodeTexts(second.window)).toEqual(['Alpha', 'Bravo'])
   })
 
@@ -551,8 +640,11 @@ test.describe('inline node expansion (mode-independent)', () => {
 
     // 300 top-level rows + 110 * 2 expanded children = 520 visible rows, above the threshold.
     const spacers = window.locator('.node-list-spacer')
+
     await expect(spacers).toHaveCount(2)
+
     const mountedRows = await window.locator('.node-row').count()
+
     expect(mountedRows).toBeLessThan(topCount + expandedCount * 2)
   })
 })
@@ -578,22 +670,30 @@ test.describe('inline node expansion (Vim editing only)', () => {
       location: { currentParentId: null, selectedNodeId: 'blank' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).focus()
+
     await window.keyboard.press('o')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
     await expect(node(window, 3)).toBeFocused()
     await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     await window.screenshot({ path: test.info().outputPath('empty-before-sibling-o.png') })
     await window.keyboard.type('Inserted')
     await window.keyboard.press('Escape')
     await node(window, 2).focus()
+
     await window.keyboard.press('.')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', 'Inserted', 'Inserted', 'Next task'])
     await expect(node(window, 3)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', 'Inserted', 'Next task'])
   })
 
@@ -601,35 +701,53 @@ test.describe('inline node expansion (Vim editing only)', () => {
   test('moves a last empty inline child left with o and stops at the focused boundary', async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(false))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).focus()
+
     await window.keyboard.press('o')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect(node(window, 3)).toBeFocused()
+
     const childX = (await node(window, 3).boundingBox())!.x
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('o')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
     await expect(node(window, 3)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
     const bounds = await Promise.all([1, 3].map((index) => node(window, index).boundingBox()))
+
     expect(bounds[1]!.x).toBe(bounds[0]!.x)
     expect(bounds[1]!.x).toBeLessThan(childX)
+
     await window.screenshot({ path: test.info().outputPath('empty-node-o.png') })
     await window.keyboard.type('outside')
+
     await expect(node(window, 3)).toHaveValue('outside')
+
     await window.keyboard.press('Escape')
     await node(window, 1).focus()
+
     await window.keyboard.press('g')
     await window.keyboard.press('d')
+
     await expect(parent(window)).toHaveValue('Test')
+
     await node(window, 1).focus()
+
     await window.keyboard.press('o')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['something', ''])
     await expect(parent(window)).toHaveValue('Test')
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.press('Escape')
     await window.keyboard.press('o')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['something', '', ''])
     await expect(parent(window)).toHaveValue('Test')
     await expect(node(window, 3)).toBeFocused()
@@ -645,20 +763,32 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await window.keyboard.press('j')
 
     await expect(node(window, 2)).toBeFocused()
+
     await window.keyboard.press('j')
+
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.press('j')
+
     await expect(node(window, 4)).toBeFocused()
+
     await window.keyboard.press('j')
+
     await expect(node(window, 5)).toBeFocused()
+
     await window.keyboard.press('k')
+
     await expect(node(window, 4)).toBeFocused()
+
     await node(window, 1).click()
     await window.keyboard.press('2')
     await window.keyboard.press('j')
+
     await expect(node(window, 3)).toBeFocused()
+
     await window.keyboard.press('2')
     await window.keyboard.press('k')
+
     await expect(node(window, 1)).toBeFocused()
   })
 
@@ -674,18 +804,25 @@ test.describe('inline node expansion (Vim editing only)', () => {
     // za toggles the selected node's own fold; zc and zo close and open it.
     await window.keyboard.press('z')
     await window.keyboard.press('a')
+
     await expect(node(window, 2)).toHaveValue('Alpha child one')
+
     await window.keyboard.press('z')
     await window.keyboard.press('c')
+
     await expect(node(window, 2)).toHaveValue('Bravo')
+
     await window.keyboard.press('z')
     await window.keyboard.press('o')
+
     await expect(node(window, 2)).toHaveValue('Alpha child one')
 
     // zR opens every fold recursively, including the nested grandchild.
     await node(window, 2).focus()
+
     await window.keyboard.press('z')
     await pressShifted(window, 'R')
+
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',
@@ -696,34 +833,45 @@ test.describe('inline node expansion (Vim editing only)', () => {
 
     // zM closes every fold and hands the caret to the displayed ancestor of the hidden descendant.
     await node(window, 3).focus()
+
     await window.keyboard.press('z')
     await pressShifted(window, 'M')
+
     await expect(node(window, 1)).toBeFocused()
     expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
 
     // zC discards the nested choice, so reopening the root shows one level; a leaf ignores zO.
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('a')
     await node(window, 2).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('a')
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await pressShifted(window, 'C')
     await window.keyboard.press('z')
     await window.keyboard.press('o')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+
     await node(window, 4).focus()
+
     await window.keyboard.press('z')
     await pressShifted(window, 'O')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
 
     // zO on the root opens the whole nested subtree, including the grandchild.
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await pressShifted(window, 'O')
+
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',
@@ -742,34 +890,48 @@ test.describe('inline node expansion (Vim editing only)', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
     const locationBefore = await window.getByLabel('Current location').innerText()
     await node(window, 1).focus()
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
 
     await window.keyboard.press('o')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+
     await window.screenshot({ path: test.info().outputPath('o-collapsed.png') })
     await window.keyboard.type('New')
     await window.keyboard.press('Escape')
 
     expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Bravo'])
+
     await window.keyboard.press('u')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+
     await window.keyboard.press('u')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
     await window.keyboard.press('Control+r')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Bravo'])
+
     await window.keyboard.press('Control+r')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Bravo'])
+
     await window.keyboard.press('u')
     await window.keyboard.press('u')
 
     // Replay uses the target's current fold, rather than the original insertion level.
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('o')
     await window.keyboard.press('.')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'New', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -777,37 +939,51 @@ test.describe('inline node expansion (Vim editing only)', () => {
 
     await window.keyboard.press('u')
     await node(window, 1).focus()
+
     await window.keyboard.press('o')
+
     await expect(node(window, 2)).toBeFocused()
     await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     expect(await nodeTexts(window)).toEqual(['Alpha', '', 'Alpha child one', 'Alpha child two', 'Bravo'])
+
     const rows = window.locator('.node-row')
+
     expect(await rows.nth(1).getAttribute('data-depth')).toBe(await rows.nth(2).getAttribute('data-depth'))
     expect(Number(await rows.nth(1).getAttribute('data-depth'))).toBe(
       Number(await rows.nth(0).getAttribute('data-depth')) + 1,
     )
+
     await window.screenshot({ path: test.info().outputPath('o-expanded.png') })
     await window.keyboard.type('Child')
     await window.keyboard.press('Escape')
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('c')
     await window.keyboard.press('.')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('u')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+
     await node(window, 1).focus()
+
     await window.keyboard.press('z')
     await window.keyboard.press('o')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Alpha child one', 'Alpha child two', 'Bravo'])
 
     // A leaf still gets a sibling below.
     await node(window, 5).focus()
+
     await window.keyboard.press('o')
     await window.keyboard.press('Escape')
+
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Alpha child one', 'Alpha child two', 'Bravo', ''])
   })
 
@@ -824,12 +1000,14 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await lockSystemClipboard()
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     // The only child is gone; its own parent is selected and nothing was entered.
     await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
     await expect(node(window, 2)).toBeFocused()
     await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
 
     await window.keyboard.press('u')
+
     await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
     await expect(node(window, 3)).toBeFocused()
     await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
@@ -841,11 +1019,13 @@ test.describe('inline node expansion (Vim editing only)', () => {
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).click()
+
     await expect(node(window, 2)).toBeFocused()
 
     // gg always targets the first displayed root, never the focused descendant's own real parent.
     await window.keyboard.press('g')
     await window.keyboard.press('g')
+
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveValue('Alpha')
 
@@ -853,6 +1033,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     // instead of stopping at the descendant's own last real sibling (Alpha child two).
     await node(window, 2).click()
     await window.keyboard.press('G')
+
     await expect(node(window, 4)).toBeFocused()
     await expect(node(window, 4)).toHaveValue('Bravo')
   })
@@ -866,6 +1047,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await node(window, 2).click()
     await window.keyboard.press('V')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
 
     await window.getByRole('button', { name: 'Collapse node 1' }).click()
@@ -913,9 +1095,12 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await node(window, 1).click()
     await window.keyboard.press('V')
     await window.keyboard.press('j')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
     await expect(window.locator('.node-row-visual-selected')).toHaveCount(5)
+
     await window.keyboard.press('Escape')
+
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     // 2yy yanks Alpha's whole subtree and Bravo as a two-sibling forest, then p puts fresh-ID copies
@@ -927,6 +1112,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await window.keyboard.press('y')
     await node(window, 6).click()
     await window.keyboard.press('p')
+
     expect(await nodeTexts(window)).toEqual([
       'Alpha',
       'Alpha child one',
@@ -944,6 +1130,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
     await window.keyboard.press('2')
     await window.keyboard.press('d')
     await window.keyboard.press('d')
+
     expect(await nodeTexts(window)).toEqual(['Charlie', 'Alpha', 'Bravo'])
   })
 })
@@ -953,6 +1140,7 @@ test.describe('appearance colors by depth', () => {
   test('colors node text by depth in the dark appearance only', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await window.getByRole('button', { name: 'Expand node 1' }).click()
     await window.getByRole('button', { name: 'Expand node 2' }).click()
     // Rows: Alpha(1), Alpha child one(2), Alpha grandchild(3), Alpha child two(4), Bravo(5).
@@ -960,6 +1148,7 @@ test.describe('appearance colors by depth', () => {
       Promise.all([1, 2, 3, 5].map((index) => node(window, index).evaluate((el) => getComputedStyle(el).color)))
 
     await window.emulateMedia({ colorScheme: 'dark' })
+
     expect(await colors()).toEqual([
       'rgb(223, 175, 143)',
       'rgb(240, 223, 175)',
@@ -968,6 +1157,7 @@ test.describe('appearance colors by depth', () => {
     ])
 
     await window.emulateMedia({ colorScheme: 'light' })
+
     expect(new Set(await colors()).size).toBe(1)
   })
 })

@@ -10,9 +10,11 @@ test.describe('spellcheck', () => {
       if (webContents === undefined) throw new Error('The main window is unavailable.')
       return { sessionEnabled: webContents.session.isSpellCheckerEnabled() }
     })
+
     expect(preferences.sessionEnabled).toBe(false)
 
     await typeInto(node(window, 1), 'dfjdf kjjj')
+
     await expect(node(window, 1)).toHaveAttribute('spellcheck', 'false')
     expect(await window.evaluate(() => document.activeElement?.getAttribute('spellcheck'))).toBe('false')
   })

@@ -109,6 +109,7 @@ describe('main IPC handlers', () => {
     nativeClipboard.read.mockResolvedValue([
       { types: ['image/png'], getType: async () => ({ size: 25 * 1024 * 1024 + 1, arrayBuffer }) },
     ])
+
     expect(ipcChannels.readClipboard).toBe('tree:read-clipboard')
     await expect(handlers.get(ipcChannels.readClipboard)!({ senderFrame: { url: rendererUrl } })).rejects.toThrow(
       'Clipboard image is too large (maximum 25 MiB).',
@@ -122,34 +123,48 @@ describe('main IPC handlers', () => {
     const harness = createHarness()
     const { handlers, setAppearance, setCommandHistory } = harness
     const event = { senderFrame: { url: rendererUrl } }
+
     expect(handlers.get(ipcChannels.getAppearance)!(event)).toBe('system')
     expect(handlers.get(ipcChannels.getCommandHistory)!(event)).toEqual(['set-theme-dark'])
+
     for (const value of ['system', 'light', 'dark']) handlers.get(ipcChannels.setAppearance)!(event, value)
+
     expect(setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark']])
     for (const value of [null, true, 'auto', {}])
       expect(() => handlers.get(ipcChannels.setAppearance)!(event, value)).toThrow('Invalid appearance')
+
     handlers.get(ipcChannels.setCommandHistory)!(event, ['set-theme-dark'])
+
     expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(['set-theme-dark'])
     for (const value of [null, {}, [1], ['a'.repeat(101)], Array(101).fill('set-theme-dark')])
       expect(() => handlers.get(ipcChannels.setCommandHistory)!(event, value)).toThrow('Invalid command history')
     expect(setCommandHistory).toHaveBeenCalledTimes(1)
+
     setCommandHistory.mockImplementationOnce(() => {
       throw new Error('disk full')
     })
+
     expect(() => handlers.get(ipcChannels.setCommandHistory)!(event, [])).toThrow('disk full')
+
     setAppearance.mockImplementationOnce(() => {
       throw new Error('appearance failed')
     })
+
     expect(() => handlers.get(ipcChannels.setAppearance)!(event, 'light')).toThrow('appearance failed')
   })
   it('writes plain text and validated attachment bytes through the content channel', async () => {
     const { handlers, fileServices, nativeClipboard, decodePng } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
+
     expect(ipcChannels.writeClipboardContent).toBe('tree:write-clipboard-content')
+
     const write = handlers.get(ipcChannels.writeClipboardContent)!
+
     await expect(write(event, { kind: 'text', text: 'https://example.com' })).resolves.toBeUndefined()
     expect(nativeClipboard.writePlainText).toHaveBeenCalledWith('https://example.com')
+
     vi.mocked(fileServices.readAttachment).mockResolvedValue(onePixelPng)
+
     await expect(write(event, { kind: 'image', attachmentId: 'image-1' })).resolves.toBeUndefined()
     expect(fileServices.readAttachment).toHaveBeenCalledWith('image-1')
     expect(decodePng).toHaveBeenCalledWith(onePixelPng)
@@ -160,6 +175,7 @@ describe('main IPC handlers', () => {
     const { handlers, fileServices, nativeClipboard } = createHarness()
     const write = handlers.get(ipcChannels.writeClipboardContent)!
     const event = { senderFrame: { url: rendererUrl } }
+
     for (const payload of [
       null,
       { kind: 'text', text: 12 },
@@ -176,13 +192,20 @@ describe('main IPC handlers', () => {
     const { handlers, fileServices, nativeClipboard } = createHarness()
     const write = handlers.get(ipcChannels.writeClipboardContent)!
     const event = { senderFrame: { url: rendererUrl } }
+
     await expect(write(event, { kind: 'image', attachmentId: 'missing' })).rejects.toThrow('attachment is missing')
+
     vi.mocked(fileServices.readAttachment).mockRejectedValueOnce(new Error('attachment read failed'))
+
     await expect(write(event, { kind: 'image', attachmentId: 'bad' })).rejects.toThrow('attachment read failed')
+
     vi.mocked(fileServices.readAttachment).mockResolvedValueOnce(new Uint8Array([1, 2]))
+
     await expect(write(event, { kind: 'image', attachmentId: 'corrupt' })).rejects.toThrow('PNG')
     expect(nativeClipboard.writeImage).not.toHaveBeenCalled()
+
     nativeClipboard.writePlainText.mockRejectedValueOnce(new Error('native write failed'))
+
     await expect(write(event, { kind: 'text', text: 'first' })).rejects.toThrow('native write failed')
     await expect(write(event, { kind: 'text', text: 'retry' })).resolves.toBeUndefined()
   })
@@ -191,8 +214,10 @@ describe('main IPC handlers', () => {
     const { handlers, fileServices, nativeClipboard } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
     const write = handlers.get(ipcChannels.writeClipboardContent)!
+
     Reflect.deleteProperty(nativeClipboard, 'writePlainText')
     Reflect.deleteProperty(nativeClipboard, 'writeImage')
+
     await expect(write(event, { kind: 'text', text: 'text' })).rejects.toThrow('text copying is unavailable')
     await expect(write(event, { kind: 'image', attachmentId: 'image' })).rejects.toThrow('image copying is unavailable')
     expect(fileServices.readAttachment).not.toHaveBeenCalled()
@@ -211,9 +236,12 @@ describe('main IPC handlers', () => {
     const text = handlers.get(ipcChannels.writeClipboardContent)!(event, { kind: 'text', text: 'later' })
     const rich = handlers.get(ipcChannels.writeClipboard)!(event, { text: 'rich', html: '<b>rich</b>' })
     await Promise.resolve()
+
     expect(nativeClipboard.writePlainText).not.toHaveBeenCalled()
+
     release(onePixelPng)
     await Promise.all([image, text, rich])
+
     expect(nativeClipboard.writeImage.mock.invocationCallOrder[0]).toBeLessThan(
       nativeClipboard.writePlainText.mock.invocationCallOrder[0]!,
     )
@@ -257,6 +285,7 @@ describe('main IPC handlers', () => {
     const state = { ...base, view: { expandedIds: ['root'], selectedRowTop: 24 } }
 
     await handlers.get(ipcChannels.save)!(event, state)
+
     expect(vi.mocked(fileServices.save).mock.calls[0]![0]).toBe(state)
 
     for (const view of [
@@ -285,9 +314,11 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
 
     await handlers.get(ipcChannels.save)!(event, state)
+
     expect(fileServices.save).toHaveBeenCalledOnce()
 
     current.children.push({ id: 'n20', text: '', children: [] })
+
     await expect(Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, state))).rejects.toThrow(
       'Nodes cannot be nested deeper than 20 levels.',
     )
@@ -321,6 +352,7 @@ describe('main IPC handlers', () => {
       ...request,
       selectionText: 'x'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS + 10),
     })
+
     expect(showEditorContextMenu).toHaveBeenLastCalledWith(sender, {
       ...request,
       selectionText: 'x'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1) + '…',
@@ -337,6 +369,7 @@ describe('main IPC handlers', () => {
   it('forwards argument-free notes export and import requests and their results', async () => {
     const { handlers, notesArchive } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
+
     expect(ipcChannels.chooseNotesExportDestination).toBe('tree:notes-choose-export-destination')
     expect(ipcChannels.startNotesExport).toBe('tree:notes-start-export')
     expect(ipcChannels.chooseNotesImportArchive).toBe('tree:notes-choose-import-archive')
@@ -365,7 +398,9 @@ describe('main IPC handlers', () => {
       fileName: 'a.zip',
       replacedFolder: '~/Library/Application Support/Tree/x',
     })
+
     handlers.get(ipcChannels.showReplacedNotesFolder)!(event)
+
     for (const method of Object.values(notesArchive).filter((method) => method !== notesArchive.shutdown)) {
       expect(method).toHaveBeenCalledExactlyOnceWith()
     }
@@ -377,6 +412,7 @@ describe('main IPC handlers', () => {
     const notesChannels = Object.values(ipcChannels).filter(
       (channel) => channel.startsWith('tree:notes-') && channel !== ipcChannels.setNotesMenuState,
     )
+
     expect(notesChannels).toHaveLength(8)
 
     for (const channel of notesChannels) {
@@ -432,6 +468,7 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
 
     expect(handlers.get(ipcChannels.getAlwaysOnTop)!(event)).toBe(false)
+
     await handlers.get(ipcChannels.setAlwaysOnTop)!(event, true)
 
     expect(getAlwaysOnTop).toHaveBeenCalledOnce()
@@ -446,6 +483,7 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
 
     expect(handlers.get(ipcChannels.getVimEnabled)!(event)).toBe(true)
+
     await handlers.get(ipcChannels.setVimEnabled)!(event, false)
 
     expect(getVimEnabled).toHaveBeenCalledOnce()
@@ -526,9 +564,11 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
 
     await handlers.get(ipcChannels.writeAttachment)!(event, 'image-1', onePixelPng)
+
     expect(decodePng).toHaveBeenCalledOnce()
 
     await handlers.get(ipcChannels.readAttachment)!(event, 'image-1')
+
     expect(decodePng).toHaveBeenCalledOnce()
   })
 
@@ -541,6 +581,7 @@ describe('main IPC handlers', () => {
     expect(fileServices.cleanupAttachments).toHaveBeenLastCalledWith(['image-1', 'image-2'])
 
     vi.mocked(fileServices.cleanupAttachments).mockRejectedValueOnce(new Error('cleanup failed'))
+
     await expect(Promise.resolve().then(() => cleanup(event, []))).rejects.toThrow('cleanup failed')
   })
 
@@ -561,8 +602,11 @@ describe('main IPC handlers', () => {
   it('preserves load results and propagates persistence failures across registered channels', async () => {
     const { handlers, fileServices } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
+
     await expect(handlers.get(ipcChannels.load)!(event)).resolves.toBeNull()
+
     vi.mocked(fileServices.load).mockResolvedValueOnce(validState)
+
     await expect(handlers.get(ipcChannels.load)!(event)).resolves.toEqual(validState)
     expect(fileServices.load).toHaveBeenCalledWith()
 
@@ -570,6 +614,7 @@ describe('main IPC handlers', () => {
     vi.mocked(fileServices.load).mockRejectedValueOnce(failure)
     vi.mocked(fileServices.save).mockRejectedValueOnce(failure)
     vi.mocked(fileServices.cleanupAttachments).mockRejectedValueOnce(failure)
+
     await expect(handlers.get(ipcChannels.load)!(event)).rejects.toBe(failure)
     await expect(handlers.get(ipcChannels.save)!(event, validState)).rejects.toBe(failure)
     await expect(handlers.get(ipcChannels.cleanupAttachments)!(event, [])).rejects.toBe(failure)
@@ -579,9 +624,12 @@ describe('main IPC handlers', () => {
 // @requirement PRODUCT.md §25.1
 it('validates notes menu availability and forwards it only for a trusted caller', () => {
   const { handlers, setNotesMenuState } = createHarness()
+
   expect(ipcChannels.setNotesMenuState).toBe('tree:notes-set-menu-state')
+
   const invoke = handlers.get(ipcChannels.setNotesMenuState)!
   const event = { senderFrame: { url: rendererUrl } }
+
   expect(invoke(event, { canExport: true, canImport: false })).toBeUndefined()
   expect(setNotesMenuState).toHaveBeenCalledExactlyOnceWith({ canExport: true, canImport: false })
   for (const value of [
@@ -600,8 +648,10 @@ it('validates notes menu availability and forwards it only for a trusted caller'
   expect(() =>
     invoke({ senderFrame: { url: 'https://untrusted.test/' } }, { canExport: true, canImport: true }),
   ).toThrow('Untrusted renderer IPC call.')
+
   setNotesMenuState.mockImplementationOnce(() => {
     throw new Error('Menu failed')
   })
+
   expect(() => invoke(event, { canExport: false, canImport: false })).toThrow('Menu failed')
 })

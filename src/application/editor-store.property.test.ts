@@ -41,9 +41,11 @@ function displayedIn(state: ReadyState, document: ReadyState['document'], nodeId
 /** Check effects against the incoming view, independently of the location chosen by the command. */
 function assertTransition(store: EditorStore, before: ReadyState, action: CommandAction, knownIds: Set<string>): void {
   assertInvariants(store)
+
   const after = store.getSnapshot()
   if (after.status !== 'ready') return
   for (const id of allIds(after.document)) knownIds.add(id)
+
   for (const id of after.expansion.expandedIds) expect(knownIds.has(id)).toBe(true)
 
   // Expansion is independent of document history. Deleted nodes retain their choices for undo.
@@ -66,18 +68,22 @@ function assertTransition(store: EditorStore, before: ReadyState, action: Comman
       const previous = before.location.currentParentId
       const next = after.location.currentParentId
       if (next === previous) break
+
       expect(
         next === null ||
           (previous !== null && locateNode(after.document, previous)!.ancestors.some((a) => a.id === next)),
       ).toBe(true)
+
       return
     }
     case 'join': {
       // A join only merges siblings into the first one: it creates no node, and every attachment
       // reference survives (only one participating node may carry one, and it moves to the first).
       const beforeIds = new Set(allIds(before.document))
+
       for (const id of allIds(after.document)) expect(beforeIds.has(id)).toBe(true)
       expect([...attachmentSummary(after.document)]).toEqual([...attachmentSummary(before.document)])
+
       break
     }
     case 'undo':
@@ -91,17 +97,21 @@ function assertTransition(store: EditorStore, before: ReadyState, action: Comman
       if (before.location.selectedNodeId === before.location.currentParentId) return
       break
   }
+
   expect(after.location.currentParentId).toBe(before.location.currentParentId)
 }
 
 function assertInvariants(store: EditorStore): void {
   const state = store.getSnapshot()
+
   expect(state.status).toBe('ready')
+
   if (state.status !== 'ready') {
     return
   }
 
   const ids = allIds(state.document)
+
   expect(new Set(ids).size).toBe(ids.length)
   expect(isValidLocation(state.document, state.location)).toBe(true)
   expect(locateNode(state.document, state.location.selectedNodeId)).toBeDefined()
@@ -130,10 +140,13 @@ describe('EditorStore invariants under command sequences', () => {
           ),
           freshIds(),
         )
+
         await store.initialize()
         if (expanded) store.applyFold('open', 'target')
         const before = store.getSnapshot() as ReadyState
+
         expect(store.pasteNodeForest('target', 'after', { nodes: source, sourceIds: [] }, count)).toBe(true)
+
         const after = store.getSnapshot() as ReadyState
         const destination = expanded ? after.document.roots[0]!.children : after.document.roots.slice(1)
         const copies = destination.slice(0, source.length * count)
@@ -142,13 +155,18 @@ describe('EditorStore invariants under command sequences', () => {
           id: '',
           children: node.children.map(content),
         })
+
         expect(copies.map(content)).toEqual(Array.from({ length: count }, () => source.map(content)).flat())
         expect(after.expansion.expandedIds).toEqual(before.expansion.expandedIds)
         expect(after.location).toEqual({ currentParentId: null, selectedNodeId: copies[0]!.id })
         assertInvariants(store)
+
         store.undo()
+
         expect((store.getSnapshot() as ReadyState).document).toEqual(before.document)
+
         store.redo()
+
         expect((store.getSnapshot() as ReadyState).document).toEqual(after.document)
         assertInvariants(store)
       }),
@@ -180,6 +198,7 @@ describe('EditorStore invariants under command sequences', () => {
           ),
           freshIds(),
         )
+
         await store.initialize()
         const before = store.getSnapshot()
         if (before.status !== 'ready') throw new Error('Editor did not load')
@@ -202,15 +221,19 @@ describe('EditorStore invariants under command sequences', () => {
           createServices({ version: 1, document, location: firstLocation(document) }, () => clipboard.current),
           freshIds(),
         )
+
         await store.initialize()
         const knownIds = new Set(allIds(document))
+
         assertInvariants(store)
 
         for (const action of commands) {
           const before = store.getSnapshot()
           if (before.status !== 'ready') break
+
           const ran = await applyCommand(store, action, clipboard)
           if (!ran) break
+
           assertTransition(store, before, action, knownIds)
         }
       }),
@@ -229,17 +252,21 @@ describe('EditorStore invariants under command sequences', () => {
           createServices({ version: 1, document, location: firstLocation(document) }, () => clipboard.current),
           freshIds(),
         )
+
         await store.initialize()
         const knownIds = new Set(allIds(document))
+
         assertInvariants(store)
 
         for (const action of commands) {
           const before = store.getSnapshot()
           if (before.status !== 'ready') break
+
           const ran = await applyCommand(store, action, clipboard, () => {
             exercisedDeepSelection = true
           })
           if (!ran) break
+
           assertTransition(store, before, action, knownIds)
         }
 
@@ -254,16 +281,21 @@ describe('EditorStore invariants under command sequences', () => {
           createServices(persisted, () => ({ kind: 'text', text: '' })),
           freshIds(),
         )
+
         await restoredStore.initialize()
         const restored = restoredStore.getSnapshot()
 
         expect(restored.status).toBe('ready')
+
         if (restored.status !== 'ready') return
+
         expect(restored.document).toEqual(state.document)
         expect(restored.location.currentParentId).toBe(state.location.currentParentId)
+
         // Every remembered choice for a node the document still holds survives the restart, so the
         // restored location shows the same rows, and a selection that was displayed is kept.
         const liveIds = new Set(allIds(state.document))
+
         expect(restored.expansion.expandedIds).toEqual(
           new Set([...state.expansion.expandedIds].filter((id) => liveIds.has(id))),
         )
@@ -317,22 +349,30 @@ describe('EditorStore invariants under command sequences', () => {
           ),
           freshIds(),
         )
+
         await store.initialize()
         const knownIds = new Set(allIds(document))
         const run = async (kind: CommandAction['kind']): Promise<void> => {
           const before = store.getSnapshot()
           if (before.status !== 'ready') throw new Error('Editor did not initialize')
           const action = { kind, a: 1, b: 0, text: '' }
+
           await applyCommand(store, action, clipboard)
+
           assertTransition(store, before, action, knownIds)
         }
+
         await run('foldAll')
         store.selectNode('leaf', 0)
+
         assertInvariants(store)
+
         await run(emptyDelete ? 'deleteEmpty' : 'delete')
         await run('undo')
+
         expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'leaf' } })
         expect(store.getVisibleRows().map((row) => row.node.id)).toContain(descendants[0]!.id)
+
         await run('redo')
       }),
       { numRuns: propertyRuns(100) },
@@ -355,6 +395,7 @@ describe('EditorStore invariants under command sequences', () => {
     await fc.assert(
       fc.asyncProperty(fc.array(fc.string(), { minLength: 1, maxLength: 5 }), async (texts) => {
         const roots = texts.map((text, index) => ({ id: `root-${index}`, text, children: [] as TreeNode[] }))
+
         roots.splice(1, 0, { id: 'empty', text: '', children: [] })
         const store = new EditorStore(
           createServices(
@@ -367,14 +408,18 @@ describe('EditorStore invariants under command sequences', () => {
           ),
           () => 'created',
         )
+
         await store.initialize()
 
         store.createSiblingOrFirstChild(0)
 
         const state = store.getSnapshot()
+
         expect(state.status).toBe('ready')
+
         if (state.status === 'ready') {
           const emptyIndex = state.document.roots.findIndex((node) => node.id === 'empty')
+
           expect(state.document.roots[emptyIndex + 1]?.id).toBe('created')
           expect(state.location.selectedNodeId).toBe('created')
           expect(state.focus).toMatchObject({ nodeId: 'created', cursor: 0 })
@@ -404,34 +449,48 @@ describe('EditorStore invariants under command sequences', () => {
               release = resolve
             })
           const store = new EditorStore(services, () => 'unused')
+
           await store.initialize()
 
           const pending = store.cut('root', 0, original.length)
+
           expect(release).toBeTypeOf('function')
+
           store.editText('root', intervening)
           release!()
           await pending
 
           const state = store.getSnapshot()
+
           expect(state.status).toBe('ready')
+
           if (state.status !== 'ready') {
             return
           }
           if (intervening === original) {
             expect(state.document.roots[0]!.text).toBe('')
             expect(state.operationError).toBeUndefined()
+
             store.undo()
+
             expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: original }] } })
+
             store.redo()
+
             expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
           } else {
             expect(state.document.roots[0]!.text).toBe(intervening)
             expect(state.operationError).toBe('The cut could not finish because the text changed.')
+
             store.undo()
+
             expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: original }] } })
+
             store.redo()
+
             expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: intervening }] } })
           }
+
           assertInvariants(store)
         },
       ),
@@ -492,6 +551,7 @@ describe('EditorStore save accounting', () => {
           cleanupAttachments: async () => undefined,
         }
         const store = new EditorStore(services, () => 'created', noopClock())
+
         await store.initialize()
         await store.flushPersistence()
         saves.length = 0
@@ -516,18 +576,25 @@ describe('EditorStore save accounting', () => {
         for (const current of events) {
           if (current.kind === 'insert') {
             wordCount += current.words
+
             store.editText('root', textFor(wordCount))
             inserted += current.words
             if (inserted - acknowledged >= threshold) requested = true
+
             await tick()
             startIfIdle()
+
             expect(saves.length).toBe(started)
+
             continue
           }
 
           if (inFlight === undefined) continue
+
           const next = pending.shift()
+
           expect(next).toBeDefined()
+
           if (current.kind === 'success') {
             next!.resolve()
             acknowledged = Math.max(acknowledged, inFlight)
@@ -535,8 +602,10 @@ describe('EditorStore save accounting', () => {
             next!.reject(new Error('save failed'))
           }
           inFlight = undefined
+
           startIfIdle()
           await tick()
+
           expect(saves.length).toBe(started)
         }
 
@@ -553,12 +622,15 @@ describe('EditorStore save accounting', () => {
           pending.shift()!.resolve()
           await tick()
         }
+
         expect(saves.length).toBe(started)
 
         wordCount += threshold
+
         store.editText('root', textFor(wordCount))
         inserted += threshold
         if (inserted - acknowledged >= threshold) requested = true
+
         await tick()
         startIfIdle()
         let guard = 0
@@ -573,11 +645,14 @@ describe('EditorStore save accounting', () => {
           }
           await tick()
         }
+
         expect(acknowledged).toBe(inserted)
 
         wordCount += 1
+
         store.editText('root', textFor(wordCount))
         await tick()
+
         expect(saves.length).toBe(started)
       }),
       { numRuns: propertyRuns(200) },

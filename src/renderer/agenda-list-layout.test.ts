@@ -20,15 +20,20 @@ describe('Agenda occurrence layout', () => {
       [rows[1]!.key, 75],
       ['gone', 100],
     ])
+
     const layout = buildLayout(rows, heights)
+
     expect([...layout.offsets.slice(0, 4)]).toEqual([0, 50, 125, 150])
+
     pruneHeights(heights, rows.slice(1))
+
     expect([...heights]).toEqual([[rows[1]!.key, 75]])
   })
   // @requirement PRODUCT.md §23.6
   it('bounds mounted indices and pins the selected occurrence outside the viewport', () => {
     const layout = buildLayout(rows, new Map())
     const range = agendaListWindow(rows, layout, { start: 5000, end: 5600 }, rows[900]!.key)!
+
     expect(range.end - range.start).toBeLessThan(60)
     expect(range.pinnedIndex).toBe(900)
     expect(agendaListWindow(rows, layout, { start: 5000, end: 5600 }, rows[210]!.key)?.pinnedIndex).toBeUndefined()

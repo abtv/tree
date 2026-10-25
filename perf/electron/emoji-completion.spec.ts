@@ -12,7 +12,9 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
   const { window } = await launchTree(userDataDir, { vimEnabled: false })
   const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
   await input.focus()
+
   await expect(input).toBeFocused()
+
   await window.keyboard.press('Meta+ArrowRight')
   await window.evaluate(() => {
     const samples: number[] = []
@@ -29,28 +31,36 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
   const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
   for (let index = 0; index < 20; index++) {
     await window.keyboard.type(':')
+
     await expect(popup).toBeVisible()
     await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
       index * 3 + 1,
     )
+
     await window.keyboard.press('ArrowDown')
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
       index * 3 + 2,
     )
+
     await window.keyboard.type('rkt')
+
     await expect(popup.getByRole('option').filter({ hasText: ':rocket:' })).toBeVisible()
+
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,
       index * 3 + 3,
     )
     for (let key = 0; key < 4; key++) await window.keyboard.press('Backspace')
+
     await expect(popup).toHaveCount(0)
   }
   const samples = await window.evaluate(() => (window as unknown as { emojiPaints: number[] }).emojiPaints)
   const sorted = samples.toSorted((a, b) => a - b)
+
   recordPerfResult({
     kind: 'typing',
     scenario: 'emoji-catalog-10000-standard',
@@ -61,6 +71,7 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
       paintMaxMs: round(sorted.at(-1)!),
     },
   })
+
   expect(sorted[Math.floor(sorted.length * 0.95)]).toBeLessThan(50)
   expect(sorted.at(-1)).toBeLessThan(100)
   await expect(input).toHaveValue('Plan ')

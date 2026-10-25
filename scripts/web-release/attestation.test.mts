@@ -35,8 +35,11 @@ describe('independent manifest authentication', () => {
   it('requires gh to verify exact signed bytes, source workflow, main ref, source digest and hosted runner', async () => {
     const f = await fixture()
     const run = vi.fn<CommandRunner>()
+
     await expect(verifyAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
+
     const [command, args] = run.mock.calls[0]!
+
     expect(command).toBe('gh')
     expect(args).toEqual([
       'attestation',
@@ -69,17 +72,24 @@ describe('independent manifest authentication', () => {
       if (!args.includes('abtv/tree/.github/workflows/release.yml')) throw new Error('Signer mismatch')
       return ''
     })
+
     await expect(verifyAttestation(f.manifestFile, f.bundleFile, { run })).rejects.toThrow('verification failed')
     expect(run).toHaveBeenCalledOnce()
+
     run.mockClear()
+
     await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
     expect(run).toHaveBeenCalledTimes(2)
+
     const current = run.mock.calls[0]![1]
     const historical = run.mock.calls[1]![1]
+
     expect(historical).toEqual(current.map((arg) => arg.replace('release-web-app.yml', 'release.yml')))
+
     run.mockImplementation(() => {
       throw new Error('Invalid signature')
     })
+
     await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).rejects.toThrow(
       'verification failed',
     )
@@ -88,6 +98,7 @@ describe('independent manifest authentication', () => {
   it('does not try the historical signer when the current signature verifies', async () => {
     const f = await fixture()
     const run = vi.fn<CommandRunner>()
+
     await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
     expect(run).toHaveBeenCalledOnce()
     expect(run.mock.calls[0]![1]).toContain('abtv/tree/.github/workflows/release-web-app.yml')
@@ -96,9 +107,13 @@ describe('independent manifest authentication', () => {
   it('rejects missing proof and symlink metadata before invoking the signature verifier', async () => {
     const f = await fixture()
     const run = vi.fn<CommandRunner>()
+
     await expect(verifyAttestation(f.manifestFile, join(f.base, 'absent.json'), { run })).rejects.toThrow()
+
     const link = join(f.base, 'linked.json')
+
     await symlink(f.bundleFile.split('/').at(-1)!, link)
+
     await expect(verifyAttestation(f.manifestFile, link, { run })).rejects.toThrow('metadata')
     expect(run).not.toHaveBeenCalled()
   })
@@ -107,7 +122,9 @@ describe('independent manifest authentication', () => {
     for (const name of ['x.html', 'x.svg']) {
       const f = await fixture()
       const file = join(f.dir, 'assets', name)
+
       await writeFile(file, 'unsafe')
+
       // @ts-expect-error Exercise the obsolete JavaScript call shape; extra options must not bypass validation.
       await expect(verifyPackage(f.dir, f.manifest, { allowRetainedAssets: true })).rejects.toThrow('Unexpected')
     }
@@ -115,6 +132,7 @@ describe('independent manifest authentication', () => {
 
   it('requires independent source tool SHA to agree with authenticated package source', async () => {
     const f = await fixture()
+
     await expect(
       verifyTarget({
         directory: f.dir,
@@ -173,9 +191,11 @@ describe('authenticated retained assets', () => {
     const attest = vi.fn(async (manifestFile: string, bundleFile: string) => {
       expect(JSON.parse(await readFile(manifestFile, 'utf8'))).toEqual(f.old)
       expect(JSON.parse(await readFile(bundleFile, 'utf8'))).toEqual({})
+
       return f.old
     })
     const merged = await preparePackage(f.dir, f.manifestFile, { request: f.request, attest })
+
     expect(attest).toHaveBeenCalledOnce()
     expect(merged.sourceSha).toBe(identity.sourceSha)
     expect(merged.files).toContainEqual(f.file)
@@ -185,6 +205,7 @@ describe('authenticated retained assets', () => {
 
   it('never promotes target-supplied hashes when the old signature is invalid', async () => {
     const f = await previousFixture()
+
     await expect(
       preparePackage(f.dir, f.manifestFile, {
         request: f.request,
@@ -205,6 +226,7 @@ describe('authenticated retained assets', () => {
       if (fault === 'metadata') f.tree[0]!.size = 2 * 1024 * 1024
       if (fault === 'proof') f.tree.splice(1, 1)
       if (fault === 'collision') f.old.files.find((file) => file.path === 'assets/app.js')!.sha256 = '0'.repeat(64)
+
       await expect(
         preparePackage(f.dir, f.manifestFile, { request: f.request, attest: async () => f.old }),
       ).rejects.toThrow()
@@ -214,16 +236,22 @@ describe('authenticated retained assets', () => {
 
   it('allows genuine first publication but refuses an existing unsigned site', async () => {
     const f = await previousFixture()
+
     f.tree.splice(0)
+
     await expect(preparePackage(f.dir, f.manifestFile, { request: f.request })).resolves.toEqual(f.manifest)
+
     f.tree.push({ path: 'site', type: 'tree' })
+
     await expect(preparePackage(f.dir, f.manifestFile, { request: f.request })).rejects.toThrow('no authenticated')
   })
 
   it('checks cumulative authenticated history bounds before fetching retained assets', async () => {
     const f = await previousFixture()
+
     await writeFile(join(f.dir, 'assets/current.js'), Buffer.alloc(2 * 1024 * 1024))
     const current = await createManifest(f.dir, identity)
+
     await writeFile(f.manifestFile, JSON.stringify(current))
     f.old.files = f.manifest.files.concat(
       [1, 2, 3].map((n) => ({
@@ -232,6 +260,7 @@ describe('authenticated retained assets', () => {
         size: 8 * 1024 * 1024,
       })),
     )
+
     await expect(
       preparePackage(f.dir, f.manifestFile, {
         request: f.request,

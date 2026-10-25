@@ -10,6 +10,7 @@ it('keeps every Normal caret target on exactly one character or the terminal pos
       fc.boolean(),
       (textLength, position, hasAttachment) => {
         const target = normalCaretTarget('x'.repeat(textLength), position, hasAttachment)
+
         if (target.kind === 'block') {
           expect(target.start).toBeGreaterThanOrEqual(0)
           expect(target.end).toBe(target.start + 1)
@@ -36,8 +37,11 @@ it('never selects a character outside the link under the caret', () => {
         const link = { start: linkStart, end: linkStart + linkLength }
         const caret = link.start + (linkStartSeed % linkLength)
         const target = normalCaretTarget('x'.repeat(textLength), caret, hasAttachment)
+
         expect(target.kind).toBe('block')
+
         if (target.kind !== 'block') return
+
         expect(target.start).toBe(caret)
         expect(target.start).toBeGreaterThanOrEqual(link.start)
         expect(target.end).toBeLessThanOrEqual(link.end)
@@ -51,6 +55,7 @@ it('keeps a pending link draft only while its text still matches its url', () =>
     fc.property(fc.string({ maxLength: 40 }), fc.nat(40), fc.nat(40), (text, startSeed, endSeed) => {
       const bounds = [startSeed % (text.length + 1), endSeed % (text.length + 1)].sort((a, b) => a - b)
       const draft = { start: bounds[0]!, end: bounds[1]!, url: text.slice(bounds[0]!, bounds[1]!) }
+
       expect(currentLinkDraft(text, draft)).toBe(draft)
       expect(currentLinkDraft(text, { ...draft, url: `${draft.url}!` })).toBeUndefined()
       expect(currentLinkDraft(text, undefined)).toBeUndefined()

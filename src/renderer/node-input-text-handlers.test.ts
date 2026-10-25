@@ -61,22 +61,33 @@ describe('textarea text edits', () => {
     const row = document.createElement('div')
     row.className = 'agenda-row'
     const input = richInput('2026-10-14 composed', 18)
+
     row.append(input)
     document.body.append(row)
+
     setCaret(input, 18)
     f.deps.composing = true
+
     f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: true } } as never)
+
     expect(f.node().text).toBe('2026-10-14 composed')
     expect(f.deps.schedulePendingCaret).not.toHaveBeenCalled()
+
     f.handlers().onCompositionEnd({ currentTarget: input } as never)
+
     expect(f.deps.schedulePendingCaret).toHaveBeenCalledWith({ nodeId: 'node', input, cursor: 18, refocus: true })
+
     f.deps.composing = false
+
     f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: false } } as never)
+
     expect(f.deps.schedulePendingCaret).toHaveBeenCalledTimes(2)
   })
   it('keeps incomplete URLs as plain text without scheduling a caret', async () => {
     const f = await fixture('http:')
+
     f.handlers().onTextChange({ currentTarget: textarea('http:/') } as never)
+
     expect(f.node().text).toBe('http:/')
     expect(f.node().links ?? []).toEqual([])
     expect(f.deps.schedulePendingCaret).not.toHaveBeenCalled()
@@ -88,7 +99,9 @@ describe('textarea text edits', () => {
     f.deps.schedulePendingCaret.mockImplementation(() => {
       expect(f.node().text).toBe('https://example.')
     })
+
     f.handlers().onTextChange({ currentTarget: input, nativeEvent: { isComposing: false } } as never)
+
     expect(f.node()).toMatchObject({ text: url, links: [{ start: 0, end: url.length, url }] })
     expect(f.deps.schedulePendingCaret).toHaveBeenCalledExactlyOnceWith({ nodeId: 'node', cursor: 5, refocus: true })
   })
@@ -99,7 +112,9 @@ describe('textarea text edits', () => {
     const handlers = f.handlers()
     // The composing value belongs to the render that created these handlers.
     f.deps.composing = false
+
     handlers.onTextChange({ currentTarget: textarea(url), nativeEvent: { isComposing: source === 'native' } } as never)
+
     expect(f.node().text).toBe(url)
     expect(f.node().links ?? []).toEqual([])
     expect(f.deps.schedulePendingCaret).not.toHaveBeenCalled()
@@ -112,20 +127,28 @@ describe.each(['onContentInput', 'onContentChange'] as const)('%s link reconcili
     const links = [{ start: 4, end: original.length, url }]
     const f = await fixture(original, links)
     const input = richInput(original, 3)
+
     f.handlers()[handler]({ currentTarget: input } as never)
+
     expect(f.node()).toMatchObject({ text: original, links })
     expect(f.deps.pendingLinkDraft.current).toBeUndefined()
+
     input.textContent = 'see https//example.test'
+
     setCaret(input, 3)
     f.handlers()[handler]({ currentTarget: input } as never)
+
     expect(f.node().links ?? []).toEqual([])
     expect(f.deps.pendingLinkDraft.current).toEqual({
       nodeId: 'node',
       range: { start: 4, end: input.textContent.length, url: 'https//example.test' },
     })
+
     input.textContent = original
+
     setCaret(input, 3)
     f.handlers()[handler]({ currentTarget: input } as never)
+
     expect(f.node()).toMatchObject({ text: original, links })
     expect(f.deps.pendingLinkDraft.current).toBeUndefined()
     if (handler === 'onContentInput') {
@@ -142,7 +165,9 @@ describe.each(['onContentInput', 'onContentChange'] as const)('%s link reconcili
       range: { start: 0, end: url.length, url },
     }
     const input = richInput('plain!')
+
     f.handlers()[handler]({ currentTarget: input } as never)
+
     expect(f.node().text).toBe('plain!')
     expect(f.node().links ?? []).toEqual([])
     expect(f.deps.pendingLinkDraft.current).toBeUndefined()
@@ -151,7 +176,9 @@ describe.each(['onContentInput', 'onContentChange'] as const)('%s link reconcili
 
 it('treats a missing content-change text value as empty', async () => {
   const f = await fixture()
+
   f.handlers().onContentChange({ currentTarget: { textContent: null } } as never)
+
   expect(f.node().text).toBe('')
   expect(f.deps.pendingLinkDraft.current).toBeUndefined()
 })
@@ -163,9 +190,12 @@ describe('composition transitions', () => {
     f.deps.finishVimReplace.mockImplementation(() => {
       expect(f.deps.commandState.pending).toBeUndefined()
       expect(f.deps.setComposing).not.toHaveBeenCalled()
+
       return true
     })
+
     f.handlers().onCompositionStart({ currentTarget: textarea('hello') } as never)
+
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(undefined, false, true)
     expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(true)
   })
@@ -175,13 +205,16 @@ describe('composition transitions', () => {
     async (kind) => {
       const f = await fixture()
       const handlers = f.handlers()
+
       f.setMode('replace')
       const input = kind === 'textarea' ? textarea('composed', 4) : richInput('composed', 4)
       f.deps.setComposing.mockImplementation((value) => {
         expect(value).toBe(false)
         expect(f.deps.session.replace).toBeUndefined()
       })
+
       handlers.onCompositionEnd({ currentTarget: input } as never)
+
       expect(f.deps.session.replace).toEqual({ nodeId: 'node', baseline: 'composed', position: 4, typed: '' })
       expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(false)
     },
@@ -191,8 +224,10 @@ describe('composition transitions', () => {
     'ends composition without creating a Replace session in %s mode',
     async (mode) => {
       const f = await fixture()
+
       f.setMode(mode)
       f.handlers().onCompositionEnd({ currentTarget: textarea('hello') } as never)
+
       expect(f.deps.session.replace).toBeUndefined()
       expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(false)
     },

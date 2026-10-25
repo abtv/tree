@@ -53,12 +53,18 @@ async function fixture(attached = false) {
 describe('structural and plain Insert completion', () => {
   it.each([false, true])('captures structural text once (rich: %s)', (rich) => {
     const commandState = createVimCommandState()
+
     beginStructuralOpen(commandState, 'node', 'after')
     const element = input('created', rich)
+
     finishStructuralInsertSession({ commandState }, element)
+
     expect(commandState.lastChange).toEqual({ kind: 'structural-open', position: 'after', text: 'created' })
+
     const change = commandState.lastChange
+
     finishStructuralInsertSession({ commandState }, input('ignored'))
+
     expect(commandState.lastChange).toBe(change)
   })
 
@@ -75,6 +81,7 @@ describe('structural and plain Insert completion', () => {
       const element = input(text, rich)
       const previous = { kind: 'delete' as const, motion: 'l', count: 1 }
       f.commandState.lastChange = previous
+
       beginInsertSession(f.session, {
         nodeId: 'node',
         baseline: 'hello',
@@ -83,7 +90,9 @@ describe('structural and plain Insert completion', () => {
       })
       const finishStructuralInsert = vi.fn()
       const deps = { ...f.deps, finishStructuralInsert, getInput: () => (matching ? element : undefined) }
+
       finishInsertSession(deps, element, completed)
+
       if (completed) expect(finishStructuralInsert).toHaveBeenCalledWith(element)
       else expect(finishStructuralInsert).not.toHaveBeenCalled()
       expect(f.session.insert).toBeUndefined()
@@ -96,8 +105,11 @@ describe('structural and plain Insert completion', () => {
           deleteCount: 0,
         })
       else expect(f.commandState.lastChange).toBe(previous)
+
       const recorded = f.commandState.lastChange
+
       finishInsertSession(deps, element, true)
+
       expect(f.commandState.lastChange).toBe(recorded)
     },
   )
@@ -107,6 +119,7 @@ describe('Replace completion', () => {
   it.each([false, true])('consumes absent or empty work without committing (empty: %s)', async (empty) => {
     const f = await fixture()
     if (empty) beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 1 })
+
     expect(finishReplaceSession(f.deps)).toBe(false)
     expect(f.session.replace).toBeUndefined()
     expect(f.node().text).toBe('hello')
@@ -123,10 +136,12 @@ describe('Replace completion', () => {
     async ({ present, preserve, retreat, attached, same }) => {
       const f = await fixture(attached)
       if (!same) f.authority.nodeId = 'other'
+
       beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 1 })
       f.session.replace!.typed = 'XY'
       const element = present ? input('native selection') : undefined
       if (element instanceof HTMLTextAreaElement) element.setSelectionRange(1, 4)
+
       expect(finishReplaceSession(f.deps, element, retreat, preserve)).toBe(true)
       expect(f.node().text).toBe('hXYlo')
       expect(f.commandState.lastChange).toEqual({ kind: 'overwrite', text: 'XY', replaced: 2 })
@@ -149,6 +164,7 @@ describe('Replace completion', () => {
 describe('pending edit flush', () => {
   it('commits a real Replace session once while discarding structural capture', async () => {
     const f = await fixture()
+
     beginStructuralOpen(f.commandState, 'node', 'after')
     beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 0 })
     f.session.replace!.typed = 'X'
@@ -160,6 +176,7 @@ describe('pending edit flush', () => {
       getMode: () => 'replace' as const,
       changeVimMode,
     }
+
     expect(finishPendingEditSessions(deps)).toBe(true)
     expect(finishPendingEditSessions(deps)).toBe(false)
     expect(f.node().text).toBe('Xello')
@@ -168,6 +185,7 @@ describe('pending edit flush', () => {
   })
   it.each([true, false])('consumes plain Insert and forwards the commit flag (%s)', (committed) => {
     const session = createVimEditSessionState()
+
     beginInsertSession(session, {
       nodeId: 'node',
       baseline: '',
@@ -177,8 +195,10 @@ describe('pending edit flush', () => {
     const changeVimMode = vi.fn()
     const finishVimReplace = vi.fn(() => {
       expect(session.insert).toBeUndefined()
+
       return committed
     })
+
     expect(
       finishPendingEditSessions({
         session,
@@ -197,8 +217,10 @@ describe('Vim editing switch', () => {
     const f = await fixture()
     const element = input('created') as HTMLTextAreaElement
     element.focus()
+
     beginStructuralOpen(f.commandState, 'node', 'after')
     const events: string[] = []
+
     switchVimEditing(
       {
         ...f.deps,
@@ -228,6 +250,7 @@ describe('Vim editing switch', () => {
       },
       false,
     )
+
     expect(events).toEqual(['insert', 'replace', 'visual', 'caret', 'mode'])
     expect(f.commandState.lastChange).toBeUndefined()
     expect(f.applyCaretState).toHaveBeenCalledWith(
@@ -261,7 +284,9 @@ describe('Vim editing switch', () => {
   it.each([true, false])('switches only the mode while the store is loading (%s)', async (enabled) => {
     const f = await switching()
     vi.spyOn(f.store, 'getSnapshot').mockReturnValue({ status: 'loading' })
+
     switchVimEditing(f.switchDeps, enabled)
+
     expect(f.switchDeps.changeVimMode).toHaveBeenCalledWith(enabled ? 'normal' : 'insert')
     expect(f.applyCaretState).not.toHaveBeenCalled()
   })
@@ -281,9 +306,13 @@ describe('Vim editing switch', () => {
       f.element.setSelectionRange(1, selection ? 4 : 1)
       f.authority.caret = { cursor: 5, imageActive: image }
       if (!registered) f.switchDeps.getInput = () => undefined
+
       switchVimEditing(f.switchDeps, enabled)
+
       expect(f.switchDeps.changeVimMode).toHaveBeenCalledWith(enabled ? 'normal' : 'insert')
+
       const cursor = image && !enabled ? 5 : focused ? 1 : f.snapshot().focus.cursor
+
       expect(f.applyCaretState).toHaveBeenCalledWith(
         'node',
         { cursor, imageActive: false },

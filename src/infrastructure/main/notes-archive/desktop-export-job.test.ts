@@ -84,6 +84,7 @@ describe('desktop export job', () => {
     )
 
     const archive = new Uint8Array(await readFile(temporaryPath))
+
     expect(channel.messages[0]).toEqual({ type: 'pin', ids: expect.arrayContaining(['a', 'missing']) })
     expect(channel.messages.at(-1)).toEqual({
       type: 'written',
@@ -94,11 +95,14 @@ describe('desktop export job', () => {
       { type: 'progress', imagesDone: 1, imageCount: 2 },
       { type: 'progress', imagesDone: 2, imageCount: 2 },
     ])
+
     const browserChunks: Uint8Array[] = []
+
     await exportNotesArchive(
       { readHead: async () => head, readImage: async (id) => (id === 'a' ? onePixelPng : undefined) },
       createZipWriter((chunk) => browserChunks.push(chunk.slice())),
     )
+
     expect(archive).toEqual(concat(browserChunks))
 
     const images = new Map<string, Uint8Array>()
@@ -111,6 +115,7 @@ describe('desktop export job', () => {
         removeImages: async () => {},
       },
     })
+
     expect(prepared.head).toEqual(head)
     expect(images.get('a')).toEqual(onePixelPng)
   })
@@ -118,6 +123,7 @@ describe('desktop export job', () => {
   it('exports the newest stored version that opens', async () => {
     const snapshot = await temporaryDirectory()
     const older = headWithImages([], 'Older generation')
+
     await writeFile(join(snapshot, 'document.3.json'), JSON.stringify(older))
     await utimes(join(snapshot, 'document.3.json'), 1_000, 1_000)
     await writeFile(join(snapshot, 'document.json'), '{"version":1,"document":')
@@ -130,11 +136,13 @@ describe('desktop export job', () => {
     )
 
     expect(channel.messages.at(-1)).toMatchObject({ type: 'written' })
+
     const prepared = await prepareNotesImport(memoryFile(new Uint8Array(await readFile(temporaryPath))), {
       createInflater,
       validateImage: async () => {},
       images: { readImage: async () => undefined, writeImage: async () => {}, removeImages: async () => {} },
     })
+
     expect(prepared.head).toEqual(older)
   })
 
@@ -182,6 +190,7 @@ describe('desktop export job', () => {
   it('never overwrites an existing temporary file', async () => {
     const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
     const temporaryPath = join(userData, '.archive.tmp')
+
     await writeFile(temporaryPath, 'someone else')
     const channel = recordingChannel()
 
@@ -199,6 +208,7 @@ describe('desktop export job', () => {
 
   it('reports an image that cannot be read as notes that could not be read', async () => {
     const { userData, data, snapshot } = await savedNotes(headWithImages(['a']), {})
+
     await mkdir(join(data, 'attachments', 'a.png'))
     const channel = recordingChannel()
 

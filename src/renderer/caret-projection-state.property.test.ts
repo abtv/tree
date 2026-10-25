@@ -26,9 +26,12 @@ it('never allows deferred focus work to overwrite a newer placement or restored 
             owner.requestVisual({ nodeId: 'node', start: 0, end: action.cursor })
             owner.takeVisual()
           } else owner.restoreDrag('node', { cursor: action.cursor, imageActive: true }, 1)
+
           for (const work of stale) expect(owner.isCurrentFocusWork(work)).toBe(false)
           expect(owner.isCurrentFocusWork(owner.captureFocusWork())).toBe(true)
+
           const pending = owner.takeCaret()
+
           if (action.kind === 'command' || action.kind === 'insert') expect(pending?.cursor).toBe(action.cursor)
           else expect(pending).toBeUndefined()
         }

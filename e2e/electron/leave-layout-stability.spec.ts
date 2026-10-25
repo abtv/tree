@@ -55,12 +55,16 @@ test.describe('Layout stability when leaving a node', () => {
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
     const lastRow = window.locator('[data-node-id="last"]')
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
+
     const settledTop = (await lastRow.boundingBox())?.y
 
     await window.keyboard.press('g')
     await window.keyboard.press('d')
+
     await expect(window.locator('.node-row')).toHaveCount(1)
+
     // A hidden window on a loaded CI runner can go without animation frames, so the layout is
     // sampled at every DOM mutation and image load instead; reading the rectangle forces layout.
     await window.evaluate(() => {
@@ -80,7 +84,9 @@ test.describe('Layout stability when leaving a node', () => {
       document.addEventListener('load', observed.__sampleLastRowTop, true)
     })
     await window.keyboard.press('Control+o')
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
+
     await window.waitForTimeout(300)
 
     const tops = await window.evaluate(() => {
@@ -88,6 +94,7 @@ test.describe('Layout stability when leaving a node', () => {
       observed.__sampleLastRowTop()
       return observed.__lastRowTops
     })
+
     expect(tops).toEqual([Math.round(settledTop ?? -1)])
   })
 
@@ -105,10 +112,13 @@ test.describe('Layout stability when leaving a node', () => {
       location: { currentParentId: null, selectedNodeId: 'first' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
 
     await window.keyboard.press('Meta+p')
+
     await expect(window.locator('[data-node-id="image"]')).toHaveCount(0)
+
     // Mutation callbacks run before the browser paints the remounted row, so a decoded image here
     // is already part of its first frame.
     await window.evaluate(() => {
@@ -125,6 +135,7 @@ test.describe('Layout stability when leaving a node', () => {
       observer.observe(document.body, { childList: true, subtree: true })
     })
     await window.keyboard.press('Meta+p')
+
     await expect(window.getByAltText('Attached image')).toBeVisible()
 
     expect(

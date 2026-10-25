@@ -25,10 +25,13 @@ const today = () => {
 test('exports the saved notes and referenced images from a worker', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   const errors: string[] = []
+
   page.on('pageerror', (error) => errors.push(error.message))
   const workers: string[] = []
+
   page.on('worker', (worker) => workers.push(worker.url()))
   await page.goto(baseURL!)
   await ready(page)
@@ -39,6 +42,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     { id: 'image-a', bytes: noise },
     { id: 'image-missing' },
   ])
+
   await page.evaluate(
     (bytes) => window.treeApi.writeAttachment('image-unreferenced', new Uint8Array(bytes)),
     [...onePixelPng],
@@ -47,12 +51,17 @@ test('exports the saved notes and referenced images from a worker', async ({ new
 
   // @requirement PRODUCT.md §24
   const menu = await openMenu(page)
+
   await expect(menu.getByText('Data', { exact: true })).toBeVisible()
   await expect(menu.locator('.folder-actions-separator')).toBeVisible()
+
   // PRODUCT §24.1: the browser decides the storage line; installability.spec.mts covers both texts.
   const storage = page.locator('#storage-status')
+
   await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)
+
   const storageText = await storage.textContent()
+
   expect(
     await menu.evaluate((element) =>
       [...element.querySelectorAll('button, .menu-label, [role="status"]')].map((item) => item.textContent),
@@ -74,10 +83,13 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     storageText,
     'Folder backup is off.',
   ])
+
   await capture(page, 'data-menu-light.png')
   await page.setViewportSize({ width: 390, height: 760 })
   const narrow = (await menu.boundingBox())!
+
   expect(narrow.x >= 0 && narrow.x + narrow.width <= 390).toBe(true)
+
   await capture(page, 'data-menu-narrow.png')
   await page.setViewportSize({ width: 1100, height: 760 })
   await menu.getByRole('button', { name: 'Dark', exact: true }).click()
@@ -88,35 +100,47 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   // An edit that has not been saved yet must be in the archive.
   await page.locator('[data-node-id="welcome"] .node-input').pressSequentially('Typed just before exporting ')
   const downloading = page.waitForEvent('download')
+
   await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command' }).fill('export-notes')
   await page.keyboard.press('Enter')
   const download = await downloading
+
   expect(download.suggestedFilename()).toBe(`Tree Notes ${today()}.zip`)
   await expect(activityText(page)).toHaveText(
     `Exported “Tree Notes ${today()}.zip”. 1 image could not be found and was not included.`,
   )
+
   const panelBox = (await activity(page).boundingBox())!
   const statusBarBox = (await page.locator('.status-bar').boundingBox())!
+
   expect(panelBox.y + panelBox.height, 'The panel must not cover the status bar').toBeLessThanOrEqual(statusBarBox.y)
   expect(panelBox.x + panelBox.width).toBeCloseTo(1100 - 16, 0)
+
   await capture(page, 'data-export-result.png')
+
   expect(workers.some((url) => /archive\.worker/.test(url))).toBe(true)
 
   // @requirement PRODUCT.md §24.2
   const archive = await readDownloadedArchive(download)
+
   expect(archive.names).toEqual(['document.json', 'attachments/image-a.png', 'attachments/image-b.png'])
+
   const head = await readStored(page, 'document', 'head')
+
   expect(head.document.roots[0]!.text).toContain('Typed just before exporting')
   expect(head.document).toEqual(
     await page.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document),
   )
+
   const documentJson = new TextDecoder().decode(archive.entries.get('document.json'))
+
   expect(documentJson).toBe(JSON.stringify(head))
   expect([...archive.entries.get('attachments/image-a.png')!]).toEqual(await readStored(page, 'blobs', 'image-a'))
   expect([...archive.entries.get('attachments/image-b.png')!]).toEqual([...onePixelPng])
 
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
+
   await expect(activity(page)).toBeHidden()
   expect(errors).toEqual([])
 })
@@ -125,8 +149,10 @@ test('exports the saved notes and referenced images from a worker', async ({ new
 test('reports a stopped worker and cancels a worker that is sending the archive', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   const downloads: Download[] = []
+
   page.on('download', (download) => downloads.push(download))
   await page.goto(baseURL!)
   await ready(page)
@@ -135,7 +161,9 @@ test('reports a stopped worker and cancels a worker that is sending the archive'
 
   await replaceWorker("throw new Error('Synthetic worker failure')")
   await chooseMenuItem(page, 'Export Notes…')
+
   await expect(activityText(page)).toHaveText('Export failed. The export stopped unexpectedly.')
+
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await page.unroute(/archive\.worker/)
 
@@ -148,11 +176,16 @@ test('reports a stopped worker and cancels a worker that is sending the archive'
     }
   `)
   await chooseMenuItem(page, 'Export Notes…')
+
   await expect(activityText(page)).toHaveText('Exporting Notes… 1 of 2 images')
+
   await activity(page).getByRole('button', { name: 'Cancel', exact: true }).click()
+
   await expect(activity(page)).toBeHidden()
+
   // A done message from a worker that kept running would start a download and show the result.
   await page.waitForTimeout(2000)
+
   expect(downloads).toEqual([])
   await expect(activity(page)).toBeHidden()
 })
@@ -164,10 +197,13 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
 }) => {
   const context = await newContext()
   const page = await context.newPage()
+
   page.setDefaultTimeout(8000)
   const errors: string[] = []
+
   page.on('pageerror', (error) => errors.push(error.message))
   const downloads: Download[] = []
+
   page.on('download', (download) => downloads.push(download))
   await page.goto(baseURL!)
   await ready(page)
@@ -179,16 +215,24 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
     Array.from({ length: 24 }, (_, index) => ({ id: `large-${String(index).padStart(2, '0')}`, bytes: large })),
   )
   const editor = page.locator('[data-node-id="welcome"] .node-input')
+
   await editor.click()
   await editor.press('End')
   const largeDownload = page.waitForEvent('download', { timeout: 30_000 })
+
   await chooseMenuItem(page, 'Export Notes…')
+
   await expect(activityText(page)).toHaveText(/^Exporting Notes…/)
+
   await editor.pressSequentially(' typed during export')
+
   await expect(editor).toHaveValue(/ typed during export$/)
+
   const archive = await readDownloadedArchive(await largeDownload)
+
   expect(archive.names).toHaveLength(25)
   expect(archive.bytes.byteLength).toBeGreaterThan(24 * large.length)
+
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   downloads.length = 0
 
@@ -204,26 +248,38 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
       await route.continue().catch(() => {})
     }),
   )
+
   await chooseMenuItem(page, 'Export Notes…')
   await requested
+
   await expect(activityText(page)).toHaveText('Exporting Notes…')
+
   await capture(page, 'data-export-progress.png')
   await activity(page).getByRole('button', { name: 'Cancel', exact: true }).click()
+
   await expect(activity(page)).toBeHidden()
+
   release()
   await page.waitForTimeout(1000)
+
   await page.unroute(/archive\.worker/)
+
   expect(downloads).toEqual([])
   await expect(activity(page)).toBeHidden()
 
   // An invalid saved head is refused instead of exported.
   const valid = await readStored(page, 'document', 'head')
+
   await writeStored(page, 'document', 'head', { invalid: 'preserve this evidence' })
   await chooseMenuItem(page, 'Export Notes…')
+
   await expect(activityText(page)).toHaveText('Export failed. The saved notes are invalid, so they cannot be exported.')
+
   await capture(page, 'data-export-failed.png')
+
   expect(await readStored(page, 'document', 'head')).toEqual({ invalid: 'preserve this evidence' })
   expect(downloads).toEqual([])
+
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await writeStored(page, 'document', 'head', valid)
 
@@ -240,17 +296,25 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   await editor.pressSequentially(' never saved')
   // A failed flush refuses the export; the save-failure banner and the panel stay visible together.
   await chooseMenuItem(page, 'Export Notes…')
+
   await expect(activityText(page)).toHaveText(/^Export failed\. Your latest changes could not be saved: /)
+
   const problem = page.locator('#prototype-problem')
+
   await expect(problem).toBeVisible()
+
   const panelBox = (await activity(page).boundingBox())!
   const problemBox = (await problem.boundingBox())!
+
   expect(
     panelBox.y + panelBox.height <= problemBox.y || problemBox.y + problemBox.height <= panelBox.y,
     'The problem banner must not cover the export panel',
   ).toBe(true)
+
   await capture(page, 'data-export-save-failed.png')
+
   expect(downloads).toEqual([])
+
   await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
   await page.waitForFunction(
     () => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).persistenceLocked === true,
@@ -260,6 +324,7 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
     },
   )
   const menu = await openMenu(page)
+
   await expect(menu.getByRole('button', { name: 'Export Notes…', exact: true })).toBeDisabled()
   // @requirement PRODUCT.md §24.4
   await expect(menu.getByRole('button', { name: 'Import Notes…', exact: true })).toBeDisabled()

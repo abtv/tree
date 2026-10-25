@@ -19,9 +19,12 @@ describeForEachEditingMode('typography', ({ screenshotName }) => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     const { app, window } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     const editor = node(window, 1)
+
     await typeInto(editor, 'http://localhost:8080 test me')
+
     await expect(editor).toHaveText('http://localhost:8080 test me')
     // The bundled font draws "://l" as a ligature that moves the second slash and reads as ": /l".
     await expect(editor).toHaveCSS('font-variant-ligatures', 'none')
@@ -36,8 +39,10 @@ describeForEachEditingMode('typography', ({ screenshotName }) => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     })
     const { app, window } = await launchTree(userDataDir)
+
     await setMainWindowContentSize(app, screenshotContentSize)
     const editor = node(window, 1)
+
     await expect(editor).toHaveAttribute('contenteditable', 'true')
     await expect(editor).toHaveCSS('font-variant-ligatures', 'none')
     await expect(editor).toHaveScreenshot(screenshotName('linked-url-without-ligatures.png'))

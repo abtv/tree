@@ -71,6 +71,7 @@ describe('viewport motion target', () => {
       { nodeId: 'b', top: 40, bottom: 70 },
       { nodeId: 'clipped-bottom', top: 70, bottom: 110 },
     ]
+
     expect(viewportMotionTarget(clippedRows, viewport, 'clipped-top', motion)).toBe(target)
   })
 
@@ -104,6 +105,7 @@ describe('viewport motion target', () => {
       { nodeId: 'b', top: 40, bottom: 70 },
       { nodeId: 'clipped-bottom', top: 70, bottom: 110 },
     ]
+
     expect(viewportMotionTarget(clippedRows, viewport, 'clipped-top', 'half-down')).toBe('b')
     expect(viewportMotionTarget(clippedRows, viewport, 'clipped-bottom', 'half-up')).toBe('a')
   })
@@ -129,6 +131,7 @@ describe('viewport motion target', () => {
       { nodeId: 'b', top: 20, bottom: 40 },
       { nodeId: 'c', top: 40, bottom: 60 },
     ]
+
     expect(viewportMotionTarget(missingIdRows, viewport, 'c', 'top')).toBeUndefined()
     expect(viewportMotionTarget(missingIdRows, viewport, 'c', 'top', 2)).toBe('b')
   })
@@ -207,7 +210,9 @@ describe('viewport selection dispatch', () => {
     const beforeSelect = vi.fn(() => {
       expect(store.selectNode).not.toHaveBeenCalled()
     })
+
     moveViewportSelection({ store, syncImageCaretToFocus, beforeSelect }, 'b', motion, 9)
+
     expect(syncImageCaretToFocus).toHaveBeenCalledOnce()
     expect(beforeSelect).toHaveBeenCalledExactlyOnceWith(['top', 'middle', 'bottom'].includes(motion))
   })
@@ -232,7 +237,9 @@ describe('viewport selection dispatch', () => {
       },
     })
     const syncImageCaretToFocus = vi.fn()
+
     moveViewportSelection({ store, syncImageCaretToFocus }, 'image', motion, 9)
+
     expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('image', column)
     expect(syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
@@ -246,23 +253,35 @@ describe('viewport selection dispatch', () => {
         location: { currentParentId: null, selectedNodeId: 'b' },
       },
     })
+
     mountRows(rows)
     vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'top', 0)
+
     expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'bottom', 0)
+
     expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
+
     // Scrolled to the start, H may use the first row; at the end, L may use the last.
     vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: true, atEnd: false })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'top', 0)
+
     expect(store.selectNode).toHaveBeenLastCalledWith('a', 0)
+
     vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: true })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'b', 'bottom', 0)
+
     expect(store.selectNode).toHaveBeenLastCalledWith('d', 0)
   })
 
   it('falls back to the whole content area when no row lies inside the edge context', () => {
     vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+
     mountRows([{ nodeId: 'low', top: 80, bottom: 100 }])
     const store = createEditorStoreDouble({
       snapshot: {
@@ -271,12 +290,15 @@ describe('viewport selection dispatch', () => {
         location: { currentParentId: null, selectedNodeId: 'low' },
       },
     })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'low', 'top', 0)
+
     expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('low', 0)
   })
 
   it('does not apply the edge context to the half-page motions', () => {
     vi.mocked(viewportScrollEdges).mockReturnValue({ atStart: false, atEnd: false })
+
     mountRows(rows)
     const store = createEditorStoreDouble({
       snapshot: {
@@ -285,7 +307,9 @@ describe('viewport selection dispatch', () => {
         location: { currentParentId: null, selectedNodeId: 'a' },
       },
     })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'a', 'half-down', 0)
+
     expect(store.selectNode).toHaveBeenLastCalledWith('c', 0)
   })
 
@@ -298,7 +322,9 @@ describe('viewport selection dispatch', () => {
         location: { currentParentId: null, selectedNodeId: 'b' },
       },
     })
+
     moveViewportSelection({ store, syncImageCaretToFocus: vi.fn() }, 'a', 'top', 9, 2)
+
     expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('b', 0)
   })
 
@@ -308,7 +334,9 @@ describe('viewport selection dispatch', () => {
       snapshot: status === 'loading' ? { status } : { status, message: 'unavailable' },
     })
     const syncImageCaretToFocus = vi.fn()
+
     moveViewportSelection({ store, syncImageCaretToFocus }, 'node', 'top', 9)
+
     expect(store.selectNode).toHaveBeenCalledExactlyOnceWith('node', 9)
     expect(syncImageCaretToFocus).toHaveBeenCalledOnce()
   })
@@ -319,7 +347,9 @@ describe('viewport selection dispatch', () => {
       mountRows(records)
       const store = createEditorStoreDouble()
       const syncImageCaretToFocus = vi.fn()
+
       moveViewportSelection({ store, syncImageCaretToFocus }, 'node', 'top', 9)
+
       expect(store.getSnapshot).not.toHaveBeenCalled()
       expect(store.selectNode).not.toHaveBeenCalled()
       expect(syncImageCaretToFocus).not.toHaveBeenCalled()

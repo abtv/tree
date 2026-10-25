@@ -20,6 +20,7 @@ describe('link normalization and edit outcomes', () => {
   it('keeps an appended word separate even when it shares the URL suffix', () => {
     const original = `${url}/aaa`
     const range = { start: 0, end: original.length, url: original }
+
     expect(reconcileLinkTextEdit(original, [range], `${original} ba`)).toEqual({
       links: [range],
       createsNewLink: false,
@@ -55,6 +56,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('preserves a draft before a deletion whose repeated suffix matches its last characters', () => {
     const draft = { start: 0, end: 3, url: 'baa' }
+
     expect(
       reconcileLinkTextEdit(`baaaa ${url}`, [{ ...link, start: 6, end: 6 + url.length }], `baa ${url}`, draft),
     ).toEqual({
@@ -77,6 +79,7 @@ describe('link normalization and edit outcomes', () => {
         [edit, { start: text.length, end: text.length, inserted: '!' }],
       )
       const expectedUrl = url.slice(0, edit.start) + edit.inserted + url.slice(edit.end)
+
       expect(result).toEqual({
         text: `${expectedUrl} tail!`,
         links: [{ start: 0, end: expectedUrl.length, url: expectedUrl }],
@@ -92,6 +95,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('retains a draft without reinterpreting an unchanged invalid token', () => {
     const draft = { start: 0, end: 3, url: 'bad' }
+
     expect(reconcileLinkTextEdit('bad', [], 'bad', draft)).toEqual({ links: [], draft, createsNewLink: false })
   })
 
@@ -118,6 +122,7 @@ describe('link normalization and edit outcomes', () => {
     // Typing a URL directly before an existing word links the joined word; the space that follows
     // splits it, and the URL half must stay a link while the remainder is plain text.
     const joined = { start: 0, end: 14, url: 'http://x.comcd' }
+
     expect(reconcileLinkTextEdit('http://x.comcd', [joined], 'http://x.com cd')).toEqual({
       links: [{ start: 0, end: 12, url: 'http://x.com' }],
       createsNewLink: true,
@@ -139,6 +144,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('drops intersected drafts and shifts drafts after an adjacent deletion', () => {
     const draft = { start: 2, end: 5, url: 'bad' }
+
     expect(reconcileLinkTextEdit('x bad z', [], 'Xad z', draft)).toEqual({ links: [], createsNewLink: false })
     expect(reconcileLinkTextEdit('x bad z', [], 'x!bad z', draft)).toEqual({ links: [], draft, createsNewLink: false })
     expect(reconcileLinkTextEdit('x bad z', [], 'xbad z', draft)).toEqual({
@@ -150,12 +156,14 @@ describe('link normalization and edit outcomes', () => {
 
   it('leaves a draft unchanged when replacing text immediately after it', () => {
     const draft = { start: 2, end: 5, url: 'bad' }
+
     expect(reconcileLinkTextEdit('x bad z', [], 'x bad!z', draft)).toEqual({ links: [], draft, createsNewLink: false })
   })
 
   it('recognizes a larger URL instead of retaining the old link it absorbs', () => {
     const text = `https://b.test/${url}`
     const start = text.indexOf(url)
+
     expect(reconcileLinkTextEdit(text, [{ ...link, start, end: text.length }], `https://c.test/${url}`)).toEqual({
       links: [{ start: 0, end: text.length, url: `https://c.test/${url}` }],
       createsNewLink: true,
@@ -169,6 +177,7 @@ describe('link normalization and edit outcomes', () => {
       [{ start: url.length, end: url.length, inserted: other }],
     ]) {
       const result = replaceLinkedTextRanges(url, [link], edits)
+
       expect(result.links).toEqual([{ start: 0, end: url.length + other.length, url: result.text }])
       expect(result.createsNewLink).toBe(true)
     }
@@ -192,7 +201,9 @@ describe('link normalization and edit outcomes', () => {
       links: [{ ...link, url: 'Https://a.test' }],
       createsNewLink: false,
     })
+
     const text = `before ${url} after`
+
     expect(reconcileLinkTextEdit(text, [{ ...link, start: 7, end: 7 + url.length }], `before ${url}/x after`)).toEqual({
       links: [{ start: 7, end: 7 + url.length + 2, url: `${url}/x` }],
       createsNewLink: false,
@@ -224,6 +235,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('retains or shifts an invalid URL draft when an unrelated word changes', () => {
     const draft = { start: 2, end: 5, url: 'bad' }
+
     expect(reconcileLinkTextEdit('x bad z', [], 'xx bad z', draft)).toEqual({
       links: [],
       createsNewLink: false,
@@ -256,6 +268,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('returns normalized links and the existing draft for an unchanged edit', () => {
     const draft = { start: url.length + 1, end: url.length + 4, url: 'bad' }
+
     expect(reconcileLinkTextEdit(`${url} bad`, [link], `${url} bad`, draft)).toEqual({
       links: [link],
       draft,
@@ -269,7 +282,9 @@ describe('link normalization and edit outcomes', () => {
       links: [{ ...link, end: url.length + 5, url: `${url}/path` }],
       createsNewLink: false,
     })
+
     const http = 'http://a.test'
+
     expect(reconcileLinkTextEdit(http, [{ start: 0, end: http.length, url: http }], url)).toEqual({
       links: [link],
       createsNewLink: false,
@@ -278,7 +293,9 @@ describe('link normalization and edit outcomes', () => {
 
   it('keeps unrelated whitespace after a link outside its range', () => {
     expect(reconcileLinkTextEdit(url, [link], `${url} words`)).toEqual({ links: [link], createsNewLink: false })
+
     const invalid = reconcileLinkTextEdit(url, [link], 'https ://a.test')
+
     expect(invalid).toEqual({
       links: [],
       draft: { start: 0, end: url.length + 1, url: 'https ://a.test' },
@@ -293,6 +310,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('shifts neighboring links when replacing text immediately before them', () => {
     const text = `abc${url}`
+
     expect(reconcileLinkTextEdit(text, [{ ...link, start: 3, end: text.length }], `x${url}`)).toEqual({
       links: [{ ...link, start: 1, end: url.length + 1 }],
       createsNewLink: false,
@@ -302,6 +320,7 @@ describe('link normalization and edit outcomes', () => {
   it('creates a new URL token without consuming unrelated neighboring links', () => {
     const text = `${url} https://b.tes ${url}`
     const lastStart = text.lastIndexOf(url)
+
     expect(
       reconcileLinkTextEdit(
         text,
@@ -323,6 +342,7 @@ describe('link normalization and edit outcomes', () => {
     const start = url.length + 2
     const last = { start, end: start + url.length, url: lines[2]! }
     const links = [link, last, { start: url.length - 1, end: start + 1, url }]
+
     expect(linksForLine(links, lines, 0)).toEqual([link])
     expect(linksForLine(links, lines, 1)).toEqual([])
     expect(linksForLine(links, lines, 2)).toEqual([{ ...link, url: lines[2] }])
@@ -331,6 +351,7 @@ describe('link normalization and edit outcomes', () => {
 
   it('applies disjoint replacements in document order and preserves links next to both edits', () => {
     const text = `abc${url}xyz`
+
     const result = replaceLinkedTextRanges(
       text,
       [{ ...link, start: 3, end: 3 + url.length }],
@@ -339,6 +360,7 @@ describe('link normalization and edit outcomes', () => {
         { start: 3, end: 0, inserted: '?' },
       ],
     )
+
     expect(result).toEqual({
       text: `?${url}!`,
       links: [{ ...link, start: 1, end: 1 + url.length }],
@@ -391,6 +413,7 @@ describe('link normalization and edit outcomes', () => {
     const text = `${url}  ${url}`
     const lastStart = url.length + 2
     const inserted = 'https://b.test'
+
     expect(
       replaceLinkedTextRanges(
         text,
@@ -422,17 +445,20 @@ describe('replaceLinkedText', () => {
 
   it('removes a link intersected by the replacement', () => {
     const url = 'https://example.com'
+
     expect(replaceLinkedText(url, [{ start: 0, end: url.length, url }], 3, 4, '').links).toEqual([])
   })
 
   it('inserts at the requested character within a link', () => {
     const url = 'https://example.com'
+
     const result = replaceLinkedText(url, [{ start: 0, end: url.length, url }], 2, 2, 'X')
 
     expect(result.text).toBe('htXtps://example.com')
     expect(result.links).toEqual([])
 
     const valid = replaceLinkedText(url, [{ start: 0, end: url.length, url }], url.length, url.length, '/a')
+
     expect(valid.links).toEqual([{ start: 0, end: url.length + 2, url: `${url}/a` }])
   })
 })
@@ -456,7 +482,9 @@ describe('insertLinks', () => {
 
   it('keeps a valid pasted link range when the surrounding link is dropped', () => {
     const pasted = 'https://paste.example'
+
     const result = insertLinks([link], 5, pasted, [{ start: 0, end: pasted.length, url: pasted }])
+
     expect(result).toEqual([{ start: 5, end: 5 + pasted.length, url: pasted }])
   })
 })
@@ -482,6 +510,7 @@ describe('linkAtPosition', () => {
 
   it('picks the link that actually covers the position among several', () => {
     const other = { start: link.end + 5, end: link.end + 10, url: 'https://example.org' }
+
     expect(linkAtPosition([link, other], other.start)).toEqual(other)
     expect(linkAtPosition([link, other], link.start)).toEqual(link)
   })
@@ -499,6 +528,7 @@ describe('replaceLinkedTextRanges', () => {
         { start: url.length, end: url.length, inserted: ')' },
       ],
     )
+
     expect(result.text).toBe(`(${url})`)
     expect(result.links).toEqual([{ start: 1, end: url.length + 1, url }])
     expect(result.createsNewLink).toBe(false)
@@ -506,6 +536,7 @@ describe('replaceLinkedTextRanges', () => {
 
   it('shifts a link that follows the wrapped range by both delimiters', () => {
     const text = `ab ${url}`
+
     const result = replaceLinkedTextRanges(
       text,
       [{ start: 3, end: text.length, url }],
@@ -514,12 +545,14 @@ describe('replaceLinkedTextRanges', () => {
         { start: 2, end: 2, inserted: '"' },
       ],
     )
+
     expect(result.text).toBe(`"ab" ${url}`)
     expect(result.links).toEqual([{ start: 5, end: text.length + 2, url }])
   })
 
   it('creates a link when removing delimiters exposes a bare URL', () => {
     const text = `"${url}"`
+
     const result = replaceLinkedTextRanges(
       text,
       [],
@@ -528,6 +561,7 @@ describe('replaceLinkedTextRanges', () => {
         { start: text.length - 1, end: text.length, inserted: '' },
       ],
     )
+
     expect(result.text).toBe(url)
     expect(result.links).toEqual([{ start: 0, end: url.length, url }])
     expect(result.createsNewLink).toBe(true)
@@ -539,6 +573,7 @@ describe('replaceLinkedTextRanges', () => {
       [{ start: 0, end: url.length, url }],
       [{ start: 4, end: 4, inserted: 'X' }],
     )
+
     expect(result.links).toEqual([])
   })
 
@@ -551,11 +586,13 @@ describe('replaceLinkedTextRanges', () => {
         { start: 2, end: 5, inserted: 'Y' },
       ],
     )
+
     expect(result.text).toBe('abcdef')
   })
 
   it('clamps edit bounds to the text', () => {
     const result = replaceLinkedTextRanges('ab', [], [{ start: 5, end: 9, inserted: '!' }])
+
     expect(result.text).toBe('ab!')
   })
 })

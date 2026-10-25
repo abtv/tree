@@ -50,7 +50,9 @@ describe('shared dependency audit', () => {
   it('identifies exact push events and PR merge snapshots', () => {
     expect(auditIdentity('push', sha, push)).toEqual(identity)
     expect(auditIdentity('push', sha, { ...push, before: head }).marker).not.toBe(identity.marker)
+
     const pull = auditIdentity('pull_request', sha, pr)
+
     expect(pull.headSha).toBe(head)
     expect(pull.marker).not.toBe(auditIdentity('pull_request', head, pr).marker)
     expect(pull.marker).not.toBe(
@@ -75,6 +77,7 @@ describe('shared dependency audit', () => {
 
   it('accepts only the matching workflow and current successful attempt', async () => {
     const f = fixture()
+
     await expect(f.invoke()).resolves.toBe(42)
     expect(f.request.mock.calls[0]![0]).toContain(`event=push&head_sha=${sha}`)
     expect(f.wait).not.toHaveBeenCalled()
@@ -86,6 +89,7 @@ describe('shared dependency audit', () => {
 
   it('does not reuse a successful old attempt during a rerun', async () => {
     const f = fixture({ runs: [{ ...run, run_attempt: 2, status: 'in_progress', conclusion: null }] })
+
     await expect(f.invoke()).rejects.toThrow('Timed out')
     expect(f.wait).toHaveBeenCalled()
     await expect(fixture({ runs: [{ ...run, run_attempt: 2 }] }).invoke()).rejects.toThrow('Timed out')
@@ -99,6 +103,7 @@ describe('shared dependency audit', () => {
 
   it('rejects the latest matching failed run instead of accepting an older success', async () => {
     const f = fixture({ runs: [run, { ...run, id: 43, created_at: '2026-10-25T11:00:00Z', conclusion: 'failure' }] })
+
     await expect(f.invoke()).rejects.toThrow('did not succeed')
   })
 
@@ -122,6 +127,7 @@ describe('shared dependency audit', () => {
   it('waits for the central run and then accepts success', async () => {
     const f = fixture()
     f.request.mockResolvedValueOnce({ workflow_runs: [] })
+
     await expect(f.invoke()).resolves.toBe(42)
     expect(f.wait).toHaveBeenCalledOnce()
   })
@@ -129,11 +135,16 @@ describe('shared dependency audit', () => {
   it('fails closed on API errors and malformed responses', async () => {
     const f = fixture()
     f.request.mockRejectedValueOnce(new Error('HTTP 403'))
+
     await expect(f.invoke()).rejects.toThrow('HTTP 403')
+
     f.request.mockResolvedValueOnce({})
+
     await expect(f.invoke()).rejects.toThrow('Invalid workflow runs')
+
     const g = fixture()
     g.request.mockResolvedValueOnce({ workflow_runs: [run] }).mockResolvedValueOnce({ artifacts: [] })
+
     await expect(g.invoke()).rejects.toThrow('Invalid artifacts')
   })
 })

@@ -40,6 +40,7 @@ describe('Vim surround delimiters', () => {
 describe('Vim surround edits', () => {
   it('wraps a range as two insertions and leaves the caret on the opening delimiter', () => {
     const result = surroundWrapEdits(0, 3, ')')
+
     expect(result).toEqual({
       edits: [
         { start: 0, end: 0, inserted: '(' },
@@ -111,12 +112,14 @@ describe('Vim surround edits', () => {
 
   it('wraps text containing astral characters without splitting them', () => {
     const text = 'a 😀 b'
+
     expect(apply(text, surroundWrapEdits(2, 4, ')'))).toBe('a (😀) b')
   })
 
   it('wraps whitespace-only node text for yss', () => {
     const text = '   '
     const range = surroundLineRange(text)
+
     expect(range).toEqual({ start: 0, end: 3 })
     expect(apply(text, surroundWrapEdits(range.start, range.end, ')'))).toBe('(   )')
   })

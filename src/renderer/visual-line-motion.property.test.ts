@@ -31,6 +31,7 @@ describe('visual line motion invariants', () => {
               targetLine * columns + Math.min(logicalColumn, columns - 1),
               boundaries.length - 1,
             )
+
             expect(result).toBe(boundaries[expectedIndex])
           }
         },

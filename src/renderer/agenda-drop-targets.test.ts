@@ -32,6 +32,7 @@ describe('Agenda drag sources and drop targets', () => {
 
   it('drops on any row of another day, including its header', () => {
     const source = agendaDragSource(nodeRow('match'))!
+
     expect(agendaDropTarget({ ...dayRow, day: 20376, key: 'day:20376' }, source)).toEqual({ kind: 'day', day: 20376 })
     expect(agendaDropTarget(nodeRow('match', 20376), source)).toEqual({ kind: 'day', day: 20376 })
     expect(agendaDropTarget(nodeRow('context', 20376), source)).toEqual({ kind: 'day', day: 20376 })
@@ -39,6 +40,7 @@ describe('Agenda drag sources and drop targets', () => {
 
   it('treats the source day as a no-op and a gap as invalid', () => {
     const source = agendaDragSource(nodeRow('match'))!
+
     expect(agendaDropTarget(dayRow, source)).toEqual({ kind: 'none' })
     expect(agendaDropTarget(nodeRow('context'), source)).toEqual({ kind: 'none' })
     expect(agendaDropTarget(gapRow, source)).toEqual({ kind: 'invalid' })
@@ -50,6 +52,7 @@ describe('Agenda drag sources and drop targets', () => {
       { key: 'zero', top: 20, bottom: 20 },
       { key: 'b', top: 20, bottom: 40 },
     ]
+
     expect(agendaRowKeyAtPoint(regions, 0)).toBe('a')
     expect(agendaRowKeyAtPoint(regions, 19.9)).toBe('a')
     expect(agendaRowKeyAtPoint(regions, 20)).toBe('b')
