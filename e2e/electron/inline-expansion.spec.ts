@@ -1137,7 +1137,7 @@ test.describe('inline node expansion (Vim editing only)', () => {
 
 // @requirement PRODUCT.md §20.5
 test.describe('appearance colors by depth', () => {
-  test('colors node text by depth in the dark appearance only', async ({ userDataDir }) => {
+  test('keeps node text color stable across depths and focused parents', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -1149,12 +1149,23 @@ test.describe('appearance colors by depth', () => {
 
     await window.emulateMedia({ colorScheme: 'dark' })
 
-    expect(await colors()).toEqual([
-      'rgb(223, 175, 143)',
-      'rgb(240, 223, 175)',
-      'rgb(140, 208, 211)',
-      'rgb(223, 175, 143)',
-    ])
+    expect(await colors()).toEqual(Array(4).fill('rgb(220, 220, 204)'))
+    await window.screenshot({ path: test.info().outputPath('stable-node-text-dark.png') })
+
+    await node(window, 1).click()
+    await window.keyboard.press('Meta+.')
+    await expect(parent(window)).toHaveText('Alpha')
+    await expect(node(window, 1)).toHaveCSS('color', 'rgb(220, 220, 204)')
+    await expect(node(window, 2)).toHaveCSS('color', 'rgb(220, 220, 204)')
+
+    await node(window, 1).click()
+    await window.keyboard.press('Meta+.')
+    await expect(parent(window)).toHaveText('Alpha child one')
+    await expect(node(window, 1)).toHaveCSS('color', 'rgb(220, 220, 204)')
+    await window.screenshot({ path: test.info().outputPath('stable-node-text-focused-dark.png') })
+
+    await window.keyboard.press('Meta+,')
+    await window.keyboard.press('Meta+,')
 
     await window.emulateMedia({ colorScheme: 'light' })
 
