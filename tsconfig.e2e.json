@@ -18,7 +18,7 @@
   },
   "include": [
     "playwright*.config.ts",
-    "perf.config.ts",
+    "config/testing/*.ts",
     "e2e/**/*.ts",
     "e2e/**/*.mts",
     "perf/**/*.ts",

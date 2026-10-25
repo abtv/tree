@@ -57,7 +57,7 @@ export function containerSourceFiles(smoke = false) {
   return [
     'package.json',
     'package-lock.json',
-    'playwright.web.config.ts',
+    'config/testing/playwright.web.config.ts',
     'e2e/external-drop.ts',
     ...readdirSync(root).filter((name) => /^tsconfig[^/]*\.json$/.test(name)),
     ...sourceFiles('src'),
@@ -66,7 +66,7 @@ export function containerSourceFiles(smoke = false) {
     ...(smoke
       ? [
           'electron.vite.config.ts',
-          'playwright.smoke.config.ts',
+          'config/testing/playwright.smoke.config.ts',
           ...sourceFiles('e2e/smoke'),
           // Only the launch/menu/cleanup dependencies of the smoke spec, never screenshot baselines.
           ...[

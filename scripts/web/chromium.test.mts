@@ -35,7 +35,7 @@ it('streams smoke launch dependencies without baseline images, host output or cr
   expect(files).toEqual(
     expect.arrayContaining([
       'electron.vite.config.ts',
-      'playwright.smoke.config.ts',
+      'config/testing/playwright.smoke.config.ts',
       'e2e/smoke/happy-path.spec.mts',
       'e2e/smoke/scenario.mts',
       'e2e/electron/fixtures.ts',
@@ -127,7 +127,7 @@ it('passes current source over stdin to the fixed container and propagates test 
     expect.arrayContaining([
       'package.json',
       'package-lock.json',
-      'playwright.web.config.ts',
+      'config/testing/playwright.web.config.ts',
       'scripts/web/build.mts',
       'src/web/index.html',
       'e2e/web/fixtures.mts',

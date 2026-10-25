@@ -1,4 +1,5 @@
 import { configDefaults, defineConfig } from 'vitest/config'
+import { fileURLToPath } from 'node:url'
 
 // The domain performance guards measure sub-millisecond work under the production build. Sharing the
 // parallel unit pool lets a scheduler pause in another worker inflate the timed result, so they run
@@ -6,6 +7,7 @@ import { configDefaults, defineConfig } from 'vitest/config'
 // of the coverage-enabled unit run. Mutation workers exclude `*.performance.test.ts` for the same
 // reason. See docs/DEVELOPMENT.md §12.
 export default defineConfig({
+  root: fileURLToPath(new URL('../..', import.meta.url)),
   test: {
     environment: 'node',
     setupFiles: ['src/test/fast-check-setup.ts'],

@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test'
+import { resolve } from 'node:path'
 
 const built = process.env['TREE_WEB_BUILT'] === '1'
 const externalURL = process.env['TREE_WEB_URL']
@@ -7,9 +8,9 @@ const baseURL = externalURL ?? `http://127.0.0.1:${built ? 5175 : 5174}/`
 const channel = process.platform === 'darwin' ? 'chrome' : 'chromium'
 
 export default defineConfig({
-  testDir: './e2e/web',
+  testDir: '../../e2e/web',
   testMatch: '**/*.spec.mts',
-  outputDir: 'test-results/web',
+  outputDir: '../../test-results/web',
   fullyParallel: false,
   // Each worker owns its browser; tests within each file remain sequential.
   workers: 4,
@@ -32,6 +33,7 @@ export default defineConfig({
   ...(!externalURL && {
     webServer: {
       command: built ? 'npm run preview:web' : 'npm run dev:web',
+      cwd: resolve(__dirname, '../..'),
       url: baseURL,
       reuseExistingServer: !process.env['CI'] && !built,
       timeout: 60_000,
