@@ -396,6 +396,7 @@ for (const name of Object.keys(packageJson.scripts)) {
       'test:web',
       'test:web:built',
       'test:web:chromium',
+      'test:smoke:linux',
       'test:e2e:memory',
       'test:perf:safari',
       'test:safari',

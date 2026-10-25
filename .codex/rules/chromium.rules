@@ -2,9 +2,9 @@
 # This is an argv prefix, not a cwd restriction or protection against script edits.
 # The runner rejects arguments and fixes Docker's isolation options.
 prefix_rule(
-    pattern = ["npm", "run", "test:web:chromium"],
+    pattern = ["npm", "run", ["test:web:chromium", "test:smoke:linux"]],
     decision = "allow",
-    justification = "Run only the named offline Chromium container test workflow",
-    match = ["npm run test:web:chromium"],
-    not_match = ["docker run", "docker build", "npm run test:web:chromium-extra", "npm exec node"],
+    justification = "Run only the named offline Linux container test workflows",
+    match = ["npm run test:web:chromium", "npm run test:smoke:linux"],
+    not_match = ["docker run", "docker build", "npm run test:web:chromium-extra", "npm run test:smoke:linux-extra", "npm exec node"],
 )

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { containerArguments, run } from './chromium.mts'
+import { containerArguments, containerSourceFiles, run, runSmoke } from './chromium.mts'
 import { dependencyImage } from './chromium-image.mts'
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }))
@@ -10,8 +10,51 @@ beforeEach(() => spawn.mockReset())
 it('rejects all supplied arguments before accessing Docker', () => {
   for (const arg of ['--privileged', '--network=host', '--help', 'sh', '--config=other.ts']) {
     expect(() => run([arg])).toThrow('accepts no arguments')
+    expect(() => runSmoke([arg])).toThrow('accepts no arguments')
   }
   expect(spawn).not.toHaveBeenCalled()
+})
+
+it('selects only the fixed smoke mode with the same offline container restrictions', () => {
+  const id = `sha256:${'c'.repeat(64)}`
+  spawn
+    .mockReturnValueOnce({ status: 0, stdout: `${id}\n` } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({ status: 9 } as ReturnType<typeof spawnSync>)
+  expect(runSmoke([])).toBe(9)
+  expect(spawn.mock.calls[2]).toEqual([
+    'docker',
+    [...containerArguments(id), 'smoke'],
+    { input: Buffer.from('archive'), stdio: ['pipe', 'inherit', 'inherit'] },
+  ])
+  expect(spawn.mock.calls[1]![1]).toEqual(expect.arrayContaining(containerSourceFiles(true)))
+})
+
+it('streams smoke launch dependencies without baseline images, host output or credentials', () => {
+  const files = containerSourceFiles(true)
+  expect(files).toEqual(
+    expect.arrayContaining([
+      'electron.vite.config.ts',
+      'playwright.smoke.config.ts',
+      'e2e/smoke/happy-path.spec.mts',
+      'e2e/smoke/scenario.mts',
+      'e2e/electron/fixtures.ts',
+      'e2e/electron/electron-entry.cjs',
+      'e2e/electron/hidden-windows.cjs',
+      'e2e/electron/shortcut-stub.cjs',
+      'e2e/electron/electron-process.ts',
+      'e2e/electron/clipboard-lock.ts',
+      'scripts/web/container-entry.mts',
+      'scripts/web/static-server.mts',
+    ]),
+  )
+  expect(files.some((path) => /^(?:\.git|\.scratch|\.aws|\.codex|node_modules|out)(?:\/|$)/.test(path))).toBe(false)
+  expect(
+    files.some((path) => path.startsWith('e2e/electron/') && (path.includes('-snapshots/') || path.endsWith('.png'))),
+  ).toBe(false)
+  expect(containerSourceFiles().some((path) => path.startsWith('e2e/electron/') || path.startsWith('e2e/smoke/'))).toBe(
+    false,
+  )
 })
 
 it('runs only a local immutable image with the fixed isolation settings', () => {
@@ -88,6 +131,7 @@ it('passes current source over stdin to the fixed container and propagates test 
       'scripts/web/build.mts',
       'src/web/index.html',
       'e2e/web/fixtures.mts',
+      'e2e/external-drop.ts',
     ]),
   )
   expect(args!.some((path) => /^(\.git|\.scratch|node_modules)(\/|$)/.test(path))).toBe(false)

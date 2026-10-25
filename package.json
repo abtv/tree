@@ -26,6 +26,7 @@
     "test:smoke:electron": "playwright test -c playwright.smoke.config.ts --project=electron",
     "test:smoke:chromium": "playwright test -c playwright.smoke.config.ts --project=chromium",
     "test:smoke:safari": "node scripts/smoke-safari.mts",
+    "test:smoke:linux": "node scripts/web/linux-smoke.mts",
     "prestart": "node scripts/rename-dev-app.mts",
     "start": "electron-vite preview",
     "build": "electron-vite build",

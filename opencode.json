@@ -113,6 +113,8 @@
           "npm run test:smoke:chromium *": "allow",
           "npm run test:smoke:safari": "allow",
           "npm run test:smoke:safari *": "allow",
+          "npm run test:smoke:linux": "allow",
+          "npm run test:smoke:linux *": "allow",
           "npm run test:web:built": "allow",
           "npm run test:web:built *": "allow",
           "npm run test:web:chromium": "allow",

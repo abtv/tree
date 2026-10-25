@@ -12,6 +12,8 @@ it('loads script libraries with native Node type stripping and no transpilation 
     './scripts/retire-scratch.mts',
     './scripts/e2e-diagnose.mts',
     './scripts/web/static-server.mts',
+    './scripts/web/container-entry.mts',
+    './scripts/web/linux-smoke.mts',
     './scripts/web-release/prepare.mts',
     './scripts/web-release/publish.mts',
     './scripts/web-release/verify-target.mts',

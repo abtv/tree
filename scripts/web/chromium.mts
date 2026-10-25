@@ -6,7 +6,7 @@ import { currentDependencyImage } from './chromium-image.mts'
 
 const root = resolve(import.meta.dirname, '../..')
 
-export function containerArguments(imageID: string) {
+export function containerArguments(imageID: string, smoke = false) {
   if (!/^sha256:[a-f0-9]{64}$/.test(imageID)) throw new Error('Expected a local immutable image ID')
   return [
     'run',
@@ -28,6 +28,7 @@ export function containerArguments(imageID: string) {
     '4',
     '-i',
     imageID,
+    ...(smoke ? ['smoke'] : []),
   ]
 }
 
@@ -44,23 +45,53 @@ function sourceFiles(directory: string): string[] {
 
 export function run(args: string[]) {
   if (args.length) throw new Error('test:web:chromium accepts no arguments; it runs the full built-browser suite')
-  const image = currentDependencyImage()
-  const inspected = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { encoding: 'utf8' })
-  if (inspected.error || inspected.status !== 0) {
-    throw new Error(
-      `Chromium dependency image is unavailable. Ask the owner to run: make setup\nAgents must not build, pull, or install dependencies.\n${inspected.error?.message ?? inspected.stderr}`,
-    )
-  }
-  const dockerArgs = containerArguments(inspected.stdout.trim())
-  const files = [
+  return runContainer(false)
+}
+
+export function runSmoke(args: string[]) {
+  if (args.length) throw new Error('test:smoke:linux accepts no arguments; it runs Electron and Chromium smoke checks')
+  return runContainer(true)
+}
+
+export function containerSourceFiles(smoke = false) {
+  return [
     'package.json',
     'package-lock.json',
     'playwright.web.config.ts',
+    'e2e/external-drop.ts',
     ...readdirSync(root).filter((name) => /^tsconfig[^/]*\.json$/.test(name)),
     ...sourceFiles('src'),
     ...sourceFiles('scripts/web'),
     ...sourceFiles('e2e/web'),
+    ...(smoke
+      ? [
+          'electron.vite.config.ts',
+          'playwright.smoke.config.ts',
+          ...sourceFiles('e2e/smoke'),
+          // Only the launch/menu/cleanup dependencies of the smoke spec, never screenshot baselines.
+          ...[
+            'fixtures.ts',
+            'electron-process.ts',
+            'clipboard-lock.ts',
+            'electron-entry.cjs',
+            'hidden-windows.cjs',
+            'shortcut-stub.cjs',
+          ].map((name) => `e2e/electron/${name}`),
+        ]
+      : []),
   ]
+}
+
+function runContainer(smoke: boolean) {
+  const image = currentDependencyImage()
+  const inspected = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { encoding: 'utf8' })
+  if (inspected.error || inspected.status !== 0) {
+    throw new Error(
+      `Linux test dependency image is unavailable. Ask the owner to run: make setup\nAgents must not build, pull, or install dependencies.\n${inspected.error?.message ?? inspected.stderr}`,
+    )
+  }
+  const dockerArgs = containerArguments(inspected.stdout.trim(), smoke)
+  const files = containerSourceFiles(smoke)
   // Only these source paths enter the container. No .git, credentials, scratch,
   // host dependencies, Docker socket, ports, or host environment are forwarded.
   // Match the image's root user without needing CAP_CHOWN during extraction.
