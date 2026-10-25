@@ -8,9 +8,10 @@ import {
 } from './persistence-coordinator'
 import {
   CLEANUP_MAX_CONSECUTIVE_FAILURES,
-  SAVE_IDLE_MILLISECONDS,
+  DEFAULT_SAVE_TIMING,
   SAVE_MAX_CONSECUTIVE_FAILURES,
   SAVE_WORD_THRESHOLD,
+  type SaveTiming,
 } from './save-policy'
 
 export interface SaveSchedulerContext {
@@ -34,6 +35,7 @@ export class EditorSaveScheduler {
     services: PersistenceServices,
     private readonly clock: Clock,
     private readonly context: SaveSchedulerContext,
+    private readonly timing: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
     this.persistence = new PersistenceCoordinator(services, {
       currentState: () => this.context.currentState(),
@@ -137,7 +139,7 @@ export class EditorSaveScheduler {
     this.saveTimer = this.clock.setTimeout(() => {
       this.saveTimer = undefined
       this.requestPolicySave()
-    }, SAVE_IDLE_MILLISECONDS)
+    }, this.timing.idleMilliseconds)
   }
 
   public scheduleCleanupRetry(): void {
@@ -149,7 +151,7 @@ export class EditorSaveScheduler {
     this.saveTimer = this.clock.setTimeout(() => {
       this.saveTimer = undefined
       this.persistence.requestAttachmentCleanup()
-    }, SAVE_IDLE_MILLISECONDS)
+    }, this.timing.cleanupRetryMilliseconds)
   }
 
   private handleSaveCaptured(): void {

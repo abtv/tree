@@ -1,5 +1,16 @@
 export const SAVE_WORD_THRESHOLD = 10
 export const SAVE_IDLE_MILLISECONDS = 10_000
+
+export interface SaveTiming {
+  readonly idleMilliseconds: number
+  readonly cleanupRetryMilliseconds: number
+}
+
+export const DEFAULT_SAVE_TIMING: SaveTiming = {
+  idleMilliseconds: SAVE_IDLE_MILLISECONDS,
+  cleanupRetryMilliseconds: SAVE_IDLE_MILLISECONDS,
+}
+
 export const SAVE_MAX_CONSECUTIVE_FAILURES = 3
 export const CLEANUP_MAX_CONSECUTIVE_FAILURES = 3
 

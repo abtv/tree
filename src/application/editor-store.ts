@@ -68,7 +68,7 @@ import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import type { PersistenceFailureKind } from './persistence-coordinator'
-import { countInsertedWords, countPastedWords } from './save-policy'
+import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
   applyNodeFold,
   collapseForest,
@@ -137,27 +137,34 @@ export class EditorStore {
     private readonly services: EditorServices,
     private readonly createId: () => string,
     clock: Clock = systemClock,
+    saveTiming: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
     this.textSession = new EditorTextSession(clock)
-    this.saveScheduler = new EditorSaveScheduler(services, clock, {
-      currentState: () => {
-        const state = this.runtime.snapshot
-        // Normal callers request saves only after initialization; retain this guard for
-        // unavailable state rather than exposing the scheduler's callback publicly.
-        if (state.status !== 'ready') return undefined
-        const measured = state.agenda === undefined ? this.readSelectedRowTop?.() : undefined
-        // Number.isFinite(undefined) is false too; the explicit check narrows the type.
-        if (measured !== undefined && Number.isFinite(measured)) this.selectedRowTop = Math.max(0, Math.round(measured))
-        const expandedIds = state.expansion.expandedIds
-        const selectedRowTop = this.selectedRowTop
-        // JSON persistence omits an undefined position even if the key is present.
-        const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
-        return { document: state.document, location: state.agenda?.origin.location ?? state.location, view }
+    this.saveScheduler = new EditorSaveScheduler(
+      services,
+      clock,
+      {
+        currentState: () => {
+          const state = this.runtime.snapshot
+          // Normal callers request saves only after initialization; retain this guard for
+          // unavailable state rather than exposing the scheduler's callback publicly.
+          if (state.status !== 'ready') return undefined
+          const measured = state.agenda === undefined ? this.readSelectedRowTop?.() : undefined
+          // Number.isFinite(undefined) is false too; the explicit check narrows the type.
+          if (measured !== undefined && Number.isFinite(measured))
+            this.selectedRowTop = Math.max(0, Math.round(measured))
+          const expandedIds = state.expansion.expandedIds
+          const selectedRowTop = this.selectedRowTop
+          // JSON persistence omits an undefined position even if the key is present.
+          const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
+          return { document: state.document, location: state.agenda?.origin.location ?? state.location, view }
+        },
+        referencedAttachmentIds: () => this.referencedAttachmentIds(),
+        isPersistenceLocked: () => this.isPersistenceLocked(),
+        onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
       },
-      referencedAttachmentIds: () => this.referencedAttachmentIds(),
-      isPersistenceLocked: () => this.isPersistenceLocked(),
-      onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
-    })
+      saveTiming,
+    )
   }
 
   public getSnapshot = this.runtime.getSnapshot

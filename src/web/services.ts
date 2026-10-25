@@ -1,9 +1,8 @@
-import type { Clock, EditorServices } from '../application/editor-store-types'
+import type { EditorServices } from '../application/editor-store-types'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeApi } from '../shared/ipc'
 import { requireNode, serializeState, validatePersistedState } from '../domain/document'
 import { readEditableContent } from '../renderer/editor-dom'
-import { SAVE_IDLE_MILLISECONDS } from '../application/save-policy'
 import { extractClipboardLinks } from '../infrastructure/main/clipboard'
 import { MAX_ATTACHMENT_BYTES } from '../electron/main/ipc-security'
 import { applyAppearance } from './appearance'
@@ -30,7 +29,6 @@ export interface DataSession {
 
 export async function installBrowserPrototype(): Promise<{
   services: EditorServices
-  clock: Clock
   vimAvailable: boolean
   data: DataSession
   connect(store: EditorStore): void
@@ -328,13 +326,6 @@ export async function installBrowserPrototype(): Promise<{
         }
       },
       discardStagedImages: () => discardStagedImages(db),
-    },
-    // Use the existing save scheduler without calling its shutdown edit finishers on
-    // each autosave. Other editor timers keep their normal delays.
-    clock: {
-      setTimeout: (callback, milliseconds) =>
-        setTimeout(callback, milliseconds === SAVE_IDLE_MILLISECONDS ? 300 : milliseconds),
-      clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
     },
     connect(editor) {
       store = editor

@@ -120,6 +120,39 @@ function tick(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+it('passes save timing to the scheduler while preserving text-session grouping', async () => {
+  vi.useFakeTimers()
+  try {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const store = new EditorStore(services, ids('new'), undefined, {
+      idleMilliseconds: 300,
+      cleanupRetryMilliseconds: 300,
+    })
+    await store.initialize()
+    await store.flushPersistence()
+    services.saves.length = 0
+
+    store.editText('root', 'first')
+    await vi.advanceTimersByTimeAsync(299)
+
+    expect(services.saves).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+
+    expect(services.saves).toHaveLength(1)
+
+    store.editText('root', 'second')
+    store.undo()
+
+    expect((store.getSnapshot() as ReadySnapshot).document.roots[0]?.text).toBe('')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 async function lockEditor(
   clock: FakeClock,
   roots?: TreeNode[],

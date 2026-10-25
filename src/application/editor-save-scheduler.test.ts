@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorSaveScheduler } from './editor-save-scheduler'
 import type { Clock } from './editor-store-types'
-import { SAVE_IDLE_MILLISECONDS } from './save-policy'
+import { SAVE_IDLE_MILLISECONDS, type SaveTiming } from './save-policy'
 
 const state = {
   document: { roots: [{ id: 'root', text: '', children: [] }] },
@@ -43,20 +43,56 @@ function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function createHarness() {
+function createHarness(timing?: SaveTiming) {
   const clock = new ManualClock()
   const save = vi.fn(async (): Promise<void> => undefined)
   const cleanupAttachments = vi.fn(async (): Promise<void> => undefined)
-  const scheduler = new EditorSaveScheduler({ save, cleanupAttachments }, clock, {
-    currentState: () => state,
-    referencedAttachmentIds: () => [],
-    isPersistenceLocked: () => false,
-    onPersistenceResult: vi.fn(),
-  })
+  const scheduler = new EditorSaveScheduler(
+    { save, cleanupAttachments },
+    clock,
+    {
+      currentState: () => state,
+      referencedAttachmentIds: () => [],
+      isPersistenceLocked: () => false,
+      onPersistenceResult: vi.fn(),
+    },
+    timing,
+  )
   return { clock, save, cleanupAttachments, scheduler }
 }
 
 const IDLE = SAVE_IDLE_MILLISECONDS
+
+it('uses explicit save and cleanup intervals without changing other clock timers', async () => {
+  const { clock, save, cleanupAttachments, scheduler } = createHarness({
+    idleMilliseconds: 300,
+    cleanupRetryMilliseconds: 700,
+  })
+  const unrelated = vi.fn()
+  clock.setTimeout(unrelated, IDLE)
+
+  scheduler.markPersistedChange()
+  await clock.advanceTo(299)
+
+  expect(save).not.toHaveBeenCalled()
+
+  await clock.advanceTo(300)
+  scheduler.scheduleCleanupRetry()
+  await clock.advanceTo(999)
+
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(cleanupAttachments).not.toHaveBeenCalled()
+  expect(unrelated).not.toHaveBeenCalled()
+
+  await clock.advanceTo(1_000)
+
+  expect(cleanupAttachments).toHaveBeenCalledTimes(1)
+  expect(save).toHaveBeenCalledTimes(1)
+
+  await clock.advanceTo(IDLE)
+
+  expect(unrelated).toHaveBeenCalledOnce()
+})
 
 describe('EditorSaveScheduler idle saves', () => {
   it('saves once after the idle interval and postpones the save while changes continue', async () => {

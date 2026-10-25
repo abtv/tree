@@ -22,7 +22,10 @@ const WEB_ATTACHMENT_IMAGE_CACHE_LIMIT = 128 * 1024 * 1024
 
 try {
   const bridge = await installBrowserPrototype()
-  const store = new EditorStore(bridge.services, () => crypto.randomUUID(), bridge.clock)
+  const store = new EditorStore(bridge.services, () => crypto.randomUUID(), undefined, {
+    idleMilliseconds: 300,
+    cleanupRetryMilliseconds: 300,
+  })
   bridge.connect(store)
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
