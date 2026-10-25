@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
 import { happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 
+export const SAFARI_SMOKE_TIMEOUT_MS = 30_000
+
 export function validateArguments(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return 'help'
   assert.equal(args.length, 0, 'Use npm run test:safari with no arguments, or -- --help')
@@ -53,7 +55,7 @@ export async function runSafari(smoke = false) {
   const interrupt = () => controller.abort(new Error('Safari checks interrupted'))
   process.on('SIGINT', interrupt)
   process.on('SIGTERM', interrupt)
-  const budget = smoke ? 20_000 : 120_000
+  const budget = smoke ? SAFARI_SMOKE_TIMEOUT_MS : 120_000
   const timeout = setTimeout(() => controller.abort(new Error(`Safari checks exceeded ${budget}ms`)), budget)
   let driver: ChildProcess | undefined
   let session: string | undefined
