@@ -130,6 +130,7 @@ export async function runSafari(smoke = false) {
         return id
       }
       const smokeDriver: SmokeDriver = {
+        countRows: () => evaluate("return document.querySelectorAll('.node-row').length"),
         waitFor: async (script) => {
           const deadline = Date.now() + 5000
           while (!controller.signal.aborted) {
@@ -181,15 +182,26 @@ export async function runSafari(smoke = false) {
         },
         press: async (selector, key) => {
           await elementId(selector)
-          const value = { Enter: '\uE007', Tab: '\uE004', Escape: '\uE00C', '0': '0', i: 'i', '/': '/' }[key]
+          const specialKeys: Record<string, string> = {
+            Enter: '\uE007',
+            Tab: '\uE004',
+            Escape: '\uE00C',
+            Backspace: '\uE003',
+            ArrowUp: '\uE013',
+            ArrowDown: '\uE015',
+            Shift: '\uE008',
+            Control: '\uE009',
+            Primary: '\uE03D',
+          }
+          const values = key.split('+').map((part) => specialKeys[part] ?? part)
           await request(`/session/${session}/actions`, {
             actions: [
               {
                 type: 'key',
                 id: 'smoke-keyboard',
                 actions: [
-                  { type: 'keyDown', value },
-                  { type: 'keyUp', value },
+                  ...values.map((value) => ({ type: 'keyDown', value })),
+                  ...values.toReversed().map((value) => ({ type: 'keyUp', value })),
                 ],
               },
             ],

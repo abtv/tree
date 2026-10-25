@@ -7,17 +7,20 @@ import { happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, closeApp } from '../electron/fixtures.ts'
 
-test('persists a child, reopens, edits in Vim and searches Tree and Agenda', async ({ playwright }, testInfo) => {
+test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({ playwright }, testInfo) => {
   const errors: string[] = []
+  // Electron injects the Apple shortcut profile even in the Linux smoke container.
+  const primaryKey = testInfo.project.name === 'electron' || process.platform === 'darwin' ? 'Meta' : 'Control'
   const observe = (page: import('@playwright/test').Page) => {
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('crash', () => errors.push('Renderer crashed'))
     const driver: SmokeDriver = {
       waitFor: async (script) => {
-        await page.waitForFunction(`(async () => { ${script} })()`)
+        await expect.poll(() => page.evaluate(`(async () => { ${script} })()`), { message: script }).toBe(true)
       },
+      countRows: () => page.locator('.node-row').count(),
       fill: (selector, text) => page.locator(selector).first().fill(text),
-      press: (selector, key) => page.locator(selector).press(key),
+      press: (selector, key) => page.locator(selector).press(key.replace('Primary', primaryKey)),
       type: (selector, text) => page.locator(selector).pressSequentially(text),
       enableVim: async () => {
         await page.locator('#tree-menu-button').click()

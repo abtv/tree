@@ -6,8 +6,31 @@ export const childText = `${date} Smoke child one two three four five six seven 
 
 export interface SmokeDriver {
   waitFor: (script: string) => Promise<void>
+  countRows: () => Promise<number>
   fill: (selector: string, text: string) => Promise<void>
-  press: (selector: string, key: 'Enter' | 'Tab' | '0' | 'i' | 'Escape' | '/') => Promise<void>
+  press: (
+    selector: string,
+    key:
+      | 'Enter'
+      | 'Tab'
+      | 'Shift+Tab'
+      | 'Backspace'
+      | 'ArrowUp'
+      | 'ArrowDown'
+      | 'Primary+z'
+      | 'Primary+Shift+z'
+      | 'Control+o'
+      | 'g'
+      | 'd'
+      | '0'
+      | 'i'
+      | 'z'
+      | 'a'
+      | 'k'
+      | 'j'
+      | 'Escape'
+      | '/',
+  ) => Promise<void>
   type: (selector: string, text: string) => Promise<void>
   enableVim: () => Promise<void>
   showView: (view: 'tree' | 'agenda') => Promise<void>
@@ -17,10 +40,13 @@ export interface SmokeDriver {
 const first = '.node-row .node-input'
 const focused = '.node-input:focus'
 const searchInput = 'input[aria-label="Search"]'
+const editorText = '(element => element?.value ?? element?.textContent)'
+const textAt = (selector: string) => `${editorText}(document.querySelector(${JSON.stringify(selector)}))`
+const selectedText = (text: string) => `return ${textAt(focused)} === ${JSON.stringify(text)}`
 const rendered = `return Array.from(document.querySelectorAll('.node-row')).some(row =>
-  row.getAttribute('data-depth') === '0' && row.querySelector('.node-input')?.textContent === ${JSON.stringify(parentText)}) &&
+  row.getAttribute('data-depth') === '0' && ${editorText}(row.querySelector('.node-input')) === ${JSON.stringify(parentText)}) &&
   Array.from(document.querySelectorAll('.node-row')).some(row =>
-  row.getAttribute('data-depth') === '1' && row.querySelector('.node-input')?.textContent === ${JSON.stringify(childText)})`
+  row.getAttribute('data-depth') === '1' && ${editorText}(row.querySelector('.node-input')) === ${JSON.stringify(childText)})`
 
 async function search(driver: SmokeDriver, query: string) {
   await driver.press(':focus', '/')
@@ -36,8 +62,31 @@ async function search(driver: SmokeDriver, query: string) {
 export async function happyPath(driver: SmokeDriver) {
   await driver.waitFor(`return !!document.querySelector(${JSON.stringify(first)})`)
   await driver.fill(first, parentText)
+  await driver.waitFor(selectedText(parentText))
+  const initialRows = await driver.countRows()
+  const emptySibling = `return document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
+    ${textAt(focused)} === '' &&
+    document.activeElement?.closest('.node-row')?.getAttribute('data-depth') === '0'`
   await driver.press(focused, 'Enter')
-  await driver.waitFor(`return document.querySelector(${JSON.stringify(focused)})?.textContent === ''`)
+  await driver.waitFor(emptySibling)
+  await driver.press(focused, 'ArrowUp')
+  await driver.waitFor(selectedText(parentText))
+  await driver.press(focused, 'ArrowDown')
+  await driver.waitFor(emptySibling)
+  // Structural undo/redo cannot be satisfied by the browser's native text history.
+  await driver.press(focused, 'Backspace')
+  await driver.waitFor(`return document.querySelectorAll('.node-row').length === ${initialRows} &&
+    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+  await driver.press(focused, 'Primary+z')
+  await driver.waitFor(emptySibling)
+  await driver.press(focused, 'Primary+Shift+z')
+  await driver.waitFor(`return document.querySelectorAll('.node-row').length === ${initialRows}`)
+  await driver.press(focused, 'Primary+z')
+  await driver.waitFor(emptySibling)
+  await driver.press(focused, 'Tab')
+  await driver.waitFor(`return document.activeElement?.closest('.node-row')?.getAttribute('data-depth') === '1'`)
+  await driver.press(focused, 'Shift+Tab')
+  await driver.waitFor(emptySibling)
   await driver.press(focused, 'Tab')
   await driver.fill(focused, childText)
   await driver.waitFor(rendered)
@@ -48,22 +97,40 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.waitFor(rendered)
   await restored.enableVim()
   await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL'`)
-  await restored.waitFor(
-    `return document.querySelector(${JSON.stringify(focused)})?.textContent === ${JSON.stringify(childText)}`,
-  )
+  await restored.waitFor(selectedText(childText))
   await restored.press(focused, '0')
   await restored.press(focused, 'i')
   await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'INSERT'`)
   await restored.type(focused, 'Vim ')
   await restored.press(focused, 'Escape')
   await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL' &&
-    document.querySelector(${JSON.stringify(focused)})?.textContent === ${JSON.stringify('Vim ' + childText)}`)
+    ${textAt(focused)} === ${JSON.stringify('Vim ' + childText)}`)
+
+  await restored.press(focused, 'k')
+  await restored.waitFor(selectedText(parentText))
+  await restored.press(focused, 'z')
+  await restored.press(focused, 'a')
+  await restored.waitFor(`return document.querySelectorAll('.node-row').length === ${initialRows} &&
+    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+  await restored.press(focused, 'z')
+  await restored.press(focused, 'a')
+  await restored.waitFor(`return document.querySelectorAll('.node-row').length === ${initialRows + 1}`)
+  await restored.press(focused, 'g')
+  await restored.press(focused, 'd')
+  await restored.waitFor(`return ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
+    document.querySelectorAll('.node-row').length === 1 &&
+    ${textAt(focused)} === ${JSON.stringify('Vim ' + childText)}`)
+  // Safari reserves Cmd+, for its settings; exercise the equivalent Vim navigation.
+  await restored.press(focused, 'Control+o')
+  await restored.waitFor(`return !document.querySelector('.current-parent') &&
+    document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
+    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+  await restored.press(focused, 'j')
+  await restored.waitFor(selectedText('Vim ' + childText))
 
   // Start on the child and require search to move focus to another node in Tree.
   await search(restored, parentText)
-  await restored.waitFor(
-    `return document.activeElement?.closest('.node-row')?.querySelector('.node-input')?.textContent === ${JSON.stringify(parentText)}`,
-  )
+  await restored.waitFor(selectedText(parentText))
   await restored.press(':focus', 'Escape')
 
   await restored.showView('agenda')
@@ -79,6 +146,6 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.press(':focus', 'Escape')
   await restored.showView('tree')
   await restored.waitFor(`return !document.querySelector('.agenda-list') &&
-    document.activeElement?.closest('.node-row')?.querySelector('.node-input')?.textContent === ${JSON.stringify(parentText)}`)
+    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
 }
