@@ -6,7 +6,7 @@ export const RECENT_NODE_RESULTS = 8
 export interface RecentNode {
   readonly id: string
   readonly text: string
-  readonly path: string
+  readonly path: string | null
 }
 
 export function normalizeRecentNodes(value: unknown): string[] {
@@ -106,7 +106,7 @@ export class RecentNodes {
       results.push({
         id,
         text: label(found.at(-1)!),
-        path: found.length === 1 ? 'Root' : found.slice(0, -1).map(label).join(' › '),
+        path: found.length === 1 ? null : found.slice(0, -1).map(label).join(' › '),
       })
       if (results.length === RECENT_NODE_RESULTS) break
     }

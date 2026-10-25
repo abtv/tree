@@ -31,7 +31,10 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await first.window.keyboard.press('Meta+;')
 
     const popup = first.window.getByRole('dialog', { name: 'Recent nodes' })
-    await expect(popup.getByRole('option')).toHaveText(['Beta editedRoot', 'Alpha editedRoot'])
+    await expect(popup.getByRole('option')).toHaveText(['Beta edited', 'Alpha edited'])
+    await expect(popup.getByRole('img', { name: 'Top level' })).toHaveCount(2)
+    const fontSize = await node(first.window, 2).evaluate((element) => getComputedStyle(element).fontSize)
+    await expect(popup.locator('.recent-node-text').first()).toHaveCSS('font-size', fontSize)
     await first.window.keyboard.press('ArrowUp')
     await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
     await first.window.keyboard.press('Escape')
@@ -53,7 +56,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await second.window.emulateMedia({ colorScheme: 'dark' })
     await second.window.keyboard.press('Meta+;')
 
-    await expect(second.window.getByRole('option')).toHaveText(['Alpha editedRoot', 'Beta editedRoot'])
+    await expect(second.window.getByRole('option')).toHaveText(['Alpha edited', 'Beta edited'])
     await second.window.screenshot({ path: `.scratch/recent-nodes/${mode.mode}-dark-popup.png` })
     await second.window.keyboard.press('Escape')
   })
@@ -111,11 +114,25 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     )
     await window.reload()
     await expect(node(window, 1)).toBeVisible()
+    await window.keyboard.press('Meta+;')
+    const popup = window.getByRole('dialog', { name: 'Recent nodes' })
+    const centerOffset = () =>
+      popup.evaluate((element) => {
+        const box = element.getBoundingClientRect()
+        return Math.max(
+          Math.abs(box.left + box.width / 2 - innerWidth / 2),
+          Math.abs(box.top + box.height / 2 - innerHeight / 2),
+        )
+      })
+    await expect.poll(centerOffset).toBeLessThanOrEqual(1)
+    await window.screenshot({ path: 'test-results/recent-nodes-centered.png' })
+    await window.keyboard.press('Escape')
     await setMainWindowBounds(app, { width: 700, height: 400 })
     await node(window, 1).focus()
     await window.keyboard.press('Meta+;')
     await window.locator('.recent-nodes-title').click()
     await expect(window.getByRole('dialog', { name: 'Recent nodes' })).toBeVisible()
+    await expect.poll(centerOffset).toBeLessThanOrEqual(1)
     await window.keyboard.press('ArrowUp')
 
     const geometry = await window

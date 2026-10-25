@@ -4,6 +4,7 @@ import type { RecentNode } from '../application/recent-nodes'
 import type { ShortcutProfile } from './shortcut-profile'
 import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
 import { moveSuggestionIndex } from './completion-controller'
+import { OutlineRootIcon } from './LocationBar'
 
 export function RecentNodesPopup({
   store,
@@ -143,7 +144,15 @@ export function RecentNodesPopup({
               }}
             >
               <span className="recent-node-text">{item.text}</span>
-              <span className="recent-node-path">{item.path}</span>
+              <span className="recent-node-path">
+                {item.path === null ? (
+                  <span className="recent-node-root location-icon" role="img" aria-label="Top level" title="Top level">
+                    <OutlineRootIcon />
+                  </span>
+                ) : (
+                  item.path
+                )}
+              </span>
             </div>
           ))
         )}

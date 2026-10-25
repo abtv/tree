@@ -46,7 +46,7 @@ export function LocationBar({
   )
 }
 
-function OutlineRootIcon(): React.JSX.Element {
+export function OutlineRootIcon(): React.JSX.Element {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
       <path d="M12 6v5m0 0-5 5m5-5 5 5" />

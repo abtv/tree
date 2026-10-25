@@ -19,6 +19,7 @@ export interface SmokeDriver {
       | 'ArrowDown'
       | 'Primary+z'
       | 'Primary+Shift+z'
+      | 'Primary+;'
       | 'Control+o'
       | 'g'
       | 'd'
@@ -176,5 +177,24 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.showView('tree')
   await restored.waitFor(`return !document.querySelector('.agenda-list') &&
     ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+  const recent = '.recent-nodes-popup'
+  await restored.press(focused, 'Primary+;')
+  await restored.waitFor(
+    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`,
+  )
+  await restored.press(':focus', 'ArrowDown')
+  await restored.waitFor(
+    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify('Vim ' + childText)}`,
+  )
+  await restored.press(':focus', 'Escape')
+  await restored.waitFor(
+    `return !document.querySelector('${recent}') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
+  )
+  await restored.press(focused, 'Primary+;')
+  await restored.press(':focus', 'ArrowDown')
+  await restored.press(':focus', 'Enter')
+  await restored.waitFor(`return !document.querySelector('${recent}') &&
+    ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
+    ${textAt(focused)} === ${JSON.stringify('Vim ' + childText)}`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
 }
