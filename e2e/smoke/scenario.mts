@@ -2,7 +2,7 @@ export const parentText = 'Smoke parent'
 const today = new Date()
 const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 // Exceed the production word threshold after indenting, so persistence needs no idle wait or fake clock.
-export const childText = `${date} Smoke child one two three four five six seven eight nine ten`
+export const childText = `${date} 🐱 Smoke child one two three four five six seven eight nine ten`
 
 export interface SmokeDriver {
   waitFor: (script: string) => Promise<void>
@@ -29,6 +29,7 @@ export interface SmokeDriver {
       | 'k'
       | 'j'
       | 'Escape'
+      | ':'
       | '/',
   ) => Promise<void>
   type: (selector: string, text: string) => Promise<void>
@@ -88,6 +89,25 @@ export async function happyPath(driver: SmokeDriver) {
   await driver.press(focused, 'Shift+Tab')
   await driver.waitFor(emptySibling)
   await driver.press(focused, 'Tab')
+  // Accept real completion input before adding the volume-save fixture text.
+  const datePopup = '[role="listbox"][aria-label="Date suggestions"]'
+  const emojiPopup = '[role="listbox"][aria-label="Emoji suggestions"]'
+  await driver.type(focused, 'today')
+  await driver.waitFor(`return ${textAt(focused)} === 'today' &&
+    document.querySelector('${datePopup} [aria-selected="true"]')?.textContent.includes(${JSON.stringify(date)})`)
+  await driver.press(focused, 'Enter')
+  await driver.waitFor(`return !document.querySelector('${datePopup}') &&
+    ${textAt(focused)} === ${JSON.stringify(date)} &&
+    document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
+    document.activeElement?.closest('.node-row')?.getAttribute('data-depth') === '1'`)
+  await driver.type(focused, ' :cat')
+  await driver.waitFor(`return ${textAt(focused)} === ${JSON.stringify(date + ' :cat')} &&
+    document.querySelector('${emojiPopup} [aria-selected="true"]')?.textContent.includes(':cat:')`)
+  await driver.press(focused, 'Tab')
+  await driver.waitFor(`return !document.querySelector('${emojiPopup}') &&
+    ${textAt(focused)} === ${JSON.stringify(date + ' 🐱')} &&
+    document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
+    document.activeElement?.closest('.node-row')?.getAttribute('data-depth') === '1'`)
   await driver.fill(focused, childText)
   await driver.waitFor(rendered)
   // Read through the real platform adapter. No seeded document, mocked save or store mutation.
@@ -133,7 +153,16 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.waitFor(selectedText(parentText))
   await restored.press(':focus', 'Escape')
 
-  await restored.showView('agenda')
+  const commandInput = 'input[aria-label="Command"]'
+  await restored.press(':focus', ':')
+  await restored.waitFor(`return document.activeElement?.matches(${JSON.stringify(commandInput)}) &&
+    !!document.querySelector('.command-panel')`)
+  await restored.type(commandInput, 'agenda')
+  await restored.waitFor(`return document.querySelectorAll('.command-panel [role="option"]').length === 1 &&
+    document.querySelector('.command-panel [aria-selected="true"] .command-name')?.textContent === 'show-agenda'`)
+  await restored.press(commandInput, 'Enter')
+  await restored.waitFor(`return !document.querySelector('.command-panel') &&
+    !document.querySelector(${JSON.stringify(commandInput)})`)
   // Today's dated child must appear in the real projection, with its undated parent as context.
   await restored.waitFor(`return !!document.querySelector('.agenda-list') &&
     document.activeElement?.closest('.agenda-today')?.getAttribute('aria-selected') === 'true' &&
