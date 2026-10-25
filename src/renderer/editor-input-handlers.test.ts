@@ -13,6 +13,7 @@ import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 import { clearPending } from './vim-command-state'
 import { setNormalCaret } from './editor-dom'
+import { APPLE_SHORTCUTS, OTHER_SHORTCUTS } from './shortcut-profile'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
@@ -203,6 +204,136 @@ async function textFixture(node: TreeNode, mode: VimKeyboardState['mode'] = 'nor
   }
   return { ...harness, ...keyboard, input, press, dispatch, caretRequests }
 }
+
+// @requirement PRODUCT.md §20.2.10
+it('increments and decrements numbers with counts, dot repeat and separate history entries', async () => {
+  const f = await textFixture({ id: 'node', text: 'count 009', children: [] })
+  f.input.setSelectionRange(0, 0)
+
+  f.press('2')
+  f.dispatch('a', { ctrlKey: true })
+
+  expect(f.node().text).toBe('count 011')
+  expect(f.input.selectionStart).toBe(8)
+  expect(f.vim.register.current).toEqual({ kind: 'empty' })
+
+  f.dispatch('.')
+  expect(f.node().text).toBe('count 013')
+
+  f.dispatch('x', { ctrlKey: true })
+  expect(f.node().text).toBe('count 012')
+
+  f.dispatch('u')
+  expect(f.node().text).toBe('count 013')
+  f.dispatch('u')
+  expect(f.node().text).toBe('count 011')
+  f.dispatch('u')
+  expect(f.node().text).toBe('count 009')
+  f.dispatch('r', { ctrlKey: true })
+  expect(f.node().text).toBe('count 011')
+})
+
+it('uses hexadecimal prefix case after a digit-only result and dot repeat', async () => {
+  const f = await textFixture({ id: 'node', text: '0xFF', children: [] })
+  f.input.setSelectionRange(0, 0)
+  f.dispatch('a', { ctrlKey: true })
+  expect(f.node().text).toBe('0x100')
+
+  f.dispatch('x', { ctrlKey: true })
+  expect(f.node().text).toBe('0x0ff')
+  f.dispatch('.')
+  expect(f.node().text).toBe('0x0fe')
+})
+
+it('replaces a counter count with a count before dot as one undoable change', async () => {
+  const f = await textFixture({ id: 'node', text: '10', children: [] })
+  f.input.setSelectionRange(0, 0)
+  f.press('5')
+  f.dispatch('x', { ctrlKey: true })
+  expect(f.node().text).toBe('5')
+
+  f.press('2', '.')
+  expect(f.node().text).toBe('3')
+  f.dispatch('u')
+  expect(f.node().text).toBe('5')
+  f.input.setSelectionRange(0, 0)
+  f.dispatch('.')
+  expect(f.node().text).toBe('3')
+})
+
+it('leaves caret and repeat unchanged when a number edit is rejected', async () => {
+  const f = await textFixture({ id: 'node', text: '9', children: [] })
+  f.input.setSelectionRange(0, 0)
+  const previous = { kind: 'number' as const, amount: 3 }
+  f.commandState.lastChange = previous
+  vi.spyOn(f.store, 'replaceTextRange').mockReturnValue(false)
+  const applyCaret = vi.mocked(f.vim.applyCaretState)
+  applyCaret.mockClear()
+
+  f.dispatch('a', { ctrlKey: true })
+
+  expect(f.node().text).toBe('9')
+  expect(applyCaret).not.toHaveBeenCalled()
+  expect(f.commandState.lastChange).toBe(previous)
+})
+
+it.each(['d', 'g', 'r', 'f'])('discards pending %s instead of changing a number', async (prefix) => {
+  const f = await textFixture({ id: 'node', text: '12', children: [] })
+  f.press(prefix)
+
+  f.dispatch('a', { ctrlKey: true })
+
+  expect(f.node().text).toBe('12')
+  expect(f.commandState.pending).toBeUndefined()
+  expect(f.commandState.lastChange).toBeUndefined()
+})
+
+it('preserves caret, register and dot change when no number exists to the right', async () => {
+  const f = await textFixture({ id: 'node', text: '9 tail', children: [] })
+  f.commandState.lastChange = { kind: 'number', amount: 3 }
+  f.vim.register.current = { kind: 'text', value: 'saved' }
+  f.input.setSelectionRange(4, 4)
+
+  f.dispatch('a', { ctrlKey: true })
+
+  expect(f.node().text).toBe('9 tail')
+  expect(f.input.selectionStart).toBe(4)
+  expect(f.commandState.lastChange).toEqual({ kind: 'number', amount: 3 })
+  expect(f.vim.register.current).toEqual({ kind: 'text', value: 'saved' })
+})
+
+it.each([APPLE_SHORTCUTS, OTHER_SHORTCUTS])(
+  'routes Normal Ctrl counters before application shortcuts (%o)',
+  (shortcuts) => {
+    const store = createStore()
+    const node: TreeNode = { id: 'node', text: '10', children: [] }
+    const input = document.createElement('textarea')
+    input.value = node.text
+    input.setSelectionRange(0, 0)
+    const { vim } = createVimKeyboardDouble(node.id, { mode: 'normal' })
+    const selectAll = vi.fn()
+    const handle = createEditorKeyDownHandler({
+      store,
+      node,
+      vim,
+      shortcuts,
+      isComposing: () => false,
+      setSelectAllNodeId: selectAll,
+      onPreviewAttachment: vi.fn(),
+      shiftFocusedNode: vi.fn(),
+    })
+
+    const increment = keyEvent(input, 'a', { ctrlKey: true })
+    handle(increment)
+    handle(keyEvent(input, 'x', { ctrlKey: true }))
+
+    expect(increment.preventDefault).toHaveBeenCalled()
+    expect(store.replaceTextRange).toHaveBeenNthCalledWith(1, 'node', 0, 2, '11')
+    expect(store.replaceTextRange).toHaveBeenNthCalledWith(2, 'node', 0, 2, '9')
+    expect(store.cut).not.toHaveBeenCalled()
+    expect(selectAll).not.toHaveBeenCalledWith('node')
+  },
+)
 
 async function pendingReplaceFixture() {
   const fixture = await textFixture({ id: 'node', text: 'abcd', children: [] }, 'replace')

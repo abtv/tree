@@ -121,19 +121,36 @@ const mappedCommands: Press[] = [
 ]
 
 describe('primary-modifier parity between the Apple and other profiles', () => {
-  it.each(modes.flatMap((mode) => mappedCommands.map((command) => [mode, command] as const)))(
-    'runs the same outcome for Cmd and Ctrl in %s with %o',
-    (mode, command) => {
-      const apple = setup('apple', mode)
-      const appleOutcome = apple.outcome(apple.press({ ...command, ...primary('apple') }))
-      vi.clearAllMocks()
-      Object.assign(window, { treeApi: { quit } })
-      const other = setup('other', mode)
-      const otherOutcome = other.outcome(other.press({ ...command, ...primary('other') }))
+  it.each(
+    modes.flatMap((mode) =>
+      mappedCommands
+        .filter((command) => mode !== 'normal' || !['a', 'x'].includes(command.key))
+        .map((command) => [mode, command] as const),
+    ),
+  )('runs the same outcome for Cmd and Ctrl in %s with %o', (mode, command) => {
+    const apple = setup('apple', mode)
+    const appleOutcome = apple.outcome(apple.press({ ...command, ...primary('apple') }))
+    vi.clearAllMocks()
+    Object.assign(window, { treeApi: { quit } })
+    const other = setup('other', mode)
+    const otherOutcome = other.outcome(other.press({ ...command, ...primary('other') }))
 
-      expect(otherOutcome).toEqual(appleOutcome)
-    },
-  )
+    expect(otherOutcome).toEqual(appleOutcome)
+  })
+
+  it.each(['a', 'x'])('keeps Cmd+%s an application command and Ctrl a Normal counter', (key) => {
+    const apple = setup('apple', 'normal')
+    const appleOutcome = apple.outcome(apple.press({ key, meta: true }))
+    const other = setup('other', 'normal')
+    const otherOutcome = other.outcome(other.press({ key, ctrl: true }))
+
+    expect(appleOutcome.prevented).toBe(true)
+    expect(otherOutcome.prevented).toBe(true)
+    expect(otherOutcome.calls).toEqual([])
+    expect(otherOutcome.selection).toEqual([1, 3])
+    if (key === 'a') expect(appleOutcome.selection).toEqual([0, 5])
+    else expect(appleOutcome.calls).toEqual(['cut'])
+  })
 
   it('runs each mapped command with Ctrl in every Vim mode', () => {
     for (const mode of modes) {

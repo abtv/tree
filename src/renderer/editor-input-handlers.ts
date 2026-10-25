@@ -5,7 +5,7 @@ import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
 import { getCaret, getSelectionRange, nodeTextLength, readEditableContent, selectAll } from './editor-dom'
-import { handleVimKey } from './vim-keyboard-handler'
+import { handleVimKey, handleVimNumberKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -315,6 +315,18 @@ export function createEditorKeyDownHandler({
           }
         } else shiftFocusedNode(direction, selection, tabCursor)
       }
+      return
+    }
+    if (
+      vim?.mode === 'normal' &&
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      ['a', 'x'].includes(event.key.toLowerCase())
+    ) {
+      setSelectAllNodeId(undefined)
+      event.currentTarget.classList.remove('select-all')
+      handleVimNumberKey(event, store, node, vim)
       return
     }
     const selectingAll = primary && event.key.toLowerCase() === 'a'

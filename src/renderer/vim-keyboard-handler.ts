@@ -112,6 +112,31 @@ function syncImageCaretAtCursor(
   )
 }
 
+/** Ctrl counters accept a bare count, but never complete an operator or awaited character. */
+export function handleVimNumberKey(
+  event: KeyboardEvent<HTMLElement>,
+  store: EditorStore,
+  node: TreeNode,
+  vim: VimKeyboardState,
+): void {
+  event.preventDefault()
+  const state = vim.commandState
+  const pending = state.pending
+  clearPending(state)
+  state.verticalGoal = undefined
+  if (
+    pending?.operator !== undefined ||
+    pending?.prefix !== undefined ||
+    pending?.awaiting !== undefined ||
+    pending?.surround !== undefined
+  )
+    return
+  applyTextChange(store, node, event.currentTarget, getCaret(event.currentTarget), vim, {
+    kind: 'number',
+    amount: parseCount(pending?.count ?? '') * (event.key.toLowerCase() === 'a' ? 1 : -1),
+  })
+}
+
 export function handleVimKey(
   event: KeyboardEvent<HTMLElement>,
   store: EditorStore,
@@ -930,6 +955,13 @@ export function handleVimKey(
   } else if (!visual && event.key === '.') {
     const last = commandState.lastChange
     if (last !== undefined) {
+      if (last.kind === 'number') {
+        const amount = pending.count === '' ? last.amount : Math.sign(last.amount) * count
+        const change: VimTextChange = { kind: 'number', amount }
+        if (applyTextChange(store, node, input, cursor, vim, change, true) !== undefined)
+          recordRepeatChange(commandState, change)
+        return handled()
+      }
       if (last.kind.startsWith('structural-')) {
         for (let index = 0; index < count; index += 1) {
           if (!vim.repeatStructural(last as VimStructuralChange, cursor)) break
@@ -1054,8 +1086,10 @@ function applyTextChange(
   if (replay && result.nextText === node.text) return undefined
   if (result.nextText !== node.text) {
     // A case change rewrites around hyperlinks as one edit list; every other change is one range.
-    if (result.edits === undefined) store.replaceTextRange(node.id, result.start, result.end, result.inserted)
-    else store.replaceTextRanges(node.id, result.edits)
+    if (result.edits === undefined) {
+      const applied = store.replaceTextRange(node.id, result.start, result.end, result.inserted)
+      if (change.kind === 'number' && applied === false) return undefined
+    } else store.replaceTextRanges(node.id, result.edits)
     vim.imageTextCursor.current = undefined
   }
   if (!replay && (change.kind === 'change' || change.kind === 'substitute')) {

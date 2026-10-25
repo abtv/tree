@@ -1,3 +1,4 @@
+import { changeVimNumber } from '../domain/vim-number'
 import {
   currentWordEnd,
   findCharacter,
@@ -228,7 +229,14 @@ export function calculateTextChange(
   // Mutation triage: every branch that reads `inserted` assigns it first, so the initializer is dead.
   let inserted = ''
   let nextCursor = cursor
-  if (change.kind === 'delete' || change.kind === 'change' || change.kind === 'yank') {
+  if (change.kind === 'number') {
+    const edit = changeVimNumber(text, cursor, change.amount)
+    if (edit === undefined) return undefined
+    start = edit.start
+    end = edit.end
+    inserted = edit.inserted
+    nextCursor = edit.nextCursor
+  } else if (change.kind === 'delete' || change.kind === 'change' || change.kind === 'yank') {
     const range = textMotion(text, cursor, change.motion, change.count, change.kind === 'change')
     if (range === undefined) return undefined
     start = range.start

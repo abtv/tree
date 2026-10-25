@@ -6,6 +6,7 @@ import type { VimCaretState } from './vim-caret-transition'
 import type { VimCommandState } from './vim-command-state'
 
 export type VimTextChange =
+  | { kind: 'number'; amount: number }
   | {
       kind: 'delete' | 'change' | 'yank'
       motion: string

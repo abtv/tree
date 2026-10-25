@@ -100,6 +100,21 @@ const isDay = (row: { kind: string }): boolean => row.kind === 'day'
 afterEach(() => vi.restoreAllMocks())
 
 describe('Agenda keyboard primary commands on each profile', () => {
+  it.each(platforms)('keeps Normal counters inert on a read-only row (%s)', async (platform) => {
+    const f = await fixture(platform)
+    f.selectRow(isDay)
+    f.press('2')
+    const before = f.caret()
+
+    const event = f.press('a', { ctrl: true })
+    f.press('x', { ctrl: true })
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(f.vim!.mode).toBe('normal')
+    expect(f.caret()).toEqual(before)
+    expect(f.vim!.commandState.pending).toBeUndefined()
+  })
+
   it.each([
     ['p', {}],
     ['.', {}],

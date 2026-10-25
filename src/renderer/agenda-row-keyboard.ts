@@ -216,6 +216,18 @@ export function createAgendaKeyDownHandler({
         )
       }
     }
+    if (
+      vim?.mode === 'normal' &&
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      ['a', 'x'].includes(event.key.toLowerCase()) &&
+      !rowText?.hasEditor(row)
+    ) {
+      event.preventDefault()
+      clearPending(vim.commandState)
+      return
+    }
     const rowTextKey = (): boolean =>
       rowText !== undefined &&
       !rowText.hasEditor(row) &&
