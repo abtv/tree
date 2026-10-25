@@ -34,6 +34,53 @@ async function blockCaretAt(input: Locator, offset: number): Promise<boolean> {
 }
 
 describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.11
+  // @requirement PRODUCT.md §23.2
+  test('colors past, today and future dates consistently across Tree and Agenda', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'dates', text: 'Dates 2026-10-07 2026-10-08 2026-10-09', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'dates' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
+    await setAgendaToday(window)
+    // Force the mounted Tree editor to render using the fixed local calendar.
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await input.click()
+    await window.keyboard.press('Meta+Enter')
+    await window.keyboard.press('Meta+Enter')
+    for (const view of ['tree', 'agenda'] as const) {
+      if (view === 'agenda') await window.keyboard.press('Meta+p')
+      for (const appearance of ['light', 'dark'] as const) {
+        await window.emulateMedia({ colorScheme: appearance })
+        for (const [kind, text] of [
+          ['past', '2026-10-07'],
+          ['today', '2026-10-08'],
+          ['future', '2026-10-09'],
+        ] as const) {
+          const dates = window.locator(`.date-${kind}`)
+          await expect.poll(() => dates.count()).toBeGreaterThan(0)
+          for (const date of await dates.all()) {
+            await expect(date).toHaveText(text)
+            await expect(date).toHaveCSS(
+              'color',
+              await date.evaluate((el, name) => {
+                const probe = document.createElement('span')
+                probe.style.color = getComputedStyle(el).getPropertyValue(`--color-date-${name}`)
+                el.append(probe)
+                const color = getComputedStyle(probe).color
+                probe.remove()
+                return color
+              }, kind),
+            )
+          }
+        }
+        await window.mouse.move(600, 20)
+        await expect(window).toHaveScreenshot(screenshotName(`temporal-dates-${view}-${appearance}.png`))
+      }
+    }
+  })
+
   // @requirement PRODUCT.md §2.5
   // @requirement PRODUCT.md §20.11
   // @requirement PRODUCT.md §23.2
@@ -106,6 +153,10 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
     const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
     const first = window.getByRole('textbox', { name: 'Node 1', exact: true })
     const second = window.getByRole('textbox', { name: 'Node 2', exact: true })
+    await setAgendaToday(window)
+    await first.click()
+    await window.keyboard.press('Meta+Enter')
+    await window.keyboard.press('Meta+Enter')
     await expect(heading.locator('.agenda-date-active')).toHaveText('2026-10-08')
     await expect(first.locator('.agenda-date-active')).toHaveCount(2)
     await expect(

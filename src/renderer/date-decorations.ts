@@ -1,29 +1,37 @@
 import type { TreeNode } from '../domain/document'
+import { dayNumberOf } from '../domain/calendar-date'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { dateLikeDecorations, type TextDecoration } from './editor-dom'
 
-/**
- * Agenda text decorations: the displayed day's date in the accent color, other recognized dates in the
- * secondary color, and text resembling a date underlined (docs/PRODUCT.md §20.10, §23.9).
- */
-export function agendaDecorations(node: TreeNode, day: number): TextDecoration[] {
+/** Local calendar day for presentation; Agenda supplies its captured Today instead. */
+export function localToday(): number {
+  const date = new Date()
+  return dayNumberOf({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
+}
+
+function dateColor(day: number, today: number): string {
+  return day < today ? 'date-past' : day > today ? 'date-future' : 'date-today'
+}
+
+/** Date color expresses time; font weight identifies the displayed day's date. */
+export function agendaDecorations(node: TreeNode, day: number, today = localToday()): TextDecoration[] {
   return [
     ...findCanonicalDates(node.text, node.links).map((date) => ({
       start: date.start,
       end: date.end,
-      className: date.day === day ? 'agenda-date-active' : 'agenda-date-secondary',
+      className: `${date.day === day ? 'agenda-date-active' : 'agenda-date-secondary'} ${dateColor(date.day, today)}`,
     })),
     ...dateLikeDecorations(node),
   ].sort((left, right) => left.start - right.start)
 }
 
-/** Tree dates use Agenda's active-date styling; undecorated rows keep the plain textarea. */
-export function treeDecorations(node: TreeNode): TextDecoration[] | undefined {
+/** Tree dates are semibold; undecorated rows keep the plain textarea. */
+export function treeDecorations(node: TreeNode, today = localToday()): TextDecoration[] | undefined {
   const decorations = [
     ...findCanonicalDates(node.text, node.links).map((date) => ({
       start: date.start,
       end: date.end,
-      className: 'agenda-date-active',
+      className: `agenda-date-active ${dateColor(date.day, today)}`,
     })),
     ...dateLikeDecorations(node),
   ].sort((left, right) => left.start - right.start)

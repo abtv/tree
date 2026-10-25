@@ -82,6 +82,9 @@
   --color-drag-highlight: #f1ebdd;
   --color-drop-marker: #9b4d00;
   --color-date-like: #b4554b;
+  --color-date-past: #a0443e;
+  --color-date-today: #806800;
+  --color-date-future: #396d43;
   --color-disclosure-background: #efe9da;
   --color-enter-ring-background: #ddd5c2;
   --color-enter-ring-hover-background: #cfc6b0;
@@ -560,11 +563,16 @@ body:not(.node-drag-active) .location-link:hover {
   color: var(--color-secondary);
 }
 .agenda-date-active {
-  color: var(--color-drop-marker);
   font-weight: 600;
 }
-.agenda-date-secondary {
-  color: var(--color-secondary);
+.date-past {
+  color: var(--color-date-past);
+}
+.date-today {
+  color: var(--color-date-today);
+}
+.date-future {
+  color: var(--color-date-future);
 }
 .node-input-struck .agenda-date-active,
 .node-input-struck .agenda-date-secondary,
@@ -1424,6 +1432,9 @@ body.node-drag-invalid * {
     --color-drag-highlight: #4f4f4f;
     --color-drop-marker: #f0dfaf;
     --color-date-like: #cc9393;
+    --color-date-past: #cc9393;
+    --color-date-today: #f0dfaf;
+    --color-date-future: #7f9f7f;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);
     --color-overlay-button-hover-background: rgba(220, 220, 204, 0.24);
     --color-overlay-button-foreground: #dcdccc;

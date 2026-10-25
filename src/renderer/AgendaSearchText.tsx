@@ -9,6 +9,7 @@ import { preventReadOnlyLinkFocus } from './node-input-pointer-handlers'
 export function AgendaSearchText({
   node,
   day,
+  today,
   marks,
   query,
   currentMatch,
@@ -17,6 +18,7 @@ export function AgendaSearchText({
 }: {
   node: TreeNode
   day: number
+  today?: number | undefined
   marks: readonly CaretMark[]
   query: string
   currentMatch?: { start: number; end: number } | undefined
@@ -25,7 +27,7 @@ export function AgendaSearchText({
 }): React.JSX.Element {
   const matches = useSearchDecorations(node.text, query)
   const decorations = [
-    ...agendaDecorations(node, day),
+    ...agendaDecorations(node, day, today),
     ...matches.map((match) =>
       currentMatch?.start === match.start && currentMatch.end === match.end
         ? { ...match, className: 'search-match search-match-current' }

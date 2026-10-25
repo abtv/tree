@@ -1755,7 +1755,9 @@ While a node is being edited, a token is not underlined when the caret or select
 
 ### 20.11 Date Visualization in Tree
 
-Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, uses the same accent color and semibold weight as Agenda's displayed-day date. Tree has no displayed day, so all recognized dates receive that styling. Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
+Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, is semibold and colored relative to the local calendar's Today: past dates are red, today's dates are yellow, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface; the dark appearance uses muted lighter variants. Tree evaluates Today when rendering date decorations; Agenda uses the Today captured when it opens (§23.1).
+
+Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
 
 ---
 
@@ -1831,7 +1833,7 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 * Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
 * A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy.
 * Full text is shown and wraps as in Tree.
-* The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text. Date colors yield to struck-through text color (§2.5).
+* Every recognized date uses the temporal color of §20.11, independent of the displayed day: red in the past, yellow today and green in the future. The displayed day's date is semibold; other dates retain ordinary weight. Date colors yield to struck-through text color (§2.5).
 * Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance.
 * An outer bullet ring reflects real children; a chevron reflects projected children.
 

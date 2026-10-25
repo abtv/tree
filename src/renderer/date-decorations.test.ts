@@ -23,21 +23,37 @@ describe('date-like decorations', () => {
   })
   it('orders Agenda decorations by position across valid and resembling dates', () => {
     const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
-    expect(agendaDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'), day)).toEqual([
+    expect(agendaDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'), day, day)).toEqual([
       { start: 0, end: 10, className: DATE_LIKE_CLASS },
-      { start: 13, end: 23, className: 'agenda-date-active' },
-      { start: 26, end: 36, className: 'agenda-date-secondary' },
+      { start: 13, end: 23, className: 'agenda-date-active date-today' },
+      { start: 26, end: 36, className: 'agenda-date-secondary date-future' },
     ])
   })
 })
 
 // @requirement PRODUCT.md §20.11
 describe('Tree date visualization', () => {
-  it('uses Agenda active-date styling for every recognized date and orders all decorations', () => {
-    expect(treeDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'))).toEqual([
+  it('uses semibold temporal styling for every recognized date and orders all decorations', () => {
+    expect(
+      treeDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'), dayNumberOf({ year: 2026, month: 10, day: 14 })),
+    ).toEqual([
       { start: 0, end: 10, className: DATE_LIKE_CLASS },
-      { start: 13, end: 23, className: 'agenda-date-active' },
-      { start: 26, end: 36, className: 'agenda-date-active' },
+      { start: 13, end: 23, className: 'agenda-date-active date-today' },
+      { start: 26, end: 36, className: 'agenda-date-active date-future' },
+    ])
+  })
+  it('compares calendar days across year boundaries independently of the Agenda occurrence', () => {
+    const today = dayNumberOf({ year: 2027, month: 1, day: 1 })
+    const value = node('2026-12-31 2027-01-01 2027-01-02')
+    expect(treeDecorations(value, today)?.map((item) => item.className)).toEqual([
+      'agenda-date-active date-past',
+      'agenda-date-active date-today',
+      'agenda-date-active date-future',
+    ])
+    expect(agendaDecorations(value, today + 1, today).map((item) => item.className)).toEqual([
+      'agenda-date-secondary date-past',
+      'agenda-date-secondary date-today',
+      'agenda-date-active date-future',
     ])
   })
   it('excludes hyperlink dates and dates with touching digits', () => {

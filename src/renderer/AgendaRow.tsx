@@ -7,10 +7,10 @@ import { agendaDateLabel, agendaGapLabel, agendaRowLabel } from './agenda-labels
 import type { CaretMark } from './agenda-row-caret'
 import { markedNodes } from './marked-nodes'
 
-function datedText(node: TreeNode, day: number, marks: readonly CaretMark[]): ReactNode[] {
+function datedText(node: TreeNode, day: number, today: number, marks: readonly CaretMark[]): ReactNode[] {
   const parts: ReactNode[] = []
   let start = 0
-  for (const decoration of agendaDecorations(node, day)) {
+  for (const decoration of agendaDecorations(node, day, today)) {
     parts.push(...markedNodes(node.text, start, decoration.start, marks, false))
     parts.push(
       <span key={decoration.start} className={decoration.className}>
@@ -119,7 +119,7 @@ export const AgendaRow = memo(function AgendaRow({
               renderText(node!, row.day, marks, row.role === 'context')
             ) : (
               <span className={`agenda-text${node!.struckThrough ? ' agenda-text-struck' : ''}`}>
-                {datedText(node!, row.day, marks)}
+                {datedText(node!, row.day, today, marks)}
               </span>
             )
           ) : (

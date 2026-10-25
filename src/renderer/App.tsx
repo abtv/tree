@@ -16,7 +16,7 @@ import { AgendaSearchText } from './AgendaSearchText'
 import { CompletionPopup } from './CompletionPopup'
 import { CommandPanel } from './CommandPanel'
 import { useCommandPanel } from './use-command-panel'
-import { agendaDecorations, treeDecorations } from './date-decorations'
+import { agendaDecorations, localToday, treeDecorations } from './date-decorations'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
@@ -73,6 +73,8 @@ export function App({
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const agendaToday = state.status === 'ready' ? state.agenda?.today : undefined
+  const treeToday = localToday()
   const search = useSyncExternalStore(store.search.subscribe, store.search.session.getSnapshot)
   const searchResult = useSyncExternalStore(store.search.subscribe, store.search.getResult)
   const searchQuery = search.visible ? (search.draft ?? search.confirmed) : ''
@@ -321,7 +323,7 @@ export function App({
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           node={node}
           label={label}
-          decorations={treeDecorations(node)}
+          decorations={treeDecorations(node, treeToday)}
           searchQuery={searchQuery}
           currentMatch={searchResult?.destination?.nodeId === node.id ? searchResult.destination : undefined}
           richEditingEnabled={richEditingEnabled}
@@ -337,7 +339,7 @@ export function App({
         )}
       </>
     ),
-    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult],
+    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult, treeToday],
   )
   const renderAgendaAttachment = useCallback(
     (node: TreeNode, editable: boolean): React.JSX.Element | null =>
@@ -360,7 +362,7 @@ export function App({
           label={`Agenda node ${node.id}`}
           imageOnly={node.text.length === 0 && node.attachment !== undefined}
           imageCaretActive={isImageCaretActive(node)}
-          decorations={agendaDecorations(node, day)}
+          decorations={agendaDecorations(node, day, agendaToday)}
           searchQuery={searchQuery}
           currentMatch={
             searchResult?.destination?.nodeId === node.id && searchResult.destination.day === day
@@ -372,13 +374,14 @@ export function App({
         />
       </>
     ),
-    [isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult],
+    [agendaToday, isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult],
   )
   const renderAgendaText = useCallback(
     (node: TreeNode, day: number, marks: readonly CaretMark[], context: boolean): React.JSX.Element => (
       <AgendaSearchText
         node={node}
         day={day}
+        today={agendaToday}
         marks={marks}
         context={context}
         query={searchQuery}
@@ -390,7 +393,7 @@ export function App({
         onClick={nodeInputBindings(node).onClick}
       />
     ),
-    [nodeInputBindings, searchQuery, searchResult],
+    [agendaToday, nodeInputBindings, searchQuery, searchResult],
   )
 
   const commandList = commandPanel.open ? (
@@ -545,7 +548,7 @@ export function App({
                     node={currentParent}
                     label="Current parent"
                     parent
-                    decorations={treeDecorations(currentParent)}
+                    decorations={treeDecorations(currentParent, treeToday)}
                     searchQuery={searchQuery}
                     currentMatch={
                       searchResult?.destination?.nodeId === currentParent.id ? searchResult.destination : undefined
