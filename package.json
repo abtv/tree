@@ -101,6 +101,11 @@
     "vite": "7.3.7",
     "vitest": "4.1.12"
   },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120
+  },
   "overrides": {
     "qs": "6.16.0"
   }
