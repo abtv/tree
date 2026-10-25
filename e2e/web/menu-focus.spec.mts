@@ -275,7 +275,8 @@ test('menu cancellation preserves the image caret and its text return position',
 
 // @requirement PRODUCT.md §1.4
 test('dismissing a focused export failure returns to editing', async ({ newContext }) => {
-  const page = await (await newContext()).newPage()
+  // Keep the synthetic worker failure on the routed network path.
+  const page = await (await newContext({ serviceWorkers: 'block' })).newPage()
 
   await page.route(/archive\.worker/, (route) =>
     route.fulfill({ contentType: 'text/javascript', body: 'throw new Error("Synthetic archive failure")' }),

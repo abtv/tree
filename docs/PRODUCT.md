@@ -58,8 +58,8 @@ Every change to user-visible behavior is checked against the guidelines before i
 The owner-reviewed browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
-behavior remain as accepted. This checkpoint adds no synchronization, accounts
-or offline package; installation, storage protection, exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
+behavior remain as accepted. This checkpoint adds no synchronization or accounts;
+installation, offline access, app updates, storage protection, exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
@@ -2057,7 +2057,7 @@ Nothing in this section sends notes over the network. Notes leave browser storag
 
 ### 24.1 Installation and Storage Protection
 
-The browser version provides a web app manifest, so browsers that offer installation, such as Chrome on macOS, can install it as **Tree** in its own window. The installed app uses the same origin, storage and notes as the browser tab. It has a 192- and 512-pixel icon and an Apple touch icon taken from the Tree icon artwork, with transparent corners. Installation adds no offline support: Tree registers no service worker, and opening the installed app still loads the site.
+The browser version provides a web app manifest, so browsers that offer installation, such as Chrome on macOS, can install it as **Tree** in its own window. The installed app uses the same origin, storage and notes as the browser tab. It has a 192- and 512-pixel icon and an Apple touch icon taken from the Tree icon artwork, with transparent corners. Offline access and app updates follow §24.7 in both the installed app and an ordinary browser tab; installation is optional.
 
 The browser's window color follows the Appearance choice (§20.5): the light or dark document surface color, including after the choice changes. An installed window launched in dark appearance can briefly show the light surface color from the manifest before the page applies its appearance. Browsers do not offer a per-appearance manifest color.
 
@@ -2177,6 +2177,39 @@ Tree reads only `document.json` and the `attachments/<id>.png` files that it ref
 * A failure shows `Restore failed. <reason>` until **OK**. Besides the reasons of §24.4, a folder without `document.json` gives `“Tree Backup” does not contain document.json. Choose the folder that Tree backed up to.`; a folder that cannot be read gives `The folder could not be read: <reason>`; a browser storage failure gives `The notes could not be restored: <reason>`; a picker that fails gives `The folder could not be opened: <reason>`; and a stopped background check gives `The restore stopped unexpectedly.`
 
 Cancel and every failure keep the current notes unchanged and remove the images that the restore stored, as in §24.4. Restore does not change the backup choice. An active backup keeps running and, after the reload, copies the restored notes to its folder as its next version. An active backup trails the saved notes by seconds and keeps no earlier versions, so restoring from its own folder returns the latest saved notes, not an earlier state.
+
+### 24.7 Offline Access and App Updates
+
+The hosted browser version downloads its complete application package on the first online
+visit. The menu footer says **Ready to work offline** only after installation succeeds.
+After that, Tree can open after a browser restart without Internet, edit and save local notes,
+display stored images, and run its local archive operations. External links still require
+their destination to be reachable. The first visit and restoring a removed application cache
+require Internet. Clearing site data also removes local notes (§24); installation is not a backup.
+
+If a deployment changes during the first visit, the downloaded package may differ from the
+already open editor. In that case Tree offers **Update App** to finish offline setup through
+the same save-first reload, and does not claim that the current editor is ready offline.
+An interrupted first installation retries when connectivity returns.
+
+Tree checks for updates at startup and when connectivity returns. It downloads a complete
+new package in the background without interrupting editing. A failed or interrupted download
+leaves the installed version usable. Updates never clear or upload notes.
+
+When the new version is ready, **Update App** appears at the bottom of the ellipsis menu and
+a small dot appears on its trigger. The trigger also describes the update for assistive
+technology. The dot shares the existing backup-attention position. No update prompt steals
+focus or reloads an open editor. Applying a waiting update requires no network connection.
+
+Update App saves pending work, including buffered Vim edits, before activating the new package
+and reloading this window. Interaction is temporarily unavailable during this operation.
+A save error or timeout keeps the editor open and displays a retryable message in the menu.
+Repeated requests do not start concurrent updates. A running data operation must finish first.
+
+If other Tree tabs or windows are open, Tree asks the user to close them and retry, without
+activating the update. This edge follows the durability principle (§1.1) and the existing single
+writer restriction: an update must not switch another window's runtime underneath its work.
+These controls and the offline package apply only to the browser version, not Electron.
 
 ## 25. Desktop Notes Export and Import
 

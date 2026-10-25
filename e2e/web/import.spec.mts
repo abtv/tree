@@ -139,7 +139,8 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
   newContext,
   baseURL,
 }) => {
-  const page = await (await newContext()).newPage()
+  // Replacement-worker fault injection needs network routing; offline.spec owns cached-worker coverage.
+  const page = await (await newContext({ serviceWorkers: 'block' })).newPage()
 
   page.setDefaultTimeout(8000)
   const errors: string[] = []

@@ -146,7 +146,7 @@ export function installDataMenu(
   menu: HTMLElement,
   session: DataSession,
   focus: MenuFocus,
-): BrowserMenuCommands {
+): { commands: BrowserMenuCommands; isRunning(): boolean } {
   const commands = new BrowserMenuCommands()
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
@@ -380,7 +380,7 @@ export function installDataMenu(
         : ({ type: 'restore', folder: file } satisfies ArchiveWorkerRequest),
     )
   }
-  return commands
+  return { commands, isRunning: () => running }
 }
 
 function download(archive: Blob, fileName: string): void {

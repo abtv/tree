@@ -17,7 +17,7 @@ npm run build:web
 ```
 
 The complete package is `out/web/`: `index.html`, hashed JavaScript, CSS and font
-assets, `.nojekyll`, and the installable-app files copied from `src/web/public/`
+assets, `.nojekyll`, `sw.js`, and the installable-app files copied from `src/web/public/`
 (`manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`).
 Publication accepts only these exact root names. Upload **the contents** of this directory to the hosting
 root. No Node.js process, Vite server, API or application server is needed on the
@@ -55,8 +55,14 @@ The build includes a meta CSP; framed startup is rejected by the existing adapte
 The preview serves files directly without Vite transforms or a development client.
 Chrome can install the preview or hosted site as **Tree** from its menu; see
 [installation and storage protection](../../docs/PRODUCT.md#241-installation-and-storage-protection).
-No Service Worker, offline package or recovery generations are added. Existing
-storage and save limitations below still apply.
+The production package registers a Service Worker for offline startup and updates;
+the development server does not. After the menu reports **Ready to work offline**,
+the app can restart without Internet. A complete update downloads at startup or
+reconnection and appears as **Update App** at the bottom of the menu, with a dot
+on its trigger. It saves pending edits before reloading; other Tree windows must
+be closed first. Interrupted downloads preserve the installed version. See
+[offline access and app updates](../../docs/PRODUCT.md#247-offline-access-and-app-updates).
+No recovery generations are added. Existing storage and save limitations below still apply.
 
 ## Local development
 
@@ -136,8 +142,8 @@ saved page with the browser's own controls. A failed save keeps the editor open.
 
 Data stays in the browser unless the user exports it or chooses a backup folder. There is no device
 synchronization. Clearing site data or deleting the profile removes the
-notes stored in the browser. This version has no offline
-package or recovery generations. It requests persistent storage once per page
+notes stored in the browser and the offline package. The first visit needs Internet.
+This version has no recovery generations. It requests persistent storage once per page
 load, which only reduces eviction under storage pressure. Browser/OS force
 termination can lose uncommitted work. Full Safari and Dock-app compatibility
 remains unverified; native Safari clipboard interaction still needs verification.

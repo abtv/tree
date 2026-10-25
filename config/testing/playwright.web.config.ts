@@ -18,7 +18,7 @@ export default defineConfig({
   retries: process.env['CI'] ? 1 : 0,
   timeout: 90_000,
   expect: { timeout: 10_000 },
-  reporter: [['list'], ['html', { outputFolder: 'playwright-report/web', open: 'never' }]],
+  reporter: [['list'], ['html', { outputFolder: resolve(__dirname, '../../playwright-report/web'), open: 'never' }]],
   projects: [{ name: built ? 'chrome-built' : 'chrome', use: { channel } }],
   use: {
     baseURL,

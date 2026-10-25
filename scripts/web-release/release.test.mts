@@ -74,7 +74,7 @@ describe('release manifest and package', () => {
       '<script src="./assets/app.js"></script><link rel="manifest" href="./manifest.webmanifest">' +
         '<link rel="apple-touch-icon" href="./apple-touch-icon.png">',
     )
-    for (const name of ['manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png']) {
+    for (const name of ['manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'sw.js']) {
       await writeFile(join(dir, name), name)
     }
     const manifest = await createManifest(dir, identity)
@@ -82,7 +82,7 @@ describe('release manifest and package', () => {
     expect(manifest.assetGenerations[0]!.some((path) => !path.startsWith('assets/'))).toBe(false)
     await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
 
-    for (const name of ['other.html', 'icon.svg', 'icon-256.png', 'manifest.json', 'Icon-192.png']) {
+    for (const name of ['other.html', 'other.js', 'icon.svg', 'icon-256.png', 'manifest.json', 'Icon-192.png']) {
       const other = await fixture()
 
       await writeFile(join(other, name), name)

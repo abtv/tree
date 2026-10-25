@@ -110,7 +110,8 @@ body:has(.image-preview-overlay) #tree-menu-button {
 #tree-menu button[hidden] {
   display: none;
 }
-#tree-menu-button.backup-attention::after {
+#tree-menu-button.backup-attention::after,
+#tree-menu-button.update-attention::after {
   content: '';
   position: absolute;
   top: 3px;
@@ -138,6 +139,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
 .menu-label,
 #prototype-save-status,
 #storage-status,
+#offline-status,
 #backup-status {
   display: block;
   padding: 3px 10px;
@@ -148,6 +150,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
   padding-left: 36px;
 }
 #storage-status[hidden],
+#offline-status[hidden],
 #backup-status[hidden] {
   display: none;
 }

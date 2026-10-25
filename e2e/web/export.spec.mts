@@ -64,7 +64,9 @@ test('exports the saved notes and referenced images from a worker', async ({ new
 
   expect(
     await menu.evaluate((element) =>
-      [...element.querySelectorAll('button, .menu-label, [role="status"]')].map((item) => item.textContent),
+      [...element.querySelectorAll('button, .menu-label, [role="status"]')]
+        .filter((item) => item.id !== 'offline-status' && item.id !== 'app-update')
+        .map((item) => item.textContent),
     ),
   ).toEqual([
     'Tree',
@@ -147,7 +149,8 @@ test('exports the saved notes and referenced images from a worker', async ({ new
 
 // @requirement PRODUCT.md §24.3
 test('reports a stopped worker and cancels a worker that is sending the archive', async ({ newContext, baseURL }) => {
-  const context = await newContext()
+  // This fault injector must intercept worker requests; offline.spec covers real cached workers.
+  const context = await newContext({ serviceWorkers: 'block' })
   const page = await context.newPage()
 
   page.setDefaultTimeout(8000)
@@ -195,7 +198,8 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   newContext,
   baseURL,
 }) => {
-  const context = await newContext()
+  // Hold the archive worker request below without a service-worker cache bypassing page.route.
+  const context = await newContext({ serviceWorkers: 'block' })
   const page = await context.newPage()
 
   page.setDefaultTimeout(8000)

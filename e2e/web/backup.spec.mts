@@ -452,7 +452,8 @@ test('Restore from This Folder uses the import confirmation and preserves notes 
 })
 
 test('a stopped backup worker can be resumed without affecting browser saves', async ({ newContext }) => {
-  const context = await newContext()
+  // Keep the injected worker failure reachable through page.route.
+  const context = await newContext({ serviceWorkers: 'block' })
 
   await installBackupPicker(context)
   const page = await context.newPage()
@@ -498,7 +499,8 @@ test('a failed image write preserves the previous document and retries an empty 
   newContext,
 }) => {
   test.fixme(storedHandleCrash, storedHandleCrashReason)
-  const context = await newContext()
+  // This test rewrites the worker response to inject a filesystem failure.
+  const context = await newContext({ serviceWorkers: 'block' })
 
   await installBackupPicker(context)
   const page = await context.newPage()

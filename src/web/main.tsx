@@ -13,6 +13,7 @@ import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastruc
 import '../renderer/styles.css'
 import './styles.css'
 import { blockExternalDrops } from '../renderer/external-drop'
+import { installAppUpdates } from './app-updates'
 
 blockExternalDrops(window)
 
@@ -29,7 +30,13 @@ try {
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
   const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!)
-  const menuCommands = installDataMenu(store, menu, bridge.data, menuFocus)
+  const { commands: menuCommands, isRunning: dataOperationRunning } = installDataMenu(
+    store,
+    menu,
+    bridge.data,
+    menuFocus,
+  )
+  installAppUpdates(store, bridge.data, menuFocus, dataOperationRunning)
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
   let viewCommands: Pick<CommandServices, 'showAgenda' | 'showTree'> | undefined

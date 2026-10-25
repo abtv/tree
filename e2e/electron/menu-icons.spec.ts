@@ -130,10 +130,25 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
       document.getElementById('prototype-agenda')!.focus()
     })
     const menu = page.locator('#tree-menu')
+    const showUpdate = (visible: boolean) =>
+      page.evaluate((visible) => {
+        const status = document.getElementById('offline-status')!
+        status.textContent = 'Ready to work offline'
+        status.hidden = !visible
+        document.getElementById('app-update')!.hidden = !visible
+        document.getElementById('tree-menu-button')!.classList.toggle('update-attention', visible)
+      }, visible)
     for (const appearance of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: appearance })
 
       await expect(menu).toHaveScreenshot(`browser-menu-${appearance}.png`)
+      // @requirement PRODUCT.md §24.7
+      await showUpdate(true)
+      const action = (await page.locator('#app-update').boundingBox())!
+      const status = (await page.locator('#offline-status').boundingBox())!
+      expect(action.y).toBeGreaterThanOrEqual(status.y + status.height)
+      await expect(page).toHaveScreenshot(`browser-update-${appearance}.png`)
+      await showUpdate(false)
     }
 
     await page.setViewportSize({ width: 390, height: 650 })
@@ -142,6 +157,8 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
     await expect(menu).toHaveScreenshot('browser-menu-narrow.png')
+    await showUpdate(true)
+    await expect(page).toHaveScreenshot('browser-update-narrow.png')
   } finally {
     await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.fromId(id)?.destroy(), id)
   }

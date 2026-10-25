@@ -686,7 +686,41 @@ Performance assessment (`docs/PRODUCT.md` §22.1): starting an operation adds a 
 
 ### Browser installation and storage protection
 
-PRODUCT §24.1 adds no storage layer. Vite copies the manifest and icons from `src/web/public/` to the package root, and the release policy accepts them only by exact name. `src/web/storage-persistence.ts` reads `navigator.storage.persisted()` after the editor starts and calls `persist()` at most once per page load when storage is not yet persistent; `main.tsx` shows the result in the menu footer. `src/web/appearance.ts` switches the two `theme-color` meta tags together with the CSS appearance rules. There is no service worker. Performance assessment (§22.1): one storage-state read and at most one request per page load; no IndexedDB writes, no interactive CPU and no memory growth.
+PRODUCT §24.1 adds no notes storage layer. Vite copies the manifest and icons from `src/web/public/` to the package root, and the release policy accepts them only by exact name. `src/web/storage-persistence.ts` reads `navigator.storage.persisted()` after the editor starts and calls `persist()` at most once per page load when storage is not yet persistent; `main.tsx` shows the result in the menu footer. `src/web/appearance.ts` switches the two `theme-color` meta tags together with the CSS appearance rules. Performance assessment (§22.1): one storage-state read and at most one request per page load; no IndexedDB writes, no interactive CPU and no memory growth.
+
+### Browser offline package and updates
+
+`scripts/web/build.mts` builds `sw.js` from `src/web/workers/offline.worker.ts`, embedding
+every current package file and its SHA-256 integrity value. The cache identity hashes the
+worker bundle, including that inventory, so worker-only changes also install into a separate
+cache. `src/web/offline-worker.ts` fetches the complete package sequentially with integrity
+checks and without the HTTP cache. A failed installation deletes only its candidate cache;
+the browser keeps the active worker. The release policy permits only the exact `sw.js` name.
+
+The worker serves the cached entry page and app assets. A fixed-size metadata cache names
+the active package, the requesting page's runtime package and the waiting package. A scoped
+Web Lock serializes metadata and pruning across worker versions. Successful installation
+prunes obsolete candidates while retaining the previous waiting worker in case it is entering
+automatic activation. Failed installation leaves the previous waiting package intact.
+Activation preserves the package containing the requester's entry script and stylesheets, including after
+repeated activation timeouts; it does not infer the running version from cache creation order.
+Only initial activation claims uncontrolled pages. Other caches and IndexedDB are untouched.
+The waiting worker accepts activation only from the sole Tree window client. A new window
+that opens during activation still encounters the existing single-writer Web Lock.
+
+`src/web/app-updates.ts` registers only in the production browser entry, checks at startup
+and reconnection, and publishes readiness through the browser menu. Download never reloads
+the page. An explicit update blocks input, flushes the existing store (including pending
+asynchronous edits), suspends session writes and requests activation through a MessageChannel.
+Only this requester reloads after activation. Failure or timeout restores interaction and
+writes; no global controller-change reload listener is installed. Data operations keep their
+existing ownership and must finish before an update can apply.
+
+Performance assessment (PRODUCT §22.1): package writes occur only during installation, off
+the main thread, with temporary response memory bounded by one file. The controller retains
+no document snapshots, and typing performs no update checks or cache writes. Activation uses
+the existing save flush, adding no new persistence policy. Unit guards bound retained cache
+generations and test ownership; browser tests exercise offline startup and real update failures.
 
 ### Browser notes archive
 

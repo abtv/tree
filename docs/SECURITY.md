@@ -111,10 +111,13 @@ implemented in `src/web/services.ts`.
   transactions preserve the last committed value when a write aborts. This is a
   consistency control, not a barrier against malicious same-origin code.
 
-The current package has no Service Worker, offline package or recovery
-generations. It has a web app manifest and requests persistent storage once per
-page load (PRODUCT §24.1). Installing the app or adding the website to a
-browser's Dock or home screen does not add offline support or recovery.
+The package uses a same-origin Service Worker for offline application files and
+updates (PRODUCT §24.7). Installation verifies each file against the build's digest;
+this detects incomplete or mixed deployments, not a malicious publisher. Cached app
+files and their update requests contain no notes. A complete version waits for safe
+activation, and cache cleanup touches only Tree's scope-specific application caches.
+The package has no recovery generations. It has a web app manifest and requests
+persistent storage once per page load (PRODUCT §24.1).
 Persistent storage, when granted, protects only against eviction under storage
 pressure. Clearing site data, deleting the profile or, without persistent
 storage, browser storage eviction can remove notes; force termination can

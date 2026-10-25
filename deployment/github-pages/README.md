@@ -151,7 +151,7 @@ hashed assets remain available only after authenticating the old manifest/bundle
 and verifying their bytes before the new manifest is signed. Unlisted target files
 are removed by the whole-tree replacement, and target verification rejects extras.
 Only JavaScript, CSS and font assets are accepted; HTML/SVG assets are rejected.
-At the root, besides `index.html` and `.nojekyll`, only the exact installable-app
+At the root, besides `index.html`, `.nojekyll` and the exact Service Worker name `sw.js`, only the exact installable-app
 names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
 `apple-touch-icon.png` are accepted; they are current-only, like `index.html`.
 No archive is extracted, and no transferred JavaScript is executed in CI.
