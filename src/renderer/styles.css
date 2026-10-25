@@ -566,6 +566,12 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-date-secondary {
   color: var(--color-secondary);
 }
+.node-input-struck .agenda-date-active,
+.node-input-struck .agenda-date-secondary,
+.agenda-text-struck .agenda-date-active,
+.agenda-text-struck .agenda-date-secondary {
+  color: inherit;
+}
 /* Text that resembles a date without being one gets a 1px wavy muted-red underline. The underline is
    hidden while the caret is in or directly adjacent to the token (docs/PRODUCT.md §20.10). */
 .date-like-text:not([data-caret]) {

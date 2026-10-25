@@ -307,7 +307,7 @@ Dragging visible descendants moves a sibling subtree as one unit. Gaps are resol
 
 ### 2.5 Struck-Through Nodes
 
-A node can be struck through, for example to mark a task as done. A struck-through node draws a line through its text and shows the text in a muted color in both the light and dark appearance; hyperlinks in it keep their own color under the same line. Inside a selection highlight (§20.2) its text takes the highlight colors and keeps the line. Its circular indicator, disclosure chevron, and attached image are drawn as usual, and its text stays editable.
+A node can be struck through, for example to mark a task as done. A struck-through node draws a line through its text and shows the text in a muted color in both the light and dark appearance; hyperlinks in it keep their own color under the same line. Recognized dates in Tree and Agenda inherit the surrounding struck-through text color instead of their date color; their font weight stays unchanged. Inside a selection highlight (§20.2) its text takes the highlight colors and keeps the line. Its circular indicator, disclosure chevron, and attached image are drawn as usual, and its text stays editable.
 
 * `Cmd+Enter` toggles the selected node between struck through and normal. It works on every node, including the editable current-parent heading, in every Vim mode and in the same way whether or not Vim mode is enabled. It changes only that node: its children keep their own state.
 * In whole-node Visual mode it acts on the whole selected range instead: when every node in the range is already struck through, they all return to normal; otherwise they all become struck through. It then returns to Normal mode, as the other whole-node Visual commands do.
@@ -1755,7 +1755,7 @@ While a node is being edited, a token is not underlined when the caret or select
 
 ### 20.11 Date Visualization in Tree
 
-Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, uses the same accent color and semibold weight as Agenda's displayed-day date. Tree has no displayed day, so all recognized dates receive that styling. Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
+Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, uses the same accent color and semibold weight as Agenda's displayed-day date. Tree has no displayed day, so all recognized dates receive that styling. Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
 
 ---
 
@@ -1831,7 +1831,7 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 * Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
 * A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy.
 * Full text is shown and wraps as in Tree.
-* The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text.
+* The displayed day's date uses the accent color and semibold weight; other recognized dates use secondary text. Date colors yield to struck-through text color (§2.5).
 * Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance.
 * An outer bullet ring reflects real children; a chevron reflects projected children.
 

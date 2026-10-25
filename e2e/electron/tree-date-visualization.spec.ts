@@ -8,6 +8,7 @@ import {
   setCursor,
   screenshotContentSize,
   setMainWindowContentSize,
+  setAgendaToday,
   test,
 } from './fixtures'
 
@@ -33,6 +34,49 @@ async function blockCaretAt(input: Locator, offset: number): Promise<boolean> {
 }
 
 describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §2.5
+  // @requirement PRODUCT.md §20.11
+  // @requirement PRODUCT.md §23.2
+  test('struck dates inherit text color in Tree and Agenda', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [{ id: 'a', text: 'Finished 2026-10-08 and 2026-10-09', children: [] }],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, screenshotContentSize)
+    await setAgendaToday(window)
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await input.click()
+    await window.keyboard.press('Meta+Enter')
+    for (const view of ['tree', 'agenda'] as const) {
+      if (view === 'agenda') await window.keyboard.press('Meta+p')
+      for (const appearance of ['light', 'dark'] as const) {
+        await window.emulateMedia({ colorScheme: appearance })
+        const dates = window.locator(
+          '.node-input-struck .agenda-date-active, .node-input-struck .agenda-date-secondary, .agenda-text-struck .agenda-date-active, .agenda-text-struck .agenda-date-secondary',
+        )
+        await expect.poll(() => dates.count()).toBeGreaterThan(0)
+        for (const date of await dates.all()) {
+          await expect(date).toHaveCSS(
+            'color',
+            await date.evaluate((el) => getComputedStyle(el.closest('.node-input-struck, .agenda-text-struck')!).color),
+          )
+        }
+        await window.screenshot({ path: testInfo.outputPath(`${view}-${appearance}.png`) })
+      }
+    }
+    await window.keyboard.press('Meta+p')
+    await input.click()
+    await window.keyboard.press('Meta+Enter')
+    await expect(input).not.toHaveClass(/node-input-struck/)
+    await expect(input.locator('.agenda-date-active').first()).not.toHaveCSS(
+      'color',
+      await input.evaluate((el) => getComputedStyle(el).color),
+    )
+  })
+
   // @requirement PRODUCT.md §20.11
   test('styles heading and row dates like Agenda and preserves selection colors', async ({ userDataDir }) => {
     const url = 'https://example.com/2026-10-12'
