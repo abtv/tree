@@ -606,7 +606,7 @@ At the root level:
 
 `Cmd+Backspace` deletes the selected displayed node and its entire subtree.
 
-This is different from normal `Backspace`, which remains ordinary text editing except when the node is empty (see 8.2).
+This is different from normal `Backspace`, which remains ordinary text editing except when the node is empty or the caret is at its beginning (see 8.2–8.3).
 
 After deleting a node from the currently displayed level:
 
@@ -644,7 +644,9 @@ This is an explicit user action. Empty nodes are never deleted automatically.
 
 In Tree standard editing and Vim Insert, plain `Backspace` with a collapsed text caret at position zero removes the immediately preceding visible row only if that row has no text, attachment, or children. The current node, its subtree, selection, caret at zero, location, and editing mode remain unchanged. The preceding row may be the last visible descendant of an expanded sibling. A collapsed node with children is not empty for this rule.
 
-If no eligible preceding row exists, nothing changes; text from different nodes is never merged by this command. The editable current-parent heading cannot be removed this way. Each removal is one undoable change. A successful removal interrupts Vim Insert recording while keeping the previous repeatable change; a no-op keeps the Insert recording. Backspace on an empty current node retains §8.2, and Backspace with selected text or a caret after position zero retains ordinary text editing.
+Otherwise, if the current node and its immediately preceding sibling both have nonempty text, no children and no attachment, the command joins them. It appends the current text unchanged, without inserting a space, to the preceding sibling. The preceding sibling keeps its ID; hyperlink ranges move with their text. Selection moves to that sibling with the text caret at the join, while location and editing mode remain unchanged. Nodes with different parents never join, even if their rows are adjacent on screen.
+
+If neither rule applies, nothing changes. The editable current-parent heading cannot be removed or joined this way. Each removal or join is one undoable change. A successful change interrupts Vim Insert recording while keeping the previous repeatable change; a no-op keeps the Insert recording. Backspace on an empty current node retains §8.2, and Backspace with selected text or a caret after position zero retains ordinary text editing. Agenda does not join nodes (§23.10).
 
 ---
 

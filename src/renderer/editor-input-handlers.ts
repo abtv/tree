@@ -556,7 +556,7 @@ export function createEditorKeyDownHandler({
       getSelectionRange(event.currentTarget).end === 0
     ) {
       event.preventDefault()
-      if (store.deletePreviousEmpty(cursor)) vim?.finishInsert(event.currentTarget)
+      if (store.backspaceAtStart(cursor)) vim?.finishInsert(event.currentTarget)
     } else if (event.key === 'Enter') {
       event.preventDefault()
       store.createSiblingOrFirstChild(cursor)

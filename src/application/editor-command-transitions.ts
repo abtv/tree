@@ -6,6 +6,7 @@ import {
   insertSiblingAfter,
   insertSiblingBefore,
   insertSubtreeSibling,
+  joinSiblingRange,
   locateNode,
   moveSubtree,
   nodePath,
@@ -466,6 +467,33 @@ export function deleteSiblingRangeTransition(
 function lastVisibleDescendant(node: TreeNode, isExpanded: (id: NodeId) => boolean): TreeNode {
   while (isExpanded(node.id) && node.children.length > 0) node = node.children[node.children.length - 1]!
   return node
+}
+
+export function joinPreviousTextTransition(
+  document: Document,
+  location: Location,
+  cursor: number,
+): StructuralTransition | undefined {
+  const selected = requireNode(document, location.selectedNodeId)
+  if (cursor !== 0 || selected.node.text === '' || selected.node.id === location.currentParentId) return undefined
+  const previous = selected.siblings[selected.index - 1]
+  if (
+    previous === undefined ||
+    previous.text === '' ||
+    previous.children.length > 0 ||
+    selected.node.children.length > 0 ||
+    previous.attachment !== undefined ||
+    selected.node.attachment !== undefined
+  )
+    return undefined
+
+  const result = joinSiblingRange(document, previous.id, 2, false)
+  if (result.kind !== 'joined') return undefined
+  return {
+    document: result.document,
+    location: { ...location, selectedNodeId: previous.id },
+    focus: { nodeId: previous.id, cursor: result.cursor },
+  }
 }
 
 export function deletePreviousEmptyTransition(

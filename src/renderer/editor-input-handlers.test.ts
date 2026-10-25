@@ -34,7 +34,7 @@ function createStore(): EditorStore {
     createSibling: vi.fn(() => true),
     cut: vi.fn(async () => true),
     deleteEmptySelected: vi.fn(),
-    deletePreviousEmpty: vi.fn(() => true),
+    backspaceAtStart: vi.fn(() => true),
     deleteLink: vi.fn(() => false),
     deleteSelected: vi.fn(() => true),
     endTextSession: vi.fn(),
@@ -4512,7 +4512,7 @@ describe('editor keyboard handler', () => {
 
     handle(event)
 
-    expect(store.deletePreviousEmpty).toHaveBeenCalledWith(0)
+    expect(store.backspaceAtStart).toHaveBeenCalledWith(0)
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
 
@@ -4533,13 +4533,13 @@ describe('editor keyboard handler', () => {
 
       handle(keyEvent(input, 'Backspace', options))
 
-      expect(store.deletePreviousEmpty).not.toHaveBeenCalled()
+      expect(store.backspaceAtStart).not.toHaveBeenCalled()
     },
   )
 
   it.each([true, false])('interrupts Insert recording only after a successful adjacent-row deletion: %s', (removed) => {
     const store = createStore()
-    vi.mocked(store.deletePreviousEmpty).mockReturnValue(removed)
+    vi.mocked(store.backspaceAtStart).mockReturnValue(removed)
     const input = document.createElement('textarea')
     input.value = 'Current'
     input.setSelectionRange(0, 0)

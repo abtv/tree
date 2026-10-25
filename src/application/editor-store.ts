@@ -33,6 +33,7 @@ import {
   createSiblingOrFirstChildTransition,
   deleteEmptySelectedTransition,
   deletePreviousEmptyTransition,
+  joinPreviousTextTransition,
   deleteSelectedTransition,
   deleteSiblingRangeTransition,
   enterTransition,
@@ -1382,12 +1383,13 @@ export class EditorStore {
     return true
   }
 
-  public deletePreviousEmpty(cursor: number): boolean {
+  public backspaceAtStart(cursor: number): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked() || state.agenda !== undefined) return false
-    const transition = deletePreviousEmptyTransition(state.document, state.location, cursor, (id) =>
-      state.expansion.expandedIds.has(id),
-    )
+    const transition =
+      deletePreviousEmptyTransition(state.document, state.location, cursor, (id) =>
+        state.expansion.expandedIds.has(id),
+      ) ?? joinPreviousTextTransition(state.document, state.location, cursor)
     if (transition === undefined) return false
     this.endTextSession()
     this.applyStructural(

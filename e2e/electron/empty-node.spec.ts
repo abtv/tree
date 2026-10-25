@@ -13,6 +13,50 @@ import {
 } from './fixtures'
 
 describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
+  test('joins a linked row into a plain row and places the caret in the replacement rich editor', async ({
+    userDataDir,
+  }) => {
+    const url = 'https://example.com'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'plain', text: 'See ', children: [] },
+          { id: 'linked', text: url, links: [{ start: 0, end: url.length, url }], children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'linked' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await node(window, 2).focus()
+    await setCursor(node(window, 2), 0)
+
+    await window.keyboard.press('Backspace')
+
+    await expect.poll(() => nodeTexts(window)).toEqual([`See ${url}`])
+    const editor = node(window, 1)
+    await expect(editor).toHaveAttribute('contenteditable', 'true')
+    await expect(editor).toBeFocused()
+    await expect(editor.getByRole('link')).toHaveAttribute('href', url)
+    await expect
+      .poll(() =>
+        editor.evaluate((element) => {
+          const selection = element.ownerDocument.getSelection()
+          if (!selection?.isCollapsed || selection.rangeCount === 0) return -1
+          const range = selection.getRangeAt(0).cloneRange()
+          range.selectNodeContents(element)
+          range.setEnd(selection.anchorNode!, selection.anchorOffset)
+          return range.toString().length
+        }),
+      )
+      .toBe(4)
+    await window.screenshot({ path: test.info().outputPath(`backspace-rich-join-${mode}.png`) })
+
+    await window.keyboard.type('more ')
+
+    await expect(editor).toHaveText(`See more ${url}`)
+    await expect(editor.getByRole('link')).toHaveAttribute('href', url)
+  })
+
   // @requirement PRODUCT.md §8.3
   test('removes the preceding blank at a nonempty row’s start without moving its caret', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -52,7 +96,9 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
     await expect(node(window, 1)).toHaveValue('XBugfixes')
   })
 
-  test('keeps nonempty preceding text and removes no row for a text selection', async ({ userDataDir }) => {
+  test('joins sibling text at its start after removing a blank, but keeps native text selection deletion', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -86,8 +132,30 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
 
     await window.keyboard.press('Backspace')
 
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previousurrent'])
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 8)
+    await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 8)
+    await window.screenshot({ path: test.info().outputPath(`backspace-join-${mode}.png`) })
+
+    await window.keyboard.press('Meta+z')
+
     await expect.poll(() => nodeTexts(window)).toEqual(['Previous', 'urrent'])
-    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 8)
+
+    await window.keyboard.press('Meta+Shift+z')
+
+    await expect.poll(() => nodeTexts(window)).toEqual(['Previousurrent'])
+    await expect(node(window, 1)).toHaveJSProperty('selectionStart', 8)
+
+    await window.keyboard.type('X')
+
+    await expect(node(window, 1)).toHaveValue('PreviousXurrent')
+
+    await window.keyboard.press('Meta+z')
+
+    await expect(node(window, 1)).toHaveValue('Previousurrent')
   })
 
   test('deletes an empty node and focuses the previous sibling at the end', async ({ userDataDir }) => {
