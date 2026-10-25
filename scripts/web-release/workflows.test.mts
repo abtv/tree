@@ -11,6 +11,7 @@ const workflowFiles: Record<string, string> = {
   mutation: 'run-mutation-testing',
   'property-soak': 'run-property-tests',
   audit: 'audit-dependencies',
+  'audit-gate': 'require-dependency-audit',
   demo: 'publish-demo',
   release: 'release-web-app',
   attribution: 'enforce-agent-attribution-policy',
@@ -22,12 +23,13 @@ const readWorkflow = (suite: string) => read(`.github/workflows/${workflowFiles[
 // The reusable-workflow context belongs to its caller, as GitHub documents.
 function concurrencyGroup(
   workflow: string,
-  context: { workflow: string; ref: string; pr?: number; runId?: number; caller?: string },
+  context: { workflow: string; ref: string; pr?: number; runId?: number; caller?: string; event?: string },
 ) {
   const template = workflow.match(/^ {2}group: (.+)$/m)?.[1]
   if (!template) throw new Error('Missing workflow concurrency group')
   const values: Record<string, string | number> = {
     'github.workflow': context.workflow,
+    'github.event_name': context.event || 'push',
     'github.ref': context.ref,
     'github.event.pull_request.number || github.ref': context.pr || context.ref,
     "inputs.caller || 'audit'": context.caller || 'audit',
@@ -66,7 +68,9 @@ describe('automatic publication wiring', () => {
     ]) {
       const workflow = await readWorkflow(file!)
       const audit = workflow.split('\n  audit:')[1]!.split(/\n {2}\w+:/)[0]!
-      expect(audit).toContain('uses: ./.github/workflows/audit-dependencies.yml')
+      expect(audit).toContain(
+        `uses: ./.github/workflows/${['ci', 'browser', 'demo'].includes(file!) ? 'require-dependency-audit' : 'audit-dependencies'}.yml`,
+      )
       expect(audit).toContain(`caller: ${file}`)
       const section = workflow.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
       expect(section).toContain('needs: audit')
@@ -90,6 +94,42 @@ describe('automatic publication wiring', () => {
     const firstPr = concurrencyGroup(audit, { ...context, pr: 1 })
     const secondPr = concurrencyGroup(audit, { ...context, pr: 2 })
     expect(firstPr).not.toBe(secondPr)
+    const central = { workflow: 'Audit dependencies', ref: 'refs/heads/main' }
+    const automatic = concurrencyGroup(audit, { ...central, event: 'push' })
+    for (const event of ['schedule', 'workflow_dispatch']) {
+      expect(concurrencyGroup(audit, { ...central, event })).not.toBe(automatic)
+    }
+  })
+
+  it('runs one automatic audit and makes independent consumers require that same result', async () => {
+    const audit = await readWorkflow('audit')
+    expect(audit).toMatch(/^ {2}push:\n {4}branches: \[main\]/m)
+    expect(audit).toMatch(/^ {2}pull_request:/m)
+    expect(audit).toContain('run: node scripts/dependency-audit.mts identify')
+    expect(audit).toContain('name: ${{ steps.identity.outputs.marker }}-${{ github.run_attempt }}')
+    expect(audit).toContain("if: ${{ always() && steps.identity.outcome == 'success' }}")
+    const files = await readdir(new URL('../../.github/workflows/', import.meta.url))
+    for (const file of files.filter((name) => name.endsWith('.yml'))) {
+      const text = await read(`.github/workflows/${file}`)
+      if (file !== 'audit-dependencies.yml') expect(text).not.toMatch(/run: npm audit/)
+    }
+    for (const file of ['ci', 'browser', 'demo', 'release']) {
+      const text = await readWorkflow(file)
+      const gate = text.split('\n  audit:')[1]!.split(/\n {2}\w+:/)[0]!
+      expect(gate).toContain('uses: ./.github/workflows/require-dependency-audit.yml')
+      expect(text).toContain('actions: read')
+      expect(text).not.toContain('uses: ./.github/workflows/audit-dependencies.yml')
+    }
+    const smoke = await read('.github/workflows/run-smoke-tests.yml')
+    expect(smoke).toContain('uses: ./.github/workflows/require-dependency-audit.yml')
+    expect(smoke).toContain('needs: audit')
+    expect(smoke).toContain('actions: read')
+    const gate = await readWorkflow('audit-gate')
+    expect(gate).toContain("if: github.event_name == 'push' || github.event_name == 'pull_request'")
+    expect(gate).toContain('run: node scripts/dependency-audit.mts require')
+    expect(gate).toContain("if: github.event_name != 'push' && github.event_name != 'pull_request'")
+    expect(gate).toContain('uses: ./.github/workflows/audit-dependencies.yml')
+    expect(gate).not.toContain('continue-on-error:')
   })
 
   it.each([

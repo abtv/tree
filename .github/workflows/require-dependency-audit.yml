@@ -1,0 +1,38 @@
+name: Require dependency audit
+
+on:
+  workflow_call:
+    inputs:
+      caller:
+        type: string
+        default: audit
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  require:
+    name: Require successful shared audit
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Require the audit of this event and checkout SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/dependency-audit.mts require
+  audit:
+    name: Audit standalone run dependencies
+    if: github.event_name != 'push' && github.event_name != 'pull_request'
+    uses: ./.github/workflows/audit-dependencies.yml
+    with:
+      caller: ${{ inputs.caller }}

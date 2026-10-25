@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 # Preserve in-flight publication; reject stale candidates before transfer/deploy.
 concurrency:
@@ -18,8 +19,11 @@ jobs:
     name: Validate code
     uses: ./.github/workflows/check-code-test-and-build.yml
   audit:
-    name: Audit release dependencies
-    uses: ./.github/workflows/audit-dependencies.yml
+    name: Require release dependency audit
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/require-dependency-audit.yml
   chrome:
     needs: audit
     name: Run web E2E tests

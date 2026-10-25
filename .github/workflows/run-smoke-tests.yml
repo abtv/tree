@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -15,8 +16,8 @@ concurrency:
 
 jobs:
   audit:
-    name: Audit smoke dependencies
-    uses: ./.github/workflows/audit-dependencies.yml
+    name: Require smoke dependency audit
+    uses: ./.github/workflows/require-dependency-audit.yml
     with:
       caller: smoke
   smoke:

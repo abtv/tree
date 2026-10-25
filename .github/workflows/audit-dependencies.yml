@@ -1,6 +1,9 @@
 name: Audit dependencies
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   schedule:
     - cron: '0 */8 * * *'
   workflow_dispatch:
@@ -14,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.caller || 'audit' }}
+  group: audit-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.caller || 'audit' }}
   cancel-in-progress: true
 
 jobs:
@@ -34,3 +37,15 @@ jobs:
 
       - name: Audit dependencies at high severity or above
         run: npm audit --audit-level=high
+      - name: Identify the automatic event and checkout SHA
+        id: identity
+        if: ${{ always() && (github.event_name == 'push' || github.event_name == 'pull_request') }}
+        run: node scripts/dependency-audit.mts identify
+      - name: Record audit event identity for independent workflows
+        if: ${{ always() && steps.identity.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ${{ steps.identity.outputs.marker }}-${{ github.run_attempt }}
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1

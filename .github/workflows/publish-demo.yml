@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: demo-${{ github.workflow }}-${{ github.ref }}
@@ -14,8 +15,8 @@ concurrency:
 
 jobs:
   audit:
-    name: Audit demo dependencies
-    uses: ./.github/workflows/audit-dependencies.yml
+    name: Require demo dependency audit
+    uses: ./.github/workflows/require-dependency-audit.yml
     with:
       caller: demo
   generate:

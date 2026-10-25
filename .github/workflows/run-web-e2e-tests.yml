@@ -6,11 +6,12 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   audit:
-    name: Audit web dependencies
-    uses: ./.github/workflows/audit-dependencies.yml
+    name: Require web dependency audit
+    uses: ./.github/workflows/require-dependency-audit.yml
     with:
       caller: browser
   chrome:

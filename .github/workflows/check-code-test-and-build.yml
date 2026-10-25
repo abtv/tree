@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -13,8 +14,8 @@ concurrency:
 
 jobs:
   audit:
-    name: Audit code dependencies
-    uses: ./.github/workflows/audit-dependencies.yml
+    name: Require code dependency audit
+    uses: ./.github/workflows/require-dependency-audit.yml
     with:
       caller: ci
   check:
