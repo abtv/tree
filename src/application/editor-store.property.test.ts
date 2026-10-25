@@ -112,6 +112,50 @@ function assertInvariants(store: EditorStore): void {
 }
 
 describe('EditorStore invariants under command sequences', () => {
+  // @requirement PRODUCT.md §20.2.13
+  it('puts fresh forests at the visible-outline destination and undoes them without changing folds', async () => {
+    await fc.assert(
+      fc.asyncProperty(deepForest, fc.boolean(), fc.integer({ min: 1, max: 3 }), async (raw, expanded, count) => {
+        const source = materialize(raw).roots
+        const document = {
+          roots: [
+            { id: 'target', text: 'Target', children: [{ id: 'child', text: 'Child', children: [] }] },
+            { id: 'next', text: 'Next', children: [] },
+          ],
+        }
+        const store = new EditorStore(
+          createServices(
+            { version: 1, document, location: { currentParentId: null, selectedNodeId: 'target' } },
+            () => ({ kind: 'text', text: '' }),
+          ),
+          freshIds(),
+        )
+        await store.initialize()
+        if (expanded) store.applyFold('open', 'target')
+        const before = store.getSnapshot() as ReadyState
+        expect(store.pasteNodeForest('target', 'after', { nodes: source, sourceIds: [] }, count)).toBe(true)
+        const after = store.getSnapshot() as ReadyState
+        const destination = expanded ? after.document.roots[0]!.children : after.document.roots.slice(1)
+        const copies = destination.slice(0, source.length * count)
+        const content = (node: TreeNode): unknown => ({
+          ...node,
+          id: '',
+          children: node.children.map(content),
+        })
+        expect(copies.map(content)).toEqual(Array.from({ length: count }, () => source.map(content)).flat())
+        expect(after.expansion.expandedIds).toEqual(before.expansion.expandedIds)
+        expect(after.location).toEqual({ currentParentId: null, selectedNodeId: copies[0]!.id })
+        assertInvariants(store)
+        store.undo()
+        expect((store.getSnapshot() as ReadyState).document).toEqual(before.document)
+        store.redo()
+        expect((store.getSnapshot() as ReadyState).document).toEqual(after.document)
+        assertInvariants(store)
+      }),
+      { numRuns: propertyRuns(50) },
+    )
+  })
+
   it('keeps every direct-child range inside its Tab current-parent boundary', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(fc.string(), { minLength: 2, maxLength: 8 }), async (texts) => {

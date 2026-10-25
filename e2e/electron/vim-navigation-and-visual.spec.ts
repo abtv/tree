@@ -587,7 +587,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
   // @requirement PRODUCT.md §20.2.13
   // @requirement PRODUCT.md §20.2.19
-  test('puts a subtree as the first child of a node with children, like o, and repeats it', async ({ userDataDir }) => {
+  test('puts a subtree as the first child of an expanded branch, like o, and repeats it', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -607,6 +607,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('y')
     await window.keyboard.press('y')
     await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
     await window.keyboard.press('p')
     await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', '  A2', 'B'])
     await expect(node(window, 2)).toBeFocused()
@@ -620,6 +622,73 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await node(window, 1).focus()
     await pressShifted(window, 'P')
     await expect.poll(() => outline(window)).toEqual(['B', 'A', '  B', '  A1', '  A2', 'B'])
+  })
+
+  // @requirement PRODUCT.md §20.2.10
+  // @requirement PRODUCT.md §20.2.13
+  // @requirement PRODUCT.md §20.2.19
+  test('keeps folded branches together for p and o, with P and O before them', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'A', text: 'A', children: [{ id: 'A1', text: 'A1', children: [] }] },
+          { id: 'B', text: 'B', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'B' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const location = await window.getByLabel('Current location').innerText()
+    await node(window, 2).focus()
+    await lockSystemClipboard()
+    await window.keyboard.press('y')
+    await window.keyboard.press('y')
+    await node(window, 1).focus()
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
+    await expect(node(window, 2)).toBeFocused()
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
+    await window.screenshot({ path: testInfo.outputPath('folded-put-after.png') })
+    await window.keyboard.press('u')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B'])
+    await window.keyboard.press('Control+r')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await pressShifted(window, 'P')
+    await expect.poll(() => outline(window)).toEqual(['B', 'A', 'B'])
+    await expect(node(window, 1)).toBeFocused()
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await window.keyboard.press('o')
+    await expect.poll(() => outline(window)).toEqual(['A', '', 'B'])
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await pressShifted(window, 'O')
+    await expect.poll(() => outline(window)).toEqual(['', 'A', 'B'])
+    await expect(node(window, 1)).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    // A new p targets children once the branch is expanded.
+    await window.keyboard.press('p')
+    await expect.poll(() => outline(window)).toEqual(['A', '  B', '  A1', 'B'])
+    await expect(node(window, 2)).toBeFocused()
+    await window.screenshot({ path: testInfo.outputPath('expanded-put-child.png') })
+    await window.keyboard.press('u')
+    await node(window, 1).focus()
+    await window.keyboard.press('z')
+    await window.keyboard.press('c')
+    await window.keyboard.press('.')
+    await expect.poll(() => outline(window)).toEqual(['A', 'B', 'B'])
+    await expect(node(window, 2)).toBeFocused()
+    await expect(window.getByLabel('Current location')).toHaveText(location)
   })
 
   test('replays Visual puts and case after register exchanges, then repeats vertical changes', async ({

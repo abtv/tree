@@ -80,12 +80,36 @@ async function harness(roots: TreeNode[]) {
 // @requirement PRODUCT.md §20.2.13
 // @requirement PRODUCT.md §20.2.19
 describe('p on a node with children, repeated with .', () => {
+  it('re-evaluates the fold when replaying a put after a folded branch', async () => {
+    const f = await harness([parent(), { id: 'other', text: 'other', children: [] }])
+    try {
+      f.select('other')
+      f.press('y', 'y')
+      f.select('parent')
+      f.press('p')
+      expect(f.texts('parent')).toEqual(['one', 'two'])
+      f.select('parent')
+      f.press('z', 'o', '.')
+      expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
+      f.select('parent')
+      f.press('z', 'c', '.')
+      const state = f.store.getSnapshot()
+      if (state.status !== 'ready') throw new Error('Editor did not load')
+      expect(state.document.roots.map((node) => node.text)).toEqual(['parent', 'other', 'other', 'other'])
+      expect(state.expansion.expandedIds.has('parent')).toBe(false)
+      expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
+    } finally {
+      f.dispose()
+    }
+  })
+
   it('puts a yanked sibling subtree as the first child and repeats the rule on the current node', async () => {
     const f = await harness([parent(), { id: 'other', text: 'other', children: [] }])
     try {
       f.select('other')
       f.press('y', 'y')
       f.select('parent')
+      f.press('z', 'o')
       f.press('p')
       expect(f.texts('parent')).toEqual(['other', 'one', 'two'])
       f.select('parent')
@@ -108,6 +132,7 @@ describe('p on a node with children, repeated with .', () => {
       f.select('other')
       f.press('y', 'y')
       f.select('parent')
+      f.press('z', 'o')
       f.press('2', 'p')
       expect(f.texts('parent')).toEqual(['other', 'other', 'one', 'two'])
       f.select('parent')

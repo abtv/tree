@@ -1067,16 +1067,19 @@ export class EditorStore {
   }
 
   /**
-   * Vim `p` (`docs/PRODUCT.md` §20.2.13): on a node with children, "after" puts the content before its
-   * first child even when collapsed, and `expandId` names the fold that must open to show it. `P` keeps
-   * the plain sibling-before insertion.
+   * Vim `p` follows `o` (`docs/PRODUCT.md` §20.2.13): an expanded branch receives first children;
+   * a folded branch receives a sibling after it. `P` keeps the sibling-before insertion.
    */
   private putTarget(
     document: Document,
     nodeId: NodeId,
     position: SiblingInsertionPosition,
+    expansion: ExpansionState,
   ): { nodeId: NodeId; position: SiblingInsertionPosition; expandId: NodeId | undefined } {
-    const firstChild = position === 'after' ? requireNode(document, nodeId).node.children[0] : undefined
+    const firstChild =
+      position === 'after' && isNodeExpanded(expansion, nodeId)
+        ? requireNode(document, nodeId).node.children[0]
+        : undefined
     return firstChild === undefined
       ? { nodeId, position, expandId: undefined }
       : { nodeId: firstChild.id, position: 'before', expandId: nodeId }
@@ -1097,7 +1100,12 @@ export class EditorStore {
     if (requestedId === state.location.currentParentId) {
       return this.pasteNodeForest(requestedId, requestedPosition, { nodes: [source], sourceIds })
     }
-    const { nodeId, position, expandId } = this.putTarget(state.document, requestedId, requestedPosition)
+    const { nodeId, position, expandId } = this.putTarget(
+      state.document,
+      requestedId,
+      requestedPosition,
+      state.expansion,
+    )
     if (isPasteIntoSourceDescendant(state.document, nodeId, sourceIds)) {
       this.reportError(new Error('Cannot paste a node into one of its descendants.'))
       return false
@@ -1136,7 +1144,7 @@ export class EditorStore {
     if (heading && requestedPosition === 'before') return false
     const { nodeId, position, expandId } = heading
       ? { nodeId: requestedId, position: requestedPosition, expandId: undefined }
-      : this.putTarget(state.document, requestedId, requestedPosition)
+      : this.putTarget(state.document, requestedId, requestedPosition, state.expansion)
     if (
       (heading && source.sourceIds.includes(requestedId)) ||
       isPasteIntoSourceDescendant(state.document, nodeId, source.sourceIds)

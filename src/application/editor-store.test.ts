@@ -1915,10 +1915,44 @@ describe('EditorStore', () => {
         new FakeClock(),
       )
       await store.initialize()
+      store.applyFold('open', 'a')
       return store
     }
 
-    it('puts a subtree as the first child, keeps the location, and opens the fold', async () => {
+    it.each(['subtree', 'forest'] as const)('puts a %s after a folded branch without opening it', async (kind) => {
+      const store = await setup(['c1', 'c2', 'c3', 'c4'])
+      store.applyFold('close', 'a')
+      const before = ready(store)
+      const result =
+        kind === 'subtree'
+          ? store.pasteSubtree('a', 'after', source, ['x'])
+          : store.pasteNodeForest('a', 'after', forest, 2)
+      expect(result).toBe(true)
+      const state = ready(store)
+      expect(state.document.roots.map((node) => node.id)).toEqual(
+        kind === 'subtree' ? ['a', 'c1', 'b'] : ['a', 'c1', 'c3', 'b'],
+      )
+      expect(state.document.roots[0]).toBe(before.document.roots[0])
+      expect(state.location).toEqual({ currentParentId: null, selectedNodeId: 'c1' })
+      expect(state.focus).toMatchObject({ nodeId: 'c1', cursor: 0 })
+      expect(state.expansion).toBe(before.expansion)
+      store.undo()
+      expect(ready(store).document).toEqual(before.document)
+      store.redo()
+      expect(ready(store).document).toEqual(state.document)
+      expect(ready(store).expansion).toBe(before.expansion)
+    })
+
+    it('selects the next sibling after gp on a folded branch', async () => {
+      const store = await setup(['c1', 'c2'])
+      store.applyFold('close', 'a')
+      expect(store.pasteNodeForest('a', 'after', forest, 1, true)).toBe(true)
+      expect(ready(store).document.roots.map((node) => node.id)).toEqual(['a', 'c1', 'b'])
+      expect(ready(store).location.selectedNodeId).toBe('b')
+      expect(ready(store).expansion.expandedIds.has('a')).toBe(false)
+    })
+
+    it('puts a subtree as the first child, keeps the location, and keeps the fold open', async () => {
       const store = await setup(['c1', 'c2'])
       expect(store.pasteSubtree('a', 'after', source, ['x'])).toBe(true)
       const state = ready(store)
@@ -1950,6 +1984,7 @@ describe('EditorStore', () => {
 
     it('keeps the sibling-before put and the sibling put on a leaf', async () => {
       const store = await setup(['c1', 'c2', 'c3', 'c4'])
+      store.applyFold('close', 'a')
       expect(store.pasteSubtree('a', 'before', source, ['x'])).toBe(true)
       expect(ready(store).document.roots.map((node) => node.id)).toEqual(['c1', 'a', 'b'])
       expect(ready(store).document.roots[1]!.children.map((node) => node.id)).toEqual(['a1', 'a2'])
@@ -2030,6 +2065,7 @@ describe('EditorStore', () => {
         new FakeClock(),
       )
       await store.initialize()
+      store.applyFold('open', 'n')
       const before = ready(store)
       expect(store.pasteSubtree('n', 'after', source, ['x'])).toBe(false)
       expect(ready(store).operationError).toBe(MAX_DOCUMENT_DEPTH_ERROR)

@@ -1309,8 +1309,8 @@ Normal mode also supports:
 Normal mode also supports:
 
 * `p` and `P` to put the most recent local Vim register after or before the current node.
-* A node or sibling-forest put with `p` on a selected node that has at least one child puts the content as the first children of that node instead, including when collapsed: the displayed location stays unchanged, the node's fold opens so the content is visible, and the first inserted node is selected.
-* On the current-parent heading, `p` puts first children even when it has no children; `P` does nothing because a sibling of the heading would lie outside the displayed location. Elsewhere, `P`, and `p` on a node without children, keep the sibling insertion. Putting a node into its own children is rejected with the descendant error below, because the target lies inside the source. A text put is unchanged by this rule.
+* A node or sibling-forest put with `p` follows the same visible-outline rule as `o`: on an expanded selected node with children, it puts the content as the first children; on a collapsed node or a leaf, it puts after the node's entire subtree as siblings. The displayed location and existing folds stay unchanged, and the first inserted node is selected. `P` puts siblings before the selected node, like `O`.
+* On the current-parent heading, `p` puts first children even when it has no children; `P` does nothing because a sibling of the heading would lie outside the displayed location. Putting a node into its own children is rejected with the descendant error below, because the target lies inside the source. A text put is unchanged by this rule.
 * A plain-text put from an image caret inserts the text before that image and leaves the Normal caret on the final inserted text character, with the image caret hidden.
 * `gp` and `gP` put like `p` and `P`, with the same counts and rejections, but leave the caret immediately after the inserted content. For text, the Normal caret is on the character after the inserted text, clamped to the final text character, or to the attached image when the inserted text ends immediately before it. For a node put, the node that follows the inserted forest is selected, or the last inserted node when none follows; after a put into the children of a node, that is the node's former first child.
 * In Visual modes `gp` and `gP` are not commands.
@@ -1382,7 +1382,7 @@ Normal mode also supports:
 * A count before `.` repeats the completed change that many times, stopping at the first failed repetition and keeping those that already completed.
 * Each structural repetition is a separate undoable command and subtree puts assign fresh IDs on every repetition.
 * A repeated whole-node mutation applies to the original number of siblings starting at the current node; if that many siblings are unavailable, it makes no change.
-* A repeated `p` applies the put rule above to the current node, so it goes into the children of a node that has them and after a node that has none.
+* A repeated `p` applies the put rule above to the current node, so it goes into the first children of an expanded branch or the current-parent heading, and after a collapsed branch or a leaf.
 * A repeated put uses the originally incoming value and copy count even if a Visual `p` has since exchanged the register; `gp` and `gP` retain their post-put destination.
 * Motions, yanks, and failed changes do not replace the saved change.
 * Every individual command and repetition is atomic: when it cannot complete in full, it changes neither the document, the register, the history, the focus, nor the saved change for `.`.
@@ -1403,7 +1403,7 @@ Normal mode also supports:
 
 * In Normal mode, `yy` copies the selected node and its entire subtree, while `dd` copies it before deleting it.
 * If the most recent register action was Visual-mode text yank/delete or a character deletion, `p` and `P` insert that text after or before the current character.
-* If the most recent register action was `yy` or `dd`, `p` and `P` insert a copy of the stored subtree as a sibling after or before the current node, except that `p` on a node with children or on the editable current-parent heading puts it as that node's first children, as the `p` and `P` rule above defines; `P` on the heading does nothing.
+* If the most recent register action was `yy` or `dd`, `p` and `P` insert a copy of the stored subtree as a sibling after or before the current node, except that `p` on an expanded node with children or on the editable current-parent heading puts it as that node's first children, as the `p` and `P` rule above defines; `P` on the heading does nothing.
 * Subtree puts preserve text, hyperlinks, and attachments and assign fresh node IDs to every pasted node.
 * Yank, delete, change, case, and successful plain-text put commands return to Normal mode.
 

@@ -1452,8 +1452,9 @@ describe('editor keyboard handler', () => {
       ],
     })
 
-    it('puts the register as the first child like o, keeping the location and opening the fold', async () => {
+    it('puts the register as the first child like o on an expanded branch', async () => {
       const { store, snapshot, press, vim } = await textFixture(parent())
+      store.applyFold('open', 'parent')
       vim.register.current = { kind: 'node', value: { id: 'src', text: 'copy', children: [] }, sourceIds: ['src'] }
       press('p')
       const state = snapshot()
@@ -1475,7 +1476,8 @@ describe('editor keyboard handler', () => {
     })
 
     it('puts a counted forest as first children and gp leaves the selection on the old first child', async () => {
-      const { snapshot, press, vim } = await textFixture(parent())
+      const { store, snapshot, press, vim } = await textFixture(parent())
+      store.applyFold('open', 'parent')
       vim.register.current = {
         kind: 'nodes',
         value: {
@@ -1501,7 +1503,8 @@ describe('editor keyboard handler', () => {
     })
 
     it('reports an error and changes nothing when the node is put into itself', async () => {
-      const { snapshot, press } = await textFixture(parent())
+      const { store, snapshot, press } = await textFixture(parent())
+      store.applyFold('open', 'parent')
       const before = snapshot().document
       press('y')
       press('y')
