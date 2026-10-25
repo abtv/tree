@@ -1522,7 +1522,7 @@ describe('editor keyboard handler', () => {
     expect(f.snapshot().document.roots.some((root) => root.text === 'text')).toBe(true)
   })
 
-  it('copies only node text externally with yy while preserving the subtree register', async () => {
+  it('copies subtree text externally with yy while preserving the subtree register', async () => {
     const node: TreeNode = {
       id: 'node',
       text: 'https://example.com',
@@ -1535,7 +1535,7 @@ describe('editor keyboard handler', () => {
 
     f.press('y', 'y')
 
-    expect(f.clipboard.content).toEqual({ kind: 'text', text: node.text })
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: `${node.text}\n    child` })
     expect(f.snapshot()).toBe(before)
     expect(f.input.selectionStart).toBe(4)
     expect(f.vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
@@ -1569,14 +1569,14 @@ describe('editor keyboard handler', () => {
     expect(f.caret()).toEqual(before)
   })
 
-  it('keeps the external clipboard for counted multi-node yy and copies a clamped single node', async () => {
+  it('copies counted sibling text with yy and copies a clamped single node', async () => {
     const first: TreeNode = { id: 'first', text: 'first', children: [] }
     const last: TreeNode = { id: 'last', text: 'last', children: [] }
     const f = await textFixture(first, 'normal', { document: { roots: [first, last] } })
 
     f.press('2', 'y', 'y')
 
-    expect(f.clipboard.content).toBeUndefined()
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'first\nlast' })
 
     f.store.selectNode('last', 0)
     f.press('2', 'y', 'y')

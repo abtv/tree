@@ -753,7 +753,7 @@ The clipboard service should support:
 
 Clipboard-specific platform details must remain outside the domain.
 
-Vim external yanks and Normal `dd` use a separate `writeClipboardContent` service and IPC channel carrying plain text or an attachment ID. Application projections choose the content under PRODUCT §20.2.22; the main process validates the payload, reads image bytes through the file-service queue, and validates the PNG before writing it. Native writes are serialized with rich clipboard copies so a pending image read cannot overwrite a later copy. The external copy adds no document mutation, persistence writes, or history entries beyond the command's existing behavior; text projections read selected text, node content, or whole selected subtrees for node Visual yanks, and image copying uses the existing attachment byte and decoded-image limits. `dd` captures the caret before deletion changes focus and exports only after successful deletion; the existing undo history retains the removed attachment during image copying.
+Vim external yanks and Normal `dd` use a separate `writeClipboardContent` service and IPC channel carrying plain text or an attachment ID. Application projections choose the content under PRODUCT §20.2.22; the main process validates the payload, reads image bytes through the file-service queue, and validates the PNG before writing it. Native writes are serialized with rich clipboard copies so a pending image read cannot overwrite a later copy. The external copy adds no document mutation, persistence writes, or history entries beyond the command's existing behavior; text projections read selected text, node content, or whole selected subtrees for Normal text and node Visual yanks, and image copying uses the existing attachment byte and decoded-image limits. `dd` captures the caret before deletion changes focus and exports only after successful deletion; the existing undo history retains the removed attachment during image copying.
 
 ### Editing commands
 
@@ -991,6 +991,9 @@ root's visible descendants. It uses the existing flattened rows and runs only du
 selection. `vimForestClipboardContent` exports selected trees in preorder with four spaces per
 level, including collapsed descendants. Single leaves retain the text/image preference. Export
 costs O(selected text plus indentation), retains no new cache, and adds no document writes or syncs.
+`vimYankClipboardContent` uses that forest export for Normal `yy` on text, including counted
+forests. It retains the image-caret and empty-text-leaf rules. Normal `dd` keeps its separate
+single-node projection, so changing yank payloads does not alter deletion behavior.
 
 Performance assessment (§22.1): text-object calculations scan only the active node text. Node Visual endpoints and the repeat descriptor are constant-size state apart from one captured subtree forest, bounded by the most recent register or repeatable put. Computing a selected sibling interval scans the current displayed level; highlighting compares indices for mounted rows, so ordinary typing outside Node Visual mode does not gain a list scan. Bulk commands traverse only selected subtrees plus the copied sibling array and ancestor path; repeated puts scale with the requested count and copied forest size. A command adds one history snapshot and the existing autosave scheduling, with no new direct disk writes or syncs. The wide-list Node Visual performance guard checks interactive selection latency and mounted-row bounds.
 

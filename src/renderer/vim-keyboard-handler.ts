@@ -1,6 +1,10 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { vimNormalClipboardContent, vimSelectionClipboardContent } from '../application/vim-clipboard-content'
+import {
+  vimNormalClipboardContent,
+  vimSelectionClipboardContent,
+  vimYankClipboardContent,
+} from '../application/vim-clipboard-content'
 import { cloneNode, linkAtPosition, locateNode, requireNode, type TreeNode } from '../domain/document'
 import {
   getCaret,
@@ -524,7 +528,7 @@ export function handleVimKey(
         if (forest !== undefined)
           void store
             .copyVimContent(
-              vimNormalClipboardContent(
+              vimYankClipboardContent(
                 forest,
                 vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')).imageActive,
               ),

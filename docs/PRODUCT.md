@@ -1411,15 +1411,16 @@ Normal mode also supports:
 #### 20.2.22 System Clipboard
 
 * Vim yanks and Normal-mode `dd` also copy content to the system clipboard for external applications under the rules below.
-* Normal `yy` and `dd` exclude descendants from the system clipboard even when the local register includes the node's subtree.
+* Normal `dd` excludes descendants from the system clipboard even when the local register includes the node's subtree.
 * The local register and `p` / `P` retain the behavior described above.
 * In character-wise Visual mode, `y` copies only the selected text within the current node to the system clipboard.
-* In Normal mode, `yy` copies the entire text of the current node when the caret is on its text, or only its attached image when the image caret is active. Text and image are copied separately, never together. A counted `yy` that covers multiple sibling nodes leaves the system clipboard unchanged.
-* Normal-mode `dd` uses the same system-clipboard rules as `yy`, using the caret position before deletion and the subtrees actually removed. A deletion that changes nothing or removes multiple sibling nodes leaves the system clipboard unchanged. Clipboard failure reports an operation error without undoing the deletion or changing the local register; undo and local puts retain their existing behavior.
+* In Normal mode, `yy` on text copies the current node and all descendant text, including collapsed descendants, using the same preorder and four-space indentation as whole-node Visual `y` below. Counted `yy` copies the actual selected sibling forest, clamped at the last sibling. A single empty text leaf leaves the clipboard unchanged. Uncounted `yy` also copies the current-parent heading and its subtree without entering Visual mode.
+* On an image caret, `yy` retains image-only copying: one actual selected root copies its attached image; a counted yank covering multiple roots leaves the system clipboard unchanged. Text and image are copied separately, never together. The local register still contains complete subtrees.
+* Normal-mode `dd` copies only the removed node's own text or attached image according to the caret position before deletion. A deletion that changes nothing or removes multiple sibling nodes leaves the system clipboard unchanged. Clipboard failure reports an operation error without undoing the deletion or changing the local register; undo and local puts retain their existing behavior.
 * In whole-node Visual mode (`V`), when exactly one leaf is selected, `y` copies its entire text when non-empty, including when it also has an image; otherwise it copies the attached image when present.
 * For any larger whole-node Visual selection, `y` copies all selected subtree text, including collapsed descendants, in preorder. Lines are joined by newline characters with four spaces per nesting level relative to each selected root. Empty and image-only nodes contribute empty text entries with their nesting indentation; entries at the beginning and end are retained. Images are not included in this text export. The local structured register retains them.
 * Text copied by these Vim commands is plain text: hyperlink characters are included exactly as selected or stored in the node, without hyperlink formatting or a separate clickable representation.
-* An operation on a single leaf with neither text nor an image, or an empty character-wise text selection, leaves the system clipboard unchanged; copying nothing never clears it. Normal `yy` and `dd` also leave it unchanged when the current node has neither text nor an image.
+* An operation on a single leaf with neither text nor an image, or an empty character-wise text selection, leaves the system clipboard unchanged; copying nothing never clears it. Normal `dd` also leaves it unchanged when the current node has neither text nor an image.
 * Empty entries within a multi-node whole-node Visual yank follow the newline rule above.
 
 #### 20.2.23 Whole-Node Visual Mode and Shifts

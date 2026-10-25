@@ -11,6 +11,7 @@ import {
   launchTree,
   node,
   nodeTexts,
+  parent,
   seedDocument,
   test,
   writeClipboardText,
@@ -224,7 +225,9 @@ test('copies yy text and character Visual y as plain text while retaining local 
   await window.keyboard.press('y')
   await window.keyboard.press('y')
 
-  await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child', html: false, image: null })
   await expect(node(window, 1)).toBeFocused()
 
   // `p` on this node would put the copy into its own children, which is rejected; `P` puts it before.
@@ -238,6 +241,20 @@ test('copies yy text and character Visual y as plain text while retaining local 
   await window.keyboard.press('d')
 
   await expect(node(window, 1)).toHaveValue('Excluded child')
+
+  await parent(window).focus()
+  await window.keyboard.press('V')
+
+  await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+  await writeClipboardText(app, 'heading copy')
+  await window.keyboard.press('y')
+  await window.keyboard.press('y')
+
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child', html: false, image: null })
+  await expect(parent(window)).toBeFocused()
 
   await window.keyboard.press('Control+o')
   await node(window, 1).focus()
@@ -326,7 +343,9 @@ test('copies reverse Visual subtree text with blank lines and indented descendan
   await expect.poll(() => content(app)).toMatchObject({ text: '\n', html: false, image: null })
 })
 
-test('preserves the system clipboard for empty single nodes and counted multiple-node yy', async ({ userDataDir }) => {
+test('preserves empty single-node copies and exports counted yy forests with boundary clamping', async ({
+  userDataDir,
+}) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -337,15 +356,20 @@ test('preserves the system clipboard for empty single nodes and counted multiple
   await window.keyboard.press('y')
   await window.keyboard.press('V')
   await window.keyboard.press('y')
-  await node(window, 1).focus()
-
-  await window.keyboard.press('2')
-  await window.keyboard.press('y')
-  await window.keyboard.press('y')
-  // A subsequent Invoke is a renderer-to-main barrier; no-copy assertions don't rely on a timeout.
+  // Drain renderer-to-main work before checking that empty copies did not touch the clipboard.
   await window.evaluate(() => (globalThis.window as unknown as { treeApi: TreeApi }).treeApi.getVimEnabled())
 
   expect(await content(app)).toMatchObject({ text: 'keep', html: true, image: null })
+
+  await node(window, 1).focus()
+
+  await window.keyboard.press('3')
+  await window.keyboard.press('y')
+  await window.keyboard.press('y')
+
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child\n\n', html: false, image: null })
 
   await node(window, 4).focus()
 
@@ -392,5 +416,7 @@ test('reports native copy failure, preserves the old clipboard and local yank, t
   await window.keyboard.press('y')
   await window.keyboard.press('y')
 
-  await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false })
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child', html: false })
 })

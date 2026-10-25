@@ -32,3 +32,10 @@ export function vimForestClipboardContent(nodes: readonly TreeNode[]): Clipboard
   for (const node of nodes) append(node, 0)
   return { kind: 'text', text: lines.join('\n') }
 }
+
+/** Normal yy keeps image-caret semantics while text yanks export the entire selected forest. */
+export function vimYankClipboardContent(nodes: readonly TreeNode[], imageCaret: boolean): ClipboardContent | undefined {
+  if (imageCaret || (nodes.length === 1 && nodes[0]!.children.length === 0))
+    return vimNormalClipboardContent(nodes, imageCaret)
+  return vimForestClipboardContent(nodes)
+}

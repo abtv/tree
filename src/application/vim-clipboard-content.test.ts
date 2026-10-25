@@ -5,6 +5,7 @@ import {
   vimNodeClipboardContent,
   vimNormalClipboardContent,
   vimSelectionClipboardContent,
+  vimYankClipboardContent,
 } from './vim-clipboard-content'
 
 const node: TreeNode = {
@@ -77,10 +78,57 @@ describe('Vim external clipboard projections', () => {
     ).toEqual({ kind: 'text', text: '\n    ' })
   })
 
-  it('exports Normal yanks only when the actual sibling forest has one node', () => {
+  it('exports Normal deletions only when the actual sibling forest has one node', () => {
     expect(vimNormalClipboardContent([node], false)).toEqual({ kind: 'text', text: node.text })
     expect(vimNormalClipboardContent([node], true)).toEqual({ kind: 'image', attachmentId: 'picture' })
     expect(vimNormalClipboardContent([node, node], false)).toBeUndefined()
     expect(vimNormalClipboardContent([], false)).toBeUndefined()
+  })
+
+  it('exports text yanks as complete forests including empty roots and indented empty descendants', () => {
+    const blank: TreeNode = { id: 'blank', text: '', children: [] }
+    const branch = { ...node, children: [blank, ...node.children] }
+
+    expect(vimYankClipboardContent([branch], false)).toEqual({
+      kind: 'text',
+      text: `${node.text}\n    \n    Excluded child`,
+    })
+    expect(vimYankClipboardContent([blank, branch, blank], false)).toEqual({
+      kind: 'text',
+      text: `\n${node.text}\n    \n    Excluded child\n`,
+    })
+    expect(vimYankClipboardContent([{ ...node, text: '' }], false)).toEqual({
+      kind: 'text',
+      text: '\n    Excluded child',
+    })
+    expect(vimYankClipboardContent([blank], false)).toBeUndefined()
+    expect(vimYankClipboardContent([], false)).toBeUndefined()
+  })
+
+  it('retains image-caret and empty-text-leaf rules for Normal yanks', () => {
+    const leaf = { ...node, text: '', children: [] }
+
+    expect(vimYankClipboardContent([node], true)).toEqual({ kind: 'image', attachmentId: 'picture' })
+    expect(vimYankClipboardContent([node, leaf], true)).toBeUndefined()
+    expect(vimYankClipboardContent([leaf], false)).toBeUndefined()
+    expect(vimYankClipboardContent([leaf], true)).toEqual({ kind: 'image', attachmentId: 'picture' })
+    expect(vimYankClipboardContent([], true)).toBeUndefined()
+  })
+
+  it('reads each selected node text once in a wide subtree and retains document order', () => {
+    let reads = 0
+    const children = Array.from({ length: 10000 }, (_, index): TreeNode => ({
+      id: `child-${index}`,
+      get text() {
+        reads += 1
+        return String(index)
+      },
+      children: [],
+    }))
+
+    const copied = vimYankClipboardContent([{ id: 'root', text: 'Root', children }], false)
+
+    expect(reads).toBe(10000)
+    expect(copied).toEqual({ kind: 'text', text: `Root\n${children.map((_, index) => `    ${index}`).join('\n')}` })
   })
 })
