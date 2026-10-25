@@ -11,6 +11,7 @@ import {
   node,
   pressShifted,
   seedDocument,
+  setAgendaToday,
   setMainWindowContentSize,
   screenshotContentSize,
   test,
@@ -281,6 +282,7 @@ test('composes match, link and date rendering without moving rows or losing Inse
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
   await setMainWindowContentSize(app, screenshotContentSize)
   const row = window.locator('[data-node-id="one"]')
+  await setAgendaToday(window)
   const before = await row.boundingBox()
   for (const appearance of ['light', 'dark'] as const) {
     await window.emulateMedia({ colorScheme: appearance })

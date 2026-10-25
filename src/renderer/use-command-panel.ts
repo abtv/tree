@@ -13,7 +13,7 @@ import type { VimMode } from './vim-editing'
 import type { VimCommandState } from './vim-command-state'
 import { clearPending } from './vim-command-state'
 import { moveSuggestionIndex } from './completion-controller'
-import { getCaret } from './editor-dom'
+import { getCaret, getSelectionEndpoints, setSelectionRange } from './editor-dom'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCommandPanel(options: {
@@ -222,6 +222,8 @@ export function useCommandPanel(options: {
       beforeOpen?.()
       const active = document.activeElement
       const selection = window.getSelection()
+      const editorSelection =
+        active instanceof HTMLElement && active.matches('.node-input') ? getSelectionEndpoints(active) : undefined
       const endpoints =
         selection?.anchorNode && selection.focusNode
           ? {
@@ -237,7 +239,8 @@ export function useCommandPanel(options: {
       restore.current = () => {
         if (!(active instanceof HTMLElement) || !active.isConnected) return
         active.focus({ preventScroll: true })
-        if (active instanceof HTMLTextAreaElement && start !== undefined && end !== undefined)
+        if (editorSelection !== undefined) setSelectionRange(active, editorSelection.anchor, editorSelection.focus)
+        else if (active instanceof HTMLTextAreaElement && start !== undefined && end !== undefined)
           active.setSelectionRange(start, end, direction)
         else if (endpoints?.anchor.isConnected && endpoints.focus.isConnected) {
           selection?.setBaseAndExtent(endpoints.anchor, endpoints.anchorOffset, endpoints.focus, endpoints.focusOffset)

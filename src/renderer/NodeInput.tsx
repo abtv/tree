@@ -123,7 +123,7 @@ export function NodeInput({
   })
   const attach = (input: HTMLElement | null): void => {
     const previous = element.current
-    if (searchQuery && input === null && previous !== null && previous.ownerDocument.activeElement === previous) {
+    if (input === null && previous !== null && previous.ownerDocument.activeElement === previous) {
       retainedSelection.current = getSelectionEndpoints(previous)
     }
     element.current = input

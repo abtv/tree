@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import './test/setup'
 import { NodeInput, type NodeInputBindings } from './NodeInput'
-import { DATE_LIKE_CLASS, getSelectionRange } from './editor-dom'
+import { DATE_LIKE_CLASS, getSelectionRange, setSelectionRange } from './editor-dom'
 import { treeDecorations } from './date-decorations'
 
 afterEach(cleanup)
@@ -106,6 +106,32 @@ function view(text: string): React.JSX.Element {
 
 // @requirement PRODUCT.md §20.10
 describe('date-like text in a Tree input', () => {
+  it('preserves rich text nodes and a backward selection on an unrelated render', () => {
+    const { rerender } = render(view('abc 2026-10-14'))
+    const input = screen.getByLabelText('Node 1')
+    input.focus()
+    setSelectionRange(input, 3, 1)
+    const text = input.firstChild
+    rerender(view('abc 2026-10-14'))
+    expect(input.firstChild).toBe(text)
+    expect(getSelectionRange(input)).toEqual({ start: 1, end: 3 })
+    expect(window.getSelection()!.anchorOffset).toBe(3)
+  })
+
+  it('preserves a backward selection when temporal date decoration changes', () => {
+    const value = node('abc 2026-10-14')
+    const field = (className: string) => (
+      <NodeInput {...bindings} node={value} label="Node 1" decorations={[{ start: 4, end: 14, className }]} />
+    )
+    const { rerender } = render(field('date-past'))
+    const input = screen.getByLabelText('Node 1')
+    input.focus()
+    setSelectionRange(input, 3, 1)
+    rerender(field('date-future'))
+    expect(getSelectionRange(input)).toEqual({ start: 1, end: 3 })
+    expect(window.getSelection()!.anchorOffset).toBe(3)
+  })
+
   it('keeps the plain textarea for ordinary text', () => {
     render(view('ordinary plain text'))
     expect(screen.getByLabelText('Node 1').tagName).toBe('TEXTAREA')

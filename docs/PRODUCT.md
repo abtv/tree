@@ -1757,7 +1757,7 @@ While a node is being edited, a token is not underlined when the caret or select
 
 Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, is semibold and colored relative to the local calendar's Today: past dates are red, today's dates are yellow, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface; the dark appearance uses muted lighter variants. Tree evaluates Today when rendering date decorations; Agenda uses the Today captured when it opens (§23.1).
 
-Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text or caret offsets. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
+Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text, caret offsets or selection direction, including when Today changes between renders. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
 
 ---
 

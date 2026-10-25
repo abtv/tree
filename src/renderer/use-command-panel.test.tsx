@@ -171,6 +171,19 @@ describe('command panel owner', () => {
     expect(selection.anchorOffset).toBe(4)
     expect(selection.focusOffset).toBe(1)
   })
+  it('restores backward editor selection after its decorated text nodes are replaced', async () => {
+    const { editor } = await setup('visual', true, true)
+    editor.classList.add('node-input')
+    const selection = window.getSelection()!
+    selection.setBaseAndExtent(editor.firstChild!, 4, editor.firstChild!, 1)
+    fireEvent.keyDown(editor, { key: 'P', metaKey: true, shiftKey: true })
+    editor.innerHTML = '<span class="date-future">alpha</span>'
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+    expect(document.activeElement).toBe(editor)
+    expect(selection.anchorNode).toBe(editor.firstChild!.firstChild)
+    expect(selection.anchorOffset).toBe(4)
+    expect(selection.focusOffset).toBe(1)
+  })
   // @requirement PRODUCT.md §20.2.28
   it('expires unknown-command feedback after two seconds and cancels old deadlines on key dismissal', async () => {
     const { editor } = await setup()
