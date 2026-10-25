@@ -5,8 +5,10 @@ export const childText = 'Smoke child one two three four five six seven eight ni
 export interface SmokeDriver {
   waitFor: (script: string) => Promise<void>
   fill: (selector: string, text: string) => Promise<void>
-  press: (selector: string, key: 'Enter' | 'Tab') => Promise<void>
-  reload: () => Promise<void>
+  press: (selector: string, key: 'Enter' | 'Tab' | '0' | 'i' | 'Escape') => Promise<void>
+  type: (selector: string, text: string) => Promise<void>
+  enableVim: () => Promise<void>
+  reload: () => Promise<SmokeDriver>
 }
 
 const first = '.node-row .node-input'
@@ -27,7 +29,19 @@ export async function happyPath(driver: SmokeDriver) {
   // Read through the real platform adapter. No seeded document, mocked save or store mutation.
   await driver.waitFor(`return window.treeApi.load().then(state => state.document.roots.some(root =>
     root.text === ${JSON.stringify(parentText)} && root.children.some(child => child.text === ${JSON.stringify(childText)})))`)
-  await driver.reload()
-  await driver.waitFor(rendered)
-  await driver.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
+  const restored = await driver.reload()
+  await restored.waitFor(rendered)
+  await restored.enableVim()
+  await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL'`)
+  await restored.waitFor(
+    `return document.querySelector(${JSON.stringify(focused)})?.textContent === ${JSON.stringify(childText)}`,
+  )
+  await restored.press(focused, '0')
+  await restored.press(focused, 'i')
+  await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'INSERT'`)
+  await restored.type(focused, 'Vim ')
+  await restored.press(focused, 'Escape')
+  await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL' &&
+    document.querySelector(${JSON.stringify(focused)})?.textContent === ${JSON.stringify('Vim ' + childText)}`)
+  await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
 }

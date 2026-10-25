@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
-import { closeApp } from '../electron/fixtures.ts'
+import { clickApplicationMenuItem, closeApp } from '../electron/fixtures.ts'
 
-test('opens, edits, creates a child, saves and reloads', async ({ playwright }, testInfo) => {
+test('edits, persists a child, reopens and types in Vim', async ({ playwright }, testInfo) => {
   const errors: string[] = []
   const observe = (page: import('@playwright/test').Page) => {
     page.on('pageerror', (error) => errors.push(error.message))
@@ -18,8 +18,14 @@ test('opens, edits, creates a child, saves and reloads', async ({ playwright }, 
       },
       fill: (selector, text) => page.locator(selector).first().fill(text),
       press: (selector, key) => page.locator(selector).press(key),
+      type: (selector, text) => page.locator(selector).pressSequentially(text),
+      enableVim: async () => {
+        await page.locator('#tree-menu-button').click()
+        await page.locator('#prototype-vim').click()
+      },
       reload: async () => {
         await page.reload()
+        return driver
       },
     }
     return driver
@@ -28,9 +34,18 @@ test('opens, edits, creates a child, saves and reloads', async ({ playwright }, 
   if (testInfo.project.name === 'electron') {
     const profile = await mkdtemp(join(tmpdir(), `tree-smoke-p${process.pid}-`))
     let app: Awaited<ReturnType<typeof electron.launch>> | undefined
-    try {
-      await mkdir(join(profile, 'data'))
-      await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
+    const stop = async () => {
+      if (!app) return undefined
+      const child = app.process()
+      await closeApp(app)
+      expect(
+        child.exitCode !== null || child.signalCode !== null,
+        `Smoke process still running; retained ${profile}`,
+      ).toBe(true)
+      app = undefined
+      return child
+    }
+    const launch = async (): Promise<SmokeDriver> => {
       app = await electron.launch({
         args: [
           ...(process.platform === 'linux' && process.env['CI'] ? ['--no-sandbox'] : []),
@@ -48,17 +63,27 @@ test('opens, edits, creates a child, saves and reloads', async ({ playwright }, 
       ).toEqual([false])
       expect(await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered('CommandOrControl+0'))).toBe(false)
       expect(await page.evaluate(() => devicePixelRatio)).toBe(1)
-      await happyPath(observe(page))
+      const owned = app
+      return {
+        ...observe(page),
+        enableVim: () => clickApplicationMenuItem(owned, 'Edit', 'Vim Editing'),
+        reload: async () => {
+          const previous = await stop()
+          // A forced teardown must not count as a successful normal quit.
+          expect(previous?.exitCode).toBe(0)
+          const driver = await launch()
+          expect(app!.process().pid).not.toBe(previous?.pid)
+          return driver
+        },
+      }
+    }
+    try {
+      await mkdir(join(profile, 'data'))
+      await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
+      await happyPath(await launch())
       expect(errors).toEqual([])
     } finally {
-      if (app) {
-        const child = app.process()
-        await closeApp(app)
-        expect(
-          child.exitCode !== null || child.signalCode !== null,
-          `Smoke process still running; retained ${profile}`,
-        ).toBe(true)
-      }
+      await stop()
       // Playwright owns cleanup when launch rejects; otherwise closeApp confirmed process exit.
       await rm(profile, { recursive: true, force: true })
     }

@@ -7,7 +7,7 @@ import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
-import { happyPath } from '../../e2e/smoke/scenario.mts'
+import { happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 
 export function validateArguments(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return 'help'
@@ -127,7 +127,7 @@ export async function runSafari(smoke = false) {
         assert(id, `Missing smoke editor: ${selector}`)
         return id
       }
-      await happyPath({
+      const smokeDriver: SmokeDriver = {
         waitFor: async (script) => {
           while (!controller.signal.aborted) {
             const result = await request(`/session/${session}/execute/async`, {
@@ -147,13 +147,37 @@ export async function runSafari(smoke = false) {
           await request(`/session/${session}/element/${id}/value`, { text })
         },
         press: async (selector, key) => {
+          await elementId(selector)
+          const value = { Enter: '\uE007', Tab: '\uE004', Escape: '\uE00C', '0': '0', i: 'i' }[key]
+          await request(`/session/${session}/actions`, {
+            actions: [
+              {
+                type: 'key',
+                id: 'smoke-keyboard',
+                actions: [
+                  { type: 'keyDown', value },
+                  { type: 'keyUp', value },
+                ],
+              },
+            ],
+          })
+        },
+        type: async (selector, text) => {
           const id = await elementId(selector)
-          await request(`/session/${session}/element/${id}/value`, { text: key === 'Enter' ? '\uE007' : '\uE004' })
+          await request(`/session/${session}/element/${id}/value`, { text })
+        },
+        enableVim: async () => {
+          for (const selector of ['#tree-menu-button', '#prototype-vim']) {
+            const id = await elementId(selector)
+            await request(`/session/${session}/element/${id}/click`, {})
+          }
         },
         reload: async () => {
           await request(`/session/${session}/refresh`, {})
+          return smokeDriver
         },
-      })
+      }
+      await happyPath(smokeDriver)
       console.log(`Safari ${created.capabilities.browserVersion}: happy path passed`)
       return
     }
