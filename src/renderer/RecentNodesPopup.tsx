@@ -38,6 +38,7 @@ export function RecentNodesPopup({
   const active = useRef(false)
   const cancelSearch = useRef<() => void>(() => undefined)
   const open = items !== undefined
+  const popup = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const restore = useRef<() => void>(() => undefined)
 
@@ -55,7 +56,6 @@ export function RecentNodesPopup({
       setPending(false)
       return
     }
-    setItems([])
     cancelSearch.current = store.searchNodes(value, (results) => {
       setItems(results)
       setPending(false)
@@ -111,7 +111,11 @@ export function RecentNodesPopup({
           else if (event.key === 'Enter' || event.key === 'Tab') changeQuery(`#${suggestions[suggestionIndex]!}`, true)
           else setSuggestionIndex((index) => moveSuggestionIndex(index, direction!, suggestions.length))
         } else if (event.key === 'Escape') close()
-        else if (event.key === 'Enter') {
+        else if (pending && ['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          return
+        } else if (event.key === 'Enter') {
           const item = items[selected]
           if (item !== undefined) visit(item.id)
         } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
@@ -201,6 +205,20 @@ export function RecentNodesPopup({
   }, [open])
 
   useLayoutEffect(() => {
+    if (!open) return
+    const element = popup.current
+    if (element === null) return
+    const center = (): void => {
+      element.style.removeProperty('--search-top')
+      const top = Math.max(40, (window.innerHeight - element.getBoundingClientRect().height) / 2)
+      element.style.setProperty('--search-top', `${top}px`)
+    }
+    center()
+    window.addEventListener('resize', center)
+    return () => window.removeEventListener('resize', center)
+  }, [open])
+
+  useLayoutEffect(() => {
     const element = panel.current
     if (element === null) return
     const update = (): void => updateResultEdges(element)
@@ -236,7 +254,7 @@ export function RecentNodesPopup({
 
   if (items === undefined) return null
   return (
-    <div className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
+    <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
       <div className="recent-nodes-title">Search</div>
       <input
         ref={input}
@@ -296,6 +314,7 @@ export function RecentNodesPopup({
         ref={panel}
         role="listbox"
         aria-label={query === '' ? 'Recent nodes' : 'Search results'}
+        aria-busy={pending}
         className="node-search-results"
         onScroll={(event) => {
           updateResultEdges(event.currentTarget)
@@ -330,6 +349,7 @@ export function RecentNodesPopup({
                   style={{ position: 'absolute', top: index * 52, height: 52, width: '100%', boxSizing: 'border-box' }}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
+                    if (pending) return
                     active.current = false
                     composing.current = false
                     cancelSearch.current()
@@ -362,9 +382,11 @@ export function RecentNodesPopup({
       </div>
       <div className="node-search-footer">
         <span>
-          {suggestions.length > 0
-            ? '↑ ↓ select · Enter/Tab apply · Esc dismiss'
-            : '↑ ↓ select · Enter open · Esc close'}
+          {pending && suggestions.length === 0
+            ? 'Searching…'
+            : suggestions.length > 0
+              ? '↑ ↓ select · Enter/Tab apply · Esc dismiss'
+              : '↑ ↓ select · Enter open · Esc close'}
         </span>
       </div>
     </div>

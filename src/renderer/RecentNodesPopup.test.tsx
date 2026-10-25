@@ -5,8 +5,36 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { RecentNodesPopup } from './RecentNodesPopup'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { APPLE_SHORTCUTS } from './shortcut-profile'
+import type { RecentNode } from '../application/recent-nodes'
 
 afterEach(cleanup)
+
+// @requirement PRODUCT.md §20.14
+it('retains rows during refinement without allowing stale activation, then replaces them together', () => {
+  const { store } = setup()
+  let publish: (results: readonly RecentNode[]) => void = () => undefined
+  vi.mocked(store.searchNodes).mockImplementation((_query, callback) => {
+    publish = callback
+    return vi.fn()
+  })
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: 'nod' } })
+  act(() => publish([{ id: 'result', text: 'Node result', path: null }]))
+
+  fireEvent.change(input, { target: { value: 'node' } })
+
+  expect(screen.getByRole('option')).toHaveTextContent('Node result')
+  expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'true')
+  fireEvent.keyDown(input, { key: 'Enter' })
+  fireEvent.click(screen.getByRole('option'))
+  expect(store.visitRecentNode).not.toHaveBeenCalled()
+
+  act(() => publish([]))
+
+  expect(screen.queryByRole('option')).toBeNull()
+  expect(screen.getByText('No results')).toBeInTheDocument()
+  expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'false')
+})
 
 function setup(empty = false) {
   HTMLElement.prototype.scrollIntoView = vi.fn()

@@ -1518,7 +1518,7 @@ body.node-drag-invalid * {
   }
 }
 .recent-nodes-popup {
-  --search-top: min(20vh, 160px);
+  --search-top: 40px;
   position: fixed;
   z-index: 50;
   top: var(--search-top);

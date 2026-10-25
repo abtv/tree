@@ -163,6 +163,35 @@ test.describe('Recent-node buffered editing', () => {
 
 test.describe('Recent-node popup geometry (mode-independent)', () => {
   // @requirement PRODUCT.md §20.14
+  test('keeps the result list in place while an extra character is being searched', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 21 }, (_, i) => ({ id: `n${i}`, text: `Result node ${i}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    const input = window.getByRole('searchbox')
+    await input.fill('nod')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const before = await popup.boundingBox()
+    await window.clock.install()
+    await window.clock.pauseAt(Date.now() + 1000)
+
+    await input.press('e')
+    await window.screenshot({ path: 'test-results/search-refinement-pending.png' })
+
+    expect(await popup.boundingBox()).toEqual(before)
+    await expect(window.getByRole('option')).toHaveCount(21)
+    await window.clock.resume()
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
+    expect(await popup.boundingBox()).toEqual(before)
+    await window.screenshot({ path: 'test-results/search-refinement-complete.png' })
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('keeps selection visible in every animation frame during repeated arrow scrolling', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -344,6 +373,8 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const input = popup.getByRole('searchbox')
     const initialPopup = (await popup.boundingBox())!
     const initialInput = await input.boundingBox()
+    const viewportHeight = await window.evaluate(() => innerHeight)
+    expect(Math.abs(initialPopup.y + initialPopup.height / 2 - viewportHeight / 2)).toBeLessThanOrEqual(1)
 
     for (const query of ['al', 'Alpha', 'Alpha 11', 'missing', '#p', '#p1', '']) {
       await input.fill(query)
@@ -403,11 +434,14 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         const box = element.getBoundingClientRect()
         return Math.max(
           Math.abs(box.left + box.width / 2 - innerWidth / 2),
-          Math.abs(box.top - Math.min(innerHeight * 0.2, 160)),
+          Math.abs(box.top + box.height / 2 - innerHeight / 2),
         )
       })
     await expect.poll(centerOffset).toBeLessThanOrEqual(1)
     await window.screenshot({ path: 'test-results/recent-nodes-centered.png' })
+    await setMainWindowBounds(app, { width: 900, height: 1000 })
+    await expect.poll(centerOffset).toBeLessThanOrEqual(1)
+    await window.screenshot({ path: 'test-results/search-centered-tall.png' })
     await window.keyboard.press('Escape')
     await setMainWindowBounds(app, { width: 700, height: 400 })
     await node(window, 1).focus()
