@@ -7,7 +7,7 @@ import { happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, closeApp } from '../electron/fixtures.ts'
 
-test('edits, persists a child, reopens and types in Vim', async ({ playwright }, testInfo) => {
+test('persists a child, reopens, edits in Vim and searches Tree and Agenda', async ({ playwright }, testInfo) => {
   const errors: string[] = []
   const observe = (page: import('@playwright/test').Page) => {
     page.on('pageerror', (error) => errors.push(error.message))
@@ -22,6 +22,10 @@ test('edits, persists a child, reopens and types in Vim', async ({ playwright },
       enableVim: async () => {
         await page.locator('#tree-menu-button').click()
         await page.locator('#prototype-vim').click()
+      },
+      showView: async (view) => {
+        await page.locator('#tree-menu-button').click()
+        await page.locator(`#prototype-${view}`).click()
       },
       reload: async () => {
         await page.reload()
@@ -67,6 +71,7 @@ test('edits, persists a child, reopens and types in Vim', async ({ playwright },
       return {
         ...observe(page),
         enableVim: () => clickApplicationMenuItem(owned, 'Edit', 'Vim Editing'),
+        showView: (view) => clickApplicationMenuItem(owned, 'View', view === 'tree' ? 'Tree' : 'Agenda'),
         reload: async () => {
           const previous = await stop()
           // A forced teardown must not count as a successful normal quit.

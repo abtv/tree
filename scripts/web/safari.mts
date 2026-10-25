@@ -129,6 +129,7 @@ export async function runSafari(smoke = false) {
       }
       const smokeDriver: SmokeDriver = {
         waitFor: async (script) => {
+          const deadline = Date.now() + 5000
           while (!controller.signal.aborted) {
             const result = await request(`/session/${session}/execute/async`, {
               script: `const done = arguments[arguments.length - 1];
@@ -137,18 +138,48 @@ export async function runSafari(smoke = false) {
             })
             assert(!result.error, result.error)
             if (result.value) return
+            if (Date.now() >= deadline) {
+              const state = await evaluate(
+                `return {text: document.body.innerText, active: document.activeElement?.outerHTML}`,
+              )
+              throw new Error(`Safari smoke condition timed out: ${script}\n${JSON.stringify(state)}`)
+            }
             await delay(50, undefined, { signal: controller.signal })
           }
           controller.signal.throwIfAborted()
         },
         fill: async (selector, text) => {
           const id = await elementId(selector)
-          await request(`/session/${session}/element/${id}/clear`, {})
-          await request(`/session/${session}/element/${id}/value`, { text })
+          const tag = await request(`/session/${session}/element/${id}/name`, undefined, 'GET')
+          if (String(tag).toLowerCase() === 'input') {
+            // Element clear/send-keys can refocus the input and cancel this transient prompt.
+            // Keep its existing focus and replace the recalled query with native key actions.
+            await request(`/session/${session}/actions`, {
+              actions: [
+                {
+                  type: 'key',
+                  id: 'smoke-keyboard',
+                  actions: [
+                    { type: 'keyDown', value: '\uE03D' },
+                    { type: 'keyDown', value: 'a' },
+                    { type: 'keyUp', value: 'a' },
+                    { type: 'keyUp', value: '\uE03D' },
+                    ...Array.from(text).flatMap((value) => [
+                      { type: 'keyDown', value },
+                      { type: 'keyUp', value },
+                    ]),
+                  ],
+                },
+              ],
+            })
+          } else {
+            await request(`/session/${session}/element/${id}/clear`, {})
+            await request(`/session/${session}/element/${id}/value`, { text })
+          }
         },
         press: async (selector, key) => {
           await elementId(selector)
-          const value = { Enter: '\uE007', Tab: '\uE004', Escape: '\uE00C', '0': '0', i: 'i' }[key]
+          const value = { Enter: '\uE007', Tab: '\uE004', Escape: '\uE00C', '0': '0', i: 'i', '/': '/' }[key]
           await request(`/session/${session}/actions`, {
             actions: [
               {
@@ -168,6 +199,12 @@ export async function runSafari(smoke = false) {
         },
         enableVim: async () => {
           for (const selector of ['#tree-menu-button', '#prototype-vim']) {
+            const id = await elementId(selector)
+            await request(`/session/${session}/element/${id}/click`, {})
+          }
+        },
+        showView: async (view) => {
+          for (const selector of ['#tree-menu-button', `#prototype-${view}`]) {
             const id = await elementId(selector)
             await request(`/session/${session}/element/${id}/click`, {})
           }
