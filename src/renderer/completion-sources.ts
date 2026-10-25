@@ -2,6 +2,8 @@ import { calendarDateOf, formatCanonicalDate, weekdayOf, type DayNumber } from '
 import type { DateTextRange } from '../domain/date-recognition'
 import { suggestEmoji } from '../domain/emoji-completion'
 import { suggestDates } from '../domain/natural-date'
+import type { TagMatch } from '../domain/tag-catalog'
+import { findTags } from '../domain/tags'
 
 export interface CompletionSuggestion {
   readonly id: string
@@ -21,8 +23,27 @@ export interface CompletionMatch extends DateTextRange {
 
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-/** Adapts domain recognizers to popup data. Emoji take precedence over dates. */
-export function recognizeCompletion(text: string, caret: number, today: DayNumber): CompletionMatch | undefined {
+/** Adapts domain recognizers to popup data. Explicit tag/emoji fragments take precedence over dates. */
+export function recognizeCompletion(
+  text: string,
+  caret: number,
+  today: DayNumber,
+  tags?: TagMatch,
+): CompletionMatch | undefined {
+  if (tags !== undefined)
+    return {
+      start: tags.start,
+      end: tags.end,
+      listLabel: 'Tag suggestions',
+      retainsSelection: false,
+      preferredSuggestionId: `tag:${tags.suggestions[0]!}`,
+      suggestions: tags.suggestions.map((name) => ({
+        id: `tag:${name}`,
+        replacement: `#${name}`,
+        label: `#${name}`,
+        description: '',
+      })),
+    }
   const emoji = suggestEmoji(text, caret)
   if (emoji !== undefined)
     return {
@@ -40,6 +61,8 @@ export function recognizeCompletion(text: string, caret: number, today: DayNumbe
     }
   const dates = suggestDates(text, caret, today)
   if (dates === undefined) return undefined
+  // A new literal tag such as #today must not fall through to date acceptance.
+  if (findTags(text).some((tag) => tag.start < dates.end && tag.end > dates.start)) return undefined
   return {
     start: dates.start,
     end: dates.end,

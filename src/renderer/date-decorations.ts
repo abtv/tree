@@ -2,6 +2,11 @@ import type { TreeNode } from '../domain/document'
 import { dayNumberOf } from '../domain/calendar-date'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { dateLikeDecorations, type TextDecoration } from './editor-dom'
+import { nodeTags } from '../domain/tags'
+
+function tagDecorations(node: TreeNode): TextDecoration[] {
+  return nodeTags(node).map(({ start, end }) => ({ start, end, className: 'tag-text' }))
+}
 
 /** Local calendar day for presentation; Agenda supplies its captured Today instead. */
 export function localToday(): number {
@@ -22,6 +27,7 @@ export function agendaDecorations(node: TreeNode, day: number, today = localToda
       className: `${date.day === day ? 'agenda-date-active' : 'agenda-date-secondary'} ${dateColor(date.day, today)}`,
     })),
     ...dateLikeDecorations(node),
+    ...tagDecorations(node),
   ].sort((left, right) => left.start - right.start)
 }
 
@@ -34,6 +40,7 @@ export function treeDecorations(node: TreeNode, today = localToday()): TextDecor
       className: `agenda-date-active ${dateColor(date.day, today)}`,
     })),
     ...dateLikeDecorations(node),
+    ...tagDecorations(node),
   ].sort((left, right) => left.start - right.start)
   return decorations.length === 0 ? undefined : decorations
 }

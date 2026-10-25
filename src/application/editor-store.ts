@@ -103,11 +103,13 @@ import {
 } from './agenda-reconcile'
 import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
 import { agendaVisualSources } from './agenda-visual-selection'
+import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
+  private readonly tags = new TagCatalog()
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
@@ -118,7 +120,10 @@ export class EditorStore {
   private readonly runtime = new EditorRuntimeState(
     () => this.agendaRowsCache.clear(),
     this.agendaRowsCache,
-    (state) => this.search.update(state),
+    (state) => {
+      this.tags.update(state.document)
+      this.search.update(state)
+    },
   )
   private readonly history = new EditorHistory()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
@@ -170,6 +175,15 @@ export class EditorStore {
   public getSnapshot = this.runtime.getSnapshot
 
   public subscribe = this.runtime.subscribe
+
+  public suggestTags(
+    nodeId: NodeId,
+    text: string,
+    caret: number,
+    links: readonly LinkRange[] = [],
+  ): TagMatch | undefined {
+    return this.tags.suggest(nodeId, text, caret, links)
+  }
 
   public openAgenda(cursor?: number): void {
     const state = this.runtime.ready()

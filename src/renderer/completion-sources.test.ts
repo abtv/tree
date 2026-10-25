@@ -4,6 +4,15 @@ import { recognizeCompletion } from './completion-sources'
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 
+// @requirement PRODUCT.md §20.13
+it('keeps date-like tag names literal when no existing tag matches', () => {
+  const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  for (const text of ['#today', '#tomorrow', 'Plan #mon']) {
+    expect(recognizeCompletion(text, text.length, today)).toBeUndefined()
+    expect(recognizeCompletion(text, text.length - 1, today)).toBeUndefined()
+  }
+})
+
 // @requirement PRODUCT.md §20.9
 // @requirement PRODUCT.md §20.12
 it('adapts date and emoji matches to shared suggestions with their selection policies', () => {

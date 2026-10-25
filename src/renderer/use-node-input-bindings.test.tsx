@@ -727,6 +727,39 @@ describe('useNodeInputBindings', () => {
     },
   )
 
+  // @requirement PRODUCT.md §20.13
+  it.each([false, true])('accepts a tag as one edit and restores the literal fragment (Vim %s)', async (vimEnabled) => {
+    const f = await fixture({
+      mode: 'insert',
+      vimEnabled,
+      document: { roots: [node('node', ''), node('catalog', '#Work #work')] },
+    })
+    f.input().focus()
+
+    f.type('#W')
+
+    expect(f.result.current.completionPopup?.popup.suggestions.map((suggestion) => suggestion.replacement)).toEqual([
+      '#Work',
+    ])
+
+    f.press('Enter')
+
+    expect(f.node().text).toBe('#Work')
+    expect(f.result.current.vimMode).toBe('insert')
+
+    act(() => f.store.undo())
+    f.sync()
+
+    expect(f.node().text).toBe('#W')
+    expect(f.result.current.completionPopup).toBeUndefined()
+
+    f.type('#new ')
+
+    expect(f.node().text).toBe('#new ')
+    expect(f.result.current.completionPopup).toBeUndefined()
+    expect(f.store.suggestTags('catalog', '#n', 2)?.suggestions).toEqual(['new'])
+  })
+
   // @requirement PRODUCT.md §20.12
   it('dismisses emoji on paste, composition, focus loss, selection and external changes', async () => {
     const f = await fixture({ mode: 'insert', document: { roots: [node('node', '')] } })

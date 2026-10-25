@@ -85,6 +85,7 @@
   --color-date-past: #a0443e;
   --color-date-today: #806800;
   --color-date-future: #396d43;
+  --color-tag: #76517d;
   --color-disclosure-background: #efe9da;
   --color-enter-ring-background: #ddd5c2;
   --color-enter-ring-hover-background: #cfc6b0;
@@ -565,6 +566,11 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-date-active {
   font-weight: 600;
 }
+.tag-text {
+  color: var(--color-tag);
+  background: color-mix(in srgb, var(--color-tag) 9%, transparent);
+  border-radius: 3px;
+}
 .date-past {
   color: var(--color-date-past);
 }
@@ -573,6 +579,10 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .date-future {
   color: var(--color-date-future);
+}
+.node-input-struck .tag-text,
+.agenda-text-struck .tag-text {
+  color: inherit;
 }
 .node-input-struck .agenda-date-active,
 .node-input-struck .agenda-date-secondary,
@@ -607,11 +617,13 @@ body:not(.node-drag-active) .location-link:hover {
 .node-row-visual-selected,
 .node-row-visual-selected .node-input,
 .node-row-visual-selected .agenda-date-active,
+.node-row-visual-selected .tag-text,
 .agenda-row-visual-selected,
 .agenda-row-visual-selected .node-input,
 .agenda-row-visual-selected .agenda-text,
 .agenda-row-visual-selected .agenda-date-active,
-.agenda-row-visual-selected .agenda-date-secondary {
+.agenda-row-visual-selected .agenda-date-secondary,
+.agenda-row-visual-selected .tag-text {
   color: var(--highlight-foreground);
   background: var(--highlight-background);
 }
@@ -1435,6 +1447,7 @@ body.node-drag-invalid * {
     --color-date-past: #cc9393;
     --color-date-today: #f0dfaf;
     --color-date-future: #7f9f7f;
+    --color-tag: #d3afd7;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);
     --color-overlay-button-hover-background: rgba(220, 220, 204, 0.24);
     --color-overlay-button-foreground: #dcdccc;

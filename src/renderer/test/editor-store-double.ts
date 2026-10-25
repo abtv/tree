@@ -66,6 +66,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   )
 
   const double: EditorStorePublic = {
+    suggestTags: vi.fn(() => undefined),
     search: new EditorSearch(() => undefined, new AgendaRowsCache()),
     hideSearch: vi.fn(),
     openAgenda: vi.fn(),

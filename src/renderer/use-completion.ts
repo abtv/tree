@@ -136,7 +136,15 @@ export function useCompletion(
       const today =
         (state.status === 'ready' ? state.agenda?.today : undefined) ??
         dayNumberOf({ year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() })
-      owner.current.edit(node.id, content.text, getCaret(element), today, content.links)
+      const caret = getCaret(element)
+      owner.current.edit(
+        node.id,
+        content.text,
+        caret,
+        today,
+        content.links,
+        store.suggestTags(node.id, content.text, caret, content.links),
+      )
       context.current =
         state.status === 'ready'
           ? { parentId: state.location.currentParentId, agendaKey: state.agenda?.selectedKey }
@@ -148,6 +156,12 @@ export function useCompletion(
   const decorate = useCallback(
     (node: TreeNode, bindings: NodeInputBindings): NodeInputBindings => ({
       ...bindings,
+      inputRef: (element) => {
+        bindings.inputRef(element)
+        // Decoration can replace the textarea with a rich editor during this same edit.
+        // Keep the popup attached to that node's live element before caret reconciliation.
+        if (element !== null && owner.current.popup?.nodeId === node.id) input.current = element
+      },
       onTextChange: (event) => {
         edit(node, event.currentTarget, event.nativeEvent)
         bindings.onTextChange(event)

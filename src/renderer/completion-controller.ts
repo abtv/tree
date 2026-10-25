@@ -1,5 +1,6 @@
 import type { DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
+import type { TagMatch } from '../domain/tag-catalog'
 import { recognizeCompletion, type CompletionMatch } from './completion-sources'
 
 export function moveSuggestionIndex(selected: number, direction: -1 | 1, length: number): number {
@@ -20,8 +21,15 @@ export class CompletionController {
     this.popup = undefined
   }
 
-  public edit(nodeId: string, text: string, caret: number, today: DayNumber, excluded: readonly DateTextRange[]): void {
-    const match = recognizeCompletion(text, caret, today)
+  public edit(
+    nodeId: string,
+    text: string,
+    caret: number,
+    today: DayNumber,
+    excluded: readonly DateTextRange[],
+    tags?: TagMatch,
+  ): void {
+    const match = recognizeCompletion(text, caret, today, tags)
     if (match === undefined || excluded.some((range) => range.start < match.end && range.end > match.start)) {
       this.close()
       return

@@ -1790,6 +1790,20 @@ Escape dismisses suggestions and preserves text, caret, focus and the editing mo
 
 ---
 
+### 20.13 Tags
+
+A word beginning with `#` at the start of text or after whitespace is a tag. Names contain one or more Unicode letters, decimal digits, hyphens or underscores. Other characters end the tag. A bare `#` is not a tag. Tags are case-sensitive: `#Work` and `#work` are distinct. Hyperlink ranges and hashes embedded in other words or URLs are excluded. Tags remain ordinary editable text; typing a new name creates a tag without accepting a suggestion. No separate tag record is persisted.
+
+Tree and Agenda highlight tags with a muted violet foreground and subtle rounded background adapted to light and dark appearance. The literal `#` remains visible. Recognized dates inside tags keep their date foreground. Highlighting does not add padding, change text size, or interfere with selection, caret placement, links or existing date interpretation. Whole-node selection retains its selection colors, and struck-through tags retain the muted completion color.
+
+Typing `#` in standard editing or Vim Insert offers all distinct tags from the entire current document, including folded nodes and nodes outside the current Tree or Agenda scope. The actively edited occurrence is excluded from suggestions; other occurrences in the same node still count. A tag disappears from suggestions after its last occurrence is removed; Undo and Redo restore the matching catalog. With no available matches, no popup is shown and the text remains literal.
+
+Matching is case-sensitive and uses the emoji ordering: exact name, prefix, word prefix, substring, then ordered subsequences with gaps. Words start at the beginning or after `_` or `-`; remaining ties use deterministic lexical order. The popup initially selects the first result and resets selection on refinement. All matching names are reachable. Accepting with Enter, Tab or a click replaces only the fragment with the full `#name` as one undoable edit and leaves the caret after it. The geometry, keyboard controls, dismissal and composition lifecycle follow §20.12. Ignoring or dismissing suggestions preserves the typed tag.
+
+Getting the suggestion list from the prepared in-memory index must take less than 1 ms in the automated representative scale workload. This budget covers recognition, active-occurrence exclusion and ranking; it excludes initial index construction and popup layout/painting. Index updates and real typing responsiveness have separate scale guards (§22.1).
+
+---
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.

@@ -11,6 +11,26 @@ const node = (text: string, links?: { start: number; end: number; url: string }[
   ...(links === undefined ? {} : { links }),
 })
 
+// @requirement PRODUCT.md §20.13
+it('decorates literal tags alongside dates and search without decorating hyperlinks', () => {
+  const value = node('#Work #2026-10-08 #link', [{ start: 18, end: 23, url: 'https://example.com' }])
+  const day = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const decorations = treeDecorations(value, day)!
+
+  expect(decorations.filter((decoration) => decoration.className === 'tag-text')).toEqual([
+    { start: 0, end: 5, className: 'tag-text' },
+    { start: 6, end: 17, className: 'tag-text' },
+  ])
+  expect(agendaDecorations(value, day, day)).toEqual(decorations)
+  const element = document.createElement('div')
+  element.innerHTML = richTextHtml(value, [...decorations, { start: 1, end: 5, className: 'search-match' }])
+
+  expect(element.textContent).toBe(value.text)
+  expect(element.querySelector('.search-match.tag-text')?.textContent).toBe('Work')
+  expect(element.querySelector('.tag-text.date-today')?.textContent).toBe('2026-10-08')
+  expect(element.querySelector('a .tag-text')).toBeNull()
+})
+
 // @requirement PRODUCT.md §20.10
 describe('date-like decorations', () => {
   it('keeps ordinary Tree text undecorated and decorates resembling tokens', () => {

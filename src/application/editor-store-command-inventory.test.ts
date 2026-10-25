@@ -53,6 +53,7 @@ const exclusions: Record<string, string> = {
   canShiftNodeVisualOutWithinCurrentParent:
     'Read-only Tab shortcut boundary check is covered by focused store, property, and renderer tests.',
   moveSelectedTo: 'Convenience wrapper around moveNodeTo, which the generator drives directly.',
+  suggestTags: 'Read-only derived lookup has tag catalog properties and focused store publication coverage.',
 }
 
 it('accounts for every public EditorStore prototype method in the command generator or exclusions', () => {
