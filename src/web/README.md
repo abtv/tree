@@ -146,7 +146,7 @@ remains unverified; native Safari clipboard interaction still needs verification
 
 Chrome E2E specs live in `e2e/web/` and use Playwright Test through
 `config/testing/playwright.web.config.ts`. Electron tests live beside them in `e2e/electron/`
-and use the separate `playwright.config.ts`.
+and use the separate `config/testing/playwright.config.ts`.
 Both targets use Playwright assertions, fixtures, traces and reports. On macOS
 the suite uses the installed Google Chrome; no downloaded Playwright browser is
 required. Google Chrome has no Linux arm64 build, so on Linux the suite uses

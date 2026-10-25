@@ -34,7 +34,7 @@ it('streams smoke launch dependencies without baseline images, host output or cr
   const files = containerSourceFiles(true)
   expect(files).toEqual(
     expect.arrayContaining([
-      'electron.vite.config.ts',
+      'config/build/electron.vite.config.ts',
       'config/testing/playwright.smoke.config.ts',
       'e2e/smoke/happy-path.spec.mts',
       'e2e/smoke/scenario.mts',

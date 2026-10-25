@@ -1,4 +1,4 @@
-// Keep JavaScript: Stryker's default configuration discovery supports .mjs, not .mts.
+// Keep JavaScript: Stryker's configuration loader supports .mjs, not .mts.
 import process from 'node:process'
 
 // Mutation testing for the domain and application layers and the pure renderer modules. See docs/DEVELOPMENT.md §12.
@@ -10,7 +10,7 @@ if (shard && !['domain', 'application', 'renderer'].includes(shard)) {
 /** @satisfies {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   testRunner: 'vitest',
-  vitest: { configFile: 'vitest.config.ts' },
+  vitest: { configFile: 'config/testing/vitest.config.ts' },
   // Instrumentation measures mutated code, so submillisecond timing guards
   // run in ordinary Vitest validation instead of mutation workers. Agent scratch
   // directories can hold browser profiles with dangling links that the sandbox copy rejects.

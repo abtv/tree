@@ -47,7 +47,7 @@ jobs:
       # Each shard runs on its own machine, so the machine-global clipboard lock and the stubbed
       # global shortcut never contend across shards.
       - name: Run Electron end-to-end tests
-        run: npx playwright test --shard=${{ matrix.shard }}/6
+        run: npx playwright test -c config/testing/playwright.config.ts --shard=${{ matrix.shard }}/6
 
       - name: Upload Playwright report
         if: always()

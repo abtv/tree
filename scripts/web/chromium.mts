@@ -66,7 +66,7 @@ export function containerSourceFiles(smoke = false) {
     ...sourceFiles('e2e/web'),
     ...(smoke
       ? [
-          'electron.vite.config.ts',
+          'config/build/electron.vite.config.ts',
           'config/testing/playwright.smoke.config.ts',
           ...sourceFiles('e2e/smoke'),
           // Only the launch/menu/cleanup dependencies of the smoke spec, never screenshot baselines.

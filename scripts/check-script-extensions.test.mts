@@ -29,7 +29,7 @@ it('rejects an empty unapproved JavaScript module', async () => {
 
 it.each([
   'eslint.config.mjs',
-  'stryker.config.mjs',
+  'config/testing/stryker.config.mjs',
   'scripts/web-release/cli.mjs',
   'scripts/web-release/publish.mjs',
   'scripts/web-release/verify-target.mjs',

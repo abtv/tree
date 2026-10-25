@@ -16,9 +16,9 @@
     "types": ["node"]
   },
   "include": [
-    "../../electron.vite.config.ts",
+    "../build/electron.vite.config.ts",
     "../../eslint.config.mjs",
-    "../../vitest.config.ts",
+    "../testing/vitest.config.ts",
     "../../src/electron/main/**/*.ts",
     "../../src/electron/preload/**/*.ts",
     "../../src/domain/**/*.ts",

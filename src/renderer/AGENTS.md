@@ -12,5 +12,5 @@ Layer-specific rules for `src/renderer/` and `src/infrastructure/renderer/`. The
 
 ## Tests
 
-* jsdom tests opt in with `// @vitest-environment jsdom`. Run `npx vitest run src/renderer`.
+* jsdom tests opt in with `// @vitest-environment jsdom`. Run `npm test -- src/renderer`.
 * Assert observable UI behavior rather than internal component state.

@@ -13,5 +13,5 @@ Layer-specific rules for `src/electron/main/`, `src/electron/preload/`, and `src
 
 ## Tests
 
-* Run `npx vitest run src/electron/main src/electron/preload src/infrastructure/main`.
+* Run `npm test -- src/electron/main src/electron/preload src/infrastructure/main`.
 * Every changed IPC channel needs a focused contract test for names, arguments, return values, and error propagation, plus a real Electron end-to-end test.

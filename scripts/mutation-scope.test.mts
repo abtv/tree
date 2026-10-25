@@ -8,7 +8,7 @@ afterEach(() => {
 
 it.each(['domain', 'application', 'renderer'])('selects only the configured %s mutation scope', async (shard) => {
   vi.stubEnv('TREE_MUTATION_SHARD', shard)
-  const { default: config } = await import('../stryker.config.mjs')
+  const { default: config } = await import('../config/testing/stryker.config.mjs')
   const included = config.mutate.filter((pattern) => !pattern.startsWith('!'))
   expect(included.length).toBeGreaterThan(0)
   expect(included.every((pattern) => pattern.startsWith(`src/${shard}/`))).toBe(true)
@@ -16,12 +16,12 @@ it.each(['domain', 'application', 'renderer'])('selects only the configured %s m
 
 it('retains every full-run module in exactly one scheduled shard', async () => {
   vi.stubEnv('TREE_MUTATION_SHARD', '')
-  const { default: full } = await import('../stryker.config.mjs')
+  const { default: full } = await import('../config/testing/stryker.config.mjs')
   const scheduled = []
   for (const shard of ['domain', 'application', 'renderer']) {
     vi.stubEnv('TREE_MUTATION_SHARD', shard)
     vi.resetModules()
-    const { default: config } = await import('../stryker.config.mjs')
+    const { default: config } = await import('../config/testing/stryker.config.mjs')
     scheduled.push(...config.mutate.filter((pattern) => !pattern.startsWith('!')))
     expect(config.mutate.filter((pattern) => pattern.startsWith('!'))).toEqual(
       full.mutate.filter((pattern) => pattern.startsWith('!')),
@@ -33,7 +33,7 @@ it('retains every full-run module in exactly one scheduled shard', async () => {
 
 it('rejects an unknown shard rather than silently running a different scope', async () => {
   vi.stubEnv('TREE_MUTATION_SHARD', 'unknown')
-  await expect(import('../stryker.config.mjs')).rejects.toThrow('Unknown mutation shard')
+  await expect(import('../config/testing/stryker.config.mjs')).rejects.toThrow('Unknown mutation shard')
 })
 
 it('lets the scheduled workflow select the scope from the Stryker configuration', () => {

@@ -12,8 +12,9 @@ const hiddenParallelRun = process.env['TREE_E2E_VISIBLE'] !== '1'
 const vimSpecFile = /vim-(?:image-caret|text-editing|navigation-and-visual)\.spec\.ts$/
 
 export default defineConfig({
-  testDir: './e2e/electron',
-  globalSetup: './e2e/electron/global-setup.ts',
+  testDir: '../../e2e/electron',
+  globalSetup: '../../e2e/electron/global-setup.ts',
+  outputDir: '../../test-results',
   fullyParallel: false,
   workers: hiddenParallelRun ? (process.env['CI'] ? 4 : 6) : 1,
   forbidOnly: !!process.env['CI'],

@@ -12,6 +12,6 @@ Layer-specific rules for `src/domain/`. The repository-wide rules in the root `A
 
 ## Tests
 
-* Tests run in the Node environment. Run `npx vitest run src/domain`.
+* Tests run in the Node environment. Run `npm test -- src/domain`.
 * Add or update a `*.property.test.ts` guard when a change affects tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency.
 * Assess the performance implications of state or persistence changes per `docs/PRODUCT.md` §22.1.

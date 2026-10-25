@@ -42,7 +42,7 @@ export default tseslint.config(
     ignores: [
       // These tool configurations retain their existing JavaScript loaders/discovery.
       'eslint.config.mjs',
-      'stryker.config.mjs',
+      'config/testing/stryker.config.mjs',
       // Installed release workflows still call these compatibility entry points.
       'scripts/web-release/cli.mjs',
       'scripts/web-release/publish.mjs',
@@ -61,10 +61,9 @@ export default tseslint.config(
   },
   {
     files: [
-      'electron.vite.config.ts',
+      'config/build/*.ts',
       'eslint.config.mjs',
-      'vitest.config.ts',
-      'playwright*.config.ts',
+      'config/testing/vitest.config.ts',
       'config/testing/*.ts',
       'scripts/**/*.{js,mjs,ts,mts}',
       'e2e/**/*.{ts,mts,cjs,mjs}',
@@ -96,7 +95,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['playwright.config.ts', 'config/testing/perf.config.ts', 'e2e/**/*.ts', 'perf/**/*.ts'],
+    files: ['config/testing/playwright.config.ts', 'config/testing/perf.config.ts', 'e2e/**/*.ts', 'perf/**/*.ts'],
     rules: {
       'no-empty-pattern': 'off',
     },

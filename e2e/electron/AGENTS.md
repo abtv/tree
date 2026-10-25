@@ -6,7 +6,7 @@ Rules for the Playwright Electron suite in `e2e/electron/`. The root `AGENTS.md`
 
 * Tests drive the production build in `out/` and isolate data with a temporary `--user-data-dir`.
 * Keep the canonical rendering scale in Electron's launch arguments and the per-launch renderer-scale assertion. Do not change screenshot tolerances to compensate for display scaling; follow `docs/DEVELOPMENT.md` §9 and ADR 0019 when rendering infrastructure changes.
-* Hidden runs execute spec files in parallel across the workers configured in `playwright.config.ts`; selected long-running suites also distribute their independent tests across those workers through `configureHiddenParallelTests()`. Visible runs stay serial. The suite requires macOS with a display, and hidden windows still need a GUI session.
+* Hidden runs execute spec files in parallel across the workers configured in `config/testing/playwright.config.ts`; selected long-running suites also distribute their independent tests across those workers through `configureHiddenParallelTests()`. Visible runs stay serial. The suite requires macOS with a display, and hidden windows still need a GUI session.
 * Opt into hidden test-level parallelism only for suites whose tests are independent and use the per-test fixtures for data, cleanup, error observation, and shared-system locking. Never opt `e2e/electron/shortcut.spec.ts` into it.
 * Every worker owns its own applications. Data directories and stale-process cleanup use the per-worker marker `tree-e2e-p<pid>-`, so a launch can only ever terminate apps started by the same worker. Leftovers from earlier runs are removed once in `e2e/electron/global-setup.ts`, before workers start.
 * Never run two Playwright invocations at the same time: the global setup cleans stale `tree-e2e-` applications and would terminate the other invocation's apps.
@@ -31,6 +31,6 @@ Rules for the Playwright Electron suite in `e2e/electron/`. The root `AGENTS.md`
 
 * Run `npm run test:e2e`. Do not count blocked or skipped boundary tests as passing.
 * Run `TREE_E2E_VISIBLE=1 npm run test:e2e` to observe the real UI.
-* Run `TREE_E2E_VISIBLE=1 npm run test:e2e -- <spec>` or `TREE_E2E_VISIBLE=1 npx playwright test <spec>` to observe a single spec with visible windows.
+* Run `TREE_E2E_VISIBLE=1 npm run test:e2e -- <spec>` or `TREE_E2E_VISIBLE=1 npx playwright test -c config/testing/playwright.config.ts <spec>` to observe a single spec with visible windows.
 * In Codex, use `npm run test:e2e:visible -- <spec>` for visible runs so the project allow rule covers changing spec paths and flags. Do not prepend `TREE_E2E_VISIBLE=1` to that command or wrap it in an explicit shell invocation. See `docs/DEVELOPMENT.md` §8 for rule loading and restart requirements.
 * Prefer these documented command forms. One-off diagnostic environment variables are not pre-approved and must not be added to `opencode.json`.

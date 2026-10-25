@@ -7,7 +7,10 @@ const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 
 describe('vitest configuration', () => {
   it('does not collect specs parked in the test-results scratch directory', async () => {
-    const { vitestConfig } = await resolveConfig({ root: repositoryRoot })
+    const { vitestConfig } = await resolveConfig({
+      root: repositoryRoot,
+      config: 'config/testing/vitest.config.ts',
+    })
     const isCollected = createFilter(vitestConfig.include, vitestConfig.exclude, { resolve: false })
 
     expect(isCollected('test-results/_layout-screenshots.spec.ts')).toBe(false)
