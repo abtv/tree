@@ -1,4 +1,6 @@
 import type { DataSession } from '../services'
+import type { BrowserMenuCommands } from '../menu-commands'
+import { dataMenuCommands } from '../../application/menu-commands'
 import { openDatabase, PREFERENCE_STORE, readValue } from '../storage-schema'
 import {
   backupFailure,
@@ -51,7 +53,12 @@ export function supportsFolderBackup(): boolean {
 }
 
 /** Main-thread permission/picker UI. Saved messages and status carry no notes (PRODUCT §24.5). */
-export function installFolderBackup(session: DataSession, menu: HTMLElement, actions: BackupActions): () => void {
+export function installFolderBackup(
+  session: DataSession,
+  menu: HTMLElement,
+  commands: BrowserMenuCommands,
+  actions: BackupActions,
+): () => void {
   const button = document.getElementById('data-backup') as HTMLButtonElement
   const status = document.getElementById('backup-status')!
   const menuButton = document.getElementById('tree-menu-button')!
@@ -65,7 +72,6 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
   const choose = document.getElementById('backup-confirm-choose') as HTMLButtonElement
   const cancel = document.getElementById('backup-confirm-cancel') as HTMLButtonElement
   if (!supportsFolderBackup()) return () => undefined
-  button.hidden = false
   status.hidden = false
   let folder: FileSystemDirectoryHandle | undefined
   let worker: Worker | undefined
@@ -78,10 +84,10 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
     menuButton.setAttribute('aria-label', attention ? 'Tree menu — backup needs attention' : 'Tree menu')
   }
   const refresh = () => {
-    const label = !folder ? 'Back Up to Folder…' : paused ? 'Resume Backing Up…' : 'Stop Backing Up'
+    const name = !folder ? 'back-up-to-folder' : paused ? 'resume-backing-up' : 'stop-backing-up'
+    const label = dataMenuCommands[name]
     if (button.textContent !== label) button.textContent = label
-    const disabled = busy || !actions.available()
-    if (button.disabled !== disabled) button.disabled = disabled
+    updateCommand(name, !busy && actions.available())
   }
   const stopWorker = () => {
     worker?.terminate()
@@ -251,7 +257,7 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
     closeDialog()
   }
   menu.addEventListener('beforetoggle', refresh)
-  button.onclick = () => {
+  const updateCommand = commands.bind(button, () => {
     if (busy || !actions.available()) return
     actions.closeMenu()
     if (folder && paused) {
@@ -264,7 +270,7 @@ export function installFolderBackup(session: DataSession, menu: HTMLElement, act
     }
     const picking = window.showDirectoryPicker!({ mode: 'readwrite', id: 'tree-backup' })
     void run(async () => select(await picking))
-  }
+  })
   const unsubscribe = session.onSaved(() => {
     try {
       worker?.postMessage(backupSavedMessage())

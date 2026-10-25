@@ -12,6 +12,7 @@ import type { DataSession } from './services'
 import type { ArchiveWorkerMessage, ArchiveWorkerRequest } from './workers/archive-protocol'
 import { installFolderBackup, supportsFolderBackup } from './backup/backup-controller'
 import type { MenuFocus } from './menu-focus'
+import { BrowserMenuCommands } from './menu-commands'
 
 // Keep the object URL until the browser has taken the download.
 const DOWNLOAD_URL_LIFETIME_MILLISECONDS = 60_000
@@ -140,7 +141,13 @@ interface ImportDialog {
  * Wires the Data block of the browser menu (PRODUCT §24.3–§24.6). One export, import or restore
  * runs at a time, and none is available in the locked save-failure state.
  */
-export function installDataMenu(store: EditorStore, menu: HTMLElement, session: DataSession, focus: MenuFocus): void {
+export function installDataMenu(
+  store: EditorStore,
+  menu: HTMLElement,
+  session: DataSession,
+  focus: MenuFocus,
+): BrowserMenuCommands {
+  const commands = new BrowserMenuCommands()
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
   const restoreButton = document.getElementById('data-restore') as HTMLButtonElement
@@ -157,30 +164,19 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
     const state = store.getSnapshot()
     return state.status === 'ready' && state.persistenceLocked === true
   }
-  const refreshBackup = installFolderBackup(session, menu, {
-    closeMenu: focus.close,
-    restoreFocus: focus.restore,
-    available: () => !running && !locked(),
-    restore: (folder) => startImport(folder),
-    flush: () => store.flushPersistence(),
-  })
+  let refreshBackup = () => {}
   const refresh = () => {
-    const disabled = running || locked()
-    for (const button of [exportButton, importButton, restoreButton]) {
-      if (button.disabled !== disabled) button.disabled = disabled
-    }
+    const enabled = !running && !locked()
+    updateExport('export-notes', enabled)
+    updateImport('import-notes', enabled)
+    updateRestore(supportsFolderBackup() ? 'restore-from-folder' : undefined, enabled)
     refreshBackup()
   }
   const setRunning = (value: boolean) => {
     running = value
     refresh()
   }
-  store.subscribe(refresh)
-  menu.addEventListener('beforetoggle', refresh)
-  refresh()
-  restoreButton.hidden = !supportsFolderBackup()
-
-  exportButton.onclick = () => {
+  const updateExport = commands.bind(exportButton, () => {
     focus.close()
     if (running || locked()) return
     setRunning(true)
@@ -202,20 +198,20 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         hideTimer = setTimeout(() => panel.hide(), SUCCESS_MESSAGE_MILLISECONDS)
       }
     })
-  }
+  })
 
-  importButton.onclick = () => {
+  const updateImport = commands.bind(importButton, () => {
     focus.close()
     if (running || locked()) return
     fileInput.click()
-  }
+  })
   fileInput.onchange = () => {
     const file = fileInput.files?.[0]
     fileInput.value = ''
     if (file !== undefined && !running && !locked()) void startImport(file)
   }
 
-  restoreButton.onclick = () => {
+  const updateRestore = commands.bind(restoreButton, () => {
     focus.close()
     if (running || locked()) return
     // Read access is enough; the picker must open from this click's user activation.
@@ -227,7 +223,18 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         panel.show(`Restore failed. The folder could not be opened: ${reason(error)}`, 'OK', () => panel.hide())
       },
     )
-  }
+  })
+
+  refreshBackup = installFolderBackup(session, menu, commands, {
+    closeMenu: focus.close,
+    restoreFocus: focus.restore,
+    available: () => !running && !locked(),
+    restore: (folder) => startImport(folder),
+    flush: () => store.flushPersistence(),
+  })
+  store.subscribe(refresh)
+  menu.addEventListener('beforetoggle', refresh)
+  refresh()
 
   let onDialogCancel = () => {}
   dialog.oncancel = (event) => {
@@ -373,6 +380,7 @@ export function installDataMenu(store: EditorStore, menu: HTMLElement, session: 
         : ({ type: 'restore', folder: file } satisfies ArchiveWorkerRequest),
     )
   }
+  return commands
 }
 
 function download(archive: Blob, fileName: string): void {

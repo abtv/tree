@@ -1,55 +1,74 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest'
-import { browserMenuCommands } from './menu-commands'
-
-afterEach(() => {
-  window.dispatchEvent(new Event('pagehide'))
-  document.body.replaceChildren()
-})
+import { expect, it, vi } from 'vitest'
+import { BrowserMenuCommands } from './menu-commands'
 
 // @requirement PRODUCT.md §20.2.28
-it('adapts supported menu actions, live disabled state and backup labels without deferring activation', async () => {
-  const menu = document.createElement('div')
-  menu.innerHTML =
-    '<button id="data-export">Export Notes…</button><button id="data-import">Import Notes…</button><button id="data-backup" hidden>Back Up to Folder…</button><button id="data-restore" hidden>Restore from Folder…</button>'
-  document.body.append(menu)
-  const source = browserMenuCommands(menu)
-  const names = () => source.getSnapshot().map((command) => command.name)
+it('shares explicit availability and synchronous actions between buttons and the panel', async () => {
+  const source = new BrowserMenuCommands()
+  const button = document.createElement('button')
+  button.textContent = 'An unrelated presentation label'
+  const action = vi.fn()
+  const update = source.bind(button, action)
 
-  expect(names()).toEqual(['export-notes', 'import-notes'])
+  update('import-notes', true)
+  const command = source.getSnapshot()[0]!
+  const pending = command.run({} as never, {} as never)
 
-  const button = menu.querySelector<HTMLButtonElement>('#data-export')!
-  const click = vi.fn()
-  button.onclick = click
-  const pending = source.getSnapshot()[0]!.run({} as never, {} as never)
-
-  expect(click).toHaveBeenCalledOnce()
+  expect(command.name).toBe('import-notes')
+  expect(action).toHaveBeenCalledOnce()
+  expect(button.hidden).toBe(false)
+  expect(button.disabled).toBe(false)
+  expect(button.textContent).toBe('An unrelated presentation label')
 
   await pending
-  button.disabled = true
-  await Promise.resolve()
+  button.click()
 
+  expect(action).toHaveBeenCalledTimes(2)
+
+  update('import-notes', false)
+  button.click()
+  await command.run({} as never, {} as never)
+
+  expect(button.disabled).toBe(true)
   expect(source.getSnapshot()[0]?.enabled).toBe(false)
+  expect(action).toHaveBeenCalledTimes(2)
 
-  await source.getSnapshot()[0]!.run({} as never, {} as never)
+  update(undefined, true)
+  await command.run({} as never, {} as never)
 
-  expect(click).toHaveBeenCalledOnce()
+  expect(button.hidden).toBe(true)
+  expect(source.getSnapshot()).toEqual([])
+  expect(action).toHaveBeenCalledTimes(2)
+})
 
-  const backup = menu.querySelector<HTMLButtonElement>('#data-backup')!
-  backup.hidden = false
-  await Promise.resolve()
+// @requirement PRODUCT.md §24.5
+it('publishes backup identities from state without observing labels or replacing handlers', async () => {
+  const source = new BrowserMenuCommands()
+  const backup = document.createElement('button')
+  const action = vi.fn()
+  const update = source.bind(backup, action)
+  const listener = vi.fn()
+  source.subscribe(listener)
 
-  expect(names()).toContain('back-up-to-folder')
+  update('back-up-to-folder', true)
+  const snapshot = source.getSnapshot()
+  const handler = backup.onclick
+  backup.textContent = 'A presentation-only change'
+  update('back-up-to-folder', true)
 
-  backup.textContent = 'Stop Backing Up'
-  await Promise.resolve()
+  expect(source.getSnapshot()).toBe(snapshot)
+  expect(listener).toHaveBeenCalledOnce()
 
-  expect(names()).toContain('stop-backing-up')
-  expect(names()).not.toContain('back-up-to-folder')
+  update('stop-backing-up', true)
 
-  backup.textContent = 'Resume Backing Up…'
-  await Promise.resolve()
+  expect(source.getSnapshot().map((command) => command.name)).toEqual(['stop-backing-up'])
 
-  expect(names()).toContain('resume-backing-up')
-  expect(names()).not.toContain('stop-backing-up')
+  update('resume-backing-up', true)
+  const pending = source.getSnapshot()[0]!.run({} as never, {} as never)
+
+  expect(action).toHaveBeenCalledOnce()
+  expect(backup.onclick).toBe(handler)
+  expect(source.getSnapshot().map((command) => command.name)).toEqual(['resume-backing-up'])
+
+  await pending
 })

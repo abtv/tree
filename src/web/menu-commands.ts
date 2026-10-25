@@ -1,36 +1,30 @@
-import { dataMenuCommands, MenuCommands, type DataMenuCommandName } from '../application/menu-commands'
+import { MenuCommands, type DataMenuCommandName } from '../application/menu-commands'
 
-/** Adapts the browser's existing Data controls, preserving synchronous picker activation. */
-export function browserMenuCommands(menu: HTMLElement): MenuCommands {
-  const commands = new MenuCommands()
-  const buttons = [
-    ...menu.querySelectorAll<HTMLButtonElement>('#data-export, #data-import, #data-backup, #data-restore'),
-  ]
-  const refresh = () => {
-    commands.update(
-      buttons.flatMap((button) => {
-        if (button.hidden) return []
-        const name = (Object.keys(dataMenuCommands) as DataMenuCommandName[]).find(
-          (name) => dataMenuCommands[name] === button.textContent,
-        )
-        return name === undefined
-          ? []
-          : [
-              {
-                name,
-                enabled: !button.disabled,
-                run: () => {
-                  button.click()
-                },
-              },
-            ]
-      }),
-    )
+interface BrowserMenuEntry {
+  name: DataMenuCommandName
+  enabled: boolean
+  run(): void
+}
+
+/** Projects explicit command state into both buttons and the panel, without deferring activation. */
+export class BrowserMenuCommands extends MenuCommands {
+  private readonly entries = new Map<HTMLButtonElement, BrowserMenuEntry>()
+
+  bind(
+    button: HTMLButtonElement,
+    action: () => void,
+  ): (name: DataMenuCommandName | undefined, enabled: boolean) => void {
+    const run = () => {
+      if (this.entries.get(button)?.enabled) action()
+    }
+    button.onclick = run
+
+    return (name, enabled) => {
+      if (button.hidden !== (name === undefined)) button.hidden = name === undefined
+      if (button.disabled !== !enabled) button.disabled = !enabled
+      if (name === undefined) this.entries.delete(button)
+      else this.entries.set(button, { name, enabled, run })
+      this.update([...this.entries.values()])
+    }
   }
-  const observer = new MutationObserver(refresh)
-  for (const button of buttons)
-    observer.observe(button, { attributes: true, childList: true, subtree: true, characterData: true })
-  window.addEventListener('pagehide', () => observer.disconnect(), { once: true })
-  refresh()
-  return commands
 }

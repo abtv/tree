@@ -24,7 +24,7 @@ accepts the delivered result and confirms no further tasks remain in this batch.
    `src/web/services.ts`, `src/web/main.tsx`, and `docs/ARCHITECTURE.md`.
    Acceptance: default desktop timing and browser timing stay unchanged; an unrelated
    clock timer is unaffected; cleanup retry retains its own explicit interval.
-2. **Browser command source — Validated; awaiting commit.** Replace label-based command discovery and
+2. **Browser command source — Completed.** Replace label-based command discovery and
    MutationObserver with explicit command IDs, enabled state and shared handlers.
    Files: `src/web/menu-commands.ts`, `data-menu.ts`, `backup/backup-controller.ts`,
    `main.tsx`, focused command tests and browser command-panel coverage.
@@ -65,5 +65,5 @@ stop the dependent work. Temporary validation details live in `WORKING_PLAN.md`.
 
 ## Next task
 
-Validation and independent review passed for all three tasks. Commit tasks 2 and 3.
+Validation and independent review passed for all three tasks. Commit task 3.
 Retain this plan for final owner acceptance and confirmation of the review batch scope.

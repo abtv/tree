@@ -6,7 +6,6 @@ import { installBrowserPrototype } from './services'
 import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
-import { browserMenuCommands } from './menu-commands'
 import { installMenuFocus } from './menu-focus'
 import type { CommandServices } from '../application/command-registry'
 import { requestPersistentStorage, storageProtectionText } from './storage-persistence'
@@ -30,8 +29,7 @@ try {
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
   const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!)
-  installDataMenu(store, menu, bridge.data, menuFocus)
-  const menuCommands = browserMenuCommands(menu)
+  const menuCommands = installDataMenu(store, menu, bridge.data, menuFocus)
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
   let viewCommands: Pick<CommandServices, 'showAgenda' | 'showTree'> | undefined
