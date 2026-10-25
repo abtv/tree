@@ -1804,6 +1804,20 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 ---
 
+### 20.14 Recent Nodes
+
+`Cmd+;` opens a compact Recent nodes popup in Tree or Agenda, in standard editing and every Vim mode. Outside Apple platforms it uses `Ctrl+;` (§1.5). This deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
+
+The popup lists up to eight distinct nodes, most recently used first, with each node's text and parent path. Empty nodes use `Empty node`; image-only nodes use `Image`; top-level nodes use `Root` as their path. Labels are single-line previews, bounded to the first 160 characters per node. The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
+
+Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
+
+Up/Down wrap selection; they do not navigate the document. Enter or clicking a result closes the popup, finishes buffered editing using the existing view-change rules, opens Tree at the result's real parent, selects that node and places the text caret at its start. Escape, outside dismissal and window deactivation close without a jump and restore the originating editor selection and mode. Opening borrows editing focus, clears unfinished Vim commands and cancels a pending search draft as the command panel does. Modal dialogs, IME composition and the open command panel retain their input. The displayed order stays fixed until dismissal. There is no search field or animation.
+
+History retains at most 100 IDs separately from document content, undo and notes export. Dirty history saves every 30 seconds and during normal persistence flush, including shutdown; an abrupt exit may lose the unsaved history interval. Writes are serialized and desktop replacement is atomic. Missing or unreadable history starts empty. Write failures use the existing operation-error surface; pending history can retry on the next flush. Notes replacement resets the history even when imported IDs coincide. Browser history uses the current profile's local storage and writer-session guards.
+
+Ready result retrieval, including text and paths, and the complete MRU update work must each measure p99 below 1 ms in the maintained scale scenarios. Rendering, initial history loading and disk writes are separate costs. Tests report their measured scale; this is not an unlimited-document or worst-case scheduling guarantee. History memory is bounded; input causes no per-keystroke history writes, and the getter performs no tree traversal or I/O (§22.1).
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.

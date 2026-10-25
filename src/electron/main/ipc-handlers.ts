@@ -18,6 +18,7 @@ import type { FileServices } from '../../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
 import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../shared/ipc'
 import type { WebContents } from 'electron'
+import { RECENT_NODE_LIMIT } from '../../application/recent-nodes'
 
 export interface IpcInvokeEvent {
   senderFrame?: { url?: string } | null
@@ -29,6 +30,8 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  getRecentNodes?: () => Promise<string[]>
+  setRecentNodes?: (ids: readonly string[]) => Promise<void>
   getAppearance: () => AppearancePreference
   setAppearance: (value: AppearancePreference) => void
   getCommandHistory: () => string[]
@@ -50,6 +53,8 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  getRecentNodes,
+  setRecentNodes,
   getAppearance,
   setAppearance,
   getCommandHistory,
@@ -72,6 +77,23 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  ipcMain.handle(ipcChannels.getRecentNodes, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return getRecentNodes?.() ?? []
+  })
+  ipcMain.handle(ipcChannels.setRecentNodes, (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (
+      !Array.isArray(value) ||
+      value.length > RECENT_NODE_LIMIT ||
+      value.some((id: unknown) => typeof id !== 'string' || id.length === 0)
+    )
+      throw new Error('Invalid recent node history.')
+    return setRecentNodes?.(value as string[])
+  })
 
   ipcMain.handle(ipcChannels.getAppearance, (event) => {
     requireTrustedRenderer(event)

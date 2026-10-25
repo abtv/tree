@@ -19,6 +19,8 @@ export const treeApi: TreeApi = {
   getAppearance: () => ipcRenderer.invoke(ipcChannels.getAppearance),
   setAppearance: (value) => ipcRenderer.invoke(ipcChannels.setAppearance, value),
   getCommandHistory: () => ipcRenderer.invoke(ipcChannels.getCommandHistory),
+  getRecentNodes: () => ipcRenderer.invoke(ipcChannels.getRecentNodes),
+  setRecentNodes: (value) => ipcRenderer.invoke(ipcChannels.setRecentNodes, value),
   setCommandHistory: (value) => ipcRenderer.invoke(ipcChannels.setCommandHistory, value),
   onAppearanceChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, value: 'system' | 'light' | 'dark'): void => listener(value)

@@ -66,6 +66,8 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   )
 
   const double: EditorStorePublic = {
+    recentNodes: new RecentNodes(),
+    visitRecentNode: vi.fn(),
     suggestTags: vi.fn(() => undefined),
     search: new EditorSearch(() => undefined, new AgendaRowsCache()),
     hideSearch: vi.fn(),
@@ -149,3 +151,4 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
 
   return double as EditorStore
 }
+import { RecentNodes } from '../../application/recent-nodes'

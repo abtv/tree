@@ -254,6 +254,8 @@ bootstrapApplication({
       getAppearance: currentAppearance,
       setAppearance,
       getCommandHistory: commandHistory.load,
+      getRecentNodes: () => fileServices.loadRecentNodes!(),
+      setRecentNodes: (ids) => fileServices.saveRecentNodes!(ids),
       setCommandHistory: commandHistory.save,
       ipcMain,
       rendererUrl: resolvedRenderer.url,

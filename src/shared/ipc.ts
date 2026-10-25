@@ -26,6 +26,8 @@ export const ipcChannels = {
   setAppearance: 'tree:set-appearance',
   getCommandHistory: 'tree:get-command-history',
   setCommandHistory: 'tree:set-command-history',
+  getRecentNodes: 'tree:get-recent-nodes',
+  setRecentNodes: 'tree:set-recent-nodes',
   chooseNotesExportDestination: 'tree:notes-choose-export-destination',
   startNotesExport: 'tree:notes-start-export',
   chooseNotesImportArchive: 'tree:notes-choose-import-archive',
@@ -127,6 +129,8 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  getRecentNodes?: () => Promise<string[]>
+  setRecentNodes?: (value: readonly string[]) => Promise<void>
   getAppearance: () => Promise<'system' | 'light' | 'dark'>
   setAppearance: (value: 'system' | 'light' | 'dark') => Promise<void>
   getCommandHistory: () => Promise<string[]>

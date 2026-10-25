@@ -130,6 +130,8 @@ export async function installBrowserPrototype(): Promise<{
     }
   }
   const services: EditorServices = {
+    loadRecentNodes: async () => (await read<unknown>('preferences', 'recent-nodes')) ?? [],
+    saveRecentNodes: (ids) => write('preferences', 'recent-nodes', ids),
     async load() {
       const saved = await read<unknown>('document', 'head')
       if (saved !== undefined) {

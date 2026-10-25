@@ -15,6 +15,7 @@ import { AgendaView } from './AgendaView'
 import { AgendaSearchText } from './AgendaSearchText'
 import { CompletionPopup } from './CompletionPopup'
 import { CommandPanel } from './CommandPanel'
+import { RecentNodesPopup } from './RecentNodesPopup'
 import { useCommandPanel } from './use-command-panel'
 import { agendaDecorations, localToday, treeDecorations } from './date-decorations'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -500,6 +501,20 @@ export function App({
           dropParentId={breadcrumbTarget}
         />
       )}
+      <RecentNodesPopup
+        store={store}
+        shortcuts={shortcuts}
+        blocked={commandPanel.open}
+        beforeOpen={() => {
+          clearCommandAssembly(vimTextCommandState.commandState)
+          store.search.interruptNavigation()
+          if (store.search.session.getSnapshot().draft !== undefined) {
+            store.search.cancelDraft()
+            restoreSearchFocus()
+          }
+        }}
+        beforeVisit={beforeViewChange}
+      />
       <div className={SCROLL_VIEWPORT_CLASS}>
         <section
           className={

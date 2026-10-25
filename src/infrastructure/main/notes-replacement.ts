@@ -204,6 +204,9 @@ async function completeReplacement(
     await fs.rename(stagedDocument, join(layout.dataDirectory, DOCUMENT_NAME))
     await fs.syncDirectory(layout.dataDirectory)
   }
+  await fs.remove(join(layout.dataDirectory, 'recent-nodes.json'))
+  await fs.remove(join(layout.dataDirectory, 'recent-nodes.json.tmp'))
+  await fs.syncDirectory(layout.dataDirectory)
   await fs.remove(stagingDirectory)
   await fs.remove(join(layout.importDirectory, JOURNAL_NAME))
   await fs.syncDirectory(layout.importDirectory)

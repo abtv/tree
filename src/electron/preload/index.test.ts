@@ -34,6 +34,19 @@ describe('preload bridge', () => {
     expect(mocks.invoke).toHaveBeenCalledWith(ipcChannels.quit, 'request-1')
   })
 
+  it('forwards recent-node reads, writes, results and errors', async () => {
+    const { treeApi } = await import('./index')
+    mocks.invoke.mockResolvedValueOnce(['a'])
+
+    await expect(treeApi.getRecentNodes!()).resolves.toEqual(['a'])
+    await treeApi.setRecentNodes!(['b', 'a'])
+
+    expect(mocks.invoke.mock.calls).toEqual([['tree:get-recent-nodes'], ['tree:set-recent-nodes', ['b', 'a']]])
+    mocks.invoke.mockRejectedValueOnce(new Error('disk failure'))
+
+    await expect(treeApi.setRecentNodes!(['a'])).rejects.toThrow('disk failure')
+  })
+
   it('forwards the quit-without-saving request to the main process', async () => {
     const { treeApi } = await import('./index')
 

@@ -7,6 +7,8 @@ import type { AgendaState } from './agenda-state'
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
+  loadRecentNodes?(): Promise<unknown>
+  saveRecentNodes?(ids: readonly string[]): Promise<void>
   today?(): DayNumber
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>

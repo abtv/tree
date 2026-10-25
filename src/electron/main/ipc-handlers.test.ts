@@ -45,6 +45,8 @@ function createHarness() {
   const setAppearance = vi.fn()
   const getCommandHistory = vi.fn(() => ['set-theme-dark'])
   const setCommandHistory = vi.fn()
+  const getRecentNodes = vi.fn(async () => ['node-a'])
+  const setRecentNodes = vi.fn<(ids: readonly string[]) => Promise<void>>(async () => undefined)
   const notesArchive = {
     chooseExportDestination: vi.fn(async () => ({ ok: true as const, fileName: 'Tree Notes 2026-10-23.zip' })),
     startExport: vi.fn(async () => ({
@@ -62,6 +64,8 @@ function createHarness() {
   }
   const setNotesMenuState = vi.fn()
   registerIpcHandlers({
+    getRecentNodes,
+    setRecentNodes,
     getAppearance,
     setAppearance,
     getCommandHistory,
@@ -82,6 +86,8 @@ function createHarness() {
     setNotesMenuState,
   })
   return {
+    getRecentNodes,
+    setRecentNodes,
     setNotesMenuState,
     notesArchive,
     getAppearance,
@@ -103,6 +109,25 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('validates recent-node history, rejects untrusted calls and propagates write errors', async () => {
+    const { handlers, getRecentNodes, setRecentNodes } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const get = handlers.get(ipcChannels.getRecentNodes)!
+    const set = handlers.get(ipcChannels.setRecentNodes)!
+
+    await expect(get(event)).resolves.toEqual(['node-a'])
+    await set(event, ['node-b'])
+
+    expect(getRecentNodes).toHaveBeenCalledOnce()
+    expect(setRecentNodes).toHaveBeenCalledWith(['node-b'])
+    expect(() => set({ senderFrame: { url: 'https://untrusted.example' } }, ['node-b'])).toThrow('Untrusted')
+    expect(() => set(event, [null])).toThrow('Invalid recent')
+    expect(() => set(event, Array(101).fill('a'))).toThrow('Invalid recent')
+    expect(() => get(event, 'extra')).toThrow()
+    setRecentNodes.mockRejectedValueOnce(new Error('disk failure'))
+
+    await expect(set(event, ['node-b'])).rejects.toThrow('disk failure')
+  })
   it('propagates oversized clipboard image errors without reading bytes or writing attachments', async () => {
     const { handlers, nativeClipboard, fileServices } = createHarness()
     const arrayBuffer = vi.fn(async () => new ArrayBuffer(1))

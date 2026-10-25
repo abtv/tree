@@ -6,6 +6,7 @@ import generatorSource from './test/editor-store-arbitraries.ts?raw'
 
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
+  visitRecentNode: 'Recent-node navigation is covered by focused store properties and real popup navigation tests.',
   hideSearch:
     'Search-owned folds require an active asynchronous search; editor-search.test.ts covers cleanup and manual ownership.',
   openAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',

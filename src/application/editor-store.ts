@@ -104,11 +104,15 @@ import {
 import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
 import { agendaVisualSources } from './agenda-visual-selection'
 import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
+import { RecentNodes } from './recent-nodes'
+import { RecentNodePersistence } from './recent-node-persistence'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
+  private readonly recentPersistence: RecentNodePersistence
+  public readonly recentNodes = new RecentNodes(() => this.recentPersistence.changed())
   private readonly tags = new TagCatalog()
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
@@ -123,6 +127,7 @@ export class EditorStore {
     (state) => {
       this.tags.update(state.document)
       this.search.update(state)
+      this.recentNodes.update(state.document)
     },
   )
   private readonly history = new EditorHistory()
@@ -144,6 +149,12 @@ export class EditorStore {
     clock: Clock = systemClock,
     saveTiming: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
+    this.recentPersistence = new RecentNodePersistence(
+      clock,
+      this.recentNodes.getIds,
+      services.saveRecentNodes?.bind(services),
+      (error) => this.reportError(error),
+    )
     this.textSession = new EditorTextSession(clock)
     this.saveScheduler = new EditorSaveScheduler(
       services,
@@ -548,6 +559,7 @@ export class EditorStore {
       await this.saveScheduler.flush()
       committed = this.finishPendingEdits()
     } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
+    await this.recentPersistence.flush()
   }
 
   private finishPendingEdits(): boolean {
@@ -583,6 +595,7 @@ export class EditorStore {
   public async initialize(): Promise<void> {
     try {
       const loaded = await this.services.load()
+      const recent = await this.services.loadRecentNodes?.().catch(() => [])
       if (loaded === null) {
         const rootId = this.createId()
         this.runtime.snapshot = {
@@ -593,6 +606,7 @@ export class EditorStore {
           structuralVersion: this.runtime.getStructuralVersion(),
           expansion: COLLAPSED_EXPANSION_STATE,
         }
+        this.recentNodes.load(recent, this.runtime.snapshot.document)
         this.runtime.emit()
         this.saveScheduler.requestSave()
         this.queueAttachmentCleanup()
@@ -614,6 +628,7 @@ export class EditorStore {
         structuralVersion: this.runtime.getStructuralVersion(),
         expansion,
       }
+      this.recentNodes.load(recent, parsed.document)
       this.runtime.emit()
       this.queueAttachmentCleanup()
     } catch (error) {
@@ -738,6 +753,7 @@ export class EditorStore {
     }
     const insertedWords = countInsertedWords(node.text, text)
     const next = editNodeContent(state.document, nodeId, text, links)
+    this.recentNodes.remember(nodeId, next)
     this.runtime.replaceReady({ ...state, document: next })
     this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
@@ -899,12 +915,33 @@ export class EditorStore {
     const state = this.runtime.ready()
     const transition = enterTransition(state.document, state.location)
     if (transition === undefined) return
+    this.recentNodes.remember(state.location.selectedNodeId, state.document)
     this.endTextSession()
     this.runtime.replaceReady(
       {
         ...state,
         location: transition.location,
         focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+      },
+      true,
+    )
+    this.markPersistedChange()
+  }
+
+  public visitRecentNode(nodeId: NodeId): void {
+    const state = this.runtime.ready()
+    const found = locateNode(state.document, nodeId)
+    if (found === undefined) return
+    this.endTextSession()
+    this.hideSearch()
+    const tree = { ...this.runtime.ready() }
+    delete tree.agenda
+    this.recentNodes.remember(nodeId, state.document)
+    this.runtime.replaceReady(
+      {
+        ...tree,
+        location: { currentParentId: found.parent?.id ?? null, selectedNodeId: nodeId },
+        focus: this.runtime.newFocus(nodeId, 0),
       },
       true,
     )
@@ -1597,6 +1634,7 @@ export class EditorStore {
   ): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
+    this.recentNodes.recordChange(state.document, document, focus.nodeId)
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.runtime.replaceReady(
       { ...state, document, location, focus, expansion, ...(agenda === undefined ? {} : { agenda }) },

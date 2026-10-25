@@ -46,6 +46,8 @@ export function createElectronEditorServices(): EditorServices {
       return dayNumberOf({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
     },
     load: () => window.treeApi.load(),
+    loadRecentNodes: () => window.treeApi.getRecentNodes?.() ?? Promise.resolve([]),
+    saveRecentNodes: (ids) => notesWrite(() => window.treeApi.setRecentNodes?.(ids) ?? Promise.resolve()),
     save: (state) => notesWrite(() => window.treeApi.save(state)),
     readClipboard: () => window.treeApi.readClipboard(),
     writeClipboard: (payload) => window.treeApi.writeClipboard?.(payload) ?? Promise.resolve(),

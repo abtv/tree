@@ -46,6 +46,7 @@ export function stageImage(db: IDBDatabase, id: string, bytes: Uint8Array): Prom
 export function commitImportedHead(db: IDBDatabase, head: unknown): Promise<void> {
   const tx = db.transaction([DOCUMENT_STORE, PREFERENCE_STORE], 'readwrite', { durability: 'strict' })
   tx.objectStore(DOCUMENT_STORE).put(head, HEAD_KEY)
+  tx.objectStore(PREFERENCE_STORE).delete('recent-nodes')
   tx.objectStore(PREFERENCE_STORE).delete(stagedImageKeys())
   return complete(tx, 'Local save failed.')
 }
