@@ -1823,6 +1823,8 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 * A nonempty text query shorter than three Unicode characters shows `Enter at least 3 characters`. At three or more characters, literal text search updates as the input changes, using the smart-case rules of Vim `/` (§20.2).
 * Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once in depth-first tree order with its text and parent path.
 * All results are reachable by scrolling and keyboard selection. Pending work displays `Searching…`; no matches displays `No results`. Typing does not navigate or edit the document.
+* While tag suggestions are visible, an empty node-result list does not display `No results`.
+* The popup keeps a fixed size during query changes, bounded by the window size. Its centered position and the input position remain unchanged when recent nodes, hints, tag suggestions or search results replace one another. Lists scroll within the available space.
 
 * A leading `#` selects tag search instead of text search. It offers existing tags from the document using §20.13 ranking and case sensitivity.
 * Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape dismisses suggestions while preserving literal input; another Escape closes Search.

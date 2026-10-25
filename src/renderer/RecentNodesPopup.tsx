@@ -264,15 +264,17 @@ export function RecentNodesPopup({
         aria-activedescendant={items[selected] === undefined ? undefined : `recent-node-${selected}`}
       >
         {items.length === 0 ? (
-          <div className="recent-node-empty">
-            {query === ''
-              ? 'No recent nodes'
-              : !query.startsWith('#') && [...query].length < 3
-                ? 'Enter at least 3 characters'
-                : pending
-                  ? 'Searching…'
-                  : 'No results'}
-          </div>
+          suggestions.length > 0 ? null : (
+            <div className="recent-node-empty">
+              {query === ''
+                ? 'No recent nodes'
+                : !query.startsWith('#') && [...query].length < 3
+                  ? 'Enter at least 3 characters'
+                  : pending
+                    ? 'Searching…'
+                    : 'No results'}
+            </div>
+          )
         ) : (
           <div style={{ height: items.length * 52, position: 'relative' }}>
             {items.slice(windowStart, windowStart + 40).map((item, offset) => {

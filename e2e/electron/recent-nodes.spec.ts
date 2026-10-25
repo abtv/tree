@@ -163,6 +163,41 @@ test.describe('Recent-node buffered editing', () => {
 
 test.describe('Recent-node popup geometry (mode-independent)', () => {
   // @requirement PRODUCT.md §20.14
+  test('keeps the popup and input stationary while refining queries and avoids contradictory tag feedback', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 12 }, (_, i) => ({ id: `n${i}`, text: `Alpha ${i} #p${i}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const input = popup.getByRole('searchbox')
+    const initialPopup = await popup.boundingBox()
+    const initialInput = await input.boundingBox()
+
+    for (const query of ['al', 'Alpha', 'Alpha 11', 'missing', '#p', '#p1', '']) {
+      await input.fill(query)
+      await expect(popup.getByText('Searching…', { exact: true })).toHaveCount(0)
+      expect.soft(await popup.boundingBox(), query).toEqual(initialPopup)
+      expect.soft(await input.boundingBox(), query).toEqual(initialInput)
+      if (query === '#p') {
+        await expect(popup.getByRole('listbox', { name: 'Tags' })).toBeVisible()
+        await expect.soft(popup.getByText('No results', { exact: true })).toHaveCount(0)
+        await window.screenshot({ path: 'test-results/search-stable-tags-light.png' })
+      }
+    }
+    await input.fill('Alpha')
+    await expect(popup.getByRole('option')).toHaveCount(12)
+    await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await window.screenshot({ path: 'test-results/search-stable-results-dark.png' })
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('reveals the last result in a short window and restores focus on an outside click', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
