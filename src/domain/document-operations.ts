@@ -22,6 +22,7 @@ import {
 import { locateNode, requireNode, shareIndex } from './document-index'
 import { insertLinks, isHttpUrl, linksForLine, normalizeLinks, splitLinks } from './document-links'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
+import { completeSubtree, deriveCompletion } from './node-completion'
 
 export function createInitialDocument(id: NodeId): Document {
   const document: Document = { roots: [{ id, text: '', children: [] }] }
@@ -63,12 +64,19 @@ function cloneNodeShallow(node: TreeNode): BuildNode {
   }
 }
 
-function copyToRoot(document: Document, located: LocatedNode, nextSiblings: TreeNode[]): Document {
+function copyToRoot(
+  document: Document,
+  located: LocatedNode,
+  nextSiblings: TreeNode[],
+  completionChanged = true,
+): Document {
   if (located.parent === null) {
     return { roots: nextSiblings }
   }
 
   let replacement: TreeNode = { ...located.parent, children: nextSiblings }
+  if (completionChanged) replacement = deriveCompletion(replacement)
+  completionChanged = replacement.struckThrough !== located.parent.struckThrough
   for (let index = located.ancestors.length - 2; index >= 0; index -= 1) {
     const ancestor = located.ancestors[index]!
     const childIndex = ancestor.children.indexOf(located.ancestors[index + 1]!)
@@ -77,7 +85,8 @@ function copyToRoot(document: Document, located: LocatedNode, nextSiblings: Tree
     if (childIndex < 0) throw new Error(`Node ${located.node.id} does not exist.`)
     const children = ancestor.children.slice()
     children[childIndex] = replacement
-    replacement = { ...ancestor, children }
+    replacement = completionChanged ? deriveCompletion({ ...ancestor, children }) : { ...ancestor, children }
+    completionChanged = replacement.struckThrough !== ancestor.struckThrough
   }
 
   const rootIndex = document.roots.indexOf(located.ancestors[0]!)
@@ -88,9 +97,10 @@ function copyToRoot(document: Document, located: LocatedNode, nextSiblings: Tree
 }
 
 function replaceNode(document: Document, located: LocatedNode, replacement: TreeNode): Document {
+  if (replacement.children !== located.node.children) replacement = deriveCompletion(replacement)
   const siblings = located.siblings.slice()
   siblings[located.index] = replacement
-  return copyToRoot(document, located, siblings)
+  return copyToRoot(document, located, siblings, replacement.struckThrough !== located.node.struckThrough)
 }
 
 function contentReplacement(
@@ -338,7 +348,7 @@ export function replaceSiblingRange(
   const boundedCount = Math.max(0, Math.min(count, located.siblings.length - located.index))
   const removed = located.siblings.slice(located.index, located.index + boundedCount)
   const siblings = located.siblings.slice()
-  siblings.splice(located.index, boundedCount, ...replacements)
+  siblings.splice(located.index, boundedCount, ...replacements.map(deriveCompletion))
   const next = copyToRoot(document, located, siblings)
   const counts = new Map(attachmentSummary(document))
   for (const [id, amount] of countAttachmentIdsByTraversal(removed)) {
@@ -502,7 +512,8 @@ export function moveSubtree(document: Document, nodeId: NodeId, parentId: NodeId
   const rewrite = (ownerId: NodeId | null, children: readonly TreeNode[]): readonly TreeNode[] => {
     const next = children.slice()
     for (const [position, child] of children.entries()) {
-      if (pathIds.has(child.id)) next[position] = { ...child, children: rewrite(child.id, child.children) }
+      if (pathIds.has(child.id))
+        next[position] = deriveCompletion({ ...child, children: rewrite(child.id, child.children) })
     }
     if (ownerId === sourceParentId) next.splice(source.index, 1)
     if (ownerId === parentId) next.splice(clamp(index, 0, next.length), 0, source.node)
@@ -539,7 +550,7 @@ export function shiftSiblingRange(
     const depth = located.ancestors.length + 2
     if (range.some((node) => depth + subtreeHeight(node) - 1 > MAX_DOCUMENT_DEPTH)) return { kind: 'too-deep' }
     const siblings = located.siblings.slice(0, located.index - 1)
-    siblings.push({ ...target, children: [...target.children, ...range] })
+    siblings.push(deriveCompletion({ ...target, children: [...target.children, ...range] }))
     siblings.push(...located.siblings.slice(located.index + count))
     const next = copyToRoot(document, located, siblings)
     inheritAttachmentIds(document, next)
@@ -550,7 +561,7 @@ export function shiftSiblingRange(
   const parentLocated = requireNode(document, parent.id)
   const remaining = [...parent.children.slice(0, located.index), ...parent.children.slice(located.index + count)]
   const siblings = parentLocated.siblings.slice()
-  siblings.splice(parentLocated.index, 1, { ...parent, children: remaining }, ...range)
+  siblings.splice(parentLocated.index, 1, deriveCompletion({ ...parent, children: remaining }), ...range)
   const next = copyToRoot(document, parentLocated, siblings)
   inheritAttachmentIds(document, next)
   return { kind: 'moved', document: next }
@@ -622,7 +633,7 @@ export function joinSiblingRange(
   const text = parts.join('')
   const merged = contentReplacement({ ...first, children }, text, normalizeLinks(links, text), attached[0]?.attachment)
   const siblings = located.siblings.slice()
-  siblings.splice(located.index, count, merged)
+  siblings.splice(located.index, count, deriveCompletion(merged))
   const next = copyToRoot(document, located, siblings)
   inheritAttachmentIds(document, next)
   return { kind: 'joined', document: next, cursor }
@@ -725,8 +736,8 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
 /**
  * Toggles the strikethrough of the sibling range between `anchorId` and `focusId`, inclusive, in
  * either order (`docs/PRODUCT.md` §2.5). A range whose every node is struck through returns to
- * normal; any other range becomes struck through. Only the range's own nodes change: their text,
- * links, attachment, and children are kept, and every child subtree stays shared by reference.
+ * normal; any other range becomes struck through. Every selected subtree receives the same state,
+ * including hidden descendants. Ancestors derive their state from their resulting children.
  * Returns `undefined` when the two nodes are not siblings.
  */
 export function toggleStrikethrough(document: Document, anchorId: NodeId, focusId: NodeId): Document | undefined {
@@ -739,14 +750,7 @@ export function toggleStrikethrough(document: Document, anchorId: NodeId, focusI
   const strike = !range.every((node) => node.struckThrough === true)
   const siblings = located.siblings.slice()
   for (const [offset, node] of range.entries()) {
-    siblings[start + offset] = {
-      id: node.id,
-      text: node.text,
-      ...(node.links === undefined ? {} : { links: node.links }),
-      ...(node.attachment === undefined ? {} : { attachment: node.attachment }),
-      ...(strike ? { struckThrough: true as const } : {}),
-      children: node.children,
-    }
+    siblings[start + offset] = completeSubtree(node, strike)
   }
   const next = copyToRoot(document, located, siblings)
   shareIndex(document, next)

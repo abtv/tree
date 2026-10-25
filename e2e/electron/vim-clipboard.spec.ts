@@ -66,6 +66,52 @@ async function content(app: ElectronApplication) {
 }
 
 // @requirement PRODUCT.md §20.2.22
+// @requirement PRODUCT.md §20.2.23
+test('highlights and copies through the last descendant of the final selected branch', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        textNode('first', 'First'),
+        {
+          ...textNode('parent', 'Parent'),
+          children: [
+            {
+              ...textNode('child', 'Child'),
+              children: [textNode('last-child', 'Last child')],
+            },
+          ],
+        },
+        textNode('outside', 'Outside'),
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'first' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await writeClipboardText(app, 'old')
+  await node(window, 1).focus()
+  await window.keyboard.press('z')
+  await window.keyboard.press('R')
+  await window.keyboard.press('V')
+  await window.keyboard.press('j')
+
+  await expect(window.locator('.node-row-visual-selected')).toHaveCount(4)
+  await expect(window.locator('.node-list')).toHaveScreenshot('subtree-selection-light.png')
+  await window.emulateMedia({ colorScheme: 'dark' })
+  await expect(window.locator('.node-list')).toHaveScreenshot('subtree-selection-dark.png')
+
+  await window.keyboard.press('y')
+
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({
+      text: 'First\nParent\n    Child\n        Last child',
+      html: false,
+      image: null,
+    })
+  await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+})
+
+// @requirement PRODUCT.md §20.2.22
 test('copies dd text and images by the pre-deletion caret while preserving undo and local puts', async ({
   userDataDir,
 }) => {
@@ -237,7 +283,9 @@ test('copies an image with yy on the image caret and uses text priority for a si
   await window.keyboard.press('V')
   await window.keyboard.press('y')
 
-  await expect.poll(() => content(app)).toMatchObject({ text: 'see https://example.com', html: false, image: null })
+  await expect
+    .poll(() => content(app))
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child', html: false, image: null })
 
   await node(window, 3).focus()
 
@@ -252,9 +300,7 @@ test('copies an image with yy on the image caret and uses text priority for a si
   await expect.poll(() => content(app)).toMatchObject({ text: '', image: { size: { width: 1, height: 1 } } })
 })
 
-test('copies reverse Visual sibling text with blank lines and excludes descendants and images', async ({
-  userDataDir,
-}) => {
+test('copies reverse Visual subtree text with blank lines and indented descendants', async ({ userDataDir }) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -268,7 +314,7 @@ test('copies reverse Visual sibling text with blank lines and excludes descendan
 
   await expect
     .poll(() => content(app))
-    .toMatchObject({ text: 'see https://example.com\n\n\nLast', html: false, image: null })
+    .toMatchObject({ text: 'see https://example.com\n    Excluded child\n\n\nLast', html: false, image: null })
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
   await node(window, 2).focus()

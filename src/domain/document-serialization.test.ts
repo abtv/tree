@@ -387,7 +387,7 @@ describe('persisted state validator conformance', () => {
     expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
   })
 
-  it('loads and saves struck-through nodes as version four, leaving their children unchanged', () => {
+  it('loads legacy version four parent completion from unchanged children and saves the normalized state', () => {
     const state = {
       version: 4,
       document: {
@@ -407,14 +407,15 @@ describe('persisted state validator conformance', () => {
     const parsed = parsePersistedState(state)
 
     expect(parsed.version).toBe(4)
-    expect(parsed.document.roots[0]).toMatchObject({ struckThrough: true })
+    expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
     expect(parsed.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
     expect(parsed.view).toEqual({ expandedIds: ['root'] })
 
     const saved = serializeState(parsed.document, parsed.location, parsed.view)
 
     expect(saved.version).toBe(4)
-    expect(JSON.parse(JSON.stringify(saved))).toEqual(state)
+    expect(parsePersistedState(JSON.parse(JSON.stringify(saved)))).toEqual(parsed)
+    expect(state.document.roots[0]!.struckThrough).toBe(true)
   })
 
   it.each([1, 2, 3])('loads a schema version %i file with no struck-through node', (version) => {

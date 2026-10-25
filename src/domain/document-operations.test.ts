@@ -373,7 +373,14 @@ describe('document operation content and retention outcomes', () => {
 // @requirement PRODUCT.md §2.5
 describe('strikethrough across node operations', () => {
   const struck: Document = {
-    roots: [{ id: 'task', text: 'Task', struckThrough: true, children: [{ id: 'step', text: 'Step', children: [] }] }],
+    roots: [
+      {
+        id: 'task',
+        text: 'Task',
+        struckThrough: true,
+        children: [{ id: 'step', text: 'Step', struckThrough: true, children: [] }],
+      },
+    ],
   }
 
   it('keeps it on the original node and leaves every new node normal', () => {
@@ -394,7 +401,7 @@ describe('strikethrough across node operations', () => {
 
     const child = createFirstChild(struck, 'task', 'child')
 
-    expect(child.roots[0]!.struckThrough).toBe(true)
+    expect(child.roots[0]!.struckThrough).toBeUndefined()
     expect(child.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
   })
 
@@ -413,7 +420,7 @@ describe('strikethrough across node operations', () => {
       id: 'copy-0',
       text: 'Task',
       struckThrough: true,
-      children: [{ id: 'copy-1', text: 'Step', children: [] }],
+      children: [{ id: 'copy-1', text: 'Step', struckThrough: true, children: [] }],
     })
     expect(cloneDocument(struck)).toEqual(struck)
     expect(

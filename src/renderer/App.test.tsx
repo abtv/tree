@@ -544,7 +544,7 @@ describe('App strikethrough', () => {
     expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
   })
 
-  it('strikes the editable current-parent heading and leaves its children normal', async () => {
+  it('strikes the editable current-parent heading and its children', async () => {
     const store = await createSeededStore(tasks, { currentParentId: 'a', selectedNodeId: 'a' })
     renderReact(<App initialVimEnabled store={store} />)
     const heading = screen.getByRole('textbox', { name: 'Current parent' })
@@ -552,7 +552,7 @@ describe('App strikethrough', () => {
     fireEvent.keyDown(heading, { key: 'Enter', metaKey: true })
 
     expect(screen.getByRole('textbox', { name: 'Current parent' })).toHaveClass('node-input-struck')
-    expect(screen.getByRole('textbox', { name: 'Node 1' })).not.toHaveClass('node-input-struck')
+    expect(screen.getByRole('textbox', { name: 'Node 1' })).toHaveClass('node-input-struck')
   })
 
   it('toggles a whole-node Visual range and returns to Normal mode', async () => {

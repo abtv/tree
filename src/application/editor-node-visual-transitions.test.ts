@@ -571,7 +571,14 @@ describe('whole-node Visual transitions', () => {
     // @requirement PRODUCT.md §2.5
     it('keeps the strikethrough of each node whose case changes', () => {
       const document: Document = {
-        roots: [{ id: 'a', text: 'ab', struckThrough: true, children: [{ id: 'kid', text: 'cd', children: [] }] }],
+        roots: [
+          {
+            id: 'a',
+            text: 'ab',
+            struckThrough: true,
+            children: [{ id: 'kid', text: 'cd', struckThrough: true, children: [] }],
+          },
+        ],
       }
       const upper = nodeVisualTransition(document, location, 'U', 'a', 'a', undefined, '', true, counter())
       if (upper.kind !== 'changed') throw new Error('Expected a change.')
@@ -580,7 +587,7 @@ describe('whole-node Visual transitions', () => {
         id: 'a',
         text: 'AB',
         struckThrough: true,
-        children: [{ id: 'kid', text: 'CD', children: [] }],
+        children: [{ id: 'kid', text: 'CD', struckThrough: true, children: [] }],
       })
     })
   })

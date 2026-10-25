@@ -2396,7 +2396,7 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('normal')
   })
 
-  it('copies reverse whole-node Visual ranges with empty entries and excludes descendants', async () => {
+  it('copies reverse whole-node Visual ranges with empty entries and indented descendants', async () => {
     const a = node('a', 'A', [node('child', 'Excluded')])
     const b = node('b', '')
     const c = { ...node('c', ''), attachment: { id: 'image', mimeType: 'image/png' as const } }
@@ -2411,7 +2411,7 @@ describe('useNodeInputBindings', () => {
     f.press('k')
     f.press('y')
 
-    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\n\n\nD' })
+    expect(f.clipboard.content).toEqual({ kind: 'text', text: 'A\n    Excluded\n\n\nD' })
     expect(f.result.current.vimMode).toBe('normal')
   })
 

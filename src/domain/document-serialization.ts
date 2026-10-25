@@ -15,6 +15,7 @@ import { isValidLocation } from './document-operations'
 import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
+import { deriveCompletion } from './node-completion'
 
 /** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
 export interface ViewState {
@@ -221,6 +222,11 @@ function walkNodes(
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
     if (frame.index >= frame.input.length) {
+      if (frame.output !== undefined) {
+        for (let index = 0; index < frame.output.length; index += 1) {
+          frame.output[index] = deriveCompletion(frame.output[index]!) as BuildNode
+        }
+      }
       stack.pop()
       continue
     }

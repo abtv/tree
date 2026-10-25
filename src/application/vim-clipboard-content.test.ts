@@ -16,6 +16,22 @@ const node: TreeNode = {
 }
 
 describe('Vim external clipboard projections', () => {
+  it('exports every descendant in preorder with four spaces per level', () => {
+    const forest: TreeNode[] = [
+      {
+        id: 'root',
+        text: 'Root',
+        children: [{ id: 'child', text: 'Child', children: [{ id: 'grandchild', text: 'Grandchild', children: [] }] }],
+      },
+      { id: 'sibling', text: 'Sibling', children: [] },
+    ]
+
+    expect(vimForestClipboardContent(forest)).toEqual({
+      kind: 'text',
+      text: 'Root\n    Child\n        Grandchild\nSibling',
+    })
+  })
+
   it('copies forward and reverse character selections as plain text', () => {
     expect(vimSelectionClipboardContent(node.text, 4, 23)).toEqual({ kind: 'text', text: 'https://example.com' })
     expect(vimSelectionClipboardContent(node.text, 23, 4)).toEqual({ kind: 'text', text: 'https://example.com' })
@@ -32,34 +48,33 @@ describe('Vim external clipboard projections', () => {
     expect(vimNodeClipboardContent(textOnly, true)).toBeUndefined()
   })
 
-  it('prefers text for one Visual node and otherwise copies its image or nothing', () => {
-    expect(vimForestClipboardContent([node])).toEqual({ kind: 'text', text: node.text })
-    expect(vimForestClipboardContent([{ ...node, text: '' }])).toEqual({ kind: 'image', attachmentId: 'picture' })
+  it('prefers text for one Visual leaf and otherwise copies its image or nothing', () => {
+    expect(vimForestClipboardContent([{ ...node, children: [] }])).toEqual({ kind: 'text', text: node.text })
+    expect(vimForestClipboardContent([{ ...node, text: '', children: [] }])).toEqual({
+      kind: 'image',
+      attachmentId: 'picture',
+    })
     expect(vimForestClipboardContent([{ id: 'empty', text: '', children: [] }])).toBeUndefined()
     expect(vimForestClipboardContent([])).toBeUndefined()
   })
 
   it('joins sibling text in order with leading, middle and trailing empty entries', () => {
     const blank = { id: 'empty', text: '', children: [] }
-    const imageOnly = { ...node, text: '' }
+    const imageOnly = { ...node, text: '', children: [] }
 
     expect(vimForestClipboardContent([blank, node, imageOnly, { ...node, text: 'last' }, blank])).toEqual({
       kind: 'text',
-      text: '\nsee https://example.com\n\nlast\n',
+      text: '\nsee https://example.com\n    Excluded child\n\nlast\n    Excluded child\n',
     })
     expect(vimForestClipboardContent([blank, imageOnly])).toEqual({ kind: 'text', text: '\n' })
   })
 
-  it('never reads children when projecting a Visual forest', () => {
-    const root: TreeNode = {
-      id: 'root',
-      text: 'root',
-      get children(): TreeNode[] {
-        throw new Error('descendant traversal')
-      },
-    }
-
-    expect(vimForestClipboardContent([root, root])).toEqual({ kind: 'text', text: 'root\nroot' })
+  it('exports a single branch as text even when its root is empty or has only an image', () => {
+    expect(vimForestClipboardContent([node])).toEqual({ kind: 'text', text: `${node.text}\n    Excluded child` })
+    expect(vimForestClipboardContent([{ ...node, text: '' }])).toEqual({ kind: 'text', text: '\n    Excluded child' })
+    expect(
+      vimForestClipboardContent([{ ...node, text: '', children: [{ id: 'empty', text: '', children: [] }] }]),
+    ).toEqual({ kind: 'text', text: '\n    ' })
   })
 
   it('exports Normal yanks only when the actual sibling forest has one node', () => {

@@ -20,9 +20,15 @@ export function vimNormalClipboardContent(
 
 export function vimForestClipboardContent(nodes: readonly TreeNode[]): ClipboardContent | undefined {
   if (nodes.length === 0) return undefined
-  if (nodes.length === 1) {
+  if (nodes.length === 1 && nodes[0]!.children.length === 0) {
     const node = nodes[0]!
     return vimNodeClipboardContent(node, node.text.length === 0)
   }
-  return { kind: 'text', text: nodes.map((node) => node.text).join('\n') }
+  const lines: string[] = []
+  const append = (node: TreeNode, depth: number): void => {
+    lines.push(`${'    '.repeat(depth)}${node.text}`)
+    for (const child of node.children) append(child, depth + 1)
+  }
+  for (const node of nodes) append(node, 0)
+  return { kind: 'text', text: lines.join('\n') }
 }

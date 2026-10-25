@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
-import { buildVisibleRows, type VisibleRow } from '../application/visible-rows'
+import { buildVisibleRows, selectedSubtreeRowRange, type VisibleRow } from '../application/visible-rows'
 import { NodeRow } from './NodeRow'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
 import { computeListWindow, shouldWindow, WINDOW_OVERSCAN, type ListWindow } from './list-window'
@@ -213,14 +213,7 @@ export function NodeList({
     (sourceIndex < listWindow.start || sourceIndex >= listWindow.end)
       ? sourceIndex
       : undefined
-  const visualAnchorIndex =
-    visualNodeSelection === undefined
-      ? -1
-      : visibleRows.findIndex((row) => row.node.id === visualNodeSelection.anchorId)
-  const visualFocusIndex =
-    visualNodeSelection === undefined ? -1 : visibleRows.findIndex((row) => row.node.id === visualNodeSelection.focusId)
-  const visualStart = visualAnchorIndex < 0 || visualFocusIndex < 0 ? -1 : Math.min(visualAnchorIndex, visualFocusIndex)
-  const visualEnd = visualStart < 0 ? -1 : Math.max(visualAnchorIndex, visualFocusIndex)
+  const visualRange = selectedSubtreeRowRange(visibleRows, visualNodeSelection)
   const dropMarker = dropMarkerFor(
     freeze === undefined ? undefined : dropIndex,
     visibleRows.length,
@@ -246,7 +239,7 @@ export function NodeList({
       dropOn={dropRow === index}
       expanded={isExpanded(node.id)}
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
-      visualSelected={visualStart >= 0 && index >= visualStart && index <= visualEnd}
+      visualSelected={visualRange !== undefined && index >= visualRange.start && index <= visualRange.end}
       index={index}
       key={node.id}
       node={node}

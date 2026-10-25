@@ -87,6 +87,31 @@ interface RenderOptions {
   onToggleExpansion?: (node: TreeNode) => void
 }
 
+// @requirement PRODUCT.md §20.2.23
+it.each([false, true])(
+  'highlights the final selected subtree through its last visible descendant (reverse: %s)',
+  (reverse) => {
+    const list: TreeNode[] = [
+      { id: 'a', text: 'A', children: [] },
+      {
+        id: 'b',
+        text: 'B',
+        children: [{ id: 'child', text: 'Child', children: [{ id: 'last', text: 'Last', children: [] }] }],
+      },
+      { id: 'outside', text: 'Outside', children: [] },
+    ]
+    const { container } = renderRows({
+      list,
+      isExpanded: () => true,
+      visualNodeSelection: { anchorId: reverse ? 'b' : 'a', focusId: reverse ? 'a' : 'b' },
+    })
+
+    expect(
+      [...container.querySelectorAll('.node-row-visual-selected')].map((row) => (row as HTMLElement).dataset.nodeId),
+    ).toEqual(['a', 'b', 'child', 'last'])
+  },
+)
+
 type StubDragFreeze = {
   begin: Mock<(nodeId: string, pointerId: number) => void>
   end: Mock<(pointerId?: number) => void>

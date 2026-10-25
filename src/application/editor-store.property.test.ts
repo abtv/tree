@@ -119,6 +119,11 @@ function assertInvariants(store: EditorStore): void {
   expect(isDisplayed(store)).toBe(true)
   expect(() => assertDocument(state.document)).not.toThrow()
   expect(() => serializeState(state.document, state.location, state.expansion)).not.toThrow()
+  for (const id of ids) {
+    const node = locateNode(state.document, id)!.node
+    if (node.children.length > 0)
+      expect(node.struckThrough === true).toBe(node.children.every((child) => child.struckThrough === true))
+  }
 }
 
 describe('EditorStore invariants under command sequences', () => {
