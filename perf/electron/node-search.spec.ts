@@ -30,6 +30,19 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
   expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
   await window.keyboard.press('ArrowUp')
   await expect(window.locator('[role="option"][aria-selected="true"]')).toContainText('Needle 9999')
+  await window.keyboard.press('ArrowDown')
+  const arrowPaint = await input.evaluate(async (element) => {
+    const samples: number[] = []
+    for (let step = 0; step < 24; step++) {
+      const start = performance.now()
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      samples.push(performance.now() - start)
+    }
+    samples.sort((a, b) => a - b)
+    return { p95Ms: samples[Math.floor(samples.length * 0.95)]!, maxMs: samples.at(-1)! }
+  })
+  await expect(window.locator('[role="option"][aria-selected="true"]')).toContainText('Needle 24')
   const paintMs = await input.evaluate(async (element) => {
     const start = performance.now()
     const input = element as HTMLInputElement
@@ -45,8 +58,9 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     kind: 'node-search',
     scenario: 'wide-10000-results',
     samples: 1,
-    metrics: { completeMs, paintMs },
+    metrics: { completeMs, paintMs, arrowPaintP95Ms: arrowPaint.p95Ms, arrowPaintMaxMs: arrowPaint.maxMs },
   })
   expect(completeMs).toBeLessThan(2000)
   expect(paintMs).toBeLessThan(150)
+  expect(arrowPaint.p95Ms).toBeLessThan(80)
 })

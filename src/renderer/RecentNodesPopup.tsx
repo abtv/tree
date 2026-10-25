@@ -1,10 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { RecentNode } from '../application/recent-nodes'
 import type { ShortcutProfile } from './shortcut-profile'
 import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
 import { moveSuggestionIndex } from './completion-controller'
 import { OutlineRootIcon } from './LocationBar'
+
+const RESULT_EDGE_INSET = 12
+
+function updateResultEdges(element: HTMLElement): void {
+  element.toggleAttribute('data-scroll-before', element.scrollTop > 1)
+  element.toggleAttribute('data-scroll-after', element.scrollHeight - element.clientHeight - element.scrollTop > 1)
+}
 
 export function RecentNodesPopup({
   store,
@@ -112,9 +119,15 @@ export function RecentNodesPopup({
           setSelected(next)
           if (panel.current) {
             const top = next * 52
-            if (top < panel.current.scrollTop || top + 52 > panel.current.scrollTop + panel.current.clientHeight) {
-              panel.current.scrollTop = top
-              setWindowStart(Math.max(0, Math.min(next - 2, items.length - 40)))
+            const visibleTop = panel.current.scrollTop + RESULT_EDGE_INSET
+            const visibleBottom = panel.current.scrollTop + panel.current.clientHeight - RESULT_EDGE_INSET
+            if (top < visibleTop || top + 52 > visibleBottom) {
+              panel.current.scrollTop =
+                top < visibleTop
+                  ? Math.max(0, top - RESULT_EDGE_INSET)
+                  : top + 52 + RESULT_EDGE_INSET - panel.current.clientHeight
+              updateResultEdges(panel.current)
+              setWindowStart(Math.max(0, Math.min(Math.floor(panel.current.scrollTop / 52) - 2, items.length - 40)))
             }
           }
         } else if (event.key !== 'Tab') return
@@ -187,6 +200,16 @@ export function RecentNodesPopup({
     if (open) input.current?.focus({ preventScroll: true })
   }, [open])
 
+  useLayoutEffect(() => {
+    const element = panel.current
+    if (element === null) return
+    const update = (): void => updateResultEdges(element)
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update)
+    observer?.observe(element)
+    return () => observer?.disconnect()
+  }, [items, suggestions.length])
+
   useEffect(() => {
     panel.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
   }, [items, selected])
@@ -234,22 +257,39 @@ export function RecentNodesPopup({
         }}
       />
       {suggestions.length > 0 && (
-        <div className="node-search-tags" role="listbox" aria-label="Tags">
-          {suggestions.map((name, index) => (
-            <div
-              key={name}
-              role="option"
-              aria-selected={index === suggestionIndex}
-              className={`node-search-tag${index === suggestionIndex ? ' command-row-selected' : ''}`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => changeQuery(`#${name}`, true)}
-              ref={(element) => {
-                if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
-              }}
+        <>
+          <div className="node-search-section-title">Tags</div>
+          <div className="node-search-tags" role="listbox" aria-label="Tags">
+            {suggestions.map((name, index) => (
+              <div
+                key={name}
+                role="option"
+                aria-selected={index === suggestionIndex}
+                className={`node-search-tag${index === suggestionIndex ? ' command-row-selected' : ''}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => changeQuery(`#${name}`, true)}
+                ref={(element) => {
+                  if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
+                }}
+              >
+                #{name}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {(suggestions.length === 0 || items.length > 0) && (
+        <div className="node-search-section-title node-search-results-heading">
+          <span>{query === '' ? 'Recent' : 'Results'}</span>
+          {suggestions.length === 0 && items.length > 0 && (
+            <output
+              className="node-search-position"
+              aria-label="Result position"
+              title={`Result ${selected + 1} of ${items.length}`}
             >
-              #{name}
-            </div>
-          ))}
+              {selected + 1} / {items.length}
+            </output>
+          )}
         </div>
       )}
       <div
@@ -257,9 +297,10 @@ export function RecentNodesPopup({
         role="listbox"
         aria-label={query === '' ? 'Recent nodes' : 'Search results'}
         className="node-search-results"
-        onScroll={(event) =>
+        onScroll={(event) => {
+          updateResultEdges(event.currentTarget)
           setWindowStart(Math.max(0, Math.min(Math.floor(event.currentTarget.scrollTop / 52) - 2, items.length - 40)))
-        }
+        }}
         data-editor-focus-borrow=""
         aria-activedescendant={items[selected] === undefined ? undefined : `recent-node-${selected}`}
       >
@@ -284,8 +325,8 @@ export function RecentNodesPopup({
                   key={item.id}
                   id={`recent-node-${index}`}
                   role="option"
-                  aria-selected={index === selected}
-                  className={`recent-node-row${index === selected ? ' command-row-selected' : ''}`}
+                  aria-selected={suggestions.length === 0 && index === selected}
+                  className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
                   style={{ position: 'absolute', top: index * 52, height: 52, width: '100%', boxSizing: 'border-box' }}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => {
@@ -318,6 +359,13 @@ export function RecentNodesPopup({
             })}
           </div>
         )}
+      </div>
+      <div className="node-search-footer">
+        <span>
+          {suggestions.length > 0
+            ? '↑ ↓ select · Enter/Tab apply · Esc dismiss'
+            : '↑ ↓ select · Enter open · Esc close'}
+        </span>
       </div>
     </div>
   )

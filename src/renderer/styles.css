@@ -1518,14 +1518,14 @@ body.node-drag-invalid * {
   }
 }
 .recent-nodes-popup {
+  --search-top: min(20vh, 160px);
   position: fixed;
   z-index: 50;
-  top: 50%;
+  top: var(--search-top);
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   width: min(560px, calc(100vw - 32px));
-  height: min(520px, calc(100vh - 110px));
-  max-height: calc(100vh - 110px);
+  max-height: min(560px, calc(100vh - var(--search-top) - 40px));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1550,21 +1550,43 @@ body.node-drag-invalid * {
 }
 
 .node-search-results {
+  --search-mask-opaque: #000;
   overflow-y: auto;
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+}
+
+.node-search-results[data-scroll-before] {
+  --search-fade-top: 12px;
+}
+
+.node-search-results[data-scroll-after] {
+  --search-fade-bottom: 12px;
+}
+
+.node-search-results:is([data-scroll-before], [data-scroll-after]) {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--search-mask-opaque) var(--search-fade-top, 0px),
+    var(--search-mask-opaque) calc(100% - var(--search-fade-bottom, 0px)),
+    transparent
+  );
+}
+
+.node-search-results-heading {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--color-location-border);
 }
 
 .node-search-tags {
   overflow-y: auto;
-  max-height: 160px;
-  flex-shrink: 0;
-}
-
-.recent-nodes-popup:has(.node-search-results:empty) .node-search-tags {
-  flex: 1;
+  max-height: 192px;
+  flex: 0 1 auto;
   min-height: 0;
-  max-height: none;
+  margin: 0 10px 8px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 4px;
 }
 
 .node-search-results:empty {
@@ -1574,6 +1596,32 @@ body.node-drag-invalid * {
 .node-search-tag {
   padding: 6px 10px;
   border-radius: 4px;
+}
+
+.node-search-section-title,
+.node-search-footer {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.node-search-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.node-search-footer {
+  margin-top: 8px;
+  border-top: 1px solid var(--color-location-border);
+}
+
+.node-search-position {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .recent-nodes-title,
@@ -1592,6 +1640,7 @@ body.node-drag-invalid * {
 }
 
 .recent-node-row {
+  scroll-margin-block: 12px;
   display: flex;
   flex-direction: column;
   padding: 7px 10px;
