@@ -3,7 +3,7 @@
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": false,
+    "jsx": "react-jsx",
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
@@ -13,17 +13,17 @@
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vitest/globals"]
   },
   "include": [
-    "electron.vite.config.ts",
-    "eslint.config.mjs",
-    "vitest.config.ts",
-    "vitest.config.test.ts",
-    "src/electron/main/**/*.ts",
-    "src/electron/preload/**/*.ts",
-    "src/domain/**/*.ts",
-    "src/shared/**/*.ts",
-    "src/infrastructure/main/**/*.ts"
+    "../../src/web/**/*.ts",
+    "../../src/web/**/*.tsx",
+    "../../src/renderer/**/*.ts",
+    "../../src/renderer/**/*.tsx",
+    "../../src/domain/**/*.ts",
+    "../../src/application/**/*.ts",
+    "../../src/shared/**/*.ts",
+    "../../src/infrastructure/renderer/**/*.ts"
   ]
 }

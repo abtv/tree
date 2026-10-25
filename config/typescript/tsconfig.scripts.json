@@ -1,9 +1,13 @@
 {
   "compilerOptions": {
     "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": true,
+    "erasableSyntaxOnly": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
@@ -13,16 +17,7 @@
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": [
-    "playwright*.config.ts",
-    "config/testing/*.ts",
-    "e2e/**/*.ts",
-    "e2e/**/*.mts",
-    "perf/**/*.ts",
-    "perf/**/*.mts",
-    "src/web/file-system-access.d.ts"
-  ]
+  "include": ["../../scripts/**/*.mts", "../../scripts/**/*.mjs"]
 }

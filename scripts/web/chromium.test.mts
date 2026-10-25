@@ -127,6 +127,11 @@ it('passes current source over stdin to the fixed container and propagates test 
     expect.arrayContaining([
       'package.json',
       'package-lock.json',
+      'tsconfig.json',
+      'config/typescript/tsconfig.node.json',
+      'config/typescript/tsconfig.web.json',
+      'config/typescript/tsconfig.e2e.json',
+      'config/typescript/tsconfig.scripts.json',
       'config/testing/playwright.web.config.ts',
       'scripts/web/build.mts',
       'src/web/index.html',

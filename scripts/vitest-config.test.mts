@@ -3,7 +3,7 @@ import { createFilter } from 'vite'
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from 'vitest/node'
 
-const repositoryRoot = fileURLToPath(new URL('.', import.meta.url))
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 
 describe('vitest configuration', () => {
   it('does not collect specs parked in the test-results scratch directory', async () => {

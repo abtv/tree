@@ -152,7 +152,7 @@ const developCases = {
     'md5 test-results/example/trace.zip',
     'tmutil listlocalsnapshots /',
     'mkdir -p test-results/trace-unpacked',
-    'npx tsc --noEmit -p tsconfig.e2e.json',
+    'npx tsc --noEmit -p config/typescript/tsconfig.e2e.json',
     'git grep permission',
     'git ls-files e2e',
     'git rev-parse HEAD',

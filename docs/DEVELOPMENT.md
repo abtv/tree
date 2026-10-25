@@ -137,9 +137,9 @@ The node, renderer, end-to-end, and scripts projects compile with `strict`, `noU
 
 Prefer `.mts` over `.mjs` for new Node scripts, browser E2E and performance specs, and their helpers and tests, and migrate an existing `.mjs` script when substantially changing its implementation. This also applies to temporary Node scripts. Keep `.mjs` when a tool requires JavaScript or an existing entry point must remain compatible; document the reason beside the exception. An unrelated edit does not require an extension migration. Existing tool configuration files retain their extensions unless their migration is part of the task.
 
-Maintained Node scripts and their tests use `.mts` to declare TypeScript ES modules explicitly. Node 24 runs them directly by stripping erasable types; no build step or extra runner is required. Use explicit extensions in relative imports and type-only imports for types. `tsconfig.scripts.json` enables `erasableSyntaxOnly` and checks the scripts through `npm run typecheck:scripts`, included in `npm run typecheck` and `npm run check`. It uses the repository's ESNext/Bundler resolution to include shared `.ts` helpers; Node execution still requires real import paths and does not read tsconfig settings. The imported JavaScript tool configuration and compatibility launchers are checked as well.
+Maintained Node scripts and their tests use `.mts` to declare TypeScript ES modules explicitly. Node 24 runs them directly by stripping erasable types; no build step or extra runner is required. Use explicit extensions in relative imports and type-only imports for types. `config/typescript/tsconfig.scripts.json` enables `erasableSyntaxOnly` and checks the scripts through `npm run typecheck:scripts`, included in `npm run typecheck` and `npm run check`. It uses the repository's ESNext/Bundler resolution to include shared `.ts` helpers; Node execution still requires real import paths and does not read tsconfig settings. The imported JavaScript tool configuration and compatibility launchers are checked as well.
 
-Browser specs and helpers in `e2e/web/` and `perf/web/` use `.mts` and are checked by `tsconfig.e2e.json` alongside the Electron suites and the native Node comparison runner `perf/comparisons/safari-electron.mts`. ESLint and Stryker configurations retain `.mjs` for their existing loaders and configuration discovery. The three `.mjs` launchers in `scripts/web-release/` preserve installed workflow entry points and delegate to `.mts` implementations.
+Browser specs and helpers in `e2e/web/` and `perf/web/` use `.mts` and are checked by `config/typescript/tsconfig.e2e.json` alongside the Electron suites and the native Node comparison runner `perf/comparisons/safari-electron.mts`. ESLint and Stryker configurations retain `.mjs` for their existing loaders and configuration discovery. The three `.mjs` launchers in `scripts/web-release/` preserve installed workflow entry points and delegate to `.mts` implementations.
 
 When type checking is required by §9, type errors must be fixed before the corresponding validation can pass.
 
@@ -537,6 +537,8 @@ preserve the release verification contract and existing triggers and dependencie
 
 Keep default tool entry-point configurations in the repository root for automatic discovery.
 Additional test configurations live in `config/testing/` and are selected explicitly by the npm scripts.
+TypeScript target configurations live in `config/typescript/`; the root `tsconfig.json` references them.
+Tooling tests live alongside the maintained scripts, including `scripts/vitest-config.test.mts`.
 Their test, setup and output paths must continue to resolve to the existing repository directories.
 
 Use the highest applicable functional-validation tier. Select Electron performance scope separately under [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#selecting-performance-checks). Focused checks may be run during implementation, but they do not substitute for a broader required functional tier.
