@@ -120,7 +120,7 @@ export class RecentNodes {
   }
 }
 
-function label(node: TreeNode): string {
+export function label(node: TreeNode): string {
   const text = node.text.slice(0, 160).replace(/\s+/g, ' ').trim()
   return text || (node.attachment === undefined ? 'Empty node' : 'Image')
 }

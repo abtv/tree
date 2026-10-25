@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { RecentNodesPopup } from './RecentNodesPopup'
 import { createEditorStoreDouble } from './test/editor-store-double'
@@ -39,11 +39,11 @@ function setup(empty = false) {
 it('borrows focus, wraps eight results and restores a directional selection without visiting', () => {
   const { input, store } = setup()
   expect(screen.getAllByRole('option')).toHaveLength(8)
-  expect(screen.getByRole('listbox')).toHaveFocus()
+  expect(screen.getByRole('searchbox', { name: 'Search query' })).toHaveFocus()
   fireEvent.keyDown(document, { key: 'ArrowUp' })
   expect(screen.getAllByRole('option')[7]).toHaveAttribute('aria-selected', 'true')
   fireEvent.keyDown(document, { key: 'Tab' })
-  expect(screen.getByRole('listbox')).toHaveFocus()
+  expect(screen.getByRole('searchbox', { name: 'Search query' })).toHaveFocus()
   fireEvent.keyDown(document, { key: 'Escape' })
 
   expect(screen.queryByRole('dialog')).toBeNull()
@@ -79,4 +79,77 @@ it('visits only on confirmation and permits dismissing an empty history', () => 
   expect(empty.store.visitRecentNode).not.toHaveBeenCalled()
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(empty.input).toHaveFocus()
+})
+
+it('cancels obsolete searches, restores recent nodes on clear and starts empty with Cmd+F', () => {
+  const { store } = setup()
+  const cancel = vi.fn()
+  vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+    publish([{ id: 'result', text: 'Found', path: null }])
+    return cancel
+  })
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: 'needle' } })
+  expect(screen.getByText('Found')).toBeInTheDocument()
+  fireEvent.change(input, { target: { value: '' } })
+  expect(cancel).toHaveBeenCalledOnce()
+  expect(screen.getAllByRole('option')).toHaveLength(8)
+  fireEvent.change(input, { target: { value: 'next' } })
+  fireEvent.keyDown(input, { key: 'Escape' })
+  fireEvent.keyDown(document, { key: 'f', metaKey: true })
+
+  expect(screen.getByRole('searchbox')).toHaveValue('')
+  expect(screen.getByRole('searchbox')).toHaveFocus()
+})
+
+it('accepts tag suggestions with ordinary completion keys, keeps literal input on Escape and respects IME', () => {
+  const { store } = setup()
+  vi.mocked(store.searchNodeSuggestions).mockReturnValue(['work', 'worker'])
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: '#w' } })
+  fireEvent.keyDown(input, { key: 'n', ctrlKey: true })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  expect(input).toHaveValue('#worker')
+  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
+  fireEvent.change(input, { target: { value: '#work' } })
+  fireEvent.keyDown(input, { key: 'Escape' })
+  expect(input).toHaveValue('#work')
+  expect(input).toHaveFocus()
+  fireEvent.compositionStart(input)
+  fireEvent.change(input, { target: { value: '#作' } })
+  fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+  expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
+  expect(input).toHaveValue('#作')
+  fireEvent.compositionEnd(input)
+  expect(screen.getByRole('listbox', { name: 'Tags' })).toBeInTheDocument()
+})
+
+it('refreshes on document replacement but does not reopen when visit finishes a buffered edit', () => {
+  const { store, beforeVisit } = setup()
+  let notify: () => void = () => undefined
+  vi.mocked(store.subscribe).mockImplementation((listener) => {
+    notify = listener
+    return () => undefined
+  })
+  const snapshot = store.getSnapshot()
+  if (snapshot.status !== 'ready') throw new Error('Expected ready store')
+  vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: 'needle' } })
+  vi.mocked(store.searchNodes).mockClear()
+  vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
+
+  act(() => notify())
+  expect(store.searchNodes).toHaveBeenCalledOnce()
+
+  fireEvent.change(input, { target: { value: '' } })
+  beforeVisit.mockImplementation(() => {
+    vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
+    notify()
+  })
+  fireEvent.keyDown(input, { key: 'Enter' })
+
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(store.visitRecentNode).toHaveBeenCalledWith('0')
 })

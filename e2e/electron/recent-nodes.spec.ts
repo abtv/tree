@@ -15,6 +15,67 @@ import {
 
 describeForEachEditingMode('Recent nodes', (mode) => {
   // @requirement PRODUCT.md §20.14
+  test('searches all nodes as typed, completes existing tags and opens results from Agenda', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'Project', children: [{ id: 'child', text: 'Alpha #work #w', children: [] }] },
+          { id: 'b', text: 'alpha #Work', children: [] },
+          { id: 'c', text: 'Other #worker', children: [] },
+        ],
+      },
+      location: { currentParentId: 'a', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    const input = window.getByRole('searchbox', { name: 'Search query' })
+    const results = window.getByRole('listbox', { name: 'Search results' })
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('')
+    await input.fill('al')
+    await expect(window.getByText('Enter at least 3 characters')).toBeVisible()
+    await input.fill('alpha')
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w', 'alpha #Work'])
+    await window.screenshot({ path: `test-results/search-${mode.mode}-light.png` })
+    await input.fill('Alpha')
+    await expect(results.getByRole('option')).toHaveCount(1)
+    await input.fill('#')
+    const tags = window.getByRole('listbox', { name: 'Tags' })
+    await expect(tags.getByRole('option')).toHaveText(['#Work', '#w', '#work', '#worker'])
+    await input.fill('#wrk')
+    await window.keyboard.press('Tab')
+    await expect(input).toHaveValue('#work')
+    await expect(tags).toHaveCount(0)
+    await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w'])
+    await input.fill('#w')
+    await window.keyboard.press('Escape')
+    await expect(input).toHaveValue('#w')
+    await expect(results.getByRole('option')).toHaveCount(1)
+    await input.fill('#new_tag')
+    await expect(window.getByText('No results', { exact: true })).toBeVisible()
+    await input.fill('#')
+    await expect(tags.getByRole('option')).toHaveCount(4)
+    await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await window.screenshot({ path: `test-results/search-${mode.mode}-dark-tags.png` })
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Meta+p')
+    await window.keyboard.press('Meta+f')
+    await expect(input).toHaveValue('')
+    await input.fill('alpha')
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await window.keyboard.press('ArrowDown')
+    await window.keyboard.press('Enter')
+
+    await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
+    await expect(window.locator('[data-node-id="b"] .node-input')).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('promotes edits, cancels without navigation, visits a node and survives restart', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -30,7 +91,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await typeInto(node(first.window, 2), 'Beta edited')
     await first.window.keyboard.press('Meta+;')
 
-    const popup = first.window.getByRole('dialog', { name: 'Recent nodes' })
+    const popup = first.window.getByRole('dialog', { name: 'Search' })
     await expect(popup.getByRole('option')).toHaveText(['Beta edited', 'Alpha edited'])
     await expect(popup.getByRole('img', { name: 'Top level' })).toHaveCount(2)
     const fontSize = await node(first.window, 2).evaluate((element) => getComputedStyle(element).fontSize)
@@ -93,6 +154,7 @@ test.describe('Recent-node buffered editing', () => {
     await window.getByRole('option').filter({ hasText: 'Nested' }).click()
 
     await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+    await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     await window.keyboard.press('Meta+,')
     await expect(node(window, 2)).toHaveValue('XYta')
@@ -115,7 +177,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.reload()
     await expect(node(window, 1)).toBeVisible()
     await window.keyboard.press('Meta+;')
-    const popup = window.getByRole('dialog', { name: 'Recent nodes' })
+    const popup = window.getByRole('dialog', { name: 'Search' })
     const centerOffset = () =>
       popup.evaluate((element) => {
         const box = element.getBoundingClientRect()
@@ -131,7 +193,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await node(window, 1).focus()
     await window.keyboard.press('Meta+;')
     await window.locator('.recent-nodes-title').click()
-    await expect(window.getByRole('dialog', { name: 'Recent nodes' })).toBeVisible()
+    await expect(window.getByRole('dialog', { name: 'Search' })).toBeVisible()
     await expect.poll(centerOffset).toBeLessThanOrEqual(1)
     await window.keyboard.press('ArrowUp')
 
@@ -148,7 +210,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
 
     await window.mouse.click(10, 70)
 
-    await expect(window.getByRole('dialog', { name: 'Recent nodes' })).toHaveCount(0)
+    await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
     await expect(node(window, 1)).toBeFocused()
   })
 })

@@ -1525,13 +1525,43 @@ body.node-drag-invalid * {
   transform: translate(-50%, -50%);
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100vh - 110px);
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--color-location-border);
   border-radius: 8px;
   background: var(--color-background);
   box-shadow: 0 8px 28px var(--color-popup-shadow);
   padding: 8px;
   font-size: 15px;
+}
+
+.node-search-input {
+  margin: 0 10px 8px;
+  padding: 8px;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--color-location-border);
+  border-radius: 4px;
+}
+
+.node-search-results {
+  overflow-y: auto;
+  max-height: 416px;
+  min-height: 36px;
+}
+
+.node-search-tags {
+  overflow-y: auto;
+  max-height: 160px;
+  flex-shrink: 0;
+}
+
+.node-search-tag {
+  padding: 6px 10px;
+  border-radius: 4px;
 }
 
 .recent-nodes-title,

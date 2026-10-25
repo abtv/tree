@@ -55,6 +55,8 @@ const exclusions: Record<string, string> = {
     'Read-only Tab shortcut boundary check is covered by focused store, property, and renderer tests.',
   moveSelectedTo: 'Convenience wrapper around moveNodeTo, which the generator drives directly.',
   suggestTags: 'Read-only derived lookup has tag catalog properties and focused store publication coverage.',
+  searchNodeSuggestions: 'Read-only catalog lookup is covered by node-search and store nonmutation tests.',
+  searchNodes: 'Cancellable read-only search is covered by node-search, store nonmutation and popup lifecycle tests.',
 }
 
 it('accounts for every public EditorStore prototype method in the command generator or exclusions', () => {

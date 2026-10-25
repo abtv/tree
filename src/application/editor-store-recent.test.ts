@@ -75,3 +75,26 @@ it('reveals the real parent from Agenda, resets caret even on repeated visits an
   expect(store.getSnapshot()).not.toBe(first)
   expect(store.recentNodes.getIds()).toEqual(['child'])
 })
+
+// @requirement PRODUCT.md §20.14
+it('gates short and unknown queries without changing tags, document, selection or history', async () => {
+  const { store } = await setup()
+  store.editText('a', 'Alpha #w')
+  const before = store.getSnapshot()
+  const recent = store.recentNodes.getIds()
+  const publish = vi.fn()
+
+  store.searchNodes('Al', publish)
+  store.searchNodes('#new_tag', publish)
+  expect(publish.mock.calls).toEqual([[[]], [[]]])
+  expect(store.searchNodeSuggestions('#')).toEqual(['w'])
+  await new Promise<void>((resolve) =>
+    store.searchNodes('#w', (results) => {
+      expect(results.map(({ id }) => id)).toEqual(['a'])
+      resolve()
+    }),
+  )
+
+  expect(store.getSnapshot()).toStrictEqual(before)
+  expect(store.recentNodes.getIds()).toBe(recent)
+})

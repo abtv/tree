@@ -1815,15 +1815,31 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 ---
 
-### 20.14 Recent Nodes
+### 20.14 Search and Recent Nodes
 
-`Cmd+;` opens a compact Recent nodes popup in Tree or Agenda, in standard editing and every Vim mode. Outside Apple platforms it uses `Ctrl+;` (§1.5). This deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
+`Cmd+;` and `Cmd+F` open a compact Search popup in Tree or Agenda, in standard editing and every Vim mode. Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
 
-The popup is centered horizontally and vertically in the window and lists up to eight distinct nodes, most recently used first, with each node's text and parent path. Empty nodes use `Empty node`; image-only nodes use `Image`; top-level nodes show the same tree icon as the location bar, with the accessible label `Top level`, instead of a textual root name. Node titles use the same 15 px font size as tree text; paths use 12 px. Labels are single-line previews, bounded to the first 160 characters per node. The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
+* The input receives focus and starts empty on every opening. Empty input shows recent nodes as below.
+* A nonempty text query shorter than three Unicode characters shows `Enter at least 3 characters`. At three or more characters, literal text search updates as the input changes, using the smart-case rules of Vim `/` (§20.2).
+* Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once in depth-first tree order with its text and parent path.
+* All results are reachable by scrolling and keyboard selection. Pending work displays `Searching…`; no matches displays `No results`. Typing does not navigate or edit the document.
+
+* A leading `#` selects tag search instead of text search. It offers existing tags from the document using §20.13 ranking and case sensitivity.
+* Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape dismisses suggestions while preserving literal input; another Escape closes Search.
+* A manually typed exact existing tag searches immediately, including one-character names; a fragment or unknown tag has no node results. Search matches complete recognized tags, excluding hyperlink ranges, and never creates tags.
+* Completion acceptance leaves focus in the search input and does not jump to a node. IME composition owns its keys and suspends suggestions until commitment.
+
+Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. Memory scales with the current result list and traversal depth, without retaining earlier query snapshots. Query input causes no document/history writes or syncs. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior.
+
+The popup is centered horizontally and vertically in the window. With empty input it lists up to eight distinct recent nodes, most recently used first, with each node's text and parent path. Empty nodes use `Empty node`; image-only nodes use `Image`; top-level nodes show the same tree icon as the location bar, with the accessible label `Top level`, instead of a textual root name. Node titles use the same 15 px font size as tree text; paths use 12 px. Labels are single-line previews, bounded to the first 160 characters per node. The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
 
 Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
 
-Up/Down wrap selection; they do not navigate the document. Enter or clicking a result closes the popup, finishes buffered editing using the existing view-change rules, opens Tree at the result's real parent, selects that node and places the text caret at its start. Escape, outside dismissal and window deactivation close without a jump and restore the originating editor selection and mode. Opening borrows editing focus, clears unfinished Vim commands and cancels a pending search draft as the command panel does. Modal dialogs, IME composition and the open command panel retain their input. The displayed order stays fixed until dismissal. There is no search field or animation.
+* Without tag suggestions, Up/Down wrap result selection; they do not navigate the document.
+* Enter or clicking a result closes the popup, finishes buffered editing using the existing view-change rules, opens Tree at the result's real parent, selects that node and places the text caret at its start.
+* Escape, outside dismissal and window deactivation close without a jump and restore the originating editor selection and mode.
+* Opening borrows editing focus, clears unfinished Vim commands and cancels a pending search draft as the command panel does. Modal dialogs, IME composition and the open command panel retain their input.
+* Recent-node order stays fixed until the input changes or dismissal. There is no animation.
 
 History retains at most 100 IDs separately from document content, undo and notes export. Dirty history saves every 30 seconds and during normal persistence flush, including shutdown; an abrupt exit may lose the unsaved history interval. Writes are serialized and desktop replacement is atomic. Missing or unreadable history starts empty. Write failures use the existing operation-error surface; pending history can retry on the next flush. Notes replacement resets the history even when imported IDs coincide. Browser history uses the current profile's local storage and writer-session guards.
 

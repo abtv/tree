@@ -17,6 +17,15 @@ export class TagCatalog {
   private readonly characters = new Map<string, Set<string>>()
   private readonly sortedCharacters = new WeakMap<Set<string>, readonly string[]>()
 
+  public has(name: string): boolean {
+    return this.counts.has(name)
+  }
+
+  public searchSuggestions(query: string): readonly string[] {
+    if (tagFragment(query, query.length)?.start !== 0) return []
+    return this.suggest('', query, query.length)?.suggestions ?? []
+  }
+
   public update(document: Document): void {
     if (this.document === document) return
     let membershipChanged = false

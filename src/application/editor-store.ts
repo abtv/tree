@@ -107,6 +107,8 @@ import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
 import { RecentNodes } from './recent-nodes'
 import { RecentNodePersistence } from './recent-node-persistence'
 import { EmojiHistory } from './emoji-history'
+import { runNodeSearch } from './node-search'
+import type { RecentNode } from './recent-nodes'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
@@ -189,6 +191,18 @@ export class EditorStore {
   public getSnapshot = this.runtime.getSnapshot
 
   public subscribe = this.runtime.subscribe
+
+  public searchNodeSuggestions(query: string): readonly string[] {
+    return this.tags.searchSuggestions(query)
+  }
+
+  public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
+    if (query.startsWith('#') ? !this.tags.has(query.slice(1)) : [...query].length < 3) {
+      publish([])
+      return () => undefined
+    }
+    return runNodeSearch(this.runtime.ready().document, query, publish)
+  }
 
   public suggestTags(
     nodeId: NodeId,
