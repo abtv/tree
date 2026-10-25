@@ -1,6 +1,6 @@
 import { calendarDateOf, formatCanonicalDate, weekdayOf, type DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
-import { suggestEmoji } from '../domain/emoji-completion'
+import { suggestEmoji, type EmojiSuggestion } from '../domain/emoji-completion'
 import { suggestDates } from '../domain/natural-date'
 import type { TagMatch } from '../domain/tag-catalog'
 import { findTags } from '../domain/tags'
@@ -29,6 +29,7 @@ export function recognizeCompletion(
   caret: number,
   today: DayNumber,
   tags?: TagMatch,
+  initialEmoji?: readonly EmojiSuggestion[],
 ): CompletionMatch | undefined {
   if (tags !== undefined)
     return {
@@ -44,7 +45,7 @@ export function recognizeCompletion(
         description: '',
       })),
     }
-  const emoji = suggestEmoji(text, caret)
+  const emoji = suggestEmoji(text, caret, initialEmoji)
   if (emoji !== undefined)
     return {
       start: emoji.start,

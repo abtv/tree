@@ -25,6 +25,8 @@ export const ipcChannels = {
   getAppearance: 'tree:get-appearance',
   setAppearance: 'tree:set-appearance',
   getCommandHistory: 'tree:get-command-history',
+  getEmojiHistory: 'tree:get-emoji-history',
+  setEmojiHistory: 'tree:set-emoji-history',
   setCommandHistory: 'tree:set-command-history',
   getRecentNodes: 'tree:get-recent-nodes',
   setRecentNodes: 'tree:set-recent-nodes',
@@ -134,6 +136,8 @@ export interface TreeApi {
   getAppearance: () => Promise<'system' | 'light' | 'dark'>
   setAppearance: (value: 'system' | 'light' | 'dark') => Promise<void>
   getCommandHistory: () => Promise<string[]>
+  getEmojiHistory?: () => Promise<string[]>
+  setEmojiHistory?: (value: readonly string[]) => Promise<void>
   setCommandHistory: (value: string[]) => Promise<void>
   onAppearanceChanged?: (listener: (value: 'system' | 'light' | 'dark') => void) => () => void
   quit(requestId?: string): Promise<void>

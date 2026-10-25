@@ -19,6 +19,7 @@ import { Worker } from 'node:worker_threads'
 import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { createFileServices } from '../../infrastructure/main/file-services'
 import { createCommandHistoryStore } from '../../infrastructure/main/command-history'
+import { createEmojiHistoryStore } from '../../infrastructure/main/emoji-history'
 import {
   createDebouncedWindowBoundsSaver,
   createAppearancePreferenceStore,
@@ -244,6 +245,7 @@ bootstrapApplication({
       homeDirectory: app.getPath('home'),
     })
     const commandHistory = createCommandHistoryStore(join(app.getPath('userData'), 'data', 'command-history.json'))
+    const emojiHistory = createEmojiHistoryStore(join(app.getPath('userData'), 'data', 'emoji-history.json'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
     appearanceStore = createAppearancePreferenceStore(join(app.getPath('userData'), 'data', 'appearance.json'))
@@ -254,6 +256,8 @@ bootstrapApplication({
       getAppearance: currentAppearance,
       setAppearance,
       getCommandHistory: commandHistory.load,
+      getEmojiHistory: emojiHistory.load,
+      setEmojiHistory: emojiHistory.save,
       getRecentNodes: () => fileServices.loadRecentNodes!(),
       setRecentNodes: (ids) => fileServices.saveRecentNodes!(ids),
       setCommandHistory: commandHistory.save,

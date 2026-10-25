@@ -9,6 +9,7 @@ import {
   screenshotContentSize,
   setMainWindowContentSize,
   test,
+  closeApp,
 } from './fixtures'
 import catalog from '../../src/domain/emoji-catalog.json'
 
@@ -17,6 +18,58 @@ function matchingShortcodes(query: string): string[] {
 }
 
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.12
+  test('shares accepted MRU between Tree and Agenda and preserves it across restart', async ({
+    userDataDir,
+  }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'n' },
+    })
+    const first = await launchTree(userDataDir)
+    const input = first.window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const popup = first.window.getByRole('listbox', { name: 'Emoji suggestions' })
+    await setAgendaToday(first.window)
+    await setCursor(input, 16)
+    await first.window.keyboard.type(':rocket')
+    await first.window.keyboard.press('Enter')
+    await first.window.keyboard.type(' :cat')
+    await first.window.keyboard.press('Tab')
+    await first.window.keyboard.type(' :')
+
+    await expect(popup.getByRole('option').nth(0)).toContainText(':cat:')
+    await expect(popup.getByRole('option').nth(1)).toContainText(':rocket:')
+    await first.window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-mru.png')) })
+
+    await first.window.keyboard.type('r')
+
+    await expect(popup.getByRole('option').first()).toContainText(':rabbit:')
+    await first.window.keyboard.press('Escape')
+    await first.window.keyboard.press('Meta+p')
+    await first.window.locator('.agenda-row[data-node-id="n"]').click()
+    const agendaInput = first.window.getByRole('textbox', { name: 'Agenda node n', exact: true })
+    if (mode === 'vim') await first.window.keyboard.press('i')
+    const length = await agendaInput.evaluate((element) => element.textContent!.length)
+    await setCursor(agendaInput, length)
+    await first.window.keyboard.type(' :')
+
+    await expect(popup.getByRole('option').nth(0)).toContainText(':cat:')
+    await expect(popup.getByRole('option').nth(1)).toContainText(':rocket:')
+    await popup.getByRole('option').nth(1).click()
+    await closeApp(first.app)
+
+    const second = await launchTree(userDataDir)
+    const restored = second.window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const end = await restored.evaluate((element) => element.textContent!.length)
+    await setCursor(restored, end)
+    await second.window.keyboard.type(' :')
+
+    const options = second.window.getByRole('listbox', { name: 'Emoji suggestions' }).getByRole('option')
+    await expect(options.nth(0)).toContainText(':rocket:')
+    await expect(options.nth(1)).toContainText(':cat:')
+    await expect(options.nth(2)).toContainText(`:${Object.keys(catalog).toSorted()[0]}:`)
+  })
+
   // @requirement PRODUCT.md §20.12
   test('keeps all keyboard-selected suggestions visible in a small window', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -82,7 +135,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await popup.getByRole('option').last().scrollIntoViewIfNeeded()
     await popup.getByRole('option').last().click()
 
-    await expect(input).toHaveValue(catalog.zzz)
+    await expect(input).toHaveValue(catalog[Object.keys(catalog).at(-2)! as keyof typeof catalog])
     await expect(input).toBeFocused()
   })
 

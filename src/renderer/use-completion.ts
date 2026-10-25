@@ -107,6 +107,7 @@ export function useCompletion(
       close()
       scheduleCaret(popup.nodeId, popup.start + suggestion.replacement.length)
       store.replaceTextRange(popup.nodeId, popup.start, popup.end, suggestion.replacement)
+      if (suggestion.id.startsWith('emoji:')) store.emojiHistory.remember(suggestion.id.slice('emoji:'.length))
     },
     [observe, close, scheduleCaret, store],
   )
@@ -144,6 +145,7 @@ export function useCompletion(
         today,
         content.links,
         store.suggestTags(node.id, content.text, caret, content.links),
+        store.emojiHistory.suggestions,
       )
       context.current =
         state.status === 'ready'

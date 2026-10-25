@@ -1772,11 +1772,19 @@ Date colors yield to struck-through text color (§2.5). Recognition and hyperlin
 
 Tree and Agenda editors offer optional emoji completion in standard editing and Vim Insert. Typing a colon at the start of text or after whitespace immediately opens suggestions. English letters, digits, underscores, plus signs and hyphens refine the shortcode query, including numeric and signed aliases such as `:100`, `:+1` and `:-1`. Matching ignores case. The caret must be at the end of the fragment. A space, other punctuation or no matches closes suggestions without changing literal text. URLs, time expressions and hyperlink text do not trigger suggestions.
 
-The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. Search runs locally without network access and matches query characters in order, allowing gaps; it does not correct typos or translate queries. All matches are available in a compact scrollable popup; each shows the emoji and its full `:shortcode:`. Typing only `:` makes the whole catalog available in shortcode order. Keyboard navigation and pointer scrolling can reach every match. For example, `:rkt` offers `:rocket:` and `:wtech` offers `:woman_technologist:`. A closing colon is not required for acceptance.
+The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. Search runs locally without network access and matches query characters in order, allowing gaps; it does not correct typos or translate queries. All matches are available in a compact scrollable popup; each shows the emoji and its full `:shortcode:`.
+
+* Typing only `:` lists previously accepted shortcodes in most-recently-used order, followed by the remaining catalog in shortcode order. Without history, the whole list uses shortcode order.
+* Keyboard navigation and pointer scrolling can reach every match. For example, `:rkt` offers `:rocket:` and `:wtech` offers `:woman_technologist:`. A closing colon is not required for acceptance.
+
+* Accepting an emoji with Enter, Tab or a click moves its shortcode to the front of a unique history shared by Tree and Agenda and saved locally between launches. Typing, dismissal and Undo/Redo do not change this history.
+* History retains at most 100 shortcodes, following the bounded command-history precedent and §22 responsiveness principle. It is an application preference independent of the notes and excluded from notes archives; missing, unreadable or invalid entries are ignored.
+* A failed history write uses the existing operation-error surface and remains retryable on the next acceptance or persistence flush. Reaccepting the first entry requires no history write.
+* History changes prepare the initial order once; typing performs no history writes or document traversal. Writes are asynchronous and serialized, with at most one small preference write per changed acceptance, no added document writes or syncs, and memory bounded by the fixed catalog and history (§22.1).
 
 Results rank exact names first, then name prefixes, prefixes of words after `_`, contiguous substrings inside words, and finally matches with gaps. The first four groups use shortcode order. Matches with gaps prefer more matched word-start characters, then fewer skipped characters between the first and last match, then an earlier start, then a shorter shortcode, then shortcode order. A word starts at the beginning of a name or after `_`.
 
-When several alignments match a name, its best alignment determines its rank. Results depend only on the query and catalog. For example, `:cat` selects `:cat:` before `:cat2:` and `:joy_cat:`; Enter accepts 🐱.
+When several alignments match a name, its best alignment determines its rank. As soon as a character follows `:`, results depend only on the query and catalog, ignoring history. For example, `:cat` selects `:cat:` before `:cat2:` and `:joy_cat:`; Enter accepts 🐱.
 
 * The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling.
 * Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row.

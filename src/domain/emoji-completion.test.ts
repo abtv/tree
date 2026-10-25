@@ -30,7 +30,7 @@ it('matches English shortcode prefixes at whitespace boundaries without consumin
 })
 
 // @requirement PRODUCT.md §20.12
-it('includes every ordered subsequence and preserves catalog order for an empty query', () => {
+it('includes every ordered subsequence and uses lexical shortcode order for an empty query', () => {
   for (const query of ['', 'ma', 'r', 'rkt', 'wtech', 'thup', '+1', '-1']) {
     const text = `:${query}`
     const suggestions = suggestEmoji(text, text.length)!.suggestions
@@ -41,7 +41,7 @@ it('includes every ordered subsequence and preserves catalog order for an empty 
     })
 
     expect(suggestions.map((entry) => entry.shortcode).toSorted()).toEqual(expected.toSorted())
-    if (query === '') expect(suggestions.map((entry) => entry.shortcode)).toEqual(expected)
+    if (query === '') expect(suggestions.map((entry) => entry.shortcode)).toEqual(expected.toSorted())
   }
 })
 

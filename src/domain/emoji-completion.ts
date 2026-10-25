@@ -15,17 +15,43 @@ export interface EmojiMatch extends DateTextRange {
   readonly suggestions: readonly EmojiSuggestion[]
 }
 
-const entries: readonly EmojiSuggestion[] = Object.entries(catalog).map(([shortcode, emoji]) => ({ shortcode, emoji }))
+const entries: readonly EmojiSuggestion[] = Object.entries(catalog)
+  .map(([shortcode, emoji]) => ({ shortcode, emoji }))
+  .sort((left, right) => (left.shortcode < right.shortcode ? -1 : left.shortcode > right.shortcode ? 1 : 0))
+const byShortcode = new Map(entries.map((entry) => [entry.shortcode, entry]))
+export const EMOJI_HISTORY_LIMIT = 100
+
+export function normalizeEmojiHistory(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const result = new Set<string>()
+  for (const name of value) {
+    if (typeof name === 'string' && byShortcode.has(name)) result.add(name)
+    if (result.size === EMOJI_HISTORY_LIMIT) break
+  }
+  return [...result]
+}
+
+/** Prepare the empty-query order only when accepted history changes. */
+export function initialEmojiSuggestions(history: readonly string[]): readonly EmojiSuggestion[] {
+  const names = normalizeEmojiHistory(history)
+  if (names.length === 0) return entries
+  const used = new Set(names)
+  return [...names.map((name) => byShortcode.get(name)!), ...entries.filter(({ shortcode }) => !used.has(shortcode))]
+}
 
 /** Shortcodes are literal text until an explicit range replacement accepts a suggestion. */
-export function suggestEmoji(text: string, caret: number): EmojiMatch | undefined {
+export function suggestEmoji(
+  text: string,
+  caret: number,
+  initial: readonly EmojiSuggestion[] = entries,
+): EmojiMatch | undefined {
   // caret === 0 cannot contain a colon fragment, even if the initial bound check accepts it.
   if (!Number.isInteger(caret) || caret < 0 || caret > text.length) return undefined
   if (/[a-z0-9_+-]/i.test(text[caret] ?? '')) return undefined
   const fragment = /(?:^|\s):([a-z0-9_+-]*)$/i.exec(text.slice(0, caret))
   if (fragment === null) return undefined
   const query = fragment[1]!.toLowerCase()
-  if (query === '') return { start: caret - 1, end: caret, suggestions: entries }
+  if (query === '') return { start: caret - 1, end: caret, suggestions: initial }
   const workspace = new CompletionRankWorkspace()
   const ranked = entries.flatMap((entry) => {
     const rank = rankShortcode(entry.shortcode, query, '_', workspace)

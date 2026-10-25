@@ -1,6 +1,7 @@
 import type { DayNumber } from '../domain/calendar-date'
 import type { DateTextRange } from '../domain/date-recognition'
 import type { TagMatch } from '../domain/tag-catalog'
+import type { EmojiSuggestion } from '../domain/emoji-completion'
 import { recognizeCompletion, type CompletionMatch } from './completion-sources'
 
 export function moveSuggestionIndex(selected: number, direction: -1 | 1, length: number): number {
@@ -28,8 +29,9 @@ export class CompletionController {
     today: DayNumber,
     excluded: readonly DateTextRange[],
     tags?: TagMatch,
+    initialEmoji?: readonly EmojiSuggestion[],
   ): void {
-    const match = recognizeCompletion(text, caret, today, tags)
+    const match = recognizeCompletion(text, caret, today, tags, initialEmoji)
     if (match === undefined || excluded.some((range) => range.start < match.end && range.end > match.start)) {
       this.close()
       return

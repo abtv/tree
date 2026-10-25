@@ -106,11 +106,13 @@ import { agendaVisualSources } from './agenda-visual-selection'
 import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
 import { RecentNodes } from './recent-nodes'
 import { RecentNodePersistence } from './recent-node-persistence'
+import { EmojiHistory } from './emoji-history'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
 export class EditorStore {
+  public readonly emojiHistory: EmojiHistory
   private readonly recentPersistence: RecentNodePersistence
   public readonly recentNodes = new RecentNodes(() => this.recentPersistence.changed())
   private readonly tags = new TagCatalog()
@@ -149,6 +151,7 @@ export class EditorStore {
     clock: Clock = systemClock,
     saveTiming: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
+    this.emojiHistory = new EmojiHistory(services.saveEmojiHistory?.bind(services), (error) => this.reportError(error))
     this.recentPersistence = new RecentNodePersistence(
       clock,
       this.recentNodes.getIds,
@@ -560,6 +563,7 @@ export class EditorStore {
       committed = this.finishPendingEdits()
     } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
     await this.recentPersistence.flush()
+    await this.emojiHistory.flush()
   }
 
   private finishPendingEdits(): boolean {
@@ -595,6 +599,7 @@ export class EditorStore {
   public async initialize(): Promise<void> {
     try {
       const loaded = await this.services.load()
+      this.emojiHistory.load(await this.services.loadEmojiHistory?.().catch(() => []))
       const recent = await this.services.loadRecentNodes?.().catch(() => [])
       if (loaded === null) {
         const rootId = this.createId()

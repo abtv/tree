@@ -47,6 +47,19 @@ describe('preload bridge', () => {
     await expect(treeApi.setRecentNodes!(['a'])).rejects.toThrow('disk failure')
   })
 
+  it('forwards emoji-history channels, values and errors', async () => {
+    const { treeApi } = await import('./index')
+    mocks.invoke.mockResolvedValueOnce(['cat'])
+
+    await expect(treeApi.getEmojiHistory!()).resolves.toEqual(['cat'])
+    await treeApi.setEmojiHistory!(['rocket', 'cat'])
+
+    expect(mocks.invoke.mock.calls).toEqual([['tree:get-emoji-history'], ['tree:set-emoji-history', ['rocket', 'cat']]])
+    mocks.invoke.mockRejectedValueOnce(new Error('disk failure'))
+
+    await expect(treeApi.setEmojiHistory!(['cat'])).rejects.toThrow('disk failure')
+  })
+
   it('forwards the quit-without-saving request to the main process', async () => {
     const { treeApi } = await import('./index')
 

@@ -19,6 +19,7 @@ import { readClipboard, writeClipboard, type NativeClipboard } from '../../infra
 import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../shared/ipc'
 import type { WebContents } from 'electron'
 import { RECENT_NODE_LIMIT } from '../../application/recent-nodes'
+import { EMOJI_HISTORY_LIMIT, normalizeEmojiHistory } from '../../domain/emoji-completion'
 
 export interface IpcInvokeEvent {
   senderFrame?: { url?: string } | null
@@ -30,6 +31,8 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  getEmojiHistory?: () => Promise<string[]>
+  setEmojiHistory?: (names: readonly string[]) => Promise<void>
   getRecentNodes?: () => Promise<string[]>
   setRecentNodes?: (ids: readonly string[]) => Promise<void>
   getAppearance: () => AppearancePreference
@@ -53,6 +56,8 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  getEmojiHistory,
+  setEmojiHistory,
   getRecentNodes,
   setRecentNodes,
   getAppearance,
@@ -77,6 +82,23 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  ipcMain.handle(ipcChannels.getEmojiHistory, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return getEmojiHistory?.() ?? []
+  })
+  ipcMain.handle(ipcChannels.setEmojiHistory, (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (
+      !Array.isArray(value) ||
+      value.length > EMOJI_HISTORY_LIMIT ||
+      normalizeEmojiHistory(value).length !== value.length
+    )
+      throw new Error('Invalid emoji history.')
+    return setEmojiHistory?.(value as string[])
+  })
 
   ipcMain.handle(ipcChannels.getRecentNodes, (event, ...args) => {
     requireTrustedRenderer(event)

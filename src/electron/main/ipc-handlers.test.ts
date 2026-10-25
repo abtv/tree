@@ -46,6 +46,8 @@ function createHarness() {
   const getCommandHistory = vi.fn(() => ['set-theme-dark'])
   const setCommandHistory = vi.fn()
   const getRecentNodes = vi.fn(async () => ['node-a'])
+  const getEmojiHistory = vi.fn(async () => ['cat'])
+  const setEmojiHistory = vi.fn<(names: readonly string[]) => Promise<void>>(async () => undefined)
   const setRecentNodes = vi.fn<(ids: readonly string[]) => Promise<void>>(async () => undefined)
   const notesArchive = {
     chooseExportDestination: vi.fn(async () => ({ ok: true as const, fileName: 'Tree Notes 2026-10-23.zip' })),
@@ -64,6 +66,8 @@ function createHarness() {
   }
   const setNotesMenuState = vi.fn()
   registerIpcHandlers({
+    getEmojiHistory,
+    setEmojiHistory,
     getRecentNodes,
     setRecentNodes,
     getAppearance,
@@ -86,6 +90,8 @@ function createHarness() {
     setNotesMenuState,
   })
   return {
+    getEmojiHistory,
+    setEmojiHistory,
     getRecentNodes,
     setRecentNodes,
     setNotesMenuState,
@@ -109,6 +115,29 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('validates emoji history before storage and preserves read/write failures', async () => {
+    const { handlers, getEmojiHistory, setEmojiHistory } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const get = handlers.get(ipcChannels.getEmojiHistory)!
+    const set = handlers.get(ipcChannels.setEmojiHistory)!
+
+    await expect(get(event)).resolves.toEqual(['cat'])
+    await set(event, ['rocket', 'cat'])
+
+    expect(setEmojiHistory).toHaveBeenCalledExactlyOnceWith(['rocket', 'cat'])
+    for (const invalid of [null, [null], ['unknown'], ['cat', 'cat'], Array(101).fill('cat'), ['__proto__']])
+      expect(() => set(event, invalid)).toThrow('Invalid emoji history')
+    expect(() => get(event, 'extra')).toThrow()
+    expect(() => set(event, [], 'extra')).toThrow()
+    expect(() => get({ senderFrame: { url: 'https://untrusted.example' } })).toThrow('Untrusted')
+    expect(() => set({ senderFrame: { url: 'https://untrusted.example' } }, ['cat'])).toThrow('Untrusted')
+
+    getEmojiHistory.mockRejectedValueOnce(new Error('read failure'))
+    setEmojiHistory.mockRejectedValueOnce(new Error('write failure'))
+
+    await expect(get(event)).rejects.toThrow('read failure')
+    await expect(set(event, ['cat'])).rejects.toThrow('write failure')
+  })
   it('validates recent-node history, rejects untrusted calls and propagates write errors', async () => {
     const { handlers, getRecentNodes, setRecentNodes } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
