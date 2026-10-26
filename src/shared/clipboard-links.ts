@@ -140,7 +140,8 @@ function decodeHtmlSegment(html: string, from: number, to: number): string {
       break
     }
     const tag = html.slice(tagStart, tagEnd + 1)
-    if (/^<br\s*\/?\s*>$/i.test(tag)) label += '\n'
+    // A second whitespace run requires a slash, so malformed tags cannot split one run quadratically.
+    if (/^<br\s*(?:\/\s*)?>$/i.test(tag)) label += '\n'
     cursor = tagEnd + 1
   }
   return decodeHtml(label)

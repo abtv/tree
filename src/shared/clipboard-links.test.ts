@@ -63,4 +63,23 @@ describe('clipboard link extraction', () => {
     expect(extractClipboardLinks(malformed, '')).toEqual([])
     expect(performance.now() - startedAt).toBeLessThan(2_000)
   }, 5_000)
+
+  it('retains a link after a long malformed break tag without blocking clipboard parsing', () => {
+    const html = `<br${' '.repeat(128_000)}x><a href="https://example.com">label</a>`
+    const startedAt = performance.now()
+
+    const links = extractClipboardLinks(html, 'label')
+    const elapsed = performance.now() - startedAt
+
+    expect(links).toEqual([{ start: 0, end: 5, url: 'https://example.com' }])
+    expect(elapsed).toBeLessThan(2_000)
+  }, 15_000)
+
+  it.each(['<br>', '<BR />', '<br\t/\n>', '<br\u00a0>'])('preserves line breaks from %s before links', (tag) => {
+    const html = `label${tag}<a href="https://example.com">label</a>`
+
+    const links = extractClipboardLinks(html, 'label\nlabel')
+
+    expect(links).toEqual([{ start: 6, end: 11, url: 'https://example.com' }])
+  })
 })

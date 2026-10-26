@@ -96,6 +96,8 @@ implemented in `src/web/services.ts`.
 * **Untrusted content.** Shared rendering escapes node text and link attributes;
   domain normalization accepts only HTTP(S) link destinations. Clipboard HTML is
   reduced to text and link ranges rather than inserted as arbitrary markup.
+  Break-tag recognition uses non-overlapping whitespace runs to avoid quadratic
+  backtracking on malformed clipboard HTML; a focused regression test bounds its processing time.
   Stored documents are validated when loaded; invalid stored data is not replaced
   with a new sample document.
   Both entry points install the shared `src/renderer/external-drop.ts` window-capture
