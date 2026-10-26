@@ -15,6 +15,61 @@ import {
 
 describeForEachEditingMode('Recent nodes', (mode) => {
   // @requirement PRODUCT.md §20.14
+  test('opens a sole exact tag result with one Enter and restores suggestions for a fragment', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'Origin', children: [] },
+          { id: 'b', text: 'First #p1', children: [] },
+          { id: 'c', text: 'Second #p1', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const input = popup.getByRole('searchbox')
+    const tags = popup.getByRole('listbox', { name: 'Tags' })
+    const results = popup.getByRole('listbox', { name: 'Search results' })
+
+    await input.fill('#p1')
+
+    await expect(tags).toHaveCount(0)
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+    await expect(results.getByRole('option').last()).toHaveAttribute('aria-selected', 'false')
+    await expect(popup.getByText('↑ ↓ select · Enter open · Esc close')).toBeVisible()
+    await expect(popup.getByLabel('Result position')).toHaveText('1 / 2')
+    await expect(input).toBeFocused()
+    await window.screenshot({ path: `test-results/search-exact-tag-${mode.mode}.png` })
+    await window.keyboard.press('Enter')
+
+    await expect(popup).toHaveCount(0)
+    await expect(window.locator('[data-node-id="b"] .node-input')).toBeFocused()
+
+    await window.keyboard.press('Meta+f')
+    await input.fill('#p1')
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await window.keyboard.press('Backspace')
+
+    await expect(input).toHaveValue('#p')
+    await expect(tags.getByRole('option')).toHaveText(['#p1'])
+    await window.keyboard.press('Tab')
+    await expect(tags).toHaveCount(0)
+    await expect(input).toHaveValue('#p1')
+    await expect(results.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('ArrowDown')
+    await expect(results.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+    await window.keyboard.press('Escape')
+
+    await expect(popup).toHaveCount(0)
+    await expect(window.locator('[data-node-id="b"] .node-input')).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('searches all nodes as typed, completes existing tags and opens results from Agenda', async ({
     userDataDir,
   }) => {

@@ -77,6 +77,30 @@ it('reveals the real parent from Agenda, resets caret even on repeated visits an
 })
 
 // @requirement PRODUCT.md §20.14
+it('omits only a sole exact tag suggestion and restores completion when the query or catalog changes', async () => {
+  const { store } = await setup()
+  store.editText('a', 'Alpha #p1 #Work #作')
+  const before = store.getSnapshot()
+
+  expect(store.searchNodeSuggestions('#p1')).toEqual([])
+  expect(store.searchNodeSuggestions('#Work')).toEqual([])
+  expect(store.searchNodeSuggestions('#作')).toEqual([])
+  expect(store.searchNodeSuggestions('#p')).toEqual(['p1'])
+  expect(store.searchNodeSuggestions('#Wor')).toEqual(['Work'])
+  expect(store.searchNodeSuggestions('#work')).toEqual([])
+  expect(store.searchNodeSuggestions('#unknown')).toEqual([])
+  expect(store.getSnapshot()).toBe(before)
+
+  store.editText('b', 'Beta #p10')
+
+  expect(store.searchNodeSuggestions('#p1')).toEqual(['p1', 'p10'])
+
+  store.undo()
+
+  expect(store.searchNodeSuggestions('#p1')).toEqual([])
+})
+
+// @requirement PRODUCT.md §20.14
 it('gates short and unknown queries without changing tags, document, selection or history', async () => {
   const { store } = await setup()
   store.editText('a', 'Alpha #w')

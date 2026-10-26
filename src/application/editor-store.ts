@@ -194,7 +194,8 @@ export class EditorStore {
   public subscribe = this.runtime.subscribe
 
   public searchNodeSuggestions(query: string): readonly string[] {
-    return this.tags.searchSuggestions(query)
+    const suggestions = this.tags.searchSuggestions(query)
+    return suggestions.length === 1 && query === `#${suggestions[0]}` ? [] : suggestions
   }
 
   public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
