@@ -105,7 +105,7 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
   // Chrome tests exercise the live browser handlers. This isolated, script-free copy exercises
   // the exact production markup/styles in Electron without adding browser APIs to the desktop app.
   const html = readFileSync('src/web/index.html', 'utf8')
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gu, '')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/giu, '')
     .replace(
       '</head>',
       `<style>${readFileSync('src/renderer/styles.css', 'utf8')}\n${readFileSync('src/web/styles.css', 'utf8')}</style></head>`,
