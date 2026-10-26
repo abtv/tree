@@ -759,6 +759,40 @@ export function handleVimKey(
       setSelectionRange(input, cursor, cursor)
       vim.setMode('visual-node')
     }
+  } else if (
+    visual &&
+    snapshot.status === 'ready' &&
+    snapshot.agenda === undefined &&
+    ['j', 'k', 'J', 'K'].includes(event.key)
+  ) {
+    const direction = event.key.toLowerCase() === 'j' ? 'down' : 'up'
+    if (input.getBoundingClientRect().width === 0) return handled()
+    const measured = visualTextGeometry(input)
+    const goal = commandState.verticalGoal
+    const viewportWidth = input.ownerDocument.documentElement.clientWidth
+    const focusToken = snapshot.status === 'ready' ? snapshot.focus.token : undefined
+    const left =
+      goal?.nodeId === node.id &&
+      goal.cursor === motionCursor &&
+      goal.viewportWidth === viewportWidth &&
+      goal.text === node.text &&
+      goal.focusToken === focusToken
+        ? goal.left
+        : measured.position(motionCursor).left
+    let target = motionCursor
+    try {
+      const steps = count * (event.key === 'J' || event.key === 'K' ? 10 : 1)
+      for (let step = 0; step < steps; step += 1) {
+        const next = visualLineCursor(node.text, measured.position, target, direction, left)
+        if (next === undefined) break
+        target = next
+      }
+    } finally {
+      measured.dispose()
+    }
+    move(target)
+    commandState.verticalGoal = { nodeId: node.id, cursor: target, left, viewportWidth, focusToken, text: node.text }
+    vim.revealVerticalCaret({ nodeId: node.id, cursor: target })
   } else if (!visual && (['j', 'k', 'J', 'K'].includes(event.key) || normalArrow)) {
     const direction = event.key.toLowerCase() === 'j' || event.key === 'ArrowDown' ? 'down' : 'up'
     const geometries = new Map<string, ReturnType<typeof visualTextGeometry>>()

@@ -54,8 +54,87 @@ const caretOffset = (field: ReturnType<typeof node>) =>
     return prefix.toString().length
   })
 
+const selectedText = (field: ReturnType<typeof node>) =>
+  field.evaluate((element) =>
+    element instanceof HTMLTextAreaElement
+      ? element.value.slice(element.selectionStart, element.selectionEnd)
+      : (window.getSelection()?.toString() ?? ''),
+  )
+
 test.describe('Vim editing: navigation and Visual modes', () => {
   test.use({ sharedApplicationReset: sharedApplicationAdopted() })
+
+  for (const rich of [false, true]) {
+    test(`extends character Visual across wrapped ${rich ? 'rich' : 'plain'} lines without leaving the node`, async ({
+      userDataDir,
+    }, testInfo) => {
+      const base = 'A synthetic note with enough words to wrap over several visible lines. '.repeat(30)
+      const url = 'https://example.test'
+      const text = base + url
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            {
+              id: 'wrapped',
+              text,
+              children: [],
+              ...(rich ? { links: [{ start: base.length, end: text.length, url }] } : {}),
+            },
+            { id: 'next', text: 'Unselected neighbor', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'wrapped' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setMainWindowBounds(app, { width: 640, height: 640 })
+      const first = node(window, 1)
+      await first.focus()
+      await setCursor(first, 4)
+      await window.keyboard.press('j')
+      const secondLine = await caretOffset(first)
+      await window.keyboard.press('k')
+      await window.keyboard.press('v')
+      await window.keyboard.press('j')
+
+      await expect.poll(() => selectedText(first)).toBe(text.slice(4, secondLine + 1))
+      await window.screenshot({ path: testInfo.outputPath('visual-wrapped-selection.png') })
+      await window.keyboard.press('k')
+
+      await expect.poll(() => selectedText(first)).toBe(text.slice(4, 5))
+      await window.keyboard.press('2')
+      await window.keyboard.press('j')
+
+      expect((await selectedText(first)).length).toBeGreaterThan(secondLine - 3)
+      await window.keyboard.press('o')
+      await window.keyboard.press('j')
+
+      await expect.poll(() => caretOffset(first)).toBe(secondLine)
+      await window.keyboard.press('Escape')
+
+      await expect.poll(() => caretOffset(first)).toBe(secondLine)
+      await window.keyboard.press('v')
+      await window.keyboard.press('9')
+      await window.keyboard.press('J')
+      const clamped = await selectedText(first)
+      await window.keyboard.press('j')
+
+      await expect(first).toBeFocused()
+      expect(await selectedText(first)).toBe(clamped)
+      await expect
+        .poll(() => window.locator('.scroll-viewport').evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(0)
+      await window.screenshot({ path: testInfo.outputPath('visual-wrapped-bottom.png') })
+      await window.keyboard.press('9')
+      await window.keyboard.press('K')
+      const top = await selectedText(first)
+      await window.keyboard.press('k')
+
+      expect(await selectedText(first)).toBe(top)
+      await expect(first).toBeFocused()
+      await expect.poll(() => window.locator('.scroll-viewport').evaluate((element) => element.scrollTop)).toBe(0)
+      await expect(node(window, 2)).toHaveValue('Unselected neighbor')
+    })
+  }
 
   // @requirement PRODUCT.md §4.3
   // @requirement PRODUCT.md §20.2.9

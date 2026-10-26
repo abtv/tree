@@ -138,8 +138,8 @@ export interface VimKeyboardState {
   ) => void
   moveBoundary: (boundary: 'first' | 'last' | 'parent', cursor: number, count?: number) => void
   moveViewport: (nodeId: string, motion: VimViewportMotion, cursor: number, count?: number) => void
-  /** Reveal the final Normal vertical destination after all counted caret transitions. */
-  revealVerticalCaret: () => void
+  /** Reveal the final vertical destination after all counted caret or Visual endpoint transitions. */
+  revealVerticalCaret: (visual?: { nodeId: string; cursor: number }) => void
   syncImageCaretToFocus: () => void
   setMode: (mode: VimMode) => void
   openAttachment: (attachmentId: string) => void

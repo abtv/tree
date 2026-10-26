@@ -255,28 +255,33 @@ export function useNodeInputBindings({
     sessionFinish.finishStructuralInsertSession({ commandState: vimCommandState.current }, input)
   }, [])
 
-  const revealVerticalCaret = useCallback((): void => {
-    const projection = caretProjection.current
-    const { nodeId, caret } = projection.authority
-    const state = store.getSnapshot()
-    viewportReveal.cancel()
-    if (nodeId === undefined || state.status !== 'ready') return
-    const revision = projection.currentRevision
-    const token = state.focus.token
-    const isCurrent = (): boolean => {
-      const current = store.getSnapshot()
-      return (
-        current.status === 'ready' &&
-        current.focus.token === token &&
-        projection.currentRevision === revision &&
-        projection.mode === 'normal'
-      )
-    }
-    if (caret.imageActive) {
-      const input = inputs.current.get(nodeId)
-      if (input !== undefined) viewportReveal.begin(input.closest('.node-row') ?? input, true, isCurrent)
-    } else viewportReveal.beginLine(() => inputs.current.get(nodeId), caret.cursor, isCurrent)
-  }, [store, viewportReveal])
+  const revealVerticalCaret = useCallback(
+    (visual?: { nodeId: string; cursor: number }): void => {
+      const projection = caretProjection.current
+      const nodeId = visual?.nodeId ?? projection.authority.nodeId
+      const caret = visual === undefined ? projection.authority.caret : { cursor: visual.cursor, imageActive: false }
+      const state = store.getSnapshot()
+      viewportReveal.cancel()
+      if (nodeId === undefined || state.status !== 'ready') return
+      const revision = projection.currentRevision
+      const token = state.focus.token
+      const isCurrent = (): boolean => {
+        const current = store.getSnapshot()
+        return (
+          current.status === 'ready' &&
+          current.focus.token === token &&
+          projection.currentRevision === revision &&
+          projection.mode === (visual === undefined ? 'normal' : 'visual') &&
+          (visual === undefined || vimCommandState.current.visualFocus === visual.cursor)
+        )
+      }
+      if (caret.imageActive) {
+        const input = inputs.current.get(nodeId)
+        if (input !== undefined) viewportReveal.begin(input.closest('.node-row') ?? input, true, isCurrent)
+      } else viewportReveal.beginLine(() => inputs.current.get(nodeId), caret.cursor, isCurrent)
+    },
+    [store, viewportReveal],
+  )
 
   const syncImageCaretToFocus = useCallback((): void => {
     const state = store.getSnapshot()

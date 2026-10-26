@@ -13,6 +13,7 @@ import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
 import { clearPending } from './vim-command-state'
 import { setNormalCaret } from './editor-dom'
+import * as editorDom from './editor-dom'
 import { APPLE_SHORTCUTS, OTHER_SHORTCUTS } from './shortcut-profile'
 
 beforeEach(() => vi.useFakeTimers())
@@ -204,6 +205,67 @@ async function textFixture(node: TreeNode, mode: VimKeyboardState['mode'] = 'nor
   }
   return { ...harness, ...keyboard, input, press, dispatch, caretRequests }
 }
+
+// @requirement PRODUCT.md §20.2.20
+it('keeps the Visual anchor and desired column across short lines, counts and reversed endpoints', async () => {
+  const f = await textFixture({ id: 'node', text: 'abcdefghijklmnopqr', children: [] })
+  vi.spyOn(f.input, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 120, 60))
+  const dispose = vi.fn()
+  const geometry = vi.spyOn(editorDom, 'visualTextGeometry').mockReturnValue({
+    position: (offset) => {
+      const start = offset < 8 ? 0 : offset < 10 ? 8 : 10
+      return { top: start === 0 ? 0 : start === 8 ? 20 : 40, left: (offset - start) * 10 }
+    },
+    dispose,
+  })
+  try {
+    f.input.setSelectionRange(5, 5)
+    f.press('v', 'j')
+
+    expect(f.commandState.visualAnchor).toBe(5)
+    expect(f.commandState.visualFocus).toBe(9)
+
+    f.press('j')
+
+    expect(f.commandState.visualFocus).toBe(15)
+    expect(f.input.value.slice(f.input.selectionStart, f.input.selectionEnd)).toBe('fghijklmnop')
+
+    f.press('2', 'k')
+
+    expect(f.commandState.visualFocus).toBe(5)
+
+    f.press('o', 'K')
+
+    expect(f.commandState.visualFocus).toBe(5)
+    expect(f.commandState.visualAnchor).toBe(5)
+    expect(dispose).toHaveBeenCalledTimes(4)
+    expect(f.node().text).toBe('abcdefghijklmnopqr')
+  } finally {
+    geometry.mockRestore()
+  }
+})
+
+// @requirement PRODUCT.md §20.2.20
+it.each(['', 'abc'])('clamps Visual vertical selection within single-line text %j with an attachment', async (text) => {
+  const f = await textFixture({ id: 'node', text, children: [], attachment: { id: 'image', mimeType: 'image/png' } })
+  vi.spyOn(f.input, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 120, 20))
+  const geometry = vi.spyOn(editorDom, 'visualTextGeometry').mockReturnValue({
+    position: (offset) => ({ top: 0, left: offset * 10 }),
+    dispose: vi.fn(),
+  })
+  try {
+    f.input.setSelectionRange(0, 0)
+    f.press('v', '9', 'J', '9', 'K')
+
+    expect(f.commandState.visualAnchor).toBe(0)
+    expect(f.commandState.visualFocus).toBe(0)
+    expect(f.input.selectionEnd).toBe(text.length === 0 ? 0 : 1)
+    expect(f.vim.mode).toBe('visual')
+    expect(f.vim.applyCaretState).not.toHaveBeenCalled()
+  } finally {
+    geometry.mockRestore()
+  }
+})
 
 // @requirement PRODUCT.md §20.2.10
 it('increments and decrements numbers with counts, dot repeat and separate history entries', async () => {
