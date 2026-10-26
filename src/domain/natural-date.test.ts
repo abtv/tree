@@ -12,6 +12,38 @@ const dates = (text: string, reference = today, caret = text.length): string[] |
     formatCanonicalDate(calendarDateOf(suggestion.day)),
   )
 
+it('finishes promptly when a long digit run is not a relative date', () => {
+  const text = `${'9'.repeat(128_000)}x`
+  const startedAt = performance.now()
+
+  const result = suggestDates(text, text.length, today)
+  const elapsed = performance.now() - startedAt
+
+  expect(result).toBeUndefined()
+  expect(elapsed).toBeLessThan(2_000)
+}, 15_000)
+
+it('keeps complete numeric counts and finds later dates after long digit runs', () => {
+  const zeros = '0'.repeat(128_000)
+  const invalid = '9'.repeat(128_000)
+
+  for (const expression of [`${zeros}1 days ago`, `in ${zeros}1 days`]) {
+    const text = `Plan (${expression})`
+    const match = suggestDates(text, text.length - 1, today)!
+
+    expect(text.slice(match.start, match.end)).toBe(expression)
+    expect(match.suggestions[0]!.day).toBe(today + (expression.startsWith('in ') ? 1 : -1))
+  }
+
+  const text = `${invalid}x then tomorrow`
+  const match = suggestDates(text, text.length, today)!
+
+  expect(text.slice(match.start, match.end)).toBe('tomorrow')
+  expect(match.suggestions[0]!.day).toBe(today + 1)
+  expect(dates(`Plan ${invalid} days ago`)).toBeUndefined()
+  expect(dates('Plan a123 days ago')).toBeUndefined()
+})
+
 // @requirement PRODUCT.md §20.9.1
 it('agrees relative day and week descriptions with numeric and written counts', () => {
   for (const [count, singular] of [

@@ -98,6 +98,8 @@ implemented in `src/web/services.ts`.
   reduced to text and link ranges rather than inserted as arbitrary markup.
   Break-tag recognition uses non-overlapping whitespace runs to avoid quadratic
   backtracking on malformed clipboard HTML; a focused regression test bounds its processing time.
+  Date completion starts numeric counts only at the first digit of a run, avoiding
+  quadratic retries on long numeric text when the user edits pasted or imported notes.
   Stored documents are validated when loaded; invalid stored data is not replaced
   with a new sample document.
   Both entry points install the shared `src/renderer/external-drop.ts` window-capture

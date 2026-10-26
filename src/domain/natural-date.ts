@@ -51,7 +51,8 @@ const smallCounts = [
 const tensCounts = ['twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
 // Expanding the unit alternatives is output-equivalent: relativeSuggestionsFor still
 // rejects compound units above nine.
-const countPattern = `(?:[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
+// Start numeric counts only at the first digit, avoiding a scan of every suffix of a long digit run.
+const countPattern = `(?:(?<![0-9])[0-9]+|one +hundred|(?:${tensCounts.join('|')})(?:(?: +|-)(?:${smallCounts.slice(0, 9).join('|')}))?|${smallCounts.join('|')})`
 const relativeExpression = /^(?:in (.+) (days?|weeks?)|(.+) (days?|weeks?) ago)$/
 // Only distinctive, explicitly supported prefixes qualify. Longest first keeps
 // recognition on the complete word when the caret is inside existing text.

@@ -1716,6 +1716,8 @@ A click or press that selects a node does not move a node that is fully visible,
 
 Tree and Agenda node editors offer explicit date completion in standard editing and Vim Insert. Natural-language expressions remain ordinary text until accepted. A compact popup opens only after an edit inside a recognized expression; it never opens for paste, Undo, or programmatic text changes. Hyperlink text is excluded. Vim Normal, Visual and Replace do not offer completion.
 
+Long digit runs in node text must not cause quadratic date-recognition work on the next edit. Numeric counts are recognized as complete runs, including leading zeros; unrelated digit runs must not prevent completion of a later expression.
+
 #### 20.9.1 Recognized Expressions
 
 * Recognition ignores case and permits repeated spaces between words.
