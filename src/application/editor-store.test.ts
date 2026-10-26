@@ -2822,7 +2822,8 @@ describe('EditorStore', () => {
         ['before', '', []],
         ['root', 'Current', ['child']],
       ])
-      expect(state.location.selectedNodeId).toBe('before')
+      expect(state.location.selectedNodeId).toBe('root')
+      expect(state.focus).toMatchObject({ nodeId: 'root', cursor: 0 })
     }
   })
 

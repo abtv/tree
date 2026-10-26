@@ -148,6 +148,7 @@ it('clears a pin when its contextual ancestor is selected, maintaining a valid v
 it('closes Agenda when its scope disappears and normalizes a deleted origin on close', async () => {
   const { store } = await agendaHarness()
   store.createSiblingOrFirstChild(0)
+  store.selectNode('unused', 0)
 
   store.enter()
   store.openAgenda()

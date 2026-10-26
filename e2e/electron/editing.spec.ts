@@ -218,7 +218,62 @@ describeForEachEditingMode('creating nodes with Enter', () => {
 
     await expect(node(window, 1)).toHaveValue('')
     await expect(node(window, 2)).toHaveValue('Current')
-    await expect(node(window, 1)).toBeFocused()
+    await expect(node(window, 2)).toBeFocused()
+    expect(await node(window, 2).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+  })
+
+  test('repeated Enter after a split keeps the caret before the suffix', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+
+    await typeInto(node(window, 1), 'one linepress backspace in the beginning of the string')
+    await setCursor(node(window, 1), 8)
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Enter')
+
+    await expect(node(window, 1)).toHaveValue('one line')
+    await expect(node(window, 2)).toHaveValue('')
+    await expect(node(window, 3)).toHaveValue('press backspace in the beginning of the string')
+    await expect(node(window, 3)).toBeFocused()
+    expect(await node(window, 3).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    await window.screenshot({ caret: 'initial', path: test.info().outputPath('enter-twice-caret.png') })
+
+    await window.keyboard.press('Enter')
+    await window.keyboard.type('Here: ')
+
+    await expect(node(window, 2)).toHaveValue('')
+    await expect(node(window, 3)).toHaveValue('')
+    await expect(node(window, 4)).toHaveValue('Here: press backspace in the beginning of the string')
+    await expect(node(window, 4)).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §5.1
+  test('Enter at the beginning of linked text retains its rich editor caret', async ({ userDataDir }) => {
+    const { window } = await launchTree(userDataDir)
+    const text = 'https://example.com'
+
+    await typeInto(node(window, 1), text)
+    await setCursor(node(window, 1), 0)
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Enter')
+
+    await expect(node(window, 1)).toHaveValue('')
+    await expect(node(window, 2)).toHaveValue('')
+    await expect(node(window, 3)).toHaveText(text)
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3).locator('a')).toHaveAttribute('href', text)
+    expect(
+      await node(window, 3).evaluate((element) => {
+        const selection = element.ownerDocument.defaultView!.getSelection()!
+        const before = element.ownerDocument.createRange()
+        before.selectNodeContents(element)
+        before.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return { collapsed: selection.isCollapsed, offset: before.toString().length }
+      }),
+    ).toEqual({ collapsed: true, offset: 0 })
+
+    await window.keyboard.type('Here: ')
+
+    await expect(node(window, 3)).toHaveText(`Here: ${text}`)
   })
 
   // @requirement PRODUCT.md §5.1

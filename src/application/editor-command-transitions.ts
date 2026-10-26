@@ -186,13 +186,16 @@ export function createSiblingOrFirstChildTransition(
   if (cursor === current.node.text.length) return openBelowTransition(document, location, createId, expanded)
 
   const id = createId()
-  const selected = current.node
-  const nextDocument =
-    cursor === 0 && selected.text !== ''
-      ? insertSiblingBefore(document, location.selectedNodeId, id)
-      : splitNode(document, location.selectedNodeId, cursor, id)
+  if (cursor === 0) {
+    return {
+      document: insertSiblingBefore(document, location.selectedNodeId, id),
+      location,
+      focus: { nodeId: location.selectedNodeId, cursor: 0 },
+    }
+  }
+
   return {
-    document: nextDocument,
+    document: splitNode(document, location.selectedNodeId, cursor, id),
     location: { ...location, selectedNodeId: id },
     focus: { nodeId: id, cursor: 0 },
   }

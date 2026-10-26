@@ -672,7 +672,7 @@ describe('App', () => {
 
       const inserted: Document = { roots: [{ id: 'created-0', text: '', children: [] }, ...original.roots] }
 
-      assertState(inserted, 'created-0')
+      assertState(inserted, 'current')
       expect(screen.getByRole('textbox', { name: 'Node 2' })).toHaveValue('Current')
 
       fireEvent.keyDown(document.activeElement!, { key: 'z', metaKey: true })

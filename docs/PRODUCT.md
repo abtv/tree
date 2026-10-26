@@ -414,12 +414,12 @@ When a completion popup is open in standard editing or Vim Insert, plain `Enter`
 
 At the end of text, `Enter` follows the same placement rule as Vim `o` (§20.2.10): an expanded node with children receives a new empty first child, before its existing children; a collapsed node or a leaf receives a new empty sibling after its entire subtree. The current location and existing folds stay unchanged. An expanded parent with empty text also receives a first child; it is not an empty leaf.
 
-At the beginning of nonempty text, the new empty sibling is inserted immediately before the current node. In the middle of text, the suffix becomes a new sibling after the current node's entire subtree. These two rules do not depend on expansion.
+At the beginning of nonempty text, the new empty sibling is inserted immediately before the current node. The current node stays selected with the caret at text position zero, after the inserted empty sibling. Repeated Enter inserts further empty siblings before that same text without moving the caret away from it. In the middle of text, the suffix becomes a new sibling after the current node's entire subtree. These two rules do not depend on expansion.
 
 * On an empty leaf (no text, attachment, or children) shown inside an inline-expanded branch, `Enter` preserves that leaf. If it has a following sibling, `Enter` creates another empty sibling immediately after it at the same level, before the following sibling. Only when the empty leaf is the last sibling does `Enter` move that leaf immediately after its parent, one level left. It creates no node: the leaf keeps its identity, stays selected with the caret at text position zero, and the parent keeps its other children.
 * This never leaves the current location: on a root or a direct child of the focused current parent, `Enter` creates the next sibling at the same level.
 * Thus the first press at the end of nonempty text creates an empty child or sibling as specified above; the next press on that empty leaf moves it one level left only if it is the last sibling and that level is available. Vim `o` follows the same rule (§20.2.10).
-* Each press creates one node, or moves one empty leaf, as one undoable change, selects that node at text position zero, and keeps standard editing or Vim Insert active.
+* Each press creates one node, or moves one empty leaf, as one undoable change and keeps standard editing or Vim Insert active. It selects that node at text position zero, except at the beginning of nonempty text, where the original node stays selected as described above.
 
 ### Cursor at the end
 
@@ -451,11 +451,11 @@ Press `Enter`.
 Result:
 
 ```text
-|
-Current
+
+|Current
 ```
 
-The new sibling is empty, and the original node keeps its text, image, and children.
+The new sibling is empty, and the original node keeps its text, image, children, selection, and text cursor.
 
 ### Cursor in the middle
 

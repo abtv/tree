@@ -19,6 +19,57 @@ function countNodes(nodes: readonly TreeNode[]): number {
 }
 
 describe('editor command transition properties', () => {
+  it('keeps the nonempty node selected through repeated Enter at its start at every displayed depth', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 1 }),
+        fc.array(fc.string(), { maxLength: 6 }),
+        fc.boolean(),
+        fc.boolean(),
+        fc.integer({ min: 1, max: 5 }),
+        (text, ancestors, focused, expanded, presses) => {
+          const current: TreeNode = {
+            id: 'current',
+            text,
+            attachment: { id: 'image', mimeType: 'image/png' },
+            children: [{ id: 'kept-child', text: 'Child', children: [] }],
+          }
+          let branch = current
+          for (const [index, ancestor] of ancestors.entries()) {
+            branch = { id: `ancestor-${index}`, text: ancestor, children: [branch] }
+          }
+          let document: Document = {
+            roots: focused ? [{ id: 'scope', text: 'Scope', children: [branch] }] : [branch],
+          }
+          const location = { currentParentId: focused ? 'scope' : null, selectedNodeId: current.id }
+
+          for (let index = 0; index < presses; index += 1) {
+            const result = createSiblingOrFirstChildTransition(document, location, 0, () => `blank-${index}`, expanded)
+            if (!('document' in result)) throw new Error('Expected creation.')
+
+            assertDocument(result.document)
+
+            const selected = locateNode(result.document, current.id)!
+
+            expect(selected.node).toBe(current)
+            expect(selected.siblings.map((node) => node.id)).toEqual([
+              ...Array.from({ length: index + 1 }, (_, blank) => `blank-${blank}`),
+              current.id,
+            ])
+            expect(selected.siblings.slice(0, -1).every((node) => node.text === '' && node.children.length === 0)).toBe(
+              true,
+            )
+            expect(result.location).toEqual(location)
+            expect(result.focus).toEqual({ nodeId: current.id, cursor: 0 })
+            expect(countNodes(result.document.roots)).toBe(countNodes(document.roots) + 1)
+
+            document = result.document
+          }
+        },
+      ),
+    )
+  })
+
   it('puts ordered fresh copies under a heading while preserving its children and location', () => {
     fc.assert(
       fc.property(

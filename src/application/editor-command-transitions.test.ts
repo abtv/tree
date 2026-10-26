@@ -462,8 +462,8 @@ describe('editor command transitions', () => {
       ['first', 'First'],
       ['second', 'Second'],
     ])
-    expect(before.location).toEqual({ currentParentId: 'root', selectedNodeId: 'before' })
-    expect(before.focus).toEqual({ nodeId: 'before', cursor: 0 })
+    expect(before.location).toEqual({ currentParentId: 'root', selectedNodeId: 'first' })
+    expect(before.focus).toEqual({ nodeId: 'first', cursor: 0 })
 
     const split = createSiblingOrFirstChildTransition(
       document,
@@ -516,8 +516,10 @@ describe('editor command transitions', () => {
       child ? ['created', 'first', 'second'] : ['first', 'second'],
     )
     expect(original.text).toBe(cursor === 2 ? 'Ro' : 'Root')
-    expect(result.location).toEqual({ ...location, selectedNodeId: 'created' })
-    expect(result.focus).toEqual({ nodeId: 'created', cursor: 0 })
+    const selectedNodeId = cursor === 0 ? 'root' : 'created'
+
+    expect(result.location).toEqual({ ...location, selectedNodeId })
+    expect(result.focus).toEqual({ nodeId: selectedNodeId, cursor: 0 })
   })
 
   it.each(['', 'Parent'])('Enter reopens an expanded parent and preserves its attachment at text end (%j)', (text) => {
