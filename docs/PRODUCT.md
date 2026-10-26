@@ -840,6 +840,8 @@ When a valid HTTP or HTTPS URL is pasted, the URL is stored as a clickable hyper
 
 Only `http` and `https` URLs are hyperlinks. Invalid URLs and other schemes are pasted as ordinary text.
 
+In the browser version, both primary-modifier click and Vim Normal `Enter` open hyperlinks in a new browsing context without an opener reference or an HTTP referrer. The destination must not be able to navigate the Tree page through `window.opener`.
+
 ---
 
 ## 13. Plain Text Paste

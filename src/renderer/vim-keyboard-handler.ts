@@ -1020,7 +1020,7 @@ export function handleVimKey(
       vim.openAttachment(node.attachment.id)
     } else {
       const link = linkAtPosition(node.links, cursor)
-      if (link !== undefined) window.open(link.url, '_blank')
+      if (link !== undefined) window.open(link.url, '_blank', 'noopener,noreferrer')
     }
   } else return false
   return handled()

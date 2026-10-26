@@ -700,14 +700,14 @@ describe('link click', () => {
     expect(open).not.toHaveBeenCalled()
   })
 
-  it('opens the link in a new window on Cmd+click', async () => {
+  it('opens the link without an opener or referrer on Cmd+click', async () => {
     const f = await fixture()
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const { input, link } = linkInput()
 
     f.handlers().onClick({ target: link, currentTarget: input, metaKey: true, preventDefault: vi.fn() } as never)
 
-    expect(open).toHaveBeenCalledExactlyOnceWith('https://example.test', '_blank')
+    expect(open).toHaveBeenCalledExactlyOnceWith('https://example.test', '_blank', 'noopener,noreferrer')
   })
 
   // @requirement PRODUCT.md §1.5
@@ -726,6 +726,7 @@ describe('link click', () => {
 
     expect((event as { preventDefault: () => void }).preventDefault).toHaveBeenCalledOnce()
     expect(open).toHaveBeenCalledTimes(opens)
+    if (opens) expect(open).toHaveBeenCalledWith('https://example.test', '_blank', 'noopener,noreferrer')
   })
 
   it('does not open the link on Ctrl+click on the Apple profile', async () => {

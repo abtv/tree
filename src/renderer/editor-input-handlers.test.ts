@@ -5030,7 +5030,7 @@ describe('editor keyboard handler', () => {
 
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(firstChar)
 
-    expect(open).toHaveBeenCalledWith(url, '_blank')
+    expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
     expect(firstChar.preventDefault).toHaveBeenCalledOnce()
 
     open.mockClear()
@@ -5039,7 +5039,7 @@ describe('editor keyboard handler', () => {
 
     vimHandler(store, { id: 'node', text, links, children: [] }).handle(lastChar)
 
-    expect(open).toHaveBeenCalledWith(url, '_blank')
+    expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
 
     open.mockRestore()
   })
@@ -5200,7 +5200,7 @@ describe('Agenda split and sibling keys', () => {
     try {
       keyboard.handle(keyEvent(element, 'Enter'))
 
-      expect(open).toHaveBeenCalledWith('https://example.com', '_blank')
+      expect(open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
       expect(store.splitAgendaNode).not.toHaveBeenCalled()
       expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
       expect(element.selectionStart).toBe(2)

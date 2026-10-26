@@ -2889,7 +2889,7 @@ describe('useNodeInputBindings', () => {
 
     f.bindings().onClick(event(true) as never)
 
-    expect(open).toHaveBeenCalledWith(url, '_blank')
+    expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
     expect(preventDefault).toHaveBeenCalledTimes(2)
 
     f.bindings().onClick({ ...event(true), target: document.createElement('a') } as never)

@@ -141,7 +141,7 @@ export function createPointerHandlers(
       const link = target instanceof Element ? target.closest('a[href]') : null
       if (link === null || !event.currentTarget.contains(link)) return
       event.preventDefault()
-      if (shortcuts.isPrimary(event)) window.open(link.getAttribute('href') ?? '', '_blank')
+      if (shortcuts.isPrimary(event)) window.open(link.getAttribute('href') ?? '', '_blank', 'noopener,noreferrer')
     },
     onCut: () => store.markNextTextEditStandalone(),
     onFocus: (event: FocusEvent<HTMLElement>) => {

@@ -210,7 +210,10 @@ service. Neither version uploads documents or attachments or sends telemetry.
 Local storage still permits disclosure through user-invoked features:
 
 * **Open an external hyperlink.** The website opens the destination in another
-  browser context; Electron hands the HTTP(S) URL to the operating system through
+  browser context with `noopener,noreferrer`, for both primary-modifier click and
+  Vim Normal Enter. The destination receives no opener reference or HTTP referrer,
+  preventing reverse tabnabbing through `window.opener`. Electron hands the HTTP(S)
+  URL to the operating system through
   `src/electron/main/index.ts`. The URL may itself contain document content.
 * **Clipboard use.** Copying makes selected content available to other applications
   through the system clipboard. Browser clipboard access is subject to browser
@@ -291,6 +294,7 @@ local tests do not establish those controls.
 | Browser notes import of hostile archives | `src/application/notes-archive/zip-reader.test.ts` and `import-notes.test.ts` (malformed-archive corpus), `src/web/archive/import-job.test.ts` (real Deflate, Deflate bomb, seeded fuzzing), round-trip property | `e2e/web/import.spec.mts` against development and built packages |
 | Browser storage ownership and failed writes | Shared document validation tests | `e2e/web/storage.spec.mts` |
 | Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mts`, `e2e/web/compatibility.spec.mts` |
+| Browser external-link opener and referrer isolation | `src/renderer/node-input-pointer-handlers.test.ts`, `src/renderer/editor-input-handlers.test.ts` | `e2e/web/external-links.spec.mts` against the built package |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
