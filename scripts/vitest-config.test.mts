@@ -1,13 +1,14 @@
 import { fileURLToPath } from 'node:url'
 import { createFilter } from 'vite'
 import { describe, expect, it } from 'vitest'
+import 'vitest/config'
 import { resolveConfig } from 'vitest/node'
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url))
 
 describe('vitest configuration', () => {
   it('does not collect specs parked in the test-results scratch directory', async () => {
-    const { vitestConfig } = await resolveConfig({
+    const { test: vitestConfig } = await resolveConfig({
       root: repositoryRoot,
       config: 'config/testing/vitest.config.ts',
     })
