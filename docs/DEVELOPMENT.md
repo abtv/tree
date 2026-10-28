@@ -541,6 +541,9 @@ preserve the release verification contract and existing triggers and dependencie
 ### Risk-Based Validation
 
 Build configurations live in `config/build/` and test configurations in `config/testing/`.
+Vite 8, `@vitejs/plugin-react` 6 and `electron-vite` 6 form the compatible build toolchain.
+Use `build.rolldownOptions` for bundle inputs and `oxc.jsx.runtime` for the web JSX transform.
+Electron main and preload dependencies use `electron-vite`'s default externalization.
 The npm scripts select them explicitly; use those scripts instead of relying on tool discovery.
 Keep ESLint and the TypeScript solution entry point in the repository root for editor discovery.
 TypeScript target configurations live in `config/typescript/`; the root `tsconfig.json` references them.

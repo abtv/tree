@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 const server = await createServer({
   configFile: false,
   root: resolve(import.meta.dirname, '../../src/web'),
-  esbuild: { jsx: 'automatic' },
+  oxc: { jsx: { runtime: 'automatic' } },
   // The archive worker imports fflate after startup; discovering it then would reload the page.
   optimizeDeps: { include: ['fflate'] },
   worker: { format: 'es' },

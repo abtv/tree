@@ -9,7 +9,7 @@ await build({
   configFile: false,
   root: resolve(import.meta.dirname, '../../src/web'),
   base: './',
-  esbuild: { jsx: 'automatic' },
+  oxc: { jsx: { runtime: 'automatic' } },
   build: { outDir, emptyOutDir: true, target: 'es2022' },
   // Same-origin module workers run archive work off the main thread (ADR 0022).
   worker: { format: 'es' },
