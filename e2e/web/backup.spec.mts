@@ -1,6 +1,5 @@
 // @editing-modes: independent
 // @requirement PRODUCT.md §24.5
-import { chromium } from '@playwright/test'
 import { test, expect, capture, primaryKey } from './fixtures.mts'
 import {
   chooseMenuItem,
@@ -13,56 +12,6 @@ import {
   saved,
   seedImageNodes,
 } from './data-helpers.mts'
-
-// Linux arm64 Playwright Chromium (1243) stops the browser process with SIGTRAP when a new
-// document reads a stored OPFS directory handle from IndexedDB. The picker stub returns OPFS
-// handles, so cases that reload with a stored backup folder run only on macOS Chrome. The
-// canary below fails once Chromium is fixed; then remove these marks and the canary.
-const storedHandleCrash = process.platform === 'linux'
-const storedHandleCrashReason = 'Linux Chromium crashes when a new document reads a stored OPFS handle'
-
-test('canary: Linux Chromium still crashes when a new document reads a stored OPFS handle', async ({ baseURL }) => {
-  test.skip(!storedHandleCrash, 'Only Linux Chromium has the stored-handle crash')
-  // A separate browser keeps the expected crash away from the shared test browser.
-  const browser = await chromium.launch({ channel: 'chromium', headless: true })
-  try {
-    const page = await (await browser.newContext({ baseURL: baseURL! })).newPage()
-
-    await page.goto('/')
-    await ready(page)
-    const readStoredHandle = (store: boolean) =>
-      page.evaluate(async (store) => {
-        const db = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = indexedDB.open('stored-handle-canary', 1)
-          request.onupgradeneeded = () => request.result.createObjectStore('handles')
-          request.onsuccess = () => resolve(request.result)
-          request.onerror = () => reject(request.error)
-        })
-        const folder = store
-          ? await (await navigator.storage.getDirectory()).getDirectoryHandle('canary', { create: true })
-          : undefined
-        const value = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
-          const tx = db.transaction('handles', 'readwrite')
-          const request = store
-            ? tx.objectStore('handles').put(folder, 'folder')
-            : tx.objectStore('handles').get('folder')
-          tx.oncomplete = () => resolve(request.result)
-          tx.onabort = () => reject(tx.error)
-        })
-        db.close()
-        return store ? 'stored' : value?.kind
-      }, store)
-    await readStoredHandle(true)
-
-    await page.reload()
-    await ready(page)
-
-    await expect(readStoredHandle(false)).rejects.toThrow(/closed/)
-    expect(browser.isConnected()).toBe(false)
-  } finally {
-    await browser.close().catch(() => {})
-  }
-})
 
 test('folder handles persist and a same-origin module worker can write through them', async ({ newContext }) => {
   const context = await newContext()
@@ -123,7 +72,6 @@ test('folder handles persist and a same-origin module worker can write through t
 test('backs up saved notes and images, coalesces edits, resumes on reload, and stops without deleting files', async ({
   newContext,
 }) => {
-  test.fixme(storedHandleCrash, storedHandleCrashReason)
   const context = await newContext()
 
   await installBackupPicker(context)
@@ -194,7 +142,6 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
 test('pauses without prompting on reload and requests permission only from the Resume click', async ({
   newContext,
 }) => {
-  test.fixme(storedHandleCrash, storedHandleCrashReason)
   const context = await newContext()
 
   await installBackupPicker(context)
@@ -498,7 +445,6 @@ test('a stopped backup worker can be resumed without affecting browser saves', a
 test('a failed image write preserves the previous document and retries an empty file after restart', async ({
   newContext,
 }) => {
-  test.fixme(storedHandleCrash, storedHandleCrashReason)
   // This test rewrites the worker response to inject a filesystem failure.
   const context = await newContext({ serviceWorkers: 'block' })
 
