@@ -14,9 +14,7 @@ import '../renderer/styles.css'
 import './styles.css'
 import { blockExternalDrops } from '../renderer/external-drop'
 import { installAppUpdates } from './app-updates'
-import { version } from '../../package.json'
 
-document.getElementById('app-version')!.textContent = `Version ${version}`
 blockExternalDrops(window)
 
 // Mobile browsers discard a tab under memory pressure well before a desktop Electron renderer would.

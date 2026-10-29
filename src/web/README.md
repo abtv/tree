@@ -79,7 +79,12 @@ Another browser, profile, hostname or port has separate storage.
 
 The ellipsis button opens Tree, Agenda, Vim Editing, appearance and Data controls.
 The menu also shows local save status and whether the browser granted persistent
-storage. Only one tab may edit at a time.
+storage. Its last line identifies the loaded build with the Actions run number and
+UTC build date, for example **Version 142 · Oct 29, 2026**. Local builds without
+`GITHUB_RUN_NUMBER` show **Local build** with the date. The release workflow supplies
+the number automatically; find the corresponding run in **Release web app** in
+GitHub Actions to see its source commit and publication result. Only one tab may
+edit at a time.
 
 **Export Notes…** in the Data block downloads one ZIP archive with the saved
 document and its referenced images, in the layout of the desktop data directory.

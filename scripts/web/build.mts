@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { offlinePackage } from './offline-package.mts'
 import { createHash } from 'node:crypto'
+import { appVersionPlugin } from './app-version.mts'
 
 const outDir = resolve(import.meta.dirname, '../../out/web')
 await build({
@@ -14,6 +15,7 @@ await build({
   // Same-origin module workers run archive work off the main thread (ADR 0022).
   worker: { format: 'es' },
   plugins: [
+    appVersionPlugin(),
     {
       name: 'static-browser-policy',
       transformIndexHtml: {

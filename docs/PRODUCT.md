@@ -66,10 +66,13 @@ While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
-The browser's ellipsis menu ends with a muted, non-interactive `Version <version>`
-line showing the running application's version from `package.json`, below statuses
-and the Update App button when present. It describes the loaded app, including
-while a newer update is waiting.
+The browser's ellipsis menu ends with a muted, non-interactive version line below
+statuses and the Update App button when present. Published builds show the GitHub
+Actions release workflow's run number and the UTC build date in English, for
+example `Version 142 · Oct 29, 2026`. Builds outside Actions show
+`Local build · Oct 29, 2026`. Both values are fixed at build time and describe the
+loaded app, including offline and while a newer update is waiting. No manual
+`package.json` version change is needed for browser releases.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or

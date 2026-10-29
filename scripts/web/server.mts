@@ -1,10 +1,12 @@
 import { createServer } from 'vite'
 import { resolve } from 'node:path'
+import { appVersionPlugin } from './app-version.mts'
 
 const server = await createServer({
   configFile: false,
   root: resolve(import.meta.dirname, '../../src/web'),
   oxc: { jsx: { runtime: 'automatic' } },
+  plugins: [appVersionPlugin()],
   // The archive worker imports fflate after startup; discovering it then would reload the page.
   optimizeDeps: { include: ['fflate'] },
   worker: { format: 'es' },
