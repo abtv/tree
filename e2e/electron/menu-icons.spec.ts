@@ -136,8 +136,11 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
   }, html)
   const page = await opened
   try {
+    // Native title-bar height varies between macOS versions; compare a fixed content area.
+    await page.setViewportSize({ width: 800, height: 618 })
     await page.evaluate(() => {
       document.getElementById('prototype-save-status')!.textContent = 'Saved locally in this browser'
+      document.getElementById('app-version')!.textContent = 'Version 123 · 2026-10-29'
       ;(document.getElementById('data-export') as HTMLButtonElement).disabled = true
       document.getElementById('tree-menu')!.showPopover()
       document.getElementById('prototype-agenda')!.focus()
@@ -165,6 +168,7 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
     }
 
     await page.setViewportSize({ width: 390, height: 650 })
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
     const bounds = await menu.boundingBox()
 
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
