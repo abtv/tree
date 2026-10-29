@@ -1,6 +1,7 @@
 // @editing-modes: independent
 import { test, expect, capture } from './fixtures.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
+import { readFileSync } from 'node:fs'
 
 test('uses the menu, previews and mobile editing policy', async ({ newContext, baseURL }) => {
   const context = await newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })
@@ -63,6 +64,12 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   await page.getByRole('dialog', { name: 'Tree menu' }).waitFor()
 
   await expect(page.locator('#tree-menu .folder-actions-separator')).toBeVisible()
+
+  // @requirement PRODUCT.md §1.4
+  const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'))
+
+  await expect(page.locator('#app-version')).toHaveText(`Version ${version}`)
+  await expect(page.locator('#tree-menu > :last-child')).toHaveAttribute('id', 'app-version')
 
   const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
     const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']

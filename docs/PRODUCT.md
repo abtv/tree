@@ -66,6 +66,11 @@ While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
+The browser's ellipsis menu ends with a muted, non-interactive `Version <version>`
+line showing the running application's version from `package.json`, below statuses
+and the Update App button when present. It describes the loaded app, including
+while a newer update is waiting.
+
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or
 Agenda editor/row, keeping the caret, selection direction and editing mode/session.

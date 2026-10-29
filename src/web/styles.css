@@ -140,6 +140,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
 #prototype-save-status,
 #storage-status,
 #offline-status,
+#app-version,
 #backup-status {
   display: block;
   padding: 3px 10px;
