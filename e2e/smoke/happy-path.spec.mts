@@ -3,7 +3,7 @@ import { test, _electron as electron, chromium, expect } from '@playwright/test'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { happyPath, type SmokeDriver } from './scenario.mts'
+import { browserEditing, happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, closeApp } from '../electron/fixtures.ts'
 
@@ -15,6 +15,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('crash', () => errors.push('Renderer crashed'))
     const driver: SmokeDriver = {
+      click: (selector) => page.locator(selector).click(),
       waitFor: async (script) => {
         await expect.poll(() => page.evaluate(`(async () => { ${script} })()`), { message: script }).toBe(true)
       },
@@ -121,6 +122,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
 
       await page.goto(`http://localhost:${address.port}`)
       await happyPath(driver)
+      await browserEditing(driver)
 
       expect(errors).toEqual([])
     } finally {

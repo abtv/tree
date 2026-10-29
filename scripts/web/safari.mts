@@ -7,7 +7,7 @@ import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
-import { happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
+import { browserEditing, happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 
 export const SAFARI_SMOKE_TIMEOUT_MS = 30_000
 
@@ -130,6 +130,10 @@ export async function runSafari(smoke = false) {
         return id
       }
       const smokeDriver: SmokeDriver = {
+        click: async (selector) => {
+          const id = await elementId(selector)
+          await request(`/session/${session}/element/${id}/click`, {})
+        },
         countRows: () => evaluate("return document.querySelectorAll('.node-row').length"),
         waitFor: async (script) => {
           const deadline = Date.now() + 5000
@@ -189,6 +193,7 @@ export async function runSafari(smoke = false) {
             Backspace: '\uE003',
             ArrowUp: '\uE013',
             ArrowDown: '\uE015',
+            ArrowRight: '\uE014',
             Shift: '\uE008',
             Control: '\uE009',
             Primary: '\uE03D',
@@ -229,6 +234,7 @@ export async function runSafari(smoke = false) {
         },
       }
       await happyPath(smokeDriver)
+      await browserEditing(smokeDriver)
       console.log(`Safari ${created.capabilities.browserVersion}: happy path passed`)
       return
     }

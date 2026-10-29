@@ -5,6 +5,7 @@ const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, 
 export const childText = `${date} 🐱 Smoke child one two three four five six seven eight nine ten`
 
 export interface SmokeDriver {
+  click: (selector: string) => Promise<void>
   waitFor: (script: string) => Promise<void>
   countRows: () => Promise<number>
   fill: (selector: string, text: string) => Promise<void>
@@ -14,6 +15,7 @@ export interface SmokeDriver {
       | 'Enter'
       | 'Tab'
       | 'Shift+Tab'
+      | 'Shift+ArrowRight'
       | 'Backspace'
       | 'ArrowUp'
       | 'ArrowDown'
@@ -37,6 +39,47 @@ export interface SmokeDriver {
   enableVim: () => Promise<void>
   showView: (view: 'tree' | 'agenda') => Promise<void>
   reload: () => Promise<SmokeDriver>
+}
+
+// Browser-only coverage: Electron has a different editing policy and no Tree menu.
+export async function browserEditing(driver: SmokeDriver) {
+  const editor = '.node-input:focus'
+  const url = 'https://example.com'
+  const text = `Link ${url}`
+  await driver.press(editor, '0')
+  await driver.press(editor, 'i')
+  await driver.fill(editor, '')
+  await driver.type(editor, text)
+  await driver.waitFor(`return document.activeElement?.isContentEditable === true &&
+    document.activeElement.textContent === ${JSON.stringify(text)} &&
+    document.activeElement.querySelector('a')?.getAttribute('href') === ${JSON.stringify(url)}`)
+
+  await driver.press(editor, 'Escape')
+  await driver.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL' &&
+    document.activeElement?.matches('.node-input') && document.activeElement.isContentEditable === false &&
+    document.activeElement.textContent === ${JSON.stringify(text)}`)
+  await driver.press(editor, '0')
+  await driver.press(editor, 'i')
+  await driver.type(editor, 'X')
+  await driver.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'INSERT' &&
+    document.activeElement?.isContentEditable === true && document.activeElement.textContent === ${JSON.stringify('X' + text)} &&
+    getSelection()?.isCollapsed && getSelection()?.anchorOffset === 1 &&
+    document.activeElement.querySelector('a')?.getAttribute('href') === ${JSON.stringify(url)}`)
+
+  // Select the next character through native keyboard input, then borrow focus for the menu.
+  await driver.press(editor, 'Shift+ArrowRight')
+  await driver.waitFor(`return getSelection()?.toString() === 'L'`)
+  await driver.click('#tree-menu-button')
+  await driver.waitFor(`return document.querySelector('#tree-menu')?.matches(':popover-open') === true &&
+    document.querySelector('#tree-menu')?.contains(document.activeElement)`)
+  await driver.press(':focus', 'Escape')
+  await driver.waitFor(`return document.querySelector('#tree-menu')?.matches(':popover-open') === false &&
+    document.activeElement?.matches('.node-input') && getSelection()?.toString() === 'L' &&
+    document.querySelector('.vim-mode')?.textContent === 'INSERT'`)
+  await driver.type(editor, 'Y')
+  await driver.waitFor(`return document.activeElement?.textContent === ${JSON.stringify('XYink ' + url)} &&
+    document.activeElement.querySelector('a')?.getAttribute('href') === ${JSON.stringify(url)} &&
+    getSelection()?.isCollapsed && getSelection()?.anchorOffset === 2`)
 }
 
 const first = '.node-row .node-input'

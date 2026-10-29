@@ -467,6 +467,8 @@ The `Enforce agent attribution policy` workflow runs `scripts/check-attribution.
 Release checks are isolated from standalone manual and scheduled check cancellation;
 the concurrency rules are described in [Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
 
+Browser smoke additionally types a URL into a rich editor, switches Vim Insert → Normal → Insert, and checks the link, text, focus and caret. It then selects a character with the keyboard, opens the Tree menu, dismisses it with Escape and replaces the restored selection. Chromium and real Safari share these assertions; Electron retains its existing scenario because its editing policy and menu differ. These checks use native keyboard and pointer events, without clipboard access, extra jobs or larger time budgets.
+
 #### Workflow and job naming policy
 
 Name GitHub Actions workflows by the work they perform, using an imperative verb
