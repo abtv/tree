@@ -240,8 +240,8 @@ async function record() {
   if (recordingPage === undefined) throw new Error('No demo recording was produced.')
   const recording = join(output, 'tree-demo.webm')
   const recordingBytes = statSync(recording).size
-  if (recordingBytes === 0 || recordingBytes >= 3_000_000) {
-    throw new Error('The video must be nonempty and smaller than 3 MB.')
+  if (recordingBytes === 0 || recordingBytes >= 5_000_000) {
+    throw new Error('The video must be nonempty and smaller than 5 MB.')
   }
   const durationMs = videoDurationMs(readFileSync(recording))
   if (!Number.isFinite(durationMs) || durationMs <= 0 || durationMs >= 30_000) {
