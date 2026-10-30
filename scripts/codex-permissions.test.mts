@@ -75,6 +75,14 @@ const sandbox = [
   'test:property:soak',
 ]
 
+it.each(['domain', 'application', 'renderer'])('allows the named mutation workflow for the %s shard', (shard) => {
+  const rules = declaredRules()
+
+  expect(explicitlyAllowed(rules, ['npm', 'run', 'test:mutation', '--', '--shard', shard, '--concurrency', '4'])).toBe(
+    true,
+  )
+})
+
 it('covers every package workflow with repository approval or an explicit exemption', () => {
   const { scripts } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
     scripts: Record<string, string>

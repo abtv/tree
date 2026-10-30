@@ -57,7 +57,7 @@
     "test:coverage": "vitest run -c config/testing/vitest.config.ts --coverage",
     "test:performance": "vitest run -c config/testing/vitest.performance.config.ts",
     "test:property:soak": "TREE_PROPERTY_RUNS=20 NODE_OPTIONS=--max-old-space-size=4096 vitest run -c config/testing/vitest.config.ts --testTimeout=600000 .property.test.ts",
-    "test:mutation": "stryker run config/testing/stryker.config.mjs",
+    "test:mutation": "node scripts/run-mutation.mts",
     "test:e2e": "npm run build && playwright test -c config/testing/playwright.config.ts",
     "test:e2e:diagnose": "node scripts/e2e-diagnose.mts",
     "test:e2e:memory": "npm run test:e2e -- --config=config/testing/playwright.memory.config.ts",

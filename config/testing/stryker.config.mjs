@@ -1,11 +1,9 @@
 // Keep JavaScript: Stryker's configuration loader supports .mjs, not .mts.
 import process from 'node:process'
+import { mutationShard } from './mutation-shards.mts'
 
 // Mutation testing for the domain and application layers and the pure renderer modules. See docs/DEVELOPMENT.md §12.
-const shard = process.env['TREE_MUTATION_SHARD']
-if (shard && !['domain', 'application', 'renderer'].includes(shard)) {
-  throw new Error(`Unknown mutation shard: ${shard}`)
-}
+const shard = mutationShard(process.env['TREE_MUTATION_SHARD'])
 
 /** @satisfies {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
