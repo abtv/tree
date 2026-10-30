@@ -610,7 +610,7 @@ export function joinSiblingRange(
       while (parts.length > 0) {
         const last = parts.pop()!
         length -= last.length
-        const trimmed = last.replace(/\s+$/u, '')
+        const trimmed = last.trimEnd()
         if (trimmed !== '') {
           parts.push(trimmed)
           length += trimmed.length

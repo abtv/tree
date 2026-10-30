@@ -21,9 +21,25 @@ export function stripProductComments(content: string) {
 }
 
 export function productOwnText(lines: ProductLine[]) {
-  return stripProductComments(lines.map(({ text }) => text).join('\n'))
-    .replace(/^\s*---\s*$/gm, '')
-    .trim()
+  const content = stripProductComments(lines.map(({ text }) => text).join('\n'))
+  const parts: string[] = []
+  let cursor = 0
+  // Find separators without letting whitespace cross line boundaries. Expand each removal
+  // across adjacent blank lines to preserve the original own-text counting semantics.
+  for (const match of content.matchAll(/^[^\S\r\n\u2028\u2029]*---[^\S\r\n\u2028\u2029]*$/gm)) {
+    let start = match.index
+    let end = start + match[0].length
+    for (let index = start - 1; index >= cursor && /\s/u.test(content[index]!); index--) {
+      if (index === 0 || /[\r\n\u2028\u2029]/u.test(content[index - 1]!)) start = index
+    }
+    for (let index = end; index < content.length && /\s/u.test(content[index]!); index++) {
+      if (index + 1 === content.length || /[\r\n\u2028\u2029]/u.test(content[index + 1]!)) end = index + 1
+    }
+    parts.push(content.slice(cursor, start))
+    cursor = end
+  }
+  parts.push(content.slice(cursor))
+  return parts.join('').trim()
 }
 
 export function scanProductSections(content: string) {

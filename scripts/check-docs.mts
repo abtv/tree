@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mts'
+import { markdownLinks } from './markdown-links.mts'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -149,8 +150,8 @@ export function findBrokenLinks({
 }) {
   const issues: string[] = []
   const baseDirectory = dirname(filePath)
-  for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
-    const target = match[1]!.trim()
+  for (const link of markdownLinks(content)) {
+    const target = link.target.trim()
     if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue
     const withoutAnchor = target.split('#')[0]!
     if (withoutAnchor === '') continue
@@ -573,8 +574,9 @@ function unfinishedPlanPaths(rootDirectory: string) {
   for (const line of readFileSync(indexPath, 'utf8').split(/\r?\n/u)) {
     const status = line.trim().startsWith('|') ? line.split('|')[2]?.trim() : undefined
     if (CLOSED_PLAN_STATUS.test(status ?? '')) continue
-    for (const match of line.matchAll(/\[[^\]]+\]\(([^)#]+\.md)(?:#[^)]*)?\)/gu)) {
-      const path = relative(rootDirectory, resolve(rootDirectory, 'plans', match[1]!))
+    for (const link of markdownLinks(line, true)) {
+      const target = link.target.split('#', 1)[0]!
+      const path = relative(rootDirectory, resolve(rootDirectory, 'plans', target))
       if (!/^plans\/[^/]+\.md$/u.test(path) || path === 'plans/README.md') continue
       const filePath = join(rootDirectory, path)
       if (!existsSync(filePath)) continue

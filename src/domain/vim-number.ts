@@ -41,8 +41,13 @@ export function changeVimNumber(text: string, cursor: number, amount: number): V
 
     const negative = next < 0n
     let result = (negative ? -next : next).toString(radix)
-    const letters = token.match(/[a-zA-Z]/gu)
-    const lastLetter = letters?.at(-1)
+    let lastLetter: string | undefined
+    for (let index = token.length - 1; index >= 0; index--) {
+      if (/[a-zA-Z]/u.test(token[index]!)) {
+        lastLetter = token[index]
+        break
+      }
+    }
     const uppercase = lastLetter !== undefined && lastLetter === lastLetter.toUpperCase()
     if (radix === 16 && uppercase) result = result.toUpperCase()
     if (digits.startsWith('0') || prefix !== '') result = result.padStart(digits.length, '0')

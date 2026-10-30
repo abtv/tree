@@ -94,10 +94,12 @@ export function reconcileLinkTextEdit(
     // Whitespace typed inside a link splits it into words. Each word that is a valid URL stays a
     // link, so a URL typed in front of an existing word keeps its link once the space is typed.
     if (insertedIntroducesWhitespace) {
-      const words = [...nextText.slice(projected.start, projected.end).matchAll(/\S+/g)]
-        .map((match) => ({ start: projected.start + match.index, text: match[0] }))
-        .filter((word) => isHttpUrl(word.text))
-        .map((word) => ({ start: word.start, end: word.start + word.text.length, url: word.text }))
+      const words: LinkRange[] = []
+      for (const match of nextText.slice(projected.start, projected.end).matchAll(/\S+/g)) {
+        if (!isHttpUrl(match[0])) continue
+        const start = projected.start + match.index
+        words.push({ start, end: start + match[0].length, url: match[0] })
+      }
       if (words.length > 0) return { links: normalizeLinks([...retained, ...words], nextText), createsNewLink: true }
     }
     return {

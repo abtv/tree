@@ -123,7 +123,7 @@ function relativeSuggestionsFor(expression: string, today: DayNumber): NaturalDa
   // redundant; it also keeps anchor-removal mutants output-equivalent.
   if (relative === null || relative[0] !== expression) return undefined
   const value = relative[1] ?? relative[3]!
-  const [first, second, extra] = value.split(/[ -]/)
+  const [first, second, extra] = value.split(/[ -]/, 3)
   const small = smallCounts.indexOf(first!)
   const tens = tensCounts.indexOf(first!)
   const unit = smallCounts.slice(0, 9).indexOf(second!)
