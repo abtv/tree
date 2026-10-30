@@ -28,6 +28,12 @@ The configuration deliberately uses v26 flat `mac` signing options. In v27 these
 move under `mac.sign`; validate the installed schema when upgrading, rather than
 copying the v27 documentation into this v26 configuration.
 
+In v26, `notarize: true` alone can silently skip notarization when credentials
+are absent. The `beforePack` credential guard rejects that case before packaging,
+including direct builder invocations. Run its negative-path tests with
+`npm test -- scripts/release-guard.test.mts`. Node 24 loads the TypeScript hook
+through the v26 loader. Local packaging now requires credentials as well.
+
 The stable bundle identifier is `io.github.abtv.tree`. The existing PNG icon is
 converted by electron-builder. Only compiled `out` files and production packages
 are included; the archive worker remains included. Application name, sandbox,
@@ -43,6 +49,9 @@ The five repository secrets are `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`,
 The Base64 API key is decoded to a private temporary file and removed on exit.
 Builder notarizes and staples the app; the workflow verifies its Developer ID
 signature, ticket and Gatekeeper acceptance, then notarizes and staples the DMG.
+The DMG is explicitly signed and its Developer ID authority and Gatekeeper
+acceptance are checked too. Immediately before upload, the release must still be
+a draft. Upload does not use `--clobber`.
 Missing credentials or any failed verification prevent asset upload. The built-in
 GitHub token has only `contents: write` in the release job. No auto-updater is added.
 

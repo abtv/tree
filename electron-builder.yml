@@ -1,6 +1,7 @@
 appId: io.github.abtv.tree
 productName: Tree
 forceCodeSigning: true
+beforePack: scripts/release-guard.mts
 directories:
   output: dist
 files:
@@ -18,6 +19,8 @@ mac:
   entitlementsInherit: config/build/entitlements.mac.plist
   notarize: true
 artifactName: Tree-${version}-${arch}.${ext}
+dmg:
+  sign: true
 publish:
   provider: github
   owner: abtv
