@@ -37,7 +37,10 @@ test('persists accepted emoji history across reload and notes replacement', asyn
     {},
   )
   await chooseImportFile(page, archive)
+  const reloaded = page.waitForEvent('load')
+
   await page.getByRole('button', { name: 'Replace Notes', exact: true }).click()
+  await reloaded
   await ready(page)
   await input.fill(':')
 

@@ -7,6 +7,24 @@ import { SearchPrompt } from './SearchPrompt'
 
 afterEach(cleanup)
 
+it('confirms backward with Shift+Enter while retaining input focus', () => {
+  const store = createEditorStoreDouble()
+  const confirm = vi.spyOn(store.search, 'confirm')
+  const restoreEditor = vi.fn()
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'a', visible: true, pending: false }}
+      restoreEditor={restoreEditor}
+    />,
+  )
+
+  fireEvent.keyDown(screen.getByPlaceholderText('Find'), { key: 'Enter', shiftKey: true })
+
+  expect(confirm).toHaveBeenCalledWith(-1)
+  expect(restoreEditor).not.toHaveBeenCalled()
+})
+
 it('leaves composition confirmation and cancellation to native input before accepting a completed query', () => {
   const store = createEditorStoreDouble()
   const confirm = vi.spyOn(store.search, 'confirm')
@@ -34,7 +52,7 @@ it('leaves composition confirmation and cancellation to native input before acce
   fireEvent.keyDown(input, { key: 'Enter' })
 
   expect(confirm).toHaveBeenCalledOnce()
-  expect(restoreEditor).toHaveBeenCalledOnce()
+  expect(restoreEditor).not.toHaveBeenCalled()
 })
 
 it('cancels on window deactivation without stealing focus back from another window', () => {

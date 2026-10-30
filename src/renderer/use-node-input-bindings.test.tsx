@@ -126,6 +126,98 @@ async function fixture(
 }
 
 describe('useNodeInputBindings', () => {
+  it.each(['normal', 'insert'] as const)('defers the %s match caret until Find closes', async (mode) => {
+    const f = await fixture({ document: { roots: [node('node', 'apple apple')] }, mode })
+    const input = f.input()
+    input.classList.add('node-input')
+    input.focus()
+    setCaret(input, 0)
+    const label = document.createElement('label')
+    label.className = 'search-input-line'
+    const prompt = document.createElement('input')
+    label.append(prompt)
+    document.body.append(label)
+    prompt.focus()
+
+    await act(async () => {
+      f.store.search.begin({ nodeId: 'node', offset: 0 })
+      f.store.search.edit('apple')
+      f.store.search.confirm()
+      await vi.runAllTimersAsync()
+    })
+
+    expect(document.activeElement).toBe(prompt)
+    expect(f.result.current.readSearchCaret()).toBe(6)
+
+    const next = document.createElement('button')
+    document.body.append(next)
+    next.focus()
+
+    expect(f.result.current.readSearchCaret()).toBe(6)
+
+    act(() => {
+      f.store.hideSearch()
+      f.result.current.restoreSearchFocus()
+    })
+
+    expect(document.activeElement).toBe(input)
+    expect(getCaret(input)).toBe(6)
+  })
+
+  it('discards a deferred match caret when the user selects another Insert position', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'apple apple')] }, mode: 'insert' })
+    const input = f.input()
+    input.classList.add('node-input')
+    input.focus()
+    const label = document.createElement('label')
+    label.className = 'search-input-line'
+    const prompt = document.createElement('input')
+    label.append(prompt)
+    document.body.append(label)
+    prompt.focus()
+
+    await act(async () => {
+      f.store.search.begin({ nodeId: 'node', offset: 0 })
+      f.store.search.edit('apple')
+      f.store.search.confirm()
+      await vi.runAllTimersAsync()
+    })
+    input.focus()
+    setCaret(input, 2)
+    prompt.focus()
+    act(() => {
+      f.store.hideSearch()
+      f.result.current.restoreSearchFocus()
+    })
+
+    expect(document.activeElement).toBe(input)
+    expect(getCaret(input)).toBe(2)
+  })
+
+  it.each([false, true])('keeps the current search origin when controls borrow focus (Vim: %s)', async (vimEnabled) => {
+    const f = await fixture({
+      document: { roots: [node('node', 'apple apple apple')] },
+      vimEnabled,
+      mode: vimEnabled ? 'normal' : 'insert',
+    })
+    const input = f.input()
+    input.focus()
+    setCaret(input, 6)
+    act(() => f.bindings().onMouseUp({ currentTarget: input, button: 0 } as never))
+    act(() => f.bindings().onSelect({ currentTarget: input } as never))
+    const control = document.createElement('button')
+    control.setAttribute('data-editor-focus-borrow', '')
+    document.body.append(control)
+    control.focus()
+
+    expect(f.result.current.readSearchCaret()).toBe(6)
+
+    act(() => f.result.current.restoreSearchFocus())
+
+    expect(document.activeElement).toBe(input)
+    expect(getCaret(input)).toBe(6)
+  })
+
   // @requirement PRODUCT.md §20.2.9
   it('moves with Normal arrows, including counts and outer boundaries', async () => {
     const f = await fixture({

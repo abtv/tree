@@ -40,6 +40,13 @@ try {
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
   let viewCommands: Pick<CommandServices, 'showAgenda' | 'showTree'> | undefined
+  let searchCommand: ((command: import('../shared/ipc').FindMenuCommand) => void) | undefined
+  const registerSearchCommands = (run: NonNullable<typeof searchCommand>) => {
+    searchCommand = run
+    return () => {
+      searchCommand = undefined
+    }
+  }
   treeButton.disabled = agendaButton.disabled = true
   const registerViewCommands = (commands: NonNullable<typeof viewCommands>) => {
     viewCommands = commands
@@ -53,6 +60,7 @@ try {
     <ErrorBoundary>
       <App
         registerViewCommands={registerViewCommands}
+        registerSearchCommands={registerSearchCommands}
         menuCommands={menuCommands}
         initialVimEnabled={await window.treeApi.getVimEnabled()}
         vimAvailable={bridge.vimAvailable}
@@ -79,6 +87,8 @@ try {
   }
   treeButton.onclick = run(() => viewCommands?.showTree())
   agendaButton.onclick = run(() => viewCommands?.showAgenda())
+  document.getElementById('local-find')!.onclick = run(() => searchCommand?.('find'))
+  document.getElementById('global-search')!.onclick = run(() => searchCommand?.('all'))
   document.getElementById('prototype-vim')!.onclick = run(async () => {
     await window.treeApi.setVimEnabled(!(await window.treeApi.getVimEnabled()))
   })

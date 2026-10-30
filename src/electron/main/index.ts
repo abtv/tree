@@ -118,6 +118,11 @@ function rebuildApplicationMenu(): void {
         },
         {
           requestQuit: requestQuitFromMenu,
+          findCommand: (command) => {
+            if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
+              mainWindow.webContents.send(ipcEvents.findMenuCommand, command)
+            }
+          },
           viewCommand: (command) => {
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.viewMenuCommand, command)

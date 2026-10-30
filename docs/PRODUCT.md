@@ -1486,8 +1486,10 @@ Normal mode also supports:
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
 * Named registers, macros, and marks are not supported.
 
-Tree and Agenda support literal text search in Vim Normal mode. `/` opens a bottom-status-area
-input without moving the document layout. It selects the last confirmed query for
+Tree and Agenda support literal text search in standard editing and Vim. `Cmd+F`
+opens the local search in either editing mode; `/` also opens it in Vim Normal.
+`Cmd+;` remains the separate global node search (§20.14). A nonmodal Find panel
+opens at the upper right without moving the document layout. It selects the last confirmed query for
 replacement, or starts empty. Smart case ignores case unless the query contains an
 uppercase character. Matches do not overlap and do not cross node boundaries.
 Displayed link text participates, including phrases crossing a link boundary.
@@ -1507,16 +1509,46 @@ and mounted-text highlighting are independent of that cap. Query entry updates
 counts and highlights without moving the document caret, scrolling or unfolding.
 Scrolling and disclosure clicks retain the prompt and its captured logical origin,
 even if folding hides that origin; ordinary fold selection still applies underneath.
-Ordinary node-text clicks cancel the draft and perform ordinary selection.
+Ordinary node-text clicks close the panel, discard any draft and hide highlights,
+while preserving the clicked caret or selection. The last confirmed query remains
+available to Cmd+F and repeat commands. Scrolling and disclosure clicks keep search open.
 
 Enter confirms and moves strictly after the captured origin, wrapping if necessary.
 An empty confirmation reuses the last confirmed query, or does nothing if none exists.
-`n` and `N` navigate forward/backward from the current position, with numeric prefixes.
+In Vim Normal, `n` and `N` navigate forward/backward from the current position, with numeric prefixes.
+
+In either editing mode, `Cmd+G` and `Cmd+Shift+G` repeat forward and backward;
+previous/next buttons beside the count provide the same actions. `Shift+Enter`
+confirms backward. Focus remains in the input after confirmation; repeated Enter
+or Shift+Enter moves to the next or previous match. The query remains editable.
+Escape or the close button hides the panel and restores editor focus at the last
+match, or preserves the original selection if no jump occurred. The compact panel
+shows an input with placeholder `Find`, the count, navigation arrows and close button.
+It has no scope label; scope follows the current presentation automatically.
+
+The count area reserves space for pending and completed counts so typing and
+recounting never resize the input or move its controls.
+While counting, the previous completed count remains visible until the new count
+replaces it, without an empty intermediate state. The status is marked busy for
+assistive technology. `Searching…` replaces the previous count only after 200ms
+of continuous pending work; the completed count appears immediately.
+Closing Find cancels the pending indicator delay.
+
+The previous/next and close buttons show application-drawn tooltips on hover and
+visible keyboard focus, naming only the action without shortcuts. Tooltips appear
+below the panel and do not intercept input.
+
+Edit menu and command-panel actions expose local Find, Find Next, Find Previous
+and Search All Nodes. Search opening borrows editing focus; cancellation preserves
+the original mode and selection. Pending Replace text is committed before searching,
+without leaving Replace on opening. A confirmed jump ends Visual/Replace in Normal.
+
 Destinations place the text caret at a grapheme boundary. Exact totals show the current
-ordinal after navigation; wrapping shows a brief notice. Reveal only the destination's
-ancestor path. Successive jumps keep earlier search reveals open. Normal Escape hides
+ordinal after navigation; wrapping updates the ordinal without a separate notice. Reveal only the destination's
+ancestor path. Successive jumps keep earlier search reveals open. Escape in standard
+editing or Vim Normal hides
 feedback and closes search-opened branches except the current path, preserving
-pre-existing expansion and explicit manual fold choices. `n`/`N` restore feedback.
+pre-existing expansion and explicit manual fold choices. Repeat commands restore feedback.
 
 Agenda reveals only the selected occurrence's day and projected ancestor path;
 its folds remain independent of other days and Tree expansion. Search destinations
@@ -1526,7 +1558,8 @@ A newer manual selection, non-search command or command-panel opening cancels
 pending search jumps and queued repeats. A delayed result must not replace the
 newer caret or focus choice. Search feedback remains available.
 
-Escape during entry restores the prior confirmed search. Losing prompt focus,
+Escape during entry discards the draft, retains the prior confirmed query for recall,
+and closes the panel. Losing prompt focus,
 deactivating the window, or opening the command panel also cancels the unconfirmed
 draft; scrolling and disclosure controls retain the exceptions above. Prompt text,
 including `n`, `N` and `:`, remains literal. Native composition owns its input.
@@ -1540,8 +1573,8 @@ Entering or leaving a focused Agenda day also closes search. Query recall is sha
 between Tree and Agenda. Agenda edits update all mounted mirrors; leaving a temporarily
 pinned item removes it from the search corpus and refreshes the count.
 Search navigation preserves a pending Agenda move; Escape also cancels that move.
-While search is visible, Agenda's existing status message remains visible alongside
-the query input (when open) and the count, without changing document geometry.
+While search is visible, Agenda's existing status message remains visible in the
+bottom status bar, independently of the Find panel and without changing document geometry.
 
 Only that query is remembered in application-session memory; no search state is
 persisted in documents, view state, preferences or backups.
@@ -1834,14 +1867,14 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 ### 20.14 Search and Recent Nodes
 
-`Cmd+;` and `Cmd+F` open a compact Search popup in Tree or Agenda, in standard editing and every Vim mode. Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
+`Cmd+;` opens global Search in Tree or Agenda, in standard editing and every Vim mode. `Cmd+F` opens local search (§20.2). Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
 
 * The input receives focus and starts empty on every opening. Empty input shows recent nodes as below.
 * A nonempty text query shorter than three Unicode characters shows `Enter at least 3 characters`. At three or more characters, literal text search updates as the input changes, using the smart-case rules of Vim `/` (§20.2).
 * Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once in depth-first tree order with its text and parent path.
-* All results are reachable by scrolling and keyboard selection. Pending work displays `Searching…`; no matches displays `No results`. Typing does not navigate or edit the document.
+* All results are reachable by scrolling and keyboard selection. Pending work lasting more than 200ms displays `Searching…` once in the footer; no matches displays `No results`. Typing does not navigate or edit the document.
 * While tag suggestions are visible, an empty node-result list does not display `No results`.
-* Refining a query keeps the previous rows and list height until the new results are ready, rather than collapsing the list during asynchronous work. The footer shows `Searching…` while waiting without tag suggestions; retained rows cannot be opened or navigated until they are current. Completed results replace the list together, including an empty result or a query below the minimum length.
+* Pending searches retain rows, empty-state text and list height; stale rows cannot be activated or navigated. Without tag suggestions, the footer keeps its hint for 200ms, then shows `Searching…`. Results replace the list atomically, including empty or too-short queries. Completion, clearing and closing cancel the indicator timer.
 * The popup is centered horizontally and vertically when opened, using its initial content height. Its top edge, width and input position then remain unchanged during query changes; only the bottom edge adapts to content, up to the available window height. Resizing the application window recenters the popup within the new available space. Lists scroll within the available space.
 * Visible headings distinguish `Recent` nodes, tag suggestions (`Tags`) and matching nodes (`Results`). Tags use compact rows in a separate bordered suggestion list beneath the input. Node results retain their text and parent paths. While tag suggestions are open, only their selected row is highlighted; matching nodes may appear below without a competing selection highlight.
 * The footer explains the active keyboard action: `↑ ↓ select · Enter/Tab apply · Esc dismiss` while tag suggestions are open, otherwise `↑ ↓ select · Enter open · Esc close` when results are ready. Accepting a tag closes suggestions and leaves its full text in the input, so the results and their open action become active.
@@ -1996,7 +2029,7 @@ The active editor retains focus, caret, selection and mode when its active day c
 
 Every other occurrence of the active node is a live mirror: it shows the current text, links and image, never owns an editor, and draws its bullet as a hollow ring in the gutter color. Selecting a mirror, by pointer or keyboard, makes it the active occurrence. Editing the active occurrence updates its mirrors immediately without moving focus or changing the scroll position. When a document change moves the active occurrence to another row, the scroll position adjusts so that the active row keeps its place in the viewport; selecting a row never takes this adjustment.
 
-While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits at the left edge, or beside the query field during search entry (§20.2.26), while the mode indicator remains beside the pin on the right when Vim is enabled. It is announced as a status and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
+While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits at the left edge, including during search entry (§20.2.26), while the mode indicator remains beside the pin on the right when Vim is enabled. It is announced as a status and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
 
 ### 23.8 Agenda History Focus
 
@@ -2068,7 +2101,7 @@ The moved node becomes the selected, active occurrence under the target day, whi
 
 In Vim Normal, `dd` on a direct match marks that occurrence for a move and never deletes the node. A count marks the occurrence and the following direct matches of the same day at the same nesting level, skipping rows between them that do not qualify, such as contextual ancestors and nodes at other levels, and stops at the end of the day; fewer rows than the count mark the rows that exist. `dd` on a contextual ancestor, a day container, or a gap does nothing. Marking changes no document text, no Vim register, and not the system clipboard, and it is unavailable while persistence is locked.
 
-While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, at the left edge, or beside the query field during search entry (§20.2.26). The mode indicator remains beside the pin on the right. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
+While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, at the left edge, including during search entry (§20.2.26). The mode indicator remains beside the pin on the right. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
 
 Navigation keeps the pending move: `j`/`k`, arrow keys, `gg`, `G`, `H`/`M`/`L`, `Ctrl+d`/`Ctrl+u`, mouse selection, scrolling, folding and unfolding, and expanding or collapsing gaps. `Esc` in any Vim mode (including the `Esc` that leaves Insert or Replace), any change of the document (a text edit or another move), Undo and Redo even when they change nothing, turning Vim off, and leaving the Agenda presentation (`Cmd+P`, `Cmd+.`) cancel it without an edit or an Undo entry. `dd` on a temporarily invalid item (§23.7) does nothing.
 

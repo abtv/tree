@@ -71,6 +71,8 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   ).toEqual([
     'Tree',
     'Agenda',
+    'Find in Current View…',
+    'Search All Nodes…',
     'Vim Editing',
     'Appearance',
     'Automatic',

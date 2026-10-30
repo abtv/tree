@@ -9,40 +9,62 @@ export function SearchPrompt({
   snapshot,
   restoreEditor,
   shortcuts = APPLE_SHORTCUTS,
+  navigate,
+  beginEditing,
 }: {
   store: EditorStore
   snapshot: SearchSessionSnapshot
   restoreEditor: () => void
   shortcuts?: ShortcutProfile
+  navigate?: (direction: -1 | 1) => void
+  beginEditing?: () => void
 }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
+  const editing = snapshot.draft !== undefined
   const composing = useRef(false)
+  const editingInPlace = useRef(false)
   useLayoutEffect(() => {
+    if (!editing) return
+    if (editingInPlace.current) {
+      editingInPlace.current = false
+      return
+    }
     input.current?.focus({ preventScroll: true })
     input.current?.select()
-  }, [])
+  }, [editing])
   useEffect(() => {
     const cancel = (): void => store.search.cancelDraft()
     window.addEventListener('blur', cancel)
     return () => window.removeEventListener('blur', cancel)
   }, [store])
   return (
-    <label className="search-input-line">
-      <span>/</span>
+    <label className="search-input-line" data-editor-focus-borrow>
       <input
         ref={input}
         aria-label="Search"
-        value={snapshot.draft ?? ''}
+        placeholder="Find"
+        value={snapshot.draft ?? snapshot.confirmed}
+        onFocus={snapshot.draft === undefined ? beginEditing : undefined}
         autoComplete="off"
         spellCheck={false}
-        onChange={(event) => store.search.edit(event.target.value)}
+        onChange={(event) => {
+          const value = event.target.value
+          if (snapshot.draft === undefined) {
+            editingInPlace.current = true
+            beginEditing?.()
+          }
+          store.search.edit(value)
+        }}
         onCompositionStart={() => {
           composing.current = true
         }}
         onCompositionEnd={() => {
           composing.current = false
         }}
-        onBlur={() => store.search.cancelDraft()}
+        onBlur={(event) => {
+          if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.search-controls')) return
+          store.search.cancelDraft()
+        }}
         onKeyDown={(event) => {
           event.stopPropagation()
           if (composing.current || event.nativeEvent.isComposing) return
@@ -57,12 +79,12 @@ export function SearchPrompt({
           } else if (event.key === 'Escape') {
             event.preventDefault()
             store.cancelAgendaMove()
-            store.search.cancelDraft()
+            store.hideSearch()
             restoreEditor()
           } else if (event.key === 'Enter') {
             event.preventDefault()
-            store.search.confirm()
-            restoreEditor()
+            if (navigate !== undefined) navigate(event.shiftKey ? -1 : 1)
+            else store.search.confirm(event.shiftKey ? -1 : 1)
           }
         }}
       />

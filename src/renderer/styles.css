@@ -42,6 +42,7 @@
 
 :root {
   --color-popup-shadow: rgba(0, 0, 0, 0.12);
+  --color-search-shadow: #0002;
   --color-data-activity-shadow: rgba(0, 0, 0, 0.2);
   --color-import-backdrop: rgba(0, 0, 0, 0.3);
   /* Every color is defined once here or in the single dark override. The selection highlight is
@@ -364,7 +365,8 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 /* Opens above the status bar and ends at the toggle's right edge, so it stays inside the window. */
-.status-tooltip {
+.status-tooltip,
+.search-tooltip {
   position: absolute;
   right: 0;
   bottom: calc(100% + 8px);
@@ -380,7 +382,9 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .status-tooltip-anchor:hover .status-tooltip,
-.status-tooltip-anchor:has(:focus-visible) .status-tooltip {
+.status-tooltip-anchor:has(:focus-visible) .status-tooltip,
+.search-controls button:hover .search-tooltip,
+.search-controls button:focus-visible .search-tooltip {
   visibility: visible;
 }
 
@@ -1009,11 +1013,61 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   margin: 0 12px;
   font-size: 11px;
 }
-.search-status-message {
-  margin-left: 12px;
+.local-search-panel {
+  position: absolute;
+  z-index: 19;
+  top: calc(var(--title-bar-height) + var(--location-bar-height) + 8px);
+  right: 12px;
+  width: min(420px, calc(100% - 24px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 8px;
+  background: var(--color-background);
+  color: var(--color-text);
+  box-shadow: 0 4px 16px var(--color-search-shadow);
 }
-.search-input-line:has(~ .search-status-message) {
-  flex: 1 1 120px;
+.local-search-panel input {
+  height: 28px;
+  box-sizing: border-box;
+  padding: 4px 7px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 4px;
+}
+.local-search-panel input:focus {
+  border-color: var(--color-secondary);
+}
+.local-search-panel .search-count {
+  flex: 0 0 10ch;
+  text-align: right;
+  align-self: flex-end;
+  line-height: 28px;
+  margin: 0;
+}
+.search-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.search-controls button {
+  position: relative;
+  color: var(--color-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  height: 28px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.search-controls button:focus-visible {
+  outline: 1px solid currentColor;
+}
+.search-tooltip {
+  top: calc(100% + 8px);
+  bottom: auto;
 }
 .search-match {
   background: color-mix(in srgb, var(--highlight-background) 50%, transparent);

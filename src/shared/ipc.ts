@@ -49,6 +49,7 @@ export const ipcEvents = {
   notesProgress: 'tree:notes-progress',
   notesMenuCommand: 'tree:notes-menu-command',
   viewMenuCommand: 'tree:view-menu-command',
+  findMenuCommand: 'tree:find-menu-command',
 } as const
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
@@ -107,6 +108,7 @@ export interface NotesMenuState {
 }
 export type NotesMenuCommand = 'export' | 'import'
 export type ViewMenuCommand = 'tree' | 'agenda'
+export type FindMenuCommand = 'find' | 'next' | 'previous' | 'all'
 
 export type ClipboardPayload =
   { kind: 'text'; text: string; links?: readonly LinkRange[] } | { kind: 'image'; png: Uint8Array }
@@ -161,6 +163,7 @@ export interface TreeApi {
   onAlwaysOnTopChanged?: (listener: (alwaysOnTop: boolean) => void) => () => void
   onVimEnabledChanged?: (listener: (vimEnabled: boolean) => void) => () => void
   onViewMenuCommand?: (listener: (command: ViewMenuCommand) => void) => () => void
+  onFindMenuCommand?: (listener: (command: FindMenuCommand) => void) => () => void
   /** Notes export and import (PRODUCT §25); one operation runs at a time. */
   chooseNotesExportDestination?: () => Promise<NotesFileChoice>
   startNotesExport?: () => Promise<NotesExportResult>

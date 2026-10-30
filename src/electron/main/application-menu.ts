@@ -1,6 +1,6 @@
 import type { MenuItemConstructorOptions } from 'electron'
 import type { AppearancePreference } from '../../infrastructure/main/window-state'
-import type { NotesMenuCommand, NotesMenuState, ViewMenuCommand } from '../../shared/ipc'
+import type { FindMenuCommand, NotesMenuCommand, NotesMenuState, ViewMenuCommand } from '../../shared/ipc'
 import type { MenuIcons } from './menu-icons'
 
 export interface ApplicationMenuState {
@@ -17,6 +17,7 @@ export interface ApplicationMenuActions {
   setAppearance: (appearance: AppearancePreference) => void
   notesCommand: (command: NotesMenuCommand) => void
   viewCommand: (command: ViewMenuCommand) => void
+  findCommand: (command: FindMenuCommand) => void
 }
 
 const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreference }> = [
@@ -58,6 +59,31 @@ export function applicationMenuTemplate(
     {
       label: 'Edit',
       submenu: [
+        {
+          label: 'Find…',
+          accelerator: 'CommandOrControl+F',
+          registerAccelerator: false,
+          click: () => actions.findCommand('find'),
+        },
+        {
+          label: 'Find Next',
+          accelerator: 'CommandOrControl+G',
+          registerAccelerator: false,
+          click: () => actions.findCommand('next'),
+        },
+        {
+          label: 'Find Previous',
+          accelerator: 'CommandOrControl+Shift+G',
+          registerAccelerator: false,
+          click: () => actions.findCommand('previous'),
+        },
+        {
+          label: 'Search All Nodes…',
+          accelerator: 'CommandOrControl+;',
+          registerAccelerator: false,
+          click: () => actions.findCommand('all'),
+        },
+        { type: 'separator' },
         {
           label: 'Vim Editing',
           type: 'checkbox',

@@ -89,6 +89,7 @@ test('refreshes active search through subtree deletion and Vim Undo and Redo com
   await expect(window.locator('.search-count')).toHaveText('2 / 4')
 
   await lockSystemClipboard()
+  await node(window, 1).focus()
   await window.keyboard.press('d')
   await window.keyboard.press('d')
 
@@ -137,6 +138,7 @@ test('lets newer Insert and pointer actions cancel a pending search destination'
   await window.keyboard.press('/')
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
   await window.keyboard.press('Enter')
+  await window.keyboard.press('Escape')
   await window.keyboard.press('i')
   await window.clock.runFor(1000)
 
@@ -153,7 +155,7 @@ test('lets newer Insert and pointer actions cancel a pending search destination'
   await window.clock.runFor(1000)
 
   await expect(node(window, 3)).toBeFocused()
-  await expect(window.locator('.search-count')).toHaveText('3')
+  await expect(window.locator('.search-count')).toHaveCount(0)
 
   await window.keyboard.press('n')
   await window.keyboard.press('Meta+Shift+p')
@@ -193,6 +195,7 @@ test('searches folded text without moving during entry and recalls confirmed que
 
   await expect(window.locator('.search-count')).toHaveText('2 / 4')
 
+  await window.keyboard.press('Escape')
   await window.keyboard.press('n')
 
   await expect(window.locator('.search-count')).toHaveText('3 / 4')
@@ -252,9 +255,11 @@ test('keeps a hidden logical origin through manual folding and cancels on text c
 
   await window.keyboard.press('Enter')
 
-  await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+  await expect(prompt).toBeFocused()
   await expect(window.locator('.search-count')).toHaveText('2 / 3')
 
+  await window.locator('[data-node-id="child"] .node-input').click()
+  await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
   await window.keyboard.press('/')
   await prompt.pressSequentially('discard')
   await node(window, 1).click()
@@ -325,6 +330,9 @@ test('navigates beyond capped counts and mounts highlights after scrolling', asy
 
   await window.screenshot({ path: testInfo.outputPath('search-windowed-draft.png') })
   await window.keyboard.press('Enter')
+  await expect(prompt).toBeFocused()
+  await expect(window.locator('[data-node-id="n1"] .search-match-current')).toHaveText('apple')
+  await window.keyboard.press('Escape')
 
   await expect(window.locator('[data-node-id="n1"] .node-input')).toBeFocused()
 
@@ -387,7 +395,7 @@ test('composes match, link and date rendering without moving rows or losing Inse
 
     await window.keyboard.press('Enter')
 
-    await expect(row.locator('.node-input')).toBeFocused()
+    await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
     await expect(row.locator('.search-match-current')).toHaveText('apple')
     await expect(window).toHaveScreenshot(`search-current-${appearance}.png`)
 
@@ -452,8 +460,10 @@ test('preserves the image caret on canceled and absent searches and replaces it 
   await window.keyboard.press('Enter')
 
   await expect(editor).not.toHaveClass(/node-input-image-caret/u)
-  await expect(editor).toBeFocused()
+  await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
   await expect(window.locator('.search-count')).toContainText('1 / 1')
+  await window.keyboard.press('Escape')
+  await expect(editor).toBeFocused()
 
   await closeApp(app)
 })

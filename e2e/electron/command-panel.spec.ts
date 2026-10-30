@@ -106,7 +106,7 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    await expect(window.locator('.command-count')).toHaveText('10 of 10')
+    await expect(window.locator('.command-count')).toHaveText('14 of 14')
 
     await window.keyboard.press('ArrowUp')
 
@@ -239,8 +239,12 @@ test.describe('Normal command panel', () => {
       'set-theme-light',
       'set-theme-dark',
       'export-notes',
+      'find',
+      'find-next',
+      'find-previous',
       'import-notes',
       'quit',
+      'search-all-nodes',
       'show-agenda',
       'show-tree',
       'toggle-vim-mode',

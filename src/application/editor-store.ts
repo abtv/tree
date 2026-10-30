@@ -52,7 +52,7 @@ import { clipboardIntroducesLink, nodeContent, sameNodeContent } from './editor-
 import { EditorHistory } from './editor-history'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { EditorSearch } from './editor-search'
-import type { SearchDestination } from './search-executor'
+import type { SearchDestination, SearchPosition } from './search-executor'
 import {
   forwardJoinTransition,
   isPasteIntoSourceDescendant,
@@ -656,6 +656,19 @@ export class EditorStore {
       this.runtime.snapshot = { status: 'error', message: messageOf(error) }
       this.runtime.emit()
     }
+  }
+
+  public searchOrigin(offset: number): SearchPosition {
+    const state = this.runtime.ready()
+    if (state.agenda !== undefined) {
+      const row = this.getAgendaRows().find((candidate) => candidate.key === state.agenda!.selectedKey)
+      if (row !== undefined) {
+        return row.kind === 'node'
+          ? { nodeId: row.nodeId, day: row.day, offset }
+          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
+      }
+    }
+    return { nodeId: state.location.selectedNodeId, offset }
   }
 
   public hideSearch(): void {

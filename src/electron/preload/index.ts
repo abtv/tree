@@ -9,6 +9,13 @@ import {
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  onFindMenuCommand: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, command: unknown): void => {
+      if (command === 'find' || command === 'next' || command === 'previous' || command === 'all') listener(command)
+    }
+    ipcRenderer.on(ipcEvents.findMenuCommand, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.findMenuCommand, handler)
+  },
   onViewMenuCommand: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, command: ViewMenuCommand): void => {
       if (command === 'tree' || command === 'agenda') listener(command)

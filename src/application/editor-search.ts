@@ -88,11 +88,11 @@ export class EditorSearch {
     this.session.cancelDraft()
   }
 
-  public confirm(): void {
+  public confirm(direction: -1 | 1 = 1): void {
     this.cancelNavigation()
     this.busy = true
     const generation = this.generation
-    this.session.confirm((result) => this.publish(result, generation))
+    this.session.confirm((result) => this.publish(result, generation), direction)
     if (!this.session.getSnapshot().visible) this.busy = false
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CommandServices } from '../application/command-registry'
 import { EditorStore } from '../application/editor-store'
 import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
@@ -25,6 +25,8 @@ import { clearCommandAssembly } from './vim-command-state'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { SearchPrompt } from './SearchPrompt'
+import { SearchCount } from './SearchCount'
+import { useLocalSearch } from './use-local-search'
 import { NodeList } from './NodeList'
 import type { DropTarget } from '../application/drop-targets'
 import { QuitWithoutSavingPrompt } from './QuitWithoutSavingPrompt'
@@ -40,6 +42,7 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
+  registerSearchCommands?: (run: (command: import('../shared/ipc').FindMenuCommand) => void) => () => void
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
   menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
@@ -60,6 +63,7 @@ interface AppProps {
 }
 
 export function App({
+  registerSearchCommands,
   store,
   initialVimEnabled,
   vimAvailable = true,
@@ -80,13 +84,6 @@ export function App({
   const searchResult = useSyncExternalStore(store.search.subscribe, store.search.getResult)
   const searchQuery = search.visible ? (search.draft ?? search.confirmed) : ''
   useEffect(() => () => store.search.hide(), [store])
-  const [expiredWrap, setExpiredWrap] = useState<typeof searchResult>()
-  const wrapNotice = searchResult?.wrapped === true && searchResult !== expiredWrap
-  useEffect(() => {
-    if (!searchResult?.wrapped) return
-    const timer = window.setTimeout(() => setExpiredWrap(searchResult), 2000)
-    return () => window.clearTimeout(timer)
-  }, [searchResult])
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
   const readyDocument = state.status === 'ready' ? state.document : undefined
@@ -151,6 +148,7 @@ export function App({
     completionPopup,
     acceptCompletion,
     restoreSearchFocus,
+    readSearchCaret,
   } = useNodeInputBindings({
     store,
     selectedNodeId,
@@ -190,7 +188,11 @@ export function App({
       vimTextCommandState.setMode('normal')
     }
   }, [vimTextCommandState, setNodeVisualSelection])
+  const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    searchCommand: (command) => {
+      window.setTimeout(() => searchAction.current(command), 0)
+    },
     menuCommands: menuCommands ?? dataOperations?.menuCommands,
     vimAvailable,
     alwaysOnTopAvailable,
@@ -211,6 +213,59 @@ export function App({
     },
     beforeViewChange,
   })
+  const searchCaret = useRef<(() => number) | undefined>(undefined)
+  const openGlobalSearch = useRef<(() => void) | undefined>(undefined)
+  const readAgendaCaret = useCallback(() => searchCaret.current?.() ?? 0, [])
+  const localSearch = useLocalSearch({
+    vimEnabled,
+    store,
+    shortcuts,
+    blocked: commandPanel.open || previewAttachmentId !== undefined,
+    readAgendaCaret,
+    readEditorCaret: readSearchCaret,
+    restoreEditor: restoreSearchFocus,
+    beforeOpen: () => {
+      const active = document.activeElement
+      if (vimTextCommandState.mode === 'replace') {
+        vimTextCommandState.finishReplace?.(
+          active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
+          false,
+          true,
+        )
+      }
+      clearCommandAssembly(vimTextCommandState.commandState)
+    },
+    beforeJump: () => {
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.matches('.node-input')) {
+        vimTextCommandState.finishInsert?.(active)
+        vimTextCommandState.finishReplace?.(active, false, true)
+      }
+    },
+  })
+  useEffect(() => {
+    let previous = store.search.getResult()
+    return store.search.subscribe(() => {
+      const result = store.search.getResult()
+      if (result === previous) return
+      previous = result
+      if (result?.destination === undefined) return
+      const mode = vimTextCommandState.mode
+      if (mode === 'visual' || mode === 'visual-node' || mode === 'replace') {
+        setNodeVisualSelection(undefined)
+        vimTextCommandState.setMode('normal')
+      }
+    })
+  }, [store, vimTextCommandState, setNodeVisualSelection])
+  useLayoutEffect(() => {
+    searchAction.current = (command) => {
+      if (command === 'find') localSearch.open()
+      else if (command === 'all') openGlobalSearch.current?.()
+      else localSearch.navigate(command === 'next' ? 1 : -1)
+    }
+  }, [localSearch])
+  useEffect(() => window.treeApi.onFindMenuCommand?.((command) => searchAction.current(command)), [])
+  useEffect(() => registerSearchCommands?.((command) => searchAction.current(command)), [registerSearchCommands])
   // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
   useLayoutEffect(
     () => registerViewCommands?.(commandPanel.menuViewCommands),
@@ -472,7 +527,7 @@ export function App({
         const target = event.target
         if (
           !(target instanceof Element) ||
-          target.closest('.node-input, .agenda-list, .command-input-line, [role="dialog"]')
+          target.closest('.node-input, .agenda-list, .command-input-line, .search-controls, [role="dialog"]')
         )
           return
         if (agenda !== undefined) {
@@ -502,6 +557,7 @@ export function App({
         />
       )}
       <RecentNodesPopup
+        openRef={openGlobalSearch}
         store={store}
         shortcuts={shortcuts}
         blocked={commandPanel.open}
@@ -517,6 +573,15 @@ export function App({
       />
       <div className={SCROLL_VIEWPORT_CLASS}>
         <section
+          onClick={(event) => {
+            if (
+              event.button === 0 &&
+              search.visible &&
+              event.target instanceof Element &&
+              event.target.closest('.node-input, .agenda-text')
+            )
+              store.hideSearch()
+          }}
           className={
             agenda !== undefined
               ? `editor-shell agenda-shell${agenda.focusedDay === undefined ? '' : ' agenda-shell-focused'}`
@@ -527,6 +592,7 @@ export function App({
         >
           {agenda !== undefined ? (
             <AgendaView
+              searchCaretRef={searchCaret}
               store={store}
               agenda={agenda}
               document={state.document}
@@ -622,42 +688,84 @@ export function App({
       {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
       {commandList}
+      {search.visible && !commandPanel.open ? (
+        <section className="local-search-panel" aria-label="Find in current view" data-editor-focus-borrow>
+          <SearchPrompt
+            store={store}
+            snapshot={search}
+            restoreEditor={restoreSearchFocus}
+            shortcuts={shortcuts}
+            navigate={localSearch.navigate}
+            beginEditing={() => localSearch.open(false)}
+          />
+          <SearchCount
+            pending={search.pending}
+            label={
+              search.count?.capped
+                ? '100+'
+                : searchResult?.ordinal === undefined
+                  ? `${search.count?.total ?? 0}`
+                  : `${searchResult.ordinal} / ${search.count?.total ?? 0}`
+            }
+          />
+          <div className="search-controls" data-editor-focus-borrow>
+            <button
+              type="button"
+              aria-label="Previous match"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => localSearch.navigate(-1)}
+            >
+              ↑
+              <span aria-hidden="true" className="search-tooltip">
+                Previous match
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-label="Next match"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => localSearch.navigate(1)}
+            >
+              ↓
+              <span aria-hidden="true" className="search-tooltip">
+                Next match
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-label="Close search"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                store.hideSearch()
+                restoreSearchFocus()
+              }}
+            >
+              ×
+              <span aria-hidden="true" className="search-tooltip">
+                Close search
+              </span>
+            </button>
+          </div>
+        </section>
+      ) : null}
       <footer className="status-bar">
-        {search.draft !== undefined && !commandPanel.open ? (
-          <SearchPrompt store={store} snapshot={search} restoreEditor={restoreSearchFocus} shortcuts={shortcuts} />
-        ) : commandPanel.open ? (
+        {commandPanel.open ? (
           commandInput
         ) : commandPanel.message !== undefined ? (
           <span className="command-error" role="status">
             {commandPanel.message}
           </span>
         ) : null}
-        {search.visible && !commandPanel.open && statusMessage !== undefined ? (
-          <span className="status-bar-message search-status-message" role="status">
-            {statusMessage}
-          </span>
-        ) : null}
         {commandPanel.open ? (
           <span className="command-count">
             {commandPanel.matches.length} of {commandPanel.total}
           </span>
-        ) : search.visible ? (
-          <span className="search-count" role="status">
-            {wrapNotice ? 'Wrapped · ' : ''}
-            {search.pending
-              ? 'Searching…'
-              : search.count?.capped
-                ? '100+'
-                : searchResult?.ordinal === undefined
-                  ? `${search.count?.total ?? 0}`
-                  : `${searchResult.ordinal} / ${search.count?.total ?? 0}`}
-          </span>
-        ) : commandPanel.message !== undefined ? null : statusMessage === undefined ? (
-          <span aria-hidden="true" className="status-bar-spacer" />
-        ) : (
-          <span className="status-bar-message" role="status">
+        ) : statusMessage !== undefined ? (
+          <span className={`status-bar-message${search.visible ? ' search-status-message' : ''}`} role="status">
             {statusMessage}
           </span>
+        ) : (
+          <span aria-hidden="true" className="status-bar-spacer" />
         )}
         {vimEnabled ? (
           <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">

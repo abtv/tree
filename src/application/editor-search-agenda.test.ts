@@ -10,6 +10,7 @@ afterEach(() => vi.useRealTimers())
 
 async function setup() {
   vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 9, 30))
   const save = vi.fn(async () => undefined)
   const store = new EditorStore(
     {
@@ -43,6 +44,36 @@ async function setup() {
   }
   return { store, state, save, begin }
 }
+
+it('captures occurrence and synthetic origins using the current renderer caret', async () => {
+  const { store } = await setup()
+  store.applyAgenda({ kind: 'select', key: key(first, 'a') })
+
+  expect(store.searchOrigin(6)).toEqual({ nodeId: 'a', day: first, offset: 6 })
+
+  store.applyAgenda({ kind: 'select', key: `day:${first}` })
+
+  expect(store.searchOrigin(8)).toEqual({ beforeDay: first, offset: 0 })
+
+  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
+  expect(gap.kind).toBe('gap')
+  store.applyAgenda({ kind: 'select', key: gap.key })
+
+  if (gap.kind === 'gap') expect(store.searchOrigin(8)).toEqual({ beforeDay: gap.startDay, offset: 0 })
+
+  store.closeAgenda()
+  const getAgendaRows = vi.spyOn(store, 'getAgendaRows')
+
+  expect(store.searchOrigin(3)).toEqual({ nodeId: 'a', offset: 3 })
+  expect(getAgendaRows).not.toHaveBeenCalled()
+})
+
+it('falls back to the Tree selection while the selected Agenda row is unavailable', async () => {
+  const { store } = await setup()
+  vi.spyOn(store, 'getAgendaRows').mockReturnValue([])
+
+  expect(store.searchOrigin(4)).toEqual({ nodeId: 'a', offset: 4 })
+})
 
 it('counts folded contextual occurrences and serializes same-node and cross-day jumps without saving', async () => {
   const { store, state, save, begin } = await setup()

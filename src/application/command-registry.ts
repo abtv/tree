@@ -8,6 +8,10 @@ export interface CommandCapabilities {
 }
 
 export interface CommandServices {
+  find?(): Promise<void>
+  findNext?(): Promise<void>
+  findPrevious?(): Promise<void>
+  searchAllNodes?(): Promise<void>
   quit(): Promise<void>
   setAlwaysOnTop(value: boolean): Promise<void>
   setAppearance(value: CommandAppearance): Promise<void>
@@ -41,6 +45,23 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  ...(
+    [
+      ['find', 'Find in the current view', 'F', false, 'find'],
+      ['find-next', 'Find next match', 'G', false, 'findNext'],
+      ['find-previous', 'Find previous match', 'G', true, 'findPrevious'],
+      ['search-all-nodes', 'Search all nodes', ';', false, 'searchAllNodes'],
+    ] as const
+  ).map(([name, description, key, shift, service]): ApplicationCommand => ({
+    name,
+    description,
+    aliases: [],
+    shortcut: { key, shift },
+    active: () => false,
+    run: async (services) => {
+      await services[service]?.()
+    },
+  })),
   {
     name: 'show-agenda',
     aliases: [],

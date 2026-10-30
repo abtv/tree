@@ -57,16 +57,20 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
       },
       { capture: true },
     )
-    document.addEventListener('focusin', (event) => {
-      if (event.target instanceof HTMLElement && event.target.getAttribute('aria-label') === 'Agenda node dated-2999')
-        requestAnimationFrame(() => requestAnimationFrame(() => (probe.elapsed = performance.now() - probe.start)))
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('[aria-label="Agenda node dated-2999"] .search-match-current')) return
+      observer.disconnect()
+      requestAnimationFrame(() => requestAnimationFrame(() => (probe.elapsed = performance.now() - probe.start)))
     })
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true })
   })
   const navigationStart = performance.now()
 
   await window.keyboard.press('Enter')
 
-  await expect(window.getByRole('textbox', { name: 'Agenda node dated-2999', exact: true })).toBeFocused()
+  await expect(
+    window.getByRole('textbox', { name: 'Agenda node dated-2999', exact: true }).locator('.search-match-current'),
+  ).toBeVisible()
 
   const navigationMs = performance.now() - navigationStart
   await window.waitForFunction(
@@ -80,6 +84,7 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
       (window as unknown as { searchTimers: { callbacks: number; workMs: number; maxWorkMs: number } }).searchTimers,
   )
   const repeats: number[] = []
+  await window.keyboard.press('Escape')
   for (const [key, count] of [
     ['n', '2 / 2'],
     ['N', '1 / 2'],
@@ -182,10 +187,13 @@ test('keeps draft input and current results responsive across a wide Tree', asyn
 
   await window.keyboard.press('Enter')
 
-  await expect(window.getByRole('textbox', { name: 'Node 10000', exact: true })).toBeFocused()
+  const editor = window.getByRole('textbox', { name: 'Node 10000', exact: true })
+  await expect(editor.locator('.search-match-current')).toBeVisible()
 
   const navigationMs = performance.now() - jumpStart
 
+  await editor.focus()
+  await window.keyboard.press('0')
   await window.keyboard.press('i')
   const editStart = performance.now()
 
@@ -279,7 +287,8 @@ for (const shape of ['deep', 'long'] as const) {
 
     await window.keyboard.press('Enter')
 
-    await expect(window.locator('[data-node-id="target"] .node-input')).toBeFocused()
+    await expect(window.locator('[data-node-id="target"] .search-match-current')).toBeVisible()
+    await expect(prompt).toBeFocused()
 
     const revealMs = performance.now() - start
 

@@ -68,6 +68,7 @@ interface UseNodeInputBindingsOptions {
 }
 
 export interface NodeInputBindingsResult {
+  readSearchCaret: () => number
   restoreSearchFocus: () => void
   completionPopup: CompletionPopupPresentation | undefined
   acceptCompletion: (index: number) => void
@@ -103,6 +104,7 @@ export function useNodeInputBindings({
   const initialFocusApplied = useRef(false)
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const caretProjection = useRef(new CaretProjectionState<HTMLElement>(focus, vimMode))
+  const deferredSearchFocus = useRef<FocusIntent | undefined>(undefined)
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
@@ -246,7 +248,12 @@ export function useNodeInputBindings({
       })
       setImageCaretNodeId(caret.imageActive ? nodeId : undefined)
       if (timing === 'preserve-selection') return
-      if (store.search.session.getSnapshot().draft === undefined && timing !== 'after-edit' && input?.isConnected)
+      if (
+        store.search.session.getSnapshot().draft === undefined &&
+        !document.activeElement?.matches('.search-input-line input') &&
+        timing !== 'after-edit' &&
+        input?.isConnected
+      )
         setNormalCaret(input, caret.cursor)
     },
     [store, setImageCaretNodeId],
@@ -558,7 +565,12 @@ export function useNodeInputBindings({
     // pending placement, decoration, then completion. Unrelated commits skip focus/mode work.
     if (focus !== undefined && focus.token !== projection.syncedFocusToken) syncImageCaretToFocus()
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
-    if (store.search.session.getSnapshot().draft === undefined && changes.modeChanged && focusedInput !== undefined) {
+    if (
+      store.search.session.getSnapshot().draft === undefined &&
+      !document.activeElement?.matches('.search-input-line input') &&
+      changes.modeChanged &&
+      focusedInput !== undefined
+    ) {
       if (vimMode === 'normal') {
         // Cmd+A's deliberate selection survives the transition to Normal.
         if (!hasMultiCharacterSelection(focusedInput)) setNormalCaret(focusedInput, getCaret(focusedInput))
@@ -584,7 +596,8 @@ export function useNodeInputBindings({
         const input = inputs.current.get(focus.nodeId)
         if (input === undefined) return
         // Suppress native scrolling; the reveal policy decides how far to scroll.
-        input.focus({ preventScroll: true })
+        const keepSearchFocus = document.activeElement?.matches('.search-input-line input') === true
+        if (!keepSearchFocus) input.focus({ preventScroll: true })
         if (!preserve) {
           const row = input.closest('.node-row, .agenda-row') ?? input
           if (viewportReveal.hasLine()) viewportReveal.correct()
@@ -594,6 +607,11 @@ export function useNodeInputBindings({
           } else if (firstPass) viewportReveal.begin(row, keepContext, isCurrent)
           else viewportReveal.correct()
         }
+        if (keepSearchFocus) {
+          deferredSearchFocus.current = focus
+          return
+        }
+        deferredSearchFocus.current = undefined
         if (projection.mode === 'normal') {
           // Vertical navigation can resolve an image while focus carries the originating text column.
           const authority = projection.authority
@@ -654,6 +672,15 @@ export function useNodeInputBindings({
     }
     completion.reconcile()
   })
+
+  useEffect(() => {
+    const releaseSearchFocus = (event: FocusEvent): void => {
+      if (event.target instanceof Element && event.target.matches('.node-input, .agenda-row'))
+        deferredSearchFocus.current = undefined
+    }
+    document.addEventListener('focusin', releaseSearchFocus)
+    return () => document.removeEventListener('focusin', releaseSearchFocus)
+  }, [])
 
   useEffect(() => {
     const update = (): void => {
@@ -949,6 +976,15 @@ export function useNodeInputBindings({
   )
 
   return {
+    readSearchCaret: () => {
+      const input = selectedNodeId === undefined ? undefined : inputs.current.get(selectedNodeId)
+      return caretProjection.current.mode === 'insert' &&
+        input !== undefined &&
+        deferredSearchFocus.current === undefined &&
+        !document.activeElement?.matches('.search-input-line input')
+        ? getCaret(input)
+        : caretProjection.current.authority.caret.cursor
+    },
     restoreSearchFocus: () => {
       const state = store.getSnapshot()
       if (state.status !== 'ready') return
@@ -964,7 +1000,16 @@ export function useNodeInputBindings({
       const id = state.location.selectedNodeId
       const input = inputs.current.get(id)
       if (input === undefined) return
+      const deferred = deferredSearchFocus.current
+      deferredSearchFocus.current = undefined
       input.focus({ preventScroll: true })
+      if (deferred !== undefined && deferred.token === state.focus.token && deferred.nodeId === id) {
+        if (caretProjection.current.mode === 'normal') applyCaretState(id, caretProjection.current.authority.caret)
+        else setCaret(input, deferred.cursor)
+        return
+      }
+      // Native editing retains its selection while the search textbox borrows focus.
+      if (caretProjection.current.mode === 'insert') return
       const authority = caretProjection.current.authority
       if (authority.nodeId === id) applyCaretState(id, authority.caret)
     },

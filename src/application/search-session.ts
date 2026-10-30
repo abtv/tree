@@ -84,7 +84,7 @@ export class SearchSession {
   }
 
   /** Caller applies a current destination through the editor's existing focus/reveal owner. */
-  public confirm(publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void): void {
+  public confirm(publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void, direction: -1 | 1 = 1): void {
     const origin = this.origin
     const query = this.snapshot.draft || this.snapshot.confirmed
     this.invalidate()
@@ -92,7 +92,7 @@ export class SearchSession {
     this.set({ confirmed: query, visible: query.length > 0, pending: query.length > 0 })
     if (query.length === 0) return
     this.recount()
-    if (origin !== undefined) this.navigate(origin, 1, 1, publish)
+    if (origin !== undefined) this.navigate(origin, direction, 1, publish)
   }
 
   public hide(): void {

@@ -56,7 +56,9 @@ export function AgendaView({
   locked = false,
   visualNodeSelection,
   shortcuts,
+  searchCaretRef,
 }: {
+  searchCaretRef?: { current: (() => number) | undefined }
   shortcuts?: ShortcutProfile
   store: EditorStore
   agenda: AgendaState
@@ -92,6 +94,13 @@ export function AgendaView({
   const caret = arrived ? arrival : caretState
   // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
   const caretRef = useRef(caret)
+  useLayoutEffect(() => {
+    if (searchCaretRef === undefined) return
+    searchCaretRef.current = () => caretRef.current.focus
+    return () => {
+      searchCaretRef.current = undefined
+    }
+  }, [searchCaretRef])
   useLayoutEffect(() => {
     caretRef.current = caret
   })
@@ -332,7 +341,10 @@ export function AgendaView({
     if (store.search.session.getSnapshot().draft !== undefined) return
     const element = elements.current.get(agenda.selectedKey)
     if (element === undefined) return
-    if (element.querySelector('.node-input') === null) {
+    if (
+      element.querySelector('.node-input') === null &&
+      !globalThis.document.activeElement?.matches('.search-input-line input')
+    ) {
       element.focus({ preventScroll: true })
       // The editor that lost focus keeps its native selection, which would paint a second caret.
       globalThis.getSelection()?.removeAllRanges()

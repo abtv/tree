@@ -11,6 +11,21 @@ const context: SearchContext = {
 }
 const origin = { nodeId: 'a', offset: 0 }
 
+it('confirms a draft backward from its captured origin', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin({ nodeId: 'a', offset: 3 })
+  session.edit('aa')
+
+  session.confirm(jump, -1)
+  harness.flush()
+
+  expect(jump).toHaveBeenCalledWith(expect.objectContaining({ destination: expect.objectContaining({ start: 0 }) }))
+  expect(session.getSnapshot().confirmed).toBe('aa')
+})
+
 it('owns draft/confirmed recall, empty confirmation, hide, cancellation and disposal', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)

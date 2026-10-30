@@ -1,5 +1,45 @@
-// @editing-modes: vim
+// @editing-modes: both
 import { test, expect, primaryKey } from './fixtures.mts'
+
+function describeForEachEditingMode(title: string, body: (vimEnabled: boolean) => void) {
+  for (const vimEnabled of [false, true]) {
+    test.describe(`${title} [${vimEnabled ? 'vim' : 'standard'} editing]`, () => body(vimEnabled))
+  }
+}
+
+describeForEachEditingMode('Browser search', (vimEnabled) => {
+  test('uses local Find and a separate global search through the browser menu', async ({ newContext, baseURL }) => {
+    const context = await newContext()
+    const page = await context.newPage()
+    await page.goto(baseURL!)
+    await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+    await page.evaluate(async () => {
+      await window.treeApi.save({
+        version: 1,
+        document: { roots: [{ id: 'one', text: 'apple apple apple', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'one' },
+      })
+    })
+    await page.evaluate((enabled) => window.treeApi.setVimEnabled(enabled), vimEnabled)
+    await page.reload()
+    await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
+    await page.locator('#tree-menu-button').click()
+    await page.locator('#local-find').click()
+    const prompt = page.getByRole('textbox', { name: 'Search', exact: true })
+    await expect(prompt).toBeFocused()
+    await prompt.fill('apple')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('.search-count')).toHaveText('2 / 3')
+    await page.keyboard.press(`${primaryKey}+g`)
+    await expect(page.locator('.search-count')).toHaveText('3 / 3')
+    await page.keyboard.press('Escape')
+
+    await page.locator('#tree-menu-button').click()
+    await page.locator('#global-search').click()
+    await expect(page.getByRole('searchbox')).toBeFocused()
+  })
+})
 
 test('searches Agenda context and mirrors through native editing mode transitions', async ({ newContext, baseURL }) => {
   const context = await newContext()
@@ -39,6 +79,9 @@ test('searches Agenda context and mirrors through native editing mode transition
   await page.keyboard.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Agenda node child', exact: true })
 
+  await expect(page.locator('.search-count')).toHaveText('2 / 4')
+  await expect(prompt).toBeFocused()
+  await page.keyboard.press('Escape')
   await expect(editor).toBeFocused()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
 
@@ -104,10 +147,12 @@ test('searches through noneditable Normal text and resumes native Insert editing
   await page.keyboard.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Node 1', exact: true })
 
-  await expect(editor).toBeFocused()
+  await expect(prompt).toBeFocused()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
   await expect(page.locator('.search-count')).toHaveText('2 / 3')
 
+  await page.keyboard.press('Escape')
+  await expect(editor).toBeFocused()
   await page.keyboard.press('i')
 
   await expect(editor).toHaveAttribute('contenteditable', 'true')

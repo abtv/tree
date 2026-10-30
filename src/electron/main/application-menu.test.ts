@@ -24,6 +24,7 @@ function createActions() {
     setAppearance: vi.fn(),
     notesCommand: vi.fn(),
     viewCommand: vi.fn(),
+    findCommand: vi.fn(),
   }
 }
 
@@ -76,7 +77,14 @@ describe('application menu template', () => {
 
     expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
     expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['Quit Tree'])
-    expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual(['Vim Editing'])
+    expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual([
+      'Find…',
+      'Find Next',
+      'Find Previous',
+      'Search All Nodes…',
+      undefined,
+      'Vim Editing',
+    ])
     expect(submenuItems(template, 'View').map((item) => item.label ?? item.type)).toEqual([
       'Tree',
       'Agenda',
@@ -125,7 +133,7 @@ describe('application menu template', () => {
   ])('shows the current preferences as check marks (vim %s, always on top %s)', (vimEnabled, alwaysOnTop) => {
     const template = applicationMenuTemplate(state({ vimEnabled, alwaysOnTop }), createActions())
 
-    const vim = submenuItems(template, 'Edit')[0]
+    const vim = submenuItems(template, 'Edit').find((item) => item.label === 'Vim Editing')
     const pin = submenuItems(template, 'Window')[0]
 
     expect([vim?.type, vim?.checked]).toEqual(['checkbox', vimEnabled])
@@ -162,7 +170,10 @@ describe('application menu template', () => {
     const actions = createActions()
     const template = applicationMenuTemplate(state({ alwaysOnTop: true }), actions)
 
-    clickWithChecked(submenuItems(template, 'Edit')[0]!, true)
+    clickWithChecked(
+      submenuItems(template, 'Edit').find((item) => item.label === 'Vim Editing')!,
+      true,
+    )
     clickWithChecked(submenuItems(template, 'Window')[0]!, false)
 
     expect(actions.setVimEnabled).toHaveBeenCalledExactlyOnceWith(true)

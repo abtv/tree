@@ -7,7 +7,77 @@ import { createEditorStoreDouble } from './test/editor-store-double'
 import { APPLE_SHORTCUTS } from './shortcut-profile'
 import type { RecentNode } from '../application/recent-nodes'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+it('retains empty feedback and shows only one delayed pending label', () => {
+  vi.useFakeTimers()
+  const { store } = setup(true)
+  let publish: (results: readonly RecentNode[]) => void = () => undefined
+  vi.mocked(store.searchNodes).mockImplementation((_query, callback) => {
+    publish = callback
+    return vi.fn()
+  })
+  const input = screen.getByRole('searchbox')
+
+  fireEvent.change(input, { target: { value: 'absent' } })
+  act(() => vi.advanceTimersByTime(199))
+
+  expect(screen.getByText('No recent nodes')).toBeInTheDocument()
+  expect(screen.queryByText('Searching…')).toBeNull()
+  expect(screen.getByText('↑ ↓ select · Enter open · Esc close')).toBeInTheDocument()
+
+  act(() => vi.advanceTimersByTime(1))
+
+  expect(screen.getAllByText('Searching…')).toHaveLength(1)
+  expect(screen.getByText('No recent nodes')).toBeInTheDocument()
+
+  act(() => publish([]))
+
+  expect(screen.getByText('No results')).toBeInTheDocument()
+  expect(screen.queryByText('Searching…')).toBeNull()
+
+  fireEvent.change(input, { target: { value: 'next' } })
+  act(() => vi.advanceTimersByTime(100))
+
+  expect(screen.getByText('No results')).toBeInTheDocument()
+  expect(screen.queryByText('Searching…')).toBeNull()
+
+  act(() => publish([{ id: 'found', text: 'Next result', path: null }]))
+  act(() => vi.advanceTimersByTime(300))
+
+  expect(screen.getByRole('option')).toHaveTextContent('Next result')
+  expect(screen.queryByText('Searching…')).toBeNull()
+})
+
+it('cancels pending feedback on clear, close and reopen', () => {
+  vi.useFakeTimers()
+  const { store } = setup()
+  vi.mocked(store.searchNodes).mockImplementation(() => vi.fn())
+  const input = screen.getByRole('searchbox')
+
+  fireEvent.change(input, { target: { value: 'needle' } })
+  act(() => vi.advanceTimersByTime(100))
+  fireEvent.change(input, { target: { value: '' } })
+  act(() => vi.advanceTimersByTime(300))
+
+  expect(screen.queryByText('Searching…')).toBeNull()
+  expect(screen.getAllByRole('option')).toHaveLength(8)
+
+  fireEvent.change(input, { target: { value: 'again' } })
+  fireEvent.keyDown(input, { key: 'Escape' })
+
+  expect(screen.queryByRole('dialog')).toBeNull()
+  act(() => vi.advanceTimersByTime(300))
+
+  fireEvent.keyDown(document, { key: ';', metaKey: true })
+  act(() => vi.advanceTimersByTime(300))
+
+  expect(screen.getByRole('searchbox')).toHaveValue('')
+  expect(screen.queryByText('Searching…')).toBeNull()
+})
 
 // @requirement PRODUCT.md §20.14
 it('retains rows during refinement without allowing stale activation, then replaces them together', () => {
@@ -109,7 +179,7 @@ it('visits only on confirmation and permits dismissing an empty history', () => 
   expect(empty.input).toHaveFocus()
 })
 
-it('cancels obsolete searches, restores recent nodes on clear and starts empty with Cmd+F', () => {
+it('cancels obsolete searches, restores recent nodes on clear and starts empty with Cmd+;', () => {
   const { store } = setup()
   const cancel = vi.fn()
   vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
@@ -124,7 +194,7 @@ it('cancels obsolete searches, restores recent nodes on clear and starts empty w
   expect(screen.getAllByRole('option')).toHaveLength(8)
   fireEvent.change(input, { target: { value: 'next' } })
   fireEvent.keyDown(input, { key: 'Escape' })
-  fireEvent.keyDown(document, { key: 'f', metaKey: true })
+  fireEvent.keyDown(document, { key: ';', metaKey: true })
 
   expect(screen.getByRole('searchbox')).toHaveValue('')
   expect(screen.getByRole('searchbox')).toHaveFocus()

@@ -25,6 +25,11 @@ Agenda horizontal navigation includes contextual text, dates, gaps and the focus
 Tree and Agenda `/`, `n` and `N` follow PRODUCT §20.2.26. **Vim divergence:** the approved
 search is literal, preselects the recalled query, highlights without moving during
 entry, and uses Normal Escape to hide feedback and clean up search-owned folds.
+The shared Find panel retains input focus after Enter; Enter/Shift+Enter repeat
+forward/backward, and Escape returns focus to the last match. This deliberately
+differs from Vim's immediate return to Normal after confirmation. Cmd+F opens the
+same panel in either mode; Cmd+; opens global node search. The both-mode scenarios
+in `e2e/electron/local-search.spec.ts` cover repetition, close and clicked-caret restoration.
 Tree scope includes folded descendants and its heading; search does not cross node
 boundaries. `src/application/editor-search.test.ts` covers current-data navigation
 and fold ownership, large-branch deletion, scoped moves, split/join, mixed navigation

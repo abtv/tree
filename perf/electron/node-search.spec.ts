@@ -20,7 +20,7 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     location: { currentParentId: null, selectedNodeId: 'parent' },
   })
   const { window } = await launchTree(userDataDir)
-  await window.keyboard.press('Meta+f')
+  await window.keyboard.press('Meta+;')
   const input = window.getByRole('searchbox')
   await expect(input).toBeFocused()
   const start = performance.now()

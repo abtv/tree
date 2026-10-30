@@ -29,7 +29,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
     const input = popup.getByRole('searchbox')
     const tags = popup.getByRole('listbox', { name: 'Tags' })
@@ -50,7 +50,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await expect(popup).toHaveCount(0)
     await expect(window.locator('[data-node-id="b"] .node-input')).toBeFocused()
 
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     await input.fill('#p1')
     await expect(results.getByRole('option')).toHaveCount(2)
     await window.keyboard.press('Backspace')
@@ -84,7 +84,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
       location: { currentParentId: 'a', selectedNodeId: 'child' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     const input = window.getByRole('searchbox', { name: 'Search query' })
     const results = window.getByRole('listbox', { name: 'Search results' })
     await expect(input).toBeFocused()
@@ -119,7 +119,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('Escape')
     await window.keyboard.press('Meta+p')
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     await expect(input).toHaveValue('')
     await input.fill('alpha')
     await expect(results.getByRole('option')).toHaveCount(2)
@@ -226,7 +226,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     const input = window.getByRole('searchbox')
     await input.fill('nod')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
@@ -255,7 +255,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     await window.getByRole('searchbox').fill('node')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 100')
 
@@ -324,7 +324,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     const input = window.getByRole('searchbox')
     await input.fill('node')
     const list = window.getByRole('listbox', { name: 'Search results' })
@@ -375,7 +375,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     await window.getByRole('searchbox').fill('node')
     const list = window.getByRole('listbox', { name: 'Search results' })
     await expect(list.getByRole('option').first()).toContainText('Result node 0')
@@ -423,11 +423,26 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
-    await window.keyboard.press('Meta+f')
+    await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
     const input = popup.getByRole('searchbox')
     const initialPopup = (await popup.boundingBox())!
     const initialInput = await input.boundingBox()
+    await window.evaluate(() => {
+      const popup = document.querySelector('.recent-nodes-popup')!
+      const input = popup.querySelector('input')!
+      const probe = { flashes: 0, lostFocus: false, detached: false, frames: 0, active: true }
+      const sample = () => {
+        if (!probe.active) return
+        probe.frames++
+        if (popup.textContent?.includes('Searching…')) probe.flashes++
+        probe.lostFocus ||= document.activeElement !== input
+        probe.detached ||= !input.isConnected || !popup.isConnected
+        requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+      Object.assign(window, { globalSearchFeedbackProbe: probe })
+    })
     const viewportHeight = await window.evaluate(() => innerHeight)
     expect(Math.abs(initialPopup.y + initialPopup.height / 2 - viewportHeight / 2)).toBeLessThanOrEqual(1)
 
@@ -466,6 +481,25 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
     await window.emulateMedia({ colorScheme: 'dark' })
     await window.screenshot({ path: 'test-results/search-stable-results-dark.png' })
+    const probe = await window.evaluate(() => {
+      const probe = (
+        window as unknown as {
+          globalSearchFeedbackProbe: {
+            flashes: number
+            lostFocus: boolean
+            detached: boolean
+            frames: number
+            active: boolean
+          }
+        }
+      ).globalSearchFeedbackProbe
+      probe.active = false
+      return probe
+    })
+    expect(probe.frames).toBeGreaterThan(0)
+    expect(probe.flashes).toBe(0)
+    expect(probe.lostFocus).toBe(false)
+    expect(probe.detached).toBe(false)
   })
 
   // @requirement PRODUCT.md §20.14

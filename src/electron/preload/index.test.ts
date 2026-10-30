@@ -274,6 +274,24 @@ it('delivers notes menu commands and preserves menu-state errors', async () => {
   await expect(treeApi.setNotesMenuState?.({ canExport: false, canImport: false })).rejects.toThrow('Menu failed')
 })
 
+it('validates search menu commands and disposes their listener', async () => {
+  const { treeApi } = await import('./index')
+  const listener = vi.fn()
+  mocks.on.mockClear()
+  mocks.removeListener.mockClear()
+  const remove = treeApi.onFindMenuCommand?.(listener)
+  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: unknown) => void
+
+  for (const value of ['find', 'next', 'previous', 'all', 'invalid', null, {}]) handler({}, value)
+
+  expect(mocks.on.mock.calls[0]?.[0]).toBe('tree:find-menu-command')
+  expect(listener.mock.calls).toEqual([['find'], ['next'], ['previous'], ['all']])
+
+  remove?.()
+
+  expect(mocks.removeListener).toHaveBeenCalledExactlyOnceWith(ipcEvents.findMenuCommand, handler)
+})
+
 // @requirement PRODUCT.md §9.3
 it('delivers only supported view commands and removes the exact menu listener', async () => {
   const { treeApi } = await import('./index')

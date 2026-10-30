@@ -5,6 +5,7 @@ import type { ShortcutProfile } from './shortcut-profile'
 import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
 import { moveSuggestionIndex } from './completion-controller'
 import { OutlineRootIcon } from './LocationBar'
+import { SearchPendingLabel } from './SearchPendingLabel'
 
 const RESULT_EDGE_INSET = 12
 
@@ -19,16 +20,19 @@ export function RecentNodesPopup({
   blocked,
   beforeOpen,
   beforeVisit,
+  openRef,
 }: {
   store: EditorStore
   shortcuts: ShortcutProfile
   blocked: boolean
   beforeOpen(): void
   beforeVisit(): void
+  openRef?: { current: (() => void) | undefined }
 }): React.JSX.Element | null {
   const [items, setItems] = useState<readonly RecentNode[]>()
   const [selected, setSelected] = useState(0)
   const [query, setQuery] = useState('')
+  const [completedQuery, setCompletedQuery] = useState('')
   const [suggestions, setSuggestions] = useState<readonly string[]>([])
   const [suggestionIndex, setSuggestionIndex] = useState(0)
   const [pending, setPending] = useState(false)
@@ -53,11 +57,13 @@ export function RecentNodesPopup({
     setPending(value.startsWith('#') || [...value].length >= 3)
     if (value === '') {
       setItems(store.recentNodes.getResults())
+      setCompletedQuery(value)
       setPending(false)
       return
     }
     cancelSearch.current = store.searchNodes(value, (results) => {
       setItems(results)
+      setCompletedQuery(value)
       setPending(false)
     })
   }
@@ -79,6 +85,32 @@ export function RecentNodesPopup({
       beforeVisit()
       store.visitRecentNode(id)
     }
+    const show = (): void => {
+      if (
+        blocked ||
+        store.getSnapshot().status !== 'ready' ||
+        document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
+      )
+        return
+      beforeOpen()
+      active.current = true
+      const origin = document.activeElement
+      const selection =
+        origin instanceof HTMLElement && origin.matches('.node-input') ? getSelectionEndpoints(origin) : undefined
+      restore.current = () => {
+        if (!(origin instanceof HTMLElement) || !origin.isConnected) return
+        origin.focus({ preventScroll: true })
+        if (selection !== undefined) setSelectionRange(origin, selection.anchor, selection.focus)
+      }
+      setItems(store.recentNodes.getResults())
+      setSelected(0)
+      setQuery('')
+      setCompletedQuery('')
+      setPending(false)
+      setSuggestions([])
+      setWindowStart(0)
+    }
+    if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
       if (event.isComposing) return
       if (items !== undefined) {
@@ -87,7 +119,7 @@ export function RecentNodesPopup({
           !event.shiftKey &&
           !event.altKey &&
           !shortcuts.hasNonPrimaryCtrl(event) &&
-          (event.key === ';' || event.key.toLowerCase() === 'f')
+          event.key === ';'
         ) {
           event.preventDefault()
           event.stopImmediatePropagation()
@@ -141,7 +173,7 @@ export function RecentNodesPopup({
       }
       if (
         blocked ||
-        (event.key !== ';' && event.key.toLowerCase() !== 'f') ||
+        event.key !== ';' ||
         !shortcuts.isPrimary(event) ||
         event.shiftKey ||
         event.altKey ||
@@ -152,22 +184,7 @@ export function RecentNodesPopup({
         return
       event.preventDefault()
       event.stopImmediatePropagation()
-      beforeOpen()
-      active.current = true
-      const origin = document.activeElement
-      const selection =
-        origin instanceof HTMLElement && origin.matches('.node-input') ? getSelectionEndpoints(origin) : undefined
-      restore.current = () => {
-        if (!(origin instanceof HTMLElement) || !origin.isConnected) return
-        origin.focus({ preventScroll: true })
-        if (selection !== undefined) setSelectionRange(origin, selection.anchor, selection.focus)
-      }
-      setItems(store.recentNodes.getResults())
-      setSelected(0)
-      setQuery('')
-      setPending(false)
-      setSuggestions([])
-      setWindowStart(0)
+      show()
     }
     const outside = (event: PointerEvent): void => {
       if (items === undefined || (event.target instanceof Element && event.target.closest('.recent-nodes-popup')))
@@ -194,6 +211,7 @@ export function RecentNodesPopup({
     document.addEventListener('pointerdown', outside, true)
     window.addEventListener('blur', close)
     return () => {
+      if (openRef !== undefined) openRef.current = undefined
       document.removeEventListener('keydown', keydown, true)
       document.removeEventListener('pointerdown', outside, true)
       window.removeEventListener('blur', close)
@@ -253,6 +271,7 @@ export function RecentNodesPopup({
   })
 
   if (items === undefined) return null
+  const displayedQuery = pending ? completedQuery : query
   return (
     <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
       <div className="recent-nodes-title">Search</div>
@@ -326,13 +345,11 @@ export function RecentNodesPopup({
         {items.length === 0 ? (
           suggestions.length > 0 ? null : (
             <div className="recent-node-empty">
-              {query === ''
+              {displayedQuery === ''
                 ? 'No recent nodes'
-                : !query.startsWith('#') && [...query].length < 3
+                : !displayedQuery.startsWith('#') && [...displayedQuery].length < 3
                   ? 'Enter at least 3 characters'
-                  : pending
-                    ? 'Searching…'
-                    : 'No results'}
+                  : 'No results'}
             </div>
           )
         ) : (
@@ -382,11 +399,13 @@ export function RecentNodesPopup({
       </div>
       <div className="node-search-footer">
         <span>
-          {pending && suggestions.length === 0
-            ? 'Searching…'
-            : suggestions.length > 0
-              ? '↑ ↓ select · Enter/Tab apply · Esc dismiss'
-              : '↑ ↓ select · Enter open · Esc close'}
+          {pending && suggestions.length === 0 ? (
+            <SearchPendingLabel previous="↑ ↓ select · Enter open · Esc close" />
+          ) : suggestions.length > 0 ? (
+            '↑ ↓ select · Enter/Tab apply · Esc dismiss'
+          ) : (
+            '↑ ↓ select · Enter open · Esc close'
+          )}
         </span>
       </div>
     </div>

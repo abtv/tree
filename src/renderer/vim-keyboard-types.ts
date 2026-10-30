@@ -126,7 +126,7 @@ export interface VimKeyboardState {
    * untouched, because a text-editing command that interrupts the session (paste/cut) must act on
    * what the user still sees selected.
    */
-  finishReplace: (input: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
+  finishReplace: (input?: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
   imageTextCursor: { current: number | undefined }
   getCaretState: (nodeId: string, cursor: number, imageActive: boolean) => VimCaretState
   /** Publish the complete Normal intent and project it through the hook's registered input. */

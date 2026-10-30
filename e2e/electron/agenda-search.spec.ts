@@ -62,9 +62,12 @@ test('searches folded occurrences and moves the contextual caret within the same
   await window.keyboard.press('Enter')
   const context = window.locator(row(day, 'parent'))
 
-  await expect(context).toBeFocused()
+  await expect(prompt).toBeFocused()
   await expect(window.locator('.search-count')).toHaveText('1 / 9')
 
+  await context.focus()
+  await window.keyboard.press('0')
+  await expect(context).toBeFocused()
   await window.keyboard.press('n')
 
   await expect(window.locator('.search-count')).toHaveText('2 / 9')
@@ -135,6 +138,8 @@ test('keeps the draft through folding and scroll, restores row focus, and recall
   await window.keyboard.press('/')
   await prompt.fill('apple')
   await window.keyboard.press('Enter')
+  await expect(window.locator('.search-count')).toHaveText('1 / 9')
+  await window.locator(row(day, 'parent')).click()
 
   await expect(window.locator(row(day, 'parent'))).toBeFocused()
 
@@ -155,6 +160,8 @@ test('keeps the draft through folding and scroll, restores row focus, and recall
   await expect(window.locator('.search-count')).toHaveText('5')
 
   await window.keyboard.press('Enter')
+  await expect(window.locator('.search-count')).toHaveText('1 / 5')
+  await window.keyboard.press('Escape')
 
   await expect(window.locator(row(later, 'parent'))).toBeFocused()
 
@@ -190,12 +197,12 @@ test('keeps move and date-removal messages beside search and updates mirrors aft
   const positions = await window.evaluate(() =>
     ['.search-input-line', '.search-status-message', '.search-count'].map((selector) => {
       const rect = document.querySelector(selector)!.getBoundingClientRect()
-      return { left: rect.left, right: rect.right }
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
     }),
   )
 
-  expect(positions[0]!.right).toBeLessThanOrEqual(positions[1]!.left)
-  expect(positions[1]!.right).toBeLessThanOrEqual(positions[2]!.left)
+  expect(positions[0]!.right).toBeLessThanOrEqual(positions[2]!.left)
+  expect(positions[0]!.bottom).toBeLessThan(positions[1]!.top)
 
   await window.screenshot({ path: testInfo.outputPath('agenda-search-moving.png') })
   await window.keyboard.press('Enter')
@@ -210,7 +217,7 @@ test('keeps move and date-removal messages beside search and updates mirrors aft
   await window.keyboard.press('/')
   await prompt.fill('apple')
   await window.keyboard.press('Enter')
-  await window.locator(`${row(day, 'child')} .node-input`).click()
+  await window.locator(`${row(day, 'child')} .node-input`).focus()
   await window.keyboard.press('0')
   await window.keyboard.press('i')
   await window.keyboard.type('apple ')
@@ -224,7 +231,7 @@ test('keeps move and date-removal messages beside search and updates mirrors aft
   await window.keyboard.press('w')
   await window.keyboard.press('D')
 
-  await expect(window.locator('.search-status-message')).toHaveText('Add a date to keep this item in Agenda')
+  await expect(window.locator('.status-bar')).toContainText('Add a date to keep this item in Agenda')
 
   await window.keyboard.press('/')
   for (const appearance of ['light', 'dark'] as const) {
@@ -237,13 +244,14 @@ test('keeps move and date-removal messages beside search and updates mirrors aft
   await expect(window.locator(row(later, 'other'))).toHaveCount(0)
   await expect(window.locator('.search-count')).toHaveText('10')
 
+  await window.locator(row(day, 'parent')).focus()
   await window.keyboard.press('u')
 
   await expect(window.locator(row(later, 'other'))).toHaveCount(1)
   await expect(window.locator('.search-count')).toHaveText('11')
 
   await window.keyboard.press('Control+r')
-  await window.locator(row(day, 'parent')).click()
+  await window.locator(row(day, 'parent')).focus()
 
   await expect(window.locator(row(later, 'other'))).toHaveCount(0)
   await expect(window.locator('.search-count')).toHaveText('10')
@@ -261,6 +269,8 @@ test('uses gap position for search and cancels a pending jump on a newer synthet
   await window.keyboard.press('/')
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
   await window.keyboard.press('Enter')
+  await expect(window.locator('.search-count')).toHaveText('5 / 9')
+  await window.keyboard.press('Escape')
 
   await expect(window.locator(row(later, 'parent'))).toBeFocused()
 
@@ -300,7 +310,7 @@ test('reveals the matching line of a long contextual row after returning from a 
   await window.keyboard.press('Enter')
   const context = window.locator(row(day, 'context'))
 
-  await expect(context).toBeFocused()
+  await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
   await expect
     .poll(() =>
       context.locator('.agenda-caret').evaluate((element) => {

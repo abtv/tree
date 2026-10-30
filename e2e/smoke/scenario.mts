@@ -99,9 +99,12 @@ async function search(driver: SmokeDriver, query: string) {
   await driver.fill(searchInput, query)
   await driver.waitFor(`return document.querySelector('.search-count')?.textContent === '1'`)
   await driver.press(searchInput, 'Enter')
-  await driver.waitFor(`return !document.querySelector(${JSON.stringify(searchInput)}) &&
+  await driver.waitFor(`return document.activeElement?.matches(${JSON.stringify(searchInput)}) &&
     document.querySelector('.search-count')?.textContent === '1 / 1' &&
     document.querySelector('.search-match-current')?.textContent === ${JSON.stringify(query)}`)
+  await driver.press(searchInput, 'Escape')
+  await driver.waitFor(`return !document.querySelector(${JSON.stringify(searchInput)}) &&
+    document.activeElement?.matches('.node-input, .agenda-row')`)
 }
 
 export async function happyPath(driver: SmokeDriver) {

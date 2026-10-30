@@ -57,6 +57,7 @@ const exclusions: Record<string, string> = {
   suggestTags: 'Read-only derived lookup has tag catalog properties and focused store publication coverage.',
   searchNodeSuggestions: 'Read-only catalog lookup is covered by node-search and store nonmutation tests.',
   searchNodes: 'Cancellable read-only search is covered by node-search, store nonmutation and popup lifecycle tests.',
+  searchOrigin: 'Read-only origin projection is covered by editor-search-agenda tests; it does not change state.',
 }
 
 it('accounts for every public EditorStore prototype method in the command generator or exclusions', () => {

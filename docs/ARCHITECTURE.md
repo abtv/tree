@@ -168,6 +168,17 @@ the previous destination, and retry canceled navigation only against a fresh con
 match offsets and grapheme caret offsets are separate; subsequent navigation can preserve
 the raw match anchor while the caret remains at its containing grapheme.
 
+`use-local-search.ts` coordinates shared Find shortcuts and pointer controls with
+the existing application search session. Agenda exposes its current read-only caret
+through its renderer owner; `EditorStore.searchOrigin` resolves occurrence or synthetic
+origins. Native Find menu commands use a validated main-to-renderer notification;
+command-panel actions call the same renderer entry points. These controls retain
+bounded session-only references and add no document-scale work or persistence.
+While Find owns focus, navigation updates selection and reveal without focusing
+an editor or writing its native caret. The input bindings retain one deferred
+focus intent for close/Escape; genuine editor focus invalidates that intent so a
+later restoration cannot replace a newer manual selection.
+
 `editor-search.ts` connects Tree and Agenda input through `EditorStore`. Runtime publication updates
 its monotonic document revision, including Undo/Redo, before notifying subscribers.
 Scope identity stays stable across ordinary selection and folds. The controller serializes
