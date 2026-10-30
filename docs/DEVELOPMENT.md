@@ -22,7 +22,7 @@ The repository is the source of truth for the current implementation, documentat
 
 The development environment requires:
 
-* Node.js 24.13.1;
+* Node.js 24.22.1;
 * npm 11.8.0;
 * Git
 
