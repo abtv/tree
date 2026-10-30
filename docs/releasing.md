@@ -23,6 +23,25 @@ are serialized. All releases remain drafts until explicitly published.
 
 ## Signing and packaging
 
+After `npm ci`, the release audits the tagged lockfile with
+`npm run audit -- --audit-level=high`. High or critical advisories and audit service
+failures stop the job before signing or uploading. No dependency upgrades are automatic.
+
+Production fuses disable RunAsNode, NODE_OPTIONS, Node CLI inspection and extra
+file-protocol privileges, and require ASAR integrity and ASAR-only loading.
+The archive worker uses `worker_threads`, not `child_process.fork`; the renderer
+uses `app://tree/`. Development Electron binaries are not modified. The workflow
+reads back fuses from the packaged app and runs an isolated renderer smoke test
+using Chromium CDP, since Playwright's Electron launcher requires the disabled
+Node inspector. Neither test relaxes production fuses.
+
+An ad-hoc signed local build can be inspected with
+`node scripts/verify-release-fuses.mts <path-to-Tree.app>`, but Hardened Runtime
+may refuse to launch its framework because ad-hoc signatures have no matching
+Developer ID team. Do not add library-validation exceptions to work around this.
+The packaged smoke test must pass on the Developer ID build in Actions before
+any DMG is uploaded. A local fuse check alone does not establish launch readiness.
+
 The lockfile currently installs electron-builder 26.18.0 and Electron 44.9.3.
 The configuration deliberately uses v26 flat `mac` signing options. In v27 these
 move under `mac.sign`; validate the installed schema when upgrading, rather than

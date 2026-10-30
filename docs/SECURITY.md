@@ -248,8 +248,8 @@ user's browser settings.
 
 ## Desktop distribution hardening before shipment
 
-The repository does not yet package the application: `npm run build` produces unpackaged build
-output, not a distributable application. Before a build is handed to anyone, the distribution must:
+The macOS release workflow uses electron-builder; `npm run build` alone produces unpackaged
+output. The production packaging configuration enforces these distribution controls:
 
 * Disable the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, and
   `EnableNodeCliInspectArguments` Electron fuses, as well as any adjacent `EnableRunAsNode` fuse
@@ -263,8 +263,9 @@ output, not a distributable application. Before a build is handed to anyone, the
 
 These controls protect against using the bundled, signed Electron binary to run arbitrary Node.js
 code or inject code into the main process with `NODE_OPTIONS`, which would bypass every renderer-side
-control documented here. The packaging toolchain has not been chosen; selecting it is reserved for
-the Product Owner.
+control documented here. The release workflow checks fuse values in the packaged binary and
+tests its renderer through Chromium CDP, without enabling the Node inspector. See
+[Releasing](releasing.md) for the signing, audit and publication gates.
 
 ## Agent execution threat model
 

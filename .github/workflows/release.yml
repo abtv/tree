@@ -25,6 +25,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - run: npm ci
+      - name: Audit release tag dependency snapshot
+        run: npm run audit -- --audit-level=high
       - name: Check tag and reserve draft
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,7 +35,6 @@ jobs:
         run: |
           node -e 'const p=require("./package.json"); if(process.env.RELEASE_TAG !== `v${p.version}`) throw Error("Tag must match package version")'
           gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes "Artifacts are pending validation. Do not publish until this workflow succeeds."
-      - run: npm ci
       - run: npm run check
       - run: npm run test:smoke:electron
       - name: Build signed and notarized DMG
@@ -51,6 +53,8 @@ jobs:
           umask 077
           printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$APPLE_API_KEY"
           npx --no-install electron-builder --mac dmg --arm64 --publish never
+          node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app
+          node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app
           codesign --verify --deep --strict --verbose=2 dist/mac-arm64/Tree.app
           codesign -dv dist/mac-arm64/Tree.app 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun stapler validate dist/mac-arm64/Tree.app
