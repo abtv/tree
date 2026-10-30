@@ -280,11 +280,13 @@ test('keeps a hidden logical origin through manual folding and cancels on text c
   await node(window, 1).click()
   await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
 
+  await expect(window.getByLabel('Vim mode')).toHaveCount(0)
   await expect(window.locator('.search-count')).toHaveCount(0)
 
   await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
 
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  await expect(node(window, 1)).toBeFocused()
 
   await window.keyboard.press('/')
 
@@ -298,6 +300,10 @@ test('keeps a hidden logical origin through manual folding and cancels on text c
   await expect(window.locator('.search-count')).toHaveCount(0)
 
   await window.keyboard.press('Meta+p')
+
+  await expect(window.locator('.agenda-list')).toHaveCount(0)
+  await expect(node(window, 1)).toBeFocused()
+
   await window.keyboard.press('/')
 
   await expect(prompt).toHaveValue('apple')
