@@ -1,5 +1,8 @@
 node_modules/
 out/
+dist/
+*.p12
+*.p8
 coverage/
 test-results/
 playwright-report/
