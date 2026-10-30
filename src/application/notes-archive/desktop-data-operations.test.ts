@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NotesArchiveProgress, NotesExportResult, NotesFileChoice, NotesMenuCommand } from '../../shared/ipc'
+import type {
+  NotesArchiveProgress,
+  NotesExportResult,
+  NotesFileChoice,
+  NotesMenuCommand,
+  NotesImportPreparation,
+} from '../../shared/ipc'
 import { DesktopDataOperations } from './desktop-data-operations'
 
 function deferred<T>() {
@@ -33,7 +39,7 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
   }
   const api = {
     chooseNotesImportArchive: vi.fn(async (): Promise<NotesFileChoice> => ({ ok: true, fileName: 'Import.zip' })),
-    prepareNotesImport: vi.fn(async () => ({
+    prepareNotesImport: vi.fn(async (): Promise<NotesImportPreparation> => ({
       ok: true as const,
       fileName: 'Import.zip',
       fileBytes: 100,
@@ -78,6 +84,517 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
 afterEach(() => vi.useRealTimers())
 
 describe('desktop notes operations', () => {
+  it('can dispose before start without registering listeners', () => {
+    const h = harness()
+    const subscribe = vi.spyOn(h.store, 'subscribe')
+    const operations = new DesktopDataOperations(h.api, h.store)
+
+    operations.dispose()
+    operations.start()
+
+    expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  it.each(['export', 'import'] as const)('blocks other commands while choosing an %s archive', async (command) => {
+    const h = harness()
+    const choice = deferred<NotesFileChoice>()
+    if (command === 'export') h.api.chooseNotesExportDestination.mockReturnValueOnce(choice.promise)
+    else h.api.chooseNotesImportArchive.mockReturnValueOnce(choice.promise)
+
+    const job = command === 'export' ? h.operations.exportNotes() : h.operations.importNotes()
+    await h.operations.exportNotes()
+    await h.operations.importNotes()
+    h.operations.dismiss()
+
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'choosing' })
+    expect(h.api.chooseNotesExportDestination).toHaveBeenCalledTimes(command === 'export' ? 1 : 0)
+    expect(h.api.chooseNotesImportArchive).toHaveBeenCalledTimes(command === 'import' ? 1 : 0)
+
+    choice.resolve({ ok: false, canceled: true })
+    await job
+    h.operations.dispose()
+  })
+
+  it('changes only import availability between loading and load error', () => {
+    const h = harness()
+    h.change({ status: 'loading' })
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+
+    h.change({ status: 'error' })
+
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: true })
+    h.operations.dispose()
+  })
+
+  it('treats an absent import notice as normal', async () => {
+    const h = harness()
+
+    await Promise.resolve()
+
+    expect(h.store.reportError).not.toHaveBeenCalled()
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
+    h.operations.dispose()
+  })
+
+  it.each(['export', 'import'] as const)('ignores a rejected %s dialog after disposal', async (command) => {
+    const h = harness()
+    let reject!: (reason: unknown) => void
+    const failure = new Promise<NotesFileChoice>((_resolve, fail) => {
+      reject = fail
+    })
+    if (command === 'export') h.api.chooseNotesExportDestination.mockReturnValueOnce(failure)
+    else h.api.chooseNotesImportArchive.mockReturnValueOnce(failure)
+
+    const job = command === 'export' ? h.operations.exportNotes() : h.operations.importNotes()
+    h.operations.dispose()
+    reject(new Error('Late panel failure'))
+    await job
+
+    expect(h.api.cancelNotesOperation).toHaveBeenCalledOnce()
+  })
+
+  it('takes the import notice on an initial load error, but waits during loading', async () => {
+    const h = harness()
+    await Promise.resolve()
+    h.operations.dispose()
+    h.change({ status: 'loading' })
+    h.api.takeNotesImportNotice.mockClear()
+    const operations = new DesktopDataOperations(h.api, h.store)
+    operations.start()
+    expect(h.api.takeNotesImportNotice).not.toHaveBeenCalled()
+    h.change({ status: 'error' })
+    expect(h.api.takeNotesImportNotice).toHaveBeenCalledOnce()
+    operations.dispose()
+  })
+
+  it.each(['export', 'import'] as const)('clears the old notice timer when %s starts', async (command) => {
+    vi.useFakeTimers()
+    const h = harness({ fileName: 'Old.zip', replacedFolder: null })
+    await Promise.resolve()
+    expect(vi.getTimerCount()).toBe(1)
+    const choice = deferred<NotesFileChoice>()
+    if (command === 'export') h.api.chooseNotesExportDestination.mockReturnValueOnce(choice.promise)
+    else h.api.chooseNotesImportArchive.mockReturnValueOnce(choice.promise)
+    const job = command === 'export' ? h.operations.exportNotes() : h.operations.importNotes()
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'choosing' })
+    expect(vi.getTimerCount()).toBe(0)
+    choice.resolve({ ok: false, canceled: true })
+    await job
+    h.operations.dispose()
+  })
+
+  it.each(['export', 'import'] as const)('does not publish a late %s error after disposal', async (command) => {
+    const h = harness()
+    const cleanup = deferred<void>()
+    h.api.cancelNotesOperation.mockReturnValueOnce(cleanup.promise)
+    if (command === 'export') h.api.chooseNotesExportDestination.mockRejectedValueOnce('Panel failed')
+    else h.api.chooseNotesImportArchive.mockRejectedValueOnce('Panel failed')
+    const job = command === 'export' ? h.operations.exportNotes() : h.operations.importNotes()
+    await vi.waitFor(() => expect(h.api.cancelNotesOperation).toHaveBeenCalledOnce())
+    h.operations.dispose()
+    const state = h.operations.getSnapshot()
+    cleanup.resolve()
+    await job
+    expect(h.operations.getSnapshot()).toBe(state)
+  })
+
+  it('does not publish cancellation completion after disposal', async () => {
+    const h = harness()
+    await h.operations.importNotes()
+    const cleanup = deferred<void>()
+    h.api.cancelNotesOperation.mockReturnValueOnce(cleanup.promise)
+    const job = h.operations.cancel()
+    h.operations.dispose()
+    cleanup.resolve()
+    await job
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'canceling' })
+  })
+
+  it('does not register duplicate listeners', () => {
+    const h = harness()
+    const subscribe = vi.spyOn(h.store, 'subscribe')
+    const progress = vi.spyOn(h.api, 'onNotesProgress')
+
+    h.operations.start()
+
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(progress).not.toHaveBeenCalled()
+    h.operations.dispose()
+  })
+
+  it('reports the complete result text without previous notes', async () => {
+    const h = harness({ fileName: 'Fresh.zip', replacedFolder: null })
+    await Promise.resolve()
+    expect(h.operations.getSnapshot()).toEqual({
+      phase: 'done',
+      text: 'Imported “Fresh.zip”.',
+      showFolder: false,
+      focusAction: true,
+    })
+    h.operations.dispose()
+  })
+
+  it('does not cancel an idle operation', async () => {
+    const h = harness()
+    await h.operations.cancel()
+    expect(h.api.cancelNotesOperation).not.toHaveBeenCalled()
+    h.operations.dispose()
+  })
+
+  it('reports a lost commit response with restart instructions', async () => {
+    const h = harness()
+    await h.operations.importNotes()
+    h.api.commitNotesImport.mockRejectedValueOnce('IPC lost')
+    await h.operations.replaceNotes()
+    expect(h.operations.getSnapshot()).toEqual({
+      phase: 'restart',
+      text: 'Import failed. IPC lost Restart Tree to complete the import.',
+    })
+    h.operations.dispose()
+  })
+
+  it('keeps both menus unavailable throughout confirmation and replacement', async () => {
+    const h = harness()
+    await h.operations.importNotes()
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+    const gate = deferred<void>()
+    h.store.flushPersistence.mockReturnValueOnce(gate.promise)
+    const job = h.operations.replaceNotes()
+    await h.operations.exportNotes(true)
+    expect(h.api.chooseNotesExportDestination).not.toHaveBeenCalled()
+    h.operations.dismiss()
+    expect(h.operations.getSnapshot().phase).toBe('replacing')
+    expect(h.operations.menuCommands.getSnapshot().every((entry) => entry.enabled === false)).toBe(true)
+    gate.resolve()
+    await job
+    h.operations.dispose()
+  })
+
+  it.each(['choice', 'flush', 'prepare'] as const)('ignores a late import %s after disposal', async (stage) => {
+    const h = harness()
+    const choice = deferred<NotesFileChoice>()
+    const flush = deferred<void>()
+    const preparation = deferred<NotesImportPreparation>()
+    if (stage === 'choice') h.api.chooseNotesImportArchive.mockReturnValueOnce(choice.promise)
+    if (stage === 'flush') h.store.flushPersistence.mockReturnValueOnce(flush.promise)
+    if (stage === 'prepare') h.api.prepareNotesImport.mockReturnValueOnce(preparation.promise)
+
+    const job = h.operations.importNotes()
+    if (stage !== 'choice')
+      await vi.waitFor(() =>
+        expect(stage === 'flush' ? h.store.flushPersistence : h.api.prepareNotesImport).toHaveBeenCalledOnce(),
+      )
+    h.operations.dispose()
+    const state = h.operations.getSnapshot()
+    choice.resolve({ ok: true, fileName: 'Late.zip' })
+    flush.resolve()
+    preparation.resolve({ ok: false, message: 'Late' })
+    await job
+
+    expect(h.operations.getSnapshot()).toBe(state)
+    expect(h.operations.getConfirmation()).toBeUndefined()
+    if (stage !== 'prepare') expect(h.api.prepareNotesImport).not.toHaveBeenCalled()
+  })
+
+  it('invalidates a canceled import before a new import starts', async () => {
+    const h = harness()
+    const gate = deferred<NotesImportPreparation>()
+    h.api.prepareNotesImport.mockReturnValueOnce(gate.promise)
+    const job = h.operations.importNotes()
+    await vi.waitFor(() => expect(h.api.prepareNotesImport).toHaveBeenCalledOnce())
+    await h.operations.cancel()
+    await h.operations.importNotes()
+    const confirmation = h.operations.getConfirmation()
+    gate.resolve({ ok: false, message: 'Late failure' })
+    await job
+    expect(h.operations.getConfirmation()).toBe(confirmation)
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'confirming', text: '' })
+    h.operations.dispose()
+  })
+
+  it('does not suspend writes when disposed during the final flush', async () => {
+    const h = harness()
+    await h.operations.importNotes()
+    const gate = deferred<void>()
+    h.store.flushPersistence.mockReturnValueOnce(gate.promise)
+    const job = h.operations.replaceNotes()
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'replacing', text: 'Replacing Notes…' })
+    await h.operations.replaceNotes()
+    h.operations.dispose()
+    gate.resolve()
+    await job
+    expect(h.api.suspendWrites).not.toHaveBeenCalled()
+    expect(h.api.commitNotesImport).not.toHaveBeenCalled()
+  })
+
+  it.each(['menu', 'notice', 'folder', 'cancel', 'dispose', 'import', 'replace'] as const)(
+    'reports %s bridge failures',
+    async (stage) => {
+      const h = harness()
+      await Promise.resolve()
+      const error = new Error('Bridge failed')
+      if (stage === 'menu') {
+        h.api.setNotesMenuState.mockRejectedValueOnce(error)
+        h.change({ status: 'error' })
+      } else if (stage === 'folder') {
+        h.api.showReplacedNotesFolder.mockRejectedValueOnce(error)
+        h.operations.showReplacedFolder()
+      } else if (stage === 'notice') {
+        h.operations.dispose()
+        h.api.takeNotesImportNotice.mockRejectedValueOnce(error)
+        const other = new DesktopDataOperations(h.api, h.store)
+        other.start()
+        await Promise.resolve()
+        other.dispose()
+      } else {
+        if (stage === 'cancel' || stage === 'replace') await h.operations.importNotes()
+        h.api.cancelNotesOperation.mockRejectedValueOnce(error)
+        if (stage === 'cancel') await h.operations.cancel()
+        if (stage === 'dispose') h.operations.dispose()
+        if (stage === 'import') {
+          h.api.chooseNotesImportArchive.mockRejectedValueOnce('Panel failed')
+          await h.operations.importNotes()
+          expect(h.operations.getSnapshot()).toEqual({ phase: 'failed', text: 'Import failed. Panel failed' })
+        }
+        if (stage === 'replace') {
+          h.store.flushPersistence.mockRejectedValueOnce('Disk full')
+          await h.operations.replaceNotes()
+          expect(h.operations.getConfirmation()).toBeUndefined()
+        }
+      }
+      await vi.waitFor(() => expect(h.store.reportError).toHaveBeenCalledWith(error))
+      h.operations.dispose()
+    },
+  )
+
+  it.each([undefined, 'Import.zip'])('shows the exact import notice for %s once', async (fileName) => {
+    const h = harness({ ...(fileName === undefined ? {} : { fileName }), replacedFolder: 'Old Notes' })
+    await Promise.resolve()
+    expect(h.operations.getSnapshot()).toEqual({
+      phase: 'done',
+      text: `${fileName === undefined ? 'Imported notes.' : 'Imported “Import.zip”.'} Your previous notes are in “Old Notes”.`,
+      showFolder: true,
+      focusAction: true,
+    })
+    h.change({ status: 'error' })
+    expect(h.api.takeNotesImportNotice).toHaveBeenCalledOnce()
+    h.operations.dispose()
+  })
+
+  it.each([false, true])('ignores late notices while busy or disposed (%s)', async (disposed) => {
+    const h = harness()
+    await Promise.resolve()
+    h.operations.dispose()
+    const notice = deferred<import('../../shared/ipc').NotesImportNotice | null>()
+    h.api.takeNotesImportNotice.mockReturnValueOnce(notice.promise)
+    const operations = new DesktopDataOperations(h.api, h.store)
+    operations.start()
+    if (disposed) operations.dispose()
+    else await operations.importNotes()
+    const state = operations.getSnapshot()
+    notice.resolve({ fileName: 'Old.zip', replacedFolder: null })
+    await Promise.resolve()
+    expect(operations.getSnapshot()).toBe(state)
+    operations.dispose()
+  })
+
+  it('clears success timers on dismissal and disposal', async () => {
+    vi.useFakeTimers()
+    const h = harness()
+    await h.operations.exportNotes()
+    expect(vi.getTimerCount()).toBe(1)
+    h.operations.dismiss()
+    expect(vi.getTimerCount()).toBe(0)
+    await h.operations.exportNotes()
+    const listener = vi.fn()
+    h.operations.subscribe(listener)
+    h.operations.dispose()
+    expect(vi.getTimerCount()).toBe(0)
+    h.operations.dismiss()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('publishes changes to subscribers and removes subscriptions', async () => {
+    const { operations } = harness()
+    expect(operations.getSnapshot()).toEqual({ phase: 'idle' })
+    const listener = vi.fn()
+    const stop = operations.subscribe(listener)
+
+    await operations.exportNotes()
+
+    expect(listener).toHaveBeenCalledTimes(3)
+    stop()
+    operations.dismiss()
+    expect(listener).toHaveBeenCalledTimes(3)
+    operations.dispose()
+  })
+
+  it.each(['export', 'import'] as const)('dispatches native %s independently', async (command) => {
+    const h = harness()
+    h.command(command)
+    await vi.waitFor(() => expect(h.operations.getSnapshot().phase).toBe(command === 'export' ? 'done' : 'confirming'))
+
+    expect(h.api.chooseNotesExportDestination).toHaveBeenCalledTimes(command === 'export' ? 1 : 0)
+    expect(h.api.chooseNotesImportArchive).toHaveBeenCalledTimes(command === 'import' ? 1 : 0)
+    h.operations.dispose()
+  })
+
+  it.each(['export-notes', 'import-notes'])('exposes executable command-panel entry %s', async (name) => {
+    const h = harness()
+    expect(h.operations.menuCommands.getSnapshot().map(({ name, enabled }) => ({ name, enabled }))).toEqual([
+      { name: 'export-notes', enabled: true },
+      { name: 'import-notes', enabled: true },
+    ])
+
+    await h.operations.menuCommands
+      .getSnapshot()
+      .find((entry) => entry.name === name)!
+      .run(undefined!, undefined!)
+
+    expect(
+      name === 'export-notes' ? h.api.chooseNotesExportDestination : h.api.chooseNotesImportArchive,
+    ).toHaveBeenCalledOnce()
+    h.operations.dispose()
+  })
+
+  it('starts once and refuses commands and menu updates after disposal', async () => {
+    const h = harness()
+    h.operations.start()
+    h.operations.dispose()
+    h.operations.start()
+    h.change({ status: 'error' })
+    await h.operations.exportNotes()
+    await h.operations.importNotes()
+
+    expect(h.api.setNotesMenuState).toHaveBeenCalledTimes(1)
+    expect(h.api.chooseNotesExportDestination).not.toHaveBeenCalled()
+    expect(h.api.chooseNotesImportArchive).not.toHaveBeenCalled()
+    for (const stop of h.stops) expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it.each([{ status: 'loading' }, { status: 'ready', persistenceLocked: true }])(
+    'blocks unavailable imports: %j',
+    async (state) => {
+      const h = harness()
+      h.change(state)
+      await h.operations.importNotes()
+      expect(h.api.chooseNotesImportArchive).not.toHaveBeenCalled()
+      h.operations.dispose()
+    },
+  )
+
+  it.each(['panel', 'canceled', 'failed'] as const)('returns to confirmation after export %s', async (outcome) => {
+    const h = harness()
+    await h.operations.importNotes()
+    const confirmation = h.operations.getConfirmation()
+    await h.operations.exportNotes()
+    expect(h.api.chooseNotesExportDestination).not.toHaveBeenCalled()
+    if (outcome === 'panel') h.api.chooseNotesExportDestination.mockResolvedValueOnce({ ok: false, canceled: true })
+    else
+      h.api.startNotesExport.mockResolvedValueOnce({
+        ok: false,
+        canceled: outcome === 'canceled',
+        message: 'Disk full',
+      })
+
+    await h.operations.exportNotes(true)
+
+    expect(h.operations.getSnapshot()).toEqual({
+      phase: 'confirming',
+      text: outcome === 'failed' ? 'Export failed. Disk full' : '',
+    })
+    expect(h.operations.getConfirmation()).toBe(confirmation)
+    h.operations.dispose()
+  })
+
+  it('returns to idle for a canceled export worker', async () => {
+    const h = harness()
+    h.api.startNotesExport.mockResolvedValueOnce({ ok: false, canceled: true })
+
+    await h.operations.exportNotes()
+
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
+    h.operations.dispose()
+  })
+
+  it.each(['panel', 'canceled', 'failed'] as const)('handles import %s', async (outcome) => {
+    const h = harness()
+    if (outcome === 'panel') h.api.chooseNotesImportArchive.mockResolvedValueOnce({ ok: false, canceled: true })
+    else
+      h.api.prepareNotesImport.mockResolvedValueOnce({
+        ok: false,
+        canceled: outcome === 'canceled',
+        message: 'Bad archive',
+      })
+
+    await h.operations.importNotes()
+
+    expect(h.operations.getSnapshot()).toEqual(
+      outcome === 'failed' ? { phase: 'failed', text: 'Import failed. Bad archive' } : { phase: 'idle' },
+    )
+    expect(h.operations.getConfirmation()).toBeUndefined()
+    if (outcome === 'panel') expect(h.store.flushPersistence).not.toHaveBeenCalled()
+    h.operations.dispose()
+  })
+
+  it('reports import progress and retains the exact preparation', async () => {
+    const h = harness()
+    const preparation = deferred<NotesImportPreparation>()
+    h.api.prepareNotesImport.mockReturnValueOnce(preparation.promise)
+    const job = h.operations.importNotes()
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'choosing' })
+    await vi.waitFor(() => expect(h.api.prepareNotesImport).toHaveBeenCalledOnce())
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'running', text: 'Importing Notes…' })
+    h.progress({ imagesDone: 1, imageCount: 2 })
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'running', text: 'Importing Notes… 1 of 2 images' })
+    const result = {
+      ok: true as const,
+      fileName: 'Other.zip',
+      fileBytes: 42,
+      incoming: { nodeCount: 4, imageCount: 2, missingImageCount: 1 },
+      current: 'none' as const,
+    }
+    preparation.resolve(result)
+    await job
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'confirming', text: '' })
+    expect(h.operations.getConfirmation()).toBe(result)
+    h.operations.dispose()
+  })
+
+  it.each([false, true])('reports replacement failure details (restart=%s)', async (restartRequired) => {
+    const h = harness()
+    await h.operations.importNotes()
+    h.api.commitNotesImport.mockResolvedValueOnce({ ok: false, message: 'Disk full', restartRequired })
+
+    await h.operations.replaceNotes()
+
+    expect(h.operations.getSnapshot()).toEqual({
+      phase: restartRequired ? 'restart' : 'failed',
+      text: `Import failed. Disk full${restartRequired ? ' Restart Tree to complete the import.' : ''}`,
+    })
+    if (!restartRequired) expect(h.operations.getConfirmation()).toBeUndefined()
+    h.operations.dispose()
+  })
+
+  it('cancels replacement and blocks duplicate or locked replacement', async () => {
+    const h = harness()
+    await h.operations.replaceNotes()
+    expect(h.api.commitNotesImport).not.toHaveBeenCalled()
+    await h.operations.importNotes()
+    h.change({ status: 'ready', persistenceLocked: true })
+    await h.operations.replaceNotes()
+    expect(h.api.commitNotesImport).not.toHaveBeenCalled()
+    h.change({ status: 'error' })
+    h.store.flushPersistence.mockClear()
+    h.api.commitNotesImport.mockResolvedValueOnce({ ok: false, canceled: true })
+    await h.operations.replaceNotes()
+    expect(h.store.flushPersistence).not.toHaveBeenCalled()
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
+    expect(h.operations.getConfirmation()).toBeUndefined()
+    expect(h.api.resumeWrites).toHaveBeenCalledOnce()
+    h.operations.dispose()
+  })
+
   // @requirement PRODUCT.md §25.3
   it.each([null, '~/Tree/Replaced Notes/2026-10-23 14-05-09'])(
     'shows a one-shot import result with folder=%s',
@@ -225,6 +742,7 @@ describe('desktop notes operations', () => {
 
     expect(api.commitNotesImport).not.toHaveBeenCalled()
     expect(api.suspendWrites).not.toHaveBeenCalled()
+    expect(api.resumeWrites).not.toHaveBeenCalled()
     expect(api.cancelNotesOperation).toHaveBeenCalledOnce()
     expect(operations.getSnapshot()).toEqual({
       phase: 'failed',
@@ -433,6 +951,7 @@ describe('desktop notes operations', () => {
 
     expect(api.startNotesExport).not.toHaveBeenCalled()
     for (const stop of stops) expect(stop).toHaveBeenCalledOnce()
+    expect(api.cancelNotesOperation).toHaveBeenCalledTimes(2)
   })
 
   it('turns unexpected bridge failures into a persistent failure and reports cleanup failures', async () => {
