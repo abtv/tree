@@ -4,7 +4,7 @@ import type { ReadySnapshot } from './editor-runtime-state'
 
 afterEach(() => vi.useRealTimers())
 
-async function setup(childCount = 1) {
+async function setup(childCount = 1, nested = false) {
   vi.useFakeTimers()
   const services: EditorServices = {
     load: async () => ({
@@ -17,7 +17,7 @@ async function setup(childCount = 1) {
             children: Array.from({ length: childCount }, (_, index) => ({
               id: index === 0 ? 'b' : `b-${index}`,
               text: 'apple',
-              children: [],
+              children: nested ? [{ id: 'nested', text: 'apple', children: [] }] : [],
             })),
           },
           { id: 'c', text: 'apple', children: [{ id: 'd', text: 'apple', children: [] }] },
@@ -34,6 +34,101 @@ async function setup(childCount = 1) {
   await store.initialize()
   return { store, services, state: () => store.getSnapshot() as ReadySnapshot }
 }
+
+it('publishes draft counts and navigation results and stops notifying unsubscribed listeners', async () => {
+  const { store } = await setup()
+  const listener = vi.fn(() => store.search.getResult())
+  const unsubscribe = store.search.subscribe(listener)
+
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  listener.mockClear()
+  await vi.runAllTimersAsync()
+
+  expect(listener).toHaveBeenCalled()
+  expect(store.search.getResult()).toBeUndefined()
+
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(store.search.getResult()).toMatchObject({ destination: { nodeId: 'a', start: 6 } })
+  expect(listener.mock.results.some((result) => result.value?.destination?.start === 6)).toBe(true)
+
+  unsubscribe()
+  listener.mockClear()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('pear')
+  await vi.runAllTimersAsync()
+
+  expect(listener).not.toHaveBeenCalled()
+})
+
+it('applies every identical queued repeat and then accepts another jump', async () => {
+  const { store, state } = await setup()
+  const origin = { nodeId: 'a', offset: 0 }
+
+  store.search.begin(origin)
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate(origin, 1, 1)
+  store.search.navigate(origin, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('c')
+
+  store.search.navigate({ nodeId: 'c', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('d')
+})
+
+it('keeps different repeat counts distinct while navigation is pending', async () => {
+  const { store, state } = await setup()
+  const origin = { nodeId: 'a', offset: 0 }
+
+  store.search.begin(origin)
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate(origin, 1, 1)
+  store.search.navigate(origin, 1, 2)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('d')
+})
+
+it('confirms backward through the editor from the captured caret', async () => {
+  const { store, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 6 })
+  store.search.edit('apple')
+
+  store.search.confirm(-1)
+  await vi.runAllTimersAsync()
+
+  expect(state().focus).toMatchObject({ nodeId: 'a', cursor: 0 })
+  expect(store.search.getResult()).toMatchObject({ destination: { nodeId: 'a', start: 0 } })
+})
+
+it('transfers recursive Tree fold ownership only for descendants', async () => {
+  const { store, state } = await setup(1, true)
+  const origin = { nodeId: 'a', offset: 0 }
+  store.search.begin(origin)
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate(origin, 1, 2)
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'nested', offset: 0 }, 1, 2)
+  await vi.runAllTimersAsync()
+
+  expect(store.search.opened).toEqual(new Set(['a', 'b', 'c']))
+
+  store.search.manualFold('a', true)
+  store.search.navigate({ nodeId: 'd', offset: 0 }, -1, 1)
+  await vi.runAllTimersAsync()
+  store.hideSearch()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b']))
+  expect(store.search.opened.size).toBe(0)
+})
 
 it('serializes navigation, reveals only ancestors and cleans search-owned folds', async () => {
   const { store, state } = await setup()

@@ -1,5 +1,49 @@
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
+
+afterEach(() => vi.useRealTimers())
+
+it.each([
+  ['Alp', ['a']],
+  ['😀😀', []],
+  ['😀😀😀', ['a']],
+])('searches at three Unicode characters and gates shorter text: %s', async (query, expected) => {
+  vi.useFakeTimers()
+  const { store } = await setup()
+  store.editText('a', 'Alpha 😀😀😀')
+  const publish = vi.fn()
+
+  store.searchNodes(query, publish)
+  await vi.runAllTimersAsync()
+
+  expect(publish).toHaveBeenCalledOnce()
+  expect(publish.mock.calls[0]![0].map((row: { id: string }) => row.id)).toEqual(expected)
+})
+
+it('visits a root recent node, hides search and records the visit ahead of earlier nodes', async () => {
+  vi.useFakeTimers()
+  const { store, saveRecentNodes } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('Alpha')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  store.visitRecentNode('b')
+
+  expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'b' } })
+  expect(store.search.session.getSnapshot()).toMatchObject({ confirmed: 'Alpha', visible: false })
+  expect(store.recentNodes.getIds()).toEqual(['b', 'child'])
+
+  await store.flushPersistence()
+
+  expect(saveRecentNodes).toHaveBeenLastCalledWith(['b', 'child'])
+
+  const before = store.getSnapshot()
+  store.visitRecentNode('missing')
+
+  expect(store.getSnapshot()).toBe(before)
+  expect(store.recentNodes.getIds()).toEqual(['b', 'child'])
+})
 
 const document = {
   roots: [

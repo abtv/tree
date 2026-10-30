@@ -11,6 +11,161 @@ const context: SearchContext = {
 }
 const origin = { nodeId: 'a', offset: 0 }
 
+it('publishes confirmed pending state before either result and hides empty confirmations', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+
+  session.confirm(vi.fn())
+
+  expect(session.getSnapshot()).toEqual({ confirmed: 'aa', visible: true, pending: true })
+
+  harness.flush()
+
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', visible: true, pending: false })
+
+  session.dispose()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.confirm(vi.fn())
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', visible: false, pending: false })
+  expect(harness.pending()).toBe(0)
+})
+
+it('recounts recalled confirmation without inventing a destination after its origin was cleared', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(jump)
+  harness.flush()
+  session.hide()
+  jump.mockClear()
+
+  session.confirm(jump, -1)
+  harness.flush()
+
+  expect(jump).not.toHaveBeenCalled()
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', visible: true, pending: false, count: { total: 2 } })
+})
+
+it.each(['hide', 'cancelDraft', 'dispose'] as const)('rejects late counts after %s', (action) => {
+  const jobs: ((result: SearchResult) => void)[] = []
+  const session = new SearchSession({
+    execute(_request, publish) {
+      jobs.push(publish)
+      return () => undefined
+    },
+  })
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  const publish = jobs.at(-1)!
+
+  session[action]()
+  publish({ kind: 'count', total: 99, capped: false })
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', visible: false, pending: false })
+})
+
+it('never navigates an active draft even when a confirmed query exists', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(jump)
+  harness.flush()
+  jump.mockClear()
+  session.begin(origin)
+  session.edit('a')
+
+  session.navigate(origin, 1, 1, jump)
+  harness.flush()
+
+  expect(jump).not.toHaveBeenCalled()
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', draft: 'a', count: { total: 4 } })
+})
+
+it('recounts when the scope object changes without changing its key', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  harness.flush()
+
+  session.replaceContext({ ...context, scope: { kind: 'tree', parentId: 'a' } })
+
+  expect(session.getSnapshot()).toMatchObject({ draft: 'aa', pending: true })
+  expect(session.getSnapshot().count).toBeUndefined()
+
+  harness.flush()
+
+  expect(session.getSnapshot().count?.total).toBe(2)
+})
+
+it('notifies subscribers for completed counts and removes only the unsubscribed listener', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const removed = vi.fn()
+  const retained = vi.fn()
+  const unsubscribe = session.subscribe(removed)
+  session.subscribe(retained)
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  unsubscribe()
+  removed.mockClear()
+  retained.mockClear()
+
+  harness.flush()
+
+  expect(removed).not.toHaveBeenCalled()
+  expect(retained).toHaveBeenCalledOnce()
+  expect(session.getSnapshot().count?.total).toBe(2)
+
+  session.dispose()
+  retained.mockClear()
+  session.replaceContext(context)
+
+  expect(retained).not.toHaveBeenCalled()
+})
+
+it('cancels outstanding executor work when hiding and disposing', () => {
+  const cancels: ReturnType<typeof vi.fn>[] = []
+  const session = new SearchSession({
+    execute() {
+      const cancel = vi.fn()
+      cancels.push(cancel)
+      return cancel
+    },
+  })
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(vi.fn())
+  const count = cancels.at(-2)!
+  const navigation = cancels.at(-1)!
+
+  session.hide()
+
+  expect(count).toHaveBeenCalledOnce()
+  expect(navigation).toHaveBeenCalledOnce()
+
+  session.begin(origin)
+  const pending = cancels.at(-1)!
+  session.dispose()
+
+  expect(pending).toHaveBeenCalledOnce()
+})
+
 it('confirms a draft backward from its captured origin', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)

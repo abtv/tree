@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   availableCommands,
+  type ApplicationCommand,
   commandRegistry,
   matchCommands,
   normalizeCommandHistory,
@@ -11,6 +12,38 @@ const names = (query: string, history: readonly string[] = []): string[] =>
   matchCommands(query, history).map((command) => command.name)
 
 describe('command registry', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it.each(commandRegistry)('provides a nonempty description for $name in the command panel', (command) => {
+    expect(command.description.trim().length).toBeGreaterThan(0)
+  })
+
+  it('prioritizes exact names and aliases over history and prefix matches', () => {
+    const command = (name: string, aliases: string[] = []): ApplicationCommand => ({
+      name,
+      aliases,
+      description: name,
+      active: () => false,
+      run: async () => undefined,
+    })
+    const prefix = command('find-more')
+    const exact = command('find')
+    const alias = command('lookup', ['find'])
+
+    expect(matchCommands('find', ['find-more'], [prefix, exact, alias])).toEqual([exact, alias, prefix])
+    expect(matchCommands('two words', [], [command('lookup', ['two words'])])).toEqual([])
+  })
+
+  it('keeps quit unchecked in every context', () => {
+    const quit = commandRegistry.find((command) => command.name === 'quit')!
+
+    expect(quit.active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, view: 'agenda' })).toBe(false)
+    expect(
+      commandRegistry
+        .find((command) => command.name === 'show-tree')!
+        .active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, view: 'agenda' }),
+    ).toBe(false)
+  })
+
   // @requirement PRODUCT.md §20.2.28
   it.each([
     [true, true, 12],

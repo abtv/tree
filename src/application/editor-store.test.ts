@@ -98,6 +98,33 @@ function loadedState(document: unknown, location: unknown): EditorServices & { s
   return services
 }
 
+it('joins with the previous sibling at Backspace zero and restores the split through Undo', async () => {
+  const services = loadedState(
+    {
+      roots: [
+        { id: 'a', text: 'first', children: [] },
+        { id: 'b', text: 'second', children: [] },
+      ],
+    },
+    { currentParentId: null, selectedNodeId: 'b' },
+  )
+  const store = new EditorStore(services, ids('new'), new FakeClock())
+  await store.initialize()
+
+  expect(store.backspaceAtStart(2)).toBe(false)
+  expect(store.backspaceAtStart(0)).toBe(true)
+  expect(store.getSnapshot()).toMatchObject({
+    document: { roots: [{ id: 'a', text: 'firstsecond' }] },
+    location: { selectedNodeId: 'a' },
+    focus: { nodeId: 'a', cursor: 5 },
+  })
+  expect((store.getSnapshot() as ReadySnapshot).document.roots).toHaveLength(1)
+
+  store.undo()
+
+  expect((store.getSnapshot() as ReadySnapshot).document.roots.map((node) => node.text)).toEqual(['first', 'second'])
+})
+
 function deferredSaveServices(): {
   services: EditorServices & { saves: unknown[] }
   pending: Array<{ resolve: () => void; reject: (error: Error) => void }>
