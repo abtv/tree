@@ -23,20 +23,34 @@ function run(command: string, args: readonly string[], cwd: string, inherit = fa
 type Bump = 'patch' | 'minor' | 'major'
 const versionPaths = ['package.json', 'package-lock.json'] as const
 
+function parseVersion(version: string) {
+  const match =
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/.exec(
+      version,
+    )
+  if (!match) return undefined
+  return { core: match.slice(1, 4).map((part) => BigInt(part)), prerelease: match[4] }
+}
+
+/** Candidates produced by this command are stable; build metadata has no precedence. */
+function atLeastCandidate(remote: NonNullable<ReturnType<typeof parseVersion>>, candidate: bigint[]) {
+  for (let index = 0; index < 3; index++) {
+    if (remote.core[index] !== candidate[index]) return remote.core[index]! > candidate[index]!
+  }
+  return remote.prerelease === undefined
+}
+
 function versionFiles(texts: string[], bump: Bump) {
   const manifest = JSON.parse(texts[0]!) as { version: string }
   const lock = JSON.parse(texts[1]!) as { version: string; packages: Record<string, { version: string }> }
-  const match =
-    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/.exec(
-      manifest.version,
-    )
-  if (!match) {
+  const parsed = parseVersion(manifest.version)
+  if (!parsed) {
     throw new Error('package.json must contain a valid semantic version')
   }
   if (lock.version !== manifest.version || lock.packages['']?.version !== manifest.version) {
     throw new Error('Package and lockfile versions must match')
   }
-  const [major, minor, patch] = match.slice(1).map((part) => BigInt(part)) as [bigint, bigint, bigint]
+  const [major, minor, patch] = parsed.core as [bigint, bigint, bigint]
   const version =
     bump === 'major'
       ? `${major + 1n}.0.0`
@@ -110,14 +124,28 @@ export function releaseTag(
   const pushUrls = git('remote', 'get-url', '--push', '--all', 'origin').split('\n')
   if (pushUrls.length !== 1 || !pushUrls[0]) throw new Error('origin must have exactly one push URL')
   const destination = pushUrls[0]
+  const assertRemoteVersion = () => {
+    // The push destination may differ from origin's fetch URL. Read every release
+    // tag afresh, including tags for drafts and tags missing from the local clone.
+    const tags = git('ls-remote', '--refs', '--tags', '--', destination, 'refs/tags/v*')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.split('\t')[1]!)
+    if (tags.includes(ref)) throw new Error(`${tag} already exists in origin; choose a new version`)
+    const candidateCore = parseVersion(version)!.core
+    for (const remoteRef of tags) {
+      const remoteTag = remoteRef.slice('refs/tags/'.length)
+      const remoteVersion = parseVersion(remoteTag.slice(1))
+      if (remoteVersion && atLeastCandidate(remoteVersion, candidateCore)) {
+        throw new Error(`${tag} must be newer than remote release ${remoteTag}; update your checkout before releasing`)
+      }
+    }
+  }
   const assertAbsent = () => {
     if (git('for-each-ref', '--format=%(refname)', ref).split('\n').includes(ref)) {
       throw new Error(`${tag} already exists locally; existing tags are never replaced`)
     }
-    // Check the push destination, which may differ from origin's fetch URL.
-    if (git('ls-remote', '--refs', '--tags', '--', destination, ref) !== '') {
-      throw new Error(`${tag} already exists in origin; choose a new version`)
-    }
+    assertRemoteVersion()
   }
   assertAbsent()
   if (clean && !alreadyCommitted) {
@@ -160,6 +188,7 @@ export function releaseTag(
   if (git('rev-parse', '--verify', `${tagObject}^{commit}`) !== commit) {
     throw new Error('Local tag changed before push; inspect it without moving or deleting it')
   }
+  assertRemoteVersion()
   try {
     // Pin the source object too: a concurrent local tag move cannot publish an untested commit.
     // An explicit destination avoids mirror/push/followTags configuration and publishes no branch.

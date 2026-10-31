@@ -246,6 +246,92 @@ describe('local release tagging', () => {
     ).toThrow('already exists in origin')
   })
 
+  it.each(['v1.2.10', 'v1.3.0', 'v2.0.0', 'v1.2.4-beta.1', 'v1.2.3+build.2'])(
+    'refuses candidate v1.2.3 when remote has %s before editing or checking',
+    (remoteTag) => {
+      const { local, remote } = fixture()
+      git(local, 'push', '--quiet', remote, `HEAD:refs/tags/${remoteTag}`)
+      const original = git(local, 'rev-parse', 'HEAD')
+
+      expect(() =>
+        releaseTag(local, () => {
+          throw new Error('must not run')
+        }),
+      ).toThrow(`must be newer than remote release ${remoteTag}`)
+
+      expect(git(local, 'rev-parse', 'HEAD')).toBe(original)
+      expect(git(local, 'status', '--porcelain')).toBe('')
+      expect(git(local, 'tag', '--list')).toBe('')
+      expect(git(remote, 'rev-parse', remoteTag)).toBe(original)
+    },
+  )
+
+  it('accepts a newer stable version with older, prerelease and unrelated remote tags', () => {
+    const { local, remote } = fixture()
+    for (const tag of ['v1.2.2', 'v1.2.3-rc.9', 'v1.2.3-rc.10+build.1', 'v0.99.99', 'v-next', 'v01.2.9']) {
+      git(local, 'tag', '-a', tag, '-m', 'Remote release')
+      git(local, 'push', '--quiet', remote, `refs/tags/${tag}`)
+      git(local, 'tag', '-d', tag)
+    }
+
+    expect(releaseTag(local, () => {})).toBe('v1.2.3')
+  })
+
+  it.each([
+    ['1.2.9', 'v1.2.3', 'v1.2.10'],
+    ['9007199254740992.0.0', 'v9007199254740991.99.99', 'v9007199254740992.0.1'],
+  ])('compares numeric version components for %s', (base, remoteTag, expected) => {
+    const { local, remote } = fixture(base)
+    git(local, 'push', '--quiet', remote, `HEAD:refs/tags/${remoteTag}`)
+
+    expect(releaseTag(local, () => {})).toBe(expected)
+  })
+
+  it('rechecks after committing when a hook publishes a newer remote version', () => {
+    const { local, remote } = fixture()
+    writeFileSync(
+      join(local, '.git', 'hooks', 'post-commit'),
+      '#!/bin/sh\ngit push --quiet origin HEAD:refs/tags/v1.2.4\n',
+      { mode: 0o755 },
+    )
+
+    expect(() => releaseTag(local, () => {})).toThrow('remote release v1.2.4')
+
+    expect(git(local, 'log', '-1', '--format=%s')).toBe('chore(release): bump version to 1.2.3')
+    expect(git(local, 'tag', '--list')).toBe('')
+    expect(git(remote, 'for-each-ref', '--format=%(refname)')).toBe('refs/tags/v1.2.4')
+  })
+
+  it('checks version order at the configured push destination', () => {
+    const { local, root } = fixture()
+    const pushRemote = join(root, 'push.git')
+    git(root, 'init', '--bare', '--quiet', pushRemote)
+    git(local, 'push', '--quiet', pushRemote, 'HEAD:refs/tags/v9.0.0')
+    git(local, 'remote', 'set-url', '--push', 'origin', pushRemote)
+
+    expect(() => releaseTag(local, () => {})).toThrow('remote release v9.0.0')
+    expect(git(local, 'status', '--porcelain')).toBe('')
+  })
+
+  it('rejects a newer remote version appearing during validation without committing', () => {
+    const { local, remote } = fixture()
+    const original = git(local, 'rev-parse', 'HEAD')
+    let added = false
+
+    expect(() =>
+      releaseTag(local, () => {
+        if (added) return
+        added = true
+        git(local, 'push', '--quiet', remote, 'HEAD:refs/tags/v1.2.4')
+      }),
+    ).toThrow('remote release v1.2.4')
+
+    expect(git(local, 'rev-parse', 'HEAD')).toBe(original)
+    expect(git(local, 'tag', '--list')).toBe('')
+    expect(() => releaseTag(local, () => {})).toThrow('remote release v1.2.4')
+    expect(JSON.parse(readFileSync(join(local, 'package.json'), 'utf8')).version).toBe('1.2.3')
+  })
+
   it('fails closed on unavailable or multiple push destinations', () => {
     const { local } = fixture()
     git(local, 'remote', 'set-url', '--push', 'origin', '/missing-release-remote.git')
