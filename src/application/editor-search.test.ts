@@ -119,7 +119,7 @@ it('transfers recursive Tree fold ownership only for descendants', async () => {
   store.search.navigate({ nodeId: 'nested', offset: 0 }, 1, 2)
   await vi.runAllTimersAsync()
 
-  expect(store.search.opened).toEqual(new Set(['a', 'b', 'c']))
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b', 'c']))
 
   store.search.manualFold('a', true)
   store.search.navigate({ nodeId: 'd', offset: 0 }, -1, 1)
@@ -127,7 +127,7 @@ it('transfers recursive Tree fold ownership only for descendants', async () => {
   store.hideSearch()
 
   expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b']))
-  expect(store.search.opened.size).toBe(0)
+  expect(store.search.takeFoldsToClose(new Set())).toEqual([])
 })
 
 it('serializes navigation, reveals only ancestors and cleans search-owned folds', async () => {

@@ -3,14 +3,15 @@ import type { SearchScope } from '../domain/search-scope'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { SearchSession } from './search-session'
 import type { SearchDestination, SearchPosition, SearchResult } from './search-executor'
-import { AgendaRowsCache } from './agenda-rows'
+import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import type { AgendaCommand } from './agenda-state'
 
 type Navigation = Extract<SearchResult, { kind: 'navigate' }>
 
 /** Memory-only orchestration. Document selection and fold changes remain store commands. */
 export class EditorSearch {
   public readonly session = new SearchSession()
-  public readonly opened = new Set<string>()
+  private readonly opened = new Set<string>()
   private state: ReadySnapshot | undefined
   private revision = 0
   private scope: SearchScope = { kind: 'tree', parentId: null }
@@ -129,6 +130,41 @@ export class EditorSearch {
     this.busy = true
     const generation = this.generation
     this.session.navigate(position, direction, count, (result) => this.publish(result, generation))
+  }
+
+  public recordOpenedFold(key: string): void {
+    this.opened.add(key)
+  }
+
+  /** End search ownership, returning only folds that do not contain the current selection. */
+  public takeFoldsToClose(keep: ReadonlySet<string>): string[] {
+    const close = [...this.opened].filter((key) => !keep.has(key))
+    this.opened.clear()
+    return close
+  }
+
+  public manualAgendaFold(
+    command: Extract<AgendaCommand, { kind: 'fold' | 'toggle-fold' }>,
+    rows: readonly AgendaRow[],
+  ): void {
+    const all = command.kind === 'fold' && command.operation.endsWith('all')
+    const recursive = command.kind === 'fold' && command.operation.endsWith('recursive')
+    if (all) this.opened.clear()
+    else {
+      this.opened.delete(command.key)
+      if (recursive && this.opened.size > 0) {
+        const index = rows.findIndex((row) => row.key === command.key)
+        const parent = rows[index]
+        if (parent !== undefined && parent.kind !== 'gap') {
+          for (let cursor = index + 1; cursor < rows.length; cursor++) {
+            const row = rows[cursor]!
+            if (row.kind !== 'node' || row.day !== parent.day || (parent.kind === 'node' && row.depth <= parent.depth))
+              break
+            this.opened.delete(row.key)
+          }
+        }
+      }
+    }
   }
 
   /** Explicit manual choices transfer fold ownership away from search. */

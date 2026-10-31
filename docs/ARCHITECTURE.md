@@ -183,8 +183,10 @@ later restoration cannot replace a newer manual selection.
 its monotonic document revision, including Undo/Redo, before notifying subscribers.
 Scope identity stays stable across ordinary selection and folds. The controller serializes
 navigation and retains the raw match anchor separately from the grapheme caret. Store
-commands reveal ancestors and track search-owned expansion; manual fold commands transfer
-ownership away from search. Query entry suppresses document focus projection while keeping
+commands reveal ancestors; `EditorSearch` privately tracks search-owned expansion through
+explicit registration, manual Tree/Agenda fold transfer, and cleanup methods. The store
+applies returned cleanup keys without accessing the ownership set.
+Query entry suppresses document focus projection while keeping
 ordinary selection authority current underneath. Mounted inputs scan their own text in
 bounded asynchronous slices and compose highlights with link/date/caret intervals.
 Agenda reuses the store-owned full projection cache before fold filtering. Scope keys
