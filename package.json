@@ -67,8 +67,8 @@
     "test:perf": "npm run build && npm run build:web && playwright test -c config/testing/perf.config.ts",
     "test:perf:safari": "npm run build:web && npm run build && node perf/comparisons/safari-electron.mts",
     "test:perf:profile": "AGENDA_CPU_PROFILE=1 npm run test:perf --",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:e2e-modes && npm run check:opencode && npm run test:coverage && npm run test:performance && npm run build",
-    "check:full": "npm run check && playwright test -c config/testing/playwright.config.ts && playwright test -c config/testing/perf.config.ts --project=electron && npm run audit"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:docs && npm run check:requirements && npm run check:e2e-modes && npm run check:opencode && npm run test:coverage && npm run build",
+    "check:full": "npm run check && npm run test:performance && playwright test -c config/testing/playwright.config.ts && playwright test -c config/testing/perf.config.ts --project=electron && npm run audit"
   },
   "dependencies": {
     "fflate": "0.8.3",

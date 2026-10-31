@@ -7,7 +7,6 @@ const workflowFiles: Record<string, string> = {
   browser: 'run-web-e2e-tests',
   e2e: 'run-electron-e2e-tests',
   'e2e-memory': 'run-electron-memory-tests',
-  performance: 'run-electron-performance-tests',
   mutation: 'run-mutation-testing',
   'property-soak': 'run-property-tests',
   audit: 'audit-dependencies',
@@ -44,6 +43,24 @@ function concurrencyGroup(
 
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
+  it('keeps timing suites local while CI retains ordinary validation', async () => {
+    const { scripts } = JSON.parse(await read('package.json'))
+
+    expect(scripts.check).toContain('npm run test:coverage')
+    expect(scripts.check).not.toMatch(/test:perf(?:ormance)?/)
+    expect(scripts['check:full']).toContain('npm run test:performance')
+    expect(scripts['check:full']).toContain('perf.config.ts --project=electron')
+
+    const files = await readdir(new URL('../../.github/workflows/', import.meta.url))
+    for (const file of files.filter((name) => name.endsWith('.yml'))) {
+      const workflow = await read(`.github/workflows/${file}`)
+
+      expect(workflow, file).not.toMatch(/npm run (?:test:perf|check:full)|perf\.config\.ts/)
+    }
+    expect(await readWorkflow('ci')).toContain('npm run check')
+    expect(await read('.github/workflows/release.yml')).toContain('npm run check')
+  })
+
   it('resolves every local reusable workflow call to a callable workflow', async () => {
     const files = await readdir(new URL('../../.github/workflows/', import.meta.url))
     for (const file of files.filter((name) => name.endsWith('.yml'))) {
@@ -62,7 +79,6 @@ describe('automatic publication wiring', () => {
       ['e2e', 'shard'],
       ['browser', 'chrome'],
       ['e2e-memory', 'memory'],
-      ['performance', 'performance'],
       ['property-soak', 'soak'],
       ['mutation', 'mutation'],
       ['demo', 'generate'],
@@ -247,7 +263,7 @@ describe('automatic publication wiring', () => {
   })
 
   it('keeps macOS tests weekly/manual, demo on main pushes, and Linux validation on PRs and main', async () => {
-    for (const name of ['e2e', 'e2e-memory', 'performance', 'demo']) {
+    for (const name of ['e2e', 'e2e-memory', 'demo']) {
       const text = await readWorkflow(name)
 
       expect(text).toContain('runs-on: macos-15')

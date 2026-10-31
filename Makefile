@@ -7,7 +7,7 @@ include scripts/web/chromium-image.mk
 help:
 	@echo "make                    Show this help"
 	@echo "make setup              Prepare the Linux browser/Electron test image (owner only; network required)"
-	@echo "make check              Run standard checks, unit coverage, timing guards, and build"
+	@echo "make check              Run standard checks, unit coverage, and build"
 	@echo "make unit               Run unit tests"
 	@echo "make e2e-electron        Run Electron end-to-end tests"
 	@echo "make e2e-web            Run web end-to-end tests in offline Docker Chromium"

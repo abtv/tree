@@ -19,5 +19,8 @@ describe('vitest configuration', () => {
     expect(isCollected('e2e/web/editor.spec.mts')).toBe(false)
     expect(isCollected('perf/web/export.spec.mts')).toBe(false)
     expect(isCollected('src/domain/document.test.ts')).toBe(true)
+    expect(isCollected('src/test/regex-resources.test.ts')).toBe(true)
+    expect(isCollected('src/domain/natural-date.performance.test.ts')).toBe(false)
+    expect(isCollected('src/test/regex-resources.performance.test.ts')).toBe(false)
   })
 })
