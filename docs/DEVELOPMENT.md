@@ -913,15 +913,19 @@ npm run test:perf -- --project=electron
 
 ### Before pushing a release tag
 
-Commit the intended version in `package.json`, then run this command from the repository root on the owner's MacBook, with no competing test runs:
+Commit the intended application changes, then run this command from the repository root on the owner's MacBook, with no competing test runs:
 
 ```bash
 npm run release:electron
 ```
 
-The command requires a clean working tree, including untracked files, and derives `v<version>` from `package.json`. It refuses a tag already present locally or at origin's push destination; remote access failures stop the release. It runs `npm run check`, `npm run test:performance`, and `npm run test:perf -- --project=electron` sequentially. Before tagging, it checks the working tree, HEAD, push destination and tag absence again. It creates an annotated tag at the validated commit and pushes only that tag, without force or unrelated tags/branches. Origin must have exactly one push URL.
+The command starts from a clean working tree, including untracked files. It automatically increments patch in `package.json` and both root version fields in `package-lock.json`, without changing dependency versions. For a minor or major release, use `npm run release:electron -- minor` or `npm run release:electron -- major`. No manual version edit is needed.
 
-Any failed check prevents tag creation and push. If push fails, the local tag remains; inspect the remote outcome and local tag before retrying its explicit push. The command refuses existing tags on a subsequent run and never deletes or moves them. Use a new version and tag for a changed candidate. The command does not bump versions, commit files, push branches or publish the release draft. Run `npm run release:electron -- --help` for usage without side effects. This owner-run publishing command remains approval-gated in coding agents; it is exempt from the ordinary workflow auto-allow policy.
+It refuses the candidate's `v<version>` tag if present locally or at origin's push destination; remote access failures stop the release before version edits. It runs `npm run check`, `npm run test:performance`, and `npm run test:perf -- --project=electron` sequentially against the updated files. After successful checks, it creates `chore(release): bump version to <version>`, an annotated tag at that commit, and pushes only that tag, without force or unrelated tags/branches. Origin must have exactly one push URL. It rechecks version contents, unrelated changes, HEAD, push destination and tag absence before publishing.
+
+Failed checks leave the version edits uncommitted and create no tag. Run the same command again to retry the same version. It accepts only the exact expected version edits, including staging left by a rejected version commit; unrelated edits still block release. If the version commit succeeded but tag creation failed, retry reuses that commit. It never rewrites commits.
+
+If push fails, the local tag and version commit remain; inspect the remote outcome and local tag before retrying its explicit push. The command refuses existing tags on a subsequent run and never deletes or moves them. It does not push branches or publish the release draft. The version commit is reachable through the pushed tag; include it in the next normal branch push. Run `npm run release:electron -- --help` for usage without side effects. This owner-run publishing command remains approval-gated in coding agents; it is exempt from the ordinary workflow auto-allow policy.
 
 This is not a Git hook or CI attestation: manual tag pushes can bypass local validation. Keep the active GitHub tag ruleset for `v*` with updates and deletions restricted and no bypass actors. CI continues to validate correctness, bounded memory, dependency security and the release artifact, but does not certify timing budgets.
 

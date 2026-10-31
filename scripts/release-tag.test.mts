@@ -9,7 +9,7 @@ const directories: string[] = []
 const git = (cwd: string, ...args: string[]) =>
   execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
-function fixture(version = '1.2.3') {
+function fixture(version = '1.2.2') {
   const root = mkdtempSync(join(tmpdir(), 'tree-release-tag-'))
   directories.push(root)
   const local = join(root, 'local')
@@ -21,8 +21,16 @@ function fixture(version = '1.2.3') {
   git(local, 'config', 'user.email', 'release@example.com')
   git(local, 'config', 'commit.gpgSign', 'false')
   git(local, 'config', 'tag.gpgSign', 'false')
-  writeFileSync(join(local, 'package.json'), JSON.stringify({ version }))
-  git(local, 'add', 'package.json')
+  writeFileSync(join(local, 'package.json'), JSON.stringify({ version }, null, 2) + '\n')
+  writeFileSync(
+    join(local, 'package-lock.json'),
+    JSON.stringify(
+      { version, lockfileVersion: 3, packages: { '': { version }, 'node_modules/example': { version: '4.5.6' } } },
+      null,
+      2,
+    ) + '\n',
+  )
+  git(local, 'add', 'package.json', 'package-lock.json')
   git(local, 'commit', '--quiet', '-m', 'fixture')
   git(local, 'remote', 'add', 'origin', remote)
   return { local, remote, root }
@@ -54,7 +62,14 @@ describe('local release tagging', () => {
       ['run', 'test:perf', '--', '--project=electron'],
     ])
     expect(git(remote, 'for-each-ref', '--format=%(refname)')).toBe('refs/tags/v1.2.3')
-    expect(git(remote, 'rev-parse', 'v1.2.3^{}')).toBe(commit)
+    const released = git(local, 'rev-parse', 'HEAD')
+    expect(git(remote, 'rev-parse', 'v1.2.3^{}')).toBe(released)
+    expect(git(local, 'rev-parse', 'HEAD^')).toBe(commit)
+    expect(git(local, 'log', '-1', '--format=%s')).toBe('chore(release): bump version to 1.2.3')
+    expect(git(local, 'status', '--porcelain')).toBe('')
+    expect(
+      JSON.parse(readFileSync(join(local, 'package-lock.json'), 'utf8')).packages['node_modules/example'].version,
+    ).toBe('4.5.6')
     expect(git(remote, 'cat-file', '-t', 'v1.2.3')).toBe('tag')
   })
 
@@ -84,6 +99,100 @@ describe('local release tagging', () => {
       }),
     ).toThrow('local changes')
     expect(git(local, 'tag', '--list')).toBe('')
+  })
+
+  it('retries failed validation without another bump or an early commit', () => {
+    const { local, remote } = fixture()
+    const original = git(local, 'rev-parse', 'HEAD')
+
+    expect(() =>
+      releaseTag(local, () => {
+        throw new Error('check failed')
+      }),
+    ).toThrow('check failed')
+
+    expect(git(local, 'rev-parse', 'HEAD')).toBe(original)
+    expect(JSON.parse(readFileSync(join(local, 'package.json'), 'utf8')).version).toBe('1.2.3')
+    expect(git(remote, 'for-each-ref')).toBe('')
+
+    expect(releaseTag(local, () => {})).toBe('v1.2.3')
+    expect(git(local, 'rev-list', '--count', 'HEAD')).toBe('2')
+  })
+
+  it.each(['minor', 'major'] as const)('supports an explicit %s release', (kind) => {
+    const { local } = fixture()
+    const version = kind === 'minor' ? '1.3.0' : '2.0.0'
+
+    expect(releaseTag(local, () => {}, kind)).toBe(`v${version}`)
+    expect(git(local, 'log', '-1', '--format=%s')).toBe(`chore(release): bump version to ${version}`)
+  })
+
+  it('refuses unrelated edits added to a pending version bump', () => {
+    const { local } = fixture()
+    expect(() =>
+      releaseTag(local, () => {
+        throw new Error('check failed')
+      }),
+    ).toThrow('check failed')
+    const path = join(local, 'package.json')
+    const manifest = JSON.parse(readFileSync(path, 'utf8'))
+    manifest.description = 'unrelated edit'
+    writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n')
+
+    expect(() => releaseTag(local, () => {})).toThrow('local changes')
+    expect(git(local, 'rev-list', '--count', 'HEAD')).toBe('1')
+  })
+
+  it('retries a rejected version commit without another bump', () => {
+    const { local } = fixture()
+    const hook = join(local, '.git', 'hooks', 'commit-msg')
+    writeFileSync(hook, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+
+    expect(() => releaseTag(local, () => {})).toThrow('commit')
+
+    expect(git(local, 'rev-list', '--count', 'HEAD')).toBe('1')
+    rmSync(hook)
+    expect(releaseTag(local, () => {})).toBe('v1.2.3')
+  })
+
+  it('resumes a completed version commit after tag creation failed', () => {
+    const { local } = fixture()
+    git(local, 'config', 'tag.gpgSign', 'true')
+    git(local, 'config', 'gpg.program', '/missing-release-gpg')
+
+    expect(() => releaseTag(local, () => {})).toThrow('tag')
+
+    expect(git(local, 'log', '-1', '--format=%s')).toBe('chore(release): bump version to 1.2.3')
+    git(local, 'config', 'tag.gpgSign', 'false')
+    expect(releaseTag(local, () => {})).toBe('v1.2.3')
+    expect(git(local, 'rev-list', '--count', 'HEAD')).toBe('2')
+  })
+
+  it('bumps again only after a new application commit', () => {
+    const { local } = fixture()
+    releaseTag(local, () => {})
+
+    expect(() => releaseTag(local, () => {})).toThrow('already exists locally')
+
+    writeFileSync(join(local, 'application.txt'), 'next change')
+    git(local, 'add', 'application.txt')
+    git(local, 'commit', '--quiet', '-m', 'feat(app): add next change')
+
+    expect(releaseTag(local, () => {})).toBe('v1.2.4')
+    expect(git(local, 'log', '-1', '--format=%s')).toBe('chore(release): bump version to 1.2.4')
+  })
+
+  it('rejects a mismatched lockfile before editing files', () => {
+    const { local } = fixture()
+    const lockPath = join(local, 'package-lock.json')
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8'))
+    lock.packages[''].version = '1.0.0'
+    writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n')
+    git(local, 'add', 'package-lock.json')
+    git(local, 'commit', '--quiet', '-m', 'fixture lock mismatch')
+
+    expect(() => releaseTag(local, () => {})).toThrow('versions must match')
+    expect(git(local, 'status', '--porcelain')).toBe('')
   })
 
   it.each(['local', 'remote'])('refuses an existing %s tag without replacing it', (location) => {
@@ -165,6 +274,8 @@ describe('local release tagging', () => {
 
     expect(git(local, 'rev-parse', 'v1.2.3^{}')).toBe(git(local, 'rev-parse', 'HEAD'))
     expect(git(remote, 'for-each-ref')).toBe('')
+    expect(() => releaseTag(local, () => {})).toThrow('already exists locally')
+    expect(git(local, 'rev-list', '--count', 'HEAD')).toBe('2')
   })
 
   it('preserves a remote tag created while validation is running', () => {
@@ -199,7 +310,7 @@ describe('local release tagging', () => {
     expect(help.status).toBe(0)
     expect(help.stdout).toContain('Usage: npm run release:electron')
     expect(invalid.status).toBe(1)
-    expect(invalid.stderr).toContain('accepts no arguments')
+    expect(invalid.stderr).toContain('accepts only')
   })
 
   it.each([false, true])('CLI executes npm checks before push (check failure: %s)', (fail) => {
