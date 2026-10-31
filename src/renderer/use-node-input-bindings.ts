@@ -32,6 +32,7 @@ import * as nodeVisualCommands from './vim-node-visual-commands'
 import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn } from './caret-projection-rules'
 import { CaretProjectionState } from './caret-projection-state'
+import { SearchFocusController } from './search-focus-controller'
 import { beginReplaceClick, beginReplaceSession, createVimEditSessionState, takeReplaceClick } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
@@ -104,7 +105,14 @@ export function useNodeInputBindings({
   const initialFocusApplied = useRef(false)
   const normalCaretResizeObserver = useRef<ResizeObserver | undefined>(undefined)
   const caretProjection = useRef(new CaretProjectionState<HTMLElement>(focus, vimMode))
-  const deferredSearchFocus = useRef<FocusIntent | undefined>(undefined)
+  const searchFocus = useMemo(
+    () =>
+      new SearchFocusController(() => ({
+        draft: store.search.session.getSnapshot().draft !== undefined,
+        searchFocused: document.activeElement?.matches('.search-input-line input') === true,
+      })),
+    [store],
+  )
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
   const [composing, setComposing] = useState(false)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
@@ -248,15 +256,10 @@ export function useNodeInputBindings({
       })
       setImageCaretNodeId(caret.imageActive ? nodeId : undefined)
       if (timing === 'preserve-selection') return
-      if (
-        store.search.session.getSnapshot().draft === undefined &&
-        !document.activeElement?.matches('.search-input-line input') &&
-        timing !== 'after-edit' &&
-        input?.isConnected
-      )
+      if (searchFocus.canProjectCaret() && timing !== 'after-edit' && input?.isConnected)
         setNormalCaret(input, caret.cursor)
     },
-    [store, setImageCaretNodeId],
+    [store, setImageCaretNodeId, searchFocus],
   )
   const finishStructuralInsert = useCallback((input: HTMLElement): void => {
     sessionFinish.finishStructuralInsertSession({ commandState: vimCommandState.current }, input)
@@ -565,12 +568,7 @@ export function useNodeInputBindings({
     // pending placement, decoration, then completion. Unrelated commits skip focus/mode work.
     if (focus !== undefined && focus.token !== projection.syncedFocusToken) syncImageCaretToFocus()
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
-    if (
-      store.search.session.getSnapshot().draft === undefined &&
-      !document.activeElement?.matches('.search-input-line input') &&
-      changes.modeChanged &&
-      focusedInput !== undefined
-    ) {
+    if (searchFocus.canProjectCaret() && changes.modeChanged && focusedInput !== undefined) {
       if (vimMode === 'normal') {
         // Cmd+A's deliberate selection survives the transition to Normal.
         if (!hasMultiCharacterSelection(focusedInput)) setNormalCaret(focusedInput, getCaret(focusedInput))
@@ -592,11 +590,11 @@ export function useNodeInputBindings({
       }
       if (!viewportReveal.hasLine()) viewportReveal.cancel()
       const applyFocus = (firstPass = false): void => {
-        if (store.search.session.getSnapshot().draft !== undefined) return
+        if (!searchFocus.canProjectFocus()) return
         const input = inputs.current.get(focus.nodeId)
         if (input === undefined) return
         // Suppress native scrolling; the reveal policy decides how far to scroll.
-        const keepSearchFocus = document.activeElement?.matches('.search-input-line input') === true
+        const keepSearchFocus = searchFocus.keepsSearchFocus()
         if (!keepSearchFocus) input.focus({ preventScroll: true })
         if (!preserve) {
           const row = input.closest('.node-row, .agenda-row') ?? input
@@ -607,11 +605,8 @@ export function useNodeInputBindings({
           } else if (firstPass) viewportReveal.begin(row, keepContext, isCurrent)
           else viewportReveal.correct()
         }
-        if (keepSearchFocus) {
-          deferredSearchFocus.current = focus
-          return
-        }
-        deferredSearchFocus.current = undefined
+        searchFocus.completeFocusProjection(focus, keepSearchFocus)
+        if (keepSearchFocus) return
         if (projection.mode === 'normal') {
           // Vertical navigation can resolve an image while focus carries the originating text column.
           const authority = projection.authority
@@ -647,7 +642,7 @@ export function useNodeInputBindings({
       const state = store.getSnapshot()
       const registeredInput = inputs.current.get(pending.nodeId)
       const input = currentPendingCaretInput(pending, state, projection.currentRevision, registeredInput)
-      if (input !== undefined && store.search.session.getSnapshot().draft === undefined) {
+      if (input !== undefined && searchFocus.canProjectFocus()) {
         if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
         if (pending.restoredCaret !== undefined) {
           projection.restoreDrag(
@@ -676,11 +671,11 @@ export function useNodeInputBindings({
   useEffect(() => {
     const releaseSearchFocus = (event: FocusEvent): void => {
       if (event.target instanceof Element && event.target.matches('.node-input, .agenda-row'))
-        deferredSearchFocus.current = undefined
+        searchFocus.editorFocused()
     }
     document.addEventListener('focusin', releaseSearchFocus)
     return () => document.removeEventListener('focusin', releaseSearchFocus)
-  }, [])
+  }, [searchFocus])
 
   useEffect(() => {
     const update = (): void => {
@@ -978,10 +973,7 @@ export function useNodeInputBindings({
   return {
     readSearchCaret: () => {
       const input = selectedNodeId === undefined ? undefined : inputs.current.get(selectedNodeId)
-      return caretProjection.current.mode === 'insert' &&
-        input !== undefined &&
-        deferredSearchFocus.current === undefined &&
-        !document.activeElement?.matches('.search-input-line input')
+      return caretProjection.current.mode === 'insert' && input !== undefined && searchFocus.canReadNativeCaret()
         ? getCaret(input)
         : caretProjection.current.authority.caret.cursor
     },
@@ -1000,10 +992,9 @@ export function useNodeInputBindings({
       const id = state.location.selectedNodeId
       const input = inputs.current.get(id)
       if (input === undefined) return
-      const deferred = deferredSearchFocus.current
-      deferredSearchFocus.current = undefined
+      const deferred = searchFocus.takeRestoration(state.focus, id)
       input.focus({ preventScroll: true })
-      if (deferred !== undefined && deferred.token === state.focus.token && deferred.nodeId === id) {
+      if (deferred !== undefined) {
         if (caretProjection.current.mode === 'normal') applyCaretState(id, caretProjection.current.authority.caret)
         else setCaret(input, deferred.cursor)
         return

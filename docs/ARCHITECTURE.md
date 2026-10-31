@@ -175,8 +175,10 @@ origins. Native Find menu commands use a validated main-to-renderer notification
 command-panel actions call the same renderer entry points. These controls retain
 bounded session-only references and add no document-scale work or persistence.
 While Find owns focus, navigation updates selection and reveal without focusing
-an editor or writing its native caret. The input bindings retain one deferred
-focus intent for close/Escape; genuine editor focus invalidates that intent so a
+an editor or writing its native caret. The input bindings delegate search focus policy
+to the DOM-independent `SearchFocusController`, supplying live search and DOM focus
+observations without changing their ordered commit pipeline. The controller retains one
+deferred focus intent for close/Escape; genuine editor focus invalidates that intent so a
 later restoration cannot replace a newer manual selection.
 
 `editor-search.ts` connects Tree and Agenda input through `EditorStore`. Runtime publication updates
