@@ -50,7 +50,7 @@ function explicitlyAllowed(rules: Rule[], args: string[]) {
 // their parent npm workflow; ordinary repository tooling runs in the workspace sandbox.
 const lifecycle = ['postinstall', 'prepare', 'predev', 'prestart', 'pretest:web:built']
 // Publishing stays owner-invoked or explicitly approved; never grant it a standing host allowance.
-const ownerOnly = ['release:tag']
+const ownerOnly = ['release:electron']
 const sandbox = [
   'build',
   'build:web',

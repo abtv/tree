@@ -362,7 +362,7 @@ const documentedWorkflows = [...new Set([...development.matchAll(/npm run [A-Za-
 for (const command of documentedWorkflows) {
   assert.equal(
     chainedPermissionFor(config.agent.develop.permission.bash, command),
-    command === 'npm run release:tag' ? 'ask' : 'allow',
+    command === 'npm run release:electron' ? 'ask' : 'allow',
     `develop: documented workflow ${command} must retain its approval boundary`,
   )
   checked += 1
@@ -383,7 +383,7 @@ for (const name of Object.keys(packageJson.scripts)) {
       continue
     assert.equal(
       permissionFor(config.agent.develop.permission.bash, command),
-      name === 'release:tag' ? 'ask' : 'allow',
+      name === 'release:electron' ? 'ask' : 'allow',
       `develop: package workflow ${command} must retain its approval boundary`,
     )
     checked += 1

@@ -27,7 +27,7 @@ export function releaseTag(
 ): string {
   const git = (...args: string[]) => run('git', args, cwd)
   if (realpathSync(cwd) !== realpathSync(git('rev-parse', '--show-toplevel'))) {
-    throw new Error('Run release:tag from the repository root')
+    throw new Error('Run release:electron from the repository root')
   }
   const assertClean = () => {
     if (git('status', '--porcelain', '--untracked-files=all') !== '') {
@@ -95,10 +95,12 @@ if (import.meta.main) {
   const args = process.argv.slice(2)
   if (args.length === 1 && args[0] === '--help') {
     console.log(
-      'Usage: npm run release:tag\nValidate the clean current commit, then create and push its version tag to origin.',
+      'Usage: npm run release:electron\nValidate the clean current commit, then create and push its version tag to origin.',
     )
   } else if (args.length !== 0) {
-    console.error('release:tag accepts no arguments except --help; set the version in package.json and commit it first')
+    console.error(
+      'release:electron accepts no arguments except --help; set the version in package.json and commit it first',
+    )
     process.exitCode = 1
   } else {
     try {

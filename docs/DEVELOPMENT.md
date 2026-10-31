@@ -916,12 +916,12 @@ npm run test:perf -- --project=electron
 Commit the intended version in `package.json`, then run this command from the repository root on the owner's MacBook, with no competing test runs:
 
 ```bash
-npm run release:tag
+npm run release:electron
 ```
 
 The command requires a clean working tree, including untracked files, and derives `v<version>` from `package.json`. It refuses a tag already present locally or at origin's push destination; remote access failures stop the release. It runs `npm run check`, `npm run test:performance`, and `npm run test:perf -- --project=electron` sequentially. Before tagging, it checks the working tree, HEAD, push destination and tag absence again. It creates an annotated tag at the validated commit and pushes only that tag, without force or unrelated tags/branches. Origin must have exactly one push URL.
 
-Any failed check prevents tag creation and push. If push fails, the local tag remains; inspect the remote outcome and local tag before retrying its explicit push. The command refuses existing tags on a subsequent run and never deletes or moves them. Use a new version and tag for a changed candidate. The command does not bump versions, commit files, push branches or publish the release draft. Run `npm run release:tag -- --help` for usage without side effects. This owner-run publishing command remains approval-gated in coding agents; it is exempt from the ordinary workflow auto-allow policy.
+Any failed check prevents tag creation and push. If push fails, the local tag remains; inspect the remote outcome and local tag before retrying its explicit push. The command refuses existing tags on a subsequent run and never deletes or moves them. Use a new version and tag for a changed candidate. The command does not bump versions, commit files, push branches or publish the release draft. Run `npm run release:electron -- --help` for usage without side effects. This owner-run publishing command remains approval-gated in coding agents; it is exempt from the ordinary workflow auto-allow policy.
 
 This is not a Git hook or CI attestation: manual tag pushes can bypass local validation. Keep the active GitHub tag ruleset for `v*` with updates and deletions restricted and no bypass actors. CI continues to validate correctness, bounded memory, dependency security and the release artifact, but does not certify timing budgets.
 

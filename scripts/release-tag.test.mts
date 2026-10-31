@@ -197,7 +197,7 @@ describe('local release tagging', () => {
     const invalid = spawnSync(process.execPath, [script.pathname, '--force'], { encoding: 'utf8' })
 
     expect(help.status).toBe(0)
-    expect(help.stdout).toContain('Usage: npm run release:tag')
+    expect(help.stdout).toContain('Usage: npm run release:electron')
     expect(invalid.status).toBe(1)
     expect(invalid.stderr).toContain('accepts no arguments')
   })
