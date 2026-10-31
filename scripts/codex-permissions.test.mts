@@ -49,6 +49,8 @@ function explicitlyAllowed(rules: Rule[], args: string[]) {
 // These commands do not need a standing host-execution allowance. Lifecycle hooks run via
 // their parent npm workflow; ordinary repository tooling runs in the workspace sandbox.
 const lifecycle = ['postinstall', 'prepare', 'predev', 'prestart', 'pretest:web:built']
+// Publishing stays owner-invoked or explicitly approved; never grant it a standing host allowance.
+const ownerOnly = ['release:tag']
 const sandbox = [
   'build',
   'build:web',
@@ -88,9 +90,12 @@ it('covers every package workflow with repository approval or an explicit exempt
     scripts: Record<string, string>
   }
   const rules = declaredRules()
-  const exemptions = new Set([...lifecycle, ...sandbox])
+  const exemptions = new Set([...lifecycle, ...sandbox, ...ownerOnly])
 
   for (const name of exemptions) expect(name in scripts, `Stale permission exemption: ${name}`).toBe(true)
+  for (const name of ownerOnly) {
+    expect(explicitlyAllowed(rules, ['npm', 'run', name]), `Publishing must remain approval-gated: ${name}`).toBe(false)
+  }
 
   for (const name of Object.keys(scripts)) {
     if (exemptions.has(name)) continue

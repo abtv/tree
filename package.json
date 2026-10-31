@@ -51,6 +51,7 @@
     "check:opencode": "node scripts/check-opencode-permissions.mts",
     "changelog": "node scripts/changelog.mts --write",
     "doctor": "node scripts/doctor.mts",
+    "release:tag": "node scripts/release-tag.mts",
     "audit": "npm audit",
     "test": "vitest run -c config/testing/vitest.config.mts",
     "test:watch": "vitest -c config/testing/vitest.config.mts",
