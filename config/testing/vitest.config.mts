@@ -13,7 +13,7 @@ export default defineConfig({
       'test-results/**',
       '.scratch/**',
       '.stryker-tmp/**',
-      // Timing guards run in their own serial invocation (config/testing/vitest.performance.config.ts); see
+      // Timing guards run in their own serial invocation (config/testing/vitest.performance.config.mts); see
       // docs/DEVELOPMENT.md §12.
       'src/**/*.performance.test.ts',
     ],

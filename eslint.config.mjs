@@ -63,8 +63,8 @@ export default tseslint.config(
     files: [
       'config/build/*.ts',
       'eslint.config.mjs',
-      'config/testing/vitest.config.ts',
-      'config/testing/*.ts',
+      'config/testing/vitest.config.mts',
+      'config/testing/*.{ts,mts}',
       'scripts/**/*.{js,mjs,ts,mts}',
       'e2e/**/*.{ts,mts,cjs,mjs}',
       'perf/**/*.{ts,mts,mjs}',

@@ -23,7 +23,7 @@ Because e2e is slower and more timing-sensitive than unit tests, `npm run test:e
 
 ## Consequences
 
-- `package.json` gains a development dependency and two scripts; `config/testing/vitest.config.ts` must exclude `e2e/**` so the two runners stay separate (`docs/DEVELOPMENT.md` §8).
+- `package.json` gains a development dependency and two scripts; `config/testing/vitest.config.mts` must exclude `e2e/**` so the two runners stay separate (`docs/DEVELOPMENT.md` §8).
 - Browser binary downloads are not required for Electron testing and should be skipped during install (`docs/DEVELOPMENT.md` §3).
 - E2E tests are macOS-only and headful, so they cannot run in a headless CI without a virtual display. This constrains future automation; the suite's platform and runtime constraints are owned by `docs/DEVELOPMENT.md` §8.
 - The suite runs serially with a single worker because of the single-instance application and the global `Cmd+0` shortcut.

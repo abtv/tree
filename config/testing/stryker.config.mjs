@@ -8,7 +8,7 @@ const shard = mutationShard(process.env['TREE_MUTATION_SHARD'])
 /** @satisfies {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   testRunner: 'vitest',
-  vitest: { configFile: 'config/testing/vitest.config.ts' },
+  vitest: { configFile: 'config/testing/vitest.config.mts' },
   // Instrumentation measures mutated code, so submillisecond timing guards
   // run in ordinary Vitest validation instead of mutation workers. Agent scratch
   // directories can hold browser profiles with dangling links that the sandbox copy rejects.

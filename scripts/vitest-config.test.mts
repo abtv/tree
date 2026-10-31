@@ -10,7 +10,7 @@ describe('vitest configuration', () => {
   it('does not collect specs parked in the test-results scratch directory', async () => {
     const { test: vitestConfig } = await resolveConfig({
       root: repositoryRoot,
-      config: 'config/testing/vitest.config.ts',
+      config: 'config/testing/vitest.config.mts',
     })
     const isCollected = createFilter(vitestConfig.include, vitestConfig.exclude, { resolve: false })
 

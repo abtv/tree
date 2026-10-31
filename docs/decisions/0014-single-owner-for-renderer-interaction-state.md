@@ -33,7 +33,7 @@ and drag paths ask the caret authority to suspend or restore the caret instead o
 
 - New behavior that touches this state is added as an owner transition with a focused test; the hook only projects the
   result. A genuine defect found while extracting is reproduced and fixed defect-first rather than preserved.
-- Per-file coverage floors in `config/testing/vitest.config.ts` guard the extracted owners and the projection point as regression
+- Per-file coverage floors in `config/testing/vitest.config.mts` guard the extracted owners and the projection point as regression
   guards set just below measured coverage.
 - Owners keep bounded state that does not grow across edits, with transitions bounded by the active node text or the
   captured register payload and no disk writes, so the performance assessment in `docs/ARCHITECTURE.md` §21 continues
