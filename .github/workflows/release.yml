@@ -56,11 +56,11 @@ jobs:
           node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app
           node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app
           codesign --verify --deep --strict --verbose=2 dist/mac-arm64/Tree.app
-          codesign -dv dist/mac-arm64/Tree.app 2>&1 | grep 'Authority=Developer ID Application:'
+          codesign -dvv dist/mac-arm64/Tree.app 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun stapler validate dist/mac-arm64/Tree.app
           spctl --assess --type execute --verbose=2 dist/mac-arm64/Tree.app
           codesign --verify --strict --verbose=2 dist/Tree-*.dmg
-          codesign -dv dist/Tree-*.dmg 2>&1 | grep 'Authority=Developer ID Application:'
+          codesign -dvv dist/Tree-*.dmg 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun notarytool submit dist/Tree-*.dmg --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
           xcrun stapler staple dist/Tree-*.dmg
           xcrun stapler validate dist/Tree-*.dmg
