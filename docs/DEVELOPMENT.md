@@ -28,6 +28,12 @@ The development environment requires:
 
 The Node.js version is pinned in `.nvmrc`. The supported Node.js and npm ranges are also declared in `package.json`.
 
+On macOS, development, preview and build preparation install `assets/about/Credits.html`
+in the local Electron bundle. The packaged application includes the same file through
+`electron-builder.yml`'s `extraResources`. AppKit loads this resource for the native
+About panel's clickable repository link; do not replace it with Electron's plain-text
+`credits` option.
+
 Do not assume a different Node.js version without checking the project configuration first.
 
 Run `npm run doctor` to check the toolchain, installed Electron and Playwright packages, display availability for the Electron suites, registry reachability for `npm audit`, and build output. It reports `PASS`, `WARN`, `FAIL`, or `INFO` per check and exits nonzero on a blocking problem.
@@ -921,7 +927,7 @@ npm run release:electron
 
 The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. For minor or major use `npm run release:electron -- minor` or `npm run release:electron -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
 
-Push or merge the version commit to `main` normally. Existing main CI runs code validation, dependency audit and browser checks once. After `Release web app` completes successfully, the independent `Release macOS` workflow verifies that run's repository, workflow path, push event, main branch, exact SHA, current attempt and successful gate. It checks out that exact SHA and skips ordinary commits whose version is already reserved. It does not rerun code validation, audit, development smoke, full E2E or timing suites.
+Push or merge the version commit to `main` normally. Existing main CI runs code validation, dependency audit and browser checks once. Web signing and transfer run only when the package version exceeds the last transferred web release, resolved through its provenance's immutable source SHA. Transfer rechecks the version against the exact hosting parent before any write; a concurrent target change still fails the non-forced ref update. Missing or invalid previous provenance fails closed. An unchanged or lower version skips publication while the validation workflow succeeds. After `Release web app` completes successfully, the independent `Release macOS` workflow verifies that run's repository, workflow path, push event, main branch, exact SHA, current attempt and successful gate. It checks out that exact SHA and skips ordinary commits whose version is already reserved. It does not rerun code validation, audit, development smoke, full E2E or timing suites.
 
 A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 

@@ -141,11 +141,16 @@ body:has(.image-preview-overlay) #tree-menu-button {
 #storage-status,
 #offline-status,
 #app-version,
+#app-repository,
 #backup-status {
   display: block;
   padding: 3px 10px;
   color: var(--color-secondary);
   font-size: 11px;
+}
+#app-repository:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: -2px;
 }
 .menu-label {
   padding-left: 36px;

@@ -396,7 +396,7 @@ export async function checkedApplicationSubmenuItems(
 
 export async function clickApplicationMenuQuit(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ Menu }) => {
-    const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items[0]
+    const item = Menu.getApplicationMenu()?.items[0]?.submenu?.items.find((entry) => entry.label === 'Quit Tree')
     if (item?.click === undefined) throw new Error('The application menu quit item is unavailable.')
     item.click(item, undefined, {} as Electron.KeyboardEvent)
   })

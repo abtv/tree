@@ -194,9 +194,21 @@ describe('atomic package transfer', () => {
     conflict = false,
     workflow: workflowPath = '.github/workflows/deploy-web-app.yml',
     source = sourceRequest(),
+    previousVersion = '0.1.1',
   } = {}) {
     const f = await fixture()
     const request = vi.fn(async (path: string, options: ApiOptions = {}) => {
+      if (path.includes('/contents/package.json?ref=')) {
+        const version = path.endsWith(identity.sourceSha) ? '0.1.2' : previousVersion
+        return { encoding: 'base64', size: 20, content: Buffer.from(JSON.stringify({ version })).toString('base64') }
+      }
+      if (path.includes('/contents/provenance.json?ref=')) {
+        return {
+          encoding: 'base64',
+          size: 1000,
+          content: Buffer.from(JSON.stringify({ ...f.manifest, sourceSha: 'd'.repeat(40) })).toString('base64'),
+        }
+      }
       if (path.startsWith('/repos/abtv/tree/')) return source(path, options)
       if (path.endsWith('/git/ref/heads/main')) return { object: { sha: 'b'.repeat(40) } }
       if (path.includes('/git/commits/') && options.method !== 'POST') return { tree: { sha: 'base-tree' } }
@@ -233,6 +245,17 @@ describe('atomic package transfer', () => {
       'c'.repeat(40),
     )
   })
+  it.each(['0.1.2', '0.1.3'])(
+    'refuses transfer after hosting has reached %s without writes',
+    async (previousVersion) => {
+      const { dir, manifest, request, ...auth } = await targetFixture({ previousVersion })
+
+      await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow(
+        'already transferred or obsolete',
+      )
+      expect(request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+    },
+  )
   it('preserves existing tree paths and appends one non-forced commit containing only allowlisted files', async () => {
     const { dir, manifest, request, ...auth } = await targetFixture()
 

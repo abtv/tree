@@ -46,10 +46,30 @@ jobs:
           RELEASE_RESULTS: ${{ toJSON(needs) }}
         run: node scripts/web-release/cli.mts gate
 
+  candidate:
+    name: Check web release version
+    needs: [gate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      ready: ${{ steps.version.outputs.ready }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Compare package version with the last transferred web release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/web-release/version.mts
+
   sign:
     name: Sign web package manifest
-    needs: [gate]
-    if: ${{ !cancelled() && needs.gate.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [gate, candidate]
+    if: ${{ !cancelled() && needs.gate.result == 'success' && needs.candidate.outputs.ready == 'true' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     permissions:

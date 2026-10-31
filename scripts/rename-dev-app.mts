@@ -1,6 +1,6 @@
 // macOS takes the menu-bar application name from the Electron.app bundle, not from app.setName,
 // so a development run would show "Electron". Rename the local bundle; a packaged build sets its own name.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -17,4 +17,11 @@ if (process.platform === 'darwin') {
     `$1${APP_NAME}$2`,
   )
   if (renamed !== original) writeFileSync(plistPath, renamed)
+
+  // AppKit reads attributed credits from the native bundle, outside app.asar.
+  // Keep local About panels identical to the packaged app's extraResources.
+  copyFileSync(
+    join(root, 'assets/about/Credits.html'),
+    join(root, 'node_modules/electron/dist/Electron.app/Contents/Resources/Credits.html'),
+  )
 }

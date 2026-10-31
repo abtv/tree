@@ -140,7 +140,7 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
     await page.setViewportSize({ width: 800, height: 618 })
     await page.evaluate(() => {
       document.getElementById('prototype-save-status')!.textContent = 'Saved locally in this browser'
-      document.getElementById('app-version')!.textContent = 'Version 123 · 2026-10-29'
+      document.getElementById('app-version')!.textContent = 'Version 0.1.2 · Oct 29, 2026'
       ;(document.getElementById('data-export') as HTMLButtonElement).disabled = true
       document.getElementById('tree-menu')!.showPopover()
       document.getElementById('prototype-agenda')!.focus()

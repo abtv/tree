@@ -49,6 +49,12 @@ The application is a native-feeling macOS application and follows Apple's Human 
 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
+The desktop application menu starts with **About Tree**, followed by a separator
+before Quit Tree. About Tree opens the native macOS About panel and shows the
+application version from the root `package.json`, also used for the packaged app,
+followed by its UTC build date in English. The panel also shows a clickable
+**GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
+
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
 
 Every change to user-visible behavior is checked against the guidelines before it is considered complete. A conflict that is not already recorded as a deliberate difference is reported to the Product Owner instead of being settled silently, under `AGENTS.md` §14.
@@ -67,12 +73,14 @@ Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
 The browser's ellipsis menu ends with a muted, non-interactive version line below
-statuses and the Update App button when present. Published builds show the GitHub
-Actions release workflow's run number and the UTC build date in English, for
-example `Version 142 · Oct 29, 2026`. Builds outside Actions show
-`Local build · Oct 29, 2026`. Both values are fixed at build time and describe the
-loaded app, including offline and while a newer update is waiting. No manual
-`package.json` version change is needed for browser releases.
+statuses and the Update App button when present. All builds show the root
+`package.json` version and UTC build date in English, for example
+`Version 0.1.2 · Oct 29, 2026`. Both values are fixed at build time and describe the
+loaded app, including offline and while a newer update is waiting. Browser
+publication requires a version greater than the last transferred web release;
+ordinary commits still run validation without publishing a new package.
+Above the version line, a **GitHub repository** link opens
+`https://github.com/abtv/tree` in a new tab.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or

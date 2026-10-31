@@ -2,6 +2,11 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'electron-vite'
 import type { Plugin } from 'vite'
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { packageVersion } from '../../scripts/release-version.mjs'
+import { buildDateLabel } from '../../scripts/build-info.mjs'
+
+const { version } = packageVersion(['package.json', 'package-lock.json'].map((path) => readFileSync(path, 'utf8')))
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -35,6 +40,10 @@ function contentSecurityPolicyPlugin(): Plugin {
 
 export default defineConfig({
   main: {
+    define: {
+      __TREE_APP_VERSION__: JSON.stringify(version),
+      __TREE_BUILD_DATE__: JSON.stringify(buildDateLabel(new Date())),
+    },
     build: {
       rolldownOptions: {
         input: {

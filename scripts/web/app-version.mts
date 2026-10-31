@@ -1,22 +1,21 @@
 import type { Plugin } from 'vite'
+import { readFileSync } from 'node:fs'
+import { packageVersion, parseVersion } from '../release-version.mts'
+import { buildDateLabel } from '../build-info.mts'
 
-export function appVersionLabel(runNumber: string | undefined, builtAt: Date): string {
-  if (runNumber !== undefined && !/^[1-9]\d*$/.test(runNumber)) {
-    throw new Error('GITHUB_RUN_NUMBER must be a positive integer')
-  }
+export function appVersionLabel(version: string, builtAt: Date): string {
+  parseVersion(version)
 
-  const date = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(builtAt)
-
-  return `${runNumber === undefined ? 'Local build' : `Version ${runNumber}`} · ${date}`
+  return `Version ${version} · ${buildDateLabel(builtAt)}`
 }
 
 export function appVersionPlugin(): Plugin {
-  const label = appVersionLabel(process.env.GITHUB_RUN_NUMBER, new Date())
+  const { version } = packageVersion(
+    ['../../package.json', '../../package-lock.json'].map((path) =>
+      readFileSync(new URL(path, import.meta.url), 'utf8'),
+    ),
+  )
+  const label = appVersionLabel(version, new Date())
 
   return {
     name: 'browser-app-version',

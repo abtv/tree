@@ -30,7 +30,7 @@
     "test:smoke:linux": "node scripts/web/linux-smoke.mts",
     "prestart": "node scripts/rename-dev-app.mts",
     "start": "electron-vite preview --config config/build/electron.vite.config.ts",
-    "build": "electron-vite build --config config/build/electron.vite.config.ts",
+    "build": "node scripts/rename-dev-app.mts && electron-vite build --config config/build/electron.vite.config.ts",
     "demo:video": "playwright install ffmpeg && npm run build && node scripts/record-demo.mts",
     "typecheck:node": "tsc --noEmit -p config/typescript/tsconfig.node.json",
     "typecheck:renderer": "tsc --noEmit -p config/typescript/tsconfig.web.json",

@@ -6,6 +6,7 @@ import { api, verifySource } from './github.mts'
 import { verifyPackage } from './package.mts'
 import { verifyAttestation } from './attestation.mts'
 import { assertWorkflowWriteDenied } from './permission-check.mts'
+import { currentVersion, isNewWebVersion } from './version.mts'
 
 export async function transferPackage(
   directory: string,
@@ -39,6 +40,14 @@ export async function transferPackage(
   // Setup switches Pages before installing this workflow. The Contents-only
   // publisher cannot inspect or change Pages settings; do not broaden its token.
   const base = (await request(`${root}/git/ref/heads/main`, options)) as Reference
+  const sourcePackage = (await request(`/repos/abtv/tree/contents/package.json?ref=${manifest.sourceSha}`, {
+    token,
+  })) as { encoding: string; content: string }
+  if (sourcePackage.encoding !== 'base64') throw new Error('Invalid source package')
+  const { version } = JSON.parse(Buffer.from(sourcePackage.content, 'base64').toString('utf8'))
+  if (!(await isNewWebVersion(version, { request, token, targetSha: base.object.sha }))) {
+    throw new Error('Web release version is already transferred or obsolete')
+  }
   const commit = (await request(`${root}/git/commits/${base.object.sha}`, options)) as Commit
   const existing = (await request(`${root}/git/trees/${commit.tree.sha}?recursive=1`, options)) as Tree
   if (
@@ -130,8 +139,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const manifest = await verifyAttestation(file, bundleFile)
     await verifyPackage(directory, manifest)
     verifyIdentity(manifest, process.env)
-    if (command === 'preflight') await verifySource(manifest, { token: process.env.GH_TOKEN })
-    else
+    if (command === 'preflight') {
+      await verifySource(manifest, { token: process.env.GH_TOKEN })
+      if (!(await isNewWebVersion(await currentVersion(), { token: process.env.GH_TOKEN }))) {
+        throw new Error('Web release version is already transferred or obsolete')
+      }
+    } else
       await transferPackage(directory, manifest, {
         token: process.env.GH_TOKEN,
         targetToken: process.env.WEB_TARGET_TOKEN,

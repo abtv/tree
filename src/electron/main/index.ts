@@ -52,6 +52,8 @@ import {
 } from './window'
 
 app.setName('Tree')
+declare const __TREE_APP_VERSION__: string
+declare const __TREE_BUILD_DATE__: string
 // Privileged schemes must be registered before the app is ready.
 registerRendererScheme(protocol)
 
@@ -106,6 +108,11 @@ function setAppearance(value: AppearancePreference): void {
 let menuIcons: MenuIcons | undefined
 
 function rebuildApplicationMenu(): void {
+  app.setAboutPanelOptions({
+    applicationName: 'Tree',
+    applicationVersion: `${__TREE_APP_VERSION__} · ${__TREE_BUILD_DATE__}`,
+    version: '',
+  })
   menuIcons ??= createMenuIcons((name) => nativeImage.createMenuSymbol(name))
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(

@@ -1,6 +1,7 @@
 // @editing-modes: independent
 import { test, expect, capture } from './fixtures.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
+import { readFileSync } from 'node:fs'
 
 test('uses the menu, previews and mobile editing policy', async ({ newContext, baseURL }) => {
   const context = await newContext({ viewport: { width: 1100, height: 760 }, colorScheme: 'light' })
@@ -65,10 +66,17 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   await expect(page.locator('#tree-menu .folder-actions-separator')).toBeVisible()
 
   // @requirement PRODUCT.md §1.4
-  const version = process.env.GITHUB_RUN_NUMBER ? `Version ${process.env.GITHUB_RUN_NUMBER}` : 'Local build'
+  const version = `Version ${JSON.parse(readFileSync('package.json', 'utf8')).version}`
 
-  await expect(page.locator('#app-version')).toHaveText(new RegExp(`^${version} · [A-Z][a-z]{2} \\d{1,2}, \\d{4}$`))
+  await expect(page.locator('#app-version')).toHaveText(
+    new RegExp(`^${version.replaceAll('.', '\\.')} · [A-Z][a-z]{2} \\d{1,2}, \\d{4}$`),
+  )
   await expect(page.locator('#tree-menu > :last-child')).toHaveAttribute('id', 'app-version')
+  await expect(page.getByRole('link', { name: 'GitHub repository' })).toHaveAttribute(
+    'href',
+    'https://github.com/abtv/tree',
+  )
+  await expect(page.getByRole('link', { name: 'GitHub repository' })).toHaveAttribute('target', '_blank')
 
   const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
     const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']

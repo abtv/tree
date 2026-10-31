@@ -174,10 +174,10 @@ describe('automatic publication wiring', () => {
     const release = await read('.github/workflows/release-web-app.yml')
     const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
 
-    expect(section).toContain(`needs: [${prerequisite}]`)
+    expect(section).toContain(`needs: [${prerequisite}${job === 'sign' ? ', candidate' : ''}]`)
     // Keep cancellation, direct prerequisite and source identity checks fail-closed.
     expect(section.match(/^ {4}if: (.+)$/m)?.[1]).toBe(
-      `\${{ !cancelled() && needs.${prerequisite}.result == 'success' && github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}`,
+      `\${{ !cancelled() && needs.${prerequisite}.result == 'success' && ${job === 'sign' ? "needs.candidate.outputs.ready == 'true' && " : ''}github.repository == 'abtv/tree' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}`,
     )
   })
 
@@ -236,7 +236,7 @@ describe('automatic publication wiring', () => {
     expect(release).not.toContain('workflow_run:')
     expect(release).toContain('needs: [check, audit, chrome]')
     expect(release).toMatch(/gate:\n\s+name: Approve web release\n\s+if: always\(\)/)
-    expect(release).toMatch(/sign:\n[\s\S]*?needs: \[gate\]/)
+    expect(release).toMatch(/sign:\n[\s\S]*?needs: \[gate, candidate\]/)
     expect(release).toMatch(/publish:\n[\s\S]*?needs: \[sign\]/)
     expect(release).toContain("github.repository == 'abtv/tree' && github.event_name == 'push'")
     expect(release).toContain('name: browser-${{ github.sha }}-${{ github.run_attempt }}')

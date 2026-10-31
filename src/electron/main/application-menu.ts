@@ -37,7 +37,11 @@ export function applicationMenuTemplate(
   return [
     {
       label: 'Tree',
-      submenu: [{ label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit }],
+      submenu: [
+        { label: 'About Tree', role: 'about' },
+        { type: 'separator' },
+        { label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit },
+      ],
     },
     {
       label: 'File',

@@ -76,7 +76,7 @@ describe('application menu template', () => {
     const template = applicationMenuTemplate(state(), createActions())
 
     expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
-    expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['Quit Tree'])
+    expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['About Tree', undefined, 'Quit Tree'])
     expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual([
       'Find…',
       'Find Next',
@@ -185,7 +185,10 @@ describe('application menu template', () => {
   // @requirement PRODUCT.md §9.1
   it('keeps Cmd+Q on the quit item', () => {
     const actions = createActions()
-    const quit = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')[0]!
+    const items = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
+    expect(items[0]).toMatchObject({ label: 'About Tree', role: 'about' })
+
+    const quit = items.find((item) => item.label === 'Quit Tree')!
 
     expect(quit.accelerator).toBe('CommandOrControl+Q')
 
