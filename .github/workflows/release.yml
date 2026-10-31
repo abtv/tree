@@ -1,43 +1,70 @@
 name: Release macOS
 
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: ['Release web app']
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-macos-main
   cancel-in-progress: false
 
 jobs:
+  candidate:
+    name: Check macOS release candidate
+    if: ${{ github.repository == 'abtv/tree' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      ready: ${{ steps.plan.outputs.ready }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Verify successful source and version without writes
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-draft.mts plan
   release:
+    needs: candidate
+    if: needs.candidate.outputs.ready == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ needs.candidate.outputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
-      - name: Audit release tag dependency snapshot
-        run: npm run audit -- --audit-level=high
-      - name: Check tag and reserve draft
+      - name: Recheck source and reserve immutable tag and draft
+        id: reserve
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          node -e 'const p=require("./package.json"); if(process.env.RELEASE_TAG !== `v${p.version}`) throw Error("Tag must match package version")'
-          gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TAG" --notes "Artifacts are pending validation. Do not publish until this workflow succeeds."
-      - run: npm run check
-      - run: npm run test:smoke:electron
+        run: node scripts/release-draft.mts reserve
+      - run: npm ci
+        if: steps.reserve.outputs.ready == 'true'
+      - name: Build checked source
+        if: steps.reserve.outputs.ready == 'true'
+        run: npm run build
       - name: Build signed and notarized DMG
+        if: steps.reserve.outputs.ready == 'true'
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -66,10 +93,8 @@ jobs:
           xcrun stapler validate dist/Tree-*.dmg
           spctl --assess --type open --context context:primary-signature --verbose=2 dist/Tree-*.dmg
       - name: Upload verified artifact
+        if: steps.reserve.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true
-          gh release upload "$RELEASE_TAG" dist/Tree-*.dmg
-          gh release edit "$RELEASE_TAG" --notes "Signed and notarized macOS arm64 build. Test the DMG before publishing this draft."
+          RELEASE_ID: ${{ steps.reserve.outputs.release_id }}
+        run: node scripts/release-draft.mts upload

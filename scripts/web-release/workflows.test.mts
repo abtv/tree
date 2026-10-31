@@ -58,7 +58,7 @@ describe('automatic publication wiring', () => {
       expect(workflow, file).not.toMatch(/npm run (?:test:perf|check:full)|perf\.config\.ts/)
     }
     expect(await readWorkflow('ci')).toContain('npm run check')
-    expect(await read('.github/workflows/release.yml')).toContain('npm run check')
+    expect(await read('.github/workflows/release.yml')).not.toContain('npm run check')
   })
 
   it('resolves every local reusable workflow call to a callable workflow', async () => {

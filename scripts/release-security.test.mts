@@ -18,21 +18,50 @@ test('production packaging requires the security fuse policy', () => {
   })
 })
 
-test('release audits the installed snapshot before credentials or release writes', () => {
+test('release reuses authenticated main checks before credentials or release writes', () => {
   const workflow = load(readFileSync('.github/workflows/release.yml', 'utf8')) as {
-    jobs: { release: { steps: Array<{ run?: string; 'continue-on-error'?: boolean }> } }
+    jobs: {
+      candidate: { steps: Array<{ run?: string; with?: { ref?: string } }>; permissions?: unknown }
+      release: { needs: string; if: string; steps: Array<{ run?: string; 'continue-on-error'?: boolean }> }
+    }
   }
   const steps = workflow.jobs.release.steps
-  const audit = steps.findIndex((step) => step.run === 'npm run audit -- --audit-level=high')
+  const gate = steps.findIndex((step) => step.run === 'node scripts/release-draft.mts reserve')
 
-  expect(audit).toBeGreaterThan(steps.findIndex((step) => step.run === 'npm ci'))
-  expect(steps[audit]?.['continue-on-error']).not.toBe(true)
-  expect(audit).toBeLessThan(steps.findIndex((step) => step.run?.includes('gh release create')))
-  expect(audit).toBeLessThan(steps.findIndex((step) => step.run?.includes('electron-builder --mac')))
+  expect(workflow.jobs.release.needs).toBe('candidate')
+  expect(workflow.jobs.release.if).toBe("needs.candidate.outputs.ready == 'true'")
+  expect(workflow.jobs.candidate.steps.some((step) => step.run === 'node scripts/release-draft.mts plan')).toBe(true)
+  expect(gate).toBeGreaterThan(-1)
+  expect(gate).toBeLessThan(steps.findIndex((step) => step.run === 'npm ci'))
+  expect(steps[gate]?.['continue-on-error']).not.toBe(true)
+  expect(gate).toBeLessThan(steps.findIndex((step) => step.run?.includes('electron-builder --mac')))
+  expect(
+    steps.some((step) => /npm run (check|audit|test:perf|test:e2e|test:smoke:electron)/.test(step.run ?? '')),
+  ).toBe(false)
   const build = steps.find((step) => step.run?.includes('electron-builder --mac'))!.run!
   expect(build).toContain('--publish never')
   expect(build).toContain('node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app')
   expect(build).toContain('node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app')
   expect(build).toContain('xcrun stapler validate dist/Tree-*.dmg')
   expect(build).toContain('spctl --assess --type execute')
+  const text = readFileSync('.github/workflows/release.yml', 'utf8')
+  const header = text.split('\njobs:')[0]!
+  const candidate = text.split('\n  candidate:')[1]!.split('\n  release:')[0]!
+  expect(header).toContain('contents: read')
+  expect(header).not.toContain('contents: write')
+  expect(candidate).toContain("github.event.workflow_run.conclusion == 'success'")
+  expect(candidate).toContain("github.event.workflow_run.event == 'push'")
+  expect(candidate).toContain("github.event.workflow_run.head_branch == 'main'")
+  expect(candidate).toContain('github.event.workflow_run.head_repository.full_name == github.repository')
+  expect(candidate).toContain('ref: ${{ github.event.workflow_run.head_sha }}')
+  expect(candidate).not.toContain('secrets.')
+  expect(text.slice(0, text.indexOf('      - name: Build signed and notarized DMG'))).not.toContain('secrets.')
+  expect(text).toContain('workflow_run:')
+  expect(text).toContain("workflows: ['Release web app']")
+  expect(text).toContain('group: release-macos-main')
+  expect(text).toContain('cancel-in-progress: false')
+  expect(text).toContain('ref: ${{ needs.candidate.outputs.sha }}')
+  expect(text).toContain('node scripts/release-draft.mts upload')
+  expect(text).not.toContain('--draft=false')
+  expect(text).not.toContain('--clobber')
 })

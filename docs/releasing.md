@@ -1,31 +1,53 @@
 # macOS releases
 
-The tag-only `release.yml` workflow builds Tree for Apple Silicon and uploads a
-verified DMG to a **draft** GitHub Release. It never publishes on a main push.
+After successful checks of a version commit on `main`, `release.yml` builds Tree
+for Apple Silicon and uploads a verified DMG to a **draft** GitHub Release.
+Only the owner publishes the draft for users.
 
 ## Create a release
 
-Commit reviewed changes first. For the initial package version (0.1.0):
+Commit reviewed changes, then prepare the next patch version locally:
 
 ```bash
-git push origin HEAD
-git tag -a v0.1.0 -m "Tree 0.1.0"
-git push origin v0.1.0
+npm run release:electron
 ```
 
-For subsequent releases, update `package.json` and `package-lock.json` together
-using `npm version <version> --no-git-tag-version`, validate and commit, then push
-the matching `v<version>` tag. The workflow rejects mismatches. It reserves a draft
-before building; an existing release makes it fail instead of replacing assets.
-After a failed run, inspect and manually delete only its incomplete draft before
-rerunning the tag workflow. Never move a published tag. Concurrent runs for a tag
-are serialized. All releases remain drafts until explicitly published.
+The command updates package.json and package-lock.json and creates a version
+commit. It runs no tests, makes no network requests and creates no tag.
+Optional `-- minor` and `-- major` select those increments. Push or merge the
+commit into `main` using the normal development workflow.
+
+The existing `Release web app` main workflow runs code checks, the shared audit
+and browser tests once. Its successful completion triggers `Release macOS`.
+Desktop preflight rechecks the upstream repository, workflow path, push event,
+main branch, SHA, run attempt and successful `Approve web release` gate through
+the GitHub API. Failed, canceled, forked or superseded runs cannot reserve a
+release. No upstream artifacts or default-branch checkout supply release bytes:
+both desktop jobs check out the exact validated source SHA.
+
+A lightweight `v<version>` tag and owned draft are created only for a version
+higher than all existing valid SemVer tags and releases, or the first version.
+Drafts reserve their numbers too. Same-version commits and older versions skip
+the expensive macOS job. New reservations require the source still to be current
+main. One global desktop concurrency group serializes reservations and uploads.
+Arbitrary external tag pushes and manual draft publication are outside that lock.
+
+After a failed build, rerun the failed `Release macOS` workflow. It reuses only
+the same tag/SHA and its own empty draft; no deletion or version increment is
+needed. Once reserved, advancing main does not invalidate that draft, but a newer
+reserved version prevents uploading the older one. Published releases and
+complete uploaded DMGs are skipped. Unknown drafts or partial/unknown assets
+stop for inspection. Existing tags and assets are never replaced. No automated
+step publishes a release or changes its published/draft state after creation.
 
 ## Signing and packaging
 
-After `npm ci`, the release audits the tagged lockfile with
-`npm run audit -- --audit-level=high`. High or critical advisories and audit service
-failures stop the job before signing or uploading. No dependency upgrades are automatic.
+The successful source workflow already checked code and audited its lockfile.
+Desktop preparation does not repeat formatting, lint, type checks, ordinary
+tests, audit or development Electron smoke. It installs the same locked
+dependencies, builds the checked source and verifies the newly packaged artifact.
+Full E2E and timing suites follow the development change-risk rules; a release
+alone does not add another full run. No dependency upgrades are automatic.
 
 Production fuses disable RunAsNode, NODE_OPTIONS, Node CLI inspection and extra
 file-protocol privileges, and require ASAR integrity and ASAR-only loading.
@@ -70,9 +92,11 @@ Builder notarizes and staples the app; the workflow verifies its Developer ID
 signature, ticket and Gatekeeper acceptance, then notarizes and staples the DMG.
 The DMG is explicitly signed and its Developer ID authority and Gatekeeper
 acceptance are checked too. Immediately before upload, the release must still be
-a draft. Upload does not use `--clobber`.
+a draft owned by the checked source run, with the pinned tag/SHA and no assets.
+Upload does not use `--clobber`.
 Missing credentials or any failed verification prevent asset upload. The built-in
-GitHub token has only `contents: write` in the release job. No auto-updater is added.
+GitHub token has `contents: read` and `actions: read` in preflight; only the
+macOS preparation job adds `contents: write`. No auto-updater is added.
 
 ## Verify and publish
 

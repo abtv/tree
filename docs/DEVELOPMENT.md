@@ -403,7 +403,7 @@ It should run:
 8. tests with coverage enforcement;
 9. production build.
 
-Timing suites run locally before pushing a release tag, as described in §12. They are not part of `npm run check` or CI. Functional and bounded-heap regression tests remain in the unit suite.
+Timing suites run locally when the affected performance paths require them under procedure §10. A release alone does not require another timing run. They are not part of `npm run check` or CI. Functional and bounded-heap regression tests remain in the unit suite.
 
 The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
 
@@ -911,25 +911,21 @@ npm run test:perf -- --project=electron
 
 `make perf-electron` runs the Electron project only. Run the [browser archive scenarios](../src/web/README.md#browser-archive-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
 
-### Before pushing a release tag
+### Preparing a macOS release
 
-Commit the intended application changes, then run this command from the repository root on the owner's MacBook, with no competing test runs:
+Commit the intended application changes, then run this command from the repository root:
 
 ```bash
 npm run release:electron
 ```
 
-The command starts from a clean working tree, including untracked files. It automatically increments patch in `package.json` and both root version fields in `package-lock.json`, without changing dependency versions. For a minor or major release, use `npm run release:electron -- minor` or `npm run release:electron -- major`. No manual version edit is needed.
+The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. For minor or major use `npm run release:electron -- minor` or `npm run release:electron -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
 
-It refuses the candidate's `v<version>` tag if present locally or at origin's push destination; remote access failures stop the release before version edits. It runs `npm run check`, `npm run test:performance`, and `npm run test:perf -- --project=electron` sequentially against the updated files. After successful checks, it creates `chore(release): bump version to <version>`, an annotated tag at that commit, and pushes only that tag, without force or unrelated tags/branches. Origin must have exactly one push URL. It rechecks version contents, unrelated changes, HEAD, push destination and tag absence before publishing.
+Push or merge the version commit to `main` normally. Existing main CI runs code validation, dependency audit and browser checks once. After `Release web app` completes successfully, the independent `Release macOS` workflow verifies that run's repository, workflow path, push event, main branch, exact SHA, current attempt and successful gate. It checks out that exact SHA and skips ordinary commits whose version is already reserved. It does not rerun code validation, audit, development smoke, full E2E or timing suites.
 
-The candidate must be strictly newer than every valid semantic-version `v*` tag at the push destination. Numeric components use semantic-version precedence, not lexical order; build metadata does not change precedence. A stable candidate follows a prerelease with the same numeric components. Remote tags include drafts and tags absent from the local clone; unrelated or invalid version tags are ignored. No existing version tags permits a first release. A stale candidate stops with both versions and leaves the remote unchanged; the command never silently changes its version to catch up. It repeats this check after validation, after the version commit, and immediately before push. These are remote snapshots, not a server-side lock against simultaneous external tag pushes.
+A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 
-Failed checks leave the version edits uncommitted and create no tag. Run the same command again to retry the same version. It accepts only the exact expected version edits, including staging left by a rejected version commit; unrelated edits still block release. If the version commit succeeded but tag creation failed, retry reuses that commit. It never rewrites commits.
-
-If push fails, the local tag and version commit remain; inspect the remote outcome and local tag before retrying its explicit push. The command refuses existing tags on a subsequent run and never deletes or moves them. It does not push branches or publish the release draft. The version commit is reachable through the pushed tag; include it in the next normal branch push. Run `npm run release:electron -- --help` for usage without side effects. This owner-run publishing command remains approval-gated in coding agents; it is exempt from the ordinary workflow auto-allow policy.
-
-This is not a Git hook or CI attestation: manual tag pushes can bypass local validation. Keep the active GitHub tag ruleset for `v*` with updates and deletions restricted and no bypass actors. CI continues to validate correctness, bounded memory, dependency security and the release artifact, but does not certify timing budgets.
+The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Timing and full functional suites remain governed by change risk; preparing a release does not add another full run.
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.
