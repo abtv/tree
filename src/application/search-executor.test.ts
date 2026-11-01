@@ -14,6 +14,26 @@ const base: SearchRequest = {
 }
 
 describe('incremental executor', () => {
+  it('publishes a small completed search within its scheduled work budget', () => {
+    const callbacks: (() => void)[] = []
+    const publish = vi.fn()
+    const executor = createSearchExecutor(
+      {
+        schedule(callback) {
+          callbacks.push(callback)
+          return () => undefined
+        },
+      },
+      256,
+    )
+
+    executor.execute(base, publish)
+    callbacks.shift()!()
+
+    expect(publish).toHaveBeenCalledExactlyOnceWith({ kind: 'count', total: 3, capped: false })
+    expect(callbacks).toHaveLength(0)
+  })
+
   it.each([
     [2, 1, 2, 0, false],
     [2, -1, 1, 6, false],

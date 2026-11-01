@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-six tasks are complete.
-Next task is search-executor.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-seven tasks are complete.
+Next task is search-session.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -110,7 +110,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 34 | notes-archive/zip-reader.ts | Done: 96.72% to 97.66%, 416 killed, 10 equivalents, 1 timeout |
 | 35 | recent-node-persistence.ts | Done: 72.73% to 86.36%, 18 killed, 3 survivors, 1 timeout; threshold failed |
 | 36 | recent-nodes.ts | Done: 67.90% to 93.83%, 152 killed, 10 functionally equivalent survivors |
-| 37 | search-executor.ts | Planned |
+| 37 | search-executor.ts | Done: 99.46%, 182 killed, 1 equivalent, 3 timeouts, 2 runtime errors, 12 existing ignored |
 | 38 | search-session.ts | Planned |
 | 39 | vim-clipboard-content.ts | Planned |
 | 40 | visible-rows.ts | Planned |
@@ -736,6 +736,27 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Search executor completed result
+
+2026-11-01, 22:13:46–22:17:47 local. Baseline/final 99.46%, unchanged status counts:
+Killed 182, Survived 1, Timeout 3, RuntimeError 2, Ignored 12, NoCoverage/CompileError 0.
+Survivor 4 removes the explicit grapheme option; Intl.Segmenter's default is grapheme.
+RuntimeError 3/5 replace the locale/granularity with invalid empty strings and throw at module
+initialization. These are mutant runtime errors, not assertions or failed Stryker launches.
+Timeout 191/193/194 prevent generator progress/completion and exhaust hit limits.
+A new bounded scheduled-callback test directly asserts publication of a small completed job.
+Incremental mode reused the timeout outcomes, so the final run used --force on this same one file.
+All three still time out in the selected test order; no assertion-kill improvement is claimed.
+
+```sh
+npm run test:mutation -- --mutate src/application/search-executor.ts --incrementalFile .scratch/application-mutation/search-executor.incremental.json --concurrency 4 --timeoutMS 10000 --force
+npm test -- src/application/search-executor.test.ts src/application/search-executor.property.test.ts
+```
+
+Final dry run: 2245 tests; focused/unit-property run: 29 tests passed. Renderer types, lint,
+formatting, documentation and diff checks passed. Primary review: new test only, no changed
+production code, assertions or exclusions. Next: search-session.ts.
 
 ## Recent nodes completed result
 
