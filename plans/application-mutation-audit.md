@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-four tasks are complete.
-Next task is recent-node-persistence.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-five tasks are complete.
+Next task is recent-nodes.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -108,7 +108,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 32 | notes-archive/export-notes.ts | Done: 100%, 55 killed |
 | 33 | notes-archive/import-notes.ts | Done: 100%, 128 killed, 1 timeout |
 | 34 | notes-archive/zip-reader.ts | Done: 96.72% to 97.66%, 416 killed, 10 equivalents, 1 timeout |
-| 35 | recent-node-persistence.ts | Planned |
+| 35 | recent-node-persistence.ts | Done: 72.73% to 86.36%, 18 killed, 3 survivors, 1 timeout; threshold failed |
 | 36 | recent-nodes.ts | Planned |
 | 37 | search-executor.ts | Planned |
 | 38 | search-session.ts | Planned |
@@ -736,6 +736,27 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Recent node persistence completed result
+
+2026-11-01, 22:01:45–22:04:05 local. Baseline 72.73%, final 86.36%:
+Killed 15 → 18, Survived 6 → 3, Timeout 1 unchanged, NoCoverage/errors/ignored 0.
+The added fake-clock test kills 12/13/14: explicit flush must retire its pending timer,
+and the next dirty history receives a fresh deadline (PRODUCT.md §20.14).
+Remaining equivalents: 1 reverses a private revision direction but preserves equality;
+11 calls clearTimeout(undefined), a no-op. Survivor 5 removes the no-writer scheduling guard:
+the later flush guard still prevents all writes; only an unnecessary timer exists when the
+optional persistence port is absent. This is defensive scheduling, not a lost-write gap.
+Timeout 21 removes the flush loop body and prevents progress; it is not an assertion kill.
+
+```sh
+npm run test:mutation -- --mutate src/application/recent-node-persistence.ts --incrementalFile .scratch/application-mutation/recent-node-persistence.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/recent-node-persistence.test.ts src/application/recent-nodes.test.ts
+```
+
+Final dry run: 2005 tests; focused run: 5 tests passed. Renderer types, lint, formatting,
+documentation and diff checks passed. Threshold failed; no shard fallback. Primary review:
+only one new test file, no production changes or modified assertions. Next: recent-nodes.ts.
 
 ## ZIP reader completed result
 
