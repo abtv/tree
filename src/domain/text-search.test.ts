@@ -54,6 +54,11 @@ describe('literal search', () => {
     ['visit https://example.org now', '.org now', [[21, 29]]],
     ['anything', '', []],
     ['ababababac', 'ababac', [[4, 10]]],
+    ['abaa', 'aa', [[2, 4]]],
+    ['aaaab', 'aaab', [[1, 5]]],
+    ['aababb', 'aabb', []],
+    ['abba', 'aba', []],
+    ['aba', 'aa', []],
   ])('matches %j with %j', (text, query, expected) => {
     expect(
       [...searchText(text, pattern(query))]

@@ -10,6 +10,7 @@ describe('Vim number counters', () => {
     ['-1', 1, 1, '0', 0],
     ['0', 0, -1, '-1', 1],
     ['-009', 2, 10, '001', 2],
+    ['-009', 2, -1, '-010', 3],
     ['0077', 0, 1, '0078', 3],
     ['0x0ff', 3, 1, '0x100', 4],
     ['0X0FF', 4, -1, '0X0FE', 4],
@@ -21,6 +22,7 @@ describe('Vim number counters', () => {
     ['0X100', 0, -1, '0X0FF', 4],
     ['-0x0f', 0, 1, '-0x10', 4],
     ['18446744073709551616', 0, -1, '18446744073709551615', 19],
+    ['-18446744073709551616', 0, -1, '-18446744073709551615', 20],
   ] as const)('changes %s at %i by %i', (text, cursor, amount, expected, nextCursor) => {
     const edit = changeVimNumber(text, cursor, amount)!
 
