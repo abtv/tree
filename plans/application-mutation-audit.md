@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-five tasks are complete.
-Next task is recent-nodes.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-six tasks are complete.
+Next task is search-executor.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -109,7 +109,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 33 | notes-archive/import-notes.ts | Done: 100%, 128 killed, 1 timeout |
 | 34 | notes-archive/zip-reader.ts | Done: 96.72% to 97.66%, 416 killed, 10 equivalents, 1 timeout |
 | 35 | recent-node-persistence.ts | Done: 72.73% to 86.36%, 18 killed, 3 survivors, 1 timeout; threshold failed |
-| 36 | recent-nodes.ts | Planned |
+| 36 | recent-nodes.ts | Done: 67.90% to 93.83%, 152 killed, 10 functionally equivalent survivors |
 | 37 | search-executor.ts | Planned |
 | 38 | search-session.ts | Planned |
 | 39 | vim-clipboard-content.ts | Planned |
@@ -736,6 +736,28 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Recent nodes completed result
+
+2026-11-01, 22:04:34–22:13:14 local. Baseline 67.90%, final 93.83%:
+Killed 110 → 152, Survived 52 → 10; Timeout/NoCoverage/errors/ignored 0.
+Eleven new cases cover malformed/empty history, each independent content field, unchanged
+and deleted change sites, deep breadcrumbs, labels, the 100-ID/8-result limits and bounded
+retained path memory (PRODUCT.md §20.14). Memory checks inspect allocation size only,
+including ancestor depth after 200 unrelated branches; they do not mandate a cache hit strategy.
+Remaining 56/58/60/61/65/67/78/99/146/147 disable or bypass cache/leaf-skip optimizations.
+Results and memory bounds remain correct through fallback traversal. These are functional
+equivalents, not claims of equal CPU cost. The existing recent-nodes.performance.test.ts owns
+the p99 scenario; no timing benchmark or production implementation was changed to kill them.
+
+```sh
+npm run test:mutation -- --mutate src/application/recent-nodes.ts --incrementalFile .scratch/application-mutation/recent-nodes.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/recent-nodes.test.ts
+```
+
+Final dry run: 2350 tests; focused run: 15 tests passed. Renderer types, lint, formatting,
+documentation and diff checks passed. Primary review: only added cases/imports, existing assertions
+unchanged. No new runtime behavior or performance cost. Next: search-executor.ts.
 
 ## Recent node persistence completed result
 
