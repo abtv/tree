@@ -42,6 +42,22 @@ function flags(document: Document): Array<[string, boolean]> {
 
 // @requirement PRODUCT.md §2.5
 describe('hierarchical completion', () => {
+  it('propagates completion through every ancestor in a deep path in both directions', () => {
+    const document = { roots: [branch('root', [branch('middle', [branch('parent', [leaf('leaf')])])])] }
+
+    const complete = toggleStrikethrough(document, 'leaf', 'leaf')!
+    const reopened = toggleStrikethrough(complete, 'leaf', 'leaf')!
+
+    expect(flags(complete)).toEqual([
+      ['root', true],
+      ['middle', true],
+      ['parent', true],
+      ['leaf', true],
+    ])
+    expect(reopened).toEqual(document)
+    expect(flags(document).every(([, done]) => !done)).toBe(true)
+  })
+
   it('shares already completed subtrees while completing a mixed sibling', () => {
     const done = branch('done', [leaf('done-leaf', true)])
     const root = branch('root', [done, leaf('open')])

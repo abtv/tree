@@ -4,6 +4,62 @@ import type { TreeNode } from './document-types'
 
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
+it('rejects search queries that are not a complete tag fragment without throwing', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('source', '#alpha')] })
+
+  for (const query of ['', 'alpha', 'prefix #a']) expect(catalog.searchSuggestions(query)).toEqual([])
+})
+
+it.each(['source', 'legacy id with spaces', 'Stryker was here!'])(
+  'searches tags without treating saved node id %s as an active editing node',
+  (id) => {
+    const catalog = new TagCatalog()
+    catalog.update({ roots: [node(id, '#alpha')] })
+
+    expect(catalog.searchSuggestions('#a')).toEqual(['alpha'])
+  },
+)
+
+it('uses the current text of a node moved and edited in a replacement snapshot', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('b', '#beta'), node('a', '#alpha')] })
+  catalog.update({ roots: [node('b', '#beta', [node('a', '#apple #a_b_c')])] })
+
+  expect(catalog.suggest('a', '#', 1)?.suggestions).toEqual(['beta'])
+  expect(catalog.suggest('a', '#alpha #a', 9)?.suggestions).toEqual(['alpha', 'beta'])
+})
+
+it('discards removed node contributions before previewing text for that id', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('a', '#a_b_c'), node('b', '#beta')] })
+  catalog.update({ roots: [node('b', '#beta')] })
+
+  expect(catalog.suggest('a', '#a_b_c #ac', 10)?.suggestions).toEqual(['a_b_c'])
+})
+
+it('offers a deleted tag only once when a new draft introduces it again', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('a', '#alpha'), node('b', '#beta')] })
+  catalog.update({ roots: [node('b', '#beta')] })
+
+  expect(catalog.suggest('draft', '#alpha #', 8)?.suggestions).toEqual(['alpha', 'beta'])
+})
+
+it('merges draft tags once in alphabetical order with existing suggestions', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('a', '#apple #a_b_c'), node('b', '#alpha #abc')] })
+
+  expect(catalog.suggest('a', '#alpha #a', 9)?.suggestions).toEqual(['abc', 'alpha'])
+  expect(catalog.suggest('draft', '#aardvark #a', 12)?.suggestions).toEqual([
+    'a_b_c',
+    'aardvark',
+    'abc',
+    'alpha',
+    'apple',
+  ])
+})
+
 it('returns fuzzy names ordered by word boundaries before proximity', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [node('catalog', '#abc #a_b_c #abbc')] })
