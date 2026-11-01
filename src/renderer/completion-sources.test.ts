@@ -5,6 +5,41 @@ import { recognizeCompletion } from './completion-sources'
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
 
 // @requirement PRODUCT.md §20.13
+it('presents existing tags as literal suggestions without retaining date selection', () => {
+  const match = recognizeCompletion('Plan #to', 8, today, {
+    start: 5,
+    end: 8,
+    name: 'to',
+    suggestions: ['today', 'tomorrow'],
+  })
+
+  expect(match).toEqual({
+    start: 5,
+    end: 8,
+    listLabel: 'Tag suggestions',
+    retainsSelection: false,
+    preferredSuggestionId: 'tag:today',
+    suggestions: [
+      { id: 'tag:today', replacement: '#today', label: '#today', description: '' },
+      { id: 'tag:tomorrow', replacement: '#tomorrow', label: '#tomorrow', description: '' },
+    ],
+  })
+})
+
+// @requirement PRODUCT.md §20.9
+it('offers dates outside tag ranges even when another tag precedes or follows them', () => {
+  for (const [text, caret, start, end] of [
+    ['#work tomorrow', 14, 6, 14],
+    ['tomorrow #work', 8, 0, 8],
+  ] as const) {
+    const match = recognizeCompletion(text, caret, today)
+
+    expect(match).toMatchObject({ start, end, listLabel: 'Date suggestions' })
+    expect(match?.suggestions.map(({ replacement }) => replacement)).toEqual(['2026-10-09'])
+  }
+})
+
+// @requirement PRODUCT.md §20.13
 it('keeps date-like tag names literal when no existing tag matches', () => {
   const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
   for (const text of ['#today', '#tomorrow', 'Plan #mon']) {

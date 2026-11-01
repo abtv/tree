@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  characterCaretTransition,
   editCaretTransition,
   focusCaretTransition,
   horizontalCaretTransition,
@@ -9,6 +10,42 @@ import {
 } from './vim-caret-transition'
 
 describe('Vim caret transitions', () => {
+  // @requirement PRODUCT.md §4.3
+  it('normalizes a restored text caret inside an emoji to its complete character', () => {
+    const caret = { cursor: 2, imageActive: false }
+
+    expect(characterCaretTransition(caret, 'A🚀')).toEqual({ cursor: 1, imageActive: false })
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('normalizes the saved image return without moving the active image caret', () => {
+    const caret = { cursor: 3, imageActive: true, imageTextReturnCursor: 2 }
+    const normalized = characterCaretTransition(caret, 'A🚀')
+
+    expect(normalized).toEqual({ cursor: 3, imageActive: true, imageTextReturnCursor: 1 })
+    expect(horizontalCaretTransition(normalized, 'left', 1, 'A🚀', true)).toEqual({
+      cursor: 1,
+      imageActive: false,
+    })
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('discards a saved text return when an attached node becomes image-only', () => {
+    const caret = { cursor: 0, imageActive: true, imageTextReturnCursor: 2 }
+
+    expect(characterCaretTransition(caret, '')).toEqual({
+      cursor: 0,
+      imageActive: true,
+      imageTextReturnCursor: undefined,
+    })
+  })
+
+  it('preserves an already normalized caret instead of publishing a new state', () => {
+    const caret = { cursor: 3, imageActive: true, imageTextReturnCursor: 1 }
+
+    expect(characterCaretTransition(caret, 'A🚀')).toBe(caret)
+  })
+
   // @requirement PRODUCT.md §4.3
   it('counts complete emoji and restores the complete final character from an attached image', () => {
     const text = 'A🚀👩‍💻'

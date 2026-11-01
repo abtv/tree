@@ -92,6 +92,132 @@ function scriptedStore(
 const IMAGE = { id: 'image', mimeType: 'image/png' as const }
 
 describe('Vim vertical navigation', () => {
+  // @requirement PRODUCT.md §4.3
+  it.each([1, 2])('keeps the desired column when moving up through an image-only row with count %i', (count) => {
+    const first = node('a', 'abcdef')
+    const image = { ...node('b', ''), attachment: IMAGE }
+    const last = node('c', 'ghijkl')
+    const current = count === 1 ? image : last
+    const navigationStore = store({ roots: [first, image, last] }, current.id, null)
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: current,
+      caret: { cursor: count === 1 ? 0 : 1, imageActive: count === 1 },
+      direction: 'up',
+      count,
+      applyCaretState,
+      textLineCursor: (target, _cursor, entering, resetColumn) =>
+        entering && target.text.length > 0 ? (resetColumn ? 0 : 3) : undefined,
+    })
+
+    expect(applyCaretState).toHaveBeenLastCalledWith('a', { cursor: 3, imageActive: false }, true)
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('resolves each destination line in a counted motion across text rows', () => {
+    const first = node('a', 'abcdef')
+    const navigationStore = store({ roots: [first, node('b', 'ghijkl'), node('c', 'mnopqr')] }, 'a', null)
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: first,
+      caret: { cursor: 1, imageActive: false },
+      direction: 'down',
+      count: 2,
+      applyCaretState,
+      textLineCursor: (target, _cursor, entering) => (entering ? (target.id === 'b' ? 2 : 3) : undefined),
+    })
+
+    expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
+      { cursor: 2, imageActive: false },
+      { cursor: 3, imageActive: false },
+    ])
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('remembers the destination text column when moving up onto an image and back to text', () => {
+    const first = { ...node('a', 'abcdef'), attachment: IMAGE }
+    const second = node('b', 'next')
+    const navigationStore = store({ roots: [first, second] }, 'b', null)
+    const applyCaretState = vi.fn()
+    const textLineCursor = vi.fn((target: TreeNode, _cursor: number, entering: boolean, resetColumn?: boolean) => {
+      if (target.id !== 'a') return undefined
+      return entering ? (resetColumn ? 0 : 2) : 1
+    })
+
+    navigateVertically({
+      store: navigationStore,
+      node: second,
+      caret: { cursor: 1, imageActive: false },
+      direction: 'up',
+      count: 1,
+      applyCaretState,
+      textLineCursor,
+    })
+
+    navigateVertically({
+      store: navigationStore,
+      node: first,
+      caret: applyCaretState.mock.calls[0]![1],
+      direction: 'up',
+      count: 1,
+      applyCaretState,
+      textLineCursor,
+    })
+
+    expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
+      { cursor: 6, imageActive: true, imageTextReturnCursor: 2 },
+      { cursor: 2, imageActive: false },
+    ])
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('resets the destination text column when the first downward step leaves an image', () => {
+    const first = { ...node('a', 'abcdef'), attachment: IMAGE }
+    const second = node('b', 'next')
+    const navigationStore = store({ roots: [first, second] }, 'a', null)
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: first,
+      caret: { cursor: 6, imageActive: true, imageTextReturnCursor: 2 },
+      direction: 'down',
+      count: 1,
+      applyCaretState,
+      textLineCursor: (_node, _cursor, entering, resetColumn) => (entering ? (resetColumn ? 0 : 2) : undefined),
+    })
+
+    expect(applyCaretState).toHaveBeenLastCalledWith('b', { cursor: 0, imageActive: false }, true)
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('preserves the carried column through an image-only row during counted text-line navigation', () => {
+    const first = node('a', 'abcdef')
+    const image = { ...node('b', ''), attachment: IMAGE }
+    const last = node('c', 'ghijkl')
+    const navigationStore = store({ roots: [first, image, last] }, 'a', null)
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: first,
+      caret: { cursor: 2, imageActive: false },
+      direction: 'down',
+      count: 2,
+      applyCaretState,
+      textLineCursor: (target, _cursor, entering) => (entering && target.text.length > 0 ? 0 : undefined),
+    })
+
+    expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
+      { cursor: 0, imageActive: true, imageTextReturnCursor: undefined },
+      { cursor: 2, imageActive: false, imageTextReturnCursor: undefined },
+    ])
+  })
+
   it('consumes wrapped text steps before entering an image in a counted motion', () => {
     const current = { ...node('a', 'abcdefghijkl'), attachment: IMAGE }
     const navigationStore = store({ roots: [current, node('b', 'next')] }, 'a', null)
@@ -360,6 +486,7 @@ describe('Vim vertical navigation', () => {
       direction: 'up',
       count: 1,
       applyCaretState,
+      textLineCursor: (_node, _cursor, entering) => (entering ? 0 : undefined),
     })
 
     expect(applyCaretState).toHaveBeenCalledTimes(1)
