@@ -15,6 +15,25 @@ function tree(...roots: TreeNode[]): Document {
 const collapsed = () => false
 
 describe('locateChangeSite', () => {
+  it.each([false, true])('distinguishes reordered parents from moved children (fixed sibling: %s)', (fixed) => {
+    const a = node('a', 'Same', [node('x', 'X'), node('z', 'Z')])
+    const b = node('b', 'Same', [node('y', 'Y')])
+    const tail = fixed ? [node('fixed', 'Fixed')] : []
+    const before = tree(a, b, ...tail)
+    const after = tree(b, a, ...tail)
+
+    expect(locateChangeSite(before, after)).toEqual({ nodeId: 'b', parentId: null, cursor: 0 })
+  })
+
+  it('locates a reorder of siblings with identical content by their identities', () => {
+    const a = node('a', 'Same')
+    const b = node('b', 'Same')
+    const before = tree(node('root', 'Root', [a, b]))
+    const after = tree(node('root', 'Root', [b, a]))
+
+    expect(locateChangeSite(before, after)).toEqual({ nodeId: 'b', parentId: 'root', cursor: 0 })
+  })
+
   it('never descends into an unchanged subtree during move or text comparison', () => {
     const untouched: TreeNode = {
       id: 'large',

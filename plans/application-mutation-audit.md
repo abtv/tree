@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-one tasks are complete.
-Next task is editor-undo-focus.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-two tasks are complete.
+Next task is emoji-history.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -95,7 +95,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 19 | editor-store-types.ts | Done: 100%, 3 killed |
 | 20 | editor-store.ts | Done: 87.28% to 92.31%; 1342 killed, 111 survivors, 15 timeouts, 2 no coverage; threshold failed |
 | 21 | editor-text-session.ts | Done: 100%, 28 killed |
-| 22 | editor-undo-focus.ts | Planned |
+| 22 | editor-undo-focus.ts | Done: 87.77% to 89.89%, 165 killed, 18 survivors, 4 timeouts, 1 no coverage; threshold failed |
 | 23 | emoji-history.ts | Planned |
 | 24 | expansion-state.ts | Planned |
 | 25 | folder-backup.ts | Planned |
@@ -426,6 +426,34 @@ npm run test:mutation -- --mutate src/application/editor-clipboard-transitions.t
 ```
 
 Threshold, documentation, changed-formatting and whitespace checks passed.
+
+## Editor undo focus result
+
+Starting commit d70aa6f; 21:27:51–21:34:39. Baseline 87.77%: 161 Killed, 22 Survived,
+4 Timeout, 1 NoCoverage. Final 89.89%: 165 Killed, 18 Survived, 4 Timeout, 1 NoCoverage.
+Errors/ignored/launch errors zero. Intermediate scores 88.30/88.83. The 93% threshold fails;
+no threshold changes or layer run. Tests kill 16/18/20/106 by distinguishing reordered
+identities with equal text, and reordered parents with different child counts from cross-parent moves.
+
+Remaining 2/9/94/157 remove identity fast paths but retain value/reference comparisons;
+6's sentinel has no nodeId and cannot match a removed ID. 12/17/19/21 choose the general
+map-based comparison instead of the same-order fast path. 23's extra iteration compares
+undefined with undefined and does not recurse. 33/35 overpopulate removed IDs, but added
+IDs still come only from nodes absent in that parent; 53's same-parent check is consequently
+redundant. 73 maps null to the same -1 ancestor index. 146/149/150 allow scanning beyond
+the shorter text, but callers provide unequal text and undefined differs from its next character.
+69 and NoCoverage 71 defend a change-site node guaranteed to exist in the restored document.
+These classify 17 equivalent/redundant survivors and one defensive survivor.
+Timeout 25/100/148/154 mutate loop advancement/termination and are not assertion kills.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-undo-focus.ts --incrementalFile .scratch/application-mutation/editor-undo-focus.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/editor-undo-focus.test.ts
+```
+
+Final dry run: 2042 passing tests; focused run: 37 passing tests. Renderer types, lint,
+changed formatting, docs and whitespace checks passed. Primary review confirmed additive tests
+and unchanged production/assertions. Next: emoji-history.ts.
 Editor Agenda transitions commit: 1790885.
 
 ## Editor command transitions result
