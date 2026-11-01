@@ -146,6 +146,7 @@ it('continues a live edit in a folded remaining day but history preserves presen
 
   expect(live.selectedKey).toBe('node:98:match')
   expect(live.collapsed.size).toBe(0)
+  expect(live.focusedDay).toBeUndefined()
 
   const history = reconcileAgenda(changed, state, true)!
 
@@ -153,6 +154,24 @@ it('continues a live edit in a folded remaining day but history preserves presen
   expect(
     buildAgendaRows(agendaProjection(changed, history), history).some((row) => row.key === history.selectedKey),
   ).toBe(true)
+})
+
+// @requirement PRODUCT.md §23.7
+it('keeps the selected day when the active node leaves the agenda scope with a different date', () => {
+  const state = selected()
+  const moved: Document = {
+    roots: [
+      { ...document.roots[0]!, children: document.roots[0]!.children.slice(1) },
+      { id: 'match', text: '1970-04-09', children: [] },
+    ],
+  }
+
+  const next = reconcileAgenda(moved, state)!
+
+  expect(next.selectedKey).toBe('day:100')
+  expect(next.activeOccurrence).toBeUndefined()
+  expect(next.pinnedOccurrence).toBeUndefined()
+  expect(next.focusedDay).toBeUndefined()
 })
 
 it('scope membership excludes missing nodes, the scope root, and outside branches', () => {

@@ -52,7 +52,7 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. Next task is agenda-reconcile.ts; enumerate the remaining source files
+in this session up to ten commits. Next task is agenda-rows.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -73,8 +73,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 3 | editor-save-scheduler.ts | Done: 94.50%, 101 killed, 6 survivors, 2 timeouts |
 | 4 | editor-history.ts | Done: 93.07%, 94 killed, 4 survivors, 3 no coverage |
 | 5 | agenda-pending-move.ts | Done: 100%, 59 killed, 5 existing ignored |
-| 6 | agenda-reconcile.ts | Ready |
-| 7 | agenda-rows.ts | Planned |
+| 6 | agenda-reconcile.ts | Done: 94.34% to 95.60%, two confirmed gaps closed |
+| 7 | agenda-rows.ts | Ready |
 | 8 | agenda-state.ts | Planned |
 | 9 | agenda-visual-selection.ts | Planned |
 | 10 | command-registry.ts | Planned |
@@ -203,3 +203,31 @@ npm run test:mutation -- --mutate src/application/agenda-pending-move.ts --incre
 
 Primary source/report review completed. Documentation governance, changed formatting and diff
 checks are the applicable validation for this analysis-only task. Editor history commit: 08ac5cc.
+
+## Agenda reconciliation result
+
+Source at d54eda7, tests changed only in agenda-reconcile.test.ts; 19:25:33–19:28:01.
+Baseline 94.34%: Killed 150, Survived 9. Final 95.60%: Killed 152, Survived 7.
+Both runs: Timeout 0, NoCoverage 0, errors 0, one existing Ignored mutation (91).
+Confirmed gaps closed: migration of an active date must not enter focused-day mode (69),
+and an active node moved outside scope must not migrate selection to its new date (37).
+The changed tests pass normally and killed both previously surviving mutations.
+Remaining equivalents: 38 duplicates the missing-node check in isInAgendaScope; 65 unfolds
+an already-visible active path; 93 includes duplicate node days and undefined gap days without
+changing nearest-day selection; 114 falls through identically when looking up null;
+135 duplicates projection scope filtering; 143 duplicates nodeId discrimination;
+157 repeats selection reconciliation when no pin changed. No defensive or unresolved survivors.
+
+Both runs used this command (the second reused 141 unchanged results):
+
+```sh
+npm run test:mutation -- --mutate src/application/agenda-reconcile.ts --incrementalFile .scratch/application-mutation/agenda-reconcile.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 1972/1973 tests. Final focused validation:
+`npm test -- src/application/agenda-reconcile.test.ts` passed 17 tests.
+Low Risk static validation: `npm run typecheck:renderer`, `npm run lint`,
+`npm run format:check:changed`, `npm run check:docs`, and `git diff --check`.
+Primary diff review found no production change, weakened assertion or requirement change.
+No E2E, visual or performance checks required for these test-only changes.
+Agenda pending move commit: d54eda7.
