@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty tasks are complete.
-Next task is editor-text-session.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-one tasks are complete.
+Next task is editor-undo-focus.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -94,7 +94,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 18 | editor-search.ts | Done: 69.02% to 85.19%, 251 killed, 44 survivors, 2 timeouts; threshold failed |
 | 19 | editor-store-types.ts | Done: 100%, 3 killed |
 | 20 | editor-store.ts | Done: 87.28% to 92.31%; 1342 killed, 111 survivors, 15 timeouts, 2 no coverage; threshold failed |
-| 21 | editor-text-session.ts | Planned |
+| 21 | editor-text-session.ts | Done: 100%, 28 killed |
 | 22 | editor-undo-focus.ts | Planned |
 | 23 | emoji-history.ts | Planned |
 | 24 | expansion-state.ts | Planned |
@@ -708,3 +708,15 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Editor text session result
+
+Starting commit c008f56; 21:26:39–21:27:35. Baseline/final 100% / unchanged.
+28 Killed; Survived, Timeout, NoCoverage, errors and ignored all zero. Dry run: 2007 passing tests.
+No confirmed gap or test change. Primary source/test/report review completed.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-text-session.ts --incrementalFile .scratch/application-mutation/editor-text-session.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Threshold, documentation, changed-formatting and whitespace checks passed.
