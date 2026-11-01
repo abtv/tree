@@ -40,10 +40,6 @@ function contentSecurityPolicyPlugin(): Plugin {
 
 export default defineConfig({
   main: {
-    define: {
-      __TREE_APP_VERSION__: JSON.stringify(version),
-      __TREE_BUILD_DATE__: JSON.stringify(buildDateLabel(new Date())),
-    },
     build: {
       rolldownOptions: {
         input: {
@@ -58,6 +54,18 @@ export default defineConfig({
     build: { rolldownOptions: { input: resolve('src/electron/preload/index.ts') } },
   },
   renderer: {
+    define: {
+      __TREE_APP_VERSION__: JSON.stringify(version),
+      __TREE_BUILD_DATE__: JSON.stringify(buildDateLabel(new Date())),
+    },
     plugins: [react(), contentSecurityPolicyPlugin()],
+    build: {
+      rolldownOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          about: resolve('src/renderer/about.html'),
+        },
+      },
+    },
   },
 })

@@ -77,6 +77,12 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     'https://github.com/abtv/tree',
   )
   await expect(page.getByRole('link', { name: 'GitHub repository' })).toHaveAttribute('target', '_blank')
+  await expect(page.locator('#app-attribution')).toHaveText('© 2026 Andrei Butov · MIT License')
+  await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toHaveAttribute(
+    'href',
+    'https://github.com/abtv/tree/blob/main/LICENSE',
+  )
+  await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toHaveAttribute('target', '_blank')
 
   const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
     const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']

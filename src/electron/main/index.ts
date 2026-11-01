@@ -32,6 +32,7 @@ import {
 } from '../../infrastructure/main/window-state'
 import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
+import { createAboutWindowController, type AboutWindowController } from './about-window'
 import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
@@ -52,8 +53,6 @@ import {
 } from './window'
 
 app.setName('Tree')
-declare const __TREE_APP_VERSION__: string
-declare const __TREE_BUILD_DATE__: string
 // Privileged schemes must be registered before the app is ready.
 registerRendererScheme(protocol)
 
@@ -67,6 +66,7 @@ let notesArchive: NotesArchiveController | null = null
 let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
+let aboutWindow: AboutWindowController | null = null
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -108,11 +108,6 @@ function setAppearance(value: AppearancePreference): void {
 let menuIcons: MenuIcons | undefined
 
 function rebuildApplicationMenu(): void {
-  app.setAboutPanelOptions({
-    applicationName: 'Tree',
-    applicationVersion: `${__TREE_APP_VERSION__} · ${__TREE_BUILD_DATE__}`,
-    version: '',
-  })
   menuIcons ??= createMenuIcons((name) => nativeImage.createMenuSymbol(name))
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
@@ -122,30 +117,43 @@ function rebuildApplicationMenu(): void {
           alwaysOnTop: isAlwaysOnTop(),
           appearance: currentAppearance(),
           notes: notesMenuState,
+          modalOpen: aboutWindow?.isOpen() ?? false,
         },
         {
           requestQuit: requestQuitFromMenu,
           findCommand: (command) => {
+            if (aboutWindow?.isOpen()) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.findMenuCommand, command)
             }
           },
           viewCommand: (command) => {
+            if (aboutWindow?.isOpen()) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.viewMenuCommand, command)
             }
           },
           notesCommand: (command) => {
+            if (aboutWindow?.isOpen()) return
             if (command === 'export' ? notesMenuState.canExport : notesMenuState.canImport) {
               mainWindow?.webContents.send(ipcEvents.notesMenuCommand, command)
             }
           },
           setAppearance,
+          showAbout: () => aboutWindow?.show(),
           setVimEnabled: (value) => {
+            if (aboutWindow?.isOpen()) {
+              rebuildApplicationMenu()
+              return
+            }
             vimEnabledStore?.save(value)
             mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
           },
           setAlwaysOnTop: (value) => {
+            if (aboutWindow?.isOpen()) {
+              rebuildApplicationMenu()
+              return
+            }
             mainWindow?.setAlwaysOnTop(value)
             alwaysOnTopStore?.save(value)
             mainWindow?.webContents.send(ipcEvents.alwaysOnTopChanged, value)
@@ -228,6 +236,7 @@ bootstrapApplication({
       packagedRendererUrl,
     )
     renderer = resolvedRenderer
+    aboutWindow = createAboutWindowController(() => mainWindow, resolvedRenderer.url, rebuildApplicationMenu)
     handleRendererProtocol(protocol, packagedRendererDirectory, (path) => readFile(path))
     configureRendererSessionSecurity(session.defaultSession, resolvedRenderer)
     configureWebContentsSecurity(app, resolvedRenderer.url, (url) => {

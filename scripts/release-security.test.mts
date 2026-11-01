@@ -18,15 +18,6 @@ test('production packaging requires the security fuse policy', () => {
   })
 })
 
-test('packages attributed About credits outside the application archive', () => {
-  const config = load(readFileSync('electron-builder.yml', 'utf8')) as { extraResources: unknown[] }
-
-  expect(config.extraResources).toContainEqual({ from: 'assets/about/Credits.html', to: 'Credits.html' })
-  expect(readFileSync('assets/about/Credits.html', 'utf8')).toContain(
-    '<a href="https://github.com/abtv/tree">GitHub repository</a>',
-  )
-})
-
 test('release reuses authenticated main checks before credentials or release writes', () => {
   const workflow = load(readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')) as {
     jobs: {

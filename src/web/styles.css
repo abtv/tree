@@ -141,6 +141,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
 #storage-status,
 #offline-status,
 #app-version,
+#app-attribution,
 #app-repository,
 #backup-status {
   display: block;
@@ -148,7 +149,11 @@ body:has(.image-preview-overlay) #tree-menu-button {
   color: var(--color-secondary);
   font-size: 11px;
 }
-#app-repository:focus-visible {
+#app-attribution a {
+  color: inherit;
+}
+#app-repository:focus-visible,
+#app-attribution a:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: -2px;
 }

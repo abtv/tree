@@ -1,0 +1,58 @@
+.about-window {
+  min-width: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  text-align: center;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.about-drag-region {
+  height: 32px;
+  -webkit-app-region: drag;
+}
+
+.about-window main {
+  padding: 8px 20px 24px;
+}
+
+.about-window h1 {
+  margin: 10px 0;
+  font-size: 17px;
+}
+
+.about-window p {
+  margin: 9px 0;
+}
+
+#about-version {
+  color: var(--color-secondary);
+  font-size: 11px;
+}
+
+.about-window a {
+  color: var(--color-link);
+}
+
+.about-window a:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+#about-close {
+  margin-top: 6px;
+  padding: 5px 24px;
+  border: 1px solid var(--color-location-border);
+  border-radius: 5px;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+#about-close:hover {
+  background: var(--color-disclosure-hover-background);
+}
+
+#about-close:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
+}

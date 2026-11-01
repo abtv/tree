@@ -407,12 +407,27 @@ export async function clickApplicationMenuQuit(app: ElectronApplication): Promis
 // it would silently do nothing, even though closing the window must flush and quit while inactive
 // (docs/PRODUCT.md §9.2). These helpers address the single application window directly.
 
-export async function closeMainWindow(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
+export async function closeMainWindow(
+  app: ElectronApplication,
+  options: { allowModalChildren?: boolean } = {},
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, allowModalChildren) => {
     const windows = BrowserWindow.getAllWindows()
-    if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
-    windows[0]!.close()
-  })
+    if (!allowModalChildren) {
+      if (windows.length !== 1) throw new Error(`Expected exactly one application window, found ${windows.length}.`)
+      windows[0]!.close()
+      return
+    }
+
+    const parents = windows.filter((window) => window.getParentWindow() === null)
+    if (parents.length !== 1)
+      throw new Error(`Expected exactly one parent application window, found ${parents.length}.`)
+    const parent = parents[0]!
+    if (windows.some((window) => window !== parent && (window.getParentWindow() !== parent || !window.isModal()))) {
+      throw new Error('Expected only modal children of the main application window.')
+    }
+    parent.close()
+  }, options.allowModalChildren ?? false)
 }
 
 export async function setMainWindowBounds(

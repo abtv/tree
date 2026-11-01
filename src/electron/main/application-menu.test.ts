@@ -18,6 +18,7 @@ function applicationMenuTemplate(
 
 function createActions() {
   return {
+    showAbout: vi.fn(),
     requestQuit: vi.fn(),
     setVimEnabled: vi.fn(),
     setAlwaysOnTop: vi.fn(),
@@ -29,9 +30,15 @@ function createActions() {
 }
 
 function state(
-  overrides: Partial<{ vimEnabled: boolean; alwaysOnTop: boolean; appearance: AppearancePreference }> = {},
+  overrides: Partial<{
+    vimEnabled: boolean
+    alwaysOnTop: boolean
+    appearance: AppearancePreference
+    modalOpen: boolean
+  }> = {},
 ) {
   return {
+    modalOpen: false,
     vimEnabled: false,
     alwaysOnTop: false,
     appearance: 'system' as AppearancePreference,
@@ -53,6 +60,25 @@ function appearanceItems(template: MenuItemConstructorOptions[]): MenuItemConstr
 function clickWithChecked(item: MenuItemConstructorOptions, checked: boolean): void {
   item.click?.({ checked } as MenuItem, undefined, {} as Electron.KeyboardEvent)
 }
+
+it('disables main-window commands while About is modal but keeps About, Quit and Appearance available', () => {
+  const template = applicationMenuTemplate(state({ modalOpen: true }), createActions())
+  const blocked = [
+    ...submenuItems(template, 'File'),
+    ...submenuItems(template, 'Edit'),
+    ...submenuItems(template, 'Window'),
+    ...submenuItems(template, 'View').filter((item) => item.label === 'Tree' || item.label === 'Agenda'),
+  ].filter((item) => item.type !== 'separator')
+
+  expect(blocked.length).toBeGreaterThan(0)
+  expect(blocked.every((item) => item.enabled === false)).toBe(true)
+  expect(
+    submenuItems(template, 'Tree')
+      .filter((item) => item.type !== 'separator')
+      .every((item) => item.enabled !== false),
+  ).toBe(true)
+  expect(appearanceItems(template).every((item) => item.enabled !== false)).toBe(true)
+})
 
 describe('application menu template', () => {
   // @requirement PRODUCT.md §25.1
@@ -186,7 +212,9 @@ describe('application menu template', () => {
   it('keeps Cmd+Q on the quit item', () => {
     const actions = createActions()
     const items = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
-    expect(items[0]).toMatchObject({ label: 'About Tree', role: 'about' })
+    expect(items[0]).toMatchObject({ label: 'About Tree' })
+    clickWithChecked(items[0]!, false)
+    expect(actions.showAbout).toHaveBeenCalledOnce()
 
     const quit = items.find((item) => item.label === 'Quit Tree')!
 

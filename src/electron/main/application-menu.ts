@@ -4,6 +4,7 @@ import type { FindMenuCommand, NotesMenuCommand, NotesMenuState, ViewMenuCommand
 import type { MenuIcons } from './menu-icons'
 
 export interface ApplicationMenuState {
+  modalOpen: boolean
   vimEnabled: boolean
   alwaysOnTop: boolean
   appearance: AppearancePreference
@@ -11,6 +12,7 @@ export interface ApplicationMenuState {
 }
 
 export interface ApplicationMenuActions {
+  showAbout: () => void
   requestQuit: () => void
   setVimEnabled: (vimEnabled: boolean) => void
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
@@ -38,7 +40,7 @@ export function applicationMenuTemplate(
     {
       label: 'Tree',
       submenu: [
-        { label: 'About Tree', role: 'about' },
+        { label: 'About Tree', click: actions.showAbout },
         { type: 'separator' },
         { label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit },
       ],
@@ -49,13 +51,13 @@ export function applicationMenuTemplate(
         {
           label: 'Export Notes…',
           icon: icons.export,
-          enabled: state.notes.canExport,
+          enabled: state.notes.canExport && !state.modalOpen,
           click: () => actions.notesCommand('export'),
         },
         {
           label: 'Import Notes…',
           icon: icons.import,
-          enabled: state.notes.canImport,
+          enabled: state.notes.canImport && !state.modalOpen,
           click: () => actions.notesCommand('import'),
         },
       ],
@@ -65,24 +67,28 @@ export function applicationMenuTemplate(
       submenu: [
         {
           label: 'Find…',
+          enabled: !state.modalOpen,
           accelerator: 'CommandOrControl+F',
           registerAccelerator: false,
           click: () => actions.findCommand('find'),
         },
         {
           label: 'Find Next',
+          enabled: !state.modalOpen,
           accelerator: 'CommandOrControl+G',
           registerAccelerator: false,
           click: () => actions.findCommand('next'),
         },
         {
           label: 'Find Previous',
+          enabled: !state.modalOpen,
           accelerator: 'CommandOrControl+Shift+G',
           registerAccelerator: false,
           click: () => actions.findCommand('previous'),
         },
         {
           label: 'Search All Nodes…',
+          enabled: !state.modalOpen,
           accelerator: 'CommandOrControl+;',
           registerAccelerator: false,
           click: () => actions.findCommand('all'),
@@ -90,6 +96,7 @@ export function applicationMenuTemplate(
         { type: 'separator' },
         {
           label: 'Vim Editing',
+          enabled: !state.modalOpen,
           type: 'checkbox',
           checked: state.vimEnabled,
           click: (item) => actions.setVimEnabled(item.checked),
@@ -99,8 +106,8 @@ export function applicationMenuTemplate(
     {
       label: 'View',
       submenu: [
-        { label: 'Tree', icon: icons.tree, click: () => actions.viewCommand('tree') },
-        { label: 'Agenda', icon: icons.agenda, click: () => actions.viewCommand('agenda') },
+        { label: 'Tree', enabled: !state.modalOpen, icon: icons.tree, click: () => actions.viewCommand('tree') },
+        { label: 'Agenda', enabled: !state.modalOpen, icon: icons.agenda, click: () => actions.viewCommand('agenda') },
         { type: 'separator' },
         {
           label: 'Appearance',
@@ -118,6 +125,7 @@ export function applicationMenuTemplate(
       submenu: [
         {
           label: 'Always on Top',
+          enabled: !state.modalOpen,
           type: 'checkbox',
           checked: state.alwaysOnTop,
           click: (item) => actions.setAlwaysOnTop(item.checked),

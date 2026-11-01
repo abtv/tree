@@ -881,6 +881,17 @@ origin serializes as an opaque `null`.
 External HTTP(S) links are handed to the operating system through `shell.openExternal`; they do not
 use the renderer session.
 
+About Tree is a singleton modal child owned by `src/electron/main/about-window.ts`.
+Its separate `about.html` renderer entry shares the editor's color variables and follows
+`nativeTheme`, without a preload, TreeApi, document store or IPC commands. The native
+background uses the same palette before painting and until closing. Escape requests the
+standard renderer window close; closure releases its theme listener and restores parent focus.
+Its static application icon is a built PNG asset served by the renderer protocol. Failed
+About loads close only the child and report the error; they do not terminate the editor.
+The controller rebuilds the application menu on opening and closing. Main-window menu
+commands are disabled and guarded while About is open; blocked checkbox callbacks
+restore menu checks from the unchanged preferences. About, Quit and Appearance remain available.
+
 The main process installs navigation and window-open guards for every web contents as it is created.
 Main-frame, subframe, and redirected navigation are restricted to the resolved renderer document,
 and webview attachment is denied. The production content security policy denies child frames,

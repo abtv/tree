@@ -363,6 +363,10 @@ test('Tab leaving the menu commits the borrowed editor before another editing de
 
   await page.keyboard.press('Tab')
 
+  await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toBeFocused()
+
+  await page.keyboard.press('Tab')
+
   await expect(page.locator('#tree-menu')).toBeHidden()
   await expect(page.getByRole('button', { name: 'Top level', exact: true })).toBeFocused()
   expect(

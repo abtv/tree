@@ -50,10 +50,22 @@ The application is a native-feeling macOS application and follows Apple's Human 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
 The desktop application menu starts with **About Tree**, followed by a separator
-before Quit Tree. About Tree opens the native macOS About panel and shows the
+before Quit Tree. About Tree opens a custom modal child window and shows the
 application version from the root `package.json`, also used for the packaged app,
 followed by its UTC build date in English. The panel also shows a clickable
 **GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
+The window shows Tree's application icon, `© 2026 Andrei Butov` and `Licensed under the MIT License`,
+with **MIT License** linking to `https://github.com/abtv/tree/blob/main/LICENSE`.
+
+The About window uses the main application's shared light or dark palette (§20.5),
+including its background, text and links. Automatic follows the system appearance.
+It blocks interaction with its parent until closed with Escape or the focused **Close**
+button (also activated by Enter). Closing restores focus to the parent without changing its editor state.
+Repeated About commands focus the existing window. The window closes with its parent.
+
+While it is open, editor, view, data and Always on Top menu actions are disabled;
+About Tree, Quit Tree and Appearance remain available. Closing restores the menu actions.
+The custom window replaces the native About panel so its colors match Tree, as approved by the owner.
 
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
 
@@ -79,8 +91,11 @@ statuses and the Update App button when present. All builds show the root
 loaded app, including offline and while a newer update is waiting. Browser
 publication requires a version greater than the last transferred web release;
 ordinary commits still run validation without publishing a new package.
+
 Above the version line, a **GitHub repository** link opens
 `https://github.com/abtv/tree` in a new tab.
+Between the repository link and version, a muted line reads `© 2026 Andrei Butov · MIT License`.
+**MIT License** opens `https://github.com/abtv/tree/blob/main/LICENSE` in a new tab.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or
