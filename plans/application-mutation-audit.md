@@ -55,8 +55,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Eighteen tasks are complete.
-Next task is editor-store-types.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Nineteen tasks are complete.
+Next task is editor-store.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -90,8 +90,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 16 | editor-node-visual-transitions.ts | Done: 90.56% to 95.51%, 425 killed, 17 survivors, 3 no coverage |
 | 17 | editor-runtime-state.ts | Done: 90.57% to 93.40%, 99 killed, 7 survivors |
 | 18 | editor-search.ts | Done: 69.02% to 85.19%, 251 killed, 44 survivors, 2 timeouts; threshold failed |
-| 19 | editor-store-types.ts | Ready |
-| 20 | editor-store.ts | Planned |
+| 19 | editor-store-types.ts | Done: 100%, 3 killed |
+| 20 | editor-store.ts | Ready |
 | 21 | editor-text-session.ts | Planned |
 | 22 | editor-undo-focus.ts | Planned |
 | 23 | emoji-history.ts | Planned |
@@ -560,3 +560,17 @@ npm test -- src/application/editor-search.test.ts src/application/editor-search-
 Final dry run passed 2146 tests. Ordinary focused tests, renderer types, lint, formatting, docs
 and diff checks passed. Primary review retained existing assertions and verified tests-only changes.
 Runtime state commit: d827f3f.
+
+## Editor store types result
+
+Starting commit 18ba7e5; 20:36:09–20:36:43. This file contains executable systemClock adapters,
+so it was tested rather than skipped as type-only. Baseline/final 100% / unchanged:
+3 Killed; Survived/Timeout/NoCoverage/errors/ignored zero. All three static mutants failed tests.
+Dry run passed 1949 tests. No confirmed gap or test edits; primary source/report review completed.
+Threshold, docs, formatting and diff checks passed.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-store-types.ts --incrementalFile .scratch/application-mutation/editor-store-types.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Editor search commit: 18ba7e5.
