@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-seven tasks are complete.
-Next task is search-session.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-eight tasks are complete.
+Next task is vim-clipboard-content.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -111,7 +111,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 35 | recent-node-persistence.ts | Done: 72.73% to 86.36%, 18 killed, 3 survivors, 1 timeout; threshold failed |
 | 36 | recent-nodes.ts | Done: 67.90% to 93.83%, 152 killed, 10 functionally equivalent survivors |
 | 37 | search-executor.ts | Done: 99.46%, 182 killed, 1 equivalent, 3 timeouts, 2 runtime errors, 12 existing ignored |
-| 38 | search-session.ts | Planned |
+| 38 | search-session.ts | Done: 80.75% to 91.44%, 171 killed, 16 survivors; threshold failed |
 | 39 | vim-clipboard-content.ts | Planned |
 | 40 | visible-rows.ts | Planned |
 
@@ -736,6 +736,29 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Search session completed result
+
+2026-11-01, 22:18:11–22:24:58 local. Baseline 80.75%, final 91.44%:
+Killed 151 → 171, Survived 36 → 16; Timeout/NoCoverage/errors/ignored 0.
+Seven added cases cover initial/pending state, inactive commands, context/draft cancellation,
+late responses both before and after a replacement navigation, visible count reuse and hidden
+recount behavior. The interruption test also catches opposing counter directions reusing an old ID.
+Remaining functional equivalents/redundancies: 4 (overwritten initial previousVisible),
+38 (extra identical inactive snapshot notification, no corpus work), 41/42/49 (hidden draft is
+unreachable), 46 (explicit undefined draft), 63 (edit's recount cancels and advances count ID),
+147/179/181 (other generation/context gates reject the same stale results), 166/191 (consistent
+private counter direction). Defensive 117/163 require commands without initialized context;
+149/183 require an executor returning the wrong operation kind. No supported-flow gap remains.
+
+```sh
+npm run test:mutation -- --mutate src/application/search-session.ts --incrementalFile .scratch/application-mutation/search-session.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/search-session.test.ts
+```
+
+Final dry run: 2218 tests; focused run: 21 tests passed. Renderer types, lint, formatting,
+documentation and diff checks passed. Threshold failed; no layer fallback. Primary review:
+only new tests/helper, no changed existing assertions or production code. Next: vim-clipboard-content.ts.
 
 ## Search executor completed result
 

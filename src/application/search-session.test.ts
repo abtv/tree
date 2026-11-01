@@ -11,6 +11,128 @@ const context: SearchContext = {
 }
 const origin = { nodeId: 'a', offset: 0 }
 
+function controlledSession() {
+  const jobs: { request: SearchRequest; publish: (result: SearchResult) => void; cancel: ReturnType<typeof vi.fn> }[] =
+    []
+  const session = new SearchSession({
+    execute(request, publish) {
+      const cancel = vi.fn()
+      jobs.push({ request, publish, cancel })
+      return cancel
+    },
+  })
+  return { session, jobs }
+}
+
+it('starts inactive and publishes pending draft state before count responses', () => {
+  const { session } = controlledSession()
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', visible: false, pending: false })
+
+  session.replaceContext(context)
+  session.begin(origin)
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', draft: '', visible: true, pending: true })
+
+  session.edit('aa')
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', draft: 'aa', visible: true, pending: true })
+})
+
+it('ignores editing, draft cancellation and navigation when no query is active', () => {
+  const { session, jobs } = controlledSession()
+  session.replaceContext(context)
+  const before = session.getSnapshot()
+
+  session.edit('ignored')
+  session.cancelDraft()
+  session.navigate(origin, 1, 1, vi.fn())
+
+  expect(session.getSnapshot()).toBe(before)
+  expect(jobs).toHaveLength(0)
+})
+
+it.each(['begin', 'context'] as const)('cancels pending work and rejects a late jump after %s', (action) => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(jump)
+  const count = jobs.at(-2)!
+  const navigation = jobs.at(-1)!
+
+  if (action === 'begin') session.begin(origin)
+  else session.replaceContext({ ...context, revision: 2 })
+  navigation.publish({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
+
+  expect(count.cancel).toHaveBeenCalledOnce()
+  expect(navigation.cancel).toHaveBeenCalledOnce()
+  expect(jump).not.toHaveBeenCalled()
+})
+
+it('keeps interrupted navigation obsolete even after another jump starts', () => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(jump)
+  const interrupted = jobs.at(-1)!
+
+  session.interruptNavigation()
+  interrupted.publish({ kind: 'navigate', total: 99, wrapped: true, missingOrigin: false })
+
+  expect(interrupted.cancel).toHaveBeenCalledOnce()
+  expect(jump).not.toHaveBeenCalled()
+
+  session.navigate(origin, 1, 1, jump)
+  interrupted.publish({ kind: 'navigate', total: 99, wrapped: true, missingOrigin: false })
+
+  expect(interrupted.cancel).toHaveBeenCalledOnce()
+  expect(jump).not.toHaveBeenCalled()
+
+  jobs.at(-1)!.publish({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
+
+  expect(jump).toHaveBeenCalledExactlyOnceWith({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
+})
+
+it('does not start a hidden count when canceling a draft opened from inactive search', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+
+  session.cancelDraft()
+
+  expect(session.getSnapshot()).toEqual({ confirmed: '', visible: false, pending: false })
+  expect(harness.pending()).toBe(0)
+})
+
+it('recounts hidden confirmed queries on navigation but preserves a ready visible count', () => {
+  const { session, jobs } = controlledSession()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(vi.fn())
+  session.hide()
+  jobs.length = 0
+
+  session.navigate(origin, 1, 1, vi.fn())
+
+  expect(session.getSnapshot()).toEqual({ confirmed: 'aa', visible: true, pending: true })
+  expect(jobs.map((job) => job.request.operation.kind)).toEqual(['count', 'navigate'])
+
+  jobs[0]!.publish({ kind: 'count', total: 2, capped: false })
+  const ready = session.getSnapshot()
+  jobs.length = 0
+  session.navigate(origin, 1, 1, vi.fn())
+
+  expect(session.getSnapshot()).toBe(ready)
+  expect(jobs.map((job) => job.request.operation.kind)).toEqual(['navigate'])
+})
+
 it('publishes confirmed pending state before either result and hides empty confirmations', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)
