@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty tasks are complete.
-Next task is notes-archive/desktop-data-operations.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-one tasks are complete.
+Next task is notes-archive/export-notes.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -104,7 +104,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 28 | notes-archive/archive-messages.ts | Done: 95.42% to 96.95%, 126 killed, 4 survivors, 1 timeout |
 | 29 | notes-archive/archive-policy.ts | Done: 100%, 35 killed |
 | 30 | notes-archive/crc32.ts | Done: 93.33%, 11 killed, 1 equivalent survivor, 3 timeouts |
-| 31 | notes-archive/desktop-data-operations.ts | Planned |
+| 31 | notes-archive/desktop-data-operations.ts | Done: 97.10%, 402 killed, 11 survivors, 1 defensive no coverage; timeout replaced by assertion kill |
 | 32 | notes-archive/export-notes.ts | Planned |
 | 33 | notes-archive/import-notes.ts | Planned |
 | 34 | notes-archive/zip-reader.ts | Planned |
@@ -736,6 +736,30 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Desktop data operations completed result
+
+2026-11-01, 21:54:58–21:56:13 local mutation window. Baseline/final 97.10%:
+Killed 401 → 402, Survived 11 unchanged, Timeout 1 → 0, NoCoverage 1 unchanged;
+mutant errors and ignored 0. The new pending-notice test verifies exactly one request across
+store notifications (PRODUCT.md §25.3), killing former Timeout 98 with an assertion.
+Remaining equivalent/redundant survivors: 6 (import mode overwritten before use),
+34 (the extra import call is refused after export synchronously enters choosing),
+49/50 (confirmation already makes replacement/restart busy), 112 (clearing an absent timer),
+278 (unobserved error cause), 335/367 (suspended branch cannot run before committing),
+435 (disposal invalidates current through disposed regardless of epoch direction).
+Defensive survivors 214 (stale timer already cleared), 319 (confirming requires confirmation);
+NoCoverage 368 is the unreachable suspended-but-not-committing recovery call.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/desktop-data-operations.ts --incrementalFile .scratch/application-mutation/desktop-data-operations.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/notes-archive/desktop-data-operations.test.ts
+```
+
+Final dry run and focused run: 73 tests passed. Renderer types, lint, changed formatting,
+documentation and diff checks passed. Primary review: one added test, no production changes
+or changed existing assertions. No runtime change requires E2E/performance validation.
+Next: notes-archive/export-notes.ts.
 
 ## CRC32 result
 

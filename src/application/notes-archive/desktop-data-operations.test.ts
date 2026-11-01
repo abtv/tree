@@ -84,6 +84,23 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
 afterEach(() => vi.useRealTimers())
 
 describe('desktop notes operations', () => {
+  it('requests the import notice only once while its response is pending', async () => {
+    const h = harness()
+    h.operations.dispose()
+    const notice = deferred<import('../../shared/ipc').NotesImportNotice | null>()
+    h.api.takeNotesImportNotice.mockClear().mockReturnValueOnce(notice.promise)
+    const operations = new DesktopDataOperations(h.api, h.store)
+
+    operations.start()
+    h.change({ status: 'ready' })
+
+    expect(h.api.takeNotesImportNotice).toHaveBeenCalledOnce()
+
+    operations.dispose()
+    notice.resolve(null)
+    await notice.promise
+  })
+
   it('can dispose before start without registering listeners', () => {
     const h = harness()
     const subscribe = vi.spyOn(h.store, 'subscribe')
