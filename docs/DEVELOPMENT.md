@@ -953,7 +953,11 @@ The command requires a clean working tree on a branch. It increments patch in `p
 
 Push or merge the version commit to main normally. `Test and build app` runs checks,
 audit, browser E2E and platform smoke once. After success, publication is dispatched only
-when either platform has a new version. Web transfer still requires a version greater than
+when either platform has a new version. Eligibility compares the checked package version
+with platform release state, not the previous push. If a version-bump push fails validation,
+a later successful push can release that same version without another bump. Existing macOS
+tags and transferred web versions still prevent duplicate releases.
+Web transfer still requires a version greater than
 the last transferred release and rechecks it against the exact hosting parent before writing.
 The combined `Release new app version` verifies the completed main validation run, SHA and
 attempt, then runs independent Web and macOS branches. The Web job waits for deployment

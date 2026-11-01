@@ -56,19 +56,10 @@ export async function newMacVersion(version: string, request: Request = api, tok
   throw new Error('Too many release tags')
 }
 
-export async function versionIncreased(version: string, before: string, request: Request = api, token?: string) {
-  if (!/^[a-f0-9]{40}$/.test(before)) throw new Error('Invalid previous push SHA')
-  if (/^0+$/.test(before)) return true
-  const blob = (await request(`${root}/contents/package.json?ref=${before}`, { token })) as {
-    encoding: string
-    content: string
-    size: number
-  }
-  if (blob.encoding !== 'base64' || typeof blob.content !== 'string' || blob.size > 1024 * 1024) {
-    throw new Error('Invalid previous version metadata')
-  }
-  const previous = JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'))
-  return compareVersions(version, previous.version) > 0
+export async function releaseNeeded(version: string, request: Request = api, token?: string) {
+  const web = await isNewWebVersion(version, { request, token })
+  const mac = await newMacVersion(version, request, token)
+  return web || mac
 }
 
 export async function dispatchPublications(
@@ -104,14 +95,11 @@ if (import.meta.main) {
       )
     } else if (command === 'version') {
       const version = await currentVersion()
-      const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH!, 'utf8'))
-      const increased = await versionIncreased(version, event.before, api, process.env.GH_TOKEN)
-      const web = increased && (await isNewWebVersion(version, { token: process.env.GH_TOKEN }))
-      const mac = increased && (await newMacVersion(version, api, process.env.GH_TOKEN))
-      await appendFile(process.env.GITHUB_OUTPUT!, `ready=${web || mac}\nversion=${version}\n`)
+      const ready = await releaseNeeded(version, api, process.env.GH_TOKEN)
+      await appendFile(process.env.GITHUB_OUTPUT!, `ready=${ready}\nversion=${version}\n`)
       await appendFile(
         process.env.GITHUB_STEP_SUMMARY!,
-        web || mac ? `New release: ${version}\n` : 'Version unchanged — no release needed\n',
+        ready ? `New release: ${version}\n` : 'No new release version\n',
       )
     } else if (command === 'dispatch') {
       const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH!, 'utf8'))
