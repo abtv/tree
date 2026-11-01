@@ -50,8 +50,8 @@ This task-specific instruction overrides DEVELOPMENT.md §12's layer-shard fallb
 Keep the threshold unchanged and report a below-threshold exit honestly; a completed audit
 does not mean the threshold passed. Do not launch a layer shard.
 
-Save-policy and persistence-coordinator analyses are complete without test changes.
-Next is editor-save-scheduler.ts, then editor-history.ts; enumerate the remaining source files
+The first three analyses are complete without test changes.
+Next is editor-history.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -69,8 +69,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | --- | --- | --- |
 | 1 | save-policy.ts | Done: 86.67%, 58 killed, 10 equivalent survivors, 7 timeouts |
 | 2 | persistence-coordinator.ts | Done: 96.15%, 67 killed, 3 equivalent survivors, 8 timeouts |
-| 3 | editor-save-scheduler.ts | Ready |
-| 4 | editor-history.ts | Planned |
+| 3 | editor-save-scheduler.ts | Done: 94.50%, 101 killed, 6 survivors, 2 timeouts |
+| 4 | editor-history.ts | Ready |
 | 5 | agenda-pending-move.ts | Planned |
 | 6 | agenda-reconcile.ts | Planned |
 | 7 | agenda-rows.ts | Planned |
@@ -138,3 +138,25 @@ The separate incremental file retains the final report; the first counts are als
 `.scratch/application-mutation/persistence-baseline.md`. No test or production changes were justified.
 Save-policy commit: de065be. Documentation checks and changed formatting passed for that commit.
 Planner verified the complete 40-file inventory and Low Risk test-only validation scope.
+
+## Save scheduler result
+
+Source unchanged at 016bff9; 2026-11-01 19:18:58–19:20:18.
+Before/final: 94.50% / unchanged, no test edits or redundant rerun.
+Killed 101, Survived 6, Timeout 2, NoCoverage 0, errors 0.
+Survivors 18, 77, 85, 97 are equivalent: clearing an undefined timer is a no-op.
+Survivor 95 removes the timer check from the pending-change retry guard; pending changes
+without an armed timer still defer cleanup in the coordinator. No observed persistence difference.
+Survivor 106 removes an internal defensive guard: the coordinator always captures a save
+before acknowledging it, so the undefined watermark cannot occur through that lifecycle.
+Thus five equivalent survivors and one defensive survivor; no confirmed assertion gaps.
+Timeout 2 removes constructor wiring and stalls waiting integration tests; timeout 82
+keeps changes pending and exhausts the hit limit. Neither is an assertion kill.
+Dry run passed 1944 tests; mutation command exited 0 with the unchanged threshold:
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-save-scheduler.ts --incrementalFile .scratch/application-mutation/editor-save-scheduler.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Final per-file report remains in its incremental file. Persistence coordinator commit: 016bff9;
+documentation and changed-format checks passed. No runtime changes require E2E or performance validation.
