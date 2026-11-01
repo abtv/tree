@@ -56,7 +56,7 @@ does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
 in this session, subsequently extended to 50 files. Ten tasks are complete.
-Next task is editor-clipboard-transitions.ts; enumerate the remaining source files
+Next task is editor-command-transitions.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -84,8 +84,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 10 | command-registry.ts | Done: 95.27%, 141 killed, 7 survivors |
 | 11 | drop-targets.ts | Done: 97.58% to 98.79%, 163 killed, 2 equivalents |
 | 12 | editor-agenda-transitions.ts | Done: 96.55% to 98.85%, 86 killed, 1 equivalent |
-| 13 | editor-clipboard-transitions.ts | Ready |
-| 14 | editor-command-transitions.ts | Planned |
+| 13 | editor-clipboard-transitions.ts | Done: 97.73%, 86 killed, 1 equivalent, 1 defensive no coverage |
+| 14 | editor-command-transitions.ts | Ready |
 | 15 | editor-content-changes.ts | Planned |
 | 16 | editor-node-visual-transitions.ts | Planned |
 | 17 | editor-runtime-state.ts | Planned |
@@ -410,3 +410,18 @@ Dry runs passed 1951/1952 tests. `npm test -- src/application/editor-agenda-tran
 passed 21 tests after mutation completion. Renderer types, lint, changed formatting, docs and diff
 checks passed. Primary review confirms test-only scope; no production or fixture changes.
 Drop targets commit: 8686176.
+
+## Editor clipboard transitions result
+
+Starting commit 1790885; 19:49:54–19:50:33. Baseline/final 97.73% / unchanged.
+Killed 86, Survived 1, NoCoverage 1, Timeout/errors/ignored zero. Dry run passed 1943 tests.
+Survivor 11 is equivalent: the bogus link fallback has no numeric offsets and the range filter removes it.
+NoCoverage 50 is defensive: split always returns at least one line, so the missing-last-line fallback is unreachable.
+No confirmed test gap; no test or production change. Primary source/report review completed.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-clipboard-transitions.ts --incrementalFile .scratch/application-mutation/editor-clipboard-transitions.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Threshold, documentation, changed-formatting and whitespace checks passed.
+Editor Agenda transitions commit: 1790885.
