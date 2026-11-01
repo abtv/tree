@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-eight tasks are complete.
-Next task is vim-clipboard-content.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-nine tasks are complete.
+Next task is visible-rows.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -112,7 +112,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 36 | recent-nodes.ts | Done: 67.90% to 93.83%, 152 killed, 10 functionally equivalent survivors |
 | 37 | search-executor.ts | Done: 99.46%, 182 killed, 1 equivalent, 3 timeouts, 2 runtime errors, 12 existing ignored |
 | 38 | search-session.ts | Done: 80.75% to 91.44%, 171 killed, 16 survivors; threshold failed |
-| 39 | vim-clipboard-content.ts | Planned |
+| 39 | vim-clipboard-content.ts | Done: 100%, 61 killed |
 | 40 | visible-rows.ts | Planned |
 
 ## Owner involvement
@@ -736,6 +736,19 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Vim clipboard content completed result
+
+2026-11-01, 22:25:28–22:26:06 local. Baseline/final unchanged 100%; Killed 61,
+Survived/Timeout/NoCoverage/CompileError/RuntimeError/Ignored 0. Existing tests cover character
+selection, image/text caret semantics, forests, empty nodes and bounded text reads; no additions needed.
+
+```sh
+npm run test:mutation -- --mutate src/application/vim-clipboard-content.ts --incrementalFile .scratch/application-mutation/vim-clipboard-content.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry run: 2144 tests passed. Threshold, docs, changed formatting and diff checks passed.
+Primary review: analysis-only; no production or test changes. Next: visible-rows.ts.
 
 ## Search session completed result
 
