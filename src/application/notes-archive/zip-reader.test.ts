@@ -57,6 +57,13 @@ const rejected = (archive: Uint8Array, limits = ARCHIVE_LIMITS) => rejection(rea
 
 // @requirement PRODUCT.md §24.4
 describe('notes archive central directory', () => {
+  it('identifies a ZIP64 locator even in an archive without entries', async () => {
+    const locator = new Uint8Array(20)
+    new DataView(locator.buffer).setUint32(0, 0x07064b50, true)
+
+    expect(await rejected(buildZip([], { beforeEnd: locator }))).toBe(UNSUPPORTED_ARCHIVE_MESSAGE)
+  })
+
   it('lists the entries export writes, in central-directory order', async () => {
     const image = imageEntry('image-1', new Uint8Array([7, 8, 9]))
 
@@ -427,6 +434,29 @@ describe('notes archive entries', () => {
       { length: 16 * 1024, final: false },
       { length: 16 * 1024, final: true },
     ])
+  })
+
+  it.each([
+    [26, 12],
+    [28, 1],
+  ] as const)(
+    'rejects an inconsistent local length at offset %s even when payload bytes match',
+    async (offset, value) => {
+      const archive = patch(buildZip([documentEntry]), offset, value, 2)
+
+      expect(await rejection(readEntry(archive))).toBe(damagedEntryMessage('document.json'))
+    },
+  )
+
+  it('rejects missing trailing zero bytes even when the allocated output has the declared CRC', async () => {
+    const archive = buildZip([{ ...documentEntry, method: 8, data: new Uint8Array([1, 0]) }])
+    const truncated: CreateInflater = (onData) => ({
+      push() {
+        onData(new Uint8Array([1]))
+      },
+    })
+
+    expect(await rejection(readEntry(archive, truncated))).toBe(damagedEntryMessage('document.json'))
   })
 
   it('rejects an entry when the decoder fails after producing every byte', async () => {

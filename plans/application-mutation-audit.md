@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-three tasks are complete.
-Next task is notes-archive/zip-reader.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-four tasks are complete.
+Next task is recent-node-persistence.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -107,7 +107,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 31 | notes-archive/desktop-data-operations.ts | Done: 97.10%, 402 killed, 11 survivors, 1 defensive no coverage; timeout replaced by assertion kill |
 | 32 | notes-archive/export-notes.ts | Done: 100%, 55 killed |
 | 33 | notes-archive/import-notes.ts | Done: 100%, 128 killed, 1 timeout |
-| 34 | notes-archive/zip-reader.ts | Planned |
+| 34 | notes-archive/zip-reader.ts | Done: 96.72% to 97.66%, 416 killed, 10 equivalents, 1 timeout |
 | 35 | recent-node-persistence.ts | Planned |
 | 36 | recent-nodes.ts | Planned |
 | 37 | search-executor.ts | Planned |
@@ -736,6 +736,28 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## ZIP reader completed result
+
+2026-11-01, 21:58:21–22:01:24 local. Baseline 96.72%, final 97.66%:
+Killed 412 → 416, Survived 14 → 10, Timeout 1 unchanged; NoCoverage/errors/ignored 0.
+Four added cases kill 125 (minimal ZIP64 locator), 337/340 (invalid local name/extra lengths
+without a displaced payload) and 426 (missing trailing zero output masked by initialized memory/CRC).
+Remaining equivalent survivors: 96/111/114/249/342 change endian reads used only to compare with zero;
+196 changes an initializer overwritten by decoding; 374/377/378 remove an overflow guard but
+Uint8Array.set throws and the enclosing catch reports the same damaged-entry error;
+394 adds a zero-length read after an exact full slice without feeding any extra inflater data.
+Timeout 24 changes the inflate step from 16384 to 0.015625, causing excessive loop work;
+it remains an elapsed-time outcome, not assertion evidence.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/zip-reader.ts --incrementalFile .scratch/application-mutation/zip-reader.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/notes-archive/zip-reader.test.ts
+```
+
+Final dry run: 82 tests; focused run: 24 tests passed. Renderer types, lint, formatting,
+documentation and diff checks passed. Primary review: only new tests; existing assertions,
+production code and policy remain unchanged. Next: recent-node-persistence.ts.
 
 ## Import notes completed result
 
