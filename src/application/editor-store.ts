@@ -117,22 +117,27 @@ export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transit
 export class EditorStore {
   public readonly emojiHistory: EmojiHistory
   private readonly recentPersistence: RecentNodePersistence
-  public readonly recentNodes = new RecentNodes(() => this.recentPersistence.changed())
+  private readonly recentNodesOwner = new RecentNodes(() => this.recentPersistence.changed())
+  public readonly recentNodes: Pick<RecentNodes, 'getIds' | 'getResults'> = this.recentNodesOwner
   private readonly tags = new TagCatalog()
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
-  public readonly search = new EditorSearch(
+  private readonly searchOwner = new EditorSearch(
     (destination) => this.revealSearchDestination(destination),
     this.agendaRowsCache,
   )
+  public readonly search: Pick<
+    EditorSearch,
+    'subscribe' | 'getResult' | 'begin' | 'edit' | 'cancelDraft' | 'confirm' | 'interruptNavigation' | 'navigate'
+  > & { readonly session: Pick<EditorSearch['session'], 'getSnapshot'> } = this.searchOwner
   private readonly runtime = new EditorRuntimeState(
     () => this.agendaRowsCache.clear(),
     this.agendaRowsCache,
     (state) => {
       this.tags.update(state.document)
-      this.search.update(state)
-      this.recentNodes.update(state.document)
+      this.searchOwner.update(state)
+      this.recentNodesOwner.update(state.document)
     },
   )
   private readonly history = new EditorHistory()
@@ -265,7 +270,7 @@ export class EditorStore {
         : this.getAgendaRows()
     if (command.kind === 'select') this.search.cancelDraft()
     if (command.kind === 'toggle-fold' || command.kind === 'fold') {
-      this.search.manualAgendaFold(command, rows)
+      this.searchOwner.manualAgendaFold(command, rows)
     }
     const changed = applyAgendaCommand(state.agenda, command, rows)
     const nextRows = command.kind === 'return-timeline' ? this.agendaRowsCache.get(state.document, changed) : rows
@@ -470,7 +475,7 @@ export class EditorStore {
   }
 
   public toggleExpansion(nodeId: NodeId): void {
-    this.search.manualFold(nodeId)
+    this.searchOwner.manualFold(nodeId)
     const state = this.runtime.ready()
     if (nodeId === state.location.currentParentId) return
     const collapsing = isNodeExpanded(state.expansion, nodeId)
@@ -492,7 +497,7 @@ export class EditorStore {
   }
 
   public applyFold(command: NodeFoldCommand | 'close-all' | 'open-all', nodeId?: NodeId): void {
-    this.search.manualFold(command.endsWith('-all') ? undefined : nodeId, command.endsWith('-recursive'))
+    this.searchOwner.manualFold(command.endsWith('-all') ? undefined : nodeId, command.endsWith('-recursive'))
     const state = this.runtime.ready()
     if (command === 'close-all') {
       // At the root level the location holds every node, so closing its folds forgets every choice
@@ -606,7 +611,7 @@ export class EditorStore {
           structuralVersion: this.runtime.getStructuralVersion(),
           expansion: COLLAPSED_EXPANSION_STATE,
         }
-        this.recentNodes.load(recent, this.runtime.snapshot.document)
+        this.recentNodesOwner.load(recent, this.runtime.snapshot.document)
         this.runtime.emit()
         this.saveScheduler.requestSave()
         this.queueAttachmentCleanup()
@@ -628,7 +633,7 @@ export class EditorStore {
         structuralVersion: this.runtime.getStructuralVersion(),
         expansion,
       }
-      this.recentNodes.load(recent, parsed.document)
+      this.recentNodesOwner.load(recent, parsed.document)
       this.runtime.emit()
       this.queueAttachmentCleanup()
     } catch (error) {
@@ -650,6 +655,11 @@ export class EditorStore {
     return { nodeId: state.location.selectedNodeId, offset }
   }
 
+  /** Retire asynchronous search on renderer unmount without changing folds or persisted view state. */
+  public disposeSearch(): void {
+    this.searchOwner.hide()
+  }
+
   public hideSearch(): void {
     if (this.runtime.snapshot.status !== 'ready') return
     const state = this.runtime.ready()
@@ -659,15 +669,15 @@ export class EditorStore {
       const projection = this.agendaRowsCache.getProjection(state.document, agenda)
       const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected) : [])
       const collapsed = new Set(agenda.collapsed)
-      for (const key of this.search.takeFoldsToClose(keep)) collapsed.add(key)
-      this.search.hide()
+      for (const key of this.searchOwner.takeFoldsToClose(keep)) collapsed.add(key)
+      this.searchOwner.hide()
       this.runtime.replaceReady({ ...state, agenda: { ...agenda, collapsed } })
       return
     }
     const keep = new Set(requireNode(state.document, state.location.selectedNodeId).ancestors.map((node) => node.id))
     const expandedIds = new Set(state.expansion.expandedIds)
-    for (const id of this.search.takeFoldsToClose(keep)) expandedIds.delete(id)
-    this.search.hide()
+    for (const id of this.searchOwner.takeFoldsToClose(keep)) expandedIds.delete(id)
+    this.searchOwner.hide()
     if (expandedIds.size !== state.expansion.expandedIds.size) {
       this.runtime.replaceReady({ ...state, expansion: { expandedIds } })
       this.markPersistedChange()
@@ -684,7 +694,7 @@ export class EditorStore {
       if (path === undefined) return
       const collapsed = new Set(agenda.collapsed)
       for (const key of path) {
-        if (collapsed.delete(key)) this.search.recordOpenedFold(key)
+        if (collapsed.delete(key)) this.searchOwner.recordOpenedFold(key)
       }
       const revealed = { ...agenda, collapsed }
       const rows = this.agendaRowsCache.get(state.document, revealed)
@@ -716,7 +726,7 @@ export class EditorStore {
         continue
       }
       if (inScope && !isNodeExpanded(expansion, ancestor.id)) {
-        this.search.recordOpenedFold(ancestor.id)
+        this.searchOwner.recordOpenedFold(ancestor.id)
         expansion = expandNode(expansion, ancestor.id)
       }
     }
@@ -764,7 +774,7 @@ export class EditorStore {
     }
     const insertedWords = countInsertedWords(node.text, text)
     const next = editNodeContent(state.document, nodeId, text, links)
-    this.recentNodes.remember(nodeId, next)
+    this.recentNodesOwner.remember(nodeId, next)
     this.runtime.replaceReady({ ...state, document: next })
     this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
@@ -926,7 +936,7 @@ export class EditorStore {
     const state = this.runtime.ready()
     const transition = enterTransition(state.document, state.location)
     if (transition === undefined) return
-    this.recentNodes.remember(state.location.selectedNodeId, state.document)
+    this.recentNodesOwner.remember(state.location.selectedNodeId, state.document)
     this.endTextSession()
     this.runtime.replaceReady(
       {
@@ -947,7 +957,7 @@ export class EditorStore {
     this.hideSearch()
     const tree = { ...this.runtime.ready() }
     delete tree.agenda
-    this.recentNodes.remember(nodeId, state.document)
+    this.recentNodesOwner.remember(nodeId, state.document)
     this.runtime.replaceReady(
       {
         ...tree,
@@ -1646,7 +1656,7 @@ export class EditorStore {
   ): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
-    this.recentNodes.recordChange(state.document, document, focus.nodeId)
+    this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.runtime.replaceReady(
       { ...state, document, location, focus, expansion, ...(agenda === undefined ? {} : { agenda }) },

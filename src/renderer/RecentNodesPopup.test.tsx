@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { RecentNodesPopup } from './RecentNodesPopup'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { APPLE_SHORTCUTS } from './shortcut-profile'
-import type { RecentNode } from '../application/recent-nodes'
+import { RecentNodes, type RecentNode } from '../application/recent-nodes'
 
 afterEach(() => {
   cleanup()
@@ -108,11 +108,12 @@ it('retains rows during refinement without allowing stale activation, then repla
 
 function setup(empty = false) {
   HTMLElement.prototype.scrollIntoView = vi.fn()
-  const store = createEditorStoreDouble({ snapshot: { status: 'ready' } })
+  const recentNodes = new RecentNodes()
+  const store = createEditorStoreDouble({ snapshot: { status: 'ready' }, recentNodes })
   const document = {
     roots: Array.from({ length: 10 }, (_, id) => ({ id: String(id), text: `Node ${id}`, children: [] })),
   }
-  store.recentNodes.load(empty ? [] : document.roots.map(({ id }) => id), document)
+  recentNodes.load(empty ? [] : document.roots.map(({ id }) => id), document)
   const beforeVisit = vi.fn()
   render(
     <>

@@ -1,4 +1,5 @@
 import type { EditorStore } from '../../src/application/editor-store'
+import type { RecentNodes } from '../../src/application/recent-nodes'
 import type { TreeNode } from '../../src/domain/document'
 import { expect, launchTree, seedDocument, test } from './fixtures'
 import { recordPerfResult } from '../results'
@@ -30,7 +31,8 @@ test('recent-node retrieval and complete recalculation meet their p99 budget', a
     let fiber: Fiber | undefined = main[key]
     while (fiber?.memoizedProps?.store === undefined) fiber = fiber?.return
     const store = fiber.memoizedProps.store
-    const recent = store.recentNodes
+    // Instrument the existing owner deliberately; production consumers only receive its reader type.
+    const recent = store.recentNodes as RecentNodes
     const initial = store.getSnapshot()
     if (initial.status !== 'ready') throw new Error('Editor not ready')
     recent.load(

@@ -83,7 +83,7 @@ export function App({
   const search = useSyncExternalStore(store.search.subscribe, store.search.session.getSnapshot)
   const searchResult = useSyncExternalStore(store.search.subscribe, store.search.getResult)
   const searchQuery = search.visible ? (search.draft ?? search.confirmed) : ''
-  useEffect(() => () => store.search.hide(), [store])
+  useEffect(() => () => store.disposeSearch(), [store])
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
   const readyDocument = state.status === 'ready' ? state.document : undefined

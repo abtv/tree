@@ -79,6 +79,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     suggestTags: vi.fn(() => undefined),
     search: new EditorSearch(() => undefined, new AgendaRowsCache()),
     hideSearch: vi.fn(),
+    disposeSearch: vi.fn(),
     openAgenda: vi.fn(),
     closeAgenda: vi.fn(),
     applyAgenda: vi.fn(),

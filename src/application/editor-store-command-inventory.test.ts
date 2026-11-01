@@ -1,11 +1,28 @@
 import ts from 'typescript'
-import { expect, it } from 'vitest'
+import { expect, expectTypeOf, it } from 'vitest'
 import { EditorStore } from './editor-store'
 import storeSource from './editor-store.ts?raw'
 import generatorSource from './test/editor-store-arbitraries.ts?raw'
 
+it('keeps context and ownership mutations outside the consumer interfaces', () => {
+  expectTypeOf<keyof EditorStore['recentNodes']>().toEqualTypeOf<'getIds' | 'getResults'>()
+  expectTypeOf<keyof EditorStore['search']['session']>().toEqualTypeOf<'getSnapshot'>()
+  expectTypeOf<keyof EditorStore['search']>().toEqualTypeOf<
+    | 'subscribe'
+    | 'getResult'
+    | 'begin'
+    | 'edit'
+    | 'cancelDraft'
+    | 'confirm'
+    | 'interruptNavigation'
+    | 'navigate'
+    | 'session'
+  >()
+})
+
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
+  disposeSearch: 'Renderer unmount retires search without document changes; editor-search.test.ts covers retirement.',
   visitRecentNode: 'Recent-node navigation is covered by focused store properties and real popup navigation tests.',
   hideSearch:
     'Search-owned folds require an active asynchronous search; editor-search.test.ts covers cleanup and manual ownership.',

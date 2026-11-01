@@ -1081,6 +1081,14 @@ The domain currently isolates shared document types, hyperlink normalization, th
 
 The application layer currently isolates the editor store's shared types, pure content-change helpers, whole-node Visual transitions, runtime snapshot and focus bookkeeping, text-session boundary state, the pure undo/redo change-site comparison, and save scheduling and watermark accounting in `editor-store-types.ts`, `editor-content-changes.ts`, `editor-node-visual-transitions.ts`, `editor-runtime-state.ts`, `editor-text-session.ts`, `editor-undo-focus.ts`, and `editor-save-scheduler.ts`. `editor-store.ts` remains the public application entry point: it assembles those collaborators, coordinates command side effects, and re-exports the public API.
 
+`EditorStore.search` exposes search commands and read-only session observation, while
+context replacement and fold ownership remain private store operations. Renderer
+unmount calls `disposeSearch` to retire search without changing folds; the user
+close command remains `hideSearch`, which also releases search-owned folds.
+`EditorStore.recentNodes` exposes only result and identifier readers; loading and
+recording recent nodes remain store responsibilities. These typed views share the
+existing owners and add no subscriptions, document scans, writes or retained snapshots.
+
 Do not create empty architectural layers solely to match this diagram.
 
 ---

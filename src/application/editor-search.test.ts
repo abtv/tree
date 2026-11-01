@@ -347,7 +347,7 @@ it.each(['begin', 'hide'] as const)('clears the old navigation result on %s', as
   expect(store.search.getResult()?.destination).toBeDefined()
 
   if (action === 'begin') store.search.begin({ nodeId: 'a', offset: 6 })
-  else store.search.hide()
+  else store.disposeSearch()
 
   expect(store.search.getResult()).toBeUndefined()
 })
@@ -419,13 +419,15 @@ it('transfers recursive Tree fold ownership only for descendants', async () => {
 
   expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b', 'c']))
 
-  store.search.manualFold('a', true)
+  store.applyFold('open-recursive', 'a')
   store.search.navigate({ nodeId: 'd', offset: 0 }, -1, 1)
   await vi.runAllTimersAsync()
   store.hideSearch()
 
   expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b']))
-  expect(store.search.takeFoldsToClose(new Set())).toEqual([])
+  store.hideSearch()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b']))
 })
 
 it('serializes navigation, reveals only ancestors and cleans search-owned folds', async () => {
