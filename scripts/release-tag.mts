@@ -10,7 +10,7 @@ export function commitReleaseVersion(cwd: string, bump: Bump = 'patch') {
     return result.stdout.trim()
   }
   if (realpathSync(cwd) !== realpathSync(git('rev-parse', '--show-toplevel'))) {
-    throw new Error('Run release:electron from the repository root')
+    throw new Error('Run release from the repository root')
   }
   if (git('status', '--porcelain', '--untracked-files=all')) throw new Error('Commit or remove local changes first')
   git('symbolic-ref', '--quiet', 'HEAD')
@@ -43,10 +43,10 @@ if (import.meta.main) {
   const args = process.argv.slice(2)
   if (args.length === 1 && args[0] === '--help') {
     console.log(
-      'Usage: npm run release:electron [-- patch|minor|major]\nBump patch by default and commit locally. No tests, network access, tags or publishing.',
+      'Usage: npm run release [-- patch|minor|major]\nBump patch by default and commit locally. No tests, network access, tags or publishing.',
     )
   } else if (args.length > 1 || (args.length === 1 && !['patch', 'minor', 'major'].includes(args[0]!))) {
-    console.error('release:electron accepts only patch, minor, major, or --help')
+    console.error('release accepts only patch, minor, major, or --help')
     process.exitCode = 1
   } else {
     try {

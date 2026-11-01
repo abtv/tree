@@ -2,7 +2,7 @@
 
 include scripts/web/chromium-image.mk
 
-.PHONY: help check unit e2e-electron e2e-web smoke-linux dev-electron dev-web perf-electron
+.PHONY: help check unit e2e-electron e2e-web smoke-linux dev-electron dev-web perf-electron release
 
 help:
 	@echo "make                    Show this help"
@@ -15,6 +15,7 @@ help:
 	@echo "make dev-electron       Start Electron development mode"
 	@echo "make dev-web            Start the web development server"
 	@echo "make perf-electron      Run the full Electron performance suite"
+	@echo "make release            Bump the patch version and commit locally"
 
 check:
 	npm run check
@@ -39,3 +40,6 @@ dev-web:
 
 perf-electron:
 	npm run test:perf -- --project=electron
+
+release:
+	npm run release

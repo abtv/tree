@@ -79,6 +79,7 @@ less frequent checks.
 | `make dev-electron` | Electron development mode | `npm run dev` |
 | `make dev-web` | Web development server | `npm run dev:web` |
 | `make perf-electron` | Full Electron performance suite | `npm run test:perf -- --project=electron` |
+| `make release` | Bump the patch version and commit locally | `npm run release` |
 
 Test and development targets never run `setup` automatically. Agents continue
 using the named npm workflows and their existing permissions, including only
@@ -945,10 +946,10 @@ npm run test:perf -- --project=electron
 Commit the intended application changes, then run this command from the repository root:
 
 ```bash
-npm run release:electron
+npm run release
 ```
 
-The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. For minor or major use `npm run release:electron -- minor` or `npm run release:electron -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
+The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. `make release` runs the same default patch bump. For minor or major use `npm run release -- minor` or `npm run release -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
 
 Push or merge the version commit to main normally. `Test and build app` runs checks,
 audit, browser E2E and platform smoke once. After success, publication is dispatched only

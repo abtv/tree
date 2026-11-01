@@ -9,7 +9,7 @@ Only the owner publishes the draft for users.
 Commit reviewed changes, then prepare the next patch version locally:
 
 ```bash
-npm run release:electron
+npm run release
 ```
 
 The command updates package.json and package-lock.json and creates a version
