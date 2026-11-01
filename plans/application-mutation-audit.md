@@ -9,6 +9,9 @@ Allow at most 30 minutes per file. Add meaningful tests only for confirmed gaps.
 Do not change production code, exclusions, the 93% threshold, or weaken tests.
 Commit completed validated work per file. The owner explicitly raised this primary session's
 allowance to ten commits on continuation; four had already landed, leaving six additional tasks.
+The owner subsequently extended the allowance to 50 files in this same session, authorizing
+completion of the entire 40-file inventory with its per-file commits. Earlier session-limit
+handoffs below are historical and no longer block continuation.
 
 ## Current file and evidence
 
@@ -52,8 +55,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. All ten tasks are now complete; the extended session limit is reached.
-Next task in a fresh session is drop-targets.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Ten tasks are complete.
+Next task is editor-agenda-transitions.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -79,8 +82,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 8 | agenda-state.ts | Done: 88.41% to 90.22%, 249 killed, 27 survivors |
 | 9 | agenda-visual-selection.ts | Done: 87.50% to 96.88%, 93 killed, 3 equivalent survivors |
 | 10 | command-registry.ts | Done: 95.27%, 141 killed, 7 survivors |
-| 11 | drop-targets.ts | Ready |
-| 12 | editor-agenda-transitions.ts | Planned |
+| 11 | drop-targets.ts | Done: 97.58% to 98.79%, 163 killed, 2 equivalents |
+| 12 | editor-agenda-transitions.ts | Ready |
 | 13 | editor-clipboard-transitions.ts | Planned |
 | 14 | editor-command-transitions.ts | Planned |
 | 15 | editor-content-changes.ts | Planned |
@@ -371,3 +374,22 @@ The six continuation commits are d54eda7, 6364486, 9ecf2c4, b7542e0, 918900b and
 Across these files, tests killed 44 additional mutants; five agenda-state, nine visual-selection,
 28 agenda-rows and two reconciliation mutants. Timeouts are never counted as assertion kills here.
 Retain scratch reports for continuation. No owner product decision is needed to resume the authorized audit.
+
+## Drop targets result
+
+Starting commit 1ce929d; 19:45:38–19:47:11. Baseline 97.58% (161 Killed, 4 Survived),
+final 98.79% (163 Killed, 2 Survived). Timeout, NoCoverage, errors and ignored: zero.
+The added drop-targets.test.ts case counts node reads across 100 pointer updates and kills
+cache-removal mutants 15/18. Remaining 2 is equivalent because null lookup returns undefined;
+121 is equivalent because the removed source and a remaining sibling cannot have equal sibling indices.
+Both runs used:
+
+```sh
+npm run test:mutation -- --mutate src/application/drop-targets.ts --incrementalFile .scratch/application-mutation/drop-targets.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 208/209 tests. Final ordinary focused validation passed 24 tests:
+`npm test -- src/application/drop-targets.test.ts src/application/drop-targets.property.test.ts`.
+Renderer types, lint, changed formatting, docs and whitespace checks passed. Primary diff review
+confirms tests-only change, no runtime/performance measurement changes or production edits.
+Command registry commit: 1ce929d. The owner now authorizes all remaining files (up to 50 total).

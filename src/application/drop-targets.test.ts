@@ -49,6 +49,23 @@ function target(parentId: string | null, index: number): DropTarget {
 }
 
 describe('dragBlock', () => {
+  it('reuses the row index during repeated pointer updates over an unchanged list', () => {
+    let nodeReads = 0
+    const observed = rows.map((row) => ({
+      ...row,
+      get node() {
+        nodeReads += 1
+        return row.node
+      },
+    }))
+    const expected = dragBlock(observed, 'b')
+    nodeReads = 0
+
+    for (let update = 0; update < 100; update += 1) expect(dragBlock(observed, 'b')).toEqual(expected)
+
+    expect(nodeReads).toBe(0)
+  })
+
   it('covers the row and its visible descendants only', () => {
     expect(dragBlock(rows, 'a')).toEqual({ start: 0, end: 3 })
     expect(dragBlock(rows, 'c')).toEqual({ start: 4, end: 6 })
