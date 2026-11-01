@@ -56,7 +56,7 @@ does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
 in this session, subsequently extended to 50 files. Ten tasks are complete.
-Next task is editor-command-transitions.ts; enumerate the remaining source files
+Next task is editor-content-changes.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -85,8 +85,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 11 | drop-targets.ts | Done: 97.58% to 98.79%, 163 killed, 2 equivalents |
 | 12 | editor-agenda-transitions.ts | Done: 96.55% to 98.85%, 86 killed, 1 equivalent |
 | 13 | editor-clipboard-transitions.ts | Done: 97.73%, 86 killed, 1 equivalent, 1 defensive no coverage |
-| 14 | editor-command-transitions.ts | Ready |
-| 15 | editor-content-changes.ts | Planned |
+| 14 | editor-command-transitions.ts | Done: 95.97% to 97.32%, 580 killed, 14 survivors, 2 no coverage |
+| 15 | editor-content-changes.ts | Ready |
 | 16 | editor-node-visual-transitions.ts | Planned |
 | 17 | editor-runtime-state.ts | Planned |
 | 18 | editor-search.ts | Planned |
@@ -425,3 +425,29 @@ npm run test:mutation -- --mutate src/application/editor-clipboard-transitions.t
 
 Threshold, documentation, changed-formatting and whitespace checks passed.
 Editor Agenda transitions commit: 1790885.
+
+## Editor command transitions result
+
+Starting commit cc5df4d; 19:50:59–19:55:21. Baseline 95.97%: 572 Killed, 22 Survived,
+2 NoCoverage. Intermediate 97.15%: 579 Killed. Final 97.32%: 580 Killed, 14 Survived,
+2 NoCoverage. Timeout/errors/ignored zero throughout.
+Tests now cover ineligible nonempty/parent inline outdents, sibling creation from an expanded heading,
+collapsed default for Enter, preserving an empty current row, selecting a collapsed preceding parent,
+and focus after counted deletion. Eight previously surviving mutants fail assertions (51,72,77,99,471,537,539,562).
+Remaining: 12/434 plus NoCoverage 15/437 defend guaranteed collaborator results; 86 is redundant
+with the move coordinator's heading rejection; 95 always receives a valid outward move;
+54 selects the existing after-branch for any non-before value; 189 returns undefined for no-op
+same-parent moves either way; 256/264 defend dense visible rows; 388/411 duplicate path bounds;
+393 treats null lookup as the same -1 fast path; 521 defends an already validated two-leaf join;
+527/561 substitute undefined for false in a boolean predicate. No unresolved assertion gaps.
+
+All three runs used:
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-command-transitions.ts --incrementalFile .scratch/application-mutation/editor-command-transitions.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 2024/2029/2030 tests. Final ordinary run passed 86 tests:
+`npm test -- src/application/editor-command-transitions.test.ts src/application/editor-command-transitions.property.test.ts`.
+Renderer types, lint, changed formatting, docs and diff checks passed; primary review confirmed
+test-only changes with existing assertions retained. Clipboard transitions commit: cc5df4d.

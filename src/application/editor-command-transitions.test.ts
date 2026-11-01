@@ -67,6 +67,56 @@ function rowsFor(
 const rootLocation = { currentParentId: null, selectedNodeId: 'alpha' }
 
 describe('editor command transitions', () => {
+  it('does not delete a preceding empty row when the current row is also empty', () => {
+    const input: Document = {
+      roots: [
+        { id: 'previous', text: '', children: [] },
+        { id: 'current', text: '', children: [] },
+      ],
+    }
+
+    expect(
+      deletePreviousEmptyTransition(input, { currentParentId: null, selectedNodeId: 'current' }, 0),
+    ).toBeUndefined()
+  })
+
+  it('selects the preceding collapsed parent rather than its hidden last descendant after empty-row deletion', () => {
+    const input: Document = {
+      roots: [
+        { id: 'parent', text: 'Parent', children: [{ id: 'hidden', text: 'Hidden', children: [] }] },
+        { id: 'empty', text: '', children: [] },
+      ],
+    }
+
+    const result = deleteEmptySelectedTransition(input, { currentParentId: null, selectedNodeId: 'empty' })!
+
+    expect(result.location).toEqual({ currentParentId: null, selectedNodeId: 'parent' })
+    expect(result.focus).toEqual({ nodeId: 'parent', cursor: 6 })
+    expect(result.document.roots[0]).toBe(input.roots[0])
+  })
+
+  it.each([
+    { text: 'Nonempty', children: [] },
+    { text: '', children: [{ id: 'child', text: 'Child', children: [] }] },
+  ])('creates a sibling instead of outdenting an ineligible last inline node: %j', (content) => {
+    const input: Document = {
+      roots: [{ id: 'parent', text: 'Parent', children: [{ id: 'selected', ...content }] }],
+    }
+
+    const result = openBelowTransition(input, { currentParentId: null, selectedNodeId: 'selected' }, () => 'new')
+
+    expect(result.document.roots.map((node) => node.id)).toEqual(['parent'])
+    expect(result.document.roots[0]!.children.map((node) => node.id)).toEqual(['selected', 'new'])
+    expect(result.document.roots[0]!.children[0]).toBe(input.roots[0]!.children[0])
+  })
+
+  it('creates a sibling for an expanded current-parent heading rather than a child', () => {
+    const result = openBelowTransition(document, { currentParentId: 'root', selectedNodeId: 'root' }, () => 'new', true)
+
+    expect(result.document.roots.map((node) => node.id)).toEqual(['root', 'new', 'other-root'])
+    expect(result.document.roots[0]).toBe(document.roots[0])
+  })
+
   it('removes the preceding empty visible leaf while preserving the current row and caret', () => {
     const current: TreeNode = {
       id: 'current',
@@ -764,6 +814,20 @@ describe('editor command transitions', () => {
     expect(result.expandId).toBeUndefined()
   })
 
+  it('treats omitted expansion as collapsed when Enter is pressed at the end of a parent row', () => {
+    const result = createSiblingOrFirstChildTransition(
+      document,
+      { currentParentId: null, selectedNodeId: 'root' },
+      4,
+      () => 'below',
+    )
+    if (result.kind === 'rejected') throw new Error('Expected creation')
+
+    expect(result.document.roots.map((node) => node.id)).toEqual(['root', 'below', 'other-root'])
+    expect(result.document.roots[0]).toBe(document.roots[0])
+    expect(result.focus).toEqual({ nodeId: 'below', cursor: 0 })
+  })
+
   it('moves only nodes displayed at the current location and adjusts a later insertion index', () => {
     const moved = moveNodeTransition(document, { currentParentId: 'root', selectedNodeId: 'first' }, 'first', 2, 3)
 
@@ -1161,6 +1225,7 @@ describe('editor command transitions', () => {
       expect(result!.removed[0]!.children.map((node) => node.id)).toEqual(['b1'])
       expect(ids(result!.transition.document.roots[0]!.children)).toEqual(['a', 'd'])
       expect(result!.transition.location.selectedNodeId).toBe('d')
+      expect(result!.transition.focus).toEqual({ nodeId: 'd', cursor: 0 })
       expect(ids(deleteSiblingRangeTransition(document, at('c'), 9, () => 'unused')!.removed)).toEqual(['c', 'd'])
     })
 
