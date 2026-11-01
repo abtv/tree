@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-nine tasks are complete.
-Next task is notes-archive/crc32.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty tasks are complete.
+Next task is notes-archive/desktop-data-operations.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -103,7 +103,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 27 | node-search.ts | Done: 86.30% to 91.78%, 62 killed, 6 survivors, 5 timeouts; threshold failed |
 | 28 | notes-archive/archive-messages.ts | Done: 95.42% to 96.95%, 126 killed, 4 survivors, 1 timeout |
 | 29 | notes-archive/archive-policy.ts | Done: 100%, 35 killed |
-| 30 | notes-archive/crc32.ts | Planned |
+| 30 | notes-archive/crc32.ts | Done: 93.33%, 11 killed, 1 equivalent survivor, 3 timeouts |
 | 31 | notes-archive/desktop-data-operations.ts | Planned |
 | 32 | notes-archive/export-notes.ts | Planned |
 | 33 | notes-archive/import-notes.ts | Planned |
@@ -737,6 +737,20 @@ the final tests. Primary diff review confirmed additive tests-only implementatio
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
 
+## CRC32 result
+
+Starting commit 34e7e39; 21:52:18–21:52:52. Baseline/final 93.33% / unchanged.
+11 Killed, 1 Survived, 3 Timeout; NoCoverage/errors/ignored zero. Dry run: 78 tests.
+Survivor 2 writes one extra table entry at index 256, ignored by the fixed-size Uint32Array.
+Timeout 4/9/14 reverse loop advancement; they are not assertion kills. Existing archive tests
+cover the CRC computation; primary review found no supported assertion gap and no test edit was made.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/crc32.ts --incrementalFile .scratch/application-mutation/crc32.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Threshold, docs, changed formatting and whitespace checks passed. Next: desktop-data-operations.ts.
+
 ## Archive policy result
 
 Starting commit b7597b0; 21:51:16–21:51:37. Baseline/final 100% / unchanged.
@@ -757,7 +771,7 @@ Starting commit 6a8eea4; 21:49:07–21:50:35. Baseline 95.42%: 124 Killed, 5 Sur
 errors/ignored zero. Tests kill the exact megabyte rounding boundary (66) and previously
 uncovered singular missing-image folder message (112).
 
-68/69/71 defend the maximum GB unit for sizes near a terabyte, beyond PRODUCT §24.3's
+68/69/71 defend the maximum GB unit for sizes near a terabyte, beyond PRODUCT §24.2's
 2,147,483,647-byte archive limit and the same restore validation limits. 80 changes decimal
 precision only at the integer 100, which formats identically. Timeout 72 removes loop progress;
 it is not an assertion kill. No supported assertion gap remains.
