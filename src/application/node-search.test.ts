@@ -11,6 +11,56 @@ const document: Document = {
   ],
 }
 
+it('restores ancestor paths after leaving nested branches and separates breadcrumb levels', () => {
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'root',
+          text: 'needle root',
+          children: [
+            { id: 'branch', text: 'Branch', children: [{ id: 'deep', text: 'needle deep', children: [] }] },
+            { id: 'sibling', text: 'needle sibling', children: [] },
+          ],
+        },
+        { id: 'outside', text: 'needle outside', children: [] },
+      ],
+    },
+    'needle',
+  )
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value).toEqual([
+    { id: 'root', text: 'needle root', path: null },
+    { id: 'deep', text: 'needle deep', path: 'needle root › Branch' },
+    { id: 'sibling', text: 'needle sibling', path: 'needle root' },
+    { id: 'outside', text: 'needle outside', path: null },
+  ])
+})
+
+it('cancels the pending callback and does not reschedule an already queued stale callback', () => {
+  const callbacks: (() => void)[] = []
+  const cancelled = vi.fn()
+  const schedule = vi.fn((callback: () => void) => {
+    callbacks.push(callback)
+    return cancelled
+  })
+  const publish = vi.fn()
+  const cancel = runNodeSearch({ roots: [{ id: 'long', text: 'a'.repeat(100_000), children: [] }] }, 'xyz', publish, {
+    schedule,
+  })
+  callbacks.shift()!()
+
+  cancel()
+  callbacks.shift()!()
+
+  expect(cancelled).toHaveBeenCalledOnce()
+  expect(schedule).toHaveBeenCalledTimes(2)
+  expect(callbacks).toEqual([])
+  expect(publish).not.toHaveBeenCalled()
+})
+
 function results(query: string) {
   const work = searchNodes(document, query)
   let next = work.next()

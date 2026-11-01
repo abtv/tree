@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-six tasks are complete.
-Next task is node-search.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-seven tasks are complete.
+Next task is notes-archive/archive-messages.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -100,7 +100,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 24 | expansion-state.ts | Done: 98.65%, 73 killed, 1 equivalent survivor |
 | 25 | folder-backup.ts | Done: 95.40% to 96.55%, 84 killed, 3 survivors |
 | 26 | menu-commands.ts | Done: 79.31% to 89.66%, 26 killed, 3 survivors; threshold failed |
-| 27 | node-search.ts | Planned |
+| 27 | node-search.ts | Done: 86.30% to 91.78%, 62 killed, 6 survivors, 5 timeouts; threshold failed |
 | 28 | notes-archive/archive-messages.ts | Planned |
 | 29 | notes-archive/archive-policy.ts | Planned |
 | 30 | notes-archive/crc32.ts | Planned |
@@ -736,6 +736,31 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Node search result
+
+Starting commit 5698949; 21:46:07–21:48:14. Baseline 86.30%: 58 Killed, 10 Survived,
+5 Timeout. Final 91.78%: 62 Killed, 6 Survived, 5 Timeout; NoCoverage/errors/ignored zero.
+Threshold fails; no layer run. New tests kill 22/46/70/73 by checking ancestor restoration,
+multi-level breadcrumbs, cancellation of the scheduled callback and no rescheduling from a stale wakeup.
+
+Remaining 4 prepares an unused text pattern for tag queries; 47/49 visit empty child arrays
+and immediately pop them, preserving results and yielded work. 32 defends an undefined pattern:
+EditorStore filters short/empty ordinary queries before calling this search. 74 defends the
+cancel callback that the scheduler always supplies. 60 permits one extra generator step per
+bounded batch; exact 8192-step boundaries are not a product requirement. It is a bounded-batch
+variant rather than identical scheduling. Timeout 14/21/65/67/68 prevent traversal/progress
+or completion and are not assertion kills.
+
+```sh
+npm run test:mutation -- --mutate src/application/node-search.ts --incrementalFile .scratch/application-mutation/node-search.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/node-search.test.ts
+```
+
+Final dry run: 2005 tests; focused run: 5 tests. Renderer types, lint, formatting, docs and
+whitespace checks passed. Only formatting changed after the final mutation input was captured;
+runtime test behavior is identical. Primary review confirmed additive tests and unchanged source.
+Next: notes-archive/archive-messages.ts.
 
 ## Menu commands result
 
