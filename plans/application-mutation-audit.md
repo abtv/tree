@@ -55,8 +55,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Ten tasks are complete.
-Next task is editor-node-visual-transitions.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Sixteen tasks are complete.
+Next task is editor-runtime-state.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -87,8 +87,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 13 | editor-clipboard-transitions.ts | Done: 97.73%, 86 killed, 1 equivalent, 1 defensive no coverage |
 | 14 | editor-command-transitions.ts | Done: 95.97% to 97.32%, 580 killed, 14 survivors, 2 no coverage |
 | 15 | editor-content-changes.ts | Done: 98%, 49 killed, 1 equivalent |
-| 16 | editor-node-visual-transitions.ts | Ready |
-| 17 | editor-runtime-state.ts | Planned |
+| 16 | editor-node-visual-transitions.ts | Done: 90.56% to 95.51%, 425 killed, 17 survivors, 3 no coverage |
+| 17 | editor-runtime-state.ts | Ready |
 | 18 | editor-search.ts | Planned |
 | 19 | editor-store-types.ts | Planned |
 | 20 | editor-store.ts | Planned |
@@ -464,3 +464,31 @@ npm run test:mutation -- --mutate src/application/editor-content-changes.ts --in
 ```
 
 Editor command transitions commit: cbcb27d.
+
+## Editor node Visual transitions result
+
+Starting commit cecb0de; 19:57:00–20:07:02. Baseline 90.56%: 403 Killed, 28 Survived,
+14 NoCoverage. Final forced full-file run: 95.51%, 425 Killed, 17 Survived, 3 NoCoverage.
+Timeout/errors/ignored zero. Intermediate incremental scores were 95.51/95.73%; forced
+results varied between 95.06 and 95.51 with property-test inputs. The final numbers above
+come from all 445 mutants retested, not cached results. Initial suspicion of stale results
+was not confirmed: several mutants replace only one operand of a redundant condition.
+
+Added coverage for paste before a heading, exact/mixed forest depth limits, default and
+explicit outdent confinement, indent with confinement, missing endpoints, and the returned
+join/shift transition contract. Ordinary focused run passed 40 tests; final dry run passed 2070.
+
+Remaining 86 is equivalent (undefined parent ID does not equal null); 91/92/96 are equivalent
+for sibling ranges; 94/95/98/99 defend missing or root endpoints outside the non-root scope.
+104/105/107 and 209/210/212 are redundant heading guards for valid ranges: the heading is
+the only visible node in its sibling array. 257 and NoCoverage 259/260 defend a guaranteed
+nonempty range. 306 and NoCoverage 307 defend the already-validated paste source.
+375's bogus link is discarded by normalization. No confirmed assertion gap remains.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-node-visual-transitions.ts --incrementalFile .scratch/application-mutation/editor-node-visual-transitions.incremental.json --concurrency 4 --timeoutMS 10000 --force
+npm test -- src/application/editor-node-visual-transitions.test.ts
+```
+
+Renderer types, lint, changed formatting, docs and diff checks passed. Primary review confirms
+tests-only changes and retained assertions. Content changes commit: cecb0de.

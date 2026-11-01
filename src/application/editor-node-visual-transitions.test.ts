@@ -3,6 +3,10 @@ import type { Document, Location, TreeNode } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import {
   isPasteIntoSourceDescendant,
+  forwardJoinTransition,
+  nodeVisualJoinTransition,
+  nodeVisualShiftIsAtCurrentParentBoundary,
+  nodeVisualShiftTransition,
   nodeVisualTransition,
   pasteNodeForestTransition,
 } from './editor-node-visual-transitions'
@@ -10,6 +14,141 @@ import {
 const location: Location = { currentParentId: null, selectedNodeId: 'a' }
 
 describe('whole-node Visual transitions', () => {
+  it('returns a joined transition with the first node and join-point focus for a reverse range', () => {
+    const input: Document = { roots: ['a', 'b'].map((id) => ({ id, text: id, children: [] })) }
+
+    const result = nodeVisualJoinTransition(input, location, 'b', 'a', true)
+
+    expect(result.kind).toBe('joined')
+    if (result.kind !== 'joined') throw new Error('Expected join')
+    expect(result.transition.document.roots).toEqual([{ id: 'a', text: 'a b', children: [] }])
+    expect(result.transition.focus).toEqual({ nodeId: 'a', cursor: 1 })
+    expect(result.transition.location).toEqual(location)
+  })
+
+  it('distinguishes direct children from deeper ranges and the root view boundary', () => {
+    const input: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: '',
+          children: [{ id: 'a', text: '', children: [{ id: 'deep', text: '', children: [] }] }],
+        },
+      ],
+    }
+    const at = { currentParentId: 'parent', selectedNodeId: 'a' }
+
+    expect(nodeVisualShiftIsAtCurrentParentBoundary(input, at, 'a', 'a')).toBe(true)
+    expect(nodeVisualShiftIsAtCurrentParentBoundary(input, at, 'deep', 'deep')).toBe(false)
+    expect(nodeVisualShiftIsAtCurrentParentBoundary(input, location, 'parent', 'parent')).toBe(false)
+  })
+
+  it('keeps the displayed heading unchanged by Visual shift and join', () => {
+    const input: Document = {
+      roots: ['before', 'heading', 'after'].map((id) => ({ id, text: id, children: [] })),
+    }
+    const at = { currentParentId: 'heading', selectedNodeId: 'heading' }
+
+    expect(nodeVisualShiftTransition(input, at, 'in', 'heading', 'heading', 1, 0)).toEqual({ kind: 'none' })
+    expect(nodeVisualJoinTransition(input, at, 'heading', 'heading', true)).toEqual({ kind: 'none' })
+  })
+
+  it('allows indent with outdent confinement enabled', () => {
+    const input: Document = {
+      roots: [{ id: 'parent', text: '', children: ['a', 'b'].map((id) => ({ id, text: id, children: [] })) }],
+    }
+    const at = { currentParentId: 'parent', selectedNodeId: 'b' }
+
+    const result = nodeVisualShiftTransition(input, at, 'in', 'b', 'b', 1, 0, true)
+
+    expect(result.kind).toBe('shifted')
+    if (result.kind !== 'shifted') throw new Error('Expected shift')
+    expect(result.transition.document.roots[0]?.children[0]?.children.map((node) => node.id)).toEqual(['b'])
+    expect(result.transition.location).toEqual(at)
+  })
+
+  it('puts before a current-parent heading as its sibling rather than its first child', () => {
+    const input: Document = { roots: [{ id: 'heading', text: 'Heading', children: [] }] }
+
+    const result = pasteNodeForestTransition(
+      input,
+      { currentParentId: 'heading', selectedNodeId: 'heading' },
+      'heading',
+      'before',
+      { nodes: [{ id: 'source', text: 'Copied', children: [] }], sourceIds: [] },
+      () => 'copy',
+    )
+    if (result.kind === 'rejected') throw new Error('Expected paste')
+
+    expect(result.document.roots.map((node) => node.id)).toEqual(['copy', 'heading'])
+    expect(result.document.roots[1]).toBe(input.roots[0])
+  })
+
+  it('accepts a child forest exactly at the depth limit but rejects a mixed forest with one taller tree', () => {
+    let root: TreeNode = { id: 'heading', text: '', children: [] }
+    for (let depth = 1; depth < MAX_DOCUMENT_DEPTH - 1; depth += 1) {
+      root = { id: `ancestor-${depth}`, text: '', children: [root] }
+    }
+    const input = { roots: [root] }
+    const at = { currentParentId: 'heading', selectedNodeId: 'heading' }
+    const leaf: TreeNode = { id: 'leaf', text: 'Leaf', children: [] }
+    let allocated = 0
+    const createId = () => `copy-${++allocated}`
+
+    const accepted = pasteNodeForestTransition(
+      input,
+      at,
+      'heading',
+      'after',
+      { nodes: [leaf], sourceIds: [] },
+      createId,
+    )
+
+    expect(accepted.kind).toBeUndefined()
+    expect(allocated).toBe(1)
+
+    allocated = 0
+    const rejected = pasteNodeForestTransition(
+      input,
+      at,
+      'heading',
+      'after',
+      { nodes: [leaf, { id: 'taller', text: '', children: [leaf] }], sourceIds: [] },
+      createId,
+    )
+
+    expect(rejected).toEqual({ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR })
+    expect(allocated).toBe(0)
+  })
+
+  it('allows ordinary Visual outdent past the displayed parent unless confinement is requested', () => {
+    const input: Document = { roots: [{ id: 'parent', text: '', children: [{ id: 'a', text: 'A', children: [] }] }] }
+    const at = { currentParentId: 'parent', selectedNodeId: 'a' }
+
+    const moved = nodeVisualShiftTransition(input, at, 'out', 'a', 'a', 1, 1)
+
+    expect(moved.kind).toBe('shifted')
+    if (moved.kind !== 'shifted') throw new Error('Expected shift')
+    expect(moved.transition.location).toEqual({ currentParentId: null, selectedNodeId: 'a' })
+    expect(moved.transition.focus).toEqual({ nodeId: 'a', cursor: 1 })
+    expect(nodeVisualShiftTransition(input, at, 'out', 'a', 'a', 1, 1, true)).toEqual({ kind: 'none' })
+  })
+
+  it('returns a no-op for stale join and shift endpoints and for a forward join on the final sibling', () => {
+    const input: Document = { roots: [{ id: 'a', text: 'A', children: [] }] }
+
+    expect(forwardJoinTransition(input, location, 'a', 2, true)).toEqual({ kind: 'none' })
+    expect(nodeVisualJoinTransition(input, location, 'a', 'a', true)).toEqual({ kind: 'none' })
+    expect(forwardJoinTransition(input, location, 'missing', 2, true)).toEqual({ kind: 'none' })
+    for (const [anchor, focus] of [
+      ['missing', 'a'],
+      ['a', 'missing'],
+    ] as const) {
+      expect(nodeVisualJoinTransition(input, location, anchor, focus, true)).toEqual({ kind: 'none' })
+      expect(nodeVisualShiftTransition(input, location, 'in', anchor, focus, 1, 0)).toEqual({ kind: 'none' })
+    }
+  })
+
   it('rejects a child put on an empty heading at maximum depth before consuming IDs', () => {
     let root: TreeNode = { id: 'heading', text: '', children: [] }
     for (let depth = 1; depth < MAX_DOCUMENT_DEPTH; depth++) {
