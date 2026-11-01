@@ -5,6 +5,43 @@ import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 import { isValidLocation, type Document } from '../domain/document'
 
+it('returns to the nearest surviving origin ancestor when the Agenda scope is deleted', () => {
+  const closed = vi.fn()
+  const runtime = new EditorRuntimeState(closed)
+  const scope = { id: 'scope', text: 'Scope', children: [{ id: 'a', text: '1970-04-11', children: [] }] }
+  const document: Document = {
+    roots: [
+      { id: 'unrelated', text: '', children: [] },
+      { id: 'grand', text: 'Grand', children: [scope] },
+    ],
+  }
+  const location = { currentParentId: 'scope', selectedNodeId: 'a' }
+  const state: ReadySnapshot = {
+    status: 'ready',
+    document,
+    location,
+    agenda: openAgendaState(location, 4, 100),
+    focus: runtime.newFocus('a', 4),
+    structuralVersion: 0,
+    expansion: COLLAPSED_EXPANSION_STATE,
+  }
+  runtime.replaceReady(state)
+  const previousToken = runtime.ready().focus.token
+
+  runtime.replaceReady(
+    {
+      ...runtime.ready(),
+      document: { roots: [document.roots[0]!, { ...document.roots[1]!, children: [] }] },
+    },
+    true,
+  )
+
+  expect(runtime.ready().agenda).toBeUndefined()
+  expect(runtime.ready().location).toEqual({ currentParentId: 'grand', selectedNodeId: 'grand' })
+  expect(runtime.ready().focus).toEqual({ nodeId: 'grand', cursor: 0, token: previousToken + 1 })
+  expect(closed).toHaveBeenCalledOnce()
+})
+
 it('short-circuits Agenda reconciliation in Tree and calls the seam once when Agenda is present', () => {
   const runtime = new EditorRuntimeState()
   const state: ReadySnapshot = {

@@ -55,8 +55,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Sixteen tasks are complete.
-Next task is editor-runtime-state.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Seventeen tasks are complete.
+Next task is editor-search.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -88,8 +88,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 14 | editor-command-transitions.ts | Done: 95.97% to 97.32%, 580 killed, 14 survivors, 2 no coverage |
 | 15 | editor-content-changes.ts | Done: 98%, 49 killed, 1 equivalent |
 | 16 | editor-node-visual-transitions.ts | Done: 90.56% to 95.51%, 425 killed, 17 survivors, 3 no coverage |
-| 17 | editor-runtime-state.ts | Ready |
-| 18 | editor-search.ts | Planned |
+| 17 | editor-runtime-state.ts | Done: 90.57% to 93.40%, 99 killed, 7 survivors |
+| 18 | editor-search.ts | Ready |
 | 19 | editor-store-types.ts | Planned |
 | 20 | editor-store.ts | Planned |
 | 21 | editor-text-session.ts | Planned |
@@ -492,3 +492,26 @@ npm test -- src/application/editor-node-visual-transitions.test.ts
 
 Renderer types, lint, changed formatting, docs and diff checks passed. Primary review confirms
 tests-only changes and retained assertions. Content changes commit: cecb0de.
+
+## Editor runtime state result
+
+Starting commit 874b2b8; 20:07:30–20:11:25. Baseline 90.57%: 96 Killed, 10 Survived.
+Final 93.40%: 99 Killed, 7 Survived; Timeout/NoCoverage/errors/ignored zero.
+Added a deleted-Agenda-scope scenario that must return to the nearest surviving ancestor,
+not an unrelated first root, with a fresh focus and exactly one close notification.
+It kills 55/56/57 by requiring the previous document's ancestor path.
+
+Remaining equivalents: 34 is redundant with document inequality from loading; 45 is guarded
+by the earlier missing-agenda branch; 54 passes undefined from loading, invoking the callee's
+default document; 72 only removes an absent/undefined error key; 79 releases undefined as a no-op;
+91 still sees no agenda on loading. Defensive 58 cannot affect the closing-scope fallback:
+its returned location is the surviving heading or first root, without inline ancestors to unfold.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-runtime-state.ts --incrementalFile .scratch/application-mutation/editor-runtime-state.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/editor-runtime-state.test.ts src/application/editor-runtime-agenda.test.ts
+```
+
+Dry runs passed 1957/1958 tests; final ordinary run passed 10. Renderer types, lint,
+formatting, docs and diff checks passed. Primary review confirms tests-only scope.
+Visual transitions commit: 874b2b8.
