@@ -997,6 +997,8 @@ Major dependency changes should be documented and, when appropriate, recorded as
 
 Direct dependencies are declared with exact versions and no range operators (`docs/decisions/0006-exact-dependency-pinning.md`). Upgrade a dependency by changing its exact version, reinstalling, and completing High Risk functional validation under §9; select Electron performance checks separately under procedure §10. Do not widen the version to a range.
 
+The project `.npmrc` sets `save-exact=true` so npm saves exact versions when adding dependencies. `scripts/dependency-pinning.test.mts`, included in `npm run check`, rejects version ranges and mismatches between direct dependency declarations and resolved lockfile versions.
+
 `package.json` `overrides` pins `qs` to a patched version: `@stryker-mutator/core` pins `typed-rest-client` `~2.3.0`, which pins a `qs` release with known advisories. Remove the override when a Stryker release depends on a patched `typed-rest-client`.
 
 `npm audit` runs as the final step of `npm run check:full`, not of `npm run check`, so known vulnerabilities are reported at the end of complete validation. It requires registry access and fails when offline.

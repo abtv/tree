@@ -64,7 +64,7 @@ Developer ID team. Do not add library-validation exceptions to work around this.
 The packaged smoke test must pass on the Developer ID build in Actions before
 any DMG is uploaded. A local fuse check alone does not establish launch readiness.
 
-The lockfile currently installs electron-builder 26.18.0 and Electron 44.9.3.
+See `package.json` and `package-lock.json` for the exact installed versions.
 The configuration deliberately uses v26 flat `mac` signing options. In v27 these
 move under `mac.sign`; validate the installed schema when upgrading, rather than
 copying the v27 documentation into this v26 configuration.
