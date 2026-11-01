@@ -50,10 +50,10 @@ This task-specific instruction overrides DEVELOPMENT.md §12's layer-shard fallb
 Keep the threshold unchanged and report a below-threshold exit honestly; a completed audit
 does not mean the threshold passed. Do not launch a layer shard.
 
-Save-policy analysis is complete without test changes. Next is persistence-coordinator.ts,
-then editor-save-scheduler.ts and editor-history.ts; enumerate the remaining source files
+Save-policy and persistence-coordinator analyses are complete without test changes.
+Next is editor-save-scheduler.ts, then editor-history.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
-Every application source other than save-policy.ts remains unexamined; none is marked skipped or done.
+Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
 
 ## Task inventory
@@ -68,8 +68,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | Order | Source file | Status |
 | --- | --- | --- |
 | 1 | save-policy.ts | Done: 86.67%, 58 killed, 10 equivalent survivors, 7 timeouts |
-| 2 | persistence-coordinator.ts | Ready |
-| 3 | editor-save-scheduler.ts | Planned |
+| 2 | persistence-coordinator.ts | Done: 96.15%, 67 killed, 3 equivalent survivors, 8 timeouts |
+| 3 | editor-save-scheduler.ts | Ready |
 | 4 | editor-history.ts | Planned |
 | 5 | agenda-pending-move.ts | Planned |
 | 6 | agenda-reconcile.ts | Planned |
@@ -114,3 +114,27 @@ Whole audit authorized in Codex, including test additions and per-file commits.
 No manual product checks expected. Final acceptance is required if three substantive
 working tasks are delivered. Pause at a file's budget or a material unresolved issue.
 Resume prompt: Continue the application mutation audit at the next unfinished task in this plan.
+
+## Persistence coordinator result
+
+Source unchanged at de065be; 2026-11-01 19:14:51–19:18:20.
+Baseline: 100%, Killed 67, Timeout 11, Survived 0, NoCoverage 0, errors 0.
+Final: 96.15%, Killed 67, Timeout 8, Survived 3, NoCoverage 0, errors 0.
+The decrease reflects timeout reclassification, not weaker tests. No confirmed test gaps.
+Survivor 1 initializes requested to true, but no work is scheduled before a request.
+Survivors 36 and 37 remove effective workQueued coalescing; the promise queue still serializes
+work and the running loop consumes pending flags, leaving only empty continuations.
+These are equivalent for persistence outcomes through the public API.
+Timeouts 19, 21, 66 exhaust the hit limit; 16, 38, 39, 40, 41 exhaust elapsed time.
+They remain timeouts, not assertion kills. There are no separate defensive survivors.
+Both dry runs passed 1959 tests; both mutation runs passed the unchanged threshold.
+
+```sh
+npm run test:mutation -- --mutate src/application/persistence-coordinator.ts --incrementalFile .scratch/application-mutation/persistence-coordinator.incremental.json
+npm run test:mutation -- --mutate src/application/persistence-coordinator.ts --incrementalFile .scratch/application-mutation/persistence-coordinator.incremental.json --force --concurrency 4 --timeoutMS 10000
+```
+
+The separate incremental file retains the final report; the first counts are also recorded in
+`.scratch/application-mutation/persistence-baseline.md`. No test or production changes were justified.
+Save-policy commit: de065be. Documentation checks and changed formatting passed for that commit.
+Planner verified the complete 40-file inventory and Low Risk test-only validation scope.
