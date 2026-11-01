@@ -3,7 +3,6 @@ import { setTimeout } from 'node:timers/promises'
 import { api } from './github.mts'
 import { verifyAttestation } from './attestation.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
-import { verifyHosted } from './verify-target.mts'
 import { dispatchedSource } from '../publication.mts'
 import type { Blob, Reference, Request, WorkflowRun } from './types.mts'
 
@@ -47,6 +46,7 @@ if (import.meta.main) {
       const ready = await isNewWebVersion(await currentVersion(), { token: process.env.GH_TOKEN })
       await appendFile(process.env.GITHUB_OUTPUT!, `ready=${ready}\n`)
     } else if (command === 'verify') {
+      const { verifyHosted } = await import('./verify-target.mts')
       const head = (await api(`${root}/git/ref/heads/main`)) as Reference
       await mkdir('verified-hosting', { recursive: true })
       for (const name of ['provenance.json', 'provenance.sigstore.json']) {
