@@ -631,10 +631,14 @@ function collectLiveDocuments(rootDirectory: string) {
   return [...documents]
 }
 
-export function runChecks({ rootDirectory = ROOT } = {}) {
+const CHECK_GROUPS = ['links', 'tests', 'decisions', 'structure'] as const
+type CheckGroup = (typeof CHECK_GROUPS)[number]
+
+export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: string; group?: CheckGroup } = {}) {
   const issues: string[] = []
+  const include = (name: CheckGroup) => group === undefined || group === name
   const unfinishedPlans = unfinishedPlanPaths(rootDirectory)
-  for (const path of collectMarkdownPaths(rootDirectory)) {
+  for (const path of include('structure') ? collectMarkdownPaths(rootDirectory) : []) {
     issues.push(
       ...findScratchDependencies({
         content: readFileSync(join(rootDirectory, path), 'utf8'),
@@ -655,11 +659,11 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
     const match = ADR_FILE_PATTERN.exec(fileName)
     if (match) adrNumbers.add(Number(match[1]))
   }
-  for (const fileName of adrFiles) {
+  for (const fileName of include('decisions') ? adrFiles : []) {
     const content = readFileSync(join(decisionsDirectory, fileName), 'utf8')
     issues.push(...validateAdr({ fileName, content, adrNumbers }).issues)
   }
-  if (adrFiles.length > 0) {
+  if (include('decisions') && adrFiles.length > 0) {
     const adrIndexPath = join(decisionsDirectory, 'README.md')
     if (existsSync(adrIndexPath)) {
       issues.push(...validateAdrIndex({ content: readFileSync(adrIndexPath, 'utf8'), adrNumbers }))
@@ -671,24 +675,24 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
   for (const filePath of liveDocuments) {
     const displayPath = filePath.startsWith(`${rootDirectory}/`) ? filePath.slice(rootDirectory.length + 1) : filePath
     const content = readFileSync(filePath, 'utf8')
-    issues.push(...findBrokenLinks({ content, filePath, displayPath }))
-    issues.push(...findBrokenReferences({ content, displayPath, adrNumbers }))
-    if (!displayPath.endsWith('PRODUCT.md')) {
+    if (include('links')) issues.push(...findBrokenLinks({ content, filePath, displayPath }))
+    if (include('decisions')) issues.push(...findBrokenReferences({ content, displayPath, adrNumbers }))
+    if (include('structure') && !displayPath.endsWith('PRODUCT.md')) {
       issues.push(...findProductQuantityRestatements({ content, displayPath }))
     }
-    if (displayPath === 'docs/OPEN_QUESTIONS.md') {
+    if (include('structure') && displayPath === 'docs/OPEN_QUESTIONS.md') {
       issues.push(...validateOpenQuestions({ content, displayPath }))
     }
-    if (displayPath === 'docs/PRODUCT.md') {
+    if (include('structure') && displayPath === 'docs/PRODUCT.md') {
       issues.push(...findOversizedProductText({ content, displayPath }))
     }
-    if (displayPath === CONFORMANCE_DOCUMENT) {
+    if (include('tests') && displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))
     }
   }
   const agentPath = join(rootDirectory, 'AGENTS.md')
   const developmentPath = join(rootDirectory, 'docs', 'DEVELOPMENT.md')
-  if (existsSync(agentPath)) {
+  if (include('structure') && existsSync(agentPath)) {
     const procedurePath = join(rootDirectory, WORKFLOW_PROCEDURES)
     issues.push(
       ...validateAgentCore({
@@ -697,7 +701,7 @@ export function runChecks({ rootDirectory = ROOT } = {}) {
       }),
     )
   }
-  if (existsSync(agentPath) && existsSync(developmentPath)) {
+  if (include('structure') && existsSync(agentPath) && existsSync(developmentPath)) {
     issues.push(
       ...validateWorkflowOwnership({
         agentContent: readFileSync(agentPath, 'utf8'),
@@ -931,7 +935,14 @@ export function formatVerbatimReport(report: ReturnType<typeof compareVerbatim>)
 }
 
 export function main(args = process.argv.slice(2)) {
-  if (args.length > 0) {
+  let group: CheckGroup | undefined
+  if (args[0] === '--group') {
+    if (args.length !== 2 || !CHECK_GROUPS.includes(args[1] as CheckGroup)) {
+      console.error(`Expected --group ${CHECK_GROUPS.join('|')}`)
+      return 2
+    }
+    group = args[1] as CheckGroup
+  } else if (args.length > 0) {
     try {
       const result = runVerbatim(parseVerbatimArguments(args))
       console.log(formatVerbatimReport(result.comparison))
@@ -941,7 +952,7 @@ export function main(args = process.argv.slice(2)) {
       return 2
     }
   }
-  const { issues, liveDocumentCount } = runChecks()
+  const { issues, liveDocumentCount } = runChecks(group ? { group } : {})
   if (issues.length > 0) {
     console.error(`Documentation checks failed with ${issues.length} issue(s):`)
     for (const issue of issues) console.error(`  - ${issue}`)

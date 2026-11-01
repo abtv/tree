@@ -732,6 +732,37 @@ describe('validateOpenQuestions', () => {
 })
 
 describe('runChecks', () => {
+  it('separates CI check categories without losing any default checks', () => {
+    const root = createTemporaryRoot()
+    writeFile(root, 'README.md', '[Missing](missing.md)\n')
+    writeFile(root, 'docs/decisions/0001-first.md', '# Decision\n')
+    writeFile(root, 'docs/VIM_CONFORMANCE.md', '| Product | `src/x.test.ts`: “missing name” |\n')
+    writeFile(root, 'src/x.test.ts', "it('present name', () => {})\n")
+    writeFile(root, 'docs/OPEN_QUESTIONS.md', '# Questions\n')
+
+    const groups = ['links', 'tests', 'decisions', 'structure'] as const
+    const results = groups.map((group) => runChecks({ rootDirectory: root, group }).issues)
+    const all = runChecks({ rootDirectory: root }).issues
+
+    expect(results[0]).toEqual([expect.stringContaining('link target not found')])
+    expect(results[1]).toEqual([expect.stringContaining('no test titled')])
+    expect(results[2]).toEqual([
+      expect.stringContaining('missing Status metadata'),
+      expect.stringContaining('missing ADR index'),
+    ])
+    expect(results[3]).toEqual([expect.stringContaining('non-normative')])
+    expect(results.flat().sort()).toEqual(all.sort())
+  })
+
+  it('rejects unknown documentation categories rather than silently skipping checks', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(main(['--group', 'unknown'])).toBe(2)
+    expect(main(['--group'])).toBe(2)
+
+    error.mockRestore()
+  })
+
   it('passes on a minimal repository without a plan archive', () => {
     const root = createTemporaryRoot()
 

@@ -1,7 +1,6 @@
 name: Run web E2E tests
 
 on:
-  pull_request:
   workflow_call:
 
 permissions:
@@ -9,13 +8,7 @@ permissions:
   actions: read
 
 jobs:
-  audit:
-    name: Require web dependency audit
-    uses: ./.github/workflows/require-dependency-audit.yml
-    with:
-      caller: browser
   chrome:
-    needs: audit
     name: Test production build (Chromium)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
@@ -31,7 +24,7 @@ jobs:
       # Google Chrome has no Linux arm64 build; the suite uses Playwright's Chromium there.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Verify generated files in isolated Chromium
+      - name: Build web app and run all browser E2E tests
         run: npm run test:web:built
       - name: Preserve Chromium test reports
         if: failure()

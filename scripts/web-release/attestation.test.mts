@@ -50,7 +50,7 @@ describe('independent manifest authentication', () => {
       '--repo',
       'abtv/tree',
       '--signer-workflow',
-      'abtv/tree/.github/workflows/release-web-app.yml',
+      'abtv/tree/.github/workflows/release-new-app-version.yml',
       '--source-ref',
       'refs/heads/main',
       '--source-digest',
@@ -79,12 +79,12 @@ describe('independent manifest authentication', () => {
     run.mockClear()
 
     await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
-    expect(run).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenCalledTimes(3)
 
     const current = run.mock.calls[0]![1]
-    const historical = run.mock.calls[1]![1]
+    const historical = run.mock.calls[2]![1]
 
-    expect(historical).toEqual(current.map((arg) => arg.replace('release-web-app.yml', 'release.yml')))
+    expect(historical).toEqual(current.map((arg) => arg.replace('release-new-app-version.yml', 'release.yml')))
 
     run.mockImplementation(() => {
       throw new Error('Invalid signature')
@@ -101,7 +101,7 @@ describe('independent manifest authentication', () => {
 
     await expect(verifyRetainedAttestation(f.manifestFile, f.bundleFile, { run })).resolves.toEqual(f.manifest)
     expect(run).toHaveBeenCalledOnce()
-    expect(run.mock.calls[0]![1]).toContain('abtv/tree/.github/workflows/release-web-app.yml')
+    expect(run.mock.calls[0]![1]).toContain('abtv/tree/.github/workflows/release-new-app-version.yml')
   })
 
   it('rejects missing proof and symlink metadata before invoking the signature verifier', async () => {

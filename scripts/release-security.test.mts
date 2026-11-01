@@ -28,7 +28,7 @@ test('packages attributed About credits outside the application archive', () => 
 })
 
 test('release reuses authenticated main checks before credentials or release writes', () => {
-  const workflow = load(readFileSync('.github/workflows/release.yml', 'utf8')) as {
+  const workflow = load(readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')) as {
     jobs: {
       candidate: { steps: Array<{ run?: string; with?: { ref?: string } }>; permissions?: unknown }
       release: { needs: string; if: string; steps: Array<{ run?: string; 'continue-on-error'?: boolean }> }
@@ -53,20 +53,18 @@ test('release reuses authenticated main checks before credentials or release wri
   expect(build).toContain('node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app')
   expect(build).toContain('xcrun stapler validate dist/Tree-*.dmg')
   expect(build).toContain('spctl --assess --type execute')
-  const text = readFileSync('.github/workflows/release.yml', 'utf8')
+  const text = readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')
   const header = text.split('\njobs:')[0]!
   const candidate = text.split('\n  candidate:')[1]!.split('\n  release:')[0]!
   expect(header).toContain('contents: read')
   expect(header).not.toContain('contents: write')
-  expect(candidate).toContain("github.event.workflow_run.conclusion == 'success'")
-  expect(candidate).toContain("github.event.workflow_run.event == 'push'")
-  expect(candidate).toContain("github.event.workflow_run.head_branch == 'main'")
-  expect(candidate).toContain('github.event.workflow_run.head_repository.full_name == github.repository')
-  expect(candidate).toContain('ref: ${{ github.event.workflow_run.head_sha }}')
+  expect(candidate).toContain("github.event_name == 'workflow_dispatch'")
+  expect(candidate).toContain("github.ref == 'refs/heads/main'")
+  expect(candidate).toContain('ref: ${{ github.sha }}')
   expect(candidate).not.toContain('secrets.')
   expect(text.slice(0, text.indexOf('      - name: Build signed and notarized DMG'))).not.toContain('secrets.')
-  expect(text).toContain('workflow_run:')
-  expect(text).toContain("workflows: ['Release web app']")
+  expect(text).toContain('workflow_call:')
+  expect(text).toContain('VALIDATION_RUN_ID: ${{ inputs.run_id }}')
   expect(text).toContain('group: release-macos-main')
   expect(text).toContain('cancel-in-progress: false')
   expect(text).toContain('ref: ${{ needs.candidate.outputs.sha }}')

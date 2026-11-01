@@ -45,15 +45,15 @@ const goodRun: {
   conclusion: string | null
 } = {
   repository: { full_name: 'abtv/tree' },
-  path: '.github/workflows/release-web-app.yml',
+  path: '.github/workflows/test-and-build-app.yml',
   event: 'push',
   head_branch: 'main',
   head_sha: identity.sourceSha,
   run_attempt: 2,
-  status: 'in_progress',
-  conclusion: null,
+  status: 'completed',
+  conclusion: 'success',
 }
-const goodGate = { name: 'Approve web release', status: 'completed', conclusion: 'success' }
+const goodGate = { name: 'Check release version', status: 'completed', conclusion: 'success' }
 function sourceRequest({
   run = goodRun,
   sha = identity.sourceSha,

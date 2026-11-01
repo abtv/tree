@@ -7,6 +7,7 @@ import { verifyPackage } from './package.mts'
 import { verifyAttestation } from './attestation.mts'
 import { assertWorkflowWriteDenied } from './permission-check.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
+import { dispatchedSource } from '../publication.mts'
 
 export async function transferPackage(
   directory: string,
@@ -122,8 +123,8 @@ export function verifyIdentity(manifest: Manifest, env: NodeJS.ProcessEnv) {
   if (
     env.GITHUB_REPOSITORY !== manifest.sourceRepository ||
     env.GITHUB_SHA !== manifest.sourceSha ||
-    env.GITHUB_RUN_ID !== manifest.sourceRunId ||
-    env.GITHUB_RUN_ATTEMPT !== String(manifest.sourceRunAttempt)
+    (env.VALIDATION_RUN_ID ?? env.GITHUB_RUN_ID) !== manifest.sourceRunId ||
+    (env.VALIDATION_RUN_ATTEMPT ?? env.GITHUB_RUN_ATTEMPT) !== String(manifest.sourceRunAttempt)
   ) {
     throw new Error('Release identity differs from the current run')
   }
@@ -131,6 +132,7 @@ export function verifyIdentity(manifest: Manifest, env: NodeJS.ProcessEnv) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
+    await dispatchedSource()
     const [command, directory, file, ...extra] = process.argv.slice(2)
     if (!['preflight', 'transfer'].includes(command!) || !directory || !file || extra.length)
       throw new Error('Invalid publish arguments')

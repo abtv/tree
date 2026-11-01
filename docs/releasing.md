@@ -1,6 +1,6 @@
 # macOS releases
 
-After successful checks of a version commit on `main`, `release.yml` builds Tree
+After successful checks of a version commit on `main`, `Release new app version` builds Tree
 for Apple Silicon and uploads a verified DMG to a **draft** GitHub Release.
 Only the owner publishes the draft for users.
 
@@ -17,10 +17,12 @@ commit. It runs no tests, makes no network requests and creates no tag.
 Optional `-- minor` and `-- major` select those increments. Push or merge the
 commit into `main` using the normal development workflow.
 
-The existing `Release web app` main workflow runs code checks, the shared audit
-and browser tests once. Its successful completion triggers `Release macOS`.
+The `Test and build app` main workflow runs code checks, audit, browser E2E and
+Linux/macOS smoke once. After success it dispatches the versioned release, whose
+Web and macOS branches run independently. The macOS branch calls
+`create-macos-release-draft.yml`.
 Desktop preflight rechecks the upstream repository, workflow path, push event,
-main branch, SHA, run attempt and successful `Approve web release` gate through
+main branch, SHA, run attempt and successful `Check release version` gate through
 the GitHub API. Failed, canceled, forked or superseded runs cannot reserve a
 release. No upstream artifacts or default-branch checkout supply release bytes:
 both desktop jobs check out the exact validated source SHA.
@@ -32,10 +34,10 @@ the expensive macOS job. New reservations require the source still to be current
 main. One global desktop concurrency group serializes reservations and uploads.
 Arbitrary external tag pushes and manual draft publication are outside that lock.
 
-After a failed build, rerun the failed `Release macOS` workflow. It reuses only
+After a failed build, select **Re-run failed jobs** in `Release new app version`. It reuses only
 the same tag/SHA and its own empty draft; no deletion or version increment is
-needed. Once reserved, advancing main does not invalidate that draft, but a newer
-reserved version prevents uploading the older one. Published releases and
+needed. Dispatch verification rejects stale source main and changed validation attempts;
+a newer reserved version also prevents uploading the older one. Published releases and
 complete uploaded DMGs are skipped. Unknown drafts or partial/unknown assets
 stop for inspection. Existing tags and assets are never replaced. No automated
 step publishes a release or changes its published/draft state after creation.

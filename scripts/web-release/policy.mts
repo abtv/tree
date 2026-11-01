@@ -103,7 +103,7 @@ export function validateManifest(input: unknown): Manifest {
 }
 
 export function validateGate(results: Record<string, { result: string | undefined }>) {
-  for (const key of ['check', 'audit', 'chrome']) {
+  for (const key of ['check', 'audit', 'chrome', 'smoke']) {
     if (results[key]?.result !== 'success') throw new Error(`Release check ${key} did not succeed`)
   }
 }

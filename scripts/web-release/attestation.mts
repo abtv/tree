@@ -19,7 +19,7 @@ export async function verifyAttestation(
   bundleFile: string,
   { run = execFileSync }: { run?: CommandRunner } = {},
 ) {
-  return verifyWithSigner(manifestFile, bundleFile, 'release-web-app.yml', run)
+  return verifyWithSigner(manifestFile, bundleFile, 'release-new-app-version.yml', run)
 }
 
 // Only retention may authenticate historical packages signed before the rename.
@@ -32,14 +32,18 @@ export async function verifyRetainedAttestation(
   try {
     return await verifyAttestation(manifestFile, bundleFile, { run })
   } catch {
-    return verifyWithSigner(manifestFile, bundleFile, 'release.yml', run)
+    try {
+      return await verifyWithSigner(manifestFile, bundleFile, 'release-web-app.yml', run)
+    } catch {
+      return verifyWithSigner(manifestFile, bundleFile, 'release.yml', run)
+    }
   }
 }
 
 async function verifyWithSigner(
   manifestFile: string,
   bundleFile: string,
-  workflow: 'release-web-app.yml' | 'release.yml',
+  workflow: 'release-new-app-version.yml' | 'release-web-app.yml' | 'release.yml',
   run: CommandRunner,
 ) {
   const manifest = validateManifest(await readMetadata(manifestFile))

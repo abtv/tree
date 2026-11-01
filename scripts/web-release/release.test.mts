@@ -181,8 +181,8 @@ describe('release manifest and package', () => {
 })
 
 describe('release gates', () => {
-  const success = Object.fromEntries(['check', 'audit', 'chrome'].map((key) => [key, { result: 'success' }]))
-  it('requires every Linux publication check to succeed', () => {
+  const success = Object.fromEntries(['check', 'audit', 'chrome', 'smoke'].map((key) => [key, { result: 'success' }]))
+  it('requires every publication check including cross-platform smoke to succeed', () => {
     expect(() => validateGate(success)).not.toThrow()
 
     for (const key of Object.keys(success)) {

@@ -411,7 +411,7 @@ It should run:
 
 Timing suites run locally when the affected performance paths require them under procedure §10. A release alone does not require another timing run. They are not part of `npm run check` or CI. Functional and bounded-heap regression tests remain in the unit suite.
 
-The documentation governance step validates ADR metadata and indexing, checks that relative links and ADR references in live documents (including active initiative plans) resolve, and rejects restated product quantities outside `docs/PRODUCT.md`.
+The documentation governance command accepts `--group links|tests|decisions|structure` for separate CI steps. Without arguments it checks every category: ADR metadata and indexing, relative links, ADR and test references, and documentation structure including restated product quantities outside `docs/PRODUCT.md`.
 
 It also scans Git-tracked and new nonignored Markdown for explicit scratch-file dependencies, including inline paths, Markdown links and reference definitions. Source copies without Git metadata are scanned recursively, excluding generated and scratch directories. Unfinished plans linked from `plans/README.md` and `WORKING_PLAN.md` may retain continuation evidence; a `Status: Completed`, `Closed`, `Done`, or `Retired` in the plan or its index row removes that exception. Directory paths ending in `/`, placeholders, fenced examples, and inline commands starting with a supported command name are allowed. This syntactic check complements the documentation and plan-closure review in `docs/AGENT_WORKFLOW.md` §11; it cannot determine whether prose states every lasting conclusion.
 
@@ -451,13 +451,36 @@ The container's network restriction applies to test execution. It does not disab
 
 ### GitHub Actions
 
-GitHub Actions runs `npm run check`, the dependency audit and built-browser Chromium tests on Linux for every pull request and push to `main`. Timing suites run only locally. The full macOS Electron test workflows run only weekly or manually: Electron E2E in six shards on Sunday at 02:00 UTC and memory at 04:00 UTC. Each Electron shard is limited to 12 minutes. These full test workflows do not run on pull requests or pushes and do not gate browser publication. Demo capture runs on every push to `main` or manually. All test workflows and demo capture first require a successful Ubuntu `npm audit --audit-level=high` job. A failed audit skips dependent tests before macOS runners are allocated.
+On each PR and push to main, `Test and build app` runs code/documentation/unit checks
+alongside one dependency audit. After both succeed, browser E2E and Linux/macOS smoke
+run concurrently. The final `Check release version` job requires every result to succeed.
+PRs never dispatch publications or receive release credentials.
 
-`Audit dependencies` executes that command once per automatic push or PR event. Automatic code, browser, smoke, demo and release jobs call `Require dependency audit`, which waits for the shared result with read-only Actions access. These gate jobs do not execute another npm audit. `scripts/dependency-audit.mts` matches the checkout SHA and push/PR payload identity, including the PR head and base, to an artifact marker from the expected audit workflow. It requires the latest matching run's current attempt to complete successfully; an artifact from an earlier attempt cannot prove a rerun passed. Missing, expired, failed, canceled, malformed or unavailable results fail closed, with a seven-minute polling limit. Markers expire after one day; rerun the corresponding central audit before retrying an older consumer. The marker contains the lockfile but consumers inspect only trusted workflow/artifact metadata and never download or execute its contents. Manual and scheduled consumers execute a fresh audit instead of waiting for an automatic event. Release, smoke and demo retain their independent triggers and cancellation groups; demo and smoke failures cannot change the source release run's status. Audit cancellation groups include the caller, pull request or branch, so concurrent checks cannot cancel each other's audits. After audit succeeds, tests run independently, and superseded standalone runs for the same pull request or branch are canceled. Failed E2E and performance runs upload their available reports and result artifacts. Mutation testing runs on a weekly or manual Ubuntu workflow, separate from pull-request validation because of its run time (§12).
+A successful main run dispatches `Publish demo video and screenshots` and, only for
+a new version, `Release new app version`. Both consumers verify the exact successful
+main validation run, attempt and source SHA before publication. Browser bytes come
+from that validation run's artifact, without rebuilding. Web and macOS release branches
+run independently; either failure makes the release red while preserving the other result.
+The source Web job waits for target deployment and checks every hosted byte.
+
+The built-in source token gets Actions write only in the publication dispatcher, to start
+these two source workflows. The cross-repository publishing App remains Contents-only.
+A failed target deployment requires the owner's retry through the link in the source job.
+Retry failed release jobs afterward; do not retransfer a completed version. Rerun all jobs
+when retrying validation itself, so tested artifacts match its current attempt.
+
+Scheduled/manual dependency audits and Electron E2E/memory suites retain separate runs.
+Timing suites stay local. New source validation cancels superseded validation, but release
+publication is serialized without canceling in-flight work. Required checks and artifacts
+must remain available; an expired artifact or changed validation attempt fails closed.
 
 #### Cross-platform smoke checks
 
-`Run smoke tests` runs on every pull request and push to `main`, and supports manual execution. After its dependency audit, two jobs share setup within each operating system: Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Safari through SafariDriver. Each platform has its own smoke invocation. A failed Electron smoke does not skip the browser smoke when the browser build succeeded. New commits cancel superseded runs. These checks supplement the existing suites and do not replace release validation.
+`Run smoke tests` is reusable and runs inside `Test and build app` after code checks
+and audit pass. Its Linux and macOS jobs run in parallel with each other and browser E2E.
+Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Safari.
+A failed Electron smoke does not skip browser smoke when its build succeeded.
+Both platform results gate publication. They supplement, rather than replace, full E2E.
 
 The shared happy path opens the production build with isolated synthetic data, types a parent, creates a sibling with Enter, and indents it with Tab. In the child it types `today`, checks the selected date suggestion, and accepts it with Enter without creating a node. It then types ` :cat`, checks the selected emoji suggestion, and accepts 🐱 with Tab without changing the child's depth. Both acceptances close their popup and retain editor focus. Additional text crosses the normal word-volume save threshold; the checks verify the persisted text and parent/child relationship through the real platform adapter without waiting for the idle timer or mocking persistence. Browser checks reload the page; Electron quits normally and starts a new process with the same isolated profile, requiring a clean exit rather than forced termination. Each target checks the restored text and hierarchy, enables Vim through its menu, enters Insert with `i`, types a prefix, and returns to Normal with Escape, asserting both the text and mode transitions. Vim `/` search must then move from the child to its parent in Tree. The check opens the command panel with `:`, types `agenda`, verifies that `show-agenda` is the single selected result, and executes it with Enter. It requires the panel to close and Agenda to show the child dated with today's local canonical date and its contextual parent, searches from the day header to the child, and returns to Tree through its menu with the original selection. Both searches assert a unique match count, confirmed current highlight and destination focus. Electron uses the existing test entry for hidden windows and a stubbed global shortcut; its production main, preload, renderer and file storage still run. Browser checks use fresh contexts/origins. Safari uses an isolated automation session and native WebDriver input, not Playwright WebKit.
 
@@ -482,15 +505,13 @@ Name GitHub Actions workflows by the work they perform, using an imperative verb
 and its object in English sentence case. Use the same principle for job display
 names. A reader should understand the purpose without opening the YAML.
 
-* Use direct actions such as `Release web app`, `Audit dependencies`, and
-  `Publish demo`. Use `Run` with established test names, including
+* Use direct actions such as `Release new app version`, `Audit dependencies`, and
+  `Publish demo video and screenshots`. Use `Run` with established test names, including
   `Run mutation testing` and `Run property tests`; preserve those terms rather
   than inventing synonyms for grammatical uniformity.
-* Distinguish a release pipeline from its individual suites. `Release web app`
-  calls code validation and web E2E testing before signing and transferring the
-  tested package. It does not represent another web test suite. PR validation
-  and release validation reuse the same suites for their respective commits.
-  Deployment in the hosting repository is a separate workflow.
+* Distinguish a release pipeline from its individual suites. `Release new app version`
+  consumes the exact successful main validation run and tested artifact. Web and macOS
+  branches are independent. The source Web job waits for the separate hosting deployment.
 * Keep names concise. Do not add category prefixes, local jargon such as
   `property soak`, or execution settings merely to describe implementation.
   Increased property-test counts and memory-report thresholds belong in suite
@@ -510,18 +531,19 @@ installed separately in the hosting repository.
 
 | Workflow name | Filename |
 | --- | --- |
-| Release web app | `release-web-app.yml` |
-| Check code, test and build | `check-code-test-and-build.yml` |
+| Release new app version | `release-new-app-version.yml` |
+| Test and build app | `test-and-build-app.yml` |
+| Create macOS release draft (reusable) | `create-macos-release-draft.yml` |
+| Run smoke tests (reusable) | `run-smoke-tests.yml` |
 | Run web E2E tests | `run-web-e2e-tests.yml` |
 | Run Electron E2E tests | `run-electron-e2e-tests.yml` |
 | Run Electron memory tests | `run-electron-memory-tests.yml` |
 | Run mutation testing | `run-mutation-testing.yml` |
 | Run property tests | `run-property-tests.yml` |
 | Audit dependencies | `audit-dependencies.yml` |
-| Require dependency audit | `require-dependency-audit.yml` |
 | Scan code with CodeQL | `scan-code-with-codeql.yml` |
 | Enforce agent attribution policy | `enforce-agent-attribution-policy.yml` |
-| Publish demo | `publish-demo.yml` |
+| Publish demo video and screenshots | `publish-demo-video-and-screenshots.yml` |
 | Deploy web app (hosting repository) | `deploy-web-app.yml` |
 
 Give every job an explicit display name. Name reusable-workflow calling jobs by
@@ -542,7 +564,8 @@ identifiers, not workflow or job names.
 When applying a rename, update reusable-workflow paths, scripts, tests, and
 documentation that consume the old names or paths. Check required status-check
 settings before changing their names. In particular, release verification
-currently matches the job name `Approve web release` and references `release-web-app.yml`;
+matches `Check release version` in `test-and-build-app.yml`, while the current
+signer is `release-new-app-version.yml`;
 those are functional contracts, not cosmetic labels. A naming change must
 preserve the release verification contract and existing triggers and dependencies.
 
@@ -589,7 +612,7 @@ Classify the complete change, not only its purpose. For example, a workflow-docu
 
 The README gallery uses [the synthetic demo document](images/demo-document.json). It is a documentation resource, not a copy of a user's application data. Preserve its contents across captures; changes to the example itself should be deliberate and reviewed. The capture script launches the built Electron application with a newly created temporary profile and never opens the normal profile. It captures the overview and then enters the meetup branch in the same running application without editing the document or changing that branch's expanded state. In the dark appearance with Vim enabled, it captures the focused branch, a search for `book` with two highlighted matches, and the unfiltered command panel. It finally fixes only `Date` to Thursday 2026-10-08, opens the Agenda with `Cmd+P` in the light appearance, and captures it; the document's dated nodes (2026-10-08 through 2026-10-15) surround that fixed Today, so the Agenda shows the same node text as the Tree images.
 
-The `Publish demo` workflow described below captures the images after recording the video and publishes them to GitHub Pages with it. The README shows the latest successful capture, automatically refreshed on every push to `main`; publication can lag while the workflow runs or if it fails. The images are not stored in Git. The script refuses to write any image when the focused branch's nodes differ from the overview or when the capture changed the document. Like the E2E fixture, it passes `-AppleShowScrollBars WhenScrolling` so CI runners without a trackpad draw overlay scrollbars.
+The `Publish demo video and screenshots` workflow described below captures the images after recording the video and publishes them to GitHub Pages with it. The README shows the latest successful capture, refreshed after successful validation of each push to `main`; publication can lag while the workflow runs or if it fails. The images are not stored in Git. The script refuses to write any image when the focused branch's nodes differ from the overview or when the capture changed the document. Like the E2E fixture, it passes `-AppleShowScrollBars WhenScrolling` so CI runners without a trackpad draw overlay scrollbars.
 
 Run `npm run screenshots:readme` on macOS to build and capture the images locally, for example after changing the capture script. It writes `tree-overview.png`, `tree-focus-dark.png`, `agenda-light.png`, `tree-search.png`, and `tree-commands.png` to ignored `reports/readme/`, replacing that directory only after every capture succeeds. Capture uses a verified device scale factor of 2 and lossless PNG output; README images keep their logical width of 860 pixels so high-density displays receive sharp text. Inspect all images, including matching node text and order, before relying on a script change. The command never stages or commits files.
 
@@ -609,7 +632,7 @@ Recording begins after the renderer and fonts are ready. Playwright's screencast
 
 The WebM video, representative PNG frames, and source metadata are written to ignored `reports/demo/`. Each run replaces that directory. Open `reports/demo/tree-demo.webm` in a compatible browser or video player to review playback and inspect the PNGs for text readability. This documentation demo does not replace visual regression tests. The video must be smaller than 5 MB (5,000,000 bytes) and shorter than 30 seconds. The script rejects empty recordings, missing or invalid WebM duration metadata, and recordings reaching either limit. The measured duration and file size are recorded in the output metadata.
 
-The separate `Publish demo` workflow runs on every push to `main` and on manual dispatch. It also runs the README screenshot capture and assembles both outputs into ignored `reports/site/`. Successful runs upload that directory as a downloadable artifact with one-day retention. Runs on `main` also deploy it to GitHub Pages, keeping the README's video and image URLs stable without storing generated files in Git. A Pages deployment replaces the whole site, so any other published file must be added to this workflow's site directory rather than deployed by a separate workflow. Other branches produce downloadable artifacts only. A failed run deploys nothing, and Pages keeps the previous video and images.
+The separate `Publish demo video and screenshots` workflow is dispatched after successful validation of a push to `main`. It also runs the README screenshot capture and assembles both outputs into ignored `reports/site/`. Successful runs upload that directory as a downloadable artifact with one-day retention. Runs on `main` also deploy it to GitHub Pages, keeping the README's video and image URLs stable without storing generated files in Git. A Pages deployment replaces the whole site, so any other published file must be added to this workflow's site directory rather than deployed by a separate workflow. Dispatch verifies the successful main run and exact SHA; arbitrary branch publication is rejected. A failed run deploys nothing, and Pages keeps the previous video and images.
 
 ### Screenshot Rendering Scale
 
@@ -927,7 +950,17 @@ npm run release:electron
 
 The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. For minor or major use `npm run release:electron -- minor` or `npm run release:electron -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
 
-Push or merge the version commit to `main` normally. Existing main CI runs code validation, dependency audit and browser checks once. Web signing and transfer run only when the package version exceeds the last transferred web release, resolved through its provenance's immutable source SHA. Transfer rechecks the version against the exact hosting parent before any write; a concurrent target change still fails the non-forced ref update. Missing or invalid previous provenance fails closed. An unchanged or lower version skips publication while the validation workflow succeeds. After `Release web app` completes successfully, the independent `Release macOS` workflow verifies that run's repository, workflow path, push event, main branch, exact SHA, current attempt and successful gate. It checks out that exact SHA and skips ordinary commits whose version is already reserved. It does not rerun code validation, audit, development smoke, full E2E or timing suites.
+Push or merge the version commit to main normally. `Test and build app` runs checks,
+audit, browser E2E and platform smoke once. After success, publication is dispatched only
+when either platform has a new version. Web transfer still requires a version greater than
+the last transferred release and rechecks it against the exact hosting parent before writing.
+The combined `Release new app version` verifies the completed main validation run, SHA and
+attempt, then runs independent Web and macOS branches. The Web job waits for deployment
+and verifies hosted bytes. The macOS branch reserves an owned draft and checks its signed
+installer without rerunning standard validation. Failed-only release retries keep successful
+work. A failed target deployment requires manual retry through the target-run link; App
+permissions remain unchanged. See [macOS releases](releasing.md) and
+[Browser publication](../deployment/github-pages/README.md) for recovery and trust details.
 
 A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 

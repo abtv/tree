@@ -51,8 +51,12 @@ Electron keeps the default native-editing path; plain textareas are unaffected.
 This adds no document writes, syncs, retained snapshots or document traversal.
 Mode changes update attributes on the bounded set of mounted inputs.
 
-The browser publication workflow composes the existing checks with a Chromium
-package check through reusable Actions workflows. A gated, short-lived GitHub
+The validation workflow runs code/unit checks alongside dependency audit, then
+Chromium package tests and Linux/macOS smoke jobs concurrently. Its successful
+main run dispatches demo publication and, only for a new version, the combined
+Web/macOS release. Dispatch consumers authenticate the exact successful validation
+run and attempt through GitHub; signed provenance retains that validation identity
+across release retries. A gated, short-lived GitHub
 App token writes package/provenance paths to the separate hosting
 repository. After the gate, a separate OIDC signing job attests the complete
 manifest, including independently authenticated retained assets. The publisher

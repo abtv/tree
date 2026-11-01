@@ -14,6 +14,8 @@ try {
     })
     await writeFile(second, `${JSON.stringify(manifest, null, 2)}\n`)
   } else if (command === 'prepare' && first && second) {
+    const { dispatchedSource } = await import('../publication.mts')
+    await dispatchedSource()
     const { verifyIdentity } = await import('./publish.mts')
     const { preparePackage } = await import('./prepare.mts')
     verifyIdentity(JSON.parse(await readFile(second, 'utf8')), process.env)

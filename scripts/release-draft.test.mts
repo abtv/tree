@@ -15,7 +15,7 @@ function fixture(version = '1.2.3') {
     head_sha: sha,
     head_branch: 'main',
     event: 'push',
-    path: '.github/workflows/release-web-app.yml',
+    path: '.github/workflows/test-and-build-app.yml',
     status: 'completed',
     conclusion: 'success',
     repository: { full_name: 'abtv/tree' },
@@ -30,7 +30,7 @@ function fixture(version = '1.2.3') {
     body: string
     assets: { name: string; state: string; size: number }[]
   }[] = []
-  const jobs = [{ name: 'Approve web release', status: 'completed', conclusion: 'success' }]
+  const jobs = [{ name: 'Check release version', status: 'completed', conclusion: 'success' }]
   const writes: { path: string; method: string; body: unknown }[] = []
   const state = { main: sha }
   const api: Request = async (path, method = 'GET', body) => {

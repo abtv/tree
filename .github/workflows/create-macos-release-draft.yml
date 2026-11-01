@@ -1,10 +1,26 @@
-name: Release macOS
+name: Create macOS release draft
 
 on:
-  workflow_run:
-    workflows: ['Release web app']
-    branches: [main]
-    types: [completed]
+  workflow_call:
+    inputs:
+      run_id:
+        type: string
+        required: true
+      run_attempt:
+        type: string
+        required: true
+      sha:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+
+env:
+  VALIDATION_RUN_ID: ${{ inputs.run_id }}
+  VALIDATION_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+  VALIDATION_SHA: ${{ inputs.sha }}
+  RELEASE_VERSION: ${{ inputs.version }}
 
 permissions:
   contents: read
@@ -17,7 +33,7 @@ concurrency:
 jobs:
   candidate:
     name: Check macOS release candidate
-    if: ${{ github.repository == 'abtv/tree' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    if: ${{ github.repository == 'abtv/tree' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     outputs:
@@ -26,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -37,6 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release-draft.mts plan
   release:
+    name: Build and test macOS installer
     needs: candidate
     if: needs.candidate.outputs.ready == 'true'
     runs-on: macos-15

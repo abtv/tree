@@ -1,6 +1,7 @@
 import { appendFileSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { packageVersion, parseVersion, compareVersions } from './release-version.mts'
+import { dispatchedSource } from './publication.mts'
 
 const repository = 'abtv/tree'
 const root = `/repos/${repository}`
@@ -66,7 +67,7 @@ export async function verifySource(event: { workflow_run: Run }, api: Request) {
     if (
       source.repository?.full_name !== repository ||
       source.head_repository?.full_name !== repository ||
-      source.path !== '.github/workflows/release-web-app.yml' ||
+      source.path !== '.github/workflows/test-and-build-app.yml' ||
       source.event !== 'push' ||
       source.head_branch !== 'main' ||
       source.status !== 'completed' ||
@@ -97,7 +98,7 @@ export async function verifySource(event: { workflow_run: Run }, api: Request) {
     if (!result.jobs.length || jobs.length > result.total_count || page === 20)
       throw new Error('Incomplete upstream job list')
   }
-  const gates = jobs.filter((job) => job.name === 'Approve web release')
+  const gates = jobs.filter((job) => job.name === 'Check release version')
   if (gates.length !== 1 || gates[0]!.status !== 'completed' || gates[0]!.conclusion !== 'success')
     throw new Error('Upstream checks did not pass')
   return run
@@ -172,7 +173,7 @@ export async function reserveDraft(event: { workflow_run: Run }, texts: string[]
       target_commitish: candidate.sha,
       name: candidate.tag,
       draft: true,
-      body: `${candidate.marker}\nPublish only after the Release macOS workflow succeeds and you test the signed DMG.`,
+      body: `${candidate.marker}\nPublish only after the macOS release job succeeds and you test the signed DMG.`,
     })) as Release)
   if (!release.draft || release.tag_name !== candidate.tag || !Number.isSafeInteger(release.id))
     throw new Error('Invalid reserved draft')
@@ -189,12 +190,12 @@ export async function verifyUpload(event: { workflow_run: Run }, texts: string[]
 if (import.meta.main) {
   try {
     if (
-      process.env.GITHUB_EVENT_NAME !== 'workflow_run' ||
+      process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
       process.env.GITHUB_REPOSITORY !== repository ||
       !process.env.GH_TOKEN
     )
-      throw new Error('Draft preparation requires a trusted workflow_run')
-    const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH!, 'utf8')) as { workflow_run: Run }
+      throw new Error('Draft preparation requires a trusted dispatch')
+    const event = { workflow_run: (await dispatchedSource()) as Run }
     const texts = ['package.json', 'package-lock.json'].map((path) => readFileSync(path, 'utf8'))
     const sha = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
     if (sha.status !== 0 || sha.stdout.trim() !== event.workflow_run.head_sha)

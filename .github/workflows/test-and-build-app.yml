@@ -1,0 +1,115 @@
+name: Test and build app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Audit dependencies
+    uses: ./.github/workflows/audit-dependencies.yml
+    with:
+      caller: ci
+  check:
+    name: Check code and documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check types, lint and formatting
+        run: npm run typecheck && npm run lint && npm run format:check
+      - name: Check documentation links
+        run: npm run check:docs -- --group links
+      - name: Check test references in documentation
+        run: npm run check:docs -- --group tests
+      - name: Check architecture decision records
+        run: npm run check:docs -- --group decisions
+      - name: Check documentation structure
+        run: npm run check:docs -- --group structure
+      - name: Check requirement test coverage
+        run: npm run check:requirements
+      - name: Check editing-mode coverage and agent permissions
+        run: npm run check:e2e-modes && npm run check:opencode
+      - name: Run unit tests
+        run: npm run test:coverage
+
+  chrome:
+    name: Run browser E2E tests
+    needs: [check, audit]
+    uses: ./.github/workflows/run-web-e2e-tests.yml
+
+  smoke:
+    name: Run smoke tests
+    needs: [check, audit]
+    uses: ./.github/workflows/run-smoke-tests.yml
+
+  candidate:
+    name: Check release version
+    needs: [check, audit, chrome, smoke]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      ready: ${{ steps.version.outputs.ready }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Require every validation job to succeed
+        env:
+          RELEASE_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/web-release/cli.mts gate
+      - name: Check release version
+        id: version
+        if: github.event_name == 'push' && github.repository == 'abtv/tree'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publication.mts version
+
+  dispatch:
+    name: Start approved publications
+    needs: candidate
+    if: github.event_name == 'push' && github.repository == 'abtv/tree'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Start demo and eligible release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_READY: ${{ needs.candidate.outputs.ready }}
+          RELEASE_VERSION: ${{ needs.candidate.outputs.version }}
+        run: node scripts/publication.mts dispatch

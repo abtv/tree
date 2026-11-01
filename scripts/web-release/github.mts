@@ -1,4 +1,4 @@
-import type { ApiError, ApiOptions, Request, Reference, WorkflowRun, Job } from './types.mts'
+import type { ApiError, ApiOptions, Request, Reference, WorkflowRun, Job, ReleaseIdentity } from './types.mts'
 import { validateManifest } from './policy.mts'
 
 export async function api(path: string, { token, method = 'GET', body }: ApiOptions = {}): Promise<unknown> {
@@ -39,20 +39,34 @@ export async function verifySource(
   { token, request = api }: { token?: string | undefined; request?: Request } = {},
 ) {
   const manifest = validateManifest(input)
+  await verifyValidation(manifest, { token, request })
+}
+
+export async function verifyValidation(
+  manifest: ReleaseIdentity,
+  { token, request = api }: { token?: string | undefined; request?: Request } = {},
+) {
+  if (
+    manifest.sourceRepository !== 'abtv/tree' ||
+    !/^[a-f0-9]{40}$/.test(manifest.sourceSha) ||
+    !/^[1-9][0-9]*$/.test(manifest.sourceRunId) ||
+    !Number.isSafeInteger(manifest.sourceRunAttempt) ||
+    manifest.sourceRunAttempt < 1
+  )
+    throw new Error('Invalid validation identity')
   const root = '/repos/abtv/tree'
   const head = (await request(`${root}/git/ref/heads/main`, { token })) as Reference
   if (head.object?.sha !== manifest.sourceSha) throw new Error('Source release is stale')
   const run = (await request(`${root}/actions/runs/${manifest.sourceRunId}`, { token })) as WorkflowRun
   if (
     run.repository?.full_name !== 'abtv/tree' ||
-    run.path !== '.github/workflows/release-web-app.yml' ||
+    run.path !== '.github/workflows/test-and-build-app.yml' ||
     run.event !== 'push' ||
     run.head_branch !== 'main' ||
     run.head_sha !== manifest.sourceSha ||
     run.run_attempt !== manifest.sourceRunAttempt ||
-    !['success', null].includes(run.conclusion) ||
-    !['in_progress', 'completed'].includes(run.status) ||
-    (run.status === 'completed' && run.conclusion !== 'success')
+    run.conclusion !== 'success' ||
+    run.status !== 'completed'
   ) {
     throw new Error('Untrusted source release run')
   }
@@ -69,8 +83,9 @@ export async function verifySource(
     if (jobs.length >= response.total_count) break
     if (response.jobs.length === 0 || page === 20) throw new Error('Incomplete source job list')
   }
-  const gates = jobs.filter((job) => job.name === 'Approve web release')
+  const gates = jobs.filter((job) => job.name === 'Check release version')
   if (gates.length !== 1 || gates[0]!.status !== 'completed' || gates[0]!.conclusion !== 'success') {
     throw new Error('Source release gate did not succeed')
   }
+  return run
 }

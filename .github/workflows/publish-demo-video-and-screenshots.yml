@@ -1,9 +1,26 @@
-name: Publish demo
+name: Publish demo video and screenshots
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful validation run
+        required: true
+      run_attempt:
+        description: Validation attempt
+        required: true
+      sha:
+        description: Validated source SHA
+        required: true
+      version:
+        description: Validated app version
+        required: true
+
+env:
+  VALIDATION_RUN_ID: ${{ inputs.run_id }}
+  VALIDATION_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+  VALIDATION_SHA: ${{ inputs.sha }}
+  RELEASE_VERSION: ${{ inputs.version }}
 
 permissions:
   contents: read
@@ -14,24 +31,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  audit:
-    name: Require demo dependency audit
-    uses: ./.github/workflows/require-dependency-audit.yml
-    with:
-      caller: demo
   generate:
     name: Generate video and screenshots
-    needs: audit
     runs-on: macos-15
     timeout-minutes: 8
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Require successful validation of this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publication.mts verify
       - name: Install dependencies
         run: npm ci
       - name: Record demo video
