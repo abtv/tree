@@ -52,7 +52,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. Next task is command-registry.ts; enumerate the remaining source files
+in this session up to ten commits. All ten tasks are now complete; the extended session limit is reached.
+Next task in a fresh session is drop-targets.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -77,8 +78,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 7 | agenda-rows.ts | Done: 82.14% to 92.14%, 258 killed, 22 survivors |
 | 8 | agenda-state.ts | Done: 88.41% to 90.22%, 249 killed, 27 survivors |
 | 9 | agenda-visual-selection.ts | Done: 87.50% to 96.88%, 93 killed, 3 equivalent survivors |
-| 10 | command-registry.ts | Ready |
-| 11 | drop-targets.ts | Planned |
+| 10 | command-registry.ts | Done: 95.27%, 141 killed, 7 survivors |
+| 11 | drop-targets.ts | Ready |
 | 12 | editor-agenda-transitions.ts | Planned |
 | 13 | editor-clipboard-transitions.ts | Planned |
 | 14 | editor-command-transitions.ts | Planned |
@@ -331,3 +332,42 @@ Dry runs passed 1934/1937 tests. Final ordinary focused run passed 6 tests:
 Low Risk validation: renderer typecheck, lint, changed formatting, docs and diff whitespace.
 Primary diff review confirms tests-only scope and preserved existing assertions.
 Agenda state commit: b7542e0.
+
+## Command registry result
+
+Source unchanged at 918900b; 19:42:49–19:43:25. Baseline/final 95.27% / unchanged.
+Killed 141, Survived 7; Timeout, NoCoverage, errors and ignored all zero.
+Dry run passed 189 tests; mutation threshold passed. No confirmed gap justifies new tests.
+Survivor 84 is equivalent because the allowed-name set contains only strings.
+Survivor 77 removes the 100-entry cap, but the fixed set of allowed unique commands has fewer entries.
+Survivors 94, 97, 99 affect equality cases absent from the unique registry names.
+Survivors 98, 100 replace the positive comparator result with zero; on the current fixed registry
+and tested runtime the exact alphabetical order remains unchanged. This is input/runtime-specific
+equivalence, not a claim that the mutated comparator is valid for arbitrary arrays or engines.
+No artificial comparator-internal tests or production edits were introduced.
+
+```sh
+npm run test:mutation -- --mutate src/application/command-registry.ts --incrementalFile .scratch/application-mutation/command-registry.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Primary source/report review completed. Documentation checks, changed formatting and diff checks
+are sufficient for this analysis-only change. Agenda visual selection commit: 918900b.
+
+## Current handoff after ten files
+
+Ten task commits exhaust the explicitly extended primary-session allowance. Thirty files remain,
+all listed above; none was silently skipped. Continue with drop-targets.ts using its own incremental file.
+All file cycles were below 30 minutes. Production code, exclusions and threshold remain unchanged.
+Four test files gained meaningful coverage; ordinary focused tests, renderer types, lint and
+documentation/format checks passed for their corresponding final inputs.
+Per-file score threshold failed for save-policy, agenda-rows and agenda-state; classification and
+limits are recorded above. No layer run was performed, following the owner's explicit instruction.
+
+Partial aggregate read from the latest ten dedicated incremental files:
+Killed 1272, Survived 89, Timeout 17, NoCoverage 3, mutant errors 0, existing Ignored 8.
+Separate launch errors: 1 (the initial unsupported reporter CLI option).
+This is not the requested final all-file aggregate and is not a full-layer run result.
+The six continuation commits are d54eda7, 6364486, 9ecf2c4, b7542e0, 918900b and this task's commit.
+Across these files, tests killed 44 additional mutants; five agenda-state, nine visual-selection,
+28 agenda-rows and two reconciliation mutants. Timeouts are never counted as assertion kills here.
+Retain scratch reports for continuation. No owner product decision is needed to resume the authorized audit.
