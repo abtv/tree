@@ -56,7 +56,7 @@ does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
 in this session, subsequently extended to 50 files. Ten tasks are complete.
-Next task is editor-agenda-transitions.ts; enumerate the remaining source files
+Next task is editor-clipboard-transitions.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -83,8 +83,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 9 | agenda-visual-selection.ts | Done: 87.50% to 96.88%, 93 killed, 3 equivalent survivors |
 | 10 | command-registry.ts | Done: 95.27%, 141 killed, 7 survivors |
 | 11 | drop-targets.ts | Done: 97.58% to 98.79%, 163 killed, 2 equivalents |
-| 12 | editor-agenda-transitions.ts | Ready |
-| 13 | editor-clipboard-transitions.ts | Planned |
+| 12 | editor-agenda-transitions.ts | Done: 96.55% to 98.85%, 86 killed, 1 equivalent |
+| 13 | editor-clipboard-transitions.ts | Ready |
 | 14 | editor-command-transitions.ts | Planned |
 | 15 | editor-content-changes.ts | Planned |
 | 16 | editor-node-visual-transitions.ts | Planned |
@@ -393,3 +393,20 @@ Dry runs passed 208/209 tests. Final ordinary focused validation passed 24 tests
 Renderer types, lint, changed formatting, docs and whitespace checks passed. Primary diff review
 confirms tests-only change, no runtime/performance measurement changes or production edits.
 Command registry commit: 1ce929d. The owner now authorizes all remaining files (up to 50 total).
+
+## Editor Agenda transitions result
+
+Starting commit 8686176; 19:47:56–19:49:30. Baseline 96.55%: Killed 84, Survived 2, NoCoverage 1.
+Final 98.85%: Killed 86, Survived 1, NoCoverage 0. Timeout/errors zero; six existing Ignored unchanged.
+The new focused-day creation test kills 32/35, including the previously uncovered branch.
+Remaining 91 inserts a non-link placeholder into an empty links array; normalization ignores entries
+without offsets, so the new node content is equivalent. No unresolved assertion gaps.
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-agenda-transitions.ts --incrementalFile .scratch/application-mutation/editor-agenda-transitions.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 1951/1952 tests. `npm test -- src/application/editor-agenda-transitions.test.ts`
+passed 21 tests after mutation completion. Renderer types, lint, changed formatting, docs and diff
+checks passed. Primary review confirms test-only scope; no production or fixture changes.
+Drop targets commit: 8686176.

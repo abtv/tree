@@ -30,6 +30,26 @@ const document: Document = {
 
 // @requirement PRODUCT.md §23.11
 describe('creating a dated node from an Agenda day', () => {
+  // @requirement PRODUCT.md §23.15
+  it('follows a newly created preceding day while focused and preserves the saved timeline return', () => {
+    const timeline = open()
+    const timelineReturn = {
+      selectedKey: timeline.selectedKey,
+      collapsed: timeline.collapsed,
+      revealed: timeline.revealed,
+      scrollTop: 120,
+    }
+    const state = { ...timeline, focusedDay: today, timelineReturn }
+
+    const result = createDayNodeTransition(document, state, rowsOf(document, state), today - 1, () => 'created')
+    if (result === undefined || result.kind === 'rejected') throw new Error('Expected a transition')
+
+    expect(result.agenda.focusedDay).toBe(today - 1)
+    expect(result.agenda.timelineReturn).toBe(timelineReturn)
+    expect(rowsOf(result.document, result.agenda).some((row) => row.key === result.agenda.selectedKey)).toBe(true)
+    expect(state.focusedDay).toBe(today)
+  })
+
   it('appends the dated text as the last root and makes it the active occurrence', () => {
     const state = open()
     const result = createDayNodeTransition(document, state, rowsOf(document, state), day(10, 8), () => 'created')
