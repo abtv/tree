@@ -10,6 +10,19 @@ import {
 } from './document-links'
 
 describe('link normalization and edit outcomes', () => {
+  it('recognizes split URL words only inside the edited link after a text prefix', () => {
+    const original = 'note https://a.test/path'
+    const url = 'https://a.test/path'
+    const links = [{ start: 5, end: original.length, url }]
+
+    const result = reconcileLinkTextEdit(original, links, 'note https://a.test/ path')
+
+    expect(result).toEqual({
+      links: [{ start: 5, end: 20, url: 'https://a.test/' }],
+      createsNewLink: true,
+    })
+  })
+
   const url = 'https://a.test'
   const link = { start: 0, end: url.length, url }
 

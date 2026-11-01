@@ -14,6 +14,15 @@ function joined(document: Document, firstId: string, count: number, spaced: bool
 }
 
 describe('joinSiblingRange', () => {
+  it('preserves internal whitespace in later texts while trimming their leading whitespace', () => {
+    const document = { roots: [node('a', 'alpha'), node('b', 'beta  gamma'), node('c', ' delta')] }
+
+    const result = joined(document, 'a', 3, true)
+
+    expect(result.document.roots[0]!.text).toBe('alpha beta  gamma delta')
+    expect(result.cursor).toBe(5)
+  })
+
   const document: Document = {
     roots: [node('a', 'alpha', [node('a1', 'one')]), node('b', 'beta', [node('b1', 'two')]), node('c', 'gamma')],
   }

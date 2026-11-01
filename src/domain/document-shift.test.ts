@@ -59,6 +59,7 @@ describe('shiftSiblingRange', () => {
 
     expect(shiftSiblingRange(tooDeep, 'wrapper', 1, 'in').kind).toBe('too-deep')
     expect(shiftSiblingRange(inner, 'wrapper', 1, 'in').kind).toBe('too-deep')
+    expect(shiftSiblingRange({ roots: [...tooDeep.roots, node('shallow')] }, 'wrapper', 2, 'in').kind).toBe('too-deep')
   })
 
   it('keeps attachment multiplicity and does not mutate the input', () => {

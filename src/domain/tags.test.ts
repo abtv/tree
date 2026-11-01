@@ -3,6 +3,19 @@ import { findTags, tagFragment } from './tags'
 
 // @requirement PRODUCT.md §20.13
 describe('literal tags', () => {
+  it('keeps tags adjacent to excluded ranges', () => {
+    expect(
+      findTags('x #tag y', [
+        { start: 0, end: 2 },
+        { start: 6, end: 8 },
+      ]),
+    ).toEqual([{ start: 2, end: 6, name: 'tag' }])
+  })
+
+  it('rejects a negative caret even when slicing would expose a valid fragment', () => {
+    expect(tagFragment('#tag ', -1)).toBeUndefined()
+  })
+
   it('recognizes Unicode letters and digits, preserves case, and stops at punctuation', () => {
     const text = '#Work #work #план-2026_週 #１２٣ #_ #- #two.words'
 

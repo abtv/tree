@@ -1,6 +1,12 @@
 import { expect, it } from 'vitest'
-import { suggestEmoji } from './emoji-completion'
+import { normalizeEmojiHistory, suggestEmoji } from './emoji-completion'
 import catalog from './emoji-catalog.json'
+
+it('keeps only the first 100 distinct known history names', () => {
+  const names = Object.keys(catalog).slice(0, 101)
+
+  expect(normalizeEmojiHistory([names[0], ...names, 'not_an_emoji'])).toEqual(names.slice(0, 100))
+})
 
 // @requirement PRODUCT.md §20.12
 it('matches English shortcode prefixes at whitespace boundaries without consuming surrounding text', () => {

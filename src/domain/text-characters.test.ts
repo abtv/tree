@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest'
 import { characterBoundaries, characterStart, moveCharacterOffset } from './text-characters'
 
+it('snaps a zero-count backward motion inside a grapheme to its start', () => {
+  expect(moveCharacterOffset('a👩‍💻b', 3, -1, 0)).toBe(1)
+})
+
 // @requirement PRODUCT.md §4.3
 it.each(['🚀', '👩‍💻', '👍🏽', '🇬🇧', 'e\u0301'])(
   'steps over the complete visible character %s in either direction',

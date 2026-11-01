@@ -4,6 +4,21 @@ import type { TreeNode } from './document-types'
 
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
+it('returns fuzzy names ordered by word boundaries before proximity', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('catalog', '#abc #a_b_c #abbc')] })
+
+  expect(catalog.suggest('draft', '#ac', 3)?.suggestions).toEqual(['a_b_c', 'abc', 'abbc'])
+})
+
+it('allows excluded ranges touching either edge of the active fragment', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('catalog', '#road')] })
+
+  expect(catalog.suggest('draft', 'x #ro y', 5, [{ start: 0, end: 2 }])?.suggestions).toEqual(['road'])
+  expect(catalog.suggest('draft', 'x #ro y', 5, [{ start: 5, end: 7 }])?.suggestions).toEqual(['road'])
+})
+
 // @requirement PRODUCT.md §20.13
 it('ranks whole Unicode letters consistently in ambiguous and unambiguous fuzzy matches', () => {
   const catalog = new TagCatalog()

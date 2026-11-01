@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { completeSubtree } from './node-completion'
 import {
   createFirstChild,
   deleteNode,
@@ -41,6 +42,18 @@ function flags(document: Document): Array<[string, boolean]> {
 
 // @requirement PRODUCT.md §2.5
 describe('hierarchical completion', () => {
+  it('shares already completed subtrees while completing a mixed sibling', () => {
+    const done = branch('done', [leaf('done-leaf', true)])
+    const root = branch('root', [done, leaf('open')])
+
+    const result = completeSubtree(root, true)
+
+    expect(result.children[0]).toBe(done)
+    expect(result.children[1]!.struckThrough).toBe(true)
+    expect(completeSubtree(result, true)).toBe(result)
+    expect(root.children[1]!.struckThrough).toBeUndefined()
+  })
+
   it('completes a mixed subtree and its ancestors, then reopens every descendant', () => {
     const document = { roots: [branch('root', [branch('task', [leaf('done', true), leaf('open')])])] }
 

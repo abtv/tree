@@ -8,6 +8,18 @@ const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
 describe('Agenda projection', () => {
+  it('reuses unchanged dated rows inside a nested scope after editing outside it', () => {
+    const scope = node('scope', '', [node('dated', '2026-10-14')])
+    const document = { roots: [scope, node('outside', '')] }
+    const projection = projectAgenda(document, 'scope')
+    const changed = { roots: [scope, node('outside', 'updated')] }
+
+    const result = projectAgenda(changed, 'scope', { document, projection })
+
+    expect(result).toEqual(projection)
+    expect(result[0]).toBe(projection[0])
+  })
+
   it('keeps hierarchy from Root and excludes ancestors at and above a nested scope', () => {
     const document = {
       roots: [
