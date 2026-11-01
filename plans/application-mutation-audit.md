@@ -1,6 +1,6 @@
 # Application mutation audit
 
-Status: In progress
+Status: Awaiting owner acceptance
 
 ## Authorization
 
@@ -56,12 +56,53 @@ This task-specific instruction overrides DEVELOPMENT.md §12's layer-shard fallb
 Keep the threshold unchanged and report a below-threshold exit honestly; a completed audit
 does not mean the threshold passed. Do not launch a layer shard.
 
-The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-nine tasks are complete.
-Next task is visible-rows.ts with a fresh 30-minute file budget. Enumerate remaining source files
-from the live Stryker application patterns in lexical order, excluding tests and application/test.
-Every application source other than those marked Done remains unexamined; none is silently skipped.
-Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
+All 40 file audits are complete, including 21 files in the latest continuation, within its
+50-file allowance. Each file stayed within its individual 30-minute budget; editor-store used
+the explicitly renewed budget. No implementation or audit task remains ready.
+The exact next step is owner acceptance of the delivered audit, required by AGENT_WORKFLOW.md §8
+for this 40-task initiative. After acceptance, retire this plan/index entry and its temporary
+evidence through the normal closure workflow. Do not rerun the layer or reopen equivalent
+mutations just to improve the score. The earlier next-file instructions below are historical.
+
+## Latest per-file aggregate
+
+This is an aggregate of the latest **40 separate file reports**, not a full-layer run or
+a fresh simultaneous test of all files. On 2026-11-01, all report file sets were checked:
+each contains exactly its intended source, and all source snapshots match the current files.
+The inventory matches the live Stryker application glob, excluding tests and application/test.
+Later test additions do not make earlier reports fresh runs; their recorded outcomes are retained.
+
+| Status | Count |
+| --- | ---: |
+| Killed | 6627 |
+| Survived | 379 |
+| Timeout | 54 |
+| NoCoverage | 13 |
+| CompileError | 0 |
+| RuntimeError | 2 |
+| Ignored (pre-existing exclusions) | 26 |
+| Total mutants | 7101 |
+
+The weighted Stryker-style aggregate is 94.46%: (6627 + 54) / 7073. This formula includes
+Timeout, so it does not mean 94.46% were killed by assertions. No timeout was reclassified
+by inference. The two runtime errors are invalid Intl.Segmenter initialization mutants in
+search-executor; they are separate from the one historical command-launch error at the first
+save-policy attempt. There were no new mutation launch errors in the latest continuation.
+
+Eleven file results remain below the unchanged 93% threshold: save-policy, agenda-rows,
+agenda-state, editor-search, editor-store, editor-undo-focus, emoji-history, menu-commands,
+node-search, recent-node-persistence and search-session. These were reported as threshold failures,
+with supported-input equivalents, redundant/defensive branches and qualified performance-only
+differences separated in their file triage. No known supported-flow assertion gap was left open.
+The aggregate does not replace or override any individual failed threshold.
+
+Acceptance evidence: inspect the inventory and individual triage below and the per-file commits.
+Focused tests and required types/lint/format/docs checks passed for test changes; analysis-only
+files required documentation checks. The final diff from the starting commit contains only
+application tests and this plan/index, with no production, exclusion or threshold changes.
+No existing assertion was weakened. No runtime behavior changed, so no new UI/E2E/performance
+validation was required. Raw incremental evidence remains available until owner acceptance;
+the conclusions and limitations are recorded here without requiring that evidence to understand them.
 
 ## Task inventory
 
@@ -113,7 +154,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 37 | search-executor.ts | Done: 99.46%, 182 killed, 1 equivalent, 3 timeouts, 2 runtime errors, 12 existing ignored |
 | 38 | search-session.ts | Done: 80.75% to 91.44%, 171 killed, 16 survivors; threshold failed |
 | 39 | vim-clipboard-content.ts | Done: 100%, 61 killed |
-| 40 | visible-rows.ts | Planned |
+| 40 | visible-rows.ts | Done: 100%, 54 killed |
 
 ## Owner involvement
 
@@ -736,6 +777,19 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Visible rows completed result
+
+2026-11-01, 22:26:37–22:27:23 local. Baseline/final unchanged 100%; Killed 54,
+Survived/Timeout/NoCoverage/CompileError/RuntimeError/Ignored 0. Existing tests cover preorder,
+sibling context, expansion, subtree selection and invalid endpoints; no additions needed.
+
+```sh
+npm run test:mutation -- --mutate src/application/visible-rows.ts --incrementalFile .scratch/application-mutation/visible-rows.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry run: 2411 tests passed. Threshold, docs, changed formatting and diff checks passed.
+Primary review: analysis-only; no production or test changes. All 40 files have now been audited.
 
 ## Vim clipboard content completed result
 

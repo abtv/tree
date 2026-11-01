@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Application mutation audit](application-mutation-audit.md) | In progress | Audit visible-rows.ts next; 39/40 files complete, 50-file session allowance retained |
+| [Application mutation audit](application-mutation-audit.md) | Awaiting owner acceptance | 40/40 file audits complete; latest per-file aggregate recorded, not a full-layer run |
 | [Explicit editor dependencies](explicit-editor-dependencies.md) | Awaiting owner acceptance | Accept items 1, 2 and limited 5; confirm the batch has no remaining tasks |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
