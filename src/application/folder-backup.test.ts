@@ -55,6 +55,37 @@ export function setup() {
 afterEach(() => vi.useRealTimers())
 
 describe('folder backup', () => {
+  it('does not read the next image after stopping during the previous image write', async () => {
+    const run = setup()
+    const first = head()
+    run.setHead({
+      ...first,
+      document: {
+        roots: [
+          ...first.document.roots,
+          { id: 'b', text: 'Second', attachment: { id: 'second', mimeType: 'image/png' }, children: [] },
+        ],
+      },
+    })
+    let finish!: () => void
+    run.destination.writeImage.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await vi.advanceTimersByTimeAsync(0)
+
+    run.backup.stop()
+    finish()
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(run.source.readImage).toHaveBeenCalledTimes(1)
+    expect(run.destination.writeImage).toHaveBeenCalledTimes(1)
+    expect(run.destination.writeDocument).not.toHaveBeenCalled()
+    expect(run.states).toEqual([{ state: 'writing' }])
+  })
+
   it('reports startup activity and stays idle after a successful backup without another save', async () => {
     const run = setup()
     await vi.advanceTimersByTimeAsync(0)

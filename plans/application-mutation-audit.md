@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-four tasks are complete.
-Next task is folder-backup.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-five tasks are complete.
+Next task is menu-commands.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -98,7 +98,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 22 | editor-undo-focus.ts | Done: 87.77% to 89.89%, 165 killed, 18 survivors, 4 timeouts, 1 no coverage; threshold failed |
 | 23 | emoji-history.ts | Done: 67.86% to 82.14%, 22 killed, 5 equivalents, 1 timeout; threshold failed |
 | 24 | expansion-state.ts | Done: 98.65%, 73 killed, 1 equivalent survivor |
-| 25 | folder-backup.ts | Planned |
+| 25 | folder-backup.ts | Done: 95.40% to 96.55%, 84 killed, 3 survivors |
 | 26 | menu-commands.ts | Planned |
 | 27 | node-search.ts | Planned |
 | 28 | notes-archive/archive-messages.ts | Planned |
@@ -736,6 +736,30 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Folder backup result
+
+Starting commit c6b8274; 21:40:31–21:42:55. Baseline 95.40%: 83 Killed, 4 Survived.
+Final 96.55%: 84 Killed, 3 Survived; Timeout/NoCoverage/errors/ignored zero.
+New coverage kills 39: stopping during one image write must prevent reading the next image.
+An intermediate assertion also constrained which filename came first (97.70%); the final new
+test checks only the required absence of further I/O, so it does not invent an image-order requirement.
+No pre-existing assertion was changed.
+
+Remaining 22 defends an already-cancelled timer callback; run starts synchronously when its
+callback fires. 89 only adds clearTimeout(undefined), a no-op for supported host clocks.
+35 removes sorting: successful backup content and images-before-document ordering stay the same;
+the order of different images is unspecified. Collision failures can leave a different first image,
+so this is an unspecified-order variant, not universal destination-byte equivalence.
+
+```sh
+npm run test:mutation -- --mutate src/application/folder-backup.ts --incrementalFile .scratch/application-mutation/folder-backup.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/folder-backup.test.ts
+```
+
+Final dry run: 18 tests; ordinary focused run: 17 tests. Renderer types, lint, formatting,
+docs and whitespace checks passed. Primary review confirms a tests-only change and no boundary
+implementation changes. Next: menu-commands.ts.
 
 ## Expansion state result
 
