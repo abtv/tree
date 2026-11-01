@@ -29,6 +29,24 @@ async function fixture() {
 }
 
 describe('release manifest and package', () => {
+  it('accepts repository navigation without allowing external assets', async () => {
+    const dir = await fixture()
+
+    await writeFile(
+      join(dir, 'index.html'),
+      '<script src="./assets/app.js"></script><a href="https://github.com/abtv/tree">GitHub repository</a>',
+    )
+    const manifest = await createManifest(dir, identity)
+
+    await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+
+    for (const tag of ['script src', 'link href', 'img src']) {
+      await writeFile(join(dir, 'index.html'), `<${tag}="https://github.com/abtv/tree">`)
+
+      await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
+    }
+  })
+
   it('verifies a complete immutable static package and rejects changed or added files', async () => {
     const dir = await fixture()
     const manifest = await createManifest(dir, identity)

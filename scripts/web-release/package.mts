@@ -12,6 +12,16 @@ import {
   validateManifest,
 } from './policy.mts'
 
+function* assetReferences(html: string) {
+  for (const tag of html.matchAll(/<([a-z][\w:-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi)) {
+    for (const attribute of tag[2]!.matchAll(/\s(src|href)\s*=\s*["']([^"']*)["']/gi)) {
+      // Anchor destinations are navigation, not resources loaded by the package.
+      if (tag[1]!.toLowerCase() === 'a' && attribute[1]!.toLowerCase() === 'href') continue
+      yield attribute[2]!
+    }
+  }
+}
+
 export async function inspectPackage(directory: string) {
   const files: ReleaseFile[] = []
   let total = 0
@@ -39,8 +49,7 @@ export async function inspectPackage(directory: string) {
   files.sort((a, b) => a.path.localeCompare(b.path, 'en'))
   const html = await readFile(join(directory, 'index.html'), 'utf8')
   const paths = new Set(files.map((file) => file.path))
-  for (const match of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
-    const reference = match[1]!
+  for (const reference of assetReferences(html)) {
     if (!(reference.startsWith('./assets/') || isRootPublicReference(reference)) || !paths.has(reference.slice(2))) {
       throw new Error('HTML contains a non-package asset reference')
     }
@@ -78,8 +87,8 @@ export async function verifyPackage(directory: string, input: unknown) {
   if (manifest.schema === 2) {
     const current = new Set(manifest.assetGenerations[0])
     const html = await readFile(join(directory, 'index.html'), 'utf8')
-    for (const match of html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/gi)) {
-      if (!current.has(match[1]!.slice(2)) && !isRootPublicReference(match[1]!)) {
+    for (const reference of assetReferences(html)) {
+      if (!current.has(reference.slice(2)) && !isRootPublicReference(reference)) {
         throw new Error('HTML references a non-current asset')
       }
     }
