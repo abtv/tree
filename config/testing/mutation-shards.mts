@@ -2,7 +2,7 @@
 export function mutationShard(value: string | undefined) {
   if (!value) return undefined
   if (!['domain', 'application', 'renderer'].includes(value)) {
-    throw new Error(`Unknown mutation shard: ${value}`)
+    throw new Error('Unknown mutation shard; expected domain, application, or renderer')
   }
   return value
 }

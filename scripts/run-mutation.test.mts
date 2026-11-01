@@ -94,6 +94,20 @@ it('rejects invalid CLI input before launching Stryker', () => {
   )
 
   expect(result.status).toBe(1)
-  expect(result.stderr).toContain('Unknown mutation shard: unknown')
+  expect(result.stderr).toContain('Unknown mutation shard')
+  expect(result.stdout).toBe('')
+})
+
+it('does not print an invalid environment selector', () => {
+  const sentinel = 'synthetic-private-selector'
+
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./run-mutation.mts', import.meta.url))], {
+    encoding: 'utf8',
+    env: { ...process.env, TREE_MUTATION_SHARD: sentinel },
+  })
+
+  expect(result.status).toBe(1)
+  expect(result.stderr).toContain('Unknown mutation shard')
+  expect(result.stderr).not.toContain(sentinel)
   expect(result.stdout).toBe('')
 })
