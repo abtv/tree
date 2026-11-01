@@ -271,6 +271,23 @@ describe('Vim word motions at boundaries', () => {
 })
 
 describe('Vim text-object boundaries', () => {
+  // @requirement PRODUCT.md §20.2.17
+  it.each([
+    ['[', '[word]'],
+    [']', '[word]'],
+    ['{', '{word}'],
+    ['}', '{word}'],
+  ])('selects inner and around ranges using the %s delimiter', (delimiter, text) => {
+    expect(textObjectRange(text, 2, 'i', delimiter)).toEqual({ start: 1, end: 5 })
+    expect(textObjectRange(text, 2, 'a', delimiter)).toEqual({ start: 0, end: 6 })
+  })
+
+  // @requirement PRODUCT.md §20.2.17
+  it('includes preceding whitespace for an around-word object followed by punctuation', () => {
+    expect(textObjectRange(' one.two', 2, 'a', 'w')).toEqual({ start: 0, end: 4 })
+    expect(textObjectRange(' one.two', 2, 'i', 'w')).toEqual({ start: 1, end: 4 })
+  })
+
   it('selects around a WORD run and extends over following whitespace', () => {
     expect(textObjectRange('one.two  three', 1, 'a', 'W')).toEqual({ start: 0, end: 9 })
   })
@@ -324,6 +341,16 @@ describe('Vim text-object boundaries', () => {
 })
 
 describe('Vim word motions at clamped boundaries', () => {
+  it('stops a word-end motion at the final punctuation run without passing the node edge', () => {
+    expect(moveWordEnd('word...', 4)).toBe(6)
+    expect(moveWordEnd('...', 0)).toBe(2)
+  })
+
+  it('stops a backward word-end motion at the beginning of a punctuation-only prefix', () => {
+    expect(moveWordEndBackward('... word', 2)).toBe(0)
+    expect(moveWordEndBackward('...', 2)).toBe(0)
+  })
+
   it('clamps a cursor beyond the text for the end motions', () => {
     expect(moveWordEnd('one two', 99)).toBe(6)
     expect(moveWORDEnd('one two', 99)).toBe(6)

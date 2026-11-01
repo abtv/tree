@@ -37,6 +37,16 @@ describe('caret projection ownership', () => {
     expect(owner.beginCommit(undefined, 'insert')).toEqual({ focusChanged: true, modeChanged: true })
   })
 
+  it('runs the initial projection without a focus and recognizes the first focus when loading finishes', () => {
+    const owner = new CaretProjectionState(undefined, 'normal')
+
+    expect(owner.beginCommit(undefined, 'normal')).toEqual({ focusChanged: true, modeChanged: true })
+    expect(owner.beginCommit(undefined, 'normal')).toEqual({ focusChanged: false, modeChanged: false })
+    expect(owner.beginCommit(focus, 'normal')).toEqual({ focusChanged: true, modeChanged: true })
+    expect(owner.focusToken).toBe(focus.token)
+    expect(owner.beginCommit(focus, 'normal')).toEqual({ focusChanged: false, modeChanged: false })
+  })
+
   it('keeps command caret authority until an explicit placement replaces it', () => {
     const owner = new CaretProjectionState(focus, 'normal')
 

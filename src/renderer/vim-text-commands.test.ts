@@ -402,6 +402,26 @@ describe('Vim text changes beyond deletion', () => {
     ).toMatchObject({ nextText: `SS ${url} SS`, nextCursor: 0 })
   })
 
+  // @requirement PRODUCT.md §20.2.11
+  it('limits a case change to its selected text between hyperlinks', () => {
+    const first = 'https://first.test'
+    const second = 'https://second.test'
+    const text = `${first} alpha beta ${second} tail`
+    const start = first.length + 1
+    const end = start + 'alpha'.length
+    const secondStart = text.indexOf(second)
+    const links = [
+      { start: 0, end: first.length, url: first },
+      { start: secondStart, end: secondStart + second.length, url: second },
+    ]
+
+    expect(caseEdits(text, links, start, end, 'upper')).toEqual([{ start, end, inserted: 'ALPHA' }])
+    expect(calculateTextChange(text, start, { kind: 'case', mode: 'upper', count: 5 }, false, links)).toMatchObject({
+      nextText: `${first} ALPHA beta ${second} tail`,
+      edits: [{ start, end, inserted: 'ALPHA' }],
+    })
+  })
+
   it('replays change and substitute edits through their recorded offset', () => {
     expect(
       calculateTextChange(

@@ -38,6 +38,21 @@ describe('Vim surround delimiters', () => {
 })
 
 describe('Vim surround edits', () => {
+  // @requirement PRODUCT.md §20.2.18
+  it.each([
+    ['[', '[ word ]'],
+    [']', '[word]'],
+    ['{', '{ word }'],
+    ['}', '{word}'],
+    ['<', '< word >'],
+    ['>', '<word>'],
+  ])('wraps with %s and preserves the requested padding', (delimiter, expected) => {
+    const result = surroundWrapEdits(2, 6, delimiter)
+
+    expect(result?.cursor).toBe(2)
+    expect(apply('a word z', result)).toBe(`a ${expected} z`)
+  })
+
   it('wraps a range as two insertions and leaves the caret on the opening delimiter', () => {
     const result = surroundWrapEdits(0, 3, ')')
 
