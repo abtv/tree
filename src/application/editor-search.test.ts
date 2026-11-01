@@ -1,8 +1,200 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
+import { EditorSearch } from './editor-search'
+import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { openAgendaState } from './agenda-state'
 
 afterEach(() => vi.useRealTimers())
+
+it('publishes a zero-result search without applying an absent destination', async () => {
+  const { state } = await setup()
+  const apply = vi.fn()
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  search.update(state())
+  search.begin({ nodeId: 'a', offset: 0 })
+  search.edit('missing')
+
+  search.confirm()
+  search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(apply).not.toHaveBeenCalled()
+  expect(search.getResult()).toMatchObject({ kind: 'navigate', total: 0 })
+  expect(search.getResult()?.destination).toBeUndefined()
+})
+
+it('transfers every node of a recursively folded final Agenda day', () => {
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const rows: AgendaRow[] = [
+    { kind: 'day', key: 'day:100', day: 100, content: true, isToday: true },
+    ...['a', 'b'].map((id) => ({
+      kind: 'node' as const,
+      key: id,
+      nodeId: id,
+      depth: 0,
+      day: 100,
+      role: 'match' as const,
+      hasProjectedChildren: false,
+    })),
+  ]
+  for (const row of rows) search.recordOpenedFold(row.key)
+
+  search.manualAgendaFold({ kind: 'fold', key: 'day:100', operation: 'close-recursive' }, rows)
+
+  expect(search.takeFoldsToClose(new Set())).toEqual([])
+})
+
+it('keeps search ownership in later days when manually folding an entire Agenda day', () => {
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const rows: AgendaRow[] = [100, 101].flatMap((day): AgendaRow[] => [
+    { kind: 'day', key: `day:${day}`, day, content: true, isToday: day === 100 },
+    {
+      kind: 'node',
+      key: `node:${day}`,
+      nodeId: `node-${day}`,
+      depth: 0,
+      day,
+      role: 'match',
+      hasProjectedChildren: false,
+    },
+  ])
+  for (const row of rows) search.recordOpenedFold(row.key)
+
+  search.manualAgendaFold({ kind: 'fold', key: 'day:100', operation: 'close-recursive' }, rows)
+
+  expect(search.takeFoldsToClose(new Set())).toEqual(['day:101', 'node:101'])
+})
+
+it.each(['close-recursive', 'open-recursive'] as const)(
+  'transfers only a node subtree when Agenda folding is %s',
+  (operation) => {
+    const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+    const rows: AgendaRow[] = [
+      { kind: 'day', key: 'day:100', day: 100, content: true, isToday: true },
+      ...(
+        [
+          ['before', 0],
+          ['parent', 0],
+          ['child', 1],
+          ['deep', 2],
+          ['sibling', 0],
+        ] as const
+      ).map(([id, depth]) => ({
+        kind: 'node' as const,
+        key: id,
+        nodeId: id,
+        depth,
+        day: 100,
+        role: 'match' as const,
+        hasProjectedChildren: true,
+      })),
+      { kind: 'day', key: 'day:101', day: 101, content: true, isToday: false },
+    ]
+    for (const row of rows) search.recordOpenedFold(row.key)
+
+    search.manualAgendaFold({ kind: 'fold', key: 'parent', operation }, rows)
+
+    expect(search.takeFoldsToClose(new Set())).toEqual(['day:100', 'before', 'sibling', 'day:101'])
+    expect(search.takeFoldsToClose(new Set())).toEqual([])
+  },
+)
+
+it.each(['toggle', 'close', 'open'] as const)('transfers only the chosen Agenda fold for %s', (operation) => {
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const rows: AgendaRow[] = ['parent', 'child'].map((id, depth) => ({
+    kind: 'node',
+    key: id,
+    nodeId: id,
+    depth,
+    day: 100,
+    role: 'match',
+    hasProjectedChildren: true,
+  }))
+  for (const row of rows) search.recordOpenedFold(row.key)
+
+  search.manualAgendaFold(
+    operation === 'toggle' ? { kind: 'toggle-fold', key: 'parent' } : { kind: 'fold', key: 'parent', operation },
+    rows,
+  )
+
+  expect(search.takeFoldsToClose(new Set())).toEqual(['child'])
+
+  for (const row of rows) search.recordOpenedFold(row.key)
+  search.manualAgendaFold({ kind: 'fold', key: 'parent', operation: 'close-all' }, rows)
+
+  expect(search.takeFoldsToClose(new Set())).toEqual([])
+})
+
+it('transfers a nonrecursive Tree fold without transferring its children and releases all on a global fold', async () => {
+  const { state } = await setup(1, true)
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  search.update(state())
+  for (const id of ['a', 'b', 'c']) search.recordOpenedFold(id)
+
+  search.manualFold('a')
+
+  expect(search.takeFoldsToClose(new Set(['c']))).toEqual(['b'])
+
+  for (const id of ['a', 'b', 'd']) search.recordOpenedFold(id)
+  search.manualFold('a', true)
+
+  expect(search.takeFoldsToClose(new Set())).toEqual(['d'])
+
+  for (const id of ['a', 'b', 'c']) search.recordOpenedFold(id)
+  search.manualFold()
+
+  expect(search.takeFoldsToClose(new Set())).toEqual([])
+})
+
+it('tolerates previously opened folds removed by a document edit during a manual recursive fold', async () => {
+  const { state } = await setup()
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const base = state()
+  search.update(base)
+  search.recordOpenedFold('b')
+  search.recordOpenedFold('c')
+  search.update({
+    ...base,
+    document: { roots: [base.document.roots[1]!] },
+    location: { currentParentId: null, selectedNodeId: 'c' },
+    focus: { ...base.focus, nodeId: 'c', token: base.focus.token + 1 },
+  })
+
+  expect(() => search.manualFold('c', true)).not.toThrow()
+  expect(search.takeFoldsToClose(new Set())).toEqual(['b'])
+})
+
+it('hides confirmed feedback and recounts when moving between two focused Agenda days', async () => {
+  const { state } = await setup()
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const base = {
+    ...state(),
+    document: {
+      roots: [
+        { id: 'a', text: 'apple 1970-04-11', children: [] },
+        { id: 'b', text: 'apple apple 1970-04-12', children: [] },
+      ],
+    },
+  }
+  const agenda = openAgendaState(base.location, 0, 100)
+  search.update({ ...base, agenda: { ...agenda, focusedDay: 100, selectedKey: 'day:100' } })
+  search.begin({ beforeDay: 100, offset: 0 })
+  search.edit('apple')
+  search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(search.session.getSnapshot().count?.total).toBe(1)
+
+  search.update({ ...base, agenda: { ...agenda, focusedDay: 101, selectedKey: 'day:101' } })
+
+  expect(search.session.getSnapshot()).toMatchObject({ visible: false, confirmed: 'apple' })
+
+  search.begin({ beforeDay: 101, offset: 0 })
+  await vi.runAllTimersAsync()
+
+  expect(search.session.getSnapshot().count?.total).toBe(2)
+})
 
 async function setup(childCount = 1, nested = false) {
   vi.useFakeTimers()
@@ -63,6 +255,53 @@ it('publishes draft counts and navigation results and stops notifying unsubscrib
   expect(listener).not.toHaveBeenCalled()
 })
 
+it.each(['tree', 'agenda'] as const)(
+  'replaces one non-root %s scope with another and releases previous folds',
+  async (kind) => {
+    const { state } = await setup(3)
+    const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+    const scoped = (currentParentId: string, selectedNodeId: string): ReadySnapshot => {
+      const location = { currentParentId, selectedNodeId }
+      return { ...state(), location, ...(kind === 'agenda' ? { agenda: openAgendaState(location, 0, 100) } : {}) }
+    }
+    search.update(scoped('a', 'b'))
+    search.begin({ nodeId: 'b', offset: 0 })
+    search.edit('apple')
+    search.confirm()
+    await vi.runAllTimersAsync()
+
+    expect(search.session.getSnapshot().count?.total).toBe(kind === 'tree' ? 5 : 0)
+
+    search.recordOpenedFold('old-fold')
+    search.update(scoped('c', 'd'))
+
+    expect(search.session.getSnapshot()).toMatchObject({ visible: false, confirmed: 'apple' })
+    expect(search.takeFoldsToClose(new Set())).toEqual([])
+
+    search.begin({ nodeId: 'd', offset: 0 })
+    await vi.runAllTimersAsync()
+
+    expect(search.session.getSnapshot().count?.total).toBe(kind === 'tree' ? 2 : 0)
+  },
+)
+
+it('advances from the actual match when its caret snaps to the start of a combining grapheme', async () => {
+  const { store, state } = await setup()
+  store.editText('a', 'a\u0301b\u0301')
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('\u0301')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(store.search.getResult()?.destination).toMatchObject({ nodeId: 'a', start: 1, caret: 0 })
+
+  store.search.navigate({ nodeId: 'a', offset: state().focus.cursor }, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(store.search.getResult()?.destination).toMatchObject({ nodeId: 'a', start: 3, caret: 2 })
+  expect(state().focus.cursor).toBe(2)
+})
+
 it('applies every identical queued repeat and then accepts another jump', async () => {
   const { store, state } = await setup()
   const origin = { nodeId: 'a', offset: 0 }
@@ -80,6 +319,65 @@ it('applies every identical queued repeat and then accepts another jump', async 
   await vi.runAllTimersAsync()
 
   expect(state().location.selectedNodeId).toBe('d')
+})
+
+it('serializes rapid jumps started after confirmation has already finished', async () => {
+  const { store, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+  const origin = { nodeId: 'a', offset: state().focus.cursor }
+
+  store.search.navigate(origin, 1, 1)
+  store.search.navigate(origin, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('c')
+  expect(store.search.getResult()?.destination?.nodeId).toBe('c')
+})
+
+it.each(['begin', 'hide'] as const)('clears the old navigation result on %s', async (action) => {
+  const { store } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(store.search.getResult()?.destination).toBeDefined()
+
+  if (action === 'begin') store.search.begin({ nodeId: 'a', offset: 6 })
+  else store.search.hide()
+
+  expect(store.search.getResult()).toBeUndefined()
+})
+
+it('preserves pending navigation on an unchanged publication and fold ownership on an in-scope edit', async () => {
+  const { state } = await setup()
+  const apply = vi.fn()
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  const base = state()
+  search.update(base)
+  search.begin({ nodeId: 'a', offset: 0 })
+  search.edit('apple')
+  search.confirm()
+  await vi.runAllTimersAsync()
+  apply.mockClear()
+
+  search.navigate({ nodeId: 'a', offset: 6 }, 1, 1)
+  search.update(base)
+  await vi.runAllTimersAsync()
+
+  expect(apply).toHaveBeenCalledOnce()
+  expect(apply.mock.calls[0]?.[0]).toMatchObject({ nodeId: 'b' })
+
+  search.recordOpenedFold('a')
+  search.update({
+    ...base,
+    document: { roots: base.document.roots.map((node) => ({ ...node, text: `${node.text}!` })) },
+  })
+
+  expect(search.takeFoldsToClose(new Set())).toEqual(['a'])
 })
 
 it('keeps different repeat counts distinct while navigation is pending', async () => {
@@ -220,6 +518,11 @@ it('keeps a newer manual selection authoritative over a pending search jump', as
   expect(state().location.selectedNodeId).toBe('c')
   expect(state().focus?.cursor).toBe(0)
   expect(store.search.session.getSnapshot()).toMatchObject({ confirmed: 'apple', visible: true })
+
+  store.search.navigate({ nodeId: 'c', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('d')
 })
 
 it('recounts structural deletion, split, join and history before navigating current text', async () => {

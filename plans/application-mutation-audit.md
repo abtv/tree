@@ -55,8 +55,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Seventeen tasks are complete.
-Next task is editor-search.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Eighteen tasks are complete.
+Next task is editor-store-types.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -89,8 +89,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 15 | editor-content-changes.ts | Done: 98%, 49 killed, 1 equivalent |
 | 16 | editor-node-visual-transitions.ts | Done: 90.56% to 95.51%, 425 killed, 17 survivors, 3 no coverage |
 | 17 | editor-runtime-state.ts | Done: 90.57% to 93.40%, 99 killed, 7 survivors |
-| 18 | editor-search.ts | Ready |
-| 19 | editor-store-types.ts | Planned |
+| 18 | editor-search.ts | Done: 69.02% to 85.19%, 251 killed, 44 survivors, 2 timeouts; threshold failed |
+| 19 | editor-store-types.ts | Ready |
 | 20 | editor-store.ts | Planned |
 | 21 | editor-text-session.ts | Planned |
 | 22 | editor-undo-focus.ts | Planned |
@@ -515,3 +515,48 @@ npm test -- src/application/editor-runtime-state.test.ts src/application/editor-
 Dry runs passed 1957/1958 tests; final ordinary run passed 10. Renderer types, lint,
 formatting, docs and diff checks passed. Primary review confirms tests-only scope.
 Visual transitions commit: 874b2b8.
+
+## Editor search result
+
+Starting commit d827f3f; 20:11:53–20:35:23, within the 30-minute file budget.
+Baseline 69.02%: 203 Killed, 89 Survived, 3 NoCoverage, 2 Timeout.
+Final 85.19%: 251 Killed, 44 Survived, 0 NoCoverage, 2 Timeout; errors/ignored zero.
+Stryker exit 1 remains an unmet 93% threshold, not a launch failure. No threshold or exclusion changed.
+Intermediate scores: 76.43, 78.45, 85.19, 84.51, 84.85, 85.19; the final repeat stayed at 85.19.
+Timeout counts varied up to eight between runs; their contribution is not an assertion kill.
+
+Tests cover recursive and single fold ownership (including subtree/day ends and unrelated descendants),
+Tree and Agenda scope switches, focused-day switches, matches inside combining graphemes,
+rapid jumps after confirmation, empty results with queued navigation, resuming after manual selection,
+clearing old feedback, unchanged publication, in-scope edits, and stale fold IDs after deletion.
+Killed increased by 48; all three previously uncovered mutants are now assertion-killed.
+
+Remaining triage, using the final mutant IDs:
+
+* 0/1/2/3/5: initial private values are overwritten before initialized navigation.
+* 20/23/25: scope-key sentinel changes preserve distinctions for application-generated IDs;
+  this does not claim equivalence for arbitrary adversarial IDs equal to the replacement sentinel.
+* 32/58/60/72/73/74/87: redundant context/draft guards, short-circuit narrowing,
+  identity-based invalidation, monotonic revision direction, or an explicit undefined property.
+* 96/102/105/111/112/117/120/124/259/264: redundant cancellation and empty-query handling
+  under the current SearchSession/caller contract. SearchSession independently invalidates callbacks;
+  counter direction is not an externally observable result. No assertion gap was confirmed here.
+* 128/130: disable queue coalescing while retaining the same ordered navigation operations.
+* 192/193: scan an empty ownership set; 200/205/207: real timeline headers stop traversal after
+  a missing/gap target; 219/220/223: redundant node-kind/day checks in ordered day groups;
+  227: a day header has no depth, so its comparison with node depth stays false.
+* Defensive: 100 guards cancellation without a draft; 149/151/153 guard an origin inconsistent
+  with the published selection (normal manual selection clears the anchor); 202/203 guard a missing
+  fold target; 245/297 guard calls before state initialization. These are not claimed universally equivalent.
+* Timeout 282 removes queue advancement; 288 increases the repeat counter. Neither is counted as an assertion kill.
+
+All runs used the dedicated path:
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-search.ts --incrementalFile .scratch/application-mutation/editor-search.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/editor-search.test.ts src/application/editor-search-agenda.test.ts
+```
+
+Final dry run passed 2146 tests. Ordinary focused tests, renderer types, lint, formatting, docs
+and diff checks passed. Primary review retained existing assertions and verified tests-only changes.
+Runtime state commit: d827f3f.
