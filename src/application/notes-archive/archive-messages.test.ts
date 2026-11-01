@@ -15,6 +15,24 @@ import {
 } from './archive-messages'
 
 describe('notes archive wording', () => {
+  it('promotes a rounded size to megabytes at the unit boundary', () => {
+    expect(fileSizeText(999_950)).toBe('1 MB')
+  })
+
+  it('names the folder when exactly one restored image is missing', () => {
+    const message = importConfirmationText(
+      'Backup',
+      1000,
+      { nodeCount: 1, imageCount: 0, missingImageCount: 1 },
+      'none',
+      true,
+    )
+
+    expect(message.missing).toBe(
+      '1 image that the notes use is not in the folder. Its node will show “Image could not be loaded.”',
+    )
+  })
+
   // @requirement PRODUCT.md §25.3
   it('describes preserved desktop notes for valid, empty and unreadable current data', () => {
     const incoming = { nodeCount: 1, imageCount: 0, missingImageCount: 0 }

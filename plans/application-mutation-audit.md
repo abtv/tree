@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-seven tasks are complete.
-Next task is notes-archive/archive-messages.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-eight tasks are complete.
+Next task is notes-archive/archive-policy.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -101,7 +101,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 25 | folder-backup.ts | Done: 95.40% to 96.55%, 84 killed, 3 survivors |
 | 26 | menu-commands.ts | Done: 79.31% to 89.66%, 26 killed, 3 survivors; threshold failed |
 | 27 | node-search.ts | Done: 86.30% to 91.78%, 62 killed, 6 survivors, 5 timeouts; threshold failed |
-| 28 | notes-archive/archive-messages.ts | Planned |
+| 28 | notes-archive/archive-messages.ts | Done: 95.42% to 96.95%, 126 killed, 4 survivors, 1 timeout |
 | 29 | notes-archive/archive-policy.ts | Planned |
 | 30 | notes-archive/crc32.ts | Planned |
 | 31 | notes-archive/desktop-data-operations.ts | Planned |
@@ -736,6 +736,27 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Archive messages result
+
+Starting commit 6a8eea4; 21:49:07–21:50:35. Baseline 95.42%: 124 Killed, 5 Survived,
+1 Timeout, 1 NoCoverage. Final 96.95%: 126 Killed, 4 Survived, 1 Timeout, 0 NoCoverage;
+errors/ignored zero. Tests kill the exact megabyte rounding boundary (66) and previously
+uncovered singular missing-image folder message (112).
+
+68/69/71 defend the maximum GB unit for sizes near a terabyte, beyond PRODUCT §24.3's
+2,147,483,647-byte archive limit and the same restore validation limits. 80 changes decimal
+precision only at the integer 100, which formats identically. Timeout 72 removes loop progress;
+it is not an assertion kill. No supported assertion gap remains.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/archive-messages.ts --incrementalFile .scratch/application-mutation/archive-messages.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/notes-archive/archive-messages.test.ts
+```
+
+Final dry run: 249 tests; focused run: 11 tests. Renderer types, lint, formatting, docs and
+whitespace checks passed. Primary review confirms additive tests and unchanged runtime.
+Next: notes-archive/archive-policy.ts.
 
 ## Node search result
 
