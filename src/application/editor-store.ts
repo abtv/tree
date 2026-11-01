@@ -294,7 +294,7 @@ export class EditorStore {
 
   /**
    * Create a dated node from the selected Agenda day: for that day, or for the day before it. The
-   * new node is the last child of the scope and becomes the active occurrence (`plans/agenda.md` §9).
+   * new node is the last child of the scope and becomes the active occurrence (`docs/PRODUCT.md` §23.11).
    */
   public createAgendaDayNode(day: 'selected' | 'preceding'): boolean {
     const state = this.runtime.ready()
@@ -318,7 +318,7 @@ export class EditorStore {
     return true
   }
 
-  /** `Enter` in the selected dated Agenda node: split it and date the new part (`plans/agenda.md` §9, m17). */
+  /** `Enter` in the selected dated Agenda node: split it and date the new part (`docs/PRODUCT.md` §23.11). */
   public splitAgendaNode(cursor: number): boolean {
     const state = this.runtime.ready()
     const row = this.selectedAgendaMatch()
@@ -343,7 +343,7 @@ export class EditorStore {
   }
 
   /**
-   * Move dated occurrences to `targetDay` by replacing their source days' dates (`plans/agenda.md` §11).
+   * Move dated occurrences to `targetDay` by replacing their source days' dates (`docs/PRODUCT.md` §23.12).
    * It is one undoable change that selects the first moved node on the target day, and returns whether
    * any text changed.
    */
@@ -361,7 +361,7 @@ export class EditorStore {
   /**
    * Vim `dd` in Agenda: mark the selected direct match and the next `count − 1` qualifying rows, or the
    * provided whole-node Visual range for Visual `d`, for a later
-   * `p`/`P` (`plans/agenda.md` §13). It changes no document, Vim register, or clipboard, and returns whether
+   * `p`/`P` (`docs/PRODUCT.md` §23.13). It changes no document, Vim register, or clipboard, and returns whether
    * anything was marked.
    */
   public startAgendaMove(count = 1, visual?: import('./agenda-visual-selection').AgendaVisualEndpoints): boolean {
