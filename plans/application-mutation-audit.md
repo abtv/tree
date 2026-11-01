@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-eight tasks are complete.
-Next task is notes-archive/archive-policy.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-nine tasks are complete.
+Next task is notes-archive/crc32.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -102,7 +102,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 26 | menu-commands.ts | Done: 79.31% to 89.66%, 26 killed, 3 survivors; threshold failed |
 | 27 | node-search.ts | Done: 86.30% to 91.78%, 62 killed, 6 survivors, 5 timeouts; threshold failed |
 | 28 | notes-archive/archive-messages.ts | Done: 95.42% to 96.95%, 126 killed, 4 survivors, 1 timeout |
-| 29 | notes-archive/archive-policy.ts | Planned |
+| 29 | notes-archive/archive-policy.ts | Done: 100%, 35 killed |
 | 30 | notes-archive/crc32.ts | Planned |
 | 31 | notes-archive/desktop-data-operations.ts | Planned |
 | 32 | notes-archive/export-notes.ts | Planned |
@@ -736,6 +736,19 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Archive policy result
+
+Starting commit b7597b0; 21:51:16–21:51:37. Baseline/final 100% / unchanged.
+35 Killed; all other statuses zero. Dry run: 331 tests. Existing export/import/ZIP tests
+cover this module; there is no separate archive-policy.test.ts. Primary source and coverage
+review found no gap; no tests changed.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/archive-policy.ts --incrementalFile .scratch/application-mutation/archive-policy.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Threshold, docs, changed formatting and whitespace checks passed. Next: notes-archive/crc32.ts.
 
 ## Archive messages result
 
