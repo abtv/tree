@@ -7,7 +7,8 @@ Status: In progress
 Audit every Stryker application source file sequentially, starting with persistence/history.
 Allow at most 30 minutes per file. Add meaningful tests only for confirmed gaps.
 Do not change production code, exclusions, the 93% threshold, or weaken tests.
-Commit completed validated work per file; at most four task commits per session.
+Commit completed validated work per file. The owner explicitly raised this primary session's
+allowance to ten commits on continuation; four had already landed, leaving six additional tasks.
 
 ## Current file and evidence
 
@@ -50,8 +51,8 @@ This task-specific instruction overrides DEVELOPMENT.md §12's layer-shard fallb
 Keep the threshold unchanged and report a below-threshold exit honestly; a completed audit
 does not mean the threshold passed. Do not launch a layer shard.
 
-The first four analyses are complete without test changes. The primary session reached its four-task commit limit.
-Next is agenda-pending-move.ts in a fresh session; enumerate the remaining source files
+The first four analyses are complete without test changes. The owner authorized continued work
+in this session up to ten commits. Next task is agenda-reconcile.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -71,8 +72,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 2 | persistence-coordinator.ts | Done: 96.15%, 67 killed, 3 equivalent survivors, 8 timeouts |
 | 3 | editor-save-scheduler.ts | Done: 94.50%, 101 killed, 6 survivors, 2 timeouts |
 | 4 | editor-history.ts | Done: 93.07%, 94 killed, 4 survivors, 3 no coverage |
-| 5 | agenda-pending-move.ts | Ready |
-| 6 | agenda-reconcile.ts | Planned |
+| 5 | agenda-pending-move.ts | Done: 100%, 59 killed, 5 existing ignored |
+| 6 | agenda-reconcile.ts | Ready |
 | 7 | agenda-rows.ts | Planned |
 | 8 | agenda-state.ts | Planned |
 | 9 | agenda-visual-selection.ts | Planned |
@@ -187,3 +188,18 @@ The final aggregate across all files is not yet available. Partial latest-report
 Killed 320, Survived 23, Timeout 17, NoCoverage 3, mutant errors 0; one separate CLI launch error.
 This is a partial aggregation of separate file runs, never a full-layer execution result.
 Keep the scratch evidence until the initiative finishes. Final owner acceptance is pending the whole audit.
+
+## Agenda pending move result
+
+Source unchanged at 08ac5cc; run 2026-11-01 19:24:36–19:25:12.
+Baseline/final 100% / unchanged; Killed 59, Survived 0, Timeout 0, NoCoverage 0, errors 0.
+Five existing Ignored mutants (57, 58, 60, 62, 64) retain the pre-existing type-narrowing
+suppression on pendingMoveTargetDay; no exclusion was added or changed.
+No surviving mutation or confirmed gap requires tests. Dry run: 1939 tests passed.
+
+```sh
+npm run test:mutation -- --mutate src/application/agenda-pending-move.ts --incrementalFile .scratch/application-mutation/agenda-pending-move.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Primary source/report review completed. Documentation governance, changed formatting and diff
+checks are the applicable validation for this analysis-only task. Editor history commit: 08ac5cc.
