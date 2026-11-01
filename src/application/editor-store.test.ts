@@ -6013,6 +6013,17 @@ describe('EditorStore', () => {
     expect(after.focus).toEqual(before.focus)
   })
 
+  it('reports Backspace as rejected while locked even when the preceding empty node could be removed', async () => {
+    const { store } = await lockEditor(new FakeClock(), [
+      { id: 'before', text: '', children: [] },
+      { id: 'root', text: 'Root', children: [] },
+    ])
+    const before = store.getSnapshot()
+
+    expect(store.backspaceAtStart(0)).toBe(false)
+    expect(store.getSnapshot()).toBe(before)
+  })
+
   it('retries failed cleanup without saving the document, never locks, and recovers on cleanup success', async () => {
     const services = loadedState(
       { roots: [{ id: 'root', text: '', children: [{ id: 'child', text: '', children: [] }] }] },

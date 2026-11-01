@@ -10,7 +10,9 @@ Do not change production code, exclusions, the 93% threshold, or weaken tests.
 Commit completed validated work per file. The owner explicitly raised this primary session's
 allowance to ten commits on continuation; four had already landed, leaving six additional tasks.
 The owner subsequently extended the allowance to 50 files in this same session, authorizing
-completion of the entire 40-file inventory with its per-file commits. Earlier session-limit
+completion of the entire 40-file inventory with its per-file commits. On the next continuation,
+the owner renewed editor-store.ts for 30 minutes and reaffirmed up to 50 sequential files and commits.
+Earlier session-limit
 handoffs below are historical and no longer block continuation.
 
 ## Current file and evidence
@@ -55,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Nineteen tasks are complete.
-Next task is editor-store.ts; enumerate the remaining source files
+in this session, subsequently extended to 50 files. Twenty tasks are complete.
+Next task is editor-text-session.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -91,7 +93,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 17 | editor-runtime-state.ts | Done: 90.57% to 93.40%, 99 killed, 7 survivors |
 | 18 | editor-search.ts | Done: 69.02% to 85.19%, 251 killed, 44 survivors, 2 timeouts; threshold failed |
 | 19 | editor-store-types.ts | Done: 100%, 3 killed |
-| 20 | editor-store.ts | Ready |
+| 20 | editor-store.ts | Done: 87.28% to 92.31%; 1342 killed, 111 survivors, 15 timeouts, 2 no coverage; threshold failed |
 | 21 | editor-text-session.ts | Planned |
 | 22 | editor-undo-focus.ts | Planned |
 | 23 | emoji-history.ts | Planned |
@@ -574,3 +576,135 @@ npm run test:mutation -- --mutate src/application/editor-store-types.ts --increm
 ```
 
 Editor search commit: 18ba7e5.
+
+## Editor store first-budget partial result (historical)
+
+Starting commit 8286dea. File budget started at 20:37:00 on 2026-11-01; stop by 21:07:00.
+Baseline ended 20:48:19: 87.28%, 1272 Killed, 180 Survived, 11 Timeout, 7 NoCoverage,
+zero errors/ignored. First follow-up: 87.62%, 1277 Killed, 178 Survived, 11 Timeout, 4 NoCoverage.
+Second follow-up ended 20:58:49: 88.98%, 1293 Killed, 158 Survived, 15 Timeout, 4 NoCoverage.
+These exits are threshold failures at the unchanged 93%, not launch errors.
+
+The last run started at 21:00:07 and ended at 21:02:58 with the latest test behavior:
+89.73%, 1308 Killed, 149 Survived, 11 Timeout, 2 NoCoverage, zero errors/ignored.
+Killed increased by 36 over baseline. Five previously uncovered mutants now have coverage;
+coverage alone does not mean they are killed. Dry run passed 1976 tests.
+The file is not complete: stop near the 30-minute budget with the remaining triage below preserved.
+Do not advance or call the threshold passed. A further file-budget allowance is needed to finish this file.
+No Stryker process remains running; no test or production changes for this file have been committed.
+All runs use:
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-store.ts --incrementalFile .scratch/application-mutation/editor-store.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Uncommitted tests cover preference failure reporting, concurrent clipboard writes, finite viewport
+measurements, Agenda closing/returning, deletion fallbacks, locked Backspace, retained-ID Undo
+boundaries, persisted recent/search navigation, manual fold ownership, and search inside a nested scope.
+Changed test files:
+
+* src/application/editor-store-services.test.ts
+* src/application/editor-store-agenda-delete.test.ts
+* src/application/editor-store-edit-boundaries.test.ts
+* src/application/editor-store-agenda.test.ts
+* src/application/editor-store.test.ts
+
+Renderer types, lint and formatting passed for the latest tests. After final Stryker completion,
+the following ordinary run passed all 344 tests; docs/diff checks and primary diff review passed too.
+Production code, thresholds, exclusions and existing assertions are unchanged.
+
+```sh
+npm test -- src/application/editor-store.test.ts src/application/editor-store-agenda.test.ts src/application/editor-store-agenda-delete.test.ts src/application/editor-store-edit-boundaries.test.ts src/application/editor-store-services.test.ts
+npm run typecheck:renderer
+npm run lint
+npm run format:check:changed
+npm run check:docs
+git diff --check
+```
+
+Do not commit this file as a completed audit until remaining triage is finished.
+
+Remaining work: inspect the latest full-file incremental report, classify every remaining Survived/NoCoverage,
+and close further confirmed assertion gaps within an explicitly renewed file budget if this cycle expires.
+Start with mutant 1358 (line 1589): assess Undo of a date edit when the restored Agenda day is folded;
+the mutant removes preservePresentation from reconcileAgenda. This is a candidate gap, not yet confirmed.
+Then inspect 1363/1364 (Agenda history change-site focus through Tree-collapsed ancestors).
+In particular, finish applyAgenda's publication/session conditions, search publication guards,
+copy finalization, creation/put/session boundaries, Agenda deletion guards and history focus recovery.
+Do not skip to editor-text-session.ts; editor-store.ts is still the current file.
+The many source comments identify candidate equivalents/defenses but are not a substitute for completed triage.
+
+Already inspected mechanisms for later triage: currentState's ready guard is unreachable through the scheduler;
+undefined viewport keys disappear during JSON persistence; parsePersistedState supplies a view;
+toggleNodeExpansion always changes identity; expansionAfterOpen/Put re-expand already-open targets and
+applyStructural supplies the original expansion when omitted; malformed empty link fallbacks normalize away;
+redo already follows an ended typing session; persistence callbacks only arrive for ready state.
+Do not count timed-out mutants as assertion kills. Baseline hit-limit timeouts affect flush loops;
+1488/1489 edit-tracking cleanup timeouts have a different lifecycle cause. Some additional elapsed-time
+timeouts appeared during follow-ups and must be reported from the latest result without calling them kills.
+
+Latest NoCoverage: 518 (parser-guaranteed view fallback), 716 (deleteLink lookup result defense).
+Latest Timeout: 433, 436, 437, 443, 444, 449, 452, 453, 455, 1266, 1267.
+The first nine exhaust flush-loop hit limits; the last two affect pending-edit removal and time out.
+They are not assertion kills. Other elapsed-time timeouts from intermediate runs reverted on rerun.
+
+All 149 remaining Survived IDs are retained below so none is silently skipped. The mechanism notes above
+cover only part of this list; do not label the entire list equivalent or defensive without finishing triage.
+
+```text
+15, 25, 29, 64, 74, 93, 103, 105, 111, 113, 114, 115, 126, 130, 143, 158, 165, 166
+172, 181, 191, 237, 242, 278, 287, 293, 313, 322, 324, 330, 373, 383, 385, 397, 435, 469
+486, 498, 499, 501, 502, 510, 514, 515, 517, 555, 566, 569, 571, 573, 580, 591, 592, 594
+599, 609, 612, 614, 616, 617, 618, 620, 654, 667, 683, 684, 692, 696, 710, 714, 739, 746
+748, 773, 775, 833, 862, 868, 876, 877, 891, 898, 901, 902, 904, 921, 924, 925, 927, 942
+945, 952, 954, 959, 968, 969, 977, 997, 1035, 1066, 1121, 1125, 1137, 1145, 1157, 1158, 1160, 1162
+1165, 1175, 1177, 1180, 1189, 1195, 1196, 1199, 1202, 1203, 1204, 1205, 1206, 1207, 1209, 1211, 1212, 1216
+1312, 1324, 1326, 1343, 1358, 1363, 1364, 1366, 1376, 1378, 1382, 1386, 1389, 1391, 1392, 1399, 1434, 1446
+1461, 1463, 1464, 1466, 1496
+```
+
+Last completed file commit: 8286dea (editor-store-types.ts). All later application files remain planned,
+not skipped or tested. No aggregate of all application files is available yet.
+
+## Editor store completed result
+
+This section supersedes the historical handoff above. Renewed budget: 21:06:40–21:36:40 local,
+2026-11-01. Final run ended 21:25:53. Initial baseline 87.28%: 1272 Killed, 180 Survived,
+11 Timeout, 7 NoCoverage. Final 92.31%: 1342 Killed, 111 Survived, 15 Timeout, 2 NoCoverage,
+zero mutant errors/ignored and zero new launch errors. The unchanged 93% threshold fails;
+this is a completed file audit, not a threshold pass. No layer shard was run.
+
+Renewed runs: 89.80, 90.07, 90.54, 91.43, 91.97, 92.31. The last increase includes four
+additional timeouts, not four assertion kills. Killed increased by 70 over the initial baseline
+and by 34 over the prior handoff. Mutant 1137 is now assertion-killed by the pinned-parent
+deletion scenario with a second root; its first fixture independently blocked last-root deletion.
+
+New coverage includes history preserving folded dates, typing boundaries around Agenda selection,
+search and date moves, clipboard failure recovery, search cancellation and fold ownership,
+context selection after deletion, expanded preceding descendants, insertion before an expanded
+node, layout invalidation, no-op search saves, absent Vim registers, and history with no net text change.
+Existing assertions, production code, exclusions and threshold are unchanged.
+
+Survivor classification: 22 defensive, 88 equivalent/redundant within supported inputs,
+and one qualified inactive-focus case (1211). Defensive IDs:
+15, 103, 143, 191, 287, 324, 514, 515, 517, 555, 569, 599, 616, 617, 618, 620,
+714, 773, 775, 1160, 1378, 1386.
+For 1211, Agenda destination selection replaces the temporary Tree focus when selecting a real row;
+on a day header that focus is inactive, search uses the day key and closing restores the recorded origin.
+This is not universal snapshot equivalence. Sentinel equivalents assume application-generated IDs.
+All remaining IDs were inspected; no unresolved supported assertion gap remains.
+Detailed per-ID reasoning is retained for continuation in
+`.scratch/application-mutation/editor-store-triage-renewed.md`.
+
+NoCoverage 518/716 are parser/lookup defenses. Final Timeout IDs:
+433, 436, 437, 443, 444, 449, 452, 453, 455, 1266, 1267, 1434, 1446, 1461, 1463.
+The first nine exhausted flush-loop hit limits. 1266/1267 affect pending-edit removal.
+The last four were Survived in the preceding run and are elapsed-time results without assertion
+evidence. They remain Timeout in the final status counts, despite source-level guard analysis.
+
+Every renewed run used the dedicated full-file command recorded above. Final dry run: 2000 tests.
+Ordinary validation: all 368 focused tests passed; after the last fixture change its eight-test
+file passed again. Renderer types, lint, changed formatting and whitespace checks passed for
+the final tests. Primary diff review confirmed additive tests-only implementation scope.
+No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
+Next file: src/application/editor-text-session.ts, with its own incremental report.

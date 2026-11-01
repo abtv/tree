@@ -42,6 +42,183 @@ export function ready(store: EditorStore): ReadySnapshot {
 
 afterEach(() => vi.useRealTimers())
 
+it.each(['node', 'day'] as const)('preserves Agenda %s focus after undoing net-zero typing', async (kind) => {
+  const { store } = await agendaHarness()
+  store.editText('outside', '2026-10-08 Changed')
+  store.editText('outside', '2026-10-08 Outside')
+  store.openAgenda()
+  const key = kind === 'node' ? `node:${today}:outside` : `day:${today}`
+  store.applyAgenda({ kind: 'select', key, cursor: 12 })
+  const before = ready(store)
+
+  store.undo()
+
+  expect(ready(store).document).toEqual(before.document)
+  expect(ready(store).focus).toBe(before.focus)
+  expect(ready(store).agenda?.selectedKey).toBe(key)
+  await store.flushPersistence()
+})
+
+it('resets the moved occurrence cursor when the move is put from another focused node', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 13 })
+  expect(store.startAgendaMove()).toBe(true)
+  store.applyAgenda({ kind: 'select', key: `node:${today + 20}:other`, cursor: 4 })
+
+  expect(store.putAgendaMove()).toBe(true)
+
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 0 })
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 20}:match`)
+  await store.flushPersistence()
+})
+
+it('separates typing after moving the active Agenda occurrence', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 13 })
+  store.editText('match', '2026-10-14 First')
+
+  expect(store.moveAgendaOccurrences([{ nodeId: 'match', day: today + 6 }], today + 20)).toBe(true)
+  const moved = ready(store).document
+  store.editText('match', '2026-10-28 Second')
+  store.undo()
+
+  expect(ready(store).document).toEqual(moved)
+  await store.flushPersistence()
+})
+
+it('keeps search ownership when an opened Agenda context is selected without folding it', async () => {
+  vi.useFakeTimers()
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  const contextKey = `node:${today + 6}:context`
+  store.applyAgenda({ kind: 'fold', key: contextKey, operation: 'close' })
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('Match')
+  store.search.confirm()
+  await vi.advanceTimersByTimeAsync(100)
+
+  expect(ready(store).agenda!.collapsed.has(contextKey)).toBe(false)
+  store.applyAgenda({ kind: 'select', key: contextKey })
+  store.applyAgenda({ kind: 'select', key: `node:${today}:outside` })
+  store.hideSearch()
+
+  expect(ready(store).agenda!.collapsed.has(contextKey)).toBe(true)
+})
+
+it('publishes and hides Agenda search while separating typing around the search jump', async () => {
+  vi.useFakeTimers()
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.editText('match', '2026-10-14 First needle')
+  const first = ready(store).document
+
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('needle')
+  store.search.confirm()
+  await vi.advanceTimersByTimeAsync(100)
+
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 17, revealLine: true })
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'match' })
+  store.hideSearch()
+  expect(store.search.session.getSnapshot().visible).toBe(false)
+
+  store.editText('match', '2026-10-14 Second')
+  store.undo()
+
+  expect(ready(store).document).toEqual(first)
+  await store.flushPersistence()
+})
+
+it('cancels an unfinished search when selecting an Agenda occurrence', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('Match')
+
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 4 })
+
+  expect(store.search.session.getSnapshot().draft).toBeUndefined()
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 4 })
+})
+
+it.each(['unrelated-fold', 'reselect'] as const)('respects the typing boundary for %s in Agenda', async (command) => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  const original = ready(store).document
+  store.editText('match', '2026-10-14 First')
+  const first = ready(store).document
+
+  if (command === 'reselect') store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  else store.applyAgenda({ kind: 'toggle-fold', key: `day:${today}` })
+  store.editText('match', '2026-10-14 Second')
+  store.undo()
+
+  expect(ready(store).document).toEqual(command === 'reselect' ? first : original)
+  await store.flushPersistence()
+})
+
+it('keeps a restored date folded when undo changes the active occurrence day', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  store.editText('scope', '2026-10-28 Scope')
+  store.applyAgenda({ kind: 'fold', key: `day:${today}`, operation: 'close' })
+  const collapsed = ready(store).agenda!.collapsed
+
+  store.undo()
+
+  expect(ready(store).agenda!.collapsed).toBe(collapsed)
+  expect(ready(store).agenda!.collapsed.has(`day:${today}`)).toBe(true)
+  expect(store.getAgendaRows().some((row) => row.key === `node:${today}:scope`)).toBe(false)
+  await store.flushPersistence()
+})
+
+it('closes hidden descendants too when recursively folding an Agenda day', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 6}:scope` })
+
+  store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'close-recursive' })
+
+  expect(ready(store).agenda?.collapsed.has(`node:${today + 6}:context`)).toBe(true)
+
+  store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'open' })
+  store.applyAgenda({ kind: 'fold', key: `node:${today + 6}:scope`, operation: 'open' })
+
+  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'match')).toBe(false)
+})
+
+it('restores the real selection from another day when returning to the timeline', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.applyAgenda({ kind: 'focus-day', key: `day:${today}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'select', key: `node:${today}:outside` })
+
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${today}` })
+
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 6}:match`)
+  expect(ready(store).location.selectedNodeId).toBe('match')
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 0 })
+})
+
+it('returns to a visible day when the timeline selection was an expired pin', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.editText('match', '')
+  store.applyAgenda({ kind: 'focus-day', key: `day:${today}`, scrollTop: 0 })
+
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${today}` })
+
+  expect(ready(store).agenda?.selectedKey).toBe(`day:${today + 3}`)
+  expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda?.selectedKey)).toBe(true)
+})
+
 // @requirement PRODUCT.md §23.7
 // @requirement PRODUCT.md §23.8
 it('pins the last date through Undo/Redo and leaves it only on another selection, without a history entry', async () => {
