@@ -40,6 +40,20 @@ describe('Agenda Visual selection', () => {
     expect(agendaVisualTarget(rows, 10, ends, 'first', 1)?.nodeId).toBe('a')
     expect(agendaVisualTarget(rows, 10, ends, 'last', 1)?.nodeId).toBe('c')
     expect(agendaVisualTarget(rows, 10, { anchorId: 'a', focusId: 'missing' }, 'down', 1)).toBeUndefined()
+    expect(agendaVisualTarget(rows, 10, { anchorId: 'a', focusId: 'c' }, 'first', 1)?.nodeId).toBe('a')
+  })
+  it('uses the requested day when the same node is contextual on an earlier day', () => {
+    const mirrored = [row('a', 1, 'context', 9), ...rows]
+
+    expect(agendaVisualCandidates(mirrored, 10, 'a').map((candidate) => candidate.nodeId)).toEqual(['a', 'b', 'c'])
+  })
+  it('rejects a contextual anchor even when direct matches exist at its depth', () => {
+    const contextual = [row('ancestor', 1, 'context'), row('descendant', 2), row('sibling', 1)]
+
+    expect(agendaVisualCandidates(contextual, 10, 'ancestor')).toEqual([])
+  })
+  it('drops a range whose focus disappeared rather than selecting the final candidate', () => {
+    expect(agendaVisualSources(rows, 10, { anchorId: 'c', focusId: 'missing' })).toEqual([])
   })
   it('property: skipped rows never enter a range or become a motion target', () => {
     fc.assert(

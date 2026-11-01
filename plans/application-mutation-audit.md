@@ -52,7 +52,7 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. Next task is agenda-visual-selection.ts; enumerate the remaining source files
+in this session up to ten commits. Next task is command-registry.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -76,8 +76,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 6 | agenda-reconcile.ts | Done: 94.34% to 95.60%, two confirmed gaps closed |
 | 7 | agenda-rows.ts | Done: 82.14% to 92.14%, 258 killed, 22 survivors |
 | 8 | agenda-state.ts | Done: 88.41% to 90.22%, 249 killed, 27 survivors |
-| 9 | agenda-visual-selection.ts | Ready |
-| 10 | command-registry.ts | Planned |
+| 9 | agenda-visual-selection.ts | Done: 87.50% to 96.88%, 93 killed, 3 equivalent survivors |
+| 10 | command-registry.ts | Ready |
 | 11 | drop-targets.ts | Planned |
 | 12 | editor-agenda-transitions.ts | Planned |
 | 13 | editor-clipboard-transitions.ts | Planned |
@@ -309,3 +309,25 @@ Dry runs passed 2203/2206/2206 tests. Final focused checks passed 15 tests with
 Low Risk validation: renderer typecheck, lint, changed formatting, docs and diff whitespace.
 Primary review confirms no production, fixture or requirement changes; no E2E/performance trigger.
 Agenda rows commit: 9ecf2c4.
+
+## Agenda visual selection result
+
+Source at b7542e0, tests changed only in agenda-visual-selection.property.test.ts;
+19:40:45–19:42:25. Baseline 87.50%: Killed 84, Survived 12.
+Final 96.88%: Killed 93, Survived 3. Both runs: Timeout, NoCoverage, errors, ignored all zero.
+Confirmed gaps: distinguish an earlier contextual occurrence of the same node, reject a contextual
+anchor with eligible same-depth siblings, drop a range with a missing focus at the final candidate,
+and jump to first from the final candidate rather than moving up one row. Nine mutants now fail assertions.
+Remaining equivalents: 7 and 34 remove kind checks already implied by nodeId/role;
+56 removes the anchor-index guard, but an invalid anchor produces no candidates and focus=-1.
+No defensive survivors, unresolved assertion gaps or timeouts remain.
+
+```sh
+npm run test:mutation -- --mutate src/application/agenda-visual-selection.ts --incrementalFile .scratch/application-mutation/agenda-visual-selection.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 1934/1937 tests. Final ordinary focused run passed 6 tests:
+`npm test -- src/application/agenda-visual-selection.property.test.ts`.
+Low Risk validation: renderer typecheck, lint, changed formatting, docs and diff whitespace.
+Primary diff review confirms tests-only scope and preserved existing assertions.
+Agenda state commit: b7542e0.
