@@ -3,6 +3,33 @@ import { MenuCommands, dataMenuCommands } from './menu-commands'
 import { normalizeCommandHistory } from './command-registry'
 
 describe('menu commands', () => {
+  it('publishes a changed action even when another action remains unchanged', () => {
+    const source = new MenuCommands()
+    const listener = vi.fn()
+    source.subscribe(listener)
+    const exportEntry = { name: 'export-notes' as const, enabled: true, run: vi.fn() }
+    const importEntry = { name: 'import-notes' as const, enabled: true, run: vi.fn() }
+    source.update([exportEntry, importEntry])
+
+    source.update([exportEntry, { ...importEntry, enabled: false }])
+
+    expect(source.getSnapshot().map(({ name, enabled }) => ({ name, enabled }))).toEqual([
+      { name: 'export-notes', enabled: true },
+      { name: 'import-notes', enabled: false },
+    ])
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('exposes data actions without aliases or active toggle marks', () => {
+    const source = new MenuCommands()
+    source.update([{ name: 'export-notes', enabled: true, run: vi.fn() }])
+
+    const command = source.getSnapshot()[0]!
+
+    expect(command.aliases).toEqual([])
+    expect(Boolean(command.active({} as never))).toBe(false)
+  })
+
   // @requirement PRODUCT.md §20.2.28
   it('publishes stable snapshots, current availability and state-dependent backup actions', () => {
     const source = new MenuCommands()

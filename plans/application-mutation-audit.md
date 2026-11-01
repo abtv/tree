@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-five tasks are complete.
-Next task is menu-commands.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-six tasks are complete.
+Next task is node-search.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -99,7 +99,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 23 | emoji-history.ts | Done: 67.86% to 82.14%, 22 killed, 5 equivalents, 1 timeout; threshold failed |
 | 24 | expansion-state.ts | Done: 98.65%, 73 killed, 1 equivalent survivor |
 | 25 | folder-backup.ts | Done: 95.40% to 96.55%, 84 killed, 3 survivors |
-| 26 | menu-commands.ts | Planned |
+| 26 | menu-commands.ts | Done: 79.31% to 89.66%, 26 killed, 3 survivors; threshold failed |
 | 27 | node-search.ts | Planned |
 | 28 | notes-archive/archive-messages.ts | Planned |
 | 29 | notes-archive/archive-policy.ts | Planned |
@@ -736,6 +736,26 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Menu commands result
+
+Starting commit b5c9b2d; 21:43:16–21:45:30. Baseline 79.31%: 23 Killed, 5 Survived,
+1 NoCoverage. Final 89.66%: 26 Killed, 3 Survived, 0 NoCoverage; Timeout/errors/ignored zero.
+Threshold fails at the unchanged 93%. Tests now cover an availability update while another
+entry is unchanged, no implicit aliases, and no active toggle mark on a data action.
+11/24 and previously uncovered 26 are assertion-killed. Remaining 18/21 defend dense arrays
+with equal lengths. 25 returns undefined instead of false, equivalent for the UI's active predicate;
+the test intentionally checks truthiness rather than inventing stricter runtime semantics.
+
+```sh
+npm run test:mutation -- --mutate src/application/menu-commands.ts --incrementalFile .scratch/application-mutation/menu-commands.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/menu-commands.test.ts
+```
+
+Final dry run: 265 tests; focused run: 4 tests. A new test initially supplied an extra argument
+to active; typecheck detected it, it was corrected, and affected checks and mutation evidence
+were rerun. Final renderer types, lint, formatting, docs and whitespace checks passed.
+Primary review confirmed additive tests and unchanged production. Next: node-search.ts.
 
 ## Folder backup result
 
