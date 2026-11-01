@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Thirty-two tasks are complete.
-Next task is notes-archive/import-notes.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Thirty-three tasks are complete.
+Next task is notes-archive/zip-reader.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -106,7 +106,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 30 | notes-archive/crc32.ts | Done: 93.33%, 11 killed, 1 equivalent survivor, 3 timeouts |
 | 31 | notes-archive/desktop-data-operations.ts | Done: 97.10%, 402 killed, 11 survivors, 1 defensive no coverage; timeout replaced by assertion kill |
 | 32 | notes-archive/export-notes.ts | Done: 100%, 55 killed |
-| 33 | notes-archive/import-notes.ts | Planned |
+| 33 | notes-archive/import-notes.ts | Done: 100%, 128 killed, 1 timeout |
 | 34 | notes-archive/zip-reader.ts | Planned |
 | 35 | recent-node-persistence.ts | Planned |
 | 36 | recent-nodes.ts | Planned |
@@ -736,6 +736,20 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Import notes completed result
+
+2026-11-01, 21:57:27–21:58:00 local. Baseline/final unchanged 100%; Killed 128,
+Timeout 1, Survived/NoCoverage/CompileError/RuntimeError/Ignored 0. Timeout 11 removes
+the node-count loop body, so the stack never shrinks; hit-limit exhaustion is not an assertion kill.
+Existing import tests cover validation, byte conflicts, exact limits, cleanup failures and progress.
+
+```sh
+npm run test:mutation -- --mutate src/application/notes-archive/import-notes.ts --incrementalFile .scratch/application-mutation/import-notes.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry run: 58 tests passed. Threshold, docs, changed formatting and diff checks passed.
+Primary review: analysis-only; no production or test changes. Next: notes-archive/zip-reader.ts.
 
 ## Export notes completed result
 
