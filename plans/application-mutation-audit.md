@@ -50,8 +50,8 @@ This task-specific instruction overrides DEVELOPMENT.md §12's layer-shard fallb
 Keep the threshold unchanged and report a below-threshold exit honestly; a completed audit
 does not mean the threshold passed. Do not launch a layer shard.
 
-The first three analyses are complete without test changes.
-Next is editor-history.ts; enumerate the remaining source files
+The first four analyses are complete without test changes. The primary session reached its four-task commit limit.
+Next is agenda-pending-move.ts in a fresh session; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -70,8 +70,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 1 | save-policy.ts | Done: 86.67%, 58 killed, 10 equivalent survivors, 7 timeouts |
 | 2 | persistence-coordinator.ts | Done: 96.15%, 67 killed, 3 equivalent survivors, 8 timeouts |
 | 3 | editor-save-scheduler.ts | Done: 94.50%, 101 killed, 6 survivors, 2 timeouts |
-| 4 | editor-history.ts | Ready |
-| 5 | agenda-pending-move.ts | Planned |
+| 4 | editor-history.ts | Done: 93.07%, 94 killed, 4 survivors, 3 no coverage |
+| 5 | agenda-pending-move.ts | Ready |
 | 6 | agenda-reconcile.ts | Planned |
 | 7 | agenda-rows.ts | Planned |
 | 8 | agenda-state.ts | Planned |
@@ -160,3 +160,30 @@ npm run test:mutation -- --mutate src/application/editor-save-scheduler.ts --inc
 
 Final per-file report remains in its incremental file. Persistence coordinator commit: 016bff9;
 documentation and changed-format checks passed. No runtime changes require E2E or performance validation.
+
+## Editor history result and session handoff
+
+Source unchanged at f38ee0a; 2026-11-01 19:20:47–19:21:57.
+Before/final: 93.07% / unchanged, no test edits or redundant rerun.
+Killed 94, Survived 4, Timeout 0, NoCoverage 3, errors 0.
+Survivor 83 is equivalent: looking up a null container ID finds no node, matching the fast path.
+Survivors 26 and 38 remove overflow defenses in undo/redo; total past + future is bounded by begin,
+and transfers cannot overflow. NoCoverage 29 and 41 are those unreachable overflow bodies.
+Survivor 99 and NoCoverage 102 remove/change the empty-root defense: valid editor snapshots
+always contain a root. These are three defensive survivors and three defensive NoCoverage cases,
+not missing assertions for valid public editor behavior. No confirmed gaps justify added tests.
+Dry run passed 1951 tests; mutation command exited 0:
+
+```sh
+npm run test:mutation -- --mutate src/application/editor-history.ts --incrementalFile .scratch/application-mutation/editor-history.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Save scheduler commit: f38ee0a. Documentation governance, changed formatting and diff whitespace
+checks pass for each documentation-only task; no production or test files changed.
+All four files finished well within their individual 30-minute budgets.
+Four task commits exhaust the primary-session allowance; 36 explicitly listed tasks remain.
+Resume with agenda-pending-move.ts, using its own incremental file and a fresh baseline.
+The final aggregate across all files is not yet available. Partial latest-report counts for four files:
+Killed 320, Survived 23, Timeout 17, NoCoverage 3, mutant errors 0; one separate CLI launch error.
+This is a partial aggregation of separate file runs, never a full-layer execution result.
+Keep the scratch evidence until the initiative finishes. Final owner acceptance is pending the whole audit.
