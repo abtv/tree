@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-two tasks are complete.
-Next task is emoji-history.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-three tasks are complete.
+Next task is expansion-state.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -96,7 +96,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 20 | editor-store.ts | Done: 87.28% to 92.31%; 1342 killed, 111 survivors, 15 timeouts, 2 no coverage; threshold failed |
 | 21 | editor-text-session.ts | Done: 100%, 28 killed |
 | 22 | editor-undo-focus.ts | Done: 87.77% to 89.89%, 165 killed, 18 survivors, 4 timeouts, 1 no coverage; threshold failed |
-| 23 | emoji-history.ts | Planned |
+| 23 | emoji-history.ts | Done: 67.86% to 82.14%, 22 killed, 5 equivalents, 1 timeout; threshold failed |
 | 24 | expansion-state.ts | Planned |
 | 25 | folder-backup.ts | Planned |
 | 26 | menu-commands.ts | Planned |
@@ -736,6 +736,29 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Emoji history result
+
+Starting commit d12d17d; 21:35:27–21:37:56. Baseline 67.86%: 17 Killed, 9 Survived,
+2 Timeout. Final 82.14%: 22 Killed, 5 Survived, 1 Timeout; NoCoverage/errors/ignored zero.
+The 93% threshold fails; no layer run or configuration changes. New tests cover a promotion
+whose tail entry stays at the same index, automatic retry without an explicit flush, and an
+absent preference writer. Mutants 8/17/18/23 are now Killed; prior Timeout 26 is now Killed too.
+
+Remaining equivalents: 0/1 normalize an unknown emoji away; 13 removes a redundant length
+comparison because a normalized prepend cannot shrink history and a new first item fails the
+retained every predicate; 16 queues an idle flush whose saved/revision loop writes nothing;
+19 reverses the private revision counter while preserving equality and captured revisions.
+Timeout 27 removes the write/progress body and is not an assertion kill.
+
+```sh
+npm run test:mutation -- --mutate src/application/emoji-history.ts --incrementalFile .scratch/application-mutation/emoji-history.incremental.json --concurrency 4 --timeoutMS 10000
+npm test -- src/application/emoji-history.test.ts
+```
+
+Final dry run: 2203 tests; ordinary focused run: 6 tests. Renderer types, lint, changed formatting,
+docs and whitespace checks passed. Primary review confirmed additive tests and unchanged runtime.
+Next: expansion-state.ts.
 
 ## Editor text session result
 

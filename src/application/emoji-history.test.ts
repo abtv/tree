@@ -2,6 +2,42 @@ import { expect, it, vi } from 'vitest'
 import { EmojiHistory } from './emoji-history'
 import { initialEmojiSuggestions, suggestEmoji } from '../domain/emoji-completion'
 
+it('promotes an emoji even when a later history entry stays at the same index', async () => {
+  const write = vi.fn<(names: readonly string[]) => Promise<void>>(async () => undefined)
+  const history = new EmojiHistory(write, vi.fn())
+  history.load(['cat', 'rocket', 'smile'])
+
+  history.remember('rocket')
+  await history.flush()
+
+  expect(write).toHaveBeenCalledExactlyOnceWith(['rocket', 'cat', 'smile'])
+  expect(history.suggestions.slice(0, 3).map(({ shortcode }) => shortcode)).toEqual(['rocket', 'cat', 'smile'])
+})
+
+it('retries an unchanged failed preference without requiring an explicit flush', async () => {
+  const write = vi.fn().mockRejectedValueOnce(new Error('disk failure')).mockResolvedValue(undefined)
+  const report = vi.fn()
+  const history = new EmojiHistory(write, report)
+  history.remember('cat')
+  await vi.waitFor(() => expect(report).toHaveBeenCalledOnce())
+
+  history.remember('cat')
+
+  await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(2))
+  expect(write).toHaveBeenLastCalledWith(['cat'])
+})
+
+it('keeps local history available when the host has no preference writer', async () => {
+  const report = vi.fn()
+  const history = new EmojiHistory(undefined, report)
+
+  history.remember('rocket')
+  await history.flush()
+
+  expect(history.suggestions[0]?.shortcode).toBe('rocket')
+  expect(report).not.toHaveBeenCalled()
+})
+
 // @requirement PRODUCT.md §20.12
 it('promotes unique accepted shortcodes, caches empty queries and leaves search ranking unchanged', async () => {
   const write = vi.fn<(names: readonly string[]) => Promise<void>>(async () => undefined)
