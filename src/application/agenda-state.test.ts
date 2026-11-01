@@ -129,6 +129,56 @@ it('captures the origin and keeps invalid or inapplicable commands as identity t
 
   expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: node.key }, rows)).toBe(state)
   expect(applyAgendaCommand(state, { kind: 'toggle-fold', key: gap.key }, rows)).toBe(state)
+  expect(applyAgendaCommand(state, { kind: 'focus-day', key: node.key, scrollTop: 0 }, rows)).toBe(state)
+  expect(applyAgendaCommand(state, { kind: 'focus-day', key: gap.key, scrollTop: 0 }, rows)).toBe(state)
+})
+
+// @requirement PRODUCT.md §23.10
+it('opens hidden descendant folds when opening all from a fully collapsed day', () => {
+  const initial = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const state = { ...initial, collapsed: new Set(['day:100', 'node:100:a']) }
+  const projection = [
+    {
+      day: 100,
+      rows: [
+        { nodeId: 'a', depth: 0, role: 'context' as const },
+        { nodeId: 'b', depth: 1, role: 'match' as const },
+      ],
+    },
+  ]
+
+  const next = applyAgendaCommand(
+    state,
+    { kind: 'fold', key: 'day:100', operation: 'open-all' },
+    buildAgendaRows(projection, state),
+  )
+
+  expect(next.collapsed.size).toBe(0)
+  expect(buildAgendaRows(projection, next).some((row) => row.kind === 'node' && row.nodeId === 'b')).toBe(true)
+})
+
+// @requirement PRODUCT.md §23.5
+it.each([true, false])('keeps gap regions separate with earlier-first expansion: %s', (earlierFirst) => {
+  let state = openAgendaState({ currentParentId: null, selectedNodeId: 'a' }, 0, 100)
+  const projection = [130, 160].map((day) => ({
+    day,
+    rows: [{ nodeId: `n${day}`, depth: 0, role: 'match' as const }],
+  }))
+  const gaps = buildAgendaRows(projection, state).filter((row) => row.kind === 'gap')
+  const first = gaps[earlierFirst ? 0 : 1]!
+  const second = gaps[earlierFirst ? 1 : 0]!
+  state = applyAgendaCommand(state, { kind: 'toggle-gap', key: first.key }, buildAgendaRows(projection, state))
+
+  state = applyAgendaCommand(state, { kind: 'toggle-gap', key: second.key }, buildAgendaRows(projection, state))
+
+  expect(state.selectedKey).toBe(second.key)
+
+  const remainder = buildAgendaRows(projection, state).find(
+    (row) => row.kind === 'gap' && !row.expanded && row.endDay === second.endDay,
+  )!
+  state = applyAgendaCommand(state, { kind: 'toggle-gap', key: remainder.key }, buildAgendaRows(projection, state))
+
+  expect(state.selectedKey).toBe(second.key)
 })
 
 it('reveals the next chunk and collapses the expanded header without changing the origin', () => {

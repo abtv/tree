@@ -52,7 +52,7 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. Next task is agenda-state.ts; enumerate the remaining source files
+in this session up to ten commits. Next task is agenda-visual-selection.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -75,8 +75,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 5 | agenda-pending-move.ts | Done: 100%, 59 killed, 5 existing ignored |
 | 6 | agenda-reconcile.ts | Done: 94.34% to 95.60%, two confirmed gaps closed |
 | 7 | agenda-rows.ts | Done: 82.14% to 92.14%, 258 killed, 22 survivors |
-| 8 | agenda-state.ts | Ready |
-| 9 | agenda-visual-selection.ts | Planned |
+| 8 | agenda-state.ts | Done: 88.41% to 90.22%, 249 killed, 27 survivors |
+| 9 | agenda-visual-selection.ts | Ready |
 | 10 | command-registry.ts | Planned |
 | 11 | drop-targets.ts | Planned |
 | 12 | editor-agenda-transitions.ts | Planned |
@@ -274,3 +274,38 @@ Dry runs passed 2197, 2201, 2203 tests. Final ordinary Vitest passed 17 tests:
 Low Risk checks: renderer typecheck, lint, changed formatting, docs governance and diff whitespace.
 Primary review checked the six tests against observable outputs, stable references and bounded work;
 no implementation or shared fixture changed. Agenda reconciliation commit: 6364486.
+
+## Agenda state result
+
+Source at 9ecf2c4, tests changed only in agenda-state.test.ts; 19:35:33–19:40:09.
+Baseline 88.41%: Killed 244, Survived 32. Final 90.22%: Killed 249, Survived 27.
+Timeout, NoCoverage, errors and ignored: all zero. Below-threshold exits remain reported failures.
+New coverage rejects focus-day on non-day rows (32), opens hidden descendant folds in open-all (96),
+and keeps two independent gap regions' header selection separate (63, 71, 74).
+An extra toggle assertion that did not close a gap was removed; the final run confirms the same five kills.
+
+Remaining equivalents/defenses for valid timeline rows:
+
+* 64–68: containment and row ordering already identify the containing expanded header;
+  unexpanded rows can match themselves only when the existing fallback would select that same row.
+* 72: a remainder starts strictly after its expanded header, so strict comparison is equivalent.
+* 88: the changed recursive command kind falls through to the same toggle-fold implementation.
+* 112–115, 118, 120, 121, 125: recursive scans stop at day/gap boundaries via the remaining
+  day/depth predicates; a gap has no node descendants and a day has no numeric depth.
+* 176–179, 182, 184, 185: only foldable day/node keys enter collapsed; intervening day/gap
+  boundaries fail the remaining day/depth checks, so omitted kind guards add no hidden selection.
+* 232: folding the selected row reselects the identical key.
+* 244, 245, 248: remaining day or depth checks still reject crossing a day boundary.
+* 268: only a node row has match role, making the kind check redundant.
+
+Three runs used:
+
+```sh
+npm run test:mutation -- --mutate src/application/agenda-state.ts --incrementalFile .scratch/application-mutation/agenda-state.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 2203/2206/2206 tests. Final focused checks passed 15 tests with
+`npm test -- src/application/agenda-state.test.ts src/application/agenda-focused-day.test.ts`.
+Low Risk validation: renderer typecheck, lint, changed formatting, docs and diff whitespace.
+Primary review confirms no production, fixture or requirement changes; no E2E/performance trigger.
+Agenda rows commit: 9ecf2c4.
