@@ -52,7 +52,7 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session up to ten commits. Next task is agenda-rows.ts; enumerate the remaining source files
+in this session up to ten commits. Next task is agenda-state.ts; enumerate the remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -74,8 +74,8 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 4 | editor-history.ts | Done: 93.07%, 94 killed, 4 survivors, 3 no coverage |
 | 5 | agenda-pending-move.ts | Done: 100%, 59 killed, 5 existing ignored |
 | 6 | agenda-reconcile.ts | Done: 94.34% to 95.60%, two confirmed gaps closed |
-| 7 | agenda-rows.ts | Ready |
-| 8 | agenda-state.ts | Planned |
+| 7 | agenda-rows.ts | Done: 82.14% to 92.14%, 258 killed, 22 survivors |
+| 8 | agenda-state.ts | Ready |
 | 9 | agenda-visual-selection.ts | Planned |
 | 10 | command-registry.ts | Planned |
 | 11 | drop-targets.ts | Planned |
@@ -231,3 +231,46 @@ Low Risk static validation: `npm run typecheck:renderer`, `npm run lint`,
 Primary diff review found no production change, weakened assertion or requirement change.
 No E2E, visual or performance checks required for these test-only changes.
 Agenda pending move commit: d54eda7.
+
+## Agenda rows result
+
+Source unchanged at 6364486, only agenda-rows.test.ts changed; 19:28:42–19:34:49.
+Baseline 82.14%: Killed 230, Survived 49, NoCoverage 1.
+Intermediate 87.14%: Killed 244, Survived 36, NoCoverage 0.
+Final 92.14%: Killed 258, Survived 22, NoCoverage 0.
+All runs: Timeout 0, errors 0, existing Ignored 68/71 unchanged. Threshold exits remain 1.
+Six focused tests cover ancestor paths/missing occurrences, stable rows after an undated root
+addition, direct projection reads and focused-day transitions, Today heading metadata,
+release of vanished day caches, and absence of unchanged-subtree traversal across 1000 nodes.
+These tests detect 28 additional mutations without touching production code.
+
+Remaining classification:
+
+* 12, 16: redundant missing-row/fallback guards.
+* 24, 25, 28, 29: valid preorder always reaches depth zero before passing the start;
+  relaxing the bounds cannot add an ancestor with negative depth. Some variants scan extra preceding rows.
+* 48: null is not a valid node ID; findIndex returns -1, preserving start=0.
+* 155: comparison with undefined is false, so the separate guard is redundant.
+* 196: sameDay is called only after lookup by the same day key.
+* 230, 241, 249: earlier document/scope conditions guarantee initialized state before access.
+* 245: current pin overlay is reapplied after the unpinned prior projection; its guard is redundant.
+* 213, 214, 287, 288: placeholder initial/reset arrays are replaced before their next public result.
+* 116, 118, 188, 190: functional equivalents that remove fast paths (empty fold-set lookup and
+  identical projection comparison). They may add CPU work; no timing claim is made for them.
+* 289: defensive immediate release of the private day cache on clear. Subsequent reads rebuild
+  projection identity and cannot reuse stale rows; immediate memory release is not asserted by this audit.
+
+The last two groups are explicitly retained limitations, not claimed assertion kills or proven
+performance/memory equivalence. No production edits or threshold-driven tests were introduced.
+
+All three runs used the same command with the dedicated incremental report:
+
+```sh
+npm run test:mutation -- --mutate src/application/agenda-rows.ts --incrementalFile .scratch/application-mutation/agenda-rows.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Dry runs passed 2197, 2201, 2203 tests. Final ordinary Vitest passed 17 tests:
+`npm test -- src/application/agenda-rows.test.ts`.
+Low Risk checks: renderer typecheck, lint, changed formatting, docs governance and diff whitespace.
+Primary review checked the six tests against observable outputs, stable references and bounded work;
+no implementation or shared fixture changed. Agenda reconciliation commit: 6364486.

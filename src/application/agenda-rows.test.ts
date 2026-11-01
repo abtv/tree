@@ -4,7 +4,7 @@ import { projectAgenda } from '../domain/agenda-projection'
 import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
-import { agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
+import { agendaAncestorKeys, agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
 import { openAgendaState } from './agenda-state'
 import { reconcileAgenda } from './agenda-reconcile'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
@@ -26,6 +26,94 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  it('finds only the selected occurrence ancestors, skipping preceding sibling branches', () => {
+    const projection = projectAgenda(document, null)
+    const day = today + 6
+
+    expect(agendaAncestorKeys(projection, { nodeId: 'b', day })).toEqual([
+      `day:${day}`,
+      `node:${day}:a`,
+      `node:${day}:parent`,
+    ])
+    expect(agendaAncestorKeys(projection, { nodeId: 'c', day })).toEqual([`day:${day}`, `node:${day}:parent`])
+    expect(agendaAncestorKeys(projection, { nodeId: 'parent', day })).toEqual([`day:${day}`])
+    expect(agendaAncestorKeys(projection, { nodeId: 'missing', day })).toBeUndefined()
+    expect(agendaAncestorKeys(projection, { nodeId: 'b', day: day + 1 })).toBeUndefined()
+  })
+
+  it('reuses semantically unchanged rows when an undated root is added', () => {
+    const cache = new AgendaRowsCache()
+    const state = openAgendaState(location, 0, today)
+    const before = cache.get(document, state)
+
+    const reconstructed = { roots: [...document.roots, { id: 'undated', text: 'No date', children: [] }] }
+    const after = cache.get(reconstructed, state)
+
+    expect(after).toBe(before)
+    expect(cache.getProjection(reconstructed, state)).toEqual(projectAgenda(document, null))
+  })
+
+  it('refreshes projection on a direct read and switches focused days without other state changes', () => {
+    const cache = new AgendaRowsCache()
+    const state = openAgendaState(location, 0, today)
+
+    expect(cache.getProjection(document, state)).toEqual(projectAgenda(document, null))
+
+    const focused = cache.get(document, { ...state, focusedDay: today + 6 })
+
+    expect(focused.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual([today + 6])
+    expect(cache.get(document, state).filter((row) => row.kind === 'day').length).toBeGreaterThan(1)
+  })
+
+  it('does not traverse unchanged subtrees when an edit preserves day membership', () => {
+    let childrenReads = 0
+    const stable = Array.from({ length: 1000 }, (_, index) => ({
+      id: `stable-${index}`,
+      text: '2026-10-14',
+      get children() {
+        childrenReads += 1
+        return []
+      },
+    }))
+    const first: Document = { roots: [{ id: 'edited', text: '2026-10-14', children: [] }, ...stable] }
+    const second: Document = { roots: [{ id: 'edited', text: '2026-10-14 Changed', children: [] }, ...stable] }
+    const cache = new AgendaRowsCache()
+    const state = openAgendaState(location, 0, today)
+    const before = cache.get(first, state)
+    childrenReads = 0
+
+    const after = cache.get(second, state)
+
+    expect(after).toBe(before)
+    expect(childrenReads).toBe(0)
+  })
+
+  it('marks a focused heading as Today only on the current day', () => {
+    const state = openAgendaState(location, 0, today)
+    const projection = projectAgenda(document, null)
+
+    expect(buildAgendaRows(projection, { ...state, focusedDay: today })[0]).toMatchObject({
+      day: today,
+      isToday: true,
+    })
+    expect(buildAgendaRows(projection, { ...state, focusedDay: today + 6 })[0]).toMatchObject({
+      day: today + 6,
+      isToday: false,
+    })
+  })
+
+  it('releases per-day cached rows when their dates disappear', () => {
+    const cache = new Map()
+    const state = openAgendaState(location, 0, today)
+    buildAgendaRows(projectAgenda(document, null), state, cache)
+
+    expect(cache.has(today + 6)).toBe(true)
+
+    buildAgendaRows([], state, cache)
+
+    expect(cache.size).toBe(0)
+  })
+
   it('reuses unchanged day rows when dates are added and releases them when cleared', () => {
     const cache = new AgendaRowsCache()
     const state = openAgendaState(location, 0, today)
