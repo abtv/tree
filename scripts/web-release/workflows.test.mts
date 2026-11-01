@@ -43,6 +43,19 @@ function concurrencyGroup(
 
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
+  it('installs locked parser dependencies before signing and transfer checks', async () => {
+    const release = await readWorkflow('release')
+
+    for (const job of ['sign', 'publish']) {
+      const section = release.split(`\n  ${job}:`)[1]!.split(/\n {2}\w+:/)[0]!
+      const install = section.indexOf('run: npm ci --ignore-scripts')
+      const verification = section.indexOf('run: node scripts/web-release/')
+
+      expect(install).toBeGreaterThan(-1)
+      expect(verification).toBeGreaterThan(install)
+    }
+  })
+
   it('keeps timing suites local while CI retains ordinary validation', async () => {
     const { scripts } = JSON.parse(await read('package.json'))
 
@@ -306,7 +319,13 @@ describe('automatic publication wiring', () => {
     expect(target).toContain('path: candidate/site/')
     expect(target).toContain('pages: write')
     expect(target).toContain('id-token: write')
-    expect(target).not.toMatch(/npm |node (?:candidate|site)\//)
+    expect(target).not.toMatch(/node (?:candidate|site)\//)
+    const installs = [...target.matchAll(/working-directory: ([^\n]+)\n\s+run: (npm [^\n]+)/g)]
+    expect(installs.map((match) => [match[1], match[2]])).toEqual([
+      ['release-tools', 'npm ci --ignore-scripts'],
+      ['release-tools', 'npm ci --ignore-scripts'],
+    ])
+    expect([...target.matchAll(/run: npm /g)]).toHaveLength(installs.length)
     expect(target).toContain('verify-target.mts hosted verified-provenance')
 
     const verify = target.split('\n  verify:')[1]!.split('\n  deploy:')[0]

@@ -88,6 +88,8 @@ jobs:
         with:
           name: browser-${{ github.sha }}-${{ github.run_attempt }}
           path: signed-browser
+      - name: Install locked verifier dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
       - name: Authenticate previous assets and prepare complete manifest
         env:
           GH_TOKEN: ${{ github.token }}
@@ -135,6 +137,8 @@ jobs:
         with:
           name: signed-browser-${{ github.sha }}-${{ github.run_attempt }}
           path: verified-browser
+      - name: Install locked verifier dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
       - name: Check package and source gate before obtaining write access
         env:
           GH_TOKEN: ${{ github.token }}

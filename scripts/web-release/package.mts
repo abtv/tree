@@ -2,6 +2,7 @@ import type { CurrentManifest, ReleaseFile, ReleaseIdentity } from './types.mts'
 import { createHash } from 'node:crypto'
 import { lstat, readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { parse, type DefaultTreeAdapterTypes } from 'parse5'
 import {
   allowedPath,
   assetPaths,
@@ -13,11 +14,25 @@ import {
 } from './policy.mts'
 
 function* assetReferences(html: string) {
-  for (const tag of html.matchAll(/<([a-z][\w:-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi)) {
-    for (const attribute of tag[2]!.matchAll(/\s(src|href)\s*=\s*["']([^"']*)["']/gi)) {
-      // Anchor destinations are navigation, not resources loaded by the package.
-      if (tag[1]!.toLowerCase() === 'a' && attribute[1]!.toLowerCase() === 'href') continue
-      yield attribute[2]!
+  const pending: DefaultTreeAdapterTypes.Node[] = [parse(html)]
+  while (pending.length) {
+    const node = pending.pop()!
+    if ('childNodes' in node) pending.push(...node.childNodes)
+    if ('content' in node) pending.push(node.content)
+    if (!('attrs' in node)) continue
+
+    for (const attribute of node.attrs) {
+      if (attribute.name !== 'src' && attribute.name !== 'href') continue
+      if (
+        node.namespaceURI === 'http://www.w3.org/1999/xhtml' &&
+        node.tagName === 'a' &&
+        attribute.name === 'href' &&
+        !attribute.namespace &&
+        attribute.value === 'https://github.com/abtv/tree'
+      ) {
+        continue
+      }
+      yield attribute.value
     }
   }
 }

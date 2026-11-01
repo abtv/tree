@@ -29,6 +29,38 @@ async function fixture() {
 }
 
 describe('release manifest and package', () => {
+  it('uses parsed attribute values and ignores markup-like text and comments', async () => {
+    const dir = await fixture()
+
+    await writeFile(
+      join(dir, 'index.html'),
+      '<!-- <script src=https://example.com/ignored.js></script> -->' +
+        '<script>const example = \'<a href="https://example.com">\'</script>' +
+        '<SCRIPT SRC=./assets/app.js></SCRIPT>' +
+        '<link href="./assets/app&#46;css">' +
+        '<A HREF=https://github.com/abtv/tree>Repository</A>',
+    )
+    const manifest = await createManifest(dir, identity)
+
+    await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+  })
+
+  it.each([
+    '<script src=https://example.com/app.js></script>',
+    '<LINK HREF=https://example.com/app.css>',
+    '<a href="javascript:alert(1)">link</a>',
+    '<a href="https://github.com/abtv/tree/other">link</a>',
+    '<a href="https://example.com">link</a>',
+    '<template><script src=https://example.com/app.js></script></template>',
+    '<img src="&#104;ttps://example.com/image.png">',
+  ])('rejects non-package references parsed from %s', async (html) => {
+    const dir = await fixture()
+
+    await writeFile(join(dir, 'index.html'), html)
+
+    await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
+  })
+
   it('accepts repository navigation without allowing external assets', async () => {
     const dir = await fixture()
 

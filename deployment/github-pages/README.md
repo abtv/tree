@@ -155,6 +155,15 @@ At the root, besides `index.html`, `.nojekyll` and the exact Service Worker name
 names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
 `apple-touch-icon.png` are accepted; they are current-only, like `index.html`.
 No archive is extracted, and no transferred JavaScript is executed in CI.
+The verifier parses HTML with the locked `parse5` dependency. It checks parsed
+`src` and `href` attributes, including unquoted values and template contents;
+only an HTML anchor pointing exactly to `https://github.com/abtv/tree` is exempt
+from package-reference checks. This is not an HTML sanitizer or a check of every
+network access that trusted JavaScript or CSS can initiate.
+Signing, transfer and target verification install the trusted source lockfile with
+`npm ci --ignore-scripts`; candidate files never supply dependencies or install scripts.
+Before deploying this verifier change, copy the updated `deploy-web-app.yml`
+template to the hosting repository so its verification jobs install these dependencies.
 Schema 2 manifests record up to three asset sets, newest first: the current build
 and two previous distinct builds transferred to the target repository. Repeating
 the same set does not consume a slot; returning to a retained set moves it to the

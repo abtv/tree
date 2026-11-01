@@ -1,13 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { createManifest, verifyPackage } from './package.mts'
 import { validateGate } from './policy.mts'
-import { preparePackage } from './prepare.mts'
-import { verifyIdentity } from './publish.mts'
 
 try {
   const [command, first, second, ...extra] = process.argv.slice(2)
   if (extra.length) throw new Error('Unexpected arguments')
   if (command === 'manifest' && first && second) {
+    const { createManifest } = await import('./package.mts')
     const manifest = await createManifest(first, {
       sourceRepository: process.env.GITHUB_REPOSITORY,
       sourceSha: process.env.GITHUB_SHA,
@@ -16,9 +14,12 @@ try {
     })
     await writeFile(second, `${JSON.stringify(manifest, null, 2)}\n`)
   } else if (command === 'prepare' && first && second) {
+    const { verifyIdentity } = await import('./publish.mts')
+    const { preparePackage } = await import('./prepare.mts')
     verifyIdentity(JSON.parse(await readFile(second, 'utf8')), process.env)
     await preparePackage(first, second)
   } else if (command === 'verify' && first && second) {
+    const { verifyPackage } = await import('./package.mts')
     await verifyPackage(first, JSON.parse(await readFile(second, 'utf8')))
   } else if (command === 'gate' && !first) {
     validateGate(JSON.parse(process.env.RELEASE_RESULTS!))
