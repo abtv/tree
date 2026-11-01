@@ -29,6 +29,22 @@ async function fixture() {
 }
 
 describe('release manifest and package', () => {
+  it('verifies bundled About PNG assets and detects changed image bytes', async () => {
+    const dir = await fixture()
+    const path = 'assets/tree-icon-source-BZScDtwH.png'
+
+    await writeFile(join(dir, path), 'bundled PNG')
+    await writeFile(join(dir, 'index.html'), `<img src="./${path}">`)
+    const manifest = await createManifest(dir, identity)
+
+    expect(manifest.assetGenerations[0]).toContain(path)
+    await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
+
+    await writeFile(join(dir, path), 'changed PNG')
+
+    await expect(verifyPackage(dir, manifest)).rejects.toThrow('differs')
+  })
+
   it('uses parsed attribute values and ignores markup-like text and comments', async () => {
     const dir = await fixture()
 
@@ -66,14 +82,15 @@ describe('release manifest and package', () => {
 
     await writeFile(
       join(dir, 'index.html'),
-      '<script src="./assets/app.js"></script><a href="https://github.com/abtv/tree">GitHub repository</a>',
+      '<script src="./assets/app.js"></script><a href="https://github.com/abtv/tree">GitHub repository</a>' +
+        '<a href="https://github.com/abtv/tree/blob/main/LICENSE">MIT License</a>',
     )
     const manifest = await createManifest(dir, identity)
 
     await expect(verifyPackage(dir, manifest)).resolves.toEqual(manifest)
 
     for (const tag of ['script src', 'link href', 'img src']) {
-      await writeFile(join(dir, 'index.html'), `<${tag}="https://github.com/abtv/tree">`)
+      await writeFile(join(dir, 'index.html'), `<${tag}="https://github.com/abtv/tree/blob/main/LICENSE">`)
 
       await expect(createManifest(dir, identity)).rejects.toThrow('asset reference')
     }

@@ -63,11 +63,17 @@ export async function runSafari(smoke = false) {
   let driverOrigin = ''
 
   async function request(path: string, body?: unknown, method = 'POST', cleanup = false) {
+    const started = performance.now()
     const response = await fetch(`${driverOrigin}${path}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: cleanup ? AbortSignal.timeout(5000) : AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+    }).catch((cause: unknown) => {
+      throw new Error(
+        `SafariDriver ${method} ${path} failed after ${Math.round(performance.now() - started)}ms${cleanup ? ' during cleanup' : ''}`,
+        { cause },
+      )
     })
     const { value } = await response.json()
     assert(response.ok && !value?.error, `SafariDriver: ${JSON.stringify(value)}`)

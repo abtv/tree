@@ -28,7 +28,7 @@ export function allowedPath(path: unknown) {
     path === '.nojekyll' ||
     path === 'sw.js' ||
     (typeof path === 'string' && ROOT_PUBLIC_FILES.includes(path)) ||
-    (typeof path === 'string' && /^assets\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:js|css|ttf|otf|woff2?)$/.test(path))
+    (typeof path === 'string' && /^assets\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:js|css|ttf|otf|woff2?|png)$/.test(path))
   )
 }
 

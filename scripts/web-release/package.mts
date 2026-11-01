@@ -28,7 +28,7 @@ function* assetReferences(html: string) {
         node.tagName === 'a' &&
         attribute.name === 'href' &&
         !attribute.namespace &&
-        attribute.value === 'https://github.com/abtv/tree'
+        ['https://github.com/abtv/tree', 'https://github.com/abtv/tree/blob/main/LICENSE'].includes(attribute.value)
       ) {
         continue
       }
