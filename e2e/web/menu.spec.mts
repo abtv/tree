@@ -68,21 +68,33 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   // @requirement PRODUCT.md §1.4
   const version = `Version ${JSON.parse(readFileSync('package.json', 'utf8')).version}`
 
+  await expect(page.locator('#tree-menu > :last-child')).toHaveAttribute('id', 'app-about')
+  await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+  await expect(page.locator('#tree-menu')).not.toBeVisible()
+  await expect(page.locator('#app-about-dialog')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+  await capture(page, 'about-light.png')
   await expect(page.locator('#app-version')).toHaveText(
     new RegExp(`^${version.replaceAll('.', '\\.')} · [A-Z][a-z]{2} \\d{1,2}, \\d{4}$`),
   )
-  await expect(page.locator('#tree-menu > :last-child')).toHaveAttribute('id', 'app-version')
   await expect(page.getByRole('link', { name: 'GitHub repository' })).toHaveAttribute(
     'href',
     'https://github.com/abtv/tree',
   )
   await expect(page.getByRole('link', { name: 'GitHub repository' })).toHaveAttribute('target', '_blank')
-  await expect(page.locator('#app-attribution')).toHaveText('© 2026 Andrei Butov · MIT License')
+  await expect(page.locator('#app-about-dialog')).toContainText('© 2026 Andrei Butov')
   await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toHaveAttribute(
     'href',
     'https://github.com/abtv/tree/blob/main/LICENSE',
   )
   await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toHaveAttribute('target', '_blank')
+  await page.keyboard.press('Escape')
+  await expect(page.locator('#app-about-dialog')).not.toBeVisible()
+  await open()
+  await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(page.locator('#app-about-dialog')).not.toBeVisible()
+  await open()
 
   const iconLayout = await page.locator('#tree-menu').evaluate((menu) => {
     const ids = ['prototype-tree', 'prototype-agenda', 'data-export', 'data-import']
@@ -129,6 +141,10 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   expect(await page.getByRole('button', { name: 'Dark', exact: true }).getAttribute('aria-pressed')).toBe('true')
 
   await capture(page, 'menu-open-dark.png')
+  await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+  await capture(page, 'about-dark.png')
+  await page.getByRole('button', { name: 'Close', exact: true }).click()
+  await open()
   await page.mouse.click(400, 400)
   await page.waitForFunction(() => !document.getElementById('tree-menu')!.matches(':popover-open'))
 

@@ -54,17 +54,34 @@
       <span id="backup-status" role="status" hidden></span>
       <span id="offline-status" role="status" hidden></span>
       <button id="app-update" hidden>Update App</button>
-      <a id="app-repository" href="https://github.com/abtv/tree" target="_blank" rel="noopener noreferrer"
-        >GitHub repository</a
-      >
-      <span id="app-attribution"
-        >© 2026 Andrei Butov ·
-        <a href="https://github.com/abtv/tree/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
-          >MIT License</a
-        ></span
-      >
-      <span id="app-version"></span>
+      <button id="app-about">About Tree</button>
     </div>
+    <dialog
+      id="app-about-dialog"
+      class="about-window"
+      role="dialog"
+      aria-labelledby="about-title"
+      data-editor-focus-borrow
+    >
+      <main>
+        <img src="../../assets/icons/tree-icon-source.png" width="64" height="64" alt="" />
+        <h1 id="about-title">Tree</h1>
+        <span id="app-version"></span>
+        <p>© 2026 Andrei Butov</p>
+        <p>
+          Licensed under the
+          <a href="https://github.com/abtv/tree/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+            >MIT License</a
+          >
+        </p>
+        <p>
+          <a id="app-repository" href="https://github.com/abtv/tree" target="_blank" rel="noopener noreferrer"
+            >GitHub repository</a
+          >
+        </p>
+        <button id="about-close" type="button" autofocus>Close</button>
+      </main>
+    </dialog>
     <input id="data-import-file" type="file" accept=".zip,application/zip" hidden />
     <div id="data-activity" role="status" data-popup-navigation="horizontal" hidden>
       <span id="data-activity-text"></span>

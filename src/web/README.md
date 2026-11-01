@@ -79,9 +79,9 @@ Another browser, profile, hostname or port has separate storage.
 
 The ellipsis button opens Tree, Agenda, Vim Editing, appearance and Data controls.
 The menu also shows local save status and whether the browser granted persistent
-storage. Its last line identifies the loaded build with the root `package.json`
+storage. **About Tree** opens a modal dialog identifying the loaded build with the root `package.json`
 version and UTC build date, for example **Version 0.1.2 · Oct 29, 2026**. Local builds
-use the same version source. **GitHub repository** above the version line links to
+use the same version source. **GitHub repository** in the dialog links to
 the source repository. **Release web app** in GitHub Actions records the source
 commit and publication result. Publication requires a version greater than
 the last transferred web release. Only one tab may

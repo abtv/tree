@@ -86,6 +86,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Saved locally in this browser',
     storageText,
     'Folder backup is off.',
+    'About Tree',
   ])
 
   await capture(page, 'data-menu-light.png')

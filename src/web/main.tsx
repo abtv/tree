@@ -12,6 +12,7 @@ import { requestPersistentStorage, storageProtectionText } from './storage-persi
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
 import './styles.css'
+import '../renderer/about.css'
 import { blockExternalDrops } from '../renderer/external-drop'
 import { installAppUpdates } from './app-updates'
 
@@ -30,6 +31,13 @@ try {
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
   const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!)
+  const about = document.getElementById('app-about-dialog') as HTMLDialogElement
+  document.getElementById('app-about')!.onclick = () => {
+    menuFocus.close()
+    about.showModal()
+  }
+  document.getElementById('about-close')!.onclick = () => about.close()
+  about.addEventListener('close', () => menuFocus.restore())
   const { commands: menuCommands, isRunning: dataOperationRunning } = installDataMenu(
     store,
     menu,

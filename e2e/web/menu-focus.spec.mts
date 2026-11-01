@@ -4,6 +4,38 @@ import { ready, installBackupPicker, writeFolder } from './data-helpers.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
 // @requirement PRODUCT.md §1.4
+test('About isolates keyboard input and restores the editor selection on either dismissal', async ({ newContext }) => {
+  const page = await (await newContext()).newPage()
+  await page.goto('/')
+  await ready(page)
+  const editor = page.locator('[data-node-id="welcome"] .node-input')
+  await editor.fill('About focus sample')
+
+  for (const close of ['Escape', 'Close']) {
+    await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(2, 7, 'backward'))
+    await page.locator('#tree-menu-button').click()
+    await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+    await page.keyboard.type('xyz')
+
+    await expect(editor).toHaveValue('About focus sample')
+
+    if (close === 'Escape') await page.keyboard.press('Escape')
+    else await page.getByRole('button', { name: 'Close', exact: true }).click()
+
+    await expect(editor).toBeFocused()
+    await expect
+      .poll(() =>
+        editor.evaluate((element: HTMLTextAreaElement) => [
+          element.selectionStart,
+          element.selectionEnd,
+          element.selectionDirection,
+        ]),
+      )
+      .toEqual([2, 7, 'backward'])
+  }
+})
+
+// @requirement PRODUCT.md §1.4
 test('Escape from the browser menu restores editing and backward selection without an extra Tab', async ({
   newContext,
 }) => {
@@ -358,12 +390,8 @@ test('Tab leaving the menu commits the borrowed editor before another editing de
 
   await page.keyboard.press('Tab')
 
-  await expect(page.getByRole('link', { name: 'GitHub repository', exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'About Tree', exact: true })).toBeFocused()
   await expect(page.locator('#tree-menu')).toBeVisible()
-
-  await page.keyboard.press('Tab')
-
-  await expect(page.getByRole('link', { name: 'MIT License', exact: true })).toBeFocused()
 
   await page.keyboard.press('Tab')
 

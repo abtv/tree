@@ -84,17 +84,22 @@ While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
-The browser's ellipsis menu ends with a muted, non-interactive version line below
-statuses and the Update App button when present. All builds show the root
+The browser's ellipsis menu ends with **About Tree** below statuses and the Update App
+button when present. It opens a modal dialog with the desktop About window's icon,
+title, version, copyright, license and repository links, using the shared light/dark palette.
+Close and Escape dismiss it and restore the previous editor focus and selection.
+The information appears in the dialog rather than the menu.
+
+All builds show the root
 `package.json` version and UTC build date in English, for example
 `Version 0.1.2 · Oct 29, 2026`. Both values are fixed at build time and describe the
 loaded app, including offline and while a newer update is waiting. Browser
 publication requires a version greater than the last transferred web release;
 ordinary commits still run validation without publishing a new package.
 
-Above the version line, a **GitHub repository** link opens
+A **GitHub repository** link opens
 `https://github.com/abtv/tree` in a new tab.
-Between the repository link and version, a muted line reads `© 2026 Andrei Butov · MIT License`.
+The dialog reads `© 2026 Andrei Butov` and `Licensed under the MIT License`.
 **MIT License** opens `https://github.com/abtv/tree/blob/main/LICENSE` in a new tab.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
