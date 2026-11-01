@@ -57,8 +57,8 @@ Keep the threshold unchanged and report a below-threshold exit honestly; a compl
 does not mean the threshold passed. Do not launch a layer shard.
 
 The first four analyses are complete without test changes. The owner authorized continued work
-in this session, subsequently extended to 50 files. Twenty-three tasks are complete.
-Next task is expansion-state.ts with a fresh 30-minute file budget. Enumerate remaining source files
+in this session, subsequently extended to 50 files. Twenty-four tasks are complete.
+Next task is folder-backup.ts with a fresh 30-minute file budget. Enumerate remaining source files
 from the live Stryker application patterns in lexical order, excluding tests and application/test.
 Every application source other than those marked Done remains unexamined; none is silently skipped.
 Do not report an aggregate as a full-layer run. Preserve per-file status counts and separate launch errors.
@@ -97,7 +97,7 @@ that file's own incremental path. No runtime, visual, or performance behavior ch
 | 21 | editor-text-session.ts | Done: 100%, 28 killed |
 | 22 | editor-undo-focus.ts | Done: 87.77% to 89.89%, 165 killed, 18 survivors, 4 timeouts, 1 no coverage; threshold failed |
 | 23 | emoji-history.ts | Done: 67.86% to 82.14%, 22 killed, 5 equivalents, 1 timeout; threshold failed |
-| 24 | expansion-state.ts | Planned |
+| 24 | expansion-state.ts | Done: 98.65%, 73 killed, 1 equivalent survivor |
 | 25 | folder-backup.ts | Planned |
 | 26 | menu-commands.ts | Planned |
 | 27 | node-search.ts | Planned |
@@ -736,6 +736,19 @@ file passed again. Renderer types, lint, changed formatting and whitespace check
 the final tests. Primary diff review confirmed additive tests-only implementation scope.
 No runtime or performance behavior changed, so no Electron/visual/performance check was needed.
 Next file: src/application/editor-text-session.ts, with its own incremental report.
+
+## Expansion state result
+
+Starting commit f53dde4; 21:38:38–21:39:24. Baseline/final 98.65% / unchanged.
+73 Killed, one Survived; Timeout/NoCoverage/errors/ignored zero. Dry run: 2274 tests.
+Survivor 57 removes the empty-set early return from collapseForest; the final unchanged-size
+check still returns the original state. No confirmed gap or test change. Primary review completed.
+
+```sh
+npm run test:mutation -- --mutate src/application/expansion-state.ts --incrementalFile .scratch/application-mutation/expansion-state.incremental.json --concurrency 4 --timeoutMS 10000
+```
+
+Threshold, documentation, changed-formatting and whitespace checks passed. Next: folder-backup.ts.
 
 ## Emoji history result
 
