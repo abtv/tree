@@ -146,6 +146,8 @@ pending edits.
 Copying a stored image starts the browser clipboard request during the user's
 command while its image data loads asynchronously. A missing image or denied
 clipboard access reports an operation error and leaves the document unchanged.
+An image-read failure is handled even when it occurs before the browser consumes
+the clipboard data; it must not also become an unhandled page error.
 
 Browser keyboard paste uses the clipboard data supplied by the native paste event,
 without requesting separate clipboard-read confirmation. Tree handles that data

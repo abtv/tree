@@ -211,6 +211,9 @@ export async function installBrowserPrototype(): Promise<{
         if (!bytes) throw new Error('Image could not be loaded.')
         return new Blob([bytes.slice()], { type: 'image/png' })
       })
+      // Observe failure immediately, before the clipboard implementation consumes the data.
+      // Keep the original rejected promise so the write still fails without replacing the clipboard.
+      void image.catch(() => {})
       try {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': image })])
       } catch (error) {

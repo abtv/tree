@@ -58,6 +58,8 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
     window.copiedBytes = ['previous clipboard']
     navigator.clipboard.write = async (items) => {
       if (!window.copyActivation) throw new DOMException('Copy lost user activation', 'NotAllowedError')
+      // Let the IndexedDB read fail before the clipboard consumes its promise.
+      await new Promise((resolve) => setTimeout(resolve, 50))
       const blob = await items[0]!.getType('image/png')
       window.copiedBytes = [...new Uint8Array(await blob.arrayBuffer())]
     }
@@ -78,6 +80,7 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
   expect(await page.evaluate(() => window.copiedBytes), 'Failed copy must preserve clipboard data').toEqual([
     ...onePixelPng,
   ])
+  expect(errors, 'Activation-model copy must handle missing image data').toEqual([])
 
   await page.evaluate(() => {
     navigator.clipboard.write = async () => {
@@ -86,6 +89,7 @@ test('preserves wrapping, undo and image clipboard contracts', async ({ newConte
   })
 
   expect(await page.evaluate(() => window.copyImage('compatibility-image'))).toBe('Clipboard denied')
+  expect(errors, 'Denied clipboard write must handle its image promise').toEqual([])
 
   await test.step('copies a PNG through the virtual clipboard and preserves it on failure', async () => {
     await page.evaluate(() => {
