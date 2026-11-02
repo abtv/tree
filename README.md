@@ -39,7 +39,7 @@ Detailed behavior and editing commands are described in [Product Requirements](d
 
 ## Running from Source
 
-Tree is currently in development. There is no packaged application release yet; the repository provides the source and development build.
+Tree is currently in development. The macOS release workflow builds signed and notarized Apple Silicon DMGs and uploads verified artifacts to draft GitHub Releases. Only the owner publishes those drafts for users. See [macOS releases](docs/releasing.md) for the release and verification instructions.
 
 On macOS, install the toolchain listed in the [Development Guide](docs/DEVELOPMENT.md#2-prerequisites), clone this repository, and run these commands from its directory:
 

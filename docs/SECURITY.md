@@ -1,9 +1,10 @@
 # Security Policy
 
 Tree is currently distributed as a website at <https://tree-editor.github.io>.
-The browser version is the current distribution focus; the macOS Electron application
-remains in development and is not yet packaged for distribution. This policy covers
-the published website and the source on `main`, including the desktop implementation.
+The macOS Electron release workflow also builds signed and notarized Apple Silicon
+DMGs and uploads verified artifacts to draft GitHub Releases. Only the owner
+publishes those drafts. This policy covers the website, desktop release artifacts
+and the source on `main`.
 
 ## Reporting a vulnerability
 
@@ -23,7 +24,7 @@ boundaries and update mechanisms differ:
 | Execution | Browser sandbox and origin isolation | Sandboxed Electron renderer with validated preload/IPC access to the main process |
 | Document storage | IndexedDB in the browser profile for the site's origin | Local document and attachment files managed by the main process |
 | Permissions | Browser-controlled clipboard and platform capabilities | Main-process capabilities; renderer permission requests are denied |
-| Distribution | HTTPS resources from the verified GitHub Pages publication | Packaged, signed and notarized application required before shipment |
+| Distribution | HTTPS resources from the verified GitHub Pages publication | Signed and notarized DMG uploaded to a draft release after verification; owner-controlled publication |
 
 Local storage does not protect against malicious code running with access to that
 storage. In the browser, application code served from the trusted origin can read
@@ -246,7 +247,7 @@ process calls `setSpellCheckerEnabled(false)` on the renderer session
 from its Google-hosted CDN. Browser-provided translation and similar services follow the
 user's browser settings.
 
-## Desktop distribution hardening before shipment
+## Desktop distribution
 
 The macOS release workflow uses electron-builder; `npm run build` alone produces unpackaged
 output. The production packaging configuration enforces these distribution controls:
@@ -267,6 +268,14 @@ control documented here. The release workflow checks fuse values in the packaged
 tests its renderer through Chromium CDP, without enabling the Node inspector. See
 [Releasing](releasing.md) for the signing, audit and publication gates.
 
+The release workflow builds the exact validated source SHA, reserves an immutable
+version tag and owned draft, and verifies Developer ID signatures, stapled tickets
+and Gatekeeper acceptance for the app and DMG before upload. Missing signing
+credentials or failed verification stop upload. Existing assets are never replaced,
+and no automated step publishes the draft. Signing credentials and release-write
+access are privileged trust roots. The desktop application has no auto-updater;
+the browser update mechanism does not update installed desktop applications.
+
 ## Agent execution threat model
 
 This section covers the development agents that modify or validate the repository. It is separate from the application's runtime security model above. Agents can execute repository-controlled scripts, so the repository and its dependencies are treated as trusted inputs for normal development. A malicious repository change could otherwise use an allowed build or test command to act with the agent process's host privileges.
@@ -280,7 +289,7 @@ The protections differ by tool:
 | Codex primary | `workspace-write`, approval-on-request, and configured network access; the sandbox limits filesystem scope but does not restrict individual shell commands | repository workflow, command safety, and role behavior |
 | Codex planner/reviewer | read-only sandbox; no shell access | role behavior and no-web policy |
 | Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test/build/lint command list and no-edits rule |
-| Claude Code primary and subagents | project permission settings allow only the listed routine commands without an approval prompt; there is no OS sandbox or command allowlist for the granted `Bash` tool | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured permission patterns |
+| Claude Code primary and subagents | configured macOS sandbox for ordinary Bash commands, restricted network domains and selected secret environment variables; explicitly excluded workflows run outside the sandbox under permission rules | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured sandbox and permission patterns |
 | OpenCode primary | per-command allow/deny rules, denied external directories, and denied task types in `opencode.json`; these are consent guardrails, not an OS sandbox | shared role behavior and the trusted-repository assumption |
 | OpenCode reviewer | edit, shell, web, and external-directory access denied by configuration | none for those denied capabilities; shared role behavior still applies |
 
@@ -289,7 +298,7 @@ These boundaries reduce accidental access and unsafe tool use; they do not make 
 ## Verification
 
 Runtime and publication checks are mapped below. Repository settings, account
-security and future desktop signing requirements also need operational verification;
+security and desktop signing credentials also need operational verification;
 local tests do not establish those controls.
 
 | Control | Focused tests | Real-boundary tests |
@@ -301,6 +310,7 @@ local tests do not establish those controls.
 | Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mts`, `e2e/web/compatibility.spec.mts` |
 | Browser external-link opener and referrer isolation | `src/renderer/node-input-pointer-handlers.test.ts`, `src/renderer/editor-input-handlers.test.ts` | `e2e/web/external-links.spec.mts` against the built package |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
+| Desktop draft ownership, credentials and packaging policy | `scripts/release-draft.test.mts`, `scripts/release-guard.test.mts`, `scripts/release-security.test.mts` | `create-macos-release-draft.yml`: packaged fuse readback, CDP smoke, Developer ID signatures, notarization tickets and Gatekeeper checks before upload; owner verification before publication |
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
 | Renderer session permissions and network egress | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
