@@ -287,7 +287,7 @@ The protections differ by tool:
 | Tool and role | Mechanically enforced boundary | Prompt-only boundary |
 | --- | --- | --- |
 | Codex primary | `workspace-write`, approval-on-request, and configured network access; the sandbox limits filesystem scope but does not restrict individual shell commands | repository workflow, command safety, and role behavior |
-| Codex planner/reviewer | read-only sandbox; no shell access | role behavior and no-web policy |
+| Codex planner/reviewer | read-only sandbox configured in role defaults; actual session permissions may override those defaults | inspection-only shell fallback, no edits, no tests, and no-web policy; see `AGENT_ROLES.md` for observed runtime limits |
 | Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test/build/lint command list and no-edits rule |
 | Claude Code primary and subagents | configured macOS sandbox for ordinary Bash commands, restricted network domains and selected secret environment variables; explicitly excluded workflows run outside the sandbox under permission rules | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured sandbox and permission patterns |
 | OpenCode primary | per-command allow/deny rules, denied external directories, and denied task types in `opencode.json`; these are consent guardrails, not an OS sandbox | shared role behavior and the trusted-repository assumption |

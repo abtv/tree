@@ -1,6 +1,6 @@
 # Active Plans
 
-This index lists work that spans multiple sessions: initiatives and review follow-up batches whose tasks the Product Owner authorizes one at a time. Read the linked plan before continuing its work. The workflow and plan format are in [Development Guide §11](../docs/DEVELOPMENT.md#11-multi-session-initiatives); authorization and session rules are in [AGENTS.md](../AGENTS.md).
+This index lists work that spans multiple sessions: initiatives and review follow-up batches. The linked plan records whether the Product Owner authorized the whole scope or requires task-by-task approval. Read it before continuing its work. The workflow and plan format are in [Development Guide §11](../docs/DEVELOPMENT.md#11-multi-session-initiatives); authorization and session rules are in [AGENTS.md](../AGENTS.md).
 
 | Initiative | Status | Next task |
 | --- | --- | --- |

@@ -77,7 +77,7 @@ Status: Exploring
 
 ### Observation
 
-Repository fact: the application navigates and renders one level at a time. It has no application-level facility for retrieving a node from elsewhere in the hierarchy. Browser find is limited to rendered content, and wide levels may leave off-screen rows unmounted.
+The original observation predates application search. The current application provides local Find, document-wide node and tag search, and recent-node navigation (`docs/PRODUCT.md` §20.14). The remaining question is whether these facilities resolve retrieval friction in ordinary use; their existence alone is not usage evidence.
 
 ### Hypothesis
 
@@ -101,6 +101,7 @@ Support requires recurring retrieval failures that a focused search interaction 
 
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies one-level navigation and describes browser-find limitations for windowed sibling lists.
 - 2026-09-21 — Agent inference: retrieval is likely to become more important as the document grows; real usage evidence is still required.
+- 2026-11-03 — Repository fact: PRODUCT §20.14 and the search implementation supersede the original absence-of-search premise. The recorded status is unchanged; any further experiment must assess the existing search first.
 
 ## PD-002: Keyboard-only sibling reordering
 
@@ -142,7 +143,7 @@ Status: Exploring
 
 ### Observation
 
-Repository fact: the application automatically persists the document and retains recovery generations, but it provides no documented user-facing export, import, backup, or recovery workflow.
+The original observation predates the data-portability features. Browser export, import, Chromium folder backup and folder restore are defined in `docs/PRODUCT.md` §24; desktop export, import and Replaced Notes recovery are defined in §25. Desktop persistence retains recovery generations, while browser storage does not. The remaining question is which personal recovery and portability scenarios these facilities cover adequately.
 
 ### Hypothesis
 
@@ -166,6 +167,7 @@ Support requires at least one important scenario that current persistence and sy
 
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies automatic persistence and retained generations but no user-facing data-portability workflow.
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
+- 2026-11-03 — Repository fact: PRODUCT §§24–25 and the browser/desktop archive implementations supersede the original absence-of-export premise. The recorded status is unchanged; any further experiment must assess the existing workflows first.
 
 ## TD-001: Whether a written rule is the right response to a recurring defect
 

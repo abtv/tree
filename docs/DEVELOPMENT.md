@@ -5,7 +5,7 @@
 
 ## 1. Project Overview
 
-This is a macOS desktop application built with:
+Tree provides a macOS desktop application and a published browser version, built with:
 
 * Electron
 * React
@@ -52,7 +52,10 @@ The install runs the project's `postinstall` script to download the Electron run
 
 The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests. It only runs on the machine that makes the commit, so the Attribution GitHub Actions workflow (`§9`) is the backstop for a commit made without the hook installed and for a pull request description, which no Git hook can see.
 
-The end-to-end suite drives Electron, not browser binaries, so the Playwright browser download is not needed. To skip it and reduce install size and time:
+The Electron end-to-end suite does not need Playwright browser binaries. Browser
+E2E and Chromium smoke checks do need Chromium; the prepared Linux container and
+CI install it separately. For an Electron-only development setup, browser downloads
+can be skipped:
 
 ```bash
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install
@@ -76,14 +79,15 @@ less frequent checks.
 | `make unit` | Unit tests | `npm test` |
 | `make e2e-electron` | Electron end-to-end tests | `npm run test:e2e` |
 | `make e2e-web` | Web end-to-end tests in offline Docker Chromium | `npm run test:web:chromium` |
+| `make smoke-linux` | Linux Electron and Chromium smoke checks in offline Docker | `npm run test:smoke:linux` |
 | `make dev-electron` | Electron development mode | `npm run dev` |
 | `make dev-web` | Web development server | `npm run dev:web` |
 | `make perf-electron` | Full Electron performance suite | `npm run test:perf -- --project=electron` |
 | `make release` | Bump the patch version and commit locally | `npm run release` |
 
 Test and development targets never run `setup` automatically. Agents continue
-using the named npm workflows and their existing permissions, including only
-`npm run test:web:chromium` for container tests. No general Make/Docker permission
+using the named npm workflows and their existing permissions, including
+`npm run test:web:chromium` and `npm run test:smoke:linux` for container tests. No general Make/Docker permission
 is required or added for these owner-facing shortcuts.
 
 ### Electron development

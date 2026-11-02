@@ -2,8 +2,8 @@
 
 This directory preserves the owner-reviewed browser implementation. It shares
 Tree's editor, application store and styles with the desktop app. It supports
-local development and a static hosting package. This does not publish a site or
-claim full production browser parity.
+local development and the static package published at <https://tree-editor.github.io>.
+Local commands do not publish a site; browser support does not imply full desktop parity.
 
 Browser runtime source and unit tests live here. Build and server tools live in
 `scripts/web/`; Chrome E2E specs live in `e2e/web/`. Shared editor layers remain
@@ -82,7 +82,7 @@ The menu also shows local save status and whether the browser granted persistent
 storage. **About Tree** opens a modal dialog identifying the loaded build with the root `package.json`
 version and UTC build date, for example **Version 0.1.2 · Oct 29, 2026**. Local builds
 use the same version source. **GitHub repository** in the dialog links to
-the source repository. **Release web app** in GitHub Actions records the source
+the source repository. **Release new app version** in GitHub Actions records the source
 commit and publication result. Publication requires a version greater than
 the last transferred web release. Only one tab may
 edit at a time.

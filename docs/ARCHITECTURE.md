@@ -39,8 +39,9 @@ React renderer, application store and domain
 through a browser `TreeApi` adapter, using IndexedDB and Web Locks. The Electron
 build preserves its existing output paths. A separate Vite build writes a standalone
 static package to `out/web/`; the host serves files without a Node.js runtime.
-It preserves the same browser adapter and storage identity. This checkpoint is
-not final browser architecture or publication; its constraints are in
+It preserves the same browser adapter and storage identity. The package is published
+at <https://tree-editor.github.io> through the verified release pipeline below;
+its browser compatibility and storage constraints are in
 [Browser version](../src/web/README.md).
 
 The browser composition opts into `App.deferRichEditing`. App derives native
@@ -167,7 +168,7 @@ so it supports cost attribution without claiming every callback belongs to searc
 Count and navigation have separate request IDs and share context invalidation. The caller
 must replace context before publishing a new document revision or presentation scope.
 Late callbacks are rejected even if an executor ignores cancellation. A pending navigation
-can be superseded; the future input owner must serialize repeated user intents after applying
+can be superseded; the input owner must serialize repeated user intents after applying
 the previous destination, and retry canceled navigation only against a fresh context. Raw
 match offsets and grapheme caret offsets are separate; subsequent navigation can preserve
 the raw match anchor while the caret remains at its containing grapheme.
