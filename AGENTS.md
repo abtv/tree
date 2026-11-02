@@ -178,6 +178,8 @@ For a requested new-session prompt, follow [procedure §12, New-session prompts]
 
 A delivery report is a bottom-line summary of at most three short lines: delivery/status with the commit, anything failed, unverified or blocked, and any required owner action. Keep the technical evidence required by procedure §12 out of the conversation; give it on request, or link it in one line when a handoff remains. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
 
+Exception: a requested security audit delivers the full structured report required by [Security Audit](docs/SECURITY_AUDIT.md). The three-line limit and exclusion of technical evidence do not apply to that audit report; a short summary must not replace it.
+
 ## 13. Completion Criteria
 
 Before completion, read procedure §13. Complete the authorized behavior, appropriate coverage, documentation, required tier and boundary/visual verification, and primary diff review. Keep the repository coherent and preserve unrelated behavior. User-visible changes require the HIG check in `docs/PRODUCT.md` §1.3.

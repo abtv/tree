@@ -13,7 +13,8 @@ Default to the current Tree repository, including Electron, the React renderer, 
 3. Consult current primary guidance: [Electron security](https://www.electronjs.org/docs/latest/tutorial/security), [OWASP XSS prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html), [OWASP DOM XSS prevention](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html), and relevant vendor advisories for installed versions. Record source dates and access limitations; do not present recalled or unavailable advisory data as current verification.
 4. Inspect every applicable area below. Trace attacker-controlled input through validation and transformations to its destination. Search matches identify candidates, not confirmed vulnerabilities. Check production configuration and runtime wiring; development settings and TypeScript types do not establish production protection.
 5. Run `npm run audit` and relevant existing security tests. Select focused runtime checks using [Development Guide §9](DEVELOPMENT.md#9-full-validation). Reproduce candidate failures safely with synthetic fixtures when possible. Test the actual Electron or browser boundary when a claim depends on runtime behavior. Distinguish injected test access from access a real attacker can obtain. A blocked check is unverified, not passed.
-6. Review the evidence and return the report below. Do not silently fix findings. Retain temporary evidence only when needed for an unfinished handoff; otherwise use the documented scratch retirement workflow.
+6. Account for every checklist area before finishing. Complete applicable inspection and runtime checks within the authorized scope, or identify the specific blocker and supported next action. Passing dependency and unit tests does not substitute for this coverage. Do not silently narrow the audit to source inspection; explain any remaining runtime gap and mark the audit partial when required checks remain blocked.
+7. Review the evidence and return the report below. Do not silently fix findings. Retain temporary evidence only when needed for an unfinished handoff; otherwise use the documented scratch retirement workflow.
 
 ## Inspection checklist
 
@@ -32,6 +33,8 @@ The checklist is a minimum inspection guide, not a reason to stop following a de
 
 ## Report
 
+Deliver the full structured report, even when no vulnerabilities are confirmed. Under the explicit exception in AGENTS.md §12, the three-line delivery limit and restriction on technical evidence do not apply. A brief opening summary may precede the report but must not replace it. Use the following sections: summary and scope; confirmed findings; unconfirmed candidates and hardening suggestions; coverage and validation; limitations and next actions. State when a findings section is empty.
+
 Lead with confirmed findings ordered by severity. For each finding include:
 
 * A stable report ID, severity and confidence, with the impact and prerequisites that justify them.
@@ -40,6 +43,8 @@ Lead with confirmed findings ordered by severity. For each finding include:
 * A minimal safe reproduction and observed result, or an explicit explanation of what is established by code inspection and what remains unverified.
 * A recommended correction and a regression check that would detect the failure.
 
-Separate confirmed vulnerabilities, unconfirmed candidates and defense-in-depth suggestions. Include a compact coverage table: area, inspected scope, checks run and outcome (`verified`, `inspection only`, `blocked`, or `not applicable` with a reason). Record exact commands, tested snapshot, relevant build/environment assumptions and primary-source links. Identify excluded areas and the next action for blocked checks. If there are no confirmed findings, say so within the inspected scope; never claim that the application is secure merely because tests or dependency audits passed.
+For dependency findings, also identify installed and affected versions, advisory links, dependency paths and production or build-time exposure. Distinguish a confirmed affected dependency from a confirmed exploitable path in Tree.
+
+Separate confirmed vulnerabilities, unconfirmed candidates and defense-in-depth suggestions. Include a coverage table with a row for every checklist area: inspected scope with file references, checks run, evidence and outcome (`verified`, `inspection only`, `blocked`, or `not applicable`). Split rows when subareas have different outcomes. For each omitted or unverified part, give its reason and next action; for `not applicable`, explain which relevant feature or boundary is absent. Record exact commands, tested snapshot, relevant build/environment assumptions and primary-source links. A test count alone is not coverage evidence. Identify owner-requested exclusions separately from capability blockers. If there are no confirmed findings, say so within the inspected scope; never claim that the application is secure merely because tests or dependency audits passed.
 
 Return the report in conversation unless the owner requests a saved destination. A request to fix findings starts a separate implementation task under the normal defect, validation and review rules.

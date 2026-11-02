@@ -395,6 +395,8 @@ For a multi-session initiative, commit the updated task status and next task wit
 
 ### Delivery reports
 
+For a requested security audit, use the full structured report in [Security Audit](SECURITY_AUDIT.md), including findings, coverage and evidence. The summary-only restrictions below (length, headings, tables and technical evidence) do not apply to that report. They still apply to delivery of changes to the audit instructions themselves.
+
 For completed or interrupted repository work, provide an explicit delivery report. The checklist below applies to that report; a requested prompt for another session uses the separate procedure below.
 
 The conversation report is a bottom-line summary of at most three short lines, in this order: what was delivered and its completion status, with the commit; what failed, remains unverified or is blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. Add a line only for a product decision made on the Product Owner's behalf, a possible shared cause reported by `npm run fix:history`, or, for an interface change, a link to representative inspected screenshots or recordings from the required visual evidence. Do not add headings, tables, check lists or mechanism explanations to the conversation report. Do not invent a manual application check for documentation or internal changes.
