@@ -5,8 +5,10 @@ A browser version is also available.
 This policy covers both applications, their build and publication pipelines, and
 the source on `main`.
 
-macOS installers for Apple Silicon are currently available to repository
-maintainers as draft GitHub Release assets, not as published releases for users.
+macOS installers for Apple Silicon are uploaded to draft GitHub Releases after
+verification. Only the owner publishes them for users on
+[GitHub Releases](https://github.com/abtv/tree/releases); drafts are visible only
+to repository maintainers.
 Desktop signing, verification and publication are described under
 [Desktop distribution](#desktop-distribution).
 

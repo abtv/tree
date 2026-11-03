@@ -2,6 +2,16 @@
 
 Tree is a keyboard-first outliner whose primary application is built with Electron for macOS. Write notes, break ideas into branches, and focus on a branch while keeping the surrounding structure within reach.
 
+## Availability
+
+**macOS desktop:** Tree is built for Apple Silicon Macs. The signed application is tested on macOS 15 in CI; compatibility with earlier macOS versions has not been verified. Published installers appear on [GitHub Releases](https://github.com/abtv/tree/releases). Draft releases are visible only to repository maintainers.
+
+To install a published release, download its `Tree-<version>-arm64.dmg`, open it, and drag **Tree** to **Applications**. Then open Tree from Applications. See [macOS releases](docs/releasing.md) for signing, verification, and publication details.
+
+**Browser:** Open <https://tree-editor.github.io>. It keeps notes in the current browser profile, separately from the desktop application, without automatic synchronization or desktop recovery generations. Export and import transfer notes between versions. See [Browser version](src/web/README.md) for compatibility, backup, offline access and storage limitations.
+
+## Tour
+
 [Watch the demo video](https://abtv.github.io/tree/tree-demo.webm)
 
 <img src="https://abtv.github.io/tree/tree-overview.png" width="860" alt="Tree in the light appearance, showing reading club, work, learning, and ideas branches, with some branches expanded and others folded.">
@@ -30,19 +40,13 @@ The command panel keeps application commands and their shortcuts within reach. P
 * **Flexible editing.** Use standard text editing or enable Vim-inspired editing with Normal, Insert, Visual, and Replace modes.
 * **Easy organization.** Move nodes and their branches with keyboard commands or drag-and-drop, and undo or redo edits.
 * **Image attachments.** Paste images into nodes and open them in a larger preview.
-* **Local storage.** Documents and images stay on your machine, with automatic saving and recovery from retained document versions.
+* **Local storage.** Documents and images stay on your machine, with automatic saving. The desktop application can automatically recover from retained document versions.
 * **Notes export and import.** Export notes and their images to a ZIP archive, or import an archive from either the desktop or browser version. Import replaces the current notes after confirmation.
 * **Light and dark appearances.** Choose an appearance or follow the macOS setting.
 
 Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
 
 Detailed behavior and editing commands are described in [Product Requirements](docs/PRODUCT.md).
-
-## Availability
-
-The macOS application is in development. Signed and notarized Apple Silicon DMGs are currently available to repository maintainers as draft GitHub Release assets; no desktop release is published for users yet. See [macOS releases](docs/releasing.md) for verification and publication instructions.
-
-The browser version is available at <https://tree-editor.github.io>. It keeps notes in the current browser profile, separately from the desktop application, without automatic synchronization or desktop recovery generations. Export and import transfer notes between versions. See [Browser version](src/web/README.md) for compatibility, backup, offline access and storage limitations.
 
 ## Running from Source
 
@@ -78,21 +82,9 @@ Its source, checks and current limitations are in [Browser version](src/web/READ
 * [Active Plans](plans/README.md) — multi-session initiatives and review follow-up batches, with their next tasks.
 * [License](LICENSE) — MIT License.
 
-## Development Workflow
+## Development
 
-Describe a task or defect to the coding agent. The agent handles implementation, required checks, and commits; the Product Owner controls material product and technical decisions.
-
-Write `menu` to see the [main requests](docs/WORKING_WITH_AGENT.md#command-menu), including checking task status, continuing authorized work, viewing or saving ideas, discussing a solution, fixing a defect, and requesting a security audit. The menu marks which requests can change files. Ordinary language works too. See [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md) for the complete workflow.
-
-## Project Structure
-
-Implementation code lives under `src/`. The architectural layers, module structure, and dependency direction are defined in [Architecture](docs/ARCHITECTURE.md).
-
-Coding-agent role definitions live in [Agent Roles](docs/AGENT_ROLES.md); each tool implements them through its own native config (`opencode.json` + `.opencode/agents/` for OpenCode, `.codex/config.toml` + `.codex/agents/` for Codex, `.claude/settings.json` + `.claude/agents/` for Claude Code). The development lifecycle is defined in [Agent Instructions](AGENTS.md), while durable Architecture Decision Records live in `docs/decisions/`.
-
-## Development Principles
-
-Product behavior is defined by the Product Owner and documented in [Product Requirements](docs/PRODUCT.md). The repository's operating rules, including domain/UI separation and the test contract, are defined in [Agent Instructions](AGENTS.md). The architectural invariants are defined in [Architecture](docs/ARCHITECTURE.md).
+Implementation code lives under `src/`. See [Architecture](docs/ARCHITECTURE.md) for its structure and [Architecture Decisions](docs/decisions/README.md) for recorded technical choices. [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md) explains the development workflow and the `menu` request; [Agent Instructions](AGENTS.md) define repository rules.
 
 ## License
 
