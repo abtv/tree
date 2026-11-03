@@ -135,13 +135,13 @@ jobs:
           node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app
           codesign --verify --deep --strict --verbose=2 dist/mac-arm64/Tree.app
           codesign -dvv dist/mac-arm64/Tree.app 2>&1 | grep 'Authority=Developer ID Application:'
-          xcrun stapler validate dist/mac-arm64/Tree.app
+          node scripts/stapler-validate.mts dist/mac-arm64/Tree.app
           spctl --assess --type execute --verbose=2 dist/mac-arm64/Tree.app
           codesign --verify --strict --verbose=2 dist/Tree-*.dmg
           codesign -dvv dist/Tree-*.dmg 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun notarytool submit dist/Tree-*.dmg --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
           xcrun stapler staple dist/Tree-*.dmg
-          xcrun stapler validate dist/Tree-*.dmg
+          node scripts/stapler-validate.mts dist/Tree-*.dmg
           spctl --assess --type open --context context:primary-signature --verbose=2 dist/Tree-*.dmg
       - name: Record signed installer identity
         id: digest
@@ -194,7 +194,7 @@ jobs:
         run: |
           set -euo pipefail
           codesign --verify --strict --verbose=2 "$DMG_FILE"
-          xcrun stapler validate "$DMG_FILE"
+          node scripts/stapler-validate.mts "$DMG_FILE"
           spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG_FILE"
           mount_dir="$RUNNER_TEMP/tree-dmg-mount"
           app_dir="$RUNNER_TEMP/tree-dmg-installed"
@@ -203,7 +203,7 @@ jobs:
           hdiutil attach "$DMG_FILE" -readonly -nobrowse -mountpoint "$mount_dir"
           ditto "$mount_dir/Tree.app" "$app_dir/Tree.app"
           codesign --verify --deep --strict --verbose=2 "$app_dir/Tree.app"
-          xcrun stapler validate "$app_dir/Tree.app"
+          node scripts/stapler-validate.mts "$app_dir/Tree.app"
           spctl --assess --type execute --verbose=2 "$app_dir/Tree.app"
           node scripts/verify-release-fuses.mts "$app_dir/Tree.app"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" node scripts/packaged-smoke.mts "$app_dir/Tree.app"
@@ -211,7 +211,7 @@ jobs:
           mkdir "$zip_dir"
           ditto -x -k "dist/Tree-${RELEASE_VERSION}-arm64.zip" "$zip_dir"
           codesign --verify --deep --strict --verbose=2 "$zip_dir/Tree.app"
-          xcrun stapler validate "$zip_dir/Tree.app"
+          node scripts/stapler-validate.mts "$zip_dir/Tree.app"
           spctl --assess --type execute --verbose=2 "$zip_dir/Tree.app"
           node scripts/verify-release-fuses.mts "$zip_dir/Tree.app"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" node scripts/packaged-smoke.mts "$zip_dir/Tree.app"

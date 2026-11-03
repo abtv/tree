@@ -26,6 +26,21 @@ const { candidate, reserve, sign, verify, upload } = workflow.jobs as Record<
   Job
 >
 
+test('all explicit ticket checks use bounded network retries', () => {
+  expect(text).not.toContain('xcrun stapler validate')
+  const checks = [sign, verify].flatMap((job) =>
+    job.steps.flatMap((step) => (step.run ?? '').split('\n').filter((line) => line.includes('stapler-validate.mts'))),
+  )
+
+  expect(checks.map((line) => line.trim())).toEqual([
+    'node scripts/stapler-validate.mts dist/mac-arm64/Tree.app',
+    'node scripts/stapler-validate.mts dist/Tree-*.dmg',
+    'node scripts/stapler-validate.mts "$DMG_FILE"',
+    'node scripts/stapler-validate.mts "$app_dir/Tree.app"',
+    'node scripts/stapler-validate.mts "$zip_dir/Tree.app"',
+  ])
+})
+
 test('external workflow actions are pinned to full commit identities', () => {
   for (const file of readdirSync('.github/workflows').filter((name) => /\.ya?ml$/.test(name))) {
     const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8')) as {
@@ -111,7 +126,7 @@ test('only the signer references Apple secrets and it cannot write releases or r
   const build = secretSteps[0]!.run!
   expect(build).toContain('electron-builder --mac dmg zip --arm64 --publish never')
   expect(build).not.toContain('packaged-smoke')
-  expect(build).toContain('xcrun stapler validate dist/Tree-*.dmg')
+  expect(build).toContain('node scripts/stapler-validate.mts dist/Tree-*.dmg')
   expect(build).toContain('spctl --assess --type execute')
   expect(build).toContain('trap \'rm -f "$APPLE_API_KEY"\' EXIT')
   const caller = load(readFileSync('.github/workflows/release-new-app-version.yml', 'utf8')) as {

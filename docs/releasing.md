@@ -81,6 +81,13 @@ Artifact names include the release workflow run ID and attempt. Failed-job retri
 reuse successful prerequisite outputs; a rerun of signing creates a new immutable
 artifact. Expired artifacts require rerunning their producer and dependent jobs.
 
+Explicit ticket validation uses `scripts/stapler-validate.mts`. It makes at most
+three attempts, waiting 15 and then 30 seconds, only when stapler exits with 68
+and reports an NSURLErrorDomain timeout (-1001) or lost connection (-1005).
+Other failures stop immediately; an exhausted retry returns the last failure.
+Signing, notarization submission, stapling and Gatekeeper checks are not retried
+by this wrapper. No verification failure is ignored.
+
 An ad-hoc signed local build can be inspected with
 `node scripts/verify-release-fuses.mts <path-to-Tree.app>`, but Hardened Runtime
 may refuse to launch its framework because ad-hoc signatures have no matching
