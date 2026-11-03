@@ -156,8 +156,8 @@ bounds apply before fetching retained assets. The target independently verifies
 the signature's repository, workflow, main ref, source digest and hosted runner,
 plus current source run/attempt/gate and every package byte. The publisher replaces
 the whole site tree, and the verifier rejects all unlisted files. Approved static
-asset extensions exclude HTML/SVG. Root files other than `index.html` and
-`.nojekyll` are limited to four exact installable-app names (manifest and three
+asset extensions exclude HTML/SVG. Root files other than `index.html`,
+`.nojekyll` and the exact Service Worker name `sw.js` are limited to four exact installable-app names (manifest and three
 PNG icons); HTML may reference only those root names and current assets. No
 archive extraction is used.
 

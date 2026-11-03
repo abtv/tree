@@ -18,7 +18,7 @@ The user's location is one level: either the top-level root nodes or the immedia
 
 The application is keyboard-first. Mouse interaction is primarily used for moving nodes by drag-and-drop.
 
-Text remains editable inline. The user chooses between standard text editing and Vim-inspired editing, which adds Insert, Normal, and Visual interaction modes, as defined in §20.2.
+Text remains editable inline. The user chooses between standard text editing and Vim-inspired editing, which adds Insert, Normal, Visual, and Replace interaction modes, as defined in §20.2.
 
 The application automatically saves changes.
 
@@ -185,7 +185,7 @@ the resulting artifact. Source maintainers and hosting administrators remain tru
 
 ### 1.5 Keyboard Modifiers Outside Apple Platforms
 
-The primary modifier is Cmd on Apple platforms (macOS, iOS, iPadOS) and Ctrl on every other platform. Electron runs on macOS only, so this section applies to the browser version (§1.4). Linux and Windows are the targeted platforms. Real-keyboard delivery of the shortcuts in Chromium on Linux and Windows is unverified.
+The primary modifier is Cmd on Apple platforms (macOS, iOS, iPadOS) and Ctrl on every other platform. The supported desktop product targets macOS; Linux Electron smoke tests do not establish Linux desktop product support. This section defines the browser version's non-Apple shortcuts (§1.4), targeting Linux and Windows. Real-keyboard delivery of the shortcuts in Chromium on Linux and Windows is unverified.
 
 Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with the same Shift and Alt qualifiers, and the label `⌘Q` shows as `Ctrl+Q`. Option is Alt. The rules below settle the differences.
 
@@ -1214,7 +1214,7 @@ The focused row stays mounted even when it is off-screen, so keyboard navigation
 
 A node drag that reaches the top or bottom edge of the content area scrolls the list automatically, so the node can be moved to a position outside the visible rows. This holds in every list that overflows the window, whether or not its rows are windowed; a list that fits the window does not scroll. Hovering the location toolbar does not scroll the list (§2.2).
 
-The page continues to scroll as a single document. The location bar and the current-parent heading scroll with the content.
+The content continues to scroll as a single document. The location bar stays fixed (§2.2); the current-parent heading scrolls with the content.
 
 At or below 500 visible rows, the list renders every row, including inline descendants, without windowing.
 
@@ -1390,7 +1390,7 @@ Normal mode also supports:
 
 #### 20.2.16 Counts and Operator Scope
 
-* Numeric prefixes repeat in-node motions and text edits, including operator motions (`3w`, `2dw`, `3x`, and `2r{character}`). They also count node commands: `3j` and `5k` move by that many visible rows while clamping at the first and last visible row of the location; `10G` selects the tenth visible row of the location, clamped to the last visible row; `3dd` deletes the current node and the next two displayed sibling subtrees, clamped at the last sibling, as one undoable command, and `2yy` copies the current node and the next sibling subtree into the local register as an ordered forest.
+* Numeric prefixes repeat in-node motions and text edits, including operator motions (`3w`, `2dw`, `3x`, and `2r{character}`). `3j` and `5k` repeat the vertical motion steps defined in §20.2.9 (Tree display lines and image positions) and §23.4 (Agenda rows and image positions), clamping at the view boundaries. Counts also apply to node commands: `10G` selects the tenth visible row of the location, clamped to the last visible row; `3dd` deletes the current node and the next two displayed sibling subtrees, clamped at the last sibling, as one undoable command, and `2yy` copies the current node and the next sibling subtree into the local register as an ordered forest.
 * `dd` and `yy` cover every descendant, whether or not it is expanded.
 * A `dd` that changes nothing (for example on the current-parent heading) leaves the register unchanged.
 * A count on `p` or `P` repeats the most recent subtree register that many times, assigning fresh IDs to every copy, and inserts all copies as one undoable command; a put rejected by the depth limit (§2.3) or by ancestry inserts no copy.
@@ -1651,6 +1651,10 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
+| `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.14) |
+| `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.14) |
+| `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.14) |
+| `search-all-nodes` | — | Search all nodes | — | `⌘;` | Open document-wide node and tag search (§20.14) |
 | `quit` | `q` | Quit Tree | — | `⌘Q` (`Ctrl+Q` outside Apple platforms, §1.5) | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
 | `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |
 | `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |
@@ -1668,11 +1672,11 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 
-`toggle-vim-mode` can enable or disable Vim editing from the panel; Edit > Vim Editing remains available. It has no alias or dedicated keyboard shortcut. It changes the editing preference rather than the document and remains available while saving is locked.
+`toggle-vim-mode` remains available while saving is locked and changes only the editing preference. Edit > Vim Editing remains available.
 
-The view commands have no aliases or dedicated shortcuts. A real view change resolves editing sessions and selection exactly as `Cmd+P` does; an already-active destination preserves them. They create no document edit or undo entry. Successful execution still updates command history, including when the requested view is already active.
+View changes resolve editing sessions and selection as `Cmd+P` does; an already-active destination preserves them. Neither edits the document nor adds undo history. Both update command history.
 
-Command names use lowercase ASCII words joined by hyphens, with the verb first: `toggle-<object>` switches an on/off state; `set-<object>-<value>` selects a value; `show-<view>` selects a named view; `export`, `import`, `back-up`, `stop`, `resume` and `restore` name their corresponding data-menu actions; a bare verb acts on the whole application. New verbs require an update to this rule. `q` is the only short alias; new aliases require an owner decision. `theme` names the Appearance choice, and `auto` names Automatic.
+Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions; data verbs name their menu actions. New verbs require updating this rule. `q` is the only alias; new aliases require an owner decision. `theme` means Appearance; `auto` means Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 
@@ -2028,7 +2032,7 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 * `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the active endpoint, and `y` copies the selected text to the system clipboard and the Vim register.
 * In standard editing and Vim Insert, `Left`, `Right`, `Home`, `End`, `Option+Left`, `Option+Right`, `Cmd+Left`, `Cmd+Right` and `Shift` with any of them move or extend a selection, clamped at both ends, and an arrow with a selection collapses it to the matching end.
 * `Cmd+C` copies the selection, or in Vim Normal the character under the block; `Cmd+A` selects the whole text, entering Visual in Vim.
-* The arrow keys, `Home` and `End` do nothing in Vim Normal and Visual, as in Tree.
+* `Left`, `Right`, `Home` and `End` do nothing in Vim Normal and Visual. Up and Down retain the row-navigation behavior above.
 * Day text is copied as displayed, in its original case.
 * A pointer click on another row selects it with the caret at offset zero, and a click on the row that is already selected leaves its caret where it is.
 * Every command that would insert, change, delete, put, join, indent, surround or repeat text does nothing on these rows and keeps document, caret and mode unchanged.

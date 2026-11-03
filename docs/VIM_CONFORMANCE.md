@@ -112,7 +112,7 @@ Normal-mode `:` opens the application command panel in Tree and Agenda (PRODUCT 
 
 ## Open matrix-only rules
 
-These clauses are implemented, but PRODUCT.md does not state them and no named test was found that asserts the stated rule. They move into PRODUCT.md when such a test exists (or the Product Owner decides otherwise); a row that still carries a clause keeps it tagged.
+These clauses are implemented, but PRODUCT.md does not state them and no named test was found that asserts the stated rule. Resolve them through the Product Owner under AGENTS.md §5 before promoting them to requirements, and add appropriate coverage for the approved behavior. A test alone does not authorize a product decision; a row that still carries a clause keeps it tagged.
 
 * M7: a structural command, a successful whole-node Visual movement, and a mutation reset the caret to text position `0` (rows “`o`/`O`, `dd`/`yy`…” and the whole-node Visual image row). The test that asserts position `0` for each command was not identified.
 * M12: character Visual mode and a pending Normal command also clear on any other blur. PRODUCT §20.2.6 names the listed commands and the breadcrumb and enter-control clicks only; no test covers other blurs.

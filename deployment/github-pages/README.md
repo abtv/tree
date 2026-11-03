@@ -7,8 +7,10 @@ The source is `abtv/tree`; the application destination is
 
 ## Release checks
 
-The release workflow calls standard validation, the high-severity dependency
-audit, and the Chromium production-build tests on Linux for the same source commit.
+The release workflow verifies the successful source validation run, including code
+checks, the high-severity dependency audit and Chromium production-build tests on
+Linux for the same source commit. It reuses that run's tested browser artifact
+instead of repeating those checks.
 Failed, missing, skipped or canceled checks block publication.
 Full Electron E2E and memory workflows remain weekly/manual; timing suites stay local.
 Linux/macOS smoke, including Safari smoke, gate every release. Demo also waits for
@@ -147,7 +149,7 @@ additionally denies workflow writes to the Contents-only token. Previously publi
 hashed assets remain available only after authenticating the old manifest/bundle
 and verifying their bytes before the new manifest is signed. Unlisted target files
 are removed by the whole-tree replacement, and target verification rejects extras.
-Only JavaScript, CSS and font assets are accepted; HTML/SVG assets are rejected.
+Only JavaScript, CSS, PNG and font assets are accepted; HTML/SVG assets are rejected.
 At the root, besides `index.html`, `.nojekyll` and the exact Service Worker name `sw.js`, only the exact installable-app
 names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
 `apple-touch-icon.png` are accepted; they are current-only, like `index.html`.

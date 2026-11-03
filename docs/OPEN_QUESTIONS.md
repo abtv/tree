@@ -133,7 +133,7 @@ Support requires repeated mouse transitions for sibling moves and a shortcut tha
 ### Evidence
 
 - 2026-09-21 — Product Owner statement: fast note-taking as a touch typist is important.
-- 2026-10-04 — Product Owner request: "move nodes from one parent to another, it's not working now with drag and drop". This asks for cross-parent moves by mouse; the initiative is `plans/cross-parent-drag-and-drop.md`. Keyboard moves remain unrequested.
+- 2026-10-04 — Product Owner request: "move nodes from one parent to another, it's not working now with drag and drop". This asked for cross-parent moves by mouse; the initiative was completed and its plan retired in `e7d392f`. Current behavior is specified in PRODUCT §11. This request did not authorize keyboard moves.
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` defines drag-and-drop as the only sibling-reordering interaction.
 
 ## PD-004: User-controlled export and backup
