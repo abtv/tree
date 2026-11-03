@@ -1,6 +1,6 @@
 # Tree
 
-Tree is a keyboard-first outliner for macOS. Write notes, break ideas into branches, and focus on a branch while keeping the surrounding structure within reach.
+Tree is a keyboard-first outliner whose primary application is built with Electron for macOS. Write notes, break ideas into branches, and focus on a branch while keeping the surrounding structure within reach.
 
 [Watch the demo video](https://abtv.github.io/tree/tree-demo.webm)
 
@@ -22,7 +22,7 @@ Press `Cmd+F` to find text in the current view. While Find has focus, `Enter` / 
 
 <img src="https://abtv.github.io/tree/tree-commands.png" width="860" alt="Tree command panel in the dark appearance, showing application commands and their keyboard shortcuts.">
 
-The command panel keeps application commands and their shortcuts within reach. Press `:` in Vim Normal mode to open it, then type to filter the list.
+The command panel keeps application commands and their shortcuts within reach. Press `Cmd+Shift+P` in either editing mode, or `:` in Vim Normal mode, then type to filter the list.
 
 ## Features
 
@@ -31,15 +31,20 @@ The command panel keeps application commands and their shortcuts within reach. P
 * **Easy organization.** Move nodes and their branches with keyboard commands or drag-and-drop, and undo or redo edits.
 * **Image attachments.** Paste images into nodes and open them in a larger preview.
 * **Local storage.** Documents and images stay on your machine, with automatic saving and recovery from retained document versions.
+* **Notes export and import.** Export notes and their images to a ZIP archive, or import an archive from either the desktop or browser version. Import replaces the current notes after confirmation.
 * **Light and dark appearances.** Choose an appearance or follow the macOS setting.
 
 Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
 
 Detailed behavior and editing commands are described in [Product Requirements](docs/PRODUCT.md).
 
-## Running from Source
+## Availability
 
-Tree is currently in development. The macOS release workflow builds signed and notarized Apple Silicon DMGs and uploads verified artifacts to draft GitHub Releases. Only the owner publishes those drafts for users. See [macOS releases](docs/releasing.md) for the release and verification instructions.
+The macOS application is in development. Signed and notarized Apple Silicon DMGs are currently available to repository maintainers as draft GitHub Release assets; no desktop release is published for users yet. See [macOS releases](docs/releasing.md) for verification and publication instructions.
+
+The browser version is available at <https://tree-editor.github.io>. It keeps notes in the current browser profile, separately from the desktop application, without automatic synchronization or desktop recovery generations. Export and import transfer notes between versions. See [Browser version](src/web/README.md) for compatibility, backup, offline access and storage limitations.
+
+## Running from Source
 
 On macOS, install the toolchain listed in the [Development Guide](docs/DEVELOPMENT.md#2-prerequisites), clone this repository, and run these commands from its directory:
 
@@ -66,6 +71,7 @@ Its source, checks and current limitations are in [Browser version](src/web/READ
 * [Open Questions](docs/OPEN_QUESTIONS.md) — non-normative product and technical questions that are still open, with their evidence and decisions.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.
+* [macOS Releases](docs/releasing.md) — signing, installer verification, and publication.
 * [Agent Roles](docs/AGENT_ROLES.md) — the formal definition of each agent role, shared by every coding-agent tool's config.
 * [Security Policy](docs/SECURITY.md) — the security model and the tests that verify it.
 * [Agent Instructions](AGENTS.md) — instructions for AI coding agents working on the repository.
@@ -76,7 +82,7 @@ Its source, checks and current limitations are in [Browser version](src/web/READ
 
 Describe a task or defect to the coding agent. The agent handles implementation, required checks, and commits; the Product Owner controls material product and technical decisions.
 
-Write `menu` to see the [main requests](docs/WORKING_WITH_AGENT.md#command-menu), including continuing authorized work, viewing or saving ideas, discussing a solution, fixing a defect, and reviewing permission interruptions. The menu marks which requests can change files. Ordinary language works too. See [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md) for the complete workflow.
+Write `menu` to see the [main requests](docs/WORKING_WITH_AGENT.md#command-menu), including checking task status, continuing authorized work, viewing or saving ideas, discussing a solution, fixing a defect, and requesting a security audit. The menu marks which requests can change files. Ordinary language works too. See [Working with the Coding Agent](docs/WORKING_WITH_AGENT.md) for the complete workflow.
 
 ## Project Structure
 
