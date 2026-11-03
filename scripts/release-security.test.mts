@@ -26,6 +26,22 @@ const { candidate, reserve, sign, verify, upload } = workflow.jobs as Record<
   Job
 >
 
+test('release and publication jobs explicitly disable automatic and explicit dependency caches', () => {
+  for (const file of ['create-macos-release-draft.yml', 'release-new-app-version.yml']) {
+    const release = load(readFileSync(`.github/workflows/${file}`, 'utf8')) as { jobs: Record<string, Job> }
+
+    for (const job of Object.values(release.jobs)) {
+      for (const step of job.steps ?? []) {
+        expect(step.uses?.includes('/cache@')).not.toBe(true)
+        if (step.uses?.startsWith('actions/setup-node@')) {
+          expect(step.with?.['package-manager-cache']).toBe(false)
+          expect(step.with?.cache).toBeUndefined()
+        }
+      }
+    }
+  }
+})
+
 test('production packaging requires the security fuse policy', () => {
   const config = load(readFileSync('electron-builder.yml', 'utf8')) as { electronFuses: Record<string, boolean> }
 

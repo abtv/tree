@@ -91,7 +91,8 @@ and upload run on separate fresh GitHub-hosted runners. Only signing receives
 Apple credentials; it never launches Tree and has no repository write permission.
 Verification extracts and runs the DMG's application without signing secrets or
 write permissions. Its subprocess environment is allowlisted and it publishes no
-artifact or shared cache consumed by privileged jobs. Upload independently fetches
+artifact or shared cache consumed by privileged jobs. All macOS release and web-publication
+jobs explicitly disable setup-node automatic npm caching. Upload independently fetches
 the immutable signer artifact and checks its signer-provided SHA-256 after the
 verification job succeeds; files from the test runner never become release assets.
 These boundaries still trust source maintainers, signing tools and GitHub.
