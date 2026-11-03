@@ -106,7 +106,7 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    await expect(window.locator('.command-count')).toHaveText('14 of 14')
+    await expect(window.locator('.command-count')).toHaveText('15 of 15')
 
     await window.keyboard.press('ArrowUp')
 
@@ -114,12 +114,12 @@ test.describe('Normal command panel', () => {
 
     await window.keyboard.press('Control+n')
 
-    await expect(window.getByRole('option', { selected: true })).toContainText('export-notes')
+    await expect(window.getByRole('option', { selected: true })).toContainText('about-tree')
 
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('Control+p')
 
-    await expect(window.getByRole('option', { selected: true })).toContainText('export-notes')
+    await expect(window.getByRole('option', { selected: true })).toContainText('about-tree')
 
     await window.getByRole('combobox').pressSequentially('theme')
 
@@ -238,6 +238,7 @@ test.describe('Normal command panel', () => {
       'set-theme-auto',
       'set-theme-light',
       'set-theme-dark',
+      'about-tree',
       'export-notes',
       'find',
       'find-next',

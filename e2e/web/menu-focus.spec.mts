@@ -11,15 +11,23 @@ test('About isolates keyboard input and restores the editor selection on either 
   const editor = page.locator('[data-node-id="welcome"] .node-input')
   await editor.fill('About focus sample')
 
-  for (const close of ['Escape', 'Close']) {
+  for (const close of ['Escape', 'Close', 'Outside']) {
     await editor.evaluate((element: HTMLTextAreaElement) => element.setSelectionRange(2, 7, 'backward'))
-    await page.locator('#tree-menu-button').click()
-    await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+    if (close === 'Outside') {
+      await page.keyboard.press(`${primaryKey}+Shift+p`)
+      await page.getByRole('combobox', { name: 'Command' }).fill('about-tree')
+      await page.keyboard.press('Enter')
+    } else {
+      await page.locator('#tree-menu-button').click()
+      await page.getByRole('button', { name: 'About Tree', exact: true }).click()
+    }
+    await expect(page.locator('#app-about-dialog')).toBeVisible()
     await page.keyboard.type('xyz')
 
     await expect(editor).toHaveValue('About focus sample')
 
     if (close === 'Escape') await page.keyboard.press('Escape')
+    else if (close === 'Outside') await page.mouse.click(2, 2)
     else await page.getByRole('button', { name: 'Close', exact: true }).click()
 
     await expect(editor).toBeFocused()

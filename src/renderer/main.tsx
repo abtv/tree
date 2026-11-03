@@ -14,6 +14,10 @@ import { startAppUpdates } from './app-updates'
 import type { CommandServices } from '../application/command-registry'
 import './styles.css'
 import { blockExternalDrops } from './external-drop'
+import { installAboutDialog } from './about-dialog'
+
+declare const __TREE_APP_VERSION__: string
+declare const __TREE_BUILD_DATE__: string
 
 blockExternalDrops(window)
 
@@ -24,6 +28,18 @@ if (!rootElement) {
 }
 
 const store = new EditorStore(createElectronEditorServices(), () => crypto.randomUUID())
+const about = installAboutDialog(`Version ${__TREE_APP_VERSION__} · ${__TREE_BUILD_DATE__}`, (open) => {
+  void window.treeApi.setAboutOpen!(open).catch((error: unknown) => store.reportError(error))
+})
+const stopAboutRequests = window.treeApi.onAboutRequested!(() => about.show())
+window.addEventListener(
+  'pagehide',
+  () => {
+    stopAboutRequests()
+    about.dispose()
+  },
+  { once: true },
+)
 const dataOperations = new DesktopDataOperations(
   {
     chooseNotesExportDestination: () => window.treeApi.chooseNotesExportDestination!(),
@@ -63,6 +79,7 @@ void window.treeApi
       <StrictMode>
         <ErrorBoundary>
           <App
+            showAbout={about.show}
             initialVimEnabled={initialVimEnabled}
             store={store}
             dataOperations={dataOperations}

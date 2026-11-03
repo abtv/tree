@@ -12,7 +12,7 @@ import { requestPersistentStorage, storageProtectionText } from './storage-persi
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
 import './styles.css'
-import '../renderer/about.css'
+import { installAboutDialog } from '../renderer/about-dialog'
 import { blockExternalDrops } from '../renderer/external-drop'
 import { installAppUpdates } from './app-updates'
 
@@ -31,13 +31,15 @@ try {
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
   const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!)
-  const about = document.getElementById('app-about-dialog') as HTMLDialogElement
-  document.getElementById('app-about')!.onclick = () => {
+  const version = document.getElementById('app-version')!
+  const versionLabel = version.textContent!
+  version.remove()
+  const about = installAboutDialog(versionLabel)
+  const showAbout = () => {
     menuFocus.close()
-    about.showModal()
+    about.show()
   }
-  document.getElementById('about-close')!.onclick = () => about.close()
-  about.addEventListener('close', () => menuFocus.restore())
+  document.getElementById('app-about')!.onclick = showAbout
   const { commands: menuCommands, isRunning: dataOperationRunning } = installDataMenu(
     store,
     menu,
@@ -67,6 +69,7 @@ try {
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <App
+        showAbout={showAbout}
         registerViewCommands={registerViewCommands}
         registerSearchCommands={registerSearchCommands}
         menuCommands={menuCommands}

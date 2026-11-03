@@ -53,6 +53,14 @@ export const treeApi: TreeApi = {
     ipcRenderer.on(ipcEvents.appearanceChanged, handler)
     return () => ipcRenderer.removeListener(ipcEvents.appearanceChanged, handler)
   },
+  setAboutOpen: (open) => ipcRenderer.invoke(ipcChannels.setAboutOpen, open),
+  onAboutRequested: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, ...args: unknown[]): void => {
+      if (args.length === 0) listener()
+    }
+    ipcRenderer.on(ipcEvents.aboutRequested, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.aboutRequested, handler)
+  },
   quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
   quitWithoutSaving: () => ipcRenderer.invoke(ipcChannels.quitWithoutSaving),
   onQuitRequested: (listener) => {

@@ -17,6 +17,7 @@ import { getCaret, getSelectionEndpoints, setSelectionRange } from './editor-dom
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCommandPanel(options: {
+  showAbout?: (() => void) | undefined
   searchCommand?: (command: 'find' | 'next' | 'previous' | 'all') => void
   store: EditorStore
   vimEnabled: boolean
@@ -37,6 +38,7 @@ export function useCommandPanel(options: {
   const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
   const beforeOpen = options.beforeOpen
   const searchCommand = options.searchCommand
+  const showAbout = options.showAbout
   const menuCommands = options.menuCommands ?? emptyMenuCommands
   const menuEntries = useSyncExternalStore(menuCommands.subscribe, menuCommands.getSnapshot)
   const [open, setOpen] = useState(false)
@@ -127,6 +129,9 @@ export function useCommandPanel(options: {
       try {
         await command.run(
           {
+            showAbout: async () => {
+              showAbout?.()
+            },
             find: async () => searchCommand?.('find'),
             findNext: async () => searchCommand?.('next'),
             findPrevious: async () => searchCommand?.('previous'),
@@ -160,6 +165,7 @@ export function useCommandPanel(options: {
     [
       close,
       searchCommand,
+      showAbout,
       input,
       alwaysOnTop,
       appearance,

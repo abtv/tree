@@ -14,6 +14,7 @@ const validState = {
 }
 
 function createHarness() {
+  const setAboutOpen = vi.fn()
   const handlers = new Map<string, (event: IpcInvokeEvent, ...args: unknown[]) => unknown>()
   const ipcMain = {
     handle: (channel: string, listener: (event: IpcInvokeEvent, ...args: unknown[]) => unknown) =>
@@ -68,6 +69,7 @@ function createHarness() {
   const setAppUpdateBlocked = vi.fn()
   const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn() }
   registerIpcHandlers({
+    setAboutOpen,
     setAppUpdateBlocked,
     appUpdates,
     getEmojiHistory,
@@ -94,6 +96,7 @@ function createHarness() {
     setNotesMenuState,
   })
   return {
+    setAboutOpen,
     setAppUpdateBlocked,
     appUpdates,
     getEmojiHistory,
@@ -121,6 +124,25 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('accepts only trusted boolean About state and propagates errors', () => {
+    const { handlers, setAboutOpen } = createHarness()
+    const show = handlers.get('tree:set-about-open')!
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(show(event, true)).toBeUndefined()
+    expect(setAboutOpen).toHaveBeenCalledWith(true)
+    show(event, false)
+    expect(setAboutOpen).toHaveBeenLastCalledWith(false)
+
+    expect(() => show(event, 'extra')).toThrow()
+    expect(() => show(event)).toThrow()
+    expect(() => show(event, true, 'extra')).toThrow()
+    expect(() => show({ senderFrame: { url: 'https://example.com' } }, true)).toThrow()
+    setAboutOpen.mockImplementationOnce(() => {
+      throw new Error('unavailable')
+    })
+    expect(() => show(event, true)).toThrow('unavailable')
+  })
   it('accepts only trusted boolean update availability and forwards errors', () => {
     const { handlers, setAppUpdateBlocked } = createHarness()
     const set = handlers.get(ipcChannels.setAppUpdateBlocked)!

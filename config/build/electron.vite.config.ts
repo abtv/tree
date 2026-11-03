@@ -63,7 +63,6 @@ export default defineConfig({
       rolldownOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          about: resolve('src/renderer/about.html'),
         },
       },
     },

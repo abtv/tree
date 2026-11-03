@@ -31,6 +31,7 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  setAboutOpen?: (open: boolean) => void
   setAppUpdateBlocked?: (blocked: boolean) => void
   appUpdates?: { check(): Promise<void>; confirm(id: string, saved: boolean): void; isApplying?(): boolean }
   getEmojiHistory?: () => Promise<string[]>
@@ -58,6 +59,7 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  setAboutOpen,
   setAppUpdateBlocked,
   appUpdates,
   getEmojiHistory,
@@ -86,6 +88,13 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  ipcMain.handle(ipcChannels.setAboutOpen, (event, open, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof open !== 'boolean') throw new Error('Invalid About state.')
+    setAboutOpen?.(open)
+  })
 
   ipcMain.handle(ipcChannels.checkAppUpdate, (event, ...args) => {
     requireTrustedRenderer(event)

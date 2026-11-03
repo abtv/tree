@@ -50,22 +50,27 @@ The application is a native-feeling macOS application and follows Apple's Human 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
 The desktop application menu starts with **About Tree**, **Check for Updates…** and
-**Update App** (§26), followed by a separator before Quit Tree. About Tree opens a custom modal child window and shows the
+**Update App** (§26), followed by a separator before Quit Tree. About Tree opens an inline modal dialog and shows the
 application version from the root `package.json`, also used for the packaged app,
 followed by its UTC build date in English. The panel also shows a clickable
 **GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
-The window shows Tree's application icon, `© 2026 Andrei Butov` and `Licensed under the MIT License`,
+The dialog shows Tree's application icon, `© 2026 Andrei Butov` and `Licensed under the MIT License`,
 with **MIT License** linking to `https://github.com/abtv/tree/blob/main/LICENSE`.
 
-The About window uses the main application's shared light or dark palette (§20.5),
+The About dialog uses the main application's shared light or dark palette (§20.5),
 including its background, text and links. Automatic follows the system appearance.
+It opens centered in the main window's content area and disappears as a whole when dismissed.
+It shares the existing renderer, including on first opening, and cannot move outside the main window.
+
 It blocks interaction with its parent until closed with Escape or the focused **Close**
-button (also activated by Enter). Closing restores focus to the parent without changing its editor state.
-Repeated About commands focus the existing window. The window closes with its parent.
+button (also activated by Enter), or a click in the main window's content outside About.
+The outside click only dismisses About; it does not act on the editor.
+Closing restores the previous focus and selection without changing editor state.
+Repeated About commands focus the existing dialog. It closes with the main window.
 
 While it is open, editor, view, data and Always on Top menu actions are disabled;
 About Tree, Quit Tree and Appearance remain available. Closing restores the menu actions.
-The custom window replaces the native About panel so its colors match Tree, as approved by the owner.
+The shared inline dialog replaces the native About panel so its colors match Tree and it opens promptly, as approved by the owner.
 
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
 
@@ -85,9 +90,9 @@ Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
 The browser's ellipsis menu ends with **About Tree** below statuses and the Update App
-button when present. It opens a modal dialog with the desktop About window's icon,
+button when present. It opens the shared modal dialog with the desktop About dialog's icon,
 title, version, copyright, license and repository links, using the shared light/dark palette.
-Close and Escape dismiss it and restore the previous editor focus and selection.
+Close, Escape and clicking outside the dialog dismiss it and restore the previous editor focus and selection.
 The information appears in the dialog rather than the menu.
 
 All builds show the root
@@ -703,6 +708,9 @@ Behavior:
 * if the application is minimized, restore the main window;
 * if the application is inactive, bring it to the front and activate it;
 * if the application is already active, do nothing.
+
+When About is open, activation preserves the dialog and its focus within the main
+window. Restoring a minimized main window must not dismiss About.
 
 `Cmd+0` changes only application/window focus. It preserves the selected node, the text field that contains the caret, and the caret position.
 
@@ -1658,6 +1666,7 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 | `quit` | `q` | Quit Tree | — | `⌘Q` (`Ctrl+Q` outside Apple platforms, §1.5) | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
 | `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |
 | `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |
+| `about-tree` | — | About Tree | — | — | Open About (§1.3, §1.4) |
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
 | `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |

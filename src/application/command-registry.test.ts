@@ -46,10 +46,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 12],
-    [false, true, 11],
-    [false, false, 10],
-    [true, false, 11],
+    [true, true, 13],
+    [false, true, 12],
+    [false, false, 11],
+    [true, false, 12],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -65,6 +65,7 @@ describe('command registry', () => {
       ...(alwaysOnTop ? ['toggle-always-on-top'] : []),
       ...(vim ? ['toggle-vim-mode'] : []),
       'set-theme-dark',
+      'about-tree',
       'find',
       'find-next',
       'find-previous',
@@ -100,7 +101,8 @@ describe('command registry', () => {
     ['mode', ['toggle-vim-mode']],
     ['show', ['show-agenda', 'show-tree']],
     ['agenda', ['show-agenda']],
-    ['tree', ['show-tree']],
+    ['tree', ['about-tree', 'show-tree']],
+    ['about', ['about-tree']],
     ['toggle', ['toggle-always-on-top', 'toggle-vim-mode']],
     ['q', ['quit']],
     ['qui', ['quit']],
@@ -119,6 +121,7 @@ describe('command registry', () => {
     expect(names('', history)).toEqual([
       'set-theme-light',
       'set-theme-dark',
+      'about-tree',
       'find',
       'find-next',
       'find-previous',
@@ -148,6 +151,7 @@ describe('command registry', () => {
 
   it('delegates all actions to existing services and queries their current state', async () => {
     const services = {
+      showAbout: vi.fn(async () => undefined),
       find: vi.fn(async () => undefined),
       findNext: vi.fn(async () => undefined),
       findPrevious: vi.fn(async () => undefined),
@@ -162,6 +166,7 @@ describe('command registry', () => {
     for (const command of commandRegistry)
       await command.run(services, { alwaysOnTop: true, appearance: 'dark', vimEnabled: true, view: 'tree' })
 
+    expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
     expect(services.find).toHaveBeenCalledExactlyOnceWith()
     expect(services.findNext).toHaveBeenCalledExactlyOnceWith()
@@ -189,7 +194,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(12)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(13)
   })
 
   it('keeps search actions unchecked and tolerates unavailable search services', async () => {

@@ -895,14 +895,17 @@ origin serializes as an opaque `null`.
 External HTTP(S) links are handed to the operating system through `shell.openExternal`; they do not
 use the renderer session.
 
-About Tree is a singleton modal child owned by `src/electron/main/about-window.ts`.
-Its separate `about.html` renderer entry shares the editor's color variables and follows
-`nativeTheme`, without a preload, TreeApi, document store or IPC commands. The native
-background uses the same palette before painting and until closing. Escape requests the
-standard renderer window close; closure releases its theme listener and restores parent focus.
-Its static application icon is a built PNG asset served by the renderer protocol. Failed
-About loads close only the child and report the error; they do not terminate the editor.
-The controller rebuilds the application menu on opening and closing. Main-window menu
+About Tree uses `src/renderer/about-dialog.ts` in both platform entry points.
+One eagerly mounted HTML dialog shares the editor's renderer and palette; opening
+does not create a BrowserWindow or load another document. The command panel opens
+it locally. The native menu sends an argument-free `aboutRequested` notification;
+the renderer reports open state through trusted, boolean-validated `setAboutOpen` IPC.
+Navigation and renderer loss reset the main-process state. This adds fixed DOM and
+listeners, no document traversal, and no persistence beyond existing command history.
+Escape, Close and a backdrop click close the dialog synchronously and restore focus
+and directed selection. Cmd+0 and second-instance activation surface the same main
+window without dismissing its dialog. The application icon remains a bundled PNG.
+The main process rebuilds the application menu on opening and closing. Main-window menu
 commands are disabled and guarded while About is open; blocked checkbox callbacks
 restore menu checks from the unchanged preferences. About, Quit and Appearance remain available.
 

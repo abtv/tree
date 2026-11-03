@@ -18,6 +18,29 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('forwards About state and propagates errors', async () => {
+    const { treeApi } = await import('./index')
+
+    await expect(treeApi.setAboutOpen!(true)).resolves.toBeUndefined()
+
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:set-about-open', true)
+    mocks.invoke.mockRejectedValueOnce(new Error('unavailable'))
+
+    await expect(treeApi.setAboutOpen!(false)).rejects.toThrow('unavailable')
+  })
+  it('subscribes to argument-free About menu requests and releases its listener', async () => {
+    const { treeApi } = await import('./index')
+    const listener = vi.fn()
+    const stop = treeApi.onAboutRequested!(listener)
+    const handler = mocks.on.mock.calls.findLast(([channel]) => channel === 'tree:about-requested')![1]
+
+    handler({})
+    handler({}, 'extra')
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith()
+    stop()
+    expect(mocks.removeListener).toHaveBeenCalledWith('tree:about-requested', handler)
+  })
   it('forwards update acknowledgments and errors', async () => {
     const { treeApi } = await import('./index')
     await treeApi.checkAppUpdate!()

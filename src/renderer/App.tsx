@@ -42,6 +42,7 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 
 interface AppProps {
+  showAbout?: () => void
   registerSearchCommands?: (run: (command: import('../shared/ipc').FindMenuCommand) => void) => () => void
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
   menuCommands?: import('../application/menu-commands').MenuCommandSource
@@ -63,6 +64,7 @@ interface AppProps {
 }
 
 export function App({
+  showAbout,
   registerSearchCommands,
   store,
   initialVimEnabled,
@@ -195,6 +197,7 @@ export function App({
   }, [vimTextCommandState, setNodeVisualSelection])
   const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    showAbout,
     searchCommand: (command) => {
       window.setTimeout(() => searchAction.current(command), 0)
     },

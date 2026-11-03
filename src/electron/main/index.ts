@@ -35,7 +35,6 @@ import {
 } from '../../infrastructure/main/window-state'
 import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
-import { createAboutWindowController, type AboutWindowController } from './about-window'
 import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
 import { showEditorContextMenu } from './editor-context-menu'
@@ -69,7 +68,7 @@ let notesArchive: NotesArchiveController | null = null
 let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
-let aboutWindow: AboutWindowController | null = null
+let aboutOpen = false
 let appUpdates: AppUpdates | undefined
 let appUpdateBlocked = false
 let prepareUpdateQuit: (() => () => void) | undefined
@@ -123,10 +122,7 @@ function rebuildApplicationMenu(): void {
           alwaysOnTop: isAlwaysOnTop(),
           appearance: currentAppearance(),
           notes: notesMenuState,
-          modalOpen:
-            (aboutWindow?.isOpen() ?? false) ||
-            (appUpdates?.isApplying() ?? false) ||
-            (appUpdates?.isNotifying() ?? false),
+          modalOpen: aboutOpen || (appUpdates?.isApplying() ?? false) || (appUpdates?.isNotifying() ?? false),
           updatesSupported: appUpdates !== undefined,
           updateChecking: appUpdates?.isChecking() ?? false,
           updateReady: appUpdates?.isReady() ?? false,
@@ -140,33 +136,37 @@ function rebuildApplicationMenu(): void {
           },
           updateApp: () => appUpdates?.request(),
           checkForUpdates: () => {
-            if (aboutWindow?.isOpen() || appUpdateBlocked) return
+            if (aboutOpen || appUpdateBlocked) return
             void appUpdates
               ?.checkManually()
               .catch((error: unknown) => reportMainProcessError('Could not show update status', error))
           },
           findCommand: (command) => {
-            if (aboutWindow?.isOpen()) return
+            if (aboutOpen) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.findMenuCommand, command)
             }
           },
           viewCommand: (command) => {
-            if (aboutWindow?.isOpen()) return
+            if (aboutOpen) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.viewMenuCommand, command)
             }
           },
           notesCommand: (command) => {
-            if (aboutWindow?.isOpen()) return
+            if (aboutOpen) return
             if (command === 'export' ? notesMenuState.canExport : notesMenuState.canImport) {
               mainWindow?.webContents.send(ipcEvents.notesMenuCommand, command)
             }
           },
           setAppearance,
-          showAbout: () => aboutWindow?.show(),
+          showAbout: () => {
+            if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
+              mainWindow.webContents.send(ipcEvents.aboutRequested)
+            }
+          },
           setVimEnabled: (value) => {
-            if (aboutWindow?.isOpen()) {
+            if (aboutOpen) {
               rebuildApplicationMenu()
               return
             }
@@ -174,7 +174,7 @@ function rebuildApplicationMenu(): void {
             mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
           },
           setAlwaysOnTop: (value) => {
-            if (aboutWindow?.isOpen()) {
+            if (aboutOpen) {
               rebuildApplicationMenu()
               return
             }
@@ -211,6 +211,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
   followWindowAppearance(window, nativeTheme)
   mainWindow = window
   const resetNotesMenu = (): void => {
+    aboutOpen = false
     appUpdateBlocked = false
     appUpdates?.cancelSaving()
     notesMenuState = { canExport: false, canImport: false }
@@ -235,6 +236,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
     windowBounds.flush()
   })
   window.on('closed', () => {
+    aboutOpen = false
     if (mainWindow === window) mainWindow = null
   })
   void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
@@ -273,7 +275,7 @@ bootstrapApplication({
           !!mainWindow &&
           !mainWindow.isDestroyed() &&
           !mainWindow.webContents.isLoadingMainFrame() &&
-          !aboutWindow?.isOpen() &&
+          !aboutOpen &&
           !appUpdateBlocked &&
           notesArchive?.isIdle?.() === true &&
           notesMenuState.canExport &&
@@ -334,7 +336,6 @@ bootstrapApplication({
       packagedRendererUrl,
     )
     renderer = resolvedRenderer
-    aboutWindow = createAboutWindowController(() => mainWindow, resolvedRenderer.url, rebuildApplicationMenu)
     handleRendererProtocol(protocol, packagedRendererDirectory, (path) => readFile(path))
     configureRendererSessionSecurity(session.defaultSession, resolvedRenderer)
     configureWebContentsSecurity(app, resolvedRenderer.url, (url) => {
@@ -372,6 +373,10 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      setAboutOpen: (open) => {
+        aboutOpen = open
+        rebuildApplicationMenu()
+      },
       setAppUpdateBlocked: (blocked) => {
         appUpdateBlocked = blocked
         rebuildApplicationMenu()

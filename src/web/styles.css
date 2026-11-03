@@ -283,16 +283,3 @@ body:has(#prototype-problem:not([hidden])) #data-activity {
     13px/1.5 system-ui,
     sans-serif;
 }
-#app-about-dialog {
-  width: 320px;
-  max-width: calc(100vw - 32px);
-  padding: 24px 0 0;
-  border: 1px solid var(--color-location-border);
-  border-radius: 8px;
-}
-
-#app-about-dialog #app-version {
-  padding: 0;
-  color: var(--color-secondary);
-  font-size: 11px;
-}

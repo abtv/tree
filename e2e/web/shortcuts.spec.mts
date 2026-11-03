@@ -128,6 +128,7 @@ for (const [profile, modifier, otherModifier, label] of [
 
     await expect(panel).toBeVisible()
     await expect(panel.locator('.command-name')).toHaveText([
+      'about-tree',
       'back-up-to-folder',
       'export-notes',
       'find',
@@ -144,7 +145,7 @@ for (const [profile, modifier, otherModifier, label] of [
       'show-tree',
       'toggle-vim-mode',
     ])
-    await expect(page.locator('.command-count')).toHaveText('15 of 15')
+    await expect(page.locator('.command-count')).toHaveText('16 of 16')
 
     await capture(page, `${profile}-available-commands.png`)
     const selected = () => panel.locator('[aria-selected="true"]').getAttribute('id')
@@ -181,12 +182,12 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.press('Escape')
     await page.keyboard.press(':')
 
-    await expect(panel.locator('.command-name')).toHaveCount(15)
+    await expect(panel.locator('.command-name')).toHaveCount(16)
 
     await page.getByRole('combobox', { name: 'Command', exact: true }).fill('toggle-always-on-top')
 
     await expect(panel.getByRole('option')).toHaveCount(0)
-    await expect(page.locator('.command-count')).toHaveText('0 of 15')
+    await expect(page.locator('.command-count')).toHaveText('0 of 16')
 
     await page.keyboard.press('Enter')
 

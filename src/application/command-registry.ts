@@ -8,6 +8,7 @@ export interface CommandCapabilities {
 }
 
 export interface CommandServices {
+  showAbout?(): Promise<void>
   find?(): Promise<void>
   findNext?(): Promise<void>
   findPrevious?(): Promise<void>
@@ -45,6 +46,15 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  {
+    name: 'about-tree',
+    aliases: [],
+    description: 'About Tree',
+    active: () => false,
+    run: async (services) => {
+      await services.showAbout?.()
+    },
+  },
   ...(
     [
       ['find', 'Find in the current view', 'F', false, 'find'],
