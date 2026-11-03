@@ -1,16 +1,22 @@
 # Security Policy
 
-Tree is currently distributed as a website at <https://tree-editor.github.io>.
-The macOS Electron release workflow also builds signed and notarized Apple Silicon
-DMGs and uploads verified artifacts to draft GitHub Releases. Only the owner
-publishes those drafts. This policy covers the website, desktop release artifacts
-and the source on `main`.
+Tree's primary application is the macOS desktop version built with Electron.
+A browser version is also available.
+This policy covers both applications, their build and publication pipelines, and
+the source on `main`.
+
+macOS installers for Apple Silicon are currently available to repository
+maintainers as draft GitHub Release assets, not as published releases for users.
+Desktop signing, verification and publication are described under
+[Desktop distribution](#desktop-distribution).
+
+The browser version is available at <https://tree-editor.github.io>.
 
 ## Reporting a vulnerability
 
 Report suspected vulnerabilities privately to the repository owner rather than
-opening a public issue. Identify whether the issue affects the hosted website,
-publication pipeline or desktop application, and include reproduction steps with
+opening a public issue. Identify whether the issue affects the desktop application,
+browser version or a build/publication pipeline, and include reproduction steps with
 synthetic data. Do not include secrets or personal document content.
 
 ## Security model
@@ -19,18 +25,69 @@ Both versions keep documents and attachments locally and share editor and domain
 logic. Neither has a cloud document service or sends telemetry. Their security
 boundaries and update mechanisms differ:
 
-| Boundary | Website | macOS desktop |
+| Boundary | macOS desktop | Website |
 | --- | --- | --- |
-| Execution | Browser sandbox and origin isolation | Sandboxed Electron renderer with validated preload/IPC access to the main process |
-| Document storage | IndexedDB in the browser profile for the site's origin | Local document and attachment files managed by the main process |
-| Permissions | Browser-controlled clipboard and platform capabilities | Main-process capabilities; renderer permission requests are denied |
-| Distribution | HTTPS resources from the verified GitHub Pages publication | Signed and notarized DMG uploaded to a draft release after verification; owner-controlled publication |
+| Execution | Sandboxed Electron renderer with validated preload/IPC access to the main process | Browser sandbox and origin isolation |
+| Document storage | Local document and attachment files managed by the main process | IndexedDB in the browser profile for the site's origin |
+| Permissions | Main-process capabilities; renderer permission requests are denied | Browser-controlled clipboard and platform capabilities |
+| Distribution | Signed and notarized DMG uploaded to a draft release after verification; owner-controlled publication | HTTPS resources from the verified GitHub Pages publication |
 
 Local storage does not protect against malicious code running with access to that
 storage. In the browser, application code served from the trusted origin can read
 the document; publication integrity is therefore part of document confidentiality.
 Neither version provides application-level encryption at rest or protection from
 a compromised operating system or browser profile.
+
+## Desktop runtime
+
+The Electron renderer is treated as untrusted with respect to the main process.
+It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
+validated preload/IPC surface. The structural boundaries are owned by
+`docs/ARCHITECTURE.md` §4, §7, and §15–§17.
+
+* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
+* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
+* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only `devtools:`, `blob:` and `data:` URLs and requests to the resolved renderer origin; it allows no `file:` URL. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
+* **Renderer origin without file access.** The packaged renderer loads from `app://tree/index.html`, served by a main-process handler that returns only known asset types inside the built renderer directory (`src/electron/main/renderer-protocol.ts`). Renderer code therefore cannot read documents, attachments or other local files through URLs; it reaches them only through validated IPC.
+* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
+* **Bounded attachments.** Attachment writes accept only PNG data within the shared byte, structure and decoded-dimension limits, and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
+* **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
+* **Notes export and import paths.** The renderer's notes export and import requests take no arguments. Only the native save and open panels in the main process choose files, the renderer receives file names and counts but no path it could send back, and Show in Finder reveals only a Replaced Notes folder that the main process created (`src/electron/main/notes-archive-controller.ts`, `src/electron/main/ipc-handlers.ts`). The archive worker validates archives as the browser does, and the platform decoder must accept each imported image before it is staged. The confirmation displays names and folder text as React text, never HTML. Navigation and renderer loss cancel prepared imports, including an import retained during Export Current Notes First; a replacement already committing must finish.
+* **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs, and denies child frames, workers, and media. Chromium ignores `frame-ancestors` when the policy is delivered by a meta element.
+
+Attachment limits and PNG chunk rules are owned by the implementing modules and
+`docs/ARCHITECTURE.md`. Shared domain code remains independent of React, Electron,
+Node, filesystem and DOM APIs; ESLint enforces the import boundaries.
+
+## Desktop distribution
+
+The macOS release workflow uses electron-builder; `npm run build` alone produces unpackaged
+output. The production packaging configuration enforces these distribution controls:
+
+* Disable the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, and
+  `EnableNodeCliInspectArguments` Electron fuses, as well as any adjacent `EnableRunAsNode` fuse
+  controls.
+* Enable `OnlyLoadAppFromAsar` and ASAR archive integrity validation.
+* Disable the `GrantFileProtocolExtraPrivileges` fuse. The renderer no longer loads from `file://`,
+  so the extra `file:` privileges only widen what a compromised renderer could reach.
+* Sign and notarize the macOS application with the hardened runtime. Keep entitlements minimal and
+  do not grant `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or
+  `disable-library-validation`.
+
+These controls protect against using the bundled, signed Electron binary to run arbitrary Node.js
+code or inject code into the main process with `NODE_OPTIONS`, which would bypass every renderer-side
+control documented here. The release workflow checks fuse values in the packaged binary and
+tests its renderer through Chromium CDP, without enabling the Node inspector. See
+[Releasing](releasing.md) for the signing, audit and publication gates.
+
+The release workflow builds the exact validated source SHA, reserves an immutable
+version tag and owned draft, and verifies Developer ID signatures, stapled tickets
+and Gatekeeper acceptance for the app and DMG before upload. Missing signing
+credentials or failed verification stop upload. Existing assets are never replaced,
+and no automated step publishes the draft. Signing credentials and release-write
+access are privileged trust roots. The desktop application has no auto-updater;
+the browser update mechanism does not update installed desktop applications.
 
 ## Browser runtime and storage
 
@@ -185,28 +242,6 @@ token can still corrupt retained assets or provenance and block later publicatio
 Signature failures must stop publication; recovery must restore authenticated
 files without bypassing verification.
 
-## Desktop runtime
-
-The Electron renderer is treated as untrusted with respect to the main process.
-It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
-validated preload/IPC surface. The structural boundaries are owned by
-`docs/ARCHITECTURE.md` §4, §7, and §15–§17.
-
-* **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
-* **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
-* **Trusted callers and validated payloads.** Every IPC call must originate from the resolved application renderer, and arguments are validated at runtime before any filesystem, clipboard, or application operation (`src/electron/main/ipc-handlers.ts`, `src/electron/main/ipc-security.ts`).
-* **Denied renderer permissions and egress.** The renderer session denies permission requests, permission checks, and device permissions. Its network filter allows only `devtools:`, `blob:` and `data:` URLs and requests to the resolved renderer origin; it allows no `file:` URL. External links still go to the operating system browser through `shell.openExternal` (`src/electron/main/window.ts`, `src/electron/main/index.ts`).
-* **Renderer origin without file access.** The packaged renderer loads from `app://tree/index.html`, served by a main-process handler that returns only known asset types inside the built renderer directory (`src/electron/main/renderer-protocol.ts`). Renderer code therefore cannot read documents, attachments or other local files through URLs; it reaches them only through validated IPC.
-* **Validated persistence input.** The save boundary validates untrusted persisted state, including document depth, filesystem-safe attachment identifiers, and HTTP(S)-only link destinations, without rebuilding the document (`src/domain/document.ts`, `src/electron/main/ipc-security.ts`).
-* **Bounded attachments.** Attachment writes accept only PNG data within the shared byte, structure and decoded-dimension limits, and the image must decode through the platform decoder before bytes are stored (`src/electron/main/ipc-security.ts`, `src/electron/main/png-decoder.ts`).
-* **Bounded clipboard image reads.** PNG clipboard blobs exceeding the attachment byte limit are rejected before `arrayBuffer()` copies their bytes into application memory (`src/infrastructure/main/clipboard.ts`). This does not bound memory allocated internally by Electron or macOS while obtaining the clipboard blob.
-* **Notes export and import paths.** The renderer's notes export and import requests take no arguments. Only the native save and open panels in the main process choose files, the renderer receives file names and counts but no path it could send back, and Show in Finder reveals only a Replaced Notes folder that the main process created (`src/electron/main/notes-archive-controller.ts`, `src/electron/main/ipc-handlers.ts`). The archive worker validates archives as the browser does, and the platform decoder must accept each imported image before it is staged. The confirmation displays names and folder text as React text, never HTML. Navigation and renderer loss cancel prepared imports, including an import retained during Export Current Notes First; a replacement already committing must finish.
-* **Content security policy.** The production renderer loads a restrictive CSP that still permits the application's own scripts, styles, and attachment object URLs, and denies child frames, workers, and media. Chromium ignores `frame-ancestors` when the policy is delivered by a meta element.
-
-Attachment limits and PNG chunk rules are owned by the implementing modules and
-`docs/ARCHITECTURE.md`. Shared domain code remains independent of React, Electron,
-Node, filesystem and DOM APIs; ESLint enforces the import boundaries.
-
 ## Network egress and content disclosure
 
 The website downloads its application resources over HTTPS from GitHub Pages.
@@ -246,35 +281,6 @@ process calls `setSpellCheckerEnabled(false)` on the renderer session
 (`src/electron/main/window.ts`). With the spellchecker off, Electron on Windows and Linux does not download Hunspell dictionaries
 from its Google-hosted CDN. Browser-provided translation and similar services follow the
 user's browser settings.
-
-## Desktop distribution
-
-The macOS release workflow uses electron-builder; `npm run build` alone produces unpackaged
-output. The production packaging configuration enforces these distribution controls:
-
-* Disable the `RunAsNode`, `EnableNodeOptionsEnvironmentVariable`, and
-  `EnableNodeCliInspectArguments` Electron fuses, as well as any adjacent `EnableRunAsNode` fuse
-  controls.
-* Enable `OnlyLoadAppFromAsar` and ASAR archive integrity validation.
-* Disable the `GrantFileProtocolExtraPrivileges` fuse. The renderer no longer loads from `file://`,
-  so the extra `file:` privileges only widen what a compromised renderer could reach.
-* Sign and notarize the macOS application with the hardened runtime. Keep entitlements minimal and
-  do not grant `allow-unsigned-executable-memory`, `allow-dyld-environment-variables`, or
-  `disable-library-validation`.
-
-These controls protect against using the bundled, signed Electron binary to run arbitrary Node.js
-code or inject code into the main process with `NODE_OPTIONS`, which would bypass every renderer-side
-control documented here. The release workflow checks fuse values in the packaged binary and
-tests its renderer through Chromium CDP, without enabling the Node inspector. See
-[Releasing](releasing.md) for the signing, audit and publication gates.
-
-The release workflow builds the exact validated source SHA, reserves an immutable
-version tag and owned draft, and verifies Developer ID signatures, stapled tickets
-and Gatekeeper acceptance for the app and DMG before upload. Missing signing
-credentials or failed verification stop upload. Existing assets are never replaced,
-and no automated step publishes the draft. Signing credentials and release-write
-access are privileged trust roots. The desktop application has no auto-updater;
-the browser update mechanism does not update installed desktop applications.
 
 ## Agent execution threat model
 
