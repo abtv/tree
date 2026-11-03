@@ -2,44 +2,60 @@
 
 include scripts/web/chromium-image.mk
 
-.PHONY: help check unit e2e-electron e2e-web smoke-linux dev-electron dev-web perf-electron release
+.PHONY: help dev dev-web build test-unit test-smoke test-e2e test-memory test-perf test-property test-mutation release
 
 help:
-	@echo "make                    Show this help"
-	@echo "make setup              Prepare the Linux browser/Electron test image (owner only; network required)"
-	@echo "make check              Run standard checks, unit coverage, and build"
-	@echo "make unit               Run unit tests"
-	@echo "make e2e-electron        Run Electron end-to-end tests"
-	@echo "make e2e-web            Run web end-to-end tests in offline Docker Chromium"
-	@echo "make smoke-linux        Run Linux Electron and Chromium smoke checks in offline Docker"
-	@echo "make dev-electron       Start Electron development mode"
-	@echo "make dev-web            Start the web development server"
-	@echo "make perf-electron      Run the full Electron performance suite"
-	@echo "make release            Bump the patch version and commit locally"
+	@echo "make                Show available commands"
+	@echo "make setup          Prepare the Docker test image (owner only; network required)"
+	@echo "make dev            Start Electron in development mode"
+	@echo "make dev-web        Start the web development server"
+	@echo "make build          Build the application"
+	@echo "make test-unit      Run unit and property tests with coverage"
+	@echo "make test-smoke     Run all smoke checks on macOS and in Linux Docker"
+	@echo "make test-e2e       Run Electron E2E tests locally and web E2E tests in Docker"
+	@echo "make test-memory    Run Electron memory tests"
+	@echo "make test-perf      Run domain, Electron, web, and Safari comparison benchmarks"
+	@echo "make test-property  Run property tests with increased repetitions"
+	@echo "make test-mutation  Check whether tests detect deliberately introduced bugs"
+	@echo "make release        Bump the patch version and create a local commit"
 
-check:
-	npm run check
-
-unit:
-	npm test
-
-e2e-electron:
-	npm run test:e2e
-
-e2e-web:
-	npm run test:web:chromium
-
-smoke-linux:
-	npm run test:smoke:linux
-
-dev-electron:
+dev:
 	npm run dev
 
 dev-web:
 	npm run dev:web
 
-perf-electron:
-	npm run test:perf -- --project=electron
+build:
+	npm run build
+
+test-unit:
+	npm run test:coverage
+
+test-smoke:
+	npm run build
+	npm run test:safari
+	npm run test:smoke:electron
+	npm run test:smoke:chromium
+	npm run test:smoke:safari
+	npm run test:smoke:linux
+
+test-e2e:
+	npm run test:e2e
+	npm run test:web:chromium
+
+test-memory:
+	npm run test:e2e:memory
+
+test-perf:
+	npm run test:performance
+	npm run test:perf
+	npm run test:perf:safari
+
+test-property:
+	npm run test:property
+
+test-mutation:
+	npm run test:mutation
 
 release:
 	npm run release

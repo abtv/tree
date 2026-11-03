@@ -74,7 +74,7 @@ const sandbox = [
   'doctor',
   'audit',
   'test:watch',
-  'test:property:soak',
+  'test:property',
 ]
 
 it.each(['domain', 'application', 'renderer'])('allows the named mutation workflow for the %s shard', (shard) => {

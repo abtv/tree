@@ -74,16 +74,32 @@ less frequent checks.
 | Command | Purpose | Underlying workflow |
 | --- | --- | --- |
 | `make` | Show help | No tests or preparation |
-| `make setup` | Prepare the web-test Docker image; owner only, requires network | [Chromium dependency preparation](#chromium-container-tests) |
-| `make check` | Standard checks, unit coverage, and production build | `npm run check` |
-| `make unit` | Unit tests | `npm test` |
-| `make e2e-electron` | Electron end-to-end tests | `npm run test:e2e` |
-| `make e2e-web` | Web end-to-end tests in offline Docker Chromium | `npm run test:web:chromium` |
-| `make smoke-linux` | Linux Electron and Chromium smoke checks in offline Docker | `npm run test:smoke:linux` |
-| `make dev-electron` | Electron development mode | `npm run dev` |
+| `make setup` | Prepare the Docker test image; owner only, requires network | [Chromium dependency preparation](#chromium-container-tests) |
+| `make dev` | Electron development mode | `npm run dev` |
 | `make dev-web` | Web development server | `npm run dev:web` |
-| `make perf-electron` | Full Electron performance suite | `npm run test:perf -- --project=electron` |
+| `make build` | Build the Electron application | `npm run build` |
+| `make test-unit` | Unit and property tests with coverage | `npm run test:coverage` |
+| `make test-smoke` | All macOS smoke checks and Linux smoke checks in Docker | `npm run build`, `npm run test:safari`, `npm run test:smoke:electron`, `npm run test:smoke:chromium`, `npm run test:smoke:safari`, `npm run test:smoke:linux` |
+| `make test-e2e` | Local Electron E2E and web E2E in offline Docker Chromium | `npm run test:e2e`, `npm run test:web:chromium` |
+| `make test-memory` | Electron memory tests | `npm run test:e2e:memory` |
+| `make test-perf` | Domain, Electron, web, and Safari comparison benchmarks | `npm run test:performance`, `npm run test:perf`, `npm run test:perf:safari` |
+| `make test-property` | Property tests with increased repetitions | `npm run test:property` |
+| `make test-mutation` | Check whether tests detect deliberately introduced bugs | `npm run test:mutation` |
 | `make release` | Bump the patch version and commit locally | `npm run release` |
+
+Combined targets run their listed workflows sequentially and stop at the first
+failure. They include the required builds: `test:safari` builds the web package
+before the remaining local smoke checks. The combined smoke and performance
+targets require macOS, Chrome, and Safari with Remote Automation enabled by the
+owner. Smoke and E2E also require Docker and the prepared image. No target changes
+Safari settings or prepares the image automatically. Run resource-intensive test
+targets separately to avoid concurrent workloads affecting measurements.
+
+The ordinary unit suite already includes property tests; `test-property` selects
+those tests with increased run counts. The memory suite reports measurements and
+does not promise an automated memory-growth threshold. Static code and repository
+checks remain available through `npm run check`, which includes unit coverage and
+the Electron build but excludes E2E, smoke, and timing suites.
 
 Test and development targets never run `setup` automatically. Agents continue
 using the named npm workflows and their existing permissions, including
@@ -432,7 +448,7 @@ This local command runs `npm run check`, the serial timing guards, the end-to-en
 
 Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
 
-Use `npm run test:smoke:linux` (or `make smoke-linux`) for both Linux smoke checks in the same prepared image. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser or smoke modes; it cannot select external scripts, profiles, origins or Docker options.
+Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser or smoke modes; it cannot select external scripts, profiles, origins or Docker options.
 
 Each smoke invocation reports elapsed time including its runner, application/browser startup and successful cleanup, and fails if it exceeds 20 seconds. Dependency-image preparation, source transfer, container startup and production builds are outside that budget. At 25 seconds the container supervisor forcibly kills a hung command so it can report failure and run the other target. Any remaining descendants stay inside the disposable container and are destroyed when its entry process exits after both bounded invocations. The container sets `CI=1` for smoke children so Linux Electron can run without its Chromium sandbox in this offline disposable environment. Linux arm64 container timings are local evidence, not measurements of the GitHub runner. The smoke scenario is described under [Cross-platform smoke checks](#cross-platform-smoke-checks).
 
@@ -903,7 +919,7 @@ Property-based tests using `fast-check` cover domain invariants and `EditorStore
 
 Property tests explore with a random seed on every run, locally and in CI, so each run can find a counterexample that an earlier run did not. A failure prints its seed and path. Replay it exactly with `FC_SEED=<seed> FC_PATH=<path> npm test -- <file>`; `src/test/fast-check-setup.ts` applies both variables through `fc.configureGlobal`. A fixed seed on one property is allowed only when the test asserts that a branch was reached, and needs a comment saying so. Turn every reproduced counterexample into a named deterministic test in the same commit as the fix, as `vim-mixed-interaction.property.test.ts` does.
 
-Write every run count as `propertyRuns(base)` from `src/test/property-runs.ts`. `TREE_PROPERTY_RUNS` multiplies all of them (default 1). `npm run test:property:soak` runs the property files at a factor of 20, and `.github/workflows/run-property-tests.yml` runs it nightly. A property whose every run builds the typed doubles passes a `maxScale` (`propertyRuns(base, maxScale)`), because Vitest retains every `vi.fn` it creates and thousands of runs exhaust the worker heap; do not create `vi.fn` inside a generated event. A soak failure is a candidate defect: replay it, then fix it under the defect-first workflow.
+Write every run count as `propertyRuns(base)` from `src/test/property-runs.ts`. `TREE_PROPERTY_RUNS` multiplies all of them (default 1). `npm run test:property` runs the property files at a factor of 20, and `.github/workflows/run-property-tests.yml` runs it nightly. A property whose every run builds the typed doubles passes a `maxScale` (`propertyRuns(base, maxScale)`), because Vitest retains every `vi.fn` it creates and thousands of runs exhaust the worker heap; do not create `vi.fn` inside a generated event. A property-test failure is a candidate defect: replay it, then fix it under the defect-first workflow.
 
 Mutation testing measures assertion strength, which coverage does not: Stryker changes one expression at a time in `src/domain`, `src/application`, and the selected pure renderer modules listed in `config/testing/stryker.config.mjs`, then reruns the tests that cover it. Renderer mutation targets have no React, DOM, or Electron imports. A mutant that no test fails on has survived, and the mutation score is the share of mutants the tests detected.
 
@@ -943,7 +959,7 @@ Electron performance tests live in `perf/electron/` and form the `electron` proj
 npm run test:perf -- --project=electron
 ```
 
-`make perf-electron` runs the Electron project only. Run the [browser archive scenarios](../src/web/README.md#browser-archive-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
+`make test-perf` combines domain timing guards, both performance projects, and the Safari/Electron comparison. For focused runs, use `npm run test:perf -- --project=electron` or run the [browser archive scenarios](../src/web/README.md#browser-archive-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
 
 ### Preparing a macOS release
 

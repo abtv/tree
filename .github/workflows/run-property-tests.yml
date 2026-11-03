@@ -38,4 +38,4 @@ jobs:
         run: npm ci
 
       - name: Run property tests at 20 times the run count
-        run: npm run test:property:soak
+        run: npm run test:property
