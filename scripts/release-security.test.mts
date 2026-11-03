@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { expect, test } from 'vitest'
 
@@ -25,6 +25,22 @@ const { candidate, reserve, sign, verify, upload } = workflow.jobs as Record<
   'candidate' | 'reserve' | 'sign' | 'verify' | 'upload',
   Job
 >
+
+test('external workflow actions are pinned to full commit identities', () => {
+  for (const file of readdirSync('.github/workflows').filter((name) => /\.ya?ml$/.test(name))) {
+    const workflow = load(readFileSync(`.github/workflows/${file}`, 'utf8')) as {
+      jobs: Record<string, { uses?: string; steps?: Step[] }>
+    }
+
+    for (const job of Object.values(workflow.jobs)) {
+      for (const uses of [job.uses, ...(job.steps ?? []).map((step) => step.uses)]) {
+        if (!uses || uses.startsWith('./')) continue
+
+        expect(uses, `${file}: ${uses}`).toMatch(/^[^@]+@[a-f0-9]{40}$/)
+      }
+    }
+  }
+})
 
 test('release and publication jobs explicitly disable automatic and explicit dependency caches', () => {
   for (const file of ['create-macos-release-draft.yml', 'release-new-app-version.yml']) {

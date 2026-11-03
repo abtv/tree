@@ -313,6 +313,10 @@ These boundaries reduce accidental access and unsafe tool use; they do not make 
 
 ## Verification
 
+External GitHub Actions in source workflows are pinned to full commit SHAs.
+Dependabot proposes weekly updates for review; version comments retain the
+corresponding major release. The workflow security test rejects unpinned actions.
+
 Runtime and publication checks are mapped below. Repository settings, account
 security and desktop signing credentials also need operational verification;
 local tests do not establish those controls.
