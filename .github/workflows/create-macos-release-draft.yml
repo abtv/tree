@@ -2,6 +2,17 @@ name: Create macOS release draft
 
 on:
   workflow_call:
+    secrets:
+      CSC_LINK:
+        required: true
+      CSC_KEY_PASSWORD:
+        required: true
+      APPLE_API_KEY:
+        required: true
+      APPLE_API_KEY_ID:
+        required: true
+      APPLE_API_ISSUER:
+        required: true
     inputs:
       run_id:
         type: string
@@ -52,15 +63,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release-draft.mts plan
-  release:
-    name: Build and test macOS installer
+  reserve:
+    name: Reserve macOS release draft
     needs: candidate
     if: needs.candidate.outputs.ready == 'true'
-    runs-on: macos-15
-    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
     permissions:
       contents: write
       actions: read
+    outputs:
+      ready: ${{ steps.reserve.outputs.ready }}
+      release_id: ${{ steps.reserve.outputs.release_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -69,19 +83,35 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
-          cache: npm
       - name: Recheck source and reserve immutable tag and draft
         id: reserve
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release-draft.mts reserve
+  sign:
+    name: Sign macOS installer
+    needs: [candidate, reserve]
+    if: needs.reserve.outputs.ready == 'true'
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact_id: ${{ steps.artifact.outputs.artifact-id }}
+      sha256: ${{ steps.digest.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.candidate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
       - run: npm ci
-        if: steps.reserve.outputs.ready == 'true'
       - name: Build checked source
-        if: steps.reserve.outputs.ready == 'true'
         run: npm run build
       - name: Build signed and notarized DMG
-        if: steps.reserve.outputs.ready == 'true'
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -98,7 +128,6 @@ jobs:
           printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$APPLE_API_KEY"
           npx --no-install electron-builder --mac dmg --arm64 --publish never
           node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app
-          node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app
           codesign --verify --deep --strict --verbose=2 dist/mac-arm64/Tree.app
           codesign -dvv dist/mac-arm64/Tree.app 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun stapler validate dist/mac-arm64/Tree.app
@@ -109,9 +138,91 @@ jobs:
           xcrun stapler staple dist/Tree-*.dmg
           xcrun stapler validate dist/Tree-*.dmg
           spctl --assess --type open --context context:primary-signature --verbose=2 dist/Tree-*.dmg
+      - name: Record signed installer identity
+        id: digest
+        run: node scripts/release-artifact.mts record
+      - name: Preserve signed installer without executing it
+        id: artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: macos-signed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.digest.outputs.file }}
+          if-no-files-found: error
+          retention-days: 7
+  verify:
+    name: Test signed installer on isolated macOS runner
+    needs: [candidate, sign]
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.candidate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          artifact-ids: ${{ needs.sign.outputs.artifact_id }}
+          path: dist
+          merge-multiple: true
+      - name: Require original signed bytes
+        id: digest
+        env:
+          EXPECTED_DMG_SHA256: ${{ needs.sign.outputs.sha256 }}
+        run: node scripts/release-artifact.mts verify
+      - name: Install test dependencies without lifecycle scripts or shared caches
+        run: npm ci --ignore-scripts
+      - name: Inspect and run the application extracted from the DMG
+        env:
+          DMG_FILE: ${{ steps.digest.outputs.file }}
+        run: |
+          set -euo pipefail
+          codesign --verify --strict --verbose=2 "$DMG_FILE"
+          xcrun stapler validate "$DMG_FILE"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG_FILE"
+          mount_dir="$RUNNER_TEMP/tree-dmg-mount"
+          app_dir="$RUNNER_TEMP/tree-dmg-installed"
+          mkdir "$mount_dir" "$app_dir"
+          trap 'hdiutil detach "$mount_dir"' EXIT
+          hdiutil attach "$DMG_FILE" -readonly -nobrowse -mountpoint "$mount_dir"
+          ditto "$mount_dir/Tree.app" "$app_dir/Tree.app"
+          codesign --verify --deep --strict --verbose=2 "$app_dir/Tree.app"
+          xcrun stapler validate "$app_dir/Tree.app"
+          spctl --assess --type execute --verbose=2 "$app_dir/Tree.app"
+          node scripts/verify-release-fuses.mts "$app_dir/Tree.app"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" node scripts/packaged-smoke.mts "$app_dir/Tree.app"
+  upload:
+    name: Upload tested macOS installer
+    needs: [candidate, reserve, sign, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.candidate.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          artifact-ids: ${{ needs.sign.outputs.artifact_id }}
+          path: dist
+          merge-multiple: true
+      - name: Require original signed bytes independently of the test runner
+        env:
+          EXPECTED_DMG_SHA256: ${{ needs.sign.outputs.sha256 }}
+        run: node scripts/release-artifact.mts verify
       - name: Upload verified artifact
-        if: steps.reserve.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_ID: ${{ steps.reserve.outputs.release_id }}
+          RELEASE_ID: ${{ needs.reserve.outputs.release_id }}
         run: node scripts/release-draft.mts upload

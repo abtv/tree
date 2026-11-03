@@ -86,7 +86,16 @@ version tag and owned draft, and verifies Developer ID signatures, stapled ticke
 and Gatekeeper acceptance for the app and DMG before upload. Missing signing
 credentials or failed verification stop upload. Existing assets are never replaced,
 and no automated step publishes the draft. Signing credentials and release-write
-access are privileged trust roots. The desktop application has no auto-updater;
+access are privileged trust roots. Reservation, signing, application verification
+and upload run on separate fresh GitHub-hosted runners. Only signing receives
+Apple credentials; it never launches Tree and has no repository write permission.
+Verification extracts and runs the DMG's application without signing secrets or
+write permissions. Its subprocess environment is allowlisted and it publishes no
+artifact or shared cache consumed by privileged jobs. Upload independently fetches
+the immutable signer artifact and checks its signer-provided SHA-256 after the
+verification job succeeds; files from the test runner never become release assets.
+These boundaries still trust source maintainers, signing tools and GitHub.
+The desktop application has no auto-updater;
 the browser update mechanism does not update installed desktop applications.
 
 ## Browser runtime and storage

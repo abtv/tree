@@ -965,8 +965,10 @@ Web transfer still requires a version greater than
 the last transferred release and rechecks it against the exact hosting parent before writing.
 The combined `Release new app version` verifies the completed main validation run, SHA and
 attempt, then runs independent Web and macOS branches. The Web job waits for deployment
-and verifies hosted bytes. The macOS branch reserves an owned draft and checks its signed
-installer without rerunning standard validation. Failed-only release retries keep successful
+and verifies hosted bytes. The macOS branch reserves an owned draft, signs its installer,
+checks the application copied from that DMG on a fresh runner without signing secrets,
+and uploads the original signer artifact from a separate runner after SHA-256 verification.
+It does not rerun standard validation. Failed-only release retries keep successful
 work. A failed target deployment requires manual retry through the target-run link; App
 permissions remain unchanged. See [macOS releases](releasing.md) and
 [Browser publication](../deployment/github-pages/README.md) for recovery and trust details.

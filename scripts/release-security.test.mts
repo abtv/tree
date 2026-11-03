@@ -4,6 +4,27 @@ import { expect, test } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const { load } = require('js-yaml') as { load: (text: string) => unknown }
+type Step = {
+  run?: string
+  uses?: string
+  env?: Record<string, string>
+  with?: Record<string, unknown>
+  'continue-on-error'?: boolean
+}
+type Job = {
+  needs?: string | string[]
+  if?: string
+  'runs-on': string
+  permissions?: Record<string, string>
+  outputs?: Record<string, string>
+  steps: Step[]
+}
+const text = readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')
+const workflow = load(text) as { jobs: Record<string, Job>; permissions: Record<string, string> }
+const { candidate, reserve, sign, verify, upload } = workflow.jobs as Record<
+  'candidate' | 'reserve' | 'sign' | 'verify' | 'upload',
+  Job
+>
 
 test('production packaging requires the security fuse policy', () => {
   const config = load(readFileSync('electron-builder.yml', 'utf8')) as { electronFuses: Record<string, boolean> }
@@ -18,48 +39,111 @@ test('production packaging requires the security fuse policy', () => {
   })
 })
 
-test('release reuses authenticated main checks before credentials or release writes', () => {
-  const workflow = load(readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')) as {
-    jobs: {
-      candidate: { steps: Array<{ run?: string; with?: { ref?: string } }>; permissions?: unknown }
-      release: { needs: string; if: string; steps: Array<{ run?: string; 'continue-on-error'?: boolean }> }
-    }
-  }
-  const steps = workflow.jobs.release.steps
-  const gate = steps.findIndex((step) => step.run === 'node scripts/release-draft.mts reserve')
+test('packaged execution runs on a separate read-only runner without signing credentials', () => {
+  const execution = Object.entries(workflow.jobs).filter(([, job]) =>
+    job.steps.some((step) => step.run?.includes('scripts/packaged-smoke.mts')),
+  )
 
-  expect(workflow.jobs.release.needs).toBe('candidate')
-  expect(workflow.jobs.release.if).toBe("needs.candidate.outputs.ready == 'true'")
-  expect(workflow.jobs.candidate.steps.some((step) => step.run === 'node scripts/release-draft.mts plan')).toBe(true)
-  expect(gate).toBeGreaterThan(-1)
-  expect(gate).toBeLessThan(steps.findIndex((step) => step.run === 'npm ci'))
-  expect(steps[gate]?.['continue-on-error']).not.toBe(true)
-  expect(gate).toBeLessThan(steps.findIndex((step) => step.run?.includes('electron-builder --mac')))
+  expect(execution.map(([name]) => name)).toEqual(['verify'])
+  expect(verify['runs-on']).toBe('macos-15')
+  expect(verify.permissions).toEqual({ contents: 'read', actions: 'read' })
+  expect(JSON.stringify(verify)).not.toContain('secrets.')
+  expect(JSON.stringify(verify)).not.toContain('electron-builder')
+  expect(verify.outputs).toBeUndefined()
+  for (const job of [sign, verify, upload]) {
+    expect(job.steps.some((step) => step.with?.cache !== undefined || step.uses?.includes('/cache'))).toBe(false)
+    expect(job.steps.some((step) => step['continue-on-error'])).toBe(false)
+  }
+  expect(verify.steps.some((step) => step.uses?.includes('/upload-artifact'))).toBe(false)
+  const run = verify.steps.find((step) => step.run?.includes('packaged-smoke.mts'))!.run!
+  expect(run).toContain('hdiutil attach "$DMG_FILE" -readonly -nobrowse')
+  expect(run).toContain('ditto "$mount_dir/Tree.app" "$app_dir/Tree.app"')
+  expect(run).toContain('trap \'hdiutil detach "$mount_dir"\' EXIT')
+  expect(run).toContain(
+    'env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" node scripts/packaged-smoke.mts "$app_dir/Tree.app"',
+  )
+  expect(readFileSync('scripts/packaged-smoke.mts', 'utf8')).toContain('env: packagedSmokeEnvironment(process.env)')
+})
+
+test('only the signer references Apple secrets and it cannot write releases or run Tree', () => {
   expect(
-    steps.some((step) => /npm run (check|audit|test:perf|test:e2e|test:smoke:electron)/.test(step.run ?? '')),
-  ).toBe(false)
-  const build = steps.find((step) => step.run?.includes('electron-builder --mac'))!.run!
-  expect(build).toContain('--publish never')
-  expect(build).toContain('node scripts/verify-release-fuses.mts dist/mac-arm64/Tree.app')
-  expect(build).toContain('node scripts/packaged-smoke.mts dist/mac-arm64/Tree.app')
+    Object.entries(workflow.jobs)
+      .filter(([, job]) => JSON.stringify(job).includes('secrets.'))
+      .map(([name]) => name),
+  ).toEqual(['sign'])
+  expect(sign.permissions).toEqual({ contents: 'read', actions: 'read' })
+  expect(sign.needs).toEqual(['candidate', 'reserve'])
+  expect(sign.if).toBe("needs.reserve.outputs.ready == 'true'")
+  const secretSteps = sign.steps.filter((step) => JSON.stringify(step).includes('secrets.'))
+  expect(secretSteps).toHaveLength(1)
+  const build = secretSteps[0]!.run!
+  expect(build).toContain('electron-builder --mac dmg --arm64 --publish never')
+  expect(build).not.toContain('packaged-smoke')
   expect(build).toContain('xcrun stapler validate dist/Tree-*.dmg')
   expect(build).toContain('spctl --assess --type execute')
-  const text = readFileSync('.github/workflows/create-macos-release-draft.yml', 'utf8')
-  const header = text.split('\njobs:')[0]!
-  const candidate = text.split('\n  candidate:')[1]!.split('\n  release:')[0]!
-  expect(header).toContain('contents: read')
-  expect(header).not.toContain('contents: write')
-  expect(candidate).toContain("github.event_name == 'workflow_dispatch'")
-  expect(candidate).toContain("github.ref == 'refs/heads/main'")
-  expect(candidate).toContain('ref: ${{ github.sha }}')
-  expect(candidate).not.toContain('secrets.')
-  expect(text.slice(0, text.indexOf('      - name: Build signed and notarized DMG'))).not.toContain('secrets.')
-  expect(text).toContain('workflow_call:')
-  expect(text).toContain('VALIDATION_RUN_ID: ${{ inputs.run_id }}')
+  expect(build).toContain('trap \'rm -f "$APPLE_API_KEY"\' EXIT')
+  const caller = load(readFileSync('.github/workflows/release-new-app-version.yml', 'utf8')) as {
+    jobs: { macos: { secrets: Record<string, string> } }
+  }
+  expect(Object.keys(caller.jobs.macos.secrets).sort()).toEqual([
+    'APPLE_API_ISSUER',
+    'APPLE_API_KEY',
+    'APPLE_API_KEY_ID',
+    'CSC_KEY_PASSWORD',
+    'CSC_LINK',
+  ])
+})
+
+test('upload cannot consume verifier-controlled bytes and only follows successful verification', () => {
+  expect(upload.needs).toEqual(['candidate', 'reserve', 'sign', 'verify'])
+  expect(upload.if).toBeUndefined() // Default success() rejects failed, skipped and cancelled prerequisites.
+  expect(verify.needs).toEqual(['candidate', 'sign'])
+  expect(verify.if).toBeUndefined()
+  expect(upload['runs-on']).toBe('ubuntu-24.04')
+  expect(upload.permissions).toEqual({ contents: 'write', actions: 'read' })
+  expect(sign.outputs?.artifact_id).toBe('${{ steps.artifact.outputs.artifact-id }}')
+  expect(sign.outputs?.sha256).toBe('${{ steps.digest.outputs.sha256 }}')
+  const artifact = sign.steps.find((step) => step.uses?.includes('/upload-artifact'))!
+  expect(artifact.with?.name).toBe('macos-signed-${{ github.run_id }}-${{ github.run_attempt }}')
+  expect(artifact.with?.path).toBe('${{ steps.digest.outputs.file }}')
+  expect(artifact.with?.overwrite).toBeUndefined()
+  for (const job of [verify, upload]) {
+    const download = job.steps.find((step) => step.uses?.includes('/download-artifact'))!
+    expect(download.with).toEqual({
+      'artifact-ids': '${{ needs.sign.outputs.artifact_id }}',
+      path: 'dist',
+      'merge-multiple': true,
+    })
+    const digest = job.steps.findIndex((step) => step.run === 'node scripts/release-artifact.mts verify')
+    expect(digest).toBeGreaterThan(job.steps.indexOf(download))
+    expect(job.steps[digest]!.env).toEqual({ EXPECTED_DMG_SHA256: '${{ needs.sign.outputs.sha256 }}' })
+    expect(digest).toBeLessThan(
+      job.steps.findIndex((step) =>
+        step.run?.includes(job === upload ? 'scripts/release-draft.mts upload' : 'hdiutil attach'),
+      ),
+    )
+    expect(JSON.stringify(job)).not.toContain('needs.verify.outputs')
+  }
+  expect(upload.steps.some((step) => /npm ci|packaged-smoke|electron-builder/.test(step.run ?? ''))).toBe(false)
+})
+
+test('release retains authenticated source, reservation and immutable manual publication gates', () => {
+  expect(workflow.permissions).toEqual({ contents: 'read', actions: 'read' })
+  expect(candidate.if).toContain("github.event_name == 'workflow_dispatch'")
+  expect(candidate.if).toContain("github.ref == 'refs/heads/main'")
+  expect(candidate.steps.some((step) => step.run === 'node scripts/release-draft.mts plan')).toBe(true)
+  expect(reserve.needs).toBe('candidate')
+  expect(reserve.if).toBe("needs.candidate.outputs.ready == 'true'")
+  expect(reserve.steps.some((step) => step.run === 'node scripts/release-draft.mts reserve')).toBe(true)
+  expect(reserve.steps.some((step) => step.run === 'npm ci')).toBe(false)
+  expect(upload.steps.at(-1)?.env?.RELEASE_ID).toBe('${{ needs.reserve.outputs.release_id }}')
+  for (const job of [reserve, sign, verify, upload]) {
+    const checkout = job.steps.find((step) => step.uses?.includes('/checkout'))!
+    expect(checkout.with?.ref).toBe('${{ needs.candidate.outputs.sha }}')
+    expect(checkout.with?.['persist-credentials']).toBe(false)
+  }
   expect(text).toContain('group: release-macos-main')
   expect(text).toContain('cancel-in-progress: false')
-  expect(text).toContain('ref: ${{ needs.candidate.outputs.sha }}')
-  expect(text).toContain('node scripts/release-draft.mts upload')
   expect(text).not.toContain('--draft=false')
   expect(text).not.toContain('--clobber')
 })

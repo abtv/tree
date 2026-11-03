@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { chromium } from '@playwright/test'
+import { packagedSmokeEnvironment } from './packaged-smoke-environment.mts'
 
 const app = process.argv[2]
 if (!app) throw new Error('Provide a packaged .app path')
@@ -12,6 +13,7 @@ await mkdir(join(profile, 'data'))
 await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
 const child = spawn(resolve(app, 'Contents/MacOS/Tree'), [`--user-data-dir=${profile}`, '--remote-debugging-port=0'], {
   stdio: ['ignore', 'ignore', 'pipe'],
+  env: packagedSmokeEnvironment(process.env),
 })
 const exited = new Promise<void>((done) => child.once('exit', () => done()))
 let browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | undefined

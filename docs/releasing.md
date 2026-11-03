@@ -25,7 +25,7 @@ Desktop preflight rechecks the upstream repository, workflow path, push event,
 main branch, SHA, run attempt and successful `Check release version` gate through
 the GitHub API. Failed, canceled, forked or superseded runs cannot reserve a
 release. No upstream artifacts or default-branch checkout supply release bytes:
-both desktop jobs check out the exact validated source SHA.
+every downstream desktop job checks out the exact validated source SHA.
 
 A lightweight `v<version>` tag and owned draft are created only for a version
 higher than all existing valid SemVer tags and releases, or the first version.
@@ -55,9 +55,31 @@ Production fuses disable RunAsNode, NODE_OPTIONS, Node CLI inspection and extra
 file-protocol privileges, and require ASAR integrity and ASAR-only loading.
 The archive worker uses `worker_threads`, not `child_process.fork`; the renderer
 uses `app://tree/`. Development Electron binaries are not modified. The workflow
-reads back fuses from the packaged app and runs an isolated renderer smoke test
-using Chromium CDP, since Playwright's Electron launcher requires the disabled
+reads back fuses from the packaged app. A separate macOS runner mounts the signed
+DMG read-only, copies Tree.app to an isolated installation directory, checks its
+signature, ticket, Gatekeeper acceptance and fuses, then runs the renderer smoke
+test using Chromium CDP. Playwright's Electron launcher requires the disabled
 Node inspector. Neither test relaxes production fuses.
+
+Reservation, signing, application verification and draft upload use separate
+GitHub-hosted runners. Only the signing step receives the explicitly mapped Apple
+credentials, and the signing job has no repository write permission. It never
+runs Tree. Verification has read-only permissions, no signing secrets, no shared
+dependency cache and no artifact output consumed by upload. Both the smoke runner
+and its application child receive only explicitly allowed startup variables.
+
+After notarization and stapling, the signer records the DMG SHA-256 and uploads
+only that installer as an immutable Actions artifact. Verification downloads its
+artifact ID and rejects a digest mismatch before mounting. Upload runs on a fresh
+Ubuntu runner only after successful verification, downloads the original signer
+artifact independently and checks the signer digest again. It never consumes
+bytes or a digest supplied by the application-testing runner. Only reservation
+and upload have Contents write permission; neither installs dependencies or runs
+the application. Source code, signing tools and GitHub remain trusted.
+
+Artifact names include the release workflow run ID and attempt. Failed-job retries
+reuse successful prerequisite outputs; a rerun of signing creates a new immutable
+artifact. Expired artifacts require rerunning their producer and dependent jobs.
 
 An ad-hoc signed local build can be inspected with
 `node scripts/verify-release-fuses.mts <path-to-Tree.app>`, but Hardened Runtime
@@ -97,8 +119,8 @@ acceptance are checked too. Immediately before upload, the release must still be
 a draft owned by the checked source run, with the pinned tag/SHA and no assets.
 Upload does not use `--clobber`.
 Missing credentials or any failed verification prevent asset upload. The built-in
-GitHub token has `contents: read` and `actions: read` in preflight; only the
-macOS preparation job adds `contents: write`. No auto-updater is added.
+GitHub token has `contents: read` and `actions: read` in preflight, signing and
+verification; only reservation and upload add `contents: write`. No auto-updater is added.
 
 ## Verify and publish
 
