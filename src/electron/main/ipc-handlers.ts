@@ -31,6 +31,8 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  setAppUpdateBlocked?: (blocked: boolean) => void
+  appUpdates?: { check(): Promise<void>; confirm(id: string, saved: boolean): void; isApplying?(): boolean }
   getEmojiHistory?: () => Promise<string[]>
   setEmojiHistory?: (names: readonly string[]) => Promise<void>
   getRecentNodes?: () => Promise<string[]>
@@ -56,6 +58,8 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  setAppUpdateBlocked,
+  appUpdates,
   getEmojiHistory,
   setEmojiHistory,
   getRecentNodes,
@@ -82,6 +86,25 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  ipcMain.handle(ipcChannels.checkAppUpdate, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return appUpdates?.check()
+  })
+  ipcMain.handle(ipcChannels.setAppUpdateBlocked, (event, blocked, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof blocked !== 'boolean') throw new Error('Invalid update availability.')
+    setAppUpdateBlocked?.(blocked)
+  })
+  ipcMain.handle(ipcChannels.confirmAppUpdate, (event, id, saved, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof id !== 'string' || id.length > 100 || typeof saved !== 'boolean')
+      throw new Error('Invalid update acknowledgment.')
+    appUpdates?.confirm(id, saved)
+  })
 
   ipcMain.handle(ipcChannels.getEmojiHistory, (event, ...args) => {
     requireTrustedRenderer(event)
@@ -263,6 +286,8 @@ export function registerIpcHandlers({
     ipcMain.handle(channel, (event, ...args) => {
       requireTrustedRenderer(event)
       requireNoArguments(args)
+      if (appUpdates?.isApplying?.() && channel !== ipcChannels.cancelNotesOperation)
+        throw new Error('Wait for the app update to finish.')
       return request()
     })
   }

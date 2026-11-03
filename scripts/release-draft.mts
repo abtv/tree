@@ -144,10 +144,10 @@ export async function planDraft(
       throw new Error('Existing draft is not owned by this source run')
     if (release.assets.length) {
       if (
-        release.assets.length === 1 &&
-        release.assets[0]!.name === `Tree-${version}-arm64.dmg` &&
-        release.assets[0]!.state === 'uploaded' &&
-        release.assets[0]!.size > 0
+        release.assets.length === 3 &&
+        [`Tree-${version}-arm64.dmg`, `Tree-${version}-arm64.zip`, 'latest-mac.yml'].every((name) =>
+          release.assets.some((asset) => asset.name === name && asset.state === 'uploaded' && asset.size > 0),
+        )
       )
         return undefined
       throw new Error('Existing draft has partial or unknown assets; inspect it before retrying')
@@ -214,9 +214,22 @@ if (import.meta.main) {
     } else if (command === 'upload') {
       const candidate = await verifyUpload(event, texts, Number(process.env.RELEASE_ID), request)
       const file = `dist/Tree-${candidate.tag.slice(1)}-arm64.dmg`
-      const result = spawnSync('gh', ['release', 'upload', candidate.tag, file, '--repo', repository], {
-        stdio: 'inherit',
-      })
+      const result = spawnSync(
+        'gh',
+        [
+          'release',
+          'upload',
+          candidate.tag,
+          file,
+          `dist/Tree-${candidate.tag.slice(1)}-arm64.zip`,
+          'dist/latest-mac.yml',
+          '--repo',
+          repository,
+        ],
+        {
+          stdio: 'inherit',
+        },
+      )
       if (result.error || result.status !== 0)
         throw new Error('Draft asset upload failed; inspect draft before retrying')
       // Do not PATCH draft state after upload: an owner may publish at any time.

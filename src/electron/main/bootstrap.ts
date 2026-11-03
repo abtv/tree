@@ -40,6 +40,8 @@ export interface ApplicationBootstrapDependencies {
    * cleaned up first (PRODUCT §25), or null when nothing is running.
    */
   settleBeforeQuit: () => Promise<void> | null
+  /** Called only after the update renderer flush; returns a rollback for installation failure. */
+  registerUpdateQuit?: (prepare: () => () => void) => void
 }
 
 export function bootstrapApplication({
@@ -56,8 +58,15 @@ export function bootstrapApplication({
   unregisterShortcut,
   onStartupError,
   settleBeforeQuit,
+  registerUpdateQuit,
 }: ApplicationBootstrapDependencies): void {
   let appQuitting = false
+  registerUpdateQuit?.(() => {
+    appQuitting = true
+    return () => {
+      appQuitting = false
+    }
+  })
   const quitHandshake = new QuitHandshake(
     (requestId) => {
       getMainWindow()?.webContents.send('tree:quit-requested', requestId)

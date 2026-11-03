@@ -627,6 +627,7 @@ export async function launchTree(
   options: {
     /** Simulates a display scale before the canonical E2E scale is applied, for stability coverage. */
     initialDeviceScaleFactor?: 1 | 2
+    appUpdates?: boolean
     expectReady?: boolean
     windows?: WindowMode
     shortcut?: ShortcutMode
@@ -742,6 +743,7 @@ export async function launchTree(
               '-AppleShowScrollBars',
               'WhenScrolling',
               ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
+              ...(options.appUpdates ? ['--tree-test-app-updates'] : []),
             ],
             cwd: process.cwd(),
             env: launchEnvironment(windowMode, shortcutMode),

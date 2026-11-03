@@ -49,8 +49,8 @@ The application is a native-feeling macOS application and follows Apple's Human 
 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
-The desktop application menu starts with **About Tree**, followed by a separator
-before Quit Tree. About Tree opens a custom modal child window and shows the
+The desktop application menu starts with **About Tree**, **Check for Updates…** and
+**Update App** (§26), followed by a separator before Quit Tree. About Tree opens a custom modal child window and shows the
 application version from the root `package.json`, also used for the packaged app,
 followed by its UTC build date in English. The panel also shows a clickable
 **GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
@@ -2366,3 +2366,32 @@ Tab and Shift+Tab move between the confirmation buttons and stay inside the dial
 Replace Notes moves the current `document.json`, its retained generations, any interrupted-save and legacy backup files, and the `attachments` folder into a new folder `Replaced Notes/YYYY-MM-DD HH-MM-SS` (local time) in `~/Library/Application Support/Tree/`, keeping the data-directory layout. Files are moved, not copied. When that name exists, ` 2`, ` 3`, … is appended; nothing is moved and no folder is created when there were no stored notes. Preferences stay in place. Tree never changes or deletes a Replaced Notes folder; the user removes old ones in the Finder.
 
 The replacement is one unit. The imported notes start without retained generations, and a replaced document or generation is never opened again after the replacement begins. If Tree stops during the replacement, the next start completes it before opening the notes and shows the result of §25.3. Quitting during the replacement waits for it. If it cannot be completed, loading fails with `The notes import could not be completed: <reason>` and changes no files.
+
+## 26. Desktop App Updates
+
+Packaged macOS builds check published stable GitHub releases at startup and when
+connectivity returns. Downloads run in the background without stealing focus;
+offline or failed downloads leave the installed application usable. Development
+builds do not check. No notes are sent. Prereleases and downgrades are excluded.
+
+The native Tree menu always contains **Check for Updates…** after About Tree, followed
+by **Update App**. Check for Updates checks and downloads an available update, then
+shows a native result dialog: `Tree is up to date.`, `An update is ready to install.`
+with instructions to choose Update App, or `Could not check for updates.` with retry
+guidance. Manual and background checks share one in-flight request; repeated manual
+requests show at most one result dialog. Both commands are disabled while checking,
+applying, or displaying a modal. Development builds disable both commands.
+
+Update App stays disabled until the package is downloaded, following the native
+menu convention of keeping unavailable commands visible. It is also unavailable
+during a notes operation. Applying
+it blocks editing, saves pending work including Vim buffers and attachments, and
+asks the macOS installer to verify, install and restart Tree. A failed or timed-out
+save leaves the application open and editable; it never offers to discard notes
+to install an update. Repeated requests do not start concurrent installations.
+An installation error or preparation timeout restores editing and allows another attempt. Ordinary Quit
+does not initiate installation of an update the user has not requested.
+
+Update checks add no document writes or document traversal. Explicit installation
+uses the existing persistence flush. Download/cache storage is proportional to the
+application package; update state and listeners are bounded and independent of note count.

@@ -4,6 +4,11 @@ import type { FindMenuCommand, NotesMenuCommand, NotesMenuState, ViewMenuCommand
 import type { MenuIcons } from './menu-icons'
 
 export interface ApplicationMenuState {
+  updatesSupported?: boolean
+  updateChecking?: boolean
+  updateBlocked?: boolean
+  updateReady?: boolean
+  updateApplying?: boolean
   modalOpen: boolean
   vimEnabled: boolean
   alwaysOnTop: boolean
@@ -12,6 +17,8 @@ export interface ApplicationMenuState {
 }
 
 export interface ApplicationMenuActions {
+  checkForUpdates?: () => void
+  updateApp?: () => void
   showAbout: () => void
   requestQuit: () => void
   setVimEnabled: (vimEnabled: boolean) => void
@@ -41,6 +48,28 @@ export function applicationMenuTemplate(
       label: 'Tree',
       submenu: [
         { label: 'About Tree', click: actions.showAbout },
+        {
+          label: 'Check for Updates…',
+          enabled:
+            state.updatesSupported === true &&
+            !state.updateChecking &&
+            !state.updateApplying &&
+            !state.modalOpen &&
+            !state.updateBlocked,
+          click: () => actions.checkForUpdates?.(),
+        },
+        {
+          label: 'Update App',
+          enabled:
+            state.updateReady === true &&
+            !state.updateChecking &&
+            !state.modalOpen &&
+            !state.updateApplying &&
+            !state.updateBlocked &&
+            state.notes.canExport &&
+            state.notes.canImport,
+          click: () => actions.updateApp?.(),
+        },
         { type: 'separator' },
         { label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit },
       ],

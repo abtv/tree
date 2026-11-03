@@ -109,7 +109,7 @@ test('only the signer references Apple secrets and it cannot write releases or r
   const secretSteps = sign.steps.filter((step) => JSON.stringify(step).includes('secrets.'))
   expect(secretSteps).toHaveLength(1)
   const build = secretSteps[0]!.run!
-  expect(build).toContain('electron-builder --mac dmg --arm64 --publish never')
+  expect(build).toContain('electron-builder --mac dmg zip --arm64 --publish never')
   expect(build).not.toContain('packaged-smoke')
   expect(build).toContain('xcrun stapler validate dist/Tree-*.dmg')
   expect(build).toContain('spctl --assess --type execute')
@@ -137,7 +137,7 @@ test('upload cannot consume verifier-controlled bytes and only follows successfu
   expect(sign.outputs?.sha256).toBe('${{ steps.digest.outputs.sha256 }}')
   const artifact = sign.steps.find((step) => step.uses?.includes('/upload-artifact'))!
   expect(artifact.with?.name).toBe('macos-signed-${{ github.run_id }}-${{ github.run_attempt }}')
-  expect(artifact.with?.path).toBe('${{ steps.digest.outputs.file }}')
+  expect(artifact.with?.path).toBe('dist/Tree-*.dmg\ndist/Tree-*.zip\ndist/latest-mac.yml\n')
   expect(artifact.with?.overwrite).toBeUndefined()
   for (const job of [verify, upload]) {
     const download = job.steps.find((step) => step.uses?.includes('/download-artifact'))!
@@ -148,7 +148,11 @@ test('upload cannot consume verifier-controlled bytes and only follows successfu
     })
     const digest = job.steps.findIndex((step) => step.run === 'node scripts/release-artifact.mts verify')
     expect(digest).toBeGreaterThan(job.steps.indexOf(download))
-    expect(job.steps[digest]!.env).toEqual({ EXPECTED_DMG_SHA256: '${{ needs.sign.outputs.sha256 }}' })
+    expect(job.steps[digest]!.env).toEqual({
+      EXPECTED_DMG_SHA256: '${{ needs.sign.outputs.sha256 }}',
+      EXPECTED_ZIP_SHA256: '${{ needs.sign.outputs.zip_sha256 }}',
+      EXPECTED_METADATA_SHA256: '${{ needs.sign.outputs.metadata_sha256 }}',
+    })
     expect(digest).toBeLessThan(
       job.steps.findIndex((step) =>
         step.run?.includes(job === upload ? 'scripts/release-draft.mts upload' : 'hdiutil attach'),

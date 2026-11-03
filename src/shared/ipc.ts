@@ -7,6 +7,9 @@ import type { IncomingNotes, NotesCounts } from '../application/notes-archive/im
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
 
 export const ipcChannels = {
+  setAppUpdateBlocked: 'tree:set-app-update-blocked',
+  checkAppUpdate: 'tree:check-app-update',
+  confirmAppUpdate: 'tree:confirm-app-update',
   quit: 'tree:quit',
   quitWithoutSaving: 'tree:quit-without-saving',
   load: 'tree:load',
@@ -43,6 +46,8 @@ export const ipcChannels = {
 
 /** Main-to-renderer notifications: menu commands, preference changes and notes archive progress. */
 export const ipcEvents = {
+  appUpdateRequested: 'tree:app-update-requested',
+  appUpdateFinished: 'tree:app-update-finished',
   alwaysOnTopChanged: 'tree:always-on-top-changed',
   vimEnabledChanged: 'tree:vim-enabled-changed',
   appearanceChanged: 'tree:appearance-changed',
@@ -133,6 +138,11 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  setAppUpdateBlocked?: (blocked: boolean) => Promise<void>
+  checkAppUpdate?: () => Promise<void>
+  confirmAppUpdate?: (id: string, saved: boolean) => Promise<void>
+  onAppUpdateRequested?: (listener: (id: string) => void) => () => void
+  onAppUpdateFinished?: (listener: (message: string | null) => void) => () => void
   getRecentNodes?: () => Promise<string[]>
   setRecentNodes?: (value: readonly string[]) => Promise<void>
   getAppearance: () => Promise<'system' | 'light' | 'dark'>

@@ -85,6 +85,11 @@ export function App({
   const searchQuery = search.visible ? (search.draft ?? search.confirmed) : ''
   useEffect(() => () => store.disposeSearch(), [store])
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string>()
+  const updateBlocked =
+    previewAttachmentId !== undefined || (state.status === 'ready' && state.quitWithoutSavingPrompt === true)
+  useEffect(() => {
+    void window.treeApi.setAppUpdateBlocked?.(updateBlocked).catch((error: unknown) => store.reportError(error))
+  }, [store, updateBlocked])
   const [breadcrumbTarget, setBreadcrumbTarget] = useState<string | null>()
   const readyDocument = state.status === 'ready' ? state.document : undefined
   const readyParentId = state.status === 'ready' ? state.location.currentParentId : null

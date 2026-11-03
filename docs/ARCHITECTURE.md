@@ -298,6 +298,19 @@ The important principle is that product behavior should be represented by explic
 
 ## 7. Application Layer
 
+Desktop updates (PRODUCT §26) use `electron-updater` in the main process, with the
+packaged GitHub configuration. `AppUpdates` owns a separate bounded save acknowledgment
+and rollback of the bootstrap quit permission; the ordinary QuitHandshake is unchanged.
+The native Tree menu requests a renderer flush through trusted IPC. Renderer input is
+blocked until installation or failure. Automatic installation on quit is disabled.
+The ZIP-download notification enables Update App; only after successful saving does
+the main process ask Squirrel.Mac to stage and verify it, then quit and install.
+One persistent native listener avoids accumulating deferred installation callbacks on retry.
+The permanent Check for Updates command shares an in-flight background request and
+shows one native result dialog without authorizing installation. Its check/dialog state
+disables duplicate commands; Update App remains a separate explicit save-and-install action.
+Checks and download bytes do not touch the notes store or renderer network permissions.
+
 `command-registry.ts` owns the application command panel's base registry: command names, aliases, descriptions, shortcut data (a key and a Shift flag; the renderer formats the label), state queries and run actions. `menu-commands.ts` defines data-menu command metadata and an observable source of supported actions and their enabled state. The desktop data coordinator publishes its existing menu availability. The browser Data and backup controllers publish explicit command identities and availability through `BrowserMenuCommands`, which projects that state into the buttons and the panel. Both call the same stable handlers synchronously, retaining picker user activation and rechecking current availability. Labels and DOM mutation observation do not determine command identity. The panel merges these entries with the base registry and rechecks current availability before execution. Actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical order is prepared when the available entries change; each input change scans registry entries and bounded history without document traversal.
 
 Registry entries declare required capabilities. The command-panel owner derives one available registry for matching and counts from the host's Always on Top and Vim availability. The browser entry disables Always on Top and supplies device-specific Vim availability; Electron retains both. Filtering does not modify saved history. This adds one memoized, registry-sized array per panel owner, no document work, disk writes or syncs, and no growing retained state (§22.1 of PRODUCT).

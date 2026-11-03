@@ -18,6 +18,17 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('forwards update acknowledgments and errors', async () => {
+    const { treeApi } = await import('./index')
+    await treeApi.checkAppUpdate!()
+    await treeApi.setAppUpdateBlocked!(true)
+    await treeApi.confirmAppUpdate!('id', true)
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:check-app-update')
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:set-app-update-blocked', true)
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:confirm-app-update', 'id', true)
+    mocks.invoke.mockRejectedValueOnce(new Error('stale'))
+    await expect(treeApi.confirmAppUpdate!('id', false)).rejects.toThrow('stale')
+  })
   beforeAll(async () => {
     await import('./index')
   })

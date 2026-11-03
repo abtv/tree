@@ -9,6 +9,23 @@ import {
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  setAppUpdateBlocked: (blocked) => ipcRenderer.invoke(ipcChannels.setAppUpdateBlocked, blocked),
+  checkAppUpdate: () => ipcRenderer.invoke(ipcChannels.checkAppUpdate),
+  confirmAppUpdate: (id, saved) => ipcRenderer.invoke(ipcChannels.confirmAppUpdate, id, saved),
+  onAppUpdateRequested: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, id: unknown): void => {
+      if (typeof id === 'string') listener(id)
+    }
+    ipcRenderer.on(ipcEvents.appUpdateRequested, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.appUpdateRequested, handler)
+  },
+  onAppUpdateFinished: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, message: unknown): void => {
+      if (message === null || typeof message === 'string') listener(message)
+    }
+    ipcRenderer.on(ipcEvents.appUpdateFinished, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.appUpdateFinished, handler)
+  },
   onFindMenuCommand: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, command: unknown): void => {
       if (command === 'find' || command === 'next' || command === 'previous' || command === 'all') listener(command)

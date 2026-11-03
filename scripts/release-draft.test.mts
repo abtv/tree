@@ -160,7 +160,14 @@ describe('verified main release drafts', () => {
     f.writes.length = 0
     const release = f.releases[0]!
     if (kind === 'published') release.draft = false
-    if (kind === 'ready') release.assets.push({ name: 'Tree-1.2.3-arm64.dmg', state: 'uploaded', size: 100 })
+    if (kind === 'ready')
+      release.assets.push(
+        ...['Tree-1.2.3-arm64.dmg', 'Tree-1.2.3-arm64.zip', 'latest-mac.yml'].map((name) => ({
+          name,
+          state: 'uploaded',
+          size: 100,
+        })),
+      )
     if (kind === 'unknown') release.body = 'unrelated draft'
     if (kind === 'partial') release.assets.push({ name: 'partial.dmg', state: 'new', size: 0 })
 

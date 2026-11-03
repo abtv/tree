@@ -1,7 +1,7 @@
 # macOS releases
 
 After successful checks of a version commit on `main`, `Release new app version` builds Tree
-for Apple Silicon and uploads a verified DMG to a **draft** GitHub Release.
+for Apple Silicon and uploads a verified DMG, update ZIP and metadata to a **draft** GitHub Release.
 Only the owner publishes the draft for users.
 
 ## Create a release
@@ -38,7 +38,7 @@ After a failed build, select **Re-run failed jobs** in `Release new app version`
 the same tag/SHA and its own empty draft; no deletion or version increment is
 needed. Dispatch verification rejects stale source main and changed validation attempts;
 a newer reserved version also prevents uploading the older one. Published releases and
-complete uploaded DMGs are skipped. Unknown drafts or partial/unknown assets
+complete uploaded artifact sets are skipped. Unknown drafts or partial/unknown assets
 stop for inspection. Existing tags and assets are never replaced. No automated
 step publishes a release or changes its published/draft state after creation.
 
@@ -68,11 +68,11 @@ runs Tree. Verification has read-only permissions, no signing secrets, no shared
 dependency cache and no artifact output consumed by upload. Both the smoke runner
 and its application child receive only explicitly allowed startup variables.
 
-After notarization and stapling, the signer records the DMG SHA-256 and uploads
-only that installer as an immutable Actions artifact. Verification downloads its
-artifact ID and rejects a digest mismatch before mounting. Upload runs on a fresh
+After notarization and stapling, the signer records each file's SHA-256 and uploads
+the DMG, ZIP and metadata as an immutable Actions artifact. Verification downloads its
+artifact ID and rejects a digest mismatch before mounting or extracting. Upload runs on a fresh
 Ubuntu runner only after successful verification, downloads the original signer
-artifact independently and checks the signer digest again. It never consumes
+artifact independently and checks all signer digests again. It never consumes
 bytes or a digest supplied by the application-testing runner. Only reservation
 and upload have Contents write permission; neither installs dependencies or runs
 the application. Source code, signing tools and GitHub remain trusted.
@@ -120,7 +120,17 @@ a draft owned by the checked source run, with the pinned tag/SHA and no assets.
 Upload does not use `--clobber`.
 Missing credentials or any failed verification prevent asset upload. The built-in
 GitHub token has `contents: read` and `actions: read` in preflight, signing and
-verification; only reservation and upload add `contents: write`. No auto-updater is added.
+verification; only reservation and upload add `contents: write`.
+
+Releases include the DMG, a signed application ZIP, and `latest-mac.yml` for desktop
+updates (PRODUCT §26). The artifact recorder creates metadata from the final ZIP,
+and the verifier and uploader independently check all three signer-provided digests.
+The isolated verifier also checks and launches the ZIP application. Metadata points
+only to the ZIP, so later DMG stapling cannot invalidate its update hash.
+Publish the complete draft; a partial artifact set fails closed. The first build
+containing the updater must be installed manually. Before declaring signed updates
+verified, test an actual older-to-newer signed installation with synthetic notes in
+a separate macOS account, confirming restart, version change and preserved edits.
 
 ## Verify and publish
 

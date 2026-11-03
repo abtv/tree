@@ -19,6 +19,8 @@ mac:
   target:
     - target: dmg
       arch: arm64
+    - target: zip
+      arch: arm64
   icon: assets/icons/tree-icon-source.png
   category: public.app-category.productivity
   hardenedRuntime: true

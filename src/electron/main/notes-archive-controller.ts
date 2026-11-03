@@ -73,6 +73,7 @@ export interface NotesArchiveControllerDependencies {
 }
 
 export interface NotesArchiveController {
+  isIdle?: () => boolean
   chooseExportDestination(): Promise<NotesFileChoice>
   startExport(): Promise<NotesExportResult>
   chooseImportArchive(): Promise<NotesFileChoice>
@@ -244,6 +245,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   }
 
   return {
+    isIdle: () => state.kind === 'idle',
     async chooseExportDestination() {
       if (state.kind === 'prepared' && !closing && !restartRequired) {
         waitingImport = state

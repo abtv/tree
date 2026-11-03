@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater as nativeUpdater,
   BrowserWindow,
   ClipboardItem,
   clipboard,
@@ -13,6 +14,8 @@ import {
   session,
   shell,
 } from 'electron'
+import { autoUpdater } from 'electron-updater'
+import { AppUpdates } from './app-updates'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
@@ -67,6 +70,9 @@ let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 let aboutWindow: AboutWindowController | null = null
+let appUpdates: AppUpdates | undefined
+let appUpdateBlocked = false
+let prepareUpdateQuit: (() => () => void) | undefined
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -117,10 +123,28 @@ function rebuildApplicationMenu(): void {
           alwaysOnTop: isAlwaysOnTop(),
           appearance: currentAppearance(),
           notes: notesMenuState,
-          modalOpen: aboutWindow?.isOpen() ?? false,
+          modalOpen:
+            (aboutWindow?.isOpen() ?? false) ||
+            (appUpdates?.isApplying() ?? false) ||
+            (appUpdates?.isNotifying() ?? false),
+          updatesSupported: appUpdates !== undefined,
+          updateChecking: appUpdates?.isChecking() ?? false,
+          updateReady: appUpdates?.isReady() ?? false,
+          updateBlocked: appUpdateBlocked,
+          updateApplying: appUpdates?.isApplying() ?? false,
         },
         {
-          requestQuit: requestQuitFromMenu,
+          requestQuit: () => {
+            appUpdates?.cancelSaving()
+            requestQuitFromMenu()
+          },
+          updateApp: () => appUpdates?.request(),
+          checkForUpdates: () => {
+            if (aboutWindow?.isOpen() || appUpdateBlocked) return
+            void appUpdates
+              ?.checkManually()
+              .catch((error: unknown) => reportMainProcessError('Could not show update status', error))
+          },
           findCommand: (command) => {
             if (aboutWindow?.isOpen()) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
@@ -187,6 +211,8 @@ function createMainWindow(quitWithoutSave: () => void): void {
   followWindowAppearance(window, nativeTheme)
   mainWindow = window
   const resetNotesMenu = (): void => {
+    appUpdateBlocked = false
+    appUpdates?.cancelSaving()
     notesMenuState = { canExport: false, canImport: false }
     rebuildApplicationMenu()
     void notesArchive
@@ -230,6 +256,78 @@ bootstrapApplication({
   createMainWindow,
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
+    if (app.isPackaged && process.platform === 'darwin') {
+      let nativeStaged = false
+      autoUpdater.autoInstallOnAppQuit = false
+      autoUpdater.autoDownload = true
+      autoUpdater.allowPrerelease = false
+      autoUpdater.allowDowngrade = false
+      autoUpdater.disableDifferentialDownload = true
+      appUpdates = new AppUpdates({
+        check: async () => {
+          const result = await autoUpdater.checkForUpdates()
+          await result?.downloadPromise
+        },
+        install: () => (nativeStaged ? nativeUpdater.quitAndInstall() : nativeUpdater.checkForUpdates()),
+        canInstall: () =>
+          !!mainWindow &&
+          !mainWindow.isDestroyed() &&
+          !mainWindow.webContents.isLoadingMainFrame() &&
+          !aboutWindow?.isOpen() &&
+          !appUpdateBlocked &&
+          notesArchive?.isIdle?.() === true &&
+          notesMenuState.canExport &&
+          notesMenuState.canImport,
+        prepareQuit: () => {
+          appQuitting = true
+          const release = prepareUpdateQuit!()
+          return () => {
+            appQuitting = false
+            release()
+          }
+        },
+        requestSave: (id) => mainWindow?.webContents.send(ipcEvents.appUpdateRequested, id),
+        finished: (message) => mainWindow?.webContents.send(ipcEvents.appUpdateFinished, message),
+        changed: rebuildApplicationMenu,
+        notifyCheck: async (result) => {
+          if (!mainWindow || mainWindow.isDestroyed() || appQuitting) return
+          await dialog.showMessageBox(mainWindow, {
+            type: result === 'failed' ? 'warning' : 'info',
+            message:
+              result === 'ready'
+                ? 'An update is ready to install.'
+                : result === 'failed'
+                  ? 'Could not check for updates.'
+                  : 'Tree is up to date.',
+            detail:
+              result === 'ready'
+                ? 'Choose Tree > Update App to save your work and restart with the new version.'
+                : result === 'failed'
+                  ? 'Check your Internet connection and try again.'
+                  : `You are using Tree ${app.getVersion()}.`,
+            buttons: ['OK'],
+            defaultId: 0,
+            cancelId: 0,
+          })
+        },
+      })
+      // Start native staging only after explicit consent and a successful save. Keep one
+      // listener rather than MacUpdater.quitAndInstall's accumulating deferred callbacks.
+      autoUpdater.on('update-downloaded', () => appUpdates?.downloaded())
+      nativeUpdater.on('update-downloaded', () => {
+        nativeStaged = true
+        if (appUpdates?.isInstalling()) {
+          try {
+            nativeUpdater.quitAndInstall()
+          } catch {
+            appUpdates.fail('Update failed. Try Update App again.')
+          }
+        }
+      })
+      autoUpdater.on('error', () => appUpdates?.fail('Update failed. Try Update App again.'))
+      app.on('before-quit', () => appUpdates?.cancelSaving())
+      void appUpdates.check()
+    }
     const resolvedRenderer = resolveRendererUrl(
       app.isPackaged,
       process.env['ELECTRON_RENDERER_URL'],
@@ -274,6 +372,11 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      setAppUpdateBlocked: (blocked) => {
+        appUpdateBlocked = blocked
+        rebuildApplicationMenu()
+      },
+      ...(appUpdates ? { appUpdates } : {}),
       getAppearance: currentAppearance,
       setAppearance,
       getCommandHistory: commandHistory.load,
@@ -336,4 +439,7 @@ bootstrapApplication({
     app.quit()
   },
   settleBeforeQuit: () => notesArchive?.shutdown() ?? null,
+  registerUpdateQuit: (prepare) => {
+    prepareUpdateQuit = prepare
+  },
 })

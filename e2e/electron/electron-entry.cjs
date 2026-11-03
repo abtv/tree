@@ -3,6 +3,30 @@ const { join } = require('node:path')
 const { enableHiddenWindows } = require('./hidden-windows.cjs')
 const { enableShortcutStub } = require('./shortcut-stub.cjs')
 
+if (process.argv.includes('--tree-test-app-updates')) {
+  Object.defineProperty(app, 'isPackaged', { get: () => true })
+  const updater = require('electron-updater').autoUpdater
+  const native = require('electron').autoUpdater
+  const probe = { checks: 0, installs: 0, fail: false, checkFails: false, messages: [] }
+  require('electron').dialog.showMessageBox = async (_window, options) => {
+    probe.messages.push(options.message)
+    return { response: 0, checkboxChecked: false }
+  }
+  updater.checkForUpdates = async () => {
+    probe.checks++
+    if (probe.checkFails) throw new Error('test offline')
+    return null
+  }
+  native.checkForUpdates = () => {
+    probe.installs++
+    if (probe.fail) updater.emit('error', new Error('test install failure'))
+    else native.emit('update-downloaded')
+  }
+  native.quitAndInstall = () => app.quit()
+  probe.downloaded = () => updater.emit('update-downloaded')
+  globalThis.__treeUpdates = probe
+}
+
 const appearance = process.argv.find((argument) => argument.startsWith('--tree-test-appearance='))?.split('=')[1]
 if (appearance === 'dark' || appearance === 'light') {
   nativeTheme.themeSource = appearance

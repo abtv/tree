@@ -91,15 +91,19 @@ and no automated step publishes the draft. Signing credentials and release-write
 access are privileged trust roots. Reservation, signing, application verification
 and upload run on separate fresh GitHub-hosted runners. Only signing receives
 Apple credentials; it never launches Tree and has no repository write permission.
-Verification extracts and runs the DMG's application without signing secrets or
+Verification extracts and runs the DMG and ZIP applications without signing secrets or
 write permissions. Its subprocess environment is allowlisted and it publishes no
 artifact or shared cache consumed by privileged jobs. All macOS release and web-publication
 jobs explicitly disable setup-node automatic npm caching. Upload independently fetches
-the immutable signer artifact and checks its signer-provided SHA-256 after the
+the immutable signer artifact and checks the signer-provided SHA-256 of each file after the
 verification job succeeds; files from the test runner never become release assets.
 These boundaries still trust source maintainers, signing tools and GitHub.
-The desktop application has no auto-updater;
-the browser update mechanism does not update installed desktop applications.
+The desktop updater downloads stable releases from the configured GitHub repository
+in the main process. It sends no notes, accepts no renderer-provided feed URLs, and
+does not expand renderer network permissions. ZIP hashes and macOS code signatures
+are checked before installation. Explicit Update App saves work before native staging;
+ordinary quit does not start it. GitHub release access and the Apple signing identity
+are update trust roots. The browser update mechanism is separate.
 
 ## Browser runtime and storage
 

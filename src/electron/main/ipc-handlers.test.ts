@@ -65,7 +65,11 @@ function createHarness() {
     shutdown: vi.fn(() => null),
   }
   const setNotesMenuState = vi.fn()
+  const setAppUpdateBlocked = vi.fn()
+  const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn() }
   registerIpcHandlers({
+    setAppUpdateBlocked,
+    appUpdates,
     getEmojiHistory,
     setEmojiHistory,
     getRecentNodes,
@@ -90,6 +94,8 @@ function createHarness() {
     setNotesMenuState,
   })
   return {
+    setAppUpdateBlocked,
+    appUpdates,
     getEmojiHistory,
     setEmojiHistory,
     getRecentNodes,
@@ -115,6 +121,34 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('accepts only trusted boolean update availability and forwards errors', () => {
+    const { handlers, setAppUpdateBlocked } = createHarness()
+    const set = handlers.get(ipcChannels.setAppUpdateBlocked)!
+    const event = { senderFrame: { url: rendererUrl } }
+    set(event, true)
+    expect(setAppUpdateBlocked).toHaveBeenCalledWith(true)
+    expect(() => set(event, 'true')).toThrow()
+    expect(() => set(event, true, 'extra')).toThrow()
+    expect(() => set({ senderFrame: { url: 'https://example.com' } }, true)).toThrow()
+    setAppUpdateBlocked.mockImplementationOnce(() => {
+      throw new Error('failed')
+    })
+    expect(() => set(event, false)).toThrow('failed')
+  })
+  it('validates update requests and propagates errors without accepting renderer URLs', async () => {
+    const { handlers, appUpdates } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const check = handlers.get(ipcChannels.checkAppUpdate)!
+    const confirm = handlers.get(ipcChannels.confirmAppUpdate)!
+    await check(event)
+    confirm(event, 'id', true)
+    expect(appUpdates.confirm).toHaveBeenCalledWith('id', true)
+    expect(() => check(event, 'https://example.com')).toThrow()
+    expect(() => confirm(event, 'id', 'true')).toThrow()
+    expect(() => confirm({ senderFrame: { url: 'https://example.com' } }, 'id', true)).toThrow()
+    appUpdates.check.mockRejectedValueOnce(new Error('update failure'))
+    await expect(check(event)).rejects.toThrow('update failure')
+  })
   it('validates emoji history before storage and preserves read/write failures', async () => {
     const { handlers, getEmojiHistory, setEmojiHistory } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }

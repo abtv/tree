@@ -10,6 +10,7 @@ import {
 import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
+import { startAppUpdates } from './app-updates'
 import type { CommandServices } from '../application/command-registry'
 import './styles.css'
 import { blockExternalDrops } from './external-drop'
@@ -45,6 +46,7 @@ const dataOperations = new DesktopDataOperations(
 dataOperations.start()
 window.addEventListener('pagehide', () => dataOperations.dispose(), { once: true })
 startRendererLifecycle(store, window.treeApi)
+startAppUpdates(store, window.treeApi)
 
 const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'showAgenda'>) =>
   window.treeApi.onViewMenuCommand!((command) => {

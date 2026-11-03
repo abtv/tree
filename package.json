@@ -73,6 +73,7 @@
     "check:full": "npm run check && npm run test:performance && playwright test -c config/testing/playwright.config.ts && playwright test -c config/testing/perf.config.ts --project=electron && npm run audit"
   },
   "dependencies": {
+    "electron-updater": "6.8.12",
     "fflate": "0.8.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"

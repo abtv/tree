@@ -18,6 +18,8 @@ function applicationMenuTemplate(
 
 function createActions() {
   return {
+    checkForUpdates: vi.fn(),
+    updateApp: vi.fn(),
     showAbout: vi.fn(),
     requestQuit: vi.fn(),
     setVimEnabled: vi.fn(),
@@ -74,13 +76,41 @@ it('disables main-window commands while About is modal but keeps About, Quit and
   expect(blocked.every((item) => item.enabled === false)).toBe(true)
   expect(
     submenuItems(template, 'Tree')
-      .filter((item) => item.type !== 'separator')
+      .filter((item) => item.label === 'About Tree' || item.label === 'Quit Tree')
       .every((item) => item.enabled !== false),
   ).toBe(true)
   expect(appearanceItems(template).every((item) => item.enabled !== false)).toBe(true)
 })
 
 describe('application menu template', () => {
+  it('keeps both update commands visible and enables only available actions', () => {
+    const actions = createActions()
+    const initial = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
+    expect(initial.find((item) => item.label === 'Check for Updates…')?.enabled).toBe(false)
+    expect(initial.find((item) => item.label === 'Update App')?.enabled).toBe(false)
+    const available = submenuItems(
+      applicationMenuTemplate(
+        { ...state(), updatesSupported: true, updateReady: true, notes: { canExport: true, canImport: true } },
+        actions,
+      ),
+      'Tree',
+    )
+    clickWithChecked(
+      available.find((item) => item.label === 'Check for Updates…')!,
+      false,
+    )
+    expect(actions.checkForUpdates).toHaveBeenCalledOnce()
+    expect(actions.updateApp).not.toHaveBeenCalled()
+    const busy = submenuItems(
+      applicationMenuTemplate({ ...state(), updatesSupported: true, updateReady: true, updateChecking: true }, actions),
+      'Tree',
+    )
+    expect(
+      busy
+        .filter((item) => item.label === 'Check for Updates…' || item.label === 'Update App')
+        .every((item) => item.enabled === false),
+    ).toBe(true)
+  })
   // @requirement PRODUCT.md §25.1
   it('orders notes commands, applies availability and dispatches without shortcuts', () => {
     const actions = createActions()
@@ -102,7 +132,13 @@ describe('application menu template', () => {
     const template = applicationMenuTemplate(state(), createActions())
 
     expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
-    expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual(['About Tree', undefined, 'Quit Tree'])
+    expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual([
+      'About Tree',
+      'Check for Updates…',
+      'Update App',
+      undefined,
+      'Quit Tree',
+    ])
     expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual([
       'Find…',
       'Find Next',
