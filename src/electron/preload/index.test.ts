@@ -18,6 +18,30 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('forwards update command state, execution, errors and validated notifications', async () => {
+    const { treeApi } = await import('./index')
+    const state = { 'check-for-updates': true, 'update-app': false }
+    mocks.invoke.mockResolvedValueOnce(state)
+
+    await expect(treeApi.getUpdateCommands!()).resolves.toEqual(state)
+    await treeApi.runUpdateCommand!('check-for-updates')
+
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:get-update-commands')
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:run-update-command', 'check-for-updates')
+    mocks.invoke.mockRejectedValueOnce(new Error('unavailable'))
+    await expect(treeApi.runUpdateCommand!('update-app')).rejects.toThrow('unavailable')
+    const listener = vi.fn()
+    const stop = treeApi.onUpdateCommandsChanged!(listener)
+    const handler = mocks.on.mock.calls.findLast(([name]) => name === 'tree:update-commands-changed')![1]
+
+    handler({}, null)
+    handler({}, { 'check-for-updates': true, 'update-app': 'yes' })
+    handler({}, state)
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith(state)
+    stop()
+    expect(mocks.removeListener).toHaveBeenCalledWith('tree:update-commands-changed', handler)
+  })
   it('forwards About state and propagates errors', async () => {
     const { treeApi } = await import('./index')
 

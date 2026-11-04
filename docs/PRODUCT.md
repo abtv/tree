@@ -1649,7 +1649,7 @@ outside this version.
 
 Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space is reserved for future arguments and matches nothing in this version. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
 
-Both opening keys use the same platform-specific command list. Only commands supported by the current platform appear or contribute to the matching and total counts. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
+Both opening keys use the same command list. Only platform-supported commands appear or count. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
 Every action in the desktop menu bar or browser Tree menu, including future actions, must also be available in this panel. Headings, separators and status text are not actions. Platform support, availability, confirmations, cancellation and results must match the menu. State-dependent commands follow the current menu action, including backup start, stop and resume (§24–25).
 
@@ -1678,6 +1678,8 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 | `stop-backing-up` | — | Stop Backing Up | — | — | Same as the browser Data action when folder backup is active (§24.5) |
 | `resume-backing-up` | — | Resume Backing Up… | — | — | Same as the browser Data action when folder backup is paused (§24.5) |
 | `restore-from-folder` | — | Restore from Folder… | — | — | Same as the supported browser Data action (§24.6) |
+
+Desktop also lists `check-for-updates` and `update-app` (§26).
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 

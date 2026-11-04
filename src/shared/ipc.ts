@@ -7,6 +7,8 @@ import type { IncomingNotes, NotesCounts } from '../application/notes-archive/im
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
 
 export const ipcChannels = {
+  getUpdateCommands: 'tree:get-update-commands',
+  runUpdateCommand: 'tree:run-update-command',
   setAboutOpen: 'tree:set-about-open',
   setAppUpdateBlocked: 'tree:set-app-update-blocked',
   checkAppUpdate: 'tree:check-app-update',
@@ -47,6 +49,7 @@ export const ipcChannels = {
 
 /** Main-to-renderer notifications: menu commands, preference changes and notes archive progress. */
 export const ipcEvents = {
+  updateCommandsChanged: 'tree:update-commands-changed',
   aboutRequested: 'tree:about-requested',
   appUpdateRequested: 'tree:app-update-requested',
   appUpdateFinished: 'tree:app-update-finished',
@@ -58,6 +61,9 @@ export const ipcEvents = {
   viewMenuCommand: 'tree:view-menu-command',
   findMenuCommand: 'tree:find-menu-command',
 } as const
+
+export type UpdateCommand = 'check-for-updates' | 'update-app'
+export type UpdateCommandsState = Record<UpdateCommand, boolean>
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
 export interface NotesOperationCanceled {
@@ -140,6 +146,9 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  getUpdateCommands?: () => Promise<UpdateCommandsState>
+  runUpdateCommand?: (command: UpdateCommand) => Promise<void>
+  onUpdateCommandsChanged?: (listener: (state: UpdateCommandsState) => void) => () => void
   setAboutOpen?: (open: boolean) => Promise<void>
   onAboutRequested?: (listener: () => void) => () => void
   setAppUpdateBlocked?: (blocked: boolean) => Promise<void>

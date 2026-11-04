@@ -9,6 +9,24 @@ import {
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  getUpdateCommands: () => ipcRenderer.invoke(ipcChannels.getUpdateCommands),
+  runUpdateCommand: (command) => ipcRenderer.invoke(ipcChannels.runUpdateCommand, command),
+  onUpdateCommandsChanged: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: unknown): void => {
+      if (
+        state &&
+        typeof state === 'object' &&
+        'check-for-updates' in state &&
+        'update-app' in state &&
+        typeof state['check-for-updates'] === 'boolean' &&
+        typeof state['update-app'] === 'boolean'
+      ) {
+        listener({ 'check-for-updates': state['check-for-updates'], 'update-app': state['update-app'] })
+      }
+    }
+    ipcRenderer.on(ipcEvents.updateCommandsChanged, handler)
+    return () => ipcRenderer.removeListener(ipcEvents.updateCommandsChanged, handler)
+  },
   setAppUpdateBlocked: (blocked) => ipcRenderer.invoke(ipcChannels.setAppUpdateBlocked, blocked),
   checkAppUpdate: () => ipcRenderer.invoke(ipcChannels.checkAppUpdate),
   confirmAppUpdate: (id, saved) => ipcRenderer.invoke(ipcChannels.confirmAppUpdate, id, saved),

@@ -17,6 +17,35 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { onePixelPng } from '../../src/electron/main/png-test-utils'
 
+// @requirement PRODUCT.md §20.2.28
+test('command panel shares live update availability and runs the manual check', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+  await window.locator('.node-input').first().click()
+  await window.keyboard.press('Meta+Shift+P')
+  const input = window.locator('.command-input-line input')
+  await input.fill('update-app')
+  const update = window.locator('#command-update-app')
+  await expect(update).toHaveAttribute('aria-disabled', 'true')
+  await window.keyboard.press('Enter')
+  await expect(input).toBeVisible()
+  await update.click({ force: true })
+  await expect(input).toBeVisible()
+  await window.screenshot({ path: 'test-results/update-command-disabled.png' })
+
+  await app.evaluate(() => {
+    ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
+  })
+  await expect(update).not.toHaveAttribute('aria-disabled', 'true')
+  await input.fill('check-for-updates')
+  await window.keyboard.press('Enter')
+  await expect
+    .poll(() =>
+      app.evaluate(() => (globalThis as unknown as { __treeUpdates: { messages: string[] } }).__treeUpdates.messages),
+    )
+    .toEqual(['An update is ready to install.'])
+  await expect(input).not.toBeVisible()
+})
+
 // @requirement PRODUCT.md §26
 test('manual update checks report current, failed and downloaded results without installing', async ({
   userDataDir,
@@ -68,7 +97,9 @@ test('updates only on request, flushes edits, and keeps normal quit safe after i
     ;(globalThis as unknown as { __treeUpdates: { fail: boolean } }).__treeUpdates.fail = false
   })
   const closed = app.waitForEvent('close')
-  await clickApplicationMenuItem(app, 'Tree', 'Update App')
+  await window.keyboard.press('Meta+Shift+P')
+  await window.locator('.command-input-line input').fill('update-app')
+  await window.keyboard.press('Enter')
   await closed
   expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Edited after failed update')
 })

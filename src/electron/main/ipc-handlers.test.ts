@@ -67,8 +67,12 @@ function createHarness() {
   }
   const setNotesMenuState = vi.fn()
   const setAppUpdateBlocked = vi.fn()
+  const getUpdateCommands = vi.fn(() => ({ 'check-for-updates': true, 'update-app': false }))
+  const runUpdateCommand = vi.fn()
   const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn() }
   registerIpcHandlers({
+    getUpdateCommands,
+    runUpdateCommand,
     setAboutOpen,
     setAppUpdateBlocked,
     appUpdates,
@@ -96,6 +100,8 @@ function createHarness() {
     setNotesMenuState,
   })
   return {
+    getUpdateCommands,
+    runUpdateCommand,
     setAboutOpen,
     setAppUpdateBlocked,
     appUpdates,
@@ -124,6 +130,31 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('validates update commands and rechecks availability before executing', () => {
+    const { handlers, getUpdateCommands, runUpdateCommand } = createHarness()
+    const get = handlers.get('tree:get-update-commands')!
+    const run = handlers.get('tree:run-update-command')!
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(get(event)).toEqual({ 'check-for-updates': true, 'update-app': false })
+    run(event, 'update-app')
+    expect(runUpdateCommand).not.toHaveBeenCalled()
+    run(event, 'check-for-updates')
+    expect(runUpdateCommand).toHaveBeenCalledExactlyOnceWith('check-for-updates')
+    getUpdateCommands.mockReturnValue({ 'check-for-updates': false, 'update-app': true })
+    run(event, 'update-app')
+    expect(runUpdateCommand).toHaveBeenLastCalledWith('update-app')
+
+    expect(() => get(event, true)).toThrow()
+    expect(() => get({})).toThrow('Untrusted')
+    expect(() => run({}, 'update-app')).toThrow('Untrusted')
+    expect(() => run(event, 'quit')).toThrow('Invalid update command')
+    expect(() => run(event, 'update-app', true)).toThrow()
+    runUpdateCommand.mockImplementationOnce(() => {
+      throw new Error('unavailable')
+    })
+    expect(() => run(event, 'update-app')).toThrow('unavailable')
+  })
   it('accepts only trusted boolean About state and propagates errors', () => {
     const { handlers, setAboutOpen } = createHarness()
     const show = handlers.get('tree:set-about-open')!

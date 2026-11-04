@@ -12,7 +12,7 @@ import {
   isTrustedRendererUrl,
   type PngDecoder,
 } from './ipc-security'
-import { ipcChannels, type NotesMenuState } from '../../shared/ipc'
+import { ipcChannels, type NotesMenuState, type UpdateCommand, type UpdateCommandsState } from '../../shared/ipc'
 import type { NotesArchiveController } from './notes-archive-controller'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
@@ -31,6 +31,8 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  getUpdateCommands?: () => UpdateCommandsState
+  runUpdateCommand?: (command: UpdateCommand) => void
   setAboutOpen?: (open: boolean) => void
   setAppUpdateBlocked?: (blocked: boolean) => void
   appUpdates?: { check(): Promise<void>; confirm(id: string, saved: boolean): void; isApplying?(): boolean }
@@ -59,6 +61,8 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  getUpdateCommands,
+  runUpdateCommand,
   setAboutOpen,
   setAppUpdateBlocked,
   appUpdates,
@@ -100,6 +104,17 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     requireNoArguments(args)
     return appUpdates?.check()
+  })
+  ipcMain.handle(ipcChannels.getUpdateCommands, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return getUpdateCommands?.() ?? { 'check-for-updates': false, 'update-app': false }
+  })
+  ipcMain.handle(ipcChannels.runUpdateCommand, (event, command, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (command !== 'check-for-updates' && command !== 'update-app') throw new Error('Invalid update command.')
+    if (getUpdateCommands?.()[command]) runUpdateCommand?.(command)
   })
   ipcMain.handle(ipcChannels.setAppUpdateBlocked, (event, blocked, ...args) => {
     requireTrustedRenderer(event)

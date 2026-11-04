@@ -106,11 +106,11 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    await expect(window.locator('.command-count')).toHaveText('15 of 15')
+    await expect(window.locator('.command-count')).toHaveText('17 of 17')
 
     await window.keyboard.press('ArrowUp')
 
-    await expect(window.getByRole('option', { selected: true })).toContainText('toggle-vim-mode')
+    await expect(window.getByRole('option', { selected: true })).toContainText('update-app')
 
     await window.keyboard.press('Control+n')
 
@@ -239,6 +239,7 @@ test.describe('Normal command panel', () => {
       'set-theme-light',
       'set-theme-dark',
       'about-tree',
+      'check-for-updates',
       'export-notes',
       'find',
       'find-next',
@@ -249,6 +250,7 @@ test.describe('Normal command panel', () => {
       'show-agenda',
       'show-tree',
       'toggle-vim-mode',
+      'update-app',
     ])
     expect(JSON.parse(readFileSync(join(userDataDir, 'data', 'command-history.json'), 'utf8'))).toEqual([
       'toggle-always-on-top',

@@ -112,6 +112,14 @@ function setAppearance(value: AppearancePreference): void {
 
 let menuIcons: MenuIcons | undefined
 
+function getUpdateCommands() {
+  const menu = Menu.getApplicationMenu()
+  return {
+    'check-for-updates': menu?.getMenuItemById('check-for-updates')?.enabled === true,
+    'update-app': menu?.getMenuItemById('update-app')?.enabled === true,
+  }
+}
+
 function rebuildApplicationMenu(): void {
   menuIcons ??= createMenuIcons((name) => nativeImage.createMenuSymbol(name))
   Menu.setApplicationMenu(
@@ -187,6 +195,9 @@ function rebuildApplicationMenu(): void {
       ),
     ),
   )
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(ipcEvents.updateCommandsChanged, getUpdateCommands())
+  }
 }
 
 function createMainWindow(quitWithoutSave: () => void): void {
@@ -373,6 +384,11 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      getUpdateCommands,
+      runUpdateCommand: (command) => {
+        const item = Menu.getApplicationMenu()?.getMenuItemById(command)
+        if (item?.enabled) item.click(item, mainWindow ?? undefined, { triggeredByAccelerator: false })
+      },
       setAboutOpen: (open) => {
         aboutOpen = open
         rebuildApplicationMenu()

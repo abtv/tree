@@ -11,6 +11,7 @@ import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import { startAppUpdates } from './app-updates'
+import { installUpdateCommands } from './update-commands'
 import type { CommandServices } from '../application/command-registry'
 import './styles.css'
 import { blockExternalDrops } from './external-drop'
@@ -60,6 +61,10 @@ const dataOperations = new DesktopDataOperations(
   store,
 )
 dataOperations.start()
+const menuCommands = installUpdateCommands(window.treeApi, dataOperations.menuCommands, (error) =>
+  store.reportError(error),
+)
+window.addEventListener('pagehide', () => menuCommands.dispose(), { once: true })
 window.addEventListener('pagehide', () => dataOperations.dispose(), { once: true })
 startRendererLifecycle(store, window.treeApi)
 startAppUpdates(store, window.treeApi)
@@ -83,6 +88,7 @@ void window.treeApi
             initialVimEnabled={initialVimEnabled}
             store={store}
             dataOperations={dataOperations}
+            menuCommands={menuCommands}
             registerViewCommands={registerViewCommands}
           />
         </ErrorBoundary>

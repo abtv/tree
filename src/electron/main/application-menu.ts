@@ -50,6 +50,7 @@ export function applicationMenuTemplate(
         { label: 'About Tree', click: actions.showAbout },
         {
           label: 'Check for Updates…',
+          id: 'check-for-updates',
           enabled:
             state.updatesSupported === true &&
             !state.updateChecking &&
@@ -60,6 +61,7 @@ export function applicationMenuTemplate(
         },
         {
           label: 'Update App',
+          id: 'update-app',
           enabled:
             state.updateReady === true &&
             !state.updateChecking &&
