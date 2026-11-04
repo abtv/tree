@@ -54,11 +54,18 @@ test.each([
   expect(wait).not.toHaveBeenCalled()
 })
 
-test.skipIf(process.platform !== 'darwin')('CLI preserves a real stapler failure for a nonexistent bundle', () => {
-  const result = spawnSync(process.execPath, ['scripts/stapler-validate.mts', '/nonexistent/tree-retry-test.app'], {
-    encoding: 'utf8',
-  })
+test.skipIf(process.platform !== 'darwin').each([[], ['--staple']])(
+  'CLI preserves a real stapler failure with %j',
+  (...args) => {
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/stapler-validate.mts', ...args, '/nonexistent/tree-retry-test.app'],
+      {
+        encoding: 'utf8',
+      },
+    )
 
-  expect(result.status).not.toBe(0)
-  expect(result.stdout + result.stderr).toContain('does not exist')
-})
+    expect(result.status).not.toBe(0)
+    expect(result.stdout + result.stderr).toContain('does not exist')
+  },
+)

@@ -140,7 +140,7 @@ jobs:
           codesign --verify --strict --verbose=2 dist/Tree-*.dmg
           codesign -dvv dist/Tree-*.dmg 2>&1 | grep 'Authority=Developer ID Application:'
           xcrun notarytool submit dist/Tree-*.dmg --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" --wait
-          xcrun stapler staple dist/Tree-*.dmg
+          node scripts/stapler-validate.mts --staple dist/Tree-*.dmg
           node scripts/stapler-validate.mts dist/Tree-*.dmg
           spctl --assess --type open --context context:primary-signature --verbose=2 dist/Tree-*.dmg
       - name: Record signed installer identity

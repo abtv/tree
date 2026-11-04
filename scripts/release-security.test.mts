@@ -34,11 +34,17 @@ test('all explicit ticket checks use bounded network retries', () => {
 
   expect(checks.map((line) => line.trim())).toEqual([
     'node scripts/stapler-validate.mts dist/mac-arm64/Tree.app',
+    'node scripts/stapler-validate.mts --staple dist/Tree-*.dmg',
     'node scripts/stapler-validate.mts dist/Tree-*.dmg',
     'node scripts/stapler-validate.mts "$DMG_FILE"',
     'node scripts/stapler-validate.mts "$app_dir/Tree.app"',
     'node scripts/stapler-validate.mts "$zip_dir/Tree.app"',
   ])
+})
+
+test('DMG stapling uses bounded network retries before validation', () => {
+  expect(text).not.toContain('xcrun stapler staple')
+  expect(text).toContain('node scripts/stapler-validate.mts --staple dist/Tree-*.dmg')
 })
 
 test('external workflow actions are pinned to full commit identities', () => {
