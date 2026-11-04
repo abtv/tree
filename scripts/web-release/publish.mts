@@ -1,5 +1,5 @@
 import type { Commit, Manifest, Reference, Request, Sha, Tree } from './types.mts'
-import { readFile } from 'node:fs/promises'
+import { appendFile, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { api, verifySource } from './github.mts'
@@ -146,13 +146,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       if (!(await isNewWebVersion(await currentVersion(), { token: process.env.GH_TOKEN }))) {
         throw new Error('Web release version is already transferred or obsolete')
       }
-    } else
-      await transferPackage(directory, manifest, {
+    } else {
+      const sha = await transferPackage(directory, manifest, {
         token: process.env.GH_TOKEN,
         targetToken: process.env.WEB_TARGET_TOKEN,
         manifestFile: file,
         bundleFile,
       })
+      if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `sha=${sha}\n`)
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

@@ -170,6 +170,7 @@ jobs:
           repositories: tree-editor.github.io
           permission-contents: write
       - name: Append package to hosting repository
+        id: transfer
         if: steps.pending.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -178,6 +179,7 @@ jobs:
       - name: Verify deployment and published files
         env:
           GH_TOKEN: ${{ github.token }}
+          WEB_TARGET_SHA: ${{ steps.transfer.outputs.sha }}
         run: node scripts/web-release/status.mts verify
 
   macos:

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const { load } = createRequire(import.meta.url)('js-yaml') as { load: (text: string) => Workflow }
 type Step = {
+  id?: string
   name?: string
   run?: string
   uses?: string
@@ -135,6 +136,14 @@ describe('automatic publication wiring', () => {
     expect(source).toContain('permission-contents: write')
     expect(source).not.toContain('permission-actions: write')
     expect(source).toContain('repositories: tree-editor.github.io')
+    const transfer = release.jobs.publish!.steps!.find((step) => step.id === 'transfer')
+    expect(transfer?.run).toBe(
+      'node scripts/web-release/publish.mts transfer verified-browser/web verified-browser/web-provenance.json',
+    )
+    const verify = release.jobs.publish!.steps!.find(
+      (step) => step.run === 'node scripts/web-release/status.mts verify',
+    )
+    expect(verify?.env?.WEB_TARGET_SHA).toBe('${{ steps.transfer.outputs.sha }}')
     for (const name of ['sign', 'publish']) {
       const steps = release.jobs[name]!.steps!
       const install = steps.findIndex((step) => step.run === 'npm ci --ignore-scripts')

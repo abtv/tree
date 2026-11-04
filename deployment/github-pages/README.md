@@ -182,6 +182,11 @@ signed package makes verification fail; it does not prune the authenticated mani
 
 ## Failures and ordering
 
+After transfer, the source verifies provenance and deployment at the exact target
+commit returned by the write, avoiding a stale branch-head read immediately after
+publication. A retry that skips transfer resolves the existing target head instead.
+Both paths retain signature, validation identity, hosted-byte and final-head checks.
+
 A failed check, missing credential, invalid digest, stale source/target head,
 rejected target update or failed pre-deployment verification leaves the live
 release unchanged. Target commits and source history remain append-only. Branch

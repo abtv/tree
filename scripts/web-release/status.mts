@@ -8,6 +8,16 @@ import type { Blob, Reference, Request, WorkflowRun } from './types.mts'
 
 const root = '/repos/tree-editor/tree-editor.github.io'
 
+export async function publicationHead(transferredSha: string | undefined, request: Request = api) {
+  if (transferredSha) {
+    if (!/^[a-f0-9]{40}$/.test(transferredSha)) throw new Error('Invalid transferred commit')
+    return transferredSha
+  }
+
+  const head = (await request(`${root}/git/ref/heads/main`)) as Reference
+  return head.object.sha
+}
+
 export async function waitForDeployment(sha: string, request: Request = api, wait = setTimeout) {
   // Target Actions are public. Keep this bounded below the anonymous API budget;
   // the source token does not establish Actions access in the hosting repository.
@@ -47,10 +57,10 @@ if (import.meta.main) {
       await appendFile(process.env.GITHUB_OUTPUT!, `ready=${ready}\n`)
     } else if (command === 'verify') {
       const { verifyHosted } = await import('./verify-target.mts')
-      const head = (await api(`${root}/git/ref/heads/main`)) as Reference
+      const sha = await publicationHead(process.env.WEB_TARGET_SHA)
       await mkdir('verified-hosting', { recursive: true })
       for (const name of ['provenance.json', 'provenance.sigstore.json']) {
-        const blob = (await api(`${root}/contents/${name}?ref=${head.object.sha}`)) as Blob
+        const blob = (await api(`${root}/contents/${name}?ref=${sha}`)) as Blob
         if (blob.encoding !== 'base64' || typeof blob.content !== 'string' || blob.size > 1024 * 1024)
           throw new Error('Invalid hosting metadata')
         await writeFile(`verified-hosting/${name}`, Buffer.from(blob.content, 'base64'))
@@ -65,10 +75,10 @@ if (import.meta.main) {
         String(manifest.sourceRunAttempt) !== process.env.VALIDATION_RUN_ATTEMPT
       )
         throw new Error('Hosted candidate belongs to another validation run')
-      const link = await waitForDeployment(head.object.sha)
+      const link = await waitForDeployment(sha)
       await verifyHosted(manifest)
       const latest = (await api(`${root}/git/ref/heads/main`)) as Reference
-      if (latest.object.sha !== head.object.sha) throw new Error('Hosted candidate superseded')
+      if (latest.object.sha !== sha) throw new Error('Hosted candidate superseded')
       await appendFile(
         process.env.GITHUB_STEP_SUMMARY!,
         `Web: [Published](https://tree-editor.github.io) · [Deployment](${link})\n`,
