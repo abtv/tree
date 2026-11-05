@@ -35,7 +35,7 @@ test.describe('Vim editing: text editing', () => {
   test.describe(() => {
     test.use({ sharedApplicationReset: sharedApplicationAdopted() })
     // @requirement PRODUCT.md §20.2.17
-    test('uses word, quote, and bracket text objects in Normal mode', async ({ userDataDir }) => {
+    test('uses word, quote, and bracket text objects in Normal mode', { tag: '@linux' }, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'root', text: 'one (two) "three"', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'root' },
@@ -69,7 +69,7 @@ test.describe('Vim editing: text editing', () => {
     })
 
     // @requirement PRODUCT.md §20.2.4
-    test('switches modes and applies Normal-mode motions and edits', async ({ userDataDir }) => {
+    test('switches modes and applies Normal-mode motions and edits', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -101,7 +101,7 @@ test.describe('Vim editing: text editing', () => {
     })
 
     // @requirement PRODUCT.md §20.2.9
-    test('keeps the caret on the change that u and Ctrl+r apply', async ({ userDataDir }) => {
+    test('keeps the caret on the change that u and Ctrl+r apply', { tag: '@linux' }, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'root', text: 'abcde', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'root' },
@@ -143,7 +143,7 @@ test.describe('Vim editing: text editing', () => {
   })
 
   // Fresh application: this seed starts inside a nested location.
-  test('returns to the level of the change when u applies it elsewhere', async ({ userDataDir }) => {
+  test('returns to the level of the change when u applies it elsewhere', { tag: '@linux' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -209,90 +209,98 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveValue('abc')
     })
 
-    test('drops an unfinished command before u and Ctrl+r instead of undoing or redoing', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      })
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-      await editor.focus()
+    test(
+      'drops an unfinished command before u and Ctrl+r instead of undoing or redoing',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
 
-      await setCursor(editor, 0)
+        await setCursor(editor, 0)
 
-      await editor.press('x')
+        await editor.press('x')
 
-      await expect(editor).toHaveValue('bcd')
+        await expect(editor).toHaveValue('bcd')
 
-      await editor.press('u')
+        await editor.press('u')
 
-      await expect(editor).toHaveValue('abcd')
+        await expect(editor).toHaveValue('abcd')
 
-      // A count is not a repeat for undo or redo, so it makes both commands no-ops instead of
-      // applying to the next one.
-      await editor.press('3')
-      await editor.press('Control+r')
+        // A count is not a repeat for undo or redo, so it makes both commands no-ops instead of
+        // applying to the next one.
+        await editor.press('3')
+        await editor.press('Control+r')
 
-      await expect(editor).toHaveValue('abcd')
+        await expect(editor).toHaveValue('abcd')
 
-      await editor.press('2')
-      await editor.press('u')
+        await editor.press('2')
+        await editor.press('u')
 
-      await expect(editor).toHaveValue('abcd')
+        await expect(editor).toHaveValue('abcd')
 
-      // An unfinished operator aborts the same way, and the next motion starts a new command.
-      await editor.press('d')
-      await editor.press('Control+r')
+        // An unfinished operator aborts the same way, and the next motion starts a new command.
+        await editor.press('d')
+        await editor.press('Control+r')
 
-      await expect(editor).toHaveValue('abcd')
+        await expect(editor).toHaveValue('abcd')
 
-      await editor.press('l')
+        await editor.press('l')
 
-      await expect(editor).toHaveJSProperty('selectionStart', 1)
+        await expect(editor).toHaveJSProperty('selectionStart', 1)
 
-      // Redo still works once nothing is pending.
-      await editor.press('Control+r')
+        // Redo still works once nothing is pending.
+        await editor.press('Control+r')
 
-      await expect(editor).toHaveValue('bcd')
-    })
+        await expect(editor).toHaveValue('bcd')
+      },
+    )
 
-    test('undoes two separate Vim character replacements without an empty history step', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'root', text: 'ab', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      })
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-      await editor.focus()
+    test(
+      'undoes two separate Vim character replacements without an empty history step',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'root', text: 'ab', children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
 
-      await setCursor(editor, 0)
+        await setCursor(editor, 0)
 
-      await editor.press('r')
-      await editor.press('q')
+        await editor.press('r')
+        await editor.press('q')
 
-      await expect(editor).toHaveValue('qb')
+        await expect(editor).toHaveValue('qb')
 
-      await editor.press('l')
-      await editor.press('r')
-      await pressShifted(window, 'Z')
+        await editor.press('l')
+        await editor.press('r')
+        await pressShifted(window, 'Z')
 
-      await expect(editor).toHaveValue('qZ')
+        await expect(editor).toHaveValue('qZ')
 
-      await editor.press('u')
+        await editor.press('u')
 
-      await expect(editor).toHaveValue('qb')
+        await expect(editor).toHaveValue('qb')
 
-      await editor.press('u')
+        await editor.press('u')
 
-      await expect(editor).toHaveValue('ab')
+        await expect(editor).toHaveValue('ab')
 
-      await editor.press('Control+r')
+        await editor.press('Control+r')
 
-      await expect(editor).toHaveValue('qb')
-    })
+        await expect(editor).toHaveValue('qb')
+      },
+    )
 
     // @requirement PRODUCT.md §20.2.10
-    test('A enters Insert mode at the end of the node', async ({ userDataDir }) => {
+    test('A enters Insert mode at the end of the node', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -309,7 +317,7 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveJSProperty('selectionEnd', 8)
     })
 
-    test('I enters Insert mode at the first non-whitespace character', async ({ userDataDir }) => {
+    test('I enters Insert mode at the first non-whitespace character', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -325,7 +333,7 @@ test.describe('Vim editing: text editing', () => {
     })
 
     // @requirement PRODUCT.md §20.2.21
-    test('puts the local register after the current character with p', async ({ userDataDir }) => {
+    test('puts the local register after the current character with p', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -344,96 +352,108 @@ test.describe('Vim editing: text editing', () => {
     })
 
     // @requirement PRODUCT.md §20.2.16
-    test('uses counted text operators while preserving the node and its subtree', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: {
-          roots: [{ id: 'root', text: 'one two three', children: [{ id: 'child', text: 'Child', children: [] }] }],
-        },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      })
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-      await editor.focus()
+    test(
+      'uses counted text operators while preserving the node and its subtree',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [{ id: 'root', text: 'one two three', children: [{ id: 'child', text: 'Child', children: [] }] }],
+          },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
 
-      await setCursor(editor, 0)
-      await window.keyboard.press('2')
-      await window.keyboard.press('d')
-      await window.keyboard.press('w')
+        await setCursor(editor, 0)
+        await window.keyboard.press('2')
+        await window.keyboard.press('d')
+        await window.keyboard.press('w')
 
-      await expect(editor).toHaveValue('three')
+        await expect(editor).toHaveValue('three')
 
-      await window.keyboard.press('g')
-      await window.keyboard.press('d')
+        await window.keyboard.press('g')
+        await window.keyboard.press('d')
 
-      await expect(node(window, 1)).toHaveValue('Child')
-    })
+        await expect(node(window, 1)).toHaveValue('Child')
+      },
+    )
 
-    test('changes words, finds characters, and repeats the completed change', async ({ userDataDir }) => {
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
+    test(
+      'changes words, finds characters, and repeats the completed change',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
 
-      await editor.press('i')
-      await typeInto(editor, 'one.two three')
-      await setCursor(editor, 0)
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('w')
+        await editor.press('i')
+        await typeInto(editor, 'one.two three')
+        await setCursor(editor, 0)
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('w')
 
-      await expect(editor).toHaveJSProperty('selectionStart', 3)
+        await expect(editor).toHaveJSProperty('selectionStart', 3)
 
-      await window.keyboard.press('f')
-      await window.keyboard.press('o')
+        await window.keyboard.press('f')
+        await window.keyboard.press('o')
 
-      await expect(editor).toHaveJSProperty('selectionStart', 6)
+        await expect(editor).toHaveJSProperty('selectionStart', 6)
 
-      await window.keyboard.press('b')
-      await window.keyboard.press('c')
-      await window.keyboard.press('w')
-      await window.keyboard.type('NEW')
-      await window.keyboard.press('Escape')
+        await window.keyboard.press('b')
+        await window.keyboard.press('c')
+        await window.keyboard.press('w')
+        await window.keyboard.type('NEW')
+        await window.keyboard.press('Escape')
 
-      await expect(editor).toHaveValue('one.NEW three')
+        await expect(editor).toHaveValue('one.NEW three')
 
-      await window.keyboard.press('w')
-      await window.keyboard.press('.')
+        await window.keyboard.press('w')
+        await window.keyboard.press('.')
 
-      await expect(editor).toHaveValue('one.NEW NEW')
-    })
+        await expect(editor).toHaveValue('one.NEW NEW')
+      },
+    )
 
     // @requirement PRODUCT.md §20.2.10
     // @requirement PRODUCT.md §20.2.11
-    test('replaces, substitutes, and changes through the end of node text', async ({ userDataDir }) => {
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
+    test(
+      'replaces, substitutes, and changes through the end of node text',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
 
-      await editor.press('i')
-      await typeInto(editor, 'abc def')
-      await setCursor(editor, 0)
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('r')
-      await window.keyboard.press('X')
+        await editor.press('i')
+        await typeInto(editor, 'abc def')
+        await setCursor(editor, 0)
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('r')
+        await window.keyboard.press('X')
 
-      await expect(editor).toHaveValue('Xbc def')
+        await expect(editor).toHaveValue('Xbc def')
 
-      await window.keyboard.press('s')
-      await window.keyboard.type('Y')
-      await window.keyboard.press('Escape')
+        await window.keyboard.press('s')
+        await window.keyboard.type('Y')
+        await window.keyboard.press('Escape')
 
-      await expect(editor).toHaveValue('Ybc def')
+        await expect(editor).toHaveValue('Ybc def')
 
-      await window.keyboard.press('w')
-      await window.keyboard.press('C')
-      await window.keyboard.type('tail')
-      await window.keyboard.press('Escape')
+        await window.keyboard.press('w')
+        await window.keyboard.press('C')
+        await window.keyboard.type('tail')
+        await window.keyboard.press('Escape')
 
-      await expect(editor).toHaveValue('Ybc tail')
+        await expect(editor).toHaveValue('Ybc tail')
 
-      await window.keyboard.press('D')
+        await window.keyboard.press('D')
 
-      await expect(editor).toHaveValue('Ybc tai')
-    })
+        await expect(editor).toHaveValue('Ybc tai')
+      },
+    )
 
     // @requirement PRODUCT.md §20.2.19
-    test('repeats inserted text and honors a count before dot', async ({ userDataDir }) => {
+    test('repeats inserted text and honors a count before dot', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -457,32 +477,36 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveValue('QQdef')
     })
 
-    test('repeats a deletion-only Insert edit at the same relative caret', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      })
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-      await editor.focus()
+    test(
+      'repeats a deletion-only Insert edit at the same relative caret',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'root', text: 'abcd', children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
 
-      await setCursor(editor, 1)
-      await editor.press('i')
-      await editor.press('Delete')
-      await editor.press('Escape')
+        await setCursor(editor, 1)
+        await editor.press('i')
+        await editor.press('Delete')
+        await editor.press('Escape')
 
-      await expect(editor).toHaveValue('acd')
-      await expect(editor).toHaveJSProperty('selectionStart', 0)
+        await expect(editor).toHaveValue('acd')
+        await expect(editor).toHaveJSProperty('selectionStart', 0)
 
-      await editor.press('l')
-      await editor.press('.')
+        await editor.press('l')
+        await editor.press('.')
 
-      await expect(editor).toHaveValue('ad')
-      await expect(editor).toHaveJSProperty('selectionStart', 0)
-      await expect(editor).toHaveJSProperty('selectionEnd', 1)
-    })
+        await expect(editor).toHaveValue('ad')
+        await expect(editor).toHaveJSProperty('selectionStart', 0)
+        await expect(editor).toHaveJSProperty('selectionEnd', 1)
+      },
+    )
 
-    test('repeats a completed Insert session in another node', async ({ userDataDir }) => {
+    test('repeats a completed Insert session in another node', { tag: '@linux' }, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -513,7 +537,7 @@ test.describe('Vim editing: text editing', () => {
       await expect(first).toHaveValue('Xa')
     })
 
-    test('repeats a completed change and substitute in another node', async ({ userDataDir }) => {
+    test('repeats a completed change and substitute in another node', { tag: '@linux' }, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -586,44 +610,48 @@ test.describe('Vim editing: text editing', () => {
       await expect(first).toHaveValue('Xa')
     })
 
-    test('changes whole-node text, deletes backward, and repeats counted text puts', async ({ userDataDir }) => {
-      seedDocument(userDataDir, {
-        document: {
-          roots: [{ id: 'root', text: 'parent', children: [{ id: 'child', text: 'child', children: [] }] }],
-        },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      })
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
-      await editor.focus()
+    test(
+      'changes whole-node text, deletes backward, and repeats counted text puts',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [{ id: 'root', text: 'parent', children: [{ id: 'child', text: 'child', children: [] }] }],
+          },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        await editor.focus()
 
-      await window.keyboard.press('c')
-      await window.keyboard.press('c')
-      await window.keyboard.type('new')
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('g')
-      await window.keyboard.press('d')
+        await window.keyboard.press('c')
+        await window.keyboard.press('c')
+        await window.keyboard.type('new')
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('g')
+        await window.keyboard.press('d')
 
-      await expect(node(window, 1)).toHaveValue('child')
+        await expect(node(window, 1)).toHaveValue('child')
 
-      await window.keyboard.press('Control+o')
+        await window.keyboard.press('Control+o')
 
-      await setCursor(node(window, 1), 2)
-      await window.keyboard.press('X')
+        await setCursor(node(window, 1), 2)
+        await window.keyboard.press('X')
 
-      await expect(node(window, 1)).toHaveValue('nw')
+        await expect(node(window, 1)).toHaveValue('nw')
 
-      await setCursor(node(window, 1), 0)
-      await window.keyboard.press('v')
-      await lockSystemClipboard()
-      await window.keyboard.press('y')
-      await window.keyboard.press('3')
-      await window.keyboard.press('p')
+        await setCursor(node(window, 1), 0)
+        await window.keyboard.press('v')
+        await lockSystemClipboard()
+        await window.keyboard.press('y')
+        await window.keyboard.press('3')
+        await window.keyboard.press('p')
 
-      await expect(node(window, 1)).toHaveValue('nnnnw')
-    })
+        await expect(node(window, 1)).toHaveValue('nnnnw')
+      },
+    )
 
-    test('uses WORD, ge, and repeated character-find motions', async ({ userDataDir }) => {
+    test('uses WORD, ge, and repeated character-find motions', { tag: '@linux' }, async ({ userDataDir }) => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
@@ -652,31 +680,35 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveJSProperty('selectionStart', 6)
     })
 
-    test('replaces text in Replace mode and repeats the completed session', async ({ userDataDir }) => {
-      const { window } = await launchTree(userDataDir)
-      const editor = node(window, 1)
+    test(
+      'replaces text in Replace mode and repeats the completed session',
+      { tag: '@linux' },
+      async ({ userDataDir }) => {
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
 
-      await editor.press('i')
-      await typeInto(editor, 'abcd')
-      await setCursor(editor, 2)
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('R')
+        await editor.press('i')
+        await typeInto(editor, 'abcd')
+        await setCursor(editor, 2)
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('R')
 
-      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+        await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
-      await window.keyboard.type('XY')
-      await window.keyboard.press('Escape')
+        await window.keyboard.type('XY')
+        await window.keyboard.press('Escape')
 
-      await expect(editor).toHaveValue('aXYd')
-      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-      await expect(editor).toHaveJSProperty('selectionStart', 2)
-      await expect(editor).toHaveJSProperty('selectionEnd', 3)
+        await expect(editor).toHaveValue('aXYd')
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        await expect(editor).toHaveJSProperty('selectionStart', 2)
+        await expect(editor).toHaveJSProperty('selectionEnd', 3)
 
-      await setCursor(editor, 0)
-      await window.keyboard.press('.')
+        await setCursor(editor, 0)
+        await window.keyboard.press('.')
 
-      await expect(editor).toHaveValue('XYYd')
-    })
+        await expect(editor).toHaveValue('XYYd')
+      },
+    )
 
     for (const rich of [false, true]) {
       for (const pending of [false, true]) {

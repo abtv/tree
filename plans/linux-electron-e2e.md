@@ -7,6 +7,8 @@ Linux Electron while retaining macOS visual and native integration coverage.
 The owner approved this three-task initiative in conversation on 2026-11-05.
 Approval covers implementation, validation, review corrections and task commits;
 it does not authorize publication or Linux desktop product support.
+The owner subsequently instructed the agent to complete all remaining tasks in
+the same session without requesting session rotation or renewed task approval.
 The owner additionally granted standing authorization for Linux Electron E2E in
 Docker on 2026-11-05; the durable record is in the development guide's container
 testing section. The earlier canceled execution request is superseded by this
@@ -36,8 +38,8 @@ Sources: [development](../docs/DEVELOPMENT.md),
 | ID | Outcome and expected files | Dependencies | Validation and acceptance | Status |
 | --- | --- | --- | --- | --- |
 | L1 | Portable fixture and bounded Linux pilot: `e2e/electron/fixtures.ts`, process cleanup, `config/testing/`, isolated container runner under `scripts/web/`, npm command and development instructions | None | High Risk: static/check stages, full local macOS E2E, Linux pilot and independent review passed; existing advisory accepted by owner | Done |
-| L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | High Risk where shared fixtures change; otherwise Low Risk tooling/tests with complete affected suites on both platforms. Demonstrate coverage union, intentional overlap and unchanged baselines; independent review | Ready |
-| L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: `npm run check`, selection/gate tests, platform runs, resource measurements with environment limits; retain release gating and execution cadence | Planned |
+| L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | Low Risk tooling/tests; both platform subsets, discovery union/overlap guards, unchanged baselines and independent review passed | Done |
+| L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: `npm run check`, selection/gate tests, platform runs, resource measurements with environment limits; retain release gating and execution cadence | Ready |
 
 There are three substantive working tasks. Execute within this scope, using the
 standard limit of two unsuccessful recovery attempts at one unchanged blocker
@@ -56,8 +58,8 @@ acceptance; waiting does not consume implementation work.
 - Docker and its Linux ARM64 daemon are available. The current prepared dependency
   image exists. The existing isolated Linux smoke command passed both Electron
   and Chromium on 2026-11-05. Agents must not prepare replacement images.
-- The bounded Linux fixture pilot is verified; the rest of the functional suite
-  and GitHub Linux AMD64 resource measurements remain unverified. Local ARM64
+- The allocated Linux functional subset is verified; new GitHub Linux AMD64
+  resource measurements remain unverified. Local ARM64
   timings do not establish hosted runner savings.
 - The initial fixture used macOS scrollbar defaults and Darwin-only stale-process
   cleanup. L1 preserves the macOS geometry contract, uses native Linux scrollbar
@@ -112,7 +114,7 @@ suite applies because no production performance path changes.
 | Stage | Expected owner action | Gate |
 | --- | --- | --- |
 | L1–L2 | No manual product checks currently expected; automation exercises test infrastructure | Pre-commit automated validation and independent review |
-| L3 | Hosted CI access/run may require owner action if unavailable; report before claiming hosted measurements | Capability unresolved |
+| L3 | No manual product check; distinguish historical hosted timings from local measurements of the new allocation | Read access verified; new hosted execution unverified |
 | Final result | Accept the delivered initiative, or identify remaining issues | One planned acceptance round after all three tasks |
 
 Additional permission prompts use the tool's supported approval mechanism. A
@@ -120,21 +122,38 @@ missing dependency image requires owner preparation with `make setup`.
 
 ## Next task
 
-Start L2 in a fresh task context. Introduce an explicit Linux allowlist and macOS
-complement, retaining the full local macOS config. New or unclassified tests must
-remain macOS-owned; assert that the platform union covers the full suite and that
-overlap is intentional. Keep native boundaries and all screenshots on macOS.
+Continue L3 in this session. Use four macOS shards and one Linux job as the
+bounded initial allocation; preserve weekly/manual/release triggers and the
+stable aggregate check, requiring both groups to succeed. Give artifacts platform
+and shard identities. Install only the required Linux system dependencies; Electron
+already comes from npm. Retain audit behavior and the separate memory workflow.
+Add tests of real workflow selection and aggregate failure/cancellation/skip handling.
 
-Initial whole-file candidates are `initial-state`, `deletion`, `empty-node`,
-`tab-structure`, `undo-sessions`, `vim-counters`, `local-search`, `recent-nodes`,
-`agenda-search`, `tag-completion`, `emoji-completion`, `external-drop`, `csp`,
-`renderer-failures`, `attachment-cleanup`, `notes-archive-boundary` and
-`notes-replacement-recovery` under `e2e/electron/`. They still need real Linux
-execution; geometry and focus tests are not automatically portable. Review
-navigation separately because L1 found a native caret difference. Then inspect
-the large Vim/Agenda and expansion/windowing suites for useful functional splits
-without duplicating long interaction sequences or conditional screenshot skips.
-Do not migrate CI allocation until L2 validation and review pass.
+## L2 result and reusable evidence
+
+The allocation contains 219 Linux cases and 782 macOS cases, with 22 intentional
+shared launch/reset/text-clipboard cases. Their union is the original 979 cases.
+Fifteen files are Linux-owned; 62 test declarations in five mixed specs opt in via
+tags. New files and untagged mixed cases stay on macOS. No test bodies, production
+sources, dependencies or snapshot baselines changed. The exploratory attachment
+cleanup case failed at native image paste and remains wholly macOS-owned.
+
+`npm run check` passed every stage (305 files, 5884 unit tests). Final
+`npm run test:e2e:linux` passed 219 cases in 1.9 minutes, four workers, zero retries,
+inside the isolated Linux ARM64 container. The macOS complement passed 782 cases
+with four workers in 197.2 seconds, no skips, retries or flaky cases:
+`npm run test:e2e:diagnose -- --json-output=.scratch/linux-electron-e2e/macos.json --config=config/testing/playwright.macos.config.ts --workers=4 --reporter=list,json`.
+The report sums test durations to 734.8 worker-seconds; this is not hosted billing.
+After a final allowlist assertion, the focused allocation guard passed again.
+Independent review found no meaningful issues. L1's full local macOS result remains
+valid for unchanged scenario bodies; platform ordering was exercised by both subsets.
+
+Read-only GitHub access is verified. Historical
+[run 41289362290](https://github.com/abtv/tree/actions/runs/41289362290), SHA
+`572e1e6`, used 1367 seconds across six macOS jobs (22.78 runner-minutes), with
+individual job durations of 107–317 seconds. It is an older source snapshot, not
+a controlled comparison. New hosted savings require the first updated workflow
+run; local ARM64 numbers cannot establish them. No publication is authorized.
 
 ## Resume prompt
 

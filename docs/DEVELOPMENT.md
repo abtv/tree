@@ -459,21 +459,33 @@ Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 
 
 Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke or Electron E2E modes; it cannot select external scripts, profiles, origins or Docker options.
 
-Use `npm run test:e2e:linux`, without arguments, for the bounded Linux Electron
-portability pilot. The same prepared image receives current sources and builds
+Use `npm run test:e2e:linux`, without arguments, for the Linux Electron functional
+subset. The same prepared image receives current sources and builds
 Electron before running `config/testing/playwright.linux.config.ts` under Xvfb.
-The pilot covers initial persistence, Tab structure, shared application reset and
-failure cleanup, archive workers, and selected real text-clipboard interactions.
 It uses four workers, no retries and a 15-minute child-process deadline. Failure
 or timeout fails the command; remaining descendants are removed with the container.
-The full local macOS regression command and CI allocation are unchanged.
+
+`config/testing/electron-platforms.ts` owns the explicit Linux file list and the
+small shared launch/reset/text-clipboard overlap. In mixed specs, `{ tag: '@linux' }`
+selects independent functional cases. New files and untagged cases in mixed files
+default to macOS; tests added to a Linux-owned file inherit that file's ownership.
+Keep image clipboard, native selection, window/updater integration and all screenshot
+comparisons on macOS. A passing Linux run does not establish native macOS behavior.
+The discovered union and exact overlap are checked by
+`scripts/electron-platforms.test.mts`, including a guard against Linux snapshot
+assertions. Do not add conditional skips or weaken assertions to move a case.
+
+The complete local command remains `npm run test:e2e`. Run just the macOS
+complement with `npm run test:e2e -- --config=config/testing/playwright.macos.config.ts`.
+It preserves the original projects and snapshot paths. The allocation changes
+where functional cases run, not their bodies or editing-mode parameterization.
 
 Linux uses its native scrollbar geometry; the zero-width overlay-scrollbar
 assertion and Apple user-defaults argument remain macOS-only. Both platforms
 retain the canonical renderer scale assertion, hidden-window and shortcut guards,
 clipboard lock and process ownership. The renderer keeps its Apple shortcut
 profile, including `Meta`. Linux image clipboard, native pointer selection and
-macOS screenshot comparisons are outside this pilot. No screenshot baselines are
+macOS screenshot comparisons are outside the Linux subset. No screenshot baselines are
 transferred or generated intentionally, and no production CSS is changed.
 
 Each smoke invocation reports elapsed time including its runner, application/browser startup and successful cleanup, and fails if it exceeds 20 seconds. Dependency-image preparation, source transfer, container startup and production builds are outside that budget. At 25 seconds the container supervisor forcibly kills a hung command so it can report failure and run the other target. Any remaining descendants stay inside the disposable container and are destroyed when its entry process exits after both bounded invocations. The container sets `CI=1` for smoke children so Linux Electron can run without its Chromium sandbox in this offline disposable environment. Linux arm64 container timings are local evidence, not measurements of the GitHub runner. The smoke scenario is described under [Cross-platform smoke checks](#cross-platform-smoke-checks).

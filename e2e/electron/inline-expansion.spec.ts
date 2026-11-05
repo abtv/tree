@@ -116,7 +116,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   })
 
   // @requirement PRODUCT.md §5.1
-  test('Enter at text end follows expansion and focuses the new node', async ({ userDataDir }) => {
+  test('Enter at text end follows expansion and focuses the new node', { tag: '@linux' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
     const locationBefore = await window.getByLabel('Current location').innerText()
@@ -169,98 +169,106 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   })
 
   // @requirement PRODUCT.md §5.1
-  test('keeps Enter on an empty inline node before a following sibling at the same level', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          {
-            id: 'parent',
-            text: 'Inbox',
-            children: [
-              { id: 'blank', text: '', children: [] },
-              { id: 'next', text: 'Next task', children: [] },
-            ],
-          },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'blank' },
-    })
-    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+  test(
+    'keeps Enter on an empty inline node before a following sibling at the same level',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            {
+              id: 'parent',
+              text: 'Inbox',
+              children: [
+                { id: 'blank', text: '', children: [] },
+                { id: 'next', text: 'Next task', children: [] },
+              ],
+            },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'blank' },
+      })
+      const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
 
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    await node(window, 2).focus()
+      await window.getByRole('button', { name: 'Expand node 1' }).click()
+      await node(window, 2).focus()
 
-    await window.keyboard.press('Enter')
-    await window.keyboard.press('Enter')
+      await window.keyboard.press('Enter')
+      await window.keyboard.press('Enter')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
-    await expect(node(window, 4)).toBeFocused()
-    await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
-    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
+      await expect(node(window, 4)).toBeFocused()
+      await expect(node(window, 4)).toHaveJSProperty('selectionStart', 0)
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
 
-    const bounds = await Promise.all([2, 3, 4, 5].map((index) => node(window, index).boundingBox()))
+      const bounds = await Promise.all([2, 3, 4, 5].map((index) => node(window, index).boundingBox()))
 
-    expect(bounds.map((box) => box!.x)).toEqual(Array(4).fill(bounds[0]!.x))
+      expect(bounds.map((box) => box!.x)).toEqual(Array(4).fill(bounds[0]!.x))
 
-    await window.screenshot({ path: test.info().outputPath(`empty-before-sibling-${mode}.png`) })
-    await window.keyboard.press('Meta+z')
+      await window.screenshot({ path: test.info().outputPath(`empty-before-sibling-${mode}.png`) })
+      await window.keyboard.press('Meta+z')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
+      await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', 'Next task'])
 
-    await window.keyboard.press('Meta+Shift+z')
+      await window.keyboard.press('Meta+Shift+z')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
-    await expect(node(window, 4)).toBeFocused()
+      await expect.poll(() => nodeTexts(window)).toEqual(['Inbox', '', '', '', 'Next task'])
+      await expect(node(window, 4)).toBeFocused()
 
-    await window.keyboard.type('New task')
+      await window.keyboard.type('New task')
 
-    await expect(node(window, 4)).toHaveValue('New task')
-  })
+      await expect(node(window, 4)).toHaveValue('New task')
+    },
+  )
 
   // @requirement PRODUCT.md §5.1
-  test('creates one empty child then moves that empty node one level left with Enter', async ({ userDataDir }) => {
-    seedDocument(userDataDir, emptyCreationSeed(false))
-    const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
+  test(
+    'creates one empty child then moves that empty node one level left with Enter',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      seedDocument(userDataDir, emptyCreationSeed(false))
+      const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
 
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    await node(window, 2).focus()
+      await window.getByRole('button', { name: 'Expand node 1' }).click()
+      await node(window, 2).focus()
 
-    await setCursor(node(window, 2), 'something'.length)
-    await window.keyboard.press('Enter')
+      await setCursor(node(window, 2), 'something'.length)
+      await window.keyboard.press('Enter')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
-    await expect(node(window, 3)).toBeFocused()
+      await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+      await expect(node(window, 3)).toBeFocused()
 
-    const childX = (await node(window, 3).boundingBox())!.x
+      const childX = (await node(window, 3).boundingBox())!.x
 
-    await window.keyboard.press('Enter')
+      await window.keyboard.press('Enter')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
-    await expect(node(window, 3)).toBeFocused()
-    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+      await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+      await expect(node(window, 3)).toBeFocused()
+      await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
 
-    const bounds = await Promise.all([1, 3].map((index) => node(window, index).boundingBox()))
+      const bounds = await Promise.all([1, 3].map((index) => node(window, index).boundingBox()))
 
-    expect(bounds[1]!.x).toBe(bounds[0]!.x)
-    expect(bounds[1]!.x).toBeLessThan(childX)
+      expect(bounds[1]!.x).toBe(bounds[0]!.x)
+      expect(bounds[1]!.x).toBeLessThan(childX)
 
-    await window.screenshot({ path: test.info().outputPath(`empty-node-enter-${mode}.png`) })
-    await window.keyboard.press('Meta+z')
+      await window.screenshot({ path: test.info().outputPath(`empty-node-enter-${mode}.png`) })
+      await window.keyboard.press('Meta+z')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
-    await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(childX)
+      await expect.poll(() => nodeTexts(window)).toEqual(['Test', 'something', ''])
+      await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(childX)
 
-    await window.keyboard.press('Meta+Shift+z')
+      await window.keyboard.press('Meta+Shift+z')
 
-    await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(bounds[0]!.x)
-    await expect(node(window, 3)).toBeFocused()
+      await expect.poll(async () => (await node(window, 3).boundingBox())!.x).toBe(bounds[0]!.x)
+      await expect(node(window, 3)).toBeFocused()
 
-    await window.keyboard.type('new sibling')
+      await window.keyboard.type('new sibling')
 
-    await expect(node(window, 3)).toHaveValue('new sibling')
-  })
+      await expect(node(window, 3)).toHaveValue('new sibling')
+    },
+  )
 
-  test('keeps repeated Enter creation within the focused parent', async ({ userDataDir }) => {
+  test('keeps repeated Enter creation within the focused parent', { tag: '@linux' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, emptyCreationSeed(true))
     const { window } = await launchTree(userDataDir, { initialMode: 'insert' })
     await node(window, 1).focus()
@@ -382,7 +390,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
   })
 
-  test('keeps each node’s expansion when entering and leaving a node', async ({ userDataDir }) => {
+  test('keeps each node’s expansion when entering and leaving a node', { tag: '@linux' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -413,29 +421,33 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await expect(window.getByRole('button', { name: 'Collapse node 1' })).toBeVisible()
   })
 
-  test('keeps the location when deleting and undoing a visible descendant', async ({ userDataDir }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    const expandedRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
-    const locationBefore = await window.getByLabel('Current location').innerText()
+  test(
+    'keeps the location when deleting and undoing a visible descendant',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      seedDocument(userDataDir, nestedSeed())
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      const expandedRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
+      const locationBefore = await window.getByLabel('Current location').innerText()
 
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    await window.getByRole('button', { name: 'Expand node 2' }).click()
+      await window.getByRole('button', { name: 'Expand node 1' }).click()
+      await window.getByRole('button', { name: 'Expand node 2' }).click()
 
-    await node(window, 3).click()
-    await window.keyboard.press('Meta+Backspace')
+      await node(window, 3).click()
+      await window.keyboard.press('Meta+Backspace')
 
-    // The only child is gone; its own parent is selected and nothing was entered.
-    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
-    await expect(node(window, 2)).toBeFocused()
-    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+      // The only child is gone; its own parent is selected and nothing was entered.
+      await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+      await expect(node(window, 2)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
 
-    await window.keyboard.press('Meta+z')
+      await window.keyboard.press('Meta+z')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
-    await expect(node(window, 3)).toBeFocused()
-    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
-  })
+      await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
+      await expect(node(window, 3)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+    },
+  )
 
   test('restores expansion and the selected descendant after relaunch with no other change', async ({
     userDataDir,
@@ -466,19 +478,21 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await expect(node(second.window, 3)).toBeFocused()
   })
 
-  test('opens an older document collapsed, moving a hidden selection to its displayed ancestor', async ({
-    userDataDir,
-  }) => {
-    // A version 1 seed predates persisted expansion, so the selected grandchild starts hidden.
-    seedDocument(userDataDir, { ...nestedSeed(), location: { currentParentId: 'a', selectedNodeId: 'a1a' } })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  test(
+    'opens an older document collapsed, moving a hidden selection to its displayed ancestor',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      // A version 1 seed predates persisted expansion, so the selected grandchild starts hidden.
+      seedDocument(userDataDir, { ...nestedSeed(), location: { currentParentId: 'a', selectedNodeId: 'a1a' } })
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    await expect(parent(window)).toHaveValue('Alpha')
-    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha child one', 'Alpha child two'])
-    await expect(node(window, 1)).toHaveValue('Alpha child one')
-    await expect(node(window, 1)).toBeFocused()
-    expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
-  })
+      await expect(parent(window)).toHaveValue('Alpha')
+      await expect.poll(() => nodeTexts(window)).toEqual(['Alpha child one', 'Alpha child two'])
+      await expect(node(window, 1)).toHaveValue('Alpha child one')
+      await expect(node(window, 1)).toBeFocused()
+      expect(await node(window, 1).evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    },
+  )
 
   test('crosses an expanded branch boundary with ArrowLeft and ArrowRight', async ({ userDataDir }) => {
     // ArrowLeft/ArrowRight boundary crossing is an Insert-mode arrow-key path (PRODUCT §4.3); Normal
@@ -564,7 +578,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
 
 // @requirement PRODUCT.md §2.4
 test.describe('inline node expansion (mode-independent)', () => {
-  test('keeps expansion when navigating via the location breadcrumb', async ({ userDataDir }) => {
+  test('keeps expansion when navigating via the location breadcrumb', { tag: '@linux' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
@@ -987,31 +1001,35 @@ test.describe('inline node expansion (Vim editing only)', () => {
     expect(await nodeTexts(window)).toEqual(['Alpha', 'Child', 'Alpha child one', 'Alpha child two', 'Bravo', ''])
   })
 
-  test('keeps the location when deleting with dd and undoing with u a visible descendant', async ({ userDataDir }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
-    const expandedRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
-    const locationBefore = await window.getByLabel('Current location').innerText()
+  test(
+    'keeps the location when deleting with dd and undoing with u a visible descendant',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      seedDocument(userDataDir, nestedSeed())
+      const { window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+      const expandedRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
+      const locationBefore = await window.getByLabel('Current location').innerText()
 
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-    await window.getByRole('button', { name: 'Expand node 2' }).click()
+      await window.getByRole('button', { name: 'Expand node 1' }).click()
+      await window.getByRole('button', { name: 'Expand node 2' }).click()
 
-    await node(window, 3).click()
-    await lockSystemClipboard()
-    await window.keyboard.press('d')
-    await window.keyboard.press('d')
+      await node(window, 3).click()
+      await lockSystemClipboard()
+      await window.keyboard.press('d')
+      await window.keyboard.press('d')
 
-    // The only child is gone; its own parent is selected and nothing was entered.
-    await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
-    await expect(node(window, 2)).toBeFocused()
-    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+      // The only child is gone; its own parent is selected and nothing was entered.
+      await expect.poll(() => nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+      await expect(node(window, 2)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
 
-    await window.keyboard.press('u')
+      await window.keyboard.press('u')
 
-    await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
-    await expect(node(window, 3)).toBeFocused()
-    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
-  })
+      await expect.poll(() => nodeTexts(window)).toEqual(expandedRows)
+      await expect(node(window, 3)).toBeFocused()
+      await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+    },
+  )
 
   test('keeps gg on the first displayed root while G reaches the last visible row', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())

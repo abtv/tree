@@ -108,6 +108,7 @@ function runContainer(smoke: boolean, electron = false) {
           ...containerSourceFiles(true),
           'config/testing/playwright.config.ts',
           'config/testing/playwright.linux.config.ts',
+          'config/testing/electron-platforms.ts',
           ...sourceFiles('e2e/electron').filter((path) => /\.(?:ts|cjs)$/.test(path)),
         ]),
       ]

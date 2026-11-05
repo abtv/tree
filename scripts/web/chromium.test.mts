@@ -32,6 +32,7 @@ it('runs the fixed Electron suite without copying macOS baselines or weakening i
   const files = spawn.mock.calls[1]![1]!
 
   expect(files).toContain('config/testing/playwright.linux.config.ts')
+  expect(files).toContain('config/testing/electron-platforms.ts')
   expect(files).toContain('e2e/electron/shared-application.spec.ts')
   expect(files.some((path) => path.includes('-snapshots/'))).toBe(false)
   expect(files.some((path) => /^(?:\.git|\.scratch|\.aws|\.codex|node_modules|out)(?:\/|$)/.test(path))).toBe(false)

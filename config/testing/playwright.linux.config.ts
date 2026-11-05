@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test'
 import regression from './playwright.config'
+import { linuxFiles, linuxTag, sharedFiles, sharedClipboardTitles, specPattern } from './electron-platforms'
 
-// A bounded portability pilot. The ordinary macOS command still runs the full suite.
+// The ordinary local macOS command still runs the full suite.
 export default defineConfig({
   ...regression,
   workers: 4,
@@ -9,14 +10,19 @@ export default defineConfig({
   projects: [
     {
       name: 'linux',
-      testMatch: /\/(?:initial-state|tab-structure|notes-archive-boundary|shared-application)\.spec\.ts$/,
+      testMatch: specPattern([...linuxFiles, ...sharedFiles]),
+    },
+    {
+      name: 'linux-functional',
+      testIgnore: specPattern([...linuxFiles, ...sharedFiles, 'shared-application-memory.spec.ts']),
+      grep: linuxTag,
     },
     {
       name: 'linux-clipboard',
       testMatch: /\/clipboard\.spec\.ts$/,
-      // Native image clipboard and pointer selection remain macOS-owned. This pilot
+      // Native image clipboard and pointer selection remain macOS-owned. This overlap
       // exercises real text clipboard ownership through both editor modes.
-      grep: /pastes plain text at the cursor|cuts a hyperlink and pastes it into another node/,
+      grep: sharedClipboardTitles,
     },
   ],
 })

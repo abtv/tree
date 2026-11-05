@@ -18,176 +18,184 @@ import {
 describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.9.1
   // @requirement PRODUCT.md §20.9.2
-  test('shows agreed relative units while preserving literal input until acceptance', async ({
-    userDataDir,
-  }, testInfo) => {
-    seedDocument(userDataDir, {
-      document: { roots: [{ id: 'n', text: '', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'n' },
-    })
-    const { window } = await launchTree(userDataDir)
+  test(
+    'shows agreed relative units while preserving literal input until acceptance',
+    { tag: '@linux' },
+    async ({ userDataDir }, testInfo) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: '', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
 
-    await window.clock.setFixedTime(new Date(2026, 9, 25, 12))
-    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
+      await window.clock.setFixedTime(new Date(2026, 9, 25, 12))
+      const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
 
-    await setCursor(input, 0)
-    await window.keyboard.type('in 2 week')
-    const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      await setCursor(input, 0)
+      await window.keyboard.type('in 2 week')
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
 
-    await expect(popup.getByRole('option')).toHaveCount(1)
-    await expect(popup.getByRole('option')).toContainText('2026-11-08')
-    await expect(popup.getByRole('option')).toContainText('Sun · in 2 weeks')
+      await expect(popup.getByRole('option')).toHaveCount(1)
+      await expect(popup.getByRole('option')).toContainText('2026-11-08')
+      await expect(popup.getByRole('option')).toContainText('Sun · in 2 weeks')
 
-    const text = (): Promise<string> =>
-      input.evaluate((element) =>
-        element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-      )
+      const text = (): Promise<string> =>
+        input.evaluate((element) =>
+          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+        )
 
-    await expect.poll(text).toBe('in 2 week')
+      await expect.poll(text).toBe('in 2 week')
 
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('relative-unit-agreement.png')) })
-    await window.keyboard.type('s')
+      await window.screenshot({ path: testInfo.outputPath(screenshotName('relative-unit-agreement.png')) })
+      await window.keyboard.type('s')
 
-    await expect(popup.getByRole('option', { selected: true })).toContainText('in 2 weeks')
+      await expect(popup.getByRole('option', { selected: true })).toContainText('in 2 weeks')
 
-    await window.keyboard.press('Enter')
+      await window.keyboard.press('Enter')
 
-    await expect.poll(text).toBe('2026-11-08')
-    await expect(popup).toHaveCount(0)
-  })
+      await expect.poll(text).toBe('2026-11-08')
+      await expect(popup).toHaveCount(0)
+    },
+  )
 
   // @requirement PRODUCT.md §20.9
-  test('keeps plain-editor arrows in the popup until dismissal, then resumes node navigation', async ({
-    userDataDir,
-  }) => {
-    seedDocument(userDataDir, {
-      document: {
-        roots: [
-          { id: 'n', text: 'Plan ', children: [] },
-          { id: 'other', text: 'Other', children: [] },
-        ],
-      },
-      location: { currentParentId: null, selectedNodeId: 'n' },
-    })
-    const { window } = await launchTree(userDataDir)
-    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
+  test(
+    'keeps plain-editor arrows in the popup until dismissal, then resumes node navigation',
+    { tag: '@linux' },
+    async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'n', text: 'Plan ', children: [] },
+            { id: 'other', text: 'Other', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
 
-    await setCursor(input, 5)
-    await window.keyboard.type('next wee')
-    const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      await setCursor(input, 5)
+      await window.keyboard.type('next wee')
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
 
-    await expect(popup.getByRole('option')).toHaveCount(7)
+      await expect(popup.getByRole('option')).toHaveCount(7)
 
-    await window.keyboard.down('Meta')
+      await window.keyboard.down('Meta')
 
-    await expect(popup).toBeVisible()
+      await expect(popup).toBeVisible()
 
-    await window.keyboard.up('Meta')
-    await window.keyboard.press('ArrowDown')
+      await window.keyboard.up('Meta')
+      await window.keyboard.press('ArrowDown')
 
-    await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
-    await expect(input).toBeFocused()
-    await expect(input).toHaveValue('Plan next wee')
-    await expect(input).toHaveJSProperty('selectionStart', 13)
-    await expect(input).toHaveJSProperty('selectionEnd', 13)
-
-    await window.keyboard.press('Escape')
-
-    await expect(popup).toHaveCount(0)
-
-    if (mode === 'vim') {
-      await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+      await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+      await expect(input).toBeFocused()
+      await expect(input).toHaveValue('Plan next wee')
       await expect(input).toHaveJSProperty('selectionStart', 13)
       await expect(input).toHaveJSProperty('selectionEnd', 13)
 
       await window.keyboard.press('Escape')
 
-      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(popup).toHaveCount(0)
+
+      if (mode === 'vim') {
+        await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+        await expect(input).toHaveJSProperty('selectionStart', 13)
+        await expect(input).toHaveJSProperty('selectionEnd', 13)
+
+        await window.keyboard.press('Escape')
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+        await window.keyboard.press('ArrowDown')
+
+        await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toBeFocused()
+
+        await window.keyboard.press('ArrowUp')
+
+        await expect(input).toBeFocused()
+
+        await window.keyboard.press('i')
+      }
 
       await window.keyboard.press('ArrowDown')
 
       await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toBeFocused()
-
-      await window.keyboard.press('ArrowUp')
-
-      await expect(input).toBeFocused()
-
-      await window.keyboard.press('i')
-    }
-
-    await window.keyboard.press('ArrowDown')
-
-    await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toBeFocused()
-  })
+    },
+  )
 
   // @requirement PRODUCT.md §20.9.1
   // @requirement PRODUCT.md §20.9.3
-  test('keeps coincident Monday and month choices distinct through refinement', async ({ userDataDir }, testInfo) => {
-    seedDocument(userDataDir, {
-      document: { roots: [{ id: 'n', text: 'Plan ', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'n' },
-    })
-    const { window } = await launchTree(userDataDir)
+  test(
+    'keeps coincident Monday and month choices distinct through refinement',
+    { tag: '@linux' },
+    async ({ userDataDir }, testInfo) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'n', text: 'Plan ', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { window } = await launchTree(userDataDir)
 
-    await window.clock.setFixedTime(new Date(2026, 4, 25, 12))
-    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
+      await window.clock.setFixedTime(new Date(2026, 4, 25, 12))
+      const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
 
-    await setCursor(input, 5)
-    await window.keyboard.type('next mon')
-    const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-    const rows = popup.getByRole('option')
+      await setCursor(input, 5)
+      await window.keyboard.type('next mon')
+      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
+      const rows = popup.getByRole('option')
 
-    await expect(rows).toHaveCount(4)
-    await expect(rows.nth(0)).toContainText('2026-06-01')
-    await expect(rows.nth(0)).toContainText('next monday')
-    await expect(rows.nth(1)).toContainText('2026-06-01')
-    await expect(rows.nth(1)).toContainText('next month')
-    await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true')
+      await expect(rows).toHaveCount(4)
+      await expect(rows.nth(0)).toContainText('2026-06-01')
+      await expect(rows.nth(0)).toContainText('next monday')
+      await expect(rows.nth(1)).toContainText('2026-06-01')
+      await expect(rows.nth(1)).toContainText('next month')
+      await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'true')
 
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('coincident-month-monday.png')) })
-    await window.keyboard.press('ArrowDown')
-    const selected = popup.getByRole('option', { selected: true })
+      await window.screenshot({ path: testInfo.outputPath(screenshotName('coincident-month-monday.png')) })
+      await window.keyboard.press('ArrowDown')
+      const selected = popup.getByRole('option', { selected: true })
 
-    await expect(selected).toContainText('next month')
+      await expect(selected).toContainText('next month')
 
-    await window.keyboard.type('t')
+      await window.keyboard.type('t')
 
-    await expect(rows).toHaveCount(3)
-    await expect(selected).toContainText('next month')
+      await expect(rows).toHaveCount(3)
+      await expect(selected).toContainText('next month')
 
-    await window.keyboard.press('Backspace')
+      await window.keyboard.press('Backspace')
 
-    await expect(rows).toHaveCount(4)
-    await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true')
+      await expect(rows).toHaveCount(4)
+      await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true')
 
-    await window.keyboard.type('d')
+      await window.keyboard.type('d')
 
-    await expect(rows).toHaveCount(1)
-    await expect(selected).toContainText('next monday')
+      await expect(rows).toHaveCount(1)
+      await expect(selected).toContainText('next monday')
 
-    await window.keyboard.press('Enter')
+      await window.keyboard.press('Enter')
 
-    await expect
-      .poll(() =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-        ),
-      )
-      .toBe('Plan 2026-06-01')
-    await expect(input).toBeFocused()
-  })
+      await expect
+        .poll(() =>
+          input.evaluate((element) =>
+            element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+          ),
+        )
+        .toBe('Plan 2026-06-01')
+      await expect(input).toBeFocused()
+    },
+  )
 
   for (const view of ['Tree', 'Agenda'] as const) {
     // @requirement PRODUCT.md §20.9.1
@@ -697,7 +705,7 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
 
     if (view === 'Agenda') {
       // @requirement PRODUCT.md §20.9
-      test('does not offer completion inside hyperlink text', async ({ userDataDir }) => {
+      test('does not offer completion inside hyperlink text', { tag: '@linux' }, async ({ userDataDir }) => {
         const url = 'https://example.com/tomorrow'
         seedDocument(userDataDir, {
           document: {
