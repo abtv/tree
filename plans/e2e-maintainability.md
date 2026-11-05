@@ -1,7 +1,8 @@
 # Electron E2E maintainability follow-up
 
-Status: **Awaiting owner acceptance**. All authorized implementation and
-validation is complete. The initial items are delivered at `52d85cd` and
+Status: **In progress**. Tasks 1–12 are delivered. The owner requested a further
+complete audit and implementation pass on 2026-11-06, without stopping after
+individual improvements. The initial items are delivered at `52d85cd` and
 `1875860`; the deeper layering work includes `de53989`, `ea8a9bc` and the commit
 containing this final Agenda/review update. The existing npm advisory remains
 the explicitly accepted exception.
@@ -20,7 +21,7 @@ entries for this work; this is not a passing audit or permission to suppress it.
 ## Tasks
 
 The initial scope had five substantive implementation/investigation items. The
-authorized extensions below bring the count to twelve and permit more than four
+authorized extensions below bring the count to sixteen and permit more than four
 logical commits in this session. Final
 owner acceptance is required before retiring this plan. No manual product check
 is expected because product behavior is unchanged.
@@ -45,10 +46,57 @@ production timing, state and process lifecycle are unchanged.
 
 ## Next action
 
-Await the owner's acceptance of the combined delivered result, then retire this
-plan and its index entry. No implementation task remains ready. Inspect the
-three layering commits and the coverage ownership guidance in Development §8;
-no manual application check is expected for these test-only changes.
+Complete tasks 13–16 below in this session. Do not return to an acceptance gate
+between the audit, its justified changes, and final verification. No manual
+application check is expected for these test-only changes.
+
+## Authorized remaining-suite pass (2026-11-06)
+
+The owner explicitly requested continuing until the deeper pass is finished.
+Audit the remaining visual families and the high-cost drag/hierarchy, inline
+expansion, Agenda moves and Vim navigation families. Map rules and state
+matrices to adequate focused or real App/store coverage, retain distinct native
+input, pointer, geometry, clipboard, persistence, restart and failure risks,
+and implement all justified simplifications found in this pass. No arbitrary
+test-count goal, production change, new framework/dependency, CI reduction or
+process-reuse expansion. The accepted npm advisory and ban on GitHub logs
+continue to apply. Logical commits may exceed four in this session.
+
+| Item | Scope and acceptance | Status |
+| --- | --- | --- |
+| 13 | Inventory all remaining PNG families and the five expensive spec families; identify unique risks, existing lower-level owners and safe migration candidates. Read-only independent planner for the interaction families. | Done |
+| 14 | Consolidate demonstrably repeated visual states, preserving distinct mode/caret/rendering evidence. Inspect changed baselines when needed and validate every affected visual spec. | Done |
+| 15 | Implement justified interaction-matrix and setup simplifications, adding missing real App/store coverage first and retaining native representatives. Validate affected fast and Electron cases. | In progress |
+| 16 | Verify the combined result, independently review retained coverage and maintainability, and document the final ownership and reasons for retained costly tests. | Ready |
+
+The pass is complete only when each inventoried family has a supported keep or
+change decision, every justified in-scope migration is delivered, and required
+checks/review pass. A finished small commit is not a stopping condition. Use
+affected validation for local test edits, and full `npm run check` plus local
+Electron validation for the combined migration; retain affected Linux checks
+if selected cases change. Reuse verified capabilities and unchanged audit
+evidence from this session. No product performance suite is triggered.
+Temporary audit and timing evidence belongs in `.scratch/e2e-final-pass/`.
+
+The remaining visual inventory covered all 34 directories / 220 PNGs. Seven
+families share Insert or non-editor appearance across modes: hyperlink, typed
+punctuation, preview, Agenda view, focused-day headings, editing and live mirror.
+Their 21 repeated Vim baselines were retired; all 199 remaining files represent
+retained states. No Standard baseline changed. Normal/Visual/Replace, image
+carets, focus/selection, dragging, clipping and lifecycle states remain distinct.
+The seven affected specs passed all 98 cases, with types, scoped lint and format
+checks. Inspected timeline mode pairs and restored-image/Insert-edit captures
+confirmed the shared state and separately owned Vim label. All behavioral cases
+remain in both modes.
+
+Independent planning identified six interaction simplifications: complementary
+native drag-state representatives over the complete existing App matrix; one
+stronger Agenda caret+disk flow replacing two overlapping flows; disclosure
+behavior assertions in its existing visual flow; independent Visual endpoint
+expectations below a shorter native sample; one native counted/uncounted join
+flow over focused rule tables; and real App structural pointer-interruption
+coverage before shortening its o/O/c/s native table. Other costly cases retain
+distinct pointer, native key, geometry, remount, clipboard or restart risks.
 
 ## Authorized layering work (2026-11-06)
 

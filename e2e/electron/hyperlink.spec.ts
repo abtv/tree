@@ -14,7 +14,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 
-describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
+describeForEachEditingMode('external hyperlinks', ({ mode, screenshotName }) => {
   test('edits linked characters with immediate styling and destination updates', async ({ userDataDir }, testInfo) => {
     const url = 'https://example.com'
     seedDocument(userDataDir, {
@@ -47,17 +47,13 @@ describeForEachEditingMode('external hyperlinks', ({ screenshotName }) => {
 
     await expect(editor.getByRole('link', { name: `${url}/a` })).toHaveAttribute('href', `${url}/a`)
 
-    await editor.screenshot({ path: testInfo.outputPath('editable-link-light.png') })
-
-    await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-light.png'))
+    if (mode === 'standard') await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-light.png'))
 
     await window.emulateMedia({ colorScheme: 'dark' })
 
     await expect(editor.getByRole('link')).toHaveCSS('color', 'rgb(140, 208, 211)')
 
-    await editor.screenshot({ path: testInfo.outputPath('editable-link-dark.png') })
-
-    await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-dark.png'))
+    if (mode === 'standard') await expect(editor).toHaveScreenshot(screenshotName('editable-link-insert-dark.png'))
   })
 
   test('restores a corrected link beside plain text without linking its neighbors', async ({ userDataDir }) => {

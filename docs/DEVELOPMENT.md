@@ -265,6 +265,8 @@ Visual baselines belong to distinct rendered states, not every command that reac
 
 Agenda command restrictions use `App.agenda-policy.test.tsx` for real App/store dispatch across day, gap, context and direct-match rows in Standard and Vim. It checks the live document, selection, focus, caret, mode and absence of extra saves after flushing; the lower-level command matrix still owns shortcut-profile rules. `e2e/electron/agenda-editing.spec.ts` retains native Tab focus/caret suppression and representative prohibited edits. A negative persistence assertion must let pending saves finish before reading disk: install the renderer clock before the action, advance the idle-save deadline, then await the queued `treeApi.load()` boundary. An immediate unchanged-file assertion can miss an invalid edit that has not been saved yet.
 
+Standard also owns shared Insert hyperlink/punctuation, zoomed preview, Agenda timeline/gap/windowed headings, inactive links/restored images, and Insert editing/mirror appearance. Both modes retain their native behavior, geometry and lifecycle checks. Keep separate baselines when the state includes Normal/Visual/Replace, image caret, selection or a changed focus projection; matching theme and text alone does not establish redundancy. The Vim status label is owned by the mode-toggle suite, so it does not justify duplicating every otherwise identical full-window image.
+
 Electron end-to-end tests live in `e2e/electron/` and run with:
 
 ```bash

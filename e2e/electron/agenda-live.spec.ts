@@ -79,7 +79,8 @@ describeForEachEditingMode('Agenda live occurrences', ({ mode, screenshotName })
       // where the scrollbar thumb may or may not be drawn during the capture.
       const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
 
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-live-mirror-${appearance}.png`), { clip })
+      if (mode === 'standard')
+        await expect(window).toHaveScreenshot(screenshotName(`agenda-live-mirror-${appearance}.png`), { clip })
     }
 
     await input.evaluate((element) => {

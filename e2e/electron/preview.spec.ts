@@ -88,7 +88,7 @@ describeForEachEditingMode('image preview', ({ mode, screenshotName }) => {
     await expect(close).toBeFocused()
     expect(await close.boundingBox()).toEqual(closeBounds)
     expect(await window.evaluate(() => globalThis.visualViewport!.scale)).toBe(1)
-    await expect(window).toHaveScreenshot(screenshotName('image-preview-zoomed.png'))
+    if (mode === 'standard') await expect(window).toHaveScreenshot(screenshotName('image-preview-zoomed.png'))
 
     await window.keyboard.press('Meta+-')
 

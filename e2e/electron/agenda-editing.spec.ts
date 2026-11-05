@@ -148,7 +148,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
       await window.emulateMedia({ colorScheme: appearance })
       await window.mouse.move(600, 20)
 
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-links-${appearance}.png`))
+      if (mode === 'standard') await expect(window).toHaveScreenshot(screenshotName(`agenda-links-${appearance}.png`))
     }
     const initialUrl = window.url()
 
@@ -223,7 +223,8 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
       await restarted.window.emulateMedia({ colorScheme: appearance })
       await restarted.window.mouse.move(600, 20)
 
-      await expect(restarted.window).toHaveScreenshot(screenshotName(`agenda-clipboard-${appearance}.png`))
+      if (mode === 'standard')
+        await expect(restarted.window).toHaveScreenshot(screenshotName(`agenda-clipboard-${appearance}.png`))
     }
   })
   // @requirement PRODUCT.md §23.9
@@ -326,7 +327,8 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
       // Native macOS scrollbars fade independently of CSS animations. Exclude only their edge.
       const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
 
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-editing-${appearance}.png`), { clip })
+      if (mode === 'standard')
+        await expect(window).toHaveScreenshot(screenshotName(`agenda-editing-${appearance}.png`), { clip })
     }
     const geometry = await input.evaluate((element) => ({
       text: element.textContent,

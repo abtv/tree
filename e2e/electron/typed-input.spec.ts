@@ -73,7 +73,7 @@ function caretOffset(input: Locator): Promise<number> {
   })
 }
 
-describeForEachEditingMode('typed input', ({ screenshotName }) => {
+describeForEachEditingMode('typed input', ({ mode, screenshotName }) => {
   for (const [index, entry] of CASES.entries()) {
     // @requirement PRODUCT.md §13
     test(`types ${entry.name} exactly as typed`, async ({ userDataDir }) => {
@@ -95,8 +95,9 @@ describeForEachEditingMode('typed input', ({ screenshotName }) => {
       await expect(editor).toBeFocused()
       expect(await caretOffset(editor)).toBe(entry.caret + entry.typed.length)
 
-      // One picture per mode of the punctuation line, inspected once, guards how it is drawn.
-      if (index === 1) await expect(editor).toHaveScreenshot(screenshotName('typed-operator-punctuation.png'))
+      // Both modes exercise native input; Standard owns the shared Insert typography baseline.
+      if (index === 1 && mode === 'standard')
+        await expect(editor).toHaveScreenshot(screenshotName('typed-operator-punctuation.png'))
     })
   }
 })

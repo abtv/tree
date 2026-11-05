@@ -58,7 +58,8 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     // The native overlay scrollbar fades independently of renderer state. Exclude only its edge.
     const clip = await window.evaluate(() => ({ x: 0, y: 0, width: innerWidth - 12, height: innerHeight }))
 
-    await expect(window).toHaveScreenshot(screenshotName('agenda-focused-windowed.png'), { clip })
+    if (mode === 'standard')
+      await expect(window).toHaveScreenshot(screenshotName('agenda-focused-windowed.png'), { clip })
 
     await window.keyboard.press(mode === 'vim' ? 'j' : 'ArrowDown')
 
@@ -221,7 +222,8 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
 
-      await expect(window).toHaveScreenshot(screenshotName(`agenda-focused-day-${appearance}.png`))
+      if (mode === 'standard')
+        await expect(window).toHaveScreenshot(screenshotName(`agenda-focused-day-${appearance}.png`))
 
       const session = await window.context().newCDPSession(window)
       const frames: string[] = []
