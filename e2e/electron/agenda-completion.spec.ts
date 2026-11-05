@@ -198,10 +198,10 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
   )
 
   for (const view of ['Tree', 'Agenda'] as const) {
-    // @requirement PRODUCT.md §20.9.1
-    test(`completes bare weekday prefixes and preserves a chosen date in ${view}`, async ({
-      userDataDir,
-    }, testInfo) => {
+    // App.completion.test.tsx owns grammar/refinement, replacement and Undo matrices.
+    // Keep real typing, browser Tab suppression and preferred-row visibility in both views/modes.
+    // @requirement PRODUCT.md §20.9
+    test(`accepts a visible preferred date with native Tab in ${view}`, async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
         location: { currentParentId: null, selectedNodeId: 'n' },
@@ -223,204 +223,30 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       }
 
       await setCursor(input, 16)
-      await window.keyboard.type('We')
+      await window.keyboard.type('in September')
       const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-
-      await expect(popup).toHaveCount(0)
-
-      await window.keyboard.type('dne')
-
-      await expect(popup.getByRole('option')).toHaveCount(2)
-
       const selected = popup.getByRole('option', { selected: true })
 
-      await expect(selected).toContainText('2026-10-14')
-      await expect(selected).toContainText('wednesday')
-
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`bare-weekday-${view}.png`)) })
-      await window.keyboard.press('ArrowUp')
-
-      await expect(selected).toContainText('2026-10-07')
-
-      await window.keyboard.type('sday')
-
-      await expect(selected).toContainText('2026-10-07')
-
-      await window.keyboard.press('Enter')
-      const text = (): Promise<string> =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+      await expect(selected).toContainText('2027-09-01')
+      await expect
+        .poll(() =>
+          selected.evaluate((element) => {
+            const row = element.getBoundingClientRect()
+            const container = element.closest('.date-popup')!.getBoundingClientRect()
+            return row.top >= container.top && row.bottom <= container.bottom
+          }),
         )
+        .toBe(true)
 
-      await expect.poll(text).toBe('2026-10-08 Plan 2026-10-07')
-      await expect(input).toBeFocused()
-      await expect(popup).toHaveCount(0)
-
-      await window.evaluate(() =>
-        document.addEventListener('keydown', (event) => {
-          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
-        }),
-      )
-      await window.keyboard.press('Meta+z')
-
-      await expect.poll(text).toBe('2026-10-08 Plan Wednesday')
-      await expect(popup).toHaveCount(0)
-    })
-
-    // @requirement PRODUCT.md §20.9
-    // @requirement PRODUCT.md §20.9.1
-    // @requirement PRODUCT.md §20.9.3
-    test(`disambiguates mon without losing a chosen month date in ${view}`, async ({ userDataDir }, testInfo) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'n' },
-      })
-      const { window } = await launchTree(userDataDir)
-
-      await setAgendaToday(window)
-      if (view === 'Agenda') {
-        await window.keyboard.press('Meta+p')
-        await window.locator('.agenda-row[data-node-id="n"]').click()
-      }
-      const input = window.getByRole('textbox', {
-        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
-        exact: true,
-      })
-      if (mode === 'vim') {
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('i')
-      }
-
-      await setCursor(input, 16)
-      const qualifier = view === 'Tree' ? 'next' : 'last'
-
-      await window.keyboard.type(`${qualifier} mon`)
-      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-      const rows = popup.getByRole('option')
-
-      await expect(rows).toHaveCount(4)
-
-      const expectedDates =
-        view === 'Tree'
-          ? ['2026-10-12', '2026-11-01', '2026-11-15', '2026-11-30']
-          : ['2026-09-01', '2026-09-15', '2026-09-28', '2026-09-30']
-
-      for (const [index, date] of expectedDates.entries()) await expect(rows.nth(index)).toContainText(date)
-      await expect(rows.filter({ hasText: `${qualifier} monday` })).toHaveCount(1)
-      await expect(rows.filter({ hasText: `${qualifier} month` })).toHaveCount(3)
-
-      const selected = popup.getByRole('option', { selected: true })
-
-      await expect(selected).toContainText(view === 'Tree' ? '2026-10-12' : '2026-09-30')
-
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`ambiguous-mon-${view}.png`)) })
-      for (let step = 0; step < 2; step++) await window.keyboard.press(view === 'Tree' ? 'ArrowDown' : 'ArrowUp')
-      const chosen = view === 'Tree' ? '2026-11-15' : '2026-09-15'
-
-      await expect(selected).toContainText(chosen)
-
-      await window.keyboard.type('t')
-
-      await expect(rows).toHaveCount(3)
-      await expect(selected).toContainText(chosen)
-
-      await window.keyboard.press('Backspace')
-
-      await expect(rows).toHaveCount(4)
-      await expect(selected).toContainText(chosen)
-
-      await window.keyboard.type('th')
-
-      await expect(rows).toHaveCount(3)
-      await expect(selected).toContainText(chosen)
-
-      await window.keyboard.press('Enter')
-      const text = (): Promise<string> =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-        )
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${chosen}`)
-      await expect(input).toBeFocused()
-
-      await window.evaluate(() =>
-        document.addEventListener('keydown', (event) => {
-          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
-        }),
-      )
-      await window.keyboard.press('Meta+z')
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${qualifier} month`)
-      await expect(popup).toHaveCount(0)
-
-      await window.keyboard.press('Meta+a')
-      await window.keyboard.type(`2026-10-08 Plan ${qualifier} mond`)
-
-      await expect(rows).toHaveCount(1)
-      await expect(selected).toContainText(`${qualifier} monday`)
-
-      await window.keyboard.press('Enter')
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? '2026-10-12' : '2026-09-28'}`)
-    })
-
-    // @requirement PRODUCT.md §20.9
-    // @requirement PRODUCT.md §20.9.2
-    test(`offers three adjacent-month anchors and accepts the closest default with Tab in ${view}`, async ({
-      userDataDir,
-    }, testInfo) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'n' },
-      })
-      const { window } = await launchTree(userDataDir)
-
-      await setAgendaToday(window)
-      if (view === 'Agenda') {
-        await window.keyboard.press('Meta+p')
-        await window.locator('.agenda-row[data-node-id="n"]').click()
-      }
-      const input = window.getByRole('textbox', {
-        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
-        exact: true,
-      })
-      if (mode === 'vim') {
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('i')
-      }
-
-      await setCursor(input, 16)
-      const expression = view === 'Tree' ? 'next month' : 'last month'
-
-      await window.keyboard.type(expression)
-      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-      const expected =
-        view === 'Tree' ? ['2026-11-01', '2026-11-15', '2026-11-30'] : ['2026-09-01', '2026-09-15', '2026-09-30']
-
-      await expect(popup.getByRole('option')).toHaveCount(3)
-      for (const [index, date] of expected.entries()) {
-        await expect(popup.getByRole('option').nth(index)).toContainText(date)
-        await expect(popup.getByRole('option').nth(index)).toContainText(expression)
-      }
-
-      const closest = view === 'Tree' ? expected[0]! : expected[2]!
-
-      await expect(popup.getByRole('option', { selected: true })).toContainText(closest)
-      await expect(window.locator('.date-popup-footer')).toHaveText('↑ ↓ select · Enter/Tab accept · Esc dismiss')
-
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`adjacent-month-${view}.png`)) })
       await window.keyboard.press('Tab')
-      const text = (): Promise<string> =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-        )
 
-      await expect.poll(text).toBe(`2026-10-08 Plan ${closest}`)
+      await expect.poll(() => input.textContent()).toBe('2026-10-08 Plan 2027-09-01')
       await expect(input).toBeFocused()
+      await expect(popup).toHaveCount(0)
+      await expect(window.locator('.node-input')).toHaveCount(1)
       await expect
         .poll(() =>
           input.evaluate((element) => {
-            if (element instanceof HTMLTextAreaElement) return [element.selectionStart, element.selectionEnd]
             const selection = globalThis.getSelection()!
             const range = selection.getRangeAt(0).cloneRange()
             range.selectNodeContents(element)
@@ -429,185 +255,6 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
           }),
         )
         .toEqual([26, true])
-      await expect(popup).toHaveCount(0)
-
-      await window.evaluate(() =>
-        document.addEventListener('keydown', (event) => {
-          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
-        }),
-      )
-      await window.keyboard.press('Meta+z')
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${expression}`)
-      await expect(popup).toHaveCount(0)
-    })
-
-    // @requirement PRODUCT.md §20.9
-    test(`preserves prepositions while refining weekday and month-day prefixes in ${view}`, async ({
-      userDataDir,
-    }, testInfo) => {
-      const initial = `2026-10-08 Plan ${view === 'Tree' ? 'on  at noon' : 'by Sep 15 at noon'}`
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'n', text: initial, children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'n' },
-      })
-      const { window } = await launchTree(userDataDir)
-
-      await setAgendaToday(window)
-      if (view === 'Agenda') {
-        await window.keyboard.press('Meta+p')
-        await window.locator('.agenda-row[data-node-id="n"]').click()
-      }
-      const input = window.getByRole('textbox', {
-        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
-        exact: true,
-      })
-      if (mode === 'vim') {
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('i')
-      }
-
-      await setCursor(input, view === 'Tree' ? 19 : 22)
-      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-      if (view === 'Tree') {
-        await window.keyboard.type('fr')
-
-        await expect(popup).toHaveCount(0)
-      }
-
-      await window.keyboard.type(view === 'Tree' ? 'i' : 't')
-
-      await expect(popup.getByRole('option')).toHaveCount(2)
-
-      await window.keyboard.press('ArrowDown')
-      const selectedDate = view === 'Tree' ? '2026-10-16' : '2026-09-15'
-      const selected = popup.getByRole('option', { selected: true })
-
-      await expect(selected).toContainText(selectedDate)
-      await expect(selected).toContainText(view === 'Tree' ? 'friday' : 'september 15')
-
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`preposition-date-${view}.png`)) })
-      await window.keyboard.type(view === 'Tree' ? 'day' : 'ember')
-
-      await expect(selected).toContainText(selectedDate)
-
-      await window.keyboard.press('Enter')
-      const text = (): Promise<string> =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-        )
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'on' : 'by'} ${selectedDate} at noon`)
-      await expect(input).toBeFocused()
-      await expect(popup).toHaveCount(0)
-
-      await window.evaluate(() =>
-        document.addEventListener('keydown', (event) => {
-          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
-        }),
-      )
-      await window.keyboard.press('Meta+z')
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'on friday' : 'by September 15'} at noon`)
-      await expect(popup).toHaveCount(0)
-    })
-
-    // @requirement PRODUCT.md §20.9
-    test(`refines qualified date prefixes without losing selection in ${view}`, async ({ userDataDir }, testInfo) => {
-      seedDocument(userDataDir, {
-        document: { roots: [{ id: 'n', text: '2026-10-08 Plan ', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'n' },
-      })
-      const { window } = await launchTree(userDataDir)
-
-      await setAgendaToday(window)
-      if (view === 'Agenda') {
-        await window.keyboard.press('Meta+p')
-        await window.locator('.agenda-row[data-node-id="n"]').click()
-      }
-      const input = window.getByRole('textbox', {
-        name: view === 'Agenda' ? 'Agenda node n' : 'Node 1',
-        exact: true,
-      })
-      if (mode === 'vim') {
-        await window.keyboard.press('Escape')
-        await window.keyboard.press('i')
-      }
-
-      await setCursor(input, 16)
-      const popup = window.getByRole('listbox', { name: 'Date suggestions' })
-      const fragment = view === 'Tree' ? 'in se' : 'next fr'
-
-      await window.keyboard.type(fragment)
-
-      await expect(popup).toHaveCount(0)
-
-      await window.keyboard.type(view === 'Tree' ? 'p' : 'i')
-
-      await expect(popup).toBeVisible()
-
-      if (view === 'Tree') {
-        await expect(popup.getByRole('option').first()).toContainText('2026-09-01')
-        await expect(popup.getByRole('option').last()).toContainText('2027-09-01')
-        await expect(popup.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
-
-        const visible = await popup.getByRole('option', { selected: true }).evaluate((element) => {
-          const selected = element.getBoundingClientRect()
-          const container = element.closest('.date-popup')!.getBoundingClientRect()
-          return selected.top >= container.top && selected.bottom <= container.bottom
-        })
-
-        expect(visible).toBe(true)
-
-        await window.screenshot({ path: testInfo.outputPath(screenshotName('chronological-date-preferred.png')) })
-        await window.keyboard.press('ArrowUp')
-      }
-      const selectedDate = view === 'Tree' ? '2026-09-01' : '2026-10-16'
-      const selected = popup.getByRole('option', { selected: true })
-
-      await expect(selected).toContainText(selectedDate)
-      await expect(selected).toContainText(view === 'Tree' ? 'in september' : 'next friday')
-
-      await window.keyboard.type(view === 'Tree' ? 't' : 'd')
-
-      await expect(selected).toContainText(selectedDate)
-
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`qualified-date-${view}.png`)) })
-      await window.keyboard.type(view === 'Tree' ? 'ember' : 'ay')
-
-      await expect(selected).toContainText(selectedDate)
-
-      await window.keyboard.press('Enter')
-      const text = (): Promise<string> =>
-        input.evaluate((element) =>
-          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
-        )
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${selectedDate}`)
-      await expect(input).toBeFocused()
-      await expect(popup).toHaveCount(0)
-
-      await window.evaluate(() =>
-        document.addEventListener('keydown', (event) => {
-          if (event.metaKey && event.key.toLowerCase() === 'z') event.preventDefault()
-        }),
-      )
-      await window.keyboard.press('Meta+z')
-
-      await expect.poll(text).toBe(`2026-10-08 Plan ${view === 'Tree' ? 'in september' : 'next friday'}`)
-      await expect(popup).toHaveCount(0)
-
-      await setCursor(input, (await text()).length)
-      await window.keyboard.press('Backspace')
-
-      await expect(popup).toBeVisible()
-
-      const beforeDismissal = await text()
-
-      await window.keyboard.press('Escape')
-
-      await expect(popup).toHaveCount(0)
-      await expect.poll(text).toBe(beforeDismissal)
       if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
     })
 

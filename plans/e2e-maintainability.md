@@ -62,8 +62,8 @@ minimatch advisory remains an explicit exception, not a clean audit result.
 | Item | Scope and acceptance | Status |
 | --- | --- | --- |
 | 9 | Reduce repeated breadcrumb, completion-popup, Insert-date and typography PNGs; retain mode-sensitive rendering and geometry. Own the corresponding Electron specs/baselines and Development guidance. Inspect new cropped popup baselines and run all affected specs. | Done |
-| 10 | Add real App/NodeInput/popup/store completion integration coverage before reducing grammar/refinement E2E combinations in `agenda-completion.spec.ts`; preserve unique native paths and exact replacement/Undo. No replacement UI or production test hook. | In progress |
-| 11 | Add real App/store Agenda command no-op coverage, shorten the repeated Electron command table, and ensure retained disk assertions wait for saves. Preserve native focus/caret and both modes. | Ready |
+| 10 | Add real App/NodeInput/popup/store completion integration coverage before reducing grammar/refinement E2E combinations in `agenda-completion.spec.ts`; preserve unique native paths and exact replacement/Undo. No replacement UI or production test hook. | Done |
+| 11 | Add real App/store Agenda command no-op coverage, shorten the repeated Electron command table, and ensure retained disk assertions wait for saves. Preserve native focus/caret and both modes. | In progress |
 | 12 | Validate the complete result, independently review coverage ownership, record measured costs and lasting guidance in Development, and commit remaining work. | Ready |
 
 These are four additional substantive tasks. Use Low Risk affected checks for
@@ -88,6 +88,17 @@ matched six-worker runs took 80.55 seconds before and 80.05 seconds after.
 This reduces baseline maintenance, not demonstrated runtime cost. Native
 geometry, both editing modes and distinct Vim rendering remain covered.
 Affected E2E types, lint, formatting, documentation and mode checks passed.
+
+Task 10 adds 38 real App/store completion checks (1.6 seconds locally), covering
+all five migrated grammar families in both views and modes. A temporary no-op
+Undo mutation failed the exact restored-text assertions in both modes; the
+mutation was removed and all 38 cases passed. The shared test fixture supplies
+host services, a fixed date and missing jsdom geometry only. It does not replace
+the actual popup, editor, handlers, store or their dispatch wiring.
+Twenty Electron grammar cases became four native Tab/visibility/caret cases;
+the retained completion spec passed all 22 cases in 12.1 seconds. Native
+mouse/keyboard, paste, hyperlink, focus, plain/rich and geometry checks remain.
+Renderer/E2E types, scoped lint, requirements and editing-mode guards passed.
 
 ## Authorized local cost review
 
