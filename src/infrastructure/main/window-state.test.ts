@@ -110,6 +110,32 @@ describe('createAppearancePreferenceStore', () => {
 })
 
 describe('createDebouncedWindowBoundsSaver', () => {
+  it('waits for a full quiet period after the latest resize', () => {
+    vi.useFakeTimers()
+    try {
+      const saved: WindowBounds[] = []
+      const saver = createDebouncedWindowBoundsSaver({ load: () => null, save: (value) => saved.push(value) }, 300)
+
+      saver.save(bounds)
+      vi.advanceTimersByTime(200)
+      saver.save({ ...bounds, width: 1000 })
+      vi.advanceTimersByTime(100)
+
+      expect(saved).toEqual([])
+
+      vi.advanceTimersByTime(199)
+
+      expect(saved).toEqual([])
+
+      vi.advanceTimersByTime(1)
+
+      expect(saved).toEqual([{ ...bounds, width: 1000 }])
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('coalesces rapid saves into one write and keeps the latest bounds', () => {
     vi.useFakeTimers()
     try {

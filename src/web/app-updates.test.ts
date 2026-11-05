@@ -31,6 +31,28 @@ afterEach(() => {
 })
 
 describe('update activation contract', () => {
+  it.each(['activated', 'redundant'] as const)('settles when an activating worker becomes %s', async (state) => {
+    vi.stubGlobal('MessageChannel', Channel)
+    const worker = new Worker()
+    worker.state = 'activating'
+    worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage('activating'))
+    const add = vi.spyOn(worker, 'addEventListener')
+    const remove = vi.spyOn(worker, 'removeEventListener')
+    const result = activateUpdate(worker as unknown as ServiceWorker)
+    const settled =
+      state === 'activated'
+        ? expect(result).resolves.toBeUndefined()
+        : expect(result).rejects.toThrow('no longer available')
+    await vi.waitFor(() => expect(add).toHaveBeenCalledWith('statechange', expect.any(Function)))
+
+    worker.state = state
+    worker.dispatchEvent(new Event('statechange'))
+    await settled
+
+    expect(remove).toHaveBeenCalledWith('statechange', expect.any(Function))
+    expect(worker.postMessage.mock.calls[0]![1][0]!.close).toHaveBeenCalledOnce()
+  })
+
   it('waits for activation and removes listeners after timeout', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('MessageChannel', Channel)

@@ -32,4 +32,15 @@ describe('command history preference', () => {
 
     expect(() => createCommandHistoryStore(directory).save(['set-theme-dark'])).toThrow()
   })
+
+  it('replaces persisted history when the preference directory already exists', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'tree-command-history-')), 'data', 'history.json')
+    const store = createCommandHistoryStore(path)
+    store.save(['set-theme-dark'])
+
+    store.save(['set-theme-light'])
+
+    expect(createCommandHistoryStore(path).load()).toEqual(['set-theme-light'])
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(['set-theme-light'])
+  })
 })

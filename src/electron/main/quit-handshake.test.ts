@@ -14,6 +14,30 @@ function createClock() {
 }
 
 describe('QuitHandshake', () => {
+  it('cancels the timeout after confirmation and keeps later requests inert', async () => {
+    vi.useFakeTimers()
+    try {
+      const send = vi.fn()
+      const timeout = vi.fn()
+      const quit = vi.fn()
+      const handshake = new QuitHandshake(send, timeout, quit, () => 'confirmed')
+
+      handshake.request()
+      expect(handshake.confirm('confirmed')).toBe(true)
+      await Promise.resolve()
+      handshake.request()
+      vi.advanceTimersByTime(5000)
+
+      expect(handshake.isQuitting()).toBe(true)
+      expect(send).toHaveBeenCalledOnce()
+      expect(quit).toHaveBeenCalledOnce()
+      expect(timeout).not.toHaveBeenCalled()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('sends one request and confirms only the matching request', async () => {
     const sent: string[] = []
     const quit = vi.fn()
