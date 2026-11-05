@@ -2,7 +2,7 @@
 import process from 'node:process'
 import { mutationShard } from './mutation-shards.mts'
 
-// Mutation testing for the domain and application layers and the pure renderer modules. See docs/DEVELOPMENT.md §12.
+// Local mutation scope includes every layer; CI selects the scheduled subset. See docs/DEVELOPMENT.md §12.
 const shard = mutationShard(process.env['TREE_MUTATION_SHARD'])
 
 /** @satisfies {import('@stryker-mutator/api/core').PartialStrykerOptions} */
@@ -35,7 +35,13 @@ const config = {
     'src/renderer/completion-controller.ts',
     'src/renderer/completion-sources.ts',
     'src/renderer/shortcut-profile.ts',
-    '!src/**/*.test.ts',
+    'src/web/**/*.{ts,tsx}',
+    'src/shared/**/*.ts',
+    'src/electron/**/*.ts',
+    'src/infrastructure/**/*.ts',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/*.d.ts',
+    '!src/**/*-test-utils.ts',
     '!src/application/test/**',
   ],
   reporters: ['clear-text', 'progress', 'html', 'json'],
@@ -51,7 +57,7 @@ const config = {
   cleanTempDir: 'always',
 }
 
-// CI selects a layer from this same list, so adding a module cannot leave the scheduled run behind.
+// Local runs and CI select layers from the same scope while retaining every exclusion.
 if (shard)
   config.mutate = config.mutate.filter((pattern) => pattern.startsWith('!') || pattern.startsWith(`src/${shard}/`))
 

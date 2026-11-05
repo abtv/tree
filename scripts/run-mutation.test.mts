@@ -16,16 +16,19 @@ it('keeps the full scope by default and forwards Stryker arguments literally', (
   })
 })
 
-it.each(['domain', 'application', 'renderer'])('supports both spellings of the %s shard', (shard) => {
-  for (const args of [['--shard', shard], [`--shard=${shard}`]]) {
-    const result = mutationOptions([...args, '--concurrency', '4'], {})
+it.each(['domain', 'application', 'renderer', 'web', 'shared', 'electron', 'infrastructure'])(
+  'supports both spellings of the %s shard',
+  (shard) => {
+    for (const args of [['--shard', shard], [`--shard=${shard}`]]) {
+      const result = mutationOptions([...args, '--concurrency', '4'], {})
 
-    expect(result.env.TREE_MUTATION_SHARD).toBe(shard)
-    expect(result.args).toEqual(['run', 'config/testing/stryker.config.mjs', '--concurrency', '4'])
-  }
-})
+      expect(result.env.TREE_MUTATION_SHARD).toBe(shard)
+      expect(result.args).toEqual(['run', 'config/testing/stryker.config.mjs', '--concurrency', '4'])
+    }
+  },
+)
 
-it.each(['domain', 'application', 'renderer', ''])(
+it.each(['domain', 'application', 'renderer', 'web', 'shared', 'electron', 'infrastructure', ''])(
   'preserves the CI selector %j without mutating the parent',
   (shard) => {
     const env = { TREE_MUTATION_SHARD: shard, PATH: 'original' }

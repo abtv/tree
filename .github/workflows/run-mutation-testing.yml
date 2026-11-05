@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [domain, application, renderer]
+        shard: [renderer, web, shared, electron, infrastructure]
 
     steps:
       - name: Check out repository
