@@ -455,6 +455,12 @@ owner-operated as described below. Platform sandbox permissions remain enforced.
 If a client has not loaded a matching command rule, use its supported execution
 approval mechanism; the absence of that rule does not revoke the owner's decision.
 
+For the Linux Electron migration, the owner accepted the existing minimatch
+advisory GHSA-g3hv-75wg-m249 and its transitive audit entries on 2026-11-05.
+Do not request that initiative's risk acceptance again. This was a scoped
+exception, not a passing audit or authorization to suppress audits, change
+dependencies, or accept other advisories.
+
 Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
 
 Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke or Electron E2E modes; it cannot select external scripts, profiles, origins or Docker options.
@@ -563,8 +569,13 @@ platform separately and including dependency installation, builds and retries.
 Keep queue delay and total workflow elapsed time separate. Compare the same
 source snapshot and runner configuration when making a controlled claim. Local
 ARM64 Docker and macOS results verify execution but do not establish hosted
-AMD64 Linux timings or a percentage saving in GitHub runner-minutes. Inspect the
-first updated hosted run before changing this initial shard allocation further.
+AMD64 Linux timings or a percentage saving in GitHub runner-minutes.
+The first [hosted run](https://github.com/abtv/tree/actions/runs/42101828682)
+validated the allocation: its macOS jobs totaled 17.25 runner-minutes and Linux
+4.33, compared with 22.78 macOS runner-minutes in the earlier six-shard run.
+Those runs used different source snapshots, so this observation does not establish
+a controlled savings percentage. Keep the initial allocation until further
+hosted evidence justifies changing it.
 
 #### Cross-platform smoke checks
 
