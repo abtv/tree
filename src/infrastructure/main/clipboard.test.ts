@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { readClipboard, writeClipboard } from './clipboard'
 
 describe('readClipboard', () => {
+  it('supports a read-only clipboard without optional write methods', async () => {
+    await expect(
+      writeClipboard({ read: async () => [], readText: async () => '' }, { text: 'text', html: '<p>text</p>' }),
+    ).resolves.toBeUndefined()
+  })
+
   it('rejects an oversized image before reading its bytes or falling back to text', async () => {
     const arrayBuffer = vi.fn(async () => new ArrayBuffer(1))
     const readText = vi.fn(async () => 'fallback')

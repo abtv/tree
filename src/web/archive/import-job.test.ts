@@ -83,6 +83,51 @@ const tricky = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x50, 0x4b, 0x07, 0x08, 0
 
 // @requirement PRODUCT.md §24.4
 describe('archive worker import job', () => {
+  it('bounds progress messages to changed integer percentages for large image sets', async () => {
+    const ids = Array.from({ length: 201 }, (_, index) => `image-${index}`)
+    const storage = memoryStorage(undefined)
+    const { importJob, messages } = job(storage)
+    const document = new TextEncoder().encode(JSON.stringify(headWithImages(ids)))
+
+    await importJob.prepare({ readDocument: async () => document, readImage: async () => tricky })
+
+    const progress = messages.filter((message) => message.type === 'progress')
+    expect(progress).toHaveLength(101)
+    expect(progress.map(({ imagesDone, imageCount }) => Math.floor((imagesDone * 100) / imageCount))).toEqual(
+      Array.from({ length: 101 }, (_, percent) => percent),
+    )
+    expect(progress.at(-1)).toEqual({ type: 'progress', imagesDone: 201, imageCount: 201 })
+    expect(messages.at(-1)).toEqual({
+      type: 'prepared',
+      incoming: { nodeCount: 202, imageCount: 201, missingImageCount: 0 },
+      current: 'none',
+    })
+    expect(storage.head).toBeUndefined()
+  })
+
+  it('reports the original commit failure even when staged-image cleanup also fails', async () => {
+    const original = headWithImages(['old'])
+    const storage = memoryStorage(original, { old: tricky })
+    storage.writeHead = async () => {
+      throw 'Storage disconnected'
+    }
+    storage.removeImages = async () => {
+      throw new Error('Cleanup unavailable')
+    }
+    const { importJob, messages } = job(storage)
+    await importJob.prepare(memoryFile(await exportArchive(headWithImages(['new']), { new: tricky })))
+
+    await importJob.commit()
+
+    expect(messages.at(-1)).toEqual({
+      type: 'error',
+      message: 'Your notes could not be replaced: Storage disconnected',
+    })
+    expect(storage.head).toEqual(original)
+    expect(storage.images.get('old')).toEqual(tricky)
+    expect(messages.some((message) => message.type === 'committed')).toBe(false)
+  })
+
   it('prepares an exported archive, reports both note counts, then replaces the head', async () => {
     const incoming = headWithImages(['a', 'b', 'missing'], 'Imported')
 

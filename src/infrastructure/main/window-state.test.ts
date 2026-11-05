@@ -12,12 +12,18 @@ import {
 } from './window-state'
 
 function createPath(): string {
-  return join(mkdtempSync(join(tmpdir(), 'tree-window-state-')), 'data', 'window-bounds.json')
+  return join(mkdtempSync(join(tmpdir(), 'tree-window-state-')), 'data', 'preferences', 'window-bounds.json')
 }
 
 const bounds: WindowBounds = { x: 120, y: 140, width: 900, height: 600 }
 
 describe('isValidWindowBounds', () => {
+  it.each(['x', 'y', 'width', 'height'] as const)('rejects a nonnumeric or nonfinite %s', (field) => {
+    for (const value of [undefined, null, '800', true, NaN, Infinity, -Infinity]) {
+      expect(isValidWindowBounds({ ...bounds, [field]: value })).toBe(false)
+    }
+  })
+
   it('accepts finite bounds at the application minimum size', () => {
     expect(isValidWindowBounds({ x: -10, y: 20, width: 640, height: 480 })).toBe(true)
   })
@@ -30,6 +36,28 @@ describe('isValidWindowBounds', () => {
 })
 
 describe('createWindowBoundsStore', () => {
+  it('does not overwrite saved geometry with invalid bounds', () => {
+    const path = createPath()
+    const store = createWindowBoundsStore(path)
+    store.save(bounds)
+
+    store.save({ ...bounds, width: 639 })
+
+    expect(store.load()).toEqual(bounds)
+  })
+
+  it('tolerates an unwritable preference path without damaging the blocking file', () => {
+    const path = createPath()
+    mkdirSync(dirname(dirname(path)), { recursive: true })
+    writeFileSync(dirname(path), 'blocking file')
+
+    expect(() => createWindowBoundsStore(path).save(bounds)).not.toThrow()
+    expect(() => createBooleanPreferenceStore(path).save(true)).not.toThrow()
+    expect(() => createAppearancePreferenceStore(path).save('dark')).not.toThrow()
+
+    expect(readFileSync(dirname(path), 'utf8')).toBe('blocking file')
+  })
+
   it('saves and loads bounds, creating the data directory', () => {
     const path = createPath()
     const store = createWindowBoundsStore(path)
@@ -170,6 +198,7 @@ describe('createDebouncedWindowBoundsSaver', () => {
       saver.flush()
 
       expect(saved).toEqual([{ ...bounds, y: 7 }])
+      expect(vi.getTimerCount()).toBe(0)
 
       vi.advanceTimersByTime(300)
 

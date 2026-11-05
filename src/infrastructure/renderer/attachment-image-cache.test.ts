@@ -34,6 +34,27 @@ function fakeDecoder(
 }
 
 describe('attachment image cache', () => {
+  it('keeps a new in-flight request deduplicated when a pre-clear request finishes', async () => {
+    const oldRead = deferred<Uint8Array | null>()
+    const newRead = deferred<Uint8Array | null>()
+    const read = vi.fn().mockReturnValueOnce(oldRead.promise).mockReturnValue(newRead.promise)
+    const cache = createAttachmentImageCache(read, fakeDecoder().decode, 64)
+    const oldRequest = cache.get('image')
+    cache.clear()
+    const newRequest = cache.get('image')
+
+    oldRead.resolve(bytes(4))
+    await oldRequest
+    const concurrent = cache.get('image')
+
+    expect(concurrent).toBe(newRequest)
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(cache.peek('image')).toBeUndefined()
+    newRead.resolve(bytes(4))
+    expect(await concurrent).toBe(await newRequest)
+    expect(cache.peek('image')).toBe(await newRequest)
+  })
+
   it('reads and decodes once and serves later requests from the cache', async () => {
     const read = vi.fn(async () => bytes(4))
     const decoder = fakeDecoder()

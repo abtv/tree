@@ -141,6 +141,12 @@ the permanent HTTPS address have separate storage. Before publication, explain
 that notes will not transfer automatically. The existing browser save and storage
 limitations are described in [Browser version](../src/web/README.md).
 
+Only one Tree tab or installed window may edit an origin's notes at a time. If
+startup cannot open local storage after acquiring ownership, that page retains
+ownership until it closes or reloads. It shows: `Tree could not open local storage.
+Reload this tab to try again. To use Tree in another tab, close this tab first.`
+The editor does not open on this failure.
+
 The browser Quit command flushes pending edits and requests window closure only
 after saving succeeds. It does not show a successful-save dialog. If the browser
 refuses scripted closure, the saved editor stays open and the user can close it

@@ -2,6 +2,167 @@ import { describe, expect, it } from 'vitest'
 import { extractClipboardLinks } from './clipboard-links'
 
 describe('clipboard link extraction', () => {
+  it.each(['data=x" > href="url" extra="x', 'data=x" name> href="url" extra="x', 'data=x"> href="url" extra="x'])(
+    'does not recover an href past a malformed attribute terminator: %s',
+    (attributes) => {
+      const html = `<a ${attributes}>label</a>`
+
+      expect(extractClipboardLinks(html, 'label')).toEqual([{ start: 0, end: 5, url: '' }])
+    },
+  )
+
+  it('does not invent a line break from a malformed tag containing a break-like suffix', () => {
+    const html = '<a href="url">before<foo<br>after</a>'
+
+    expect(extractClipboardLinks(html, 'before\nafter')).toEqual([])
+  })
+
+  it('does not invent a URL from an unterminated href after a malformed unrelated attribute', () => {
+    const html = '<a data=unquoted" href="https://example.com>label</a>'
+
+    expect(extractClipboardLinks(html, 'label')).toEqual([{ start: 0, end: 5, url: '' }])
+  })
+
+  it('preserves the entire link label through unknown inline elements', () => {
+    const html = '<a href="https://example.com">before<ba>inside</ba>after</a>'
+
+    expect(extractClipboardLinks(html, 'beforeinsideafter')).toEqual([
+      { start: 0, end: 17, url: 'https://example.com' },
+    ])
+  })
+
+  it.each(['/', '>'])('keeps an href after a quoted attribute ending in %j', (title) => {
+    const html = `<a title="${title}" href="https://example.com">label</a>`
+
+    expect(extractClipboardLinks(html, 'label')).toEqual([{ start: 0, end: 5, url: 'https://example.com' }])
+  })
+
+  it.each(['<', '</', 'text<', 'text</'])('does not throw on truncated markup %j', (html) => {
+    expect(extractClipboardLinks(html, 'text')).toEqual([])
+  })
+
+  it.each(['/', ' /'])('does not read an href after a self-closing marker %j', (marker) => {
+    expect(extractClipboardLinks(`<a${marker} href="unreachable">label</a>`, 'label')).toEqual([
+      { start: 0, end: 5, url: '' },
+    ])
+  })
+
+  it('ignores orphan closing anchors before a real link with the same label', () => {
+    expect(extractClipboardLinks('</a >label<a href="url">label</a>', 'labellabel')).toEqual([
+      { start: 5, end: 10, url: 'url' },
+    ])
+  })
+
+  it('does not use a later duplicate href when the first href has no quoted value', () => {
+    for (const attributes of ['href href="later"', 'href=unquoted href="later"']) {
+      expect(extractClipboardLinks(`<a ${attributes}>label</a>`, 'label')).toEqual([{ start: 0, end: 5, url: '' }])
+    }
+  })
+
+  it('skips an entire unquoted attribute value containing href-like text', () => {
+    expect(extractClipboardLinks('<a data-x=href="wrong" href="right">label</a>', 'label')).toEqual([
+      { start: 0, end: 5, url: 'right' },
+    ])
+  })
+
+  it.each(['<br>', '<BR />', '<br\t/\n>', '<br\u00a0>', '<br /  >'])('retains %s inside a link label', (tag) => {
+    expect(extractClipboardLinks(`<a href="url">first${tag}second</a>`, 'first\nsecond')).toEqual([
+      { start: 0, end: 12, url: 'url' },
+    ])
+  })
+
+  it('assigns successive identical labels to their own URLs', () => {
+    expect(extractClipboardLinks('<a href="one">x</a><a href="two">x</a>', 'xx')).toEqual([
+      { start: 0, end: 1, url: 'one' },
+      { start: 1, end: 2, url: 'two' },
+    ])
+  })
+
+  it('ignores angle brackets inside double-quoted attributes', () => {
+    expect(extractClipboardLinks('<a title="a>b" href="url">label</a>', 'label')).toEqual([
+      { start: 0, end: 5, url: 'url' },
+    ])
+  })
+
+  it.each(['<a', '<a/', '<a href="url">label</a'])('ignores unfinished tag %s', (html) => {
+    expect(extractClipboardLinks(html, 'label')).toEqual([])
+  })
+
+  it('does not treat a closing tag as the next opening anchor', () => {
+    expect(extractClipboardLinks('</a>prefix<a href="url">label</a>', 'prefixlabel')).toEqual([
+      { start: 6, end: 11, url: 'url' },
+    ])
+  })
+
+  it('keeps literal less-than characters at the end of a label', () => {
+    expect(extractClipboardLinks('<a href="url">value <</a>', 'value <')).toEqual([{ start: 0, end: 7, url: 'url' }])
+  })
+
+  it('skips unquoted unrelated attributes without reading them as href', () => {
+    expect(extractClipboardLinks('<a data-x=value>label</a>', 'label')).toEqual([{ start: 0, end: 5, url: '' }])
+    expect(extractClipboardLinks('<a href=unquoted title="other">label</a>', 'label')).toEqual([
+      { start: 0, end: 5, url: '' },
+    ])
+  })
+
+  it.each([' ', '\t', '\n', '\r', '\f'])('accepts HTML attribute whitespace %j and mixed-case names', (space) => {
+    expect(
+      extractClipboardLinks(
+        `<A${space}title='a>b'${space}HREF${space}=${space}'https://example.com'>label</A>`,
+        'label',
+      ),
+    ).toEqual([{ start: 0, end: 5, url: 'https://example.com' }])
+  })
+
+  it.each([
+    ['&AMP;&QUOT;&LT;&GT;&NBSP;', '&"<>\u00a0'],
+    ['&#x1F600;&#128512;', '😀😀'],
+    ['&#55296;&#57343;&#1114112;', '\ufffd\ufffd\ufffd'],
+    ['&#55295;&#57344;&#1114111;', '\ud7ff\ue000\udbff\udfff'],
+  ])('decodes label references %s without changing UTF-16 ranges', (encoded, label) => {
+    expect(extractClipboardLinks(`<a href="https://example.com">${encoded}</a>`, label)).toEqual([
+      { start: 0, end: label.length, url: 'https://example.com' },
+    ])
+  })
+
+  it.each(['<abbr>wrong</abbr>', '</a>wrong', '<a href="unterminated>wrong', '<a href="x">wrong'])(
+    'ignores incomplete or non-anchor markup %s',
+    (html) => {
+      expect(extractClipboardLinks(html, 'wrong')).toEqual([])
+    },
+  )
+
+  it.each(['disabled href="url"', 'data-x=value href="url"', 'title="href=wrong" href="url"', '= href="url"'])(
+    'finds href after unrelated attributes: %s',
+    (attributes) => {
+      expect(extractClipboardLinks(`<a ${attributes}>label</a>`, 'label')).toEqual([{ start: 0, end: 5, url: 'url' }])
+    },
+  )
+
+  it.each(['href=unquoted', 'href', 'title="other"', '/'])('does not invent a URL for %s', (attributes) => {
+    expect(extractClipboardLinks(`<a ${attributes}>label</a>`, 'label')).toEqual([{ start: 0, end: 5, url: '' }])
+  })
+
+  it('counts unmatched anchors toward the scanning limit', () => {
+    const html = '<a href="x">absent</a>'.repeat(100) + '<a href="last">present</a>'
+
+    expect(extractClipboardLinks(html, 'present')).toEqual([])
+  })
+
+  it('preserves duplicate unlinked text and markup before the actual link', () => {
+    expect(extractClipboardLinks('<b>label</b> &amp; <a href="url"><i>label</i></a>', 'label & label')).toEqual([
+      { start: 8, end: 13, url: 'url' },
+    ])
+  })
+
+  it('accepts the HTML size boundary but rejects one additional character', () => {
+    const anchor = '<a href="url">label</a>'
+    const html = anchor + ' '.repeat(1_048_576 - anchor.length)
+
+    expect(extractClipboardLinks(html, 'label')).toEqual([{ start: 0, end: 5, url: 'url' }])
+    expect(extractClipboardLinks(html + ' ', 'label')).toEqual([])
+  })
+
   it('retains the original href for a partial hyperlink label', () => {
     expect(extractClipboardLinks('<a href="https://example.com">example.com</a>', 'example.com')).toEqual([
       { start: 0, end: 11, url: 'https://example.com' },

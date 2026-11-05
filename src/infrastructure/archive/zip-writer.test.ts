@@ -37,6 +37,33 @@ function payloadWith(signature: number[]): Uint8Array {
 }
 
 describe('ZIP writer', () => {
+  it.each(['stored', 'deflated'] as const)('reports an oversized %s entry name as a ZIP error', (method) => {
+    const writer = createZipWriter(() => undefined)
+    const name = 'x'.repeat(65_536)
+
+    expect(() => {
+      if (method === 'stored') writer.addStored(name, new Uint8Array([1]))
+      else writer.addDeflated(name, new Uint8Array([1]))
+    }).toThrow('filename too long')
+  })
+
+  it.each(['stored', 'deflated', 'finish'] as const)('rejects %s after finalization', (operation) => {
+    const chunks: Uint8Array[] = []
+    const writer = createZipWriter((chunk) => chunks.push(chunk.slice()))
+    writer.addStored('kept.txt', new Uint8Array([1, 2]))
+    writer.finish()
+    const completed = concat(chunks)
+
+    expect(() => {
+      if (operation === 'stored') writer.addStored('late.txt', new Uint8Array([3]))
+      else if (operation === 'deflated') writer.addDeflated('late.txt', new Uint8Array([3]))
+      else writer.finish()
+    }).toThrow()
+
+    expect(concat(chunks)).toEqual(completed)
+    expect([...readArchive(completed)]).toEqual([['kept.txt', new Uint8Array([1, 2])]])
+  })
+
   it('writes deflated and stored entries in order with data descriptors', () => {
     const document = new TextEncoder().encode(JSON.stringify({ text: 'a'.repeat(5000) }))
     const image = payloadWith([1, 2, 3, 4])
@@ -116,6 +143,9 @@ describe('ZIP writer', () => {
     const archive = writeArchive([{ name: 'document.json', bytes: new Uint8Array(0), deflate: true }])
 
     expect(readArchive(archive).get('document.json')).toEqual(new Uint8Array(0))
+    expect(listCentralEntries(archive).map(({ name, method }) => ({ name, method }))).toEqual([
+      { name: 'document.json', method: 8 },
+    ])
   })
 
   // ADR 0022, D3: fflate's Zip records entry sizes only in data descriptors, and its streaming

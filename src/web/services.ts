@@ -52,7 +52,15 @@ export async function installBrowserPrototype(): Promise<{
       })
       .catch(reject)
   })
-  const db = await openDatabase()
+  let db: Awaited<ReturnType<typeof openDatabase>>
+  try {
+    db = await openDatabase()
+  } catch (cause) {
+    throw new Error(
+      'Tree could not open local storage. Reload this tab to try again. To use Tree in another tab, close this tab first.',
+      { cause },
+    )
+  }
   // Only this writer tab may remove what an earlier, unfinished import stored (PRODUCT §24.4).
   await sweepStagedImages(db).catch(() => {})
   // While an import replaces the stored notes, this session must not write them (PRODUCT §24.4).

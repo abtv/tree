@@ -92,7 +92,16 @@ describe('configureWebContentsSecurity', () => {
     const openExternal = vi.fn()
 
     configureWebContentsSecurity(app as unknown as Pick<App, 'on'>, 'file:///app/index.html', openExternal)
+    expect(app.on).toHaveBeenCalledWith('web-contents-created', expect.any(Function))
     onCreated?.({}, contents as unknown as WebContents)
+
+    const navigate = listeners.get('will-navigate') as (event: { preventDefault(): void }, url: string) => void
+    const blockedNavigation = { preventDefault: vi.fn() }
+    navigate(blockedNavigation, 'https://evil.example/')
+    expect(blockedNavigation.preventDefault).toHaveBeenCalledOnce()
+    const allowedNavigation = { preventDefault: vi.fn() }
+    navigate(allowedNavigation, 'file:///app/index.html#node')
+    expect(allowedNavigation.preventDefault).not.toHaveBeenCalled()
 
     const preventDefault = vi.fn()
     const frameNavigation = listeners.get('will-frame-navigate') as
@@ -107,6 +116,10 @@ describe('configureWebContentsSecurity', () => {
 
     redirect?.({ preventDefault, url: 'https://evil.example/redirected' })
 
+    expect(preventDefault).toHaveBeenCalledTimes(2)
+
+    frameNavigation?.({ preventDefault, url: 'file:///app/index.html' })
+    redirect?.({ preventDefault, url: 'file:///app/index.html' })
     expect(preventDefault).toHaveBeenCalledTimes(2)
 
     const webviewAttachment = listeners.get('will-attach-webview') as
@@ -145,6 +158,22 @@ describe('reportMainProcessError', () => {
 })
 
 describe('surfaceWindow', () => {
+  it('focuses a visible inactive window without restoring it', () => {
+    const window = {
+      isDestroyed: () => false,
+      isFocused: () => false,
+      isMinimized: () => false,
+      restore: vi.fn(),
+      show: vi.fn(),
+      focus: vi.fn(),
+    }
+
+    surfaceWindow(window)
+
+    expect(window.restore).not.toHaveBeenCalled()
+    expect(window.show).toHaveBeenCalledOnce()
+    expect(window.focus).toHaveBeenCalledOnce()
+  })
   it('does nothing for a destroyed window', () => {
     const window = {
       isDestroyed: () => true,
@@ -209,6 +238,9 @@ describe('isAllowedExternalUrl', () => {
 })
 
 describe('isAllowedRendererUrl', () => {
+  it('rejects a different scheme even when the host and document path match', () => {
+    expect(isAllowedRendererUrl('https://tree/index.html', 'app://tree/index.html')).toBe(false)
+  })
   it('allows only the configured renderer document', () => {
     expect(isAllowedRendererUrl('file:///app/renderer/index.html', 'file:///app/renderer/index.html')).toBe(true)
     expect(isAllowedRendererUrl('file:///app/renderer/other.html', 'file:///app/renderer/index.html')).toBe(false)
@@ -253,6 +285,13 @@ describe('resolveRendererUrl', () => {
       isDevelopment: false,
     })
   })
+
+  it('uses the packaged document when the environment URL is empty', () => {
+    expect(resolveRendererUrl(false, '', packagedDocumentUrl)).toEqual({
+      url: packagedDocumentUrl,
+      isDevelopment: false,
+    })
+  })
 })
 
 describe('configureRendererSessionSecurity', () => {
@@ -286,6 +325,19 @@ describe('configureRendererSessionSecurity', () => {
     >
     return { session, onBeforeRequest }
   }
+
+  it.each([
+    ['not a url', 'app://tree/index.html'],
+    ['https://tree/asset.js', 'not a url'],
+  ])('denies request %s with renderer URL %s', (request, renderer) => {
+    const { session, onBeforeRequest } = createSession()
+    configureRendererSessionSecurity(session, { url: renderer, isDevelopment: false })
+    const callback = vi.fn()
+
+    onBeforeRequest.mock.calls[0]![1]({ url: request }, callback)
+
+    expect(callback).toHaveBeenCalledExactlyOnceWith({ cancel: true })
+  })
 
   it('disables the spellchecker', () => {
     const { session } = createSession()

@@ -13,6 +13,62 @@ import { decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 
 describe('renderer Electron services', () => {
+  it('propagates recent-node save failures from the bridge', async () => {
+    const failure = new Error('history storage unavailable')
+    window.treeApi = {
+      ...window.treeApi,
+      setRecentNodes: vi.fn(async () => {
+        throw failure
+      }),
+    }
+
+    await expect(createElectronEditorServices().saveRecentNodes!(['node-1'])).rejects.toBe(failure)
+  })
+
+  it('forwards history values and suppresses recent-node writes during replacement', async () => {
+    const bridge = {
+      ...window.treeApi,
+      getEmojiHistory: vi.fn(async () => ['smile']),
+      setEmojiHistory: vi.fn(async () => undefined),
+      getRecentNodes: vi.fn(async () => ['node-1']),
+      setRecentNodes: vi.fn(async () => undefined),
+    }
+    window.treeApi = bridge
+    const services = createElectronEditorServices()
+
+    await expect(services.loadEmojiHistory!()).resolves.toEqual(['smile'])
+    await expect(services.loadRecentNodes!()).resolves.toEqual(['node-1'])
+    await services.saveEmojiHistory!(['heart'])
+    await services.saveRecentNodes!(['node-2'])
+
+    expect(bridge.setEmojiHistory).toHaveBeenCalledExactlyOnceWith(['heart'])
+    expect(bridge.setRecentNodes).toHaveBeenCalledExactlyOnceWith(['node-2'])
+    suspendNotesWrites()
+    try {
+      await services.saveRecentNodes!(['stale'])
+      expect(bridge.setRecentNodes).toHaveBeenCalledTimes(1)
+    } finally {
+      resumeNotesWrites()
+    }
+  })
+
+  it('supports bridges without optional history or rich clipboard methods', async () => {
+    const bridge = { ...window.treeApi }
+    delete bridge.getEmojiHistory
+    delete bridge.setEmojiHistory
+    delete bridge.getRecentNodes
+    delete bridge.setRecentNodes
+    delete bridge.writeClipboardContent
+    window.treeApi = bridge
+    const services = createElectronEditorServices()
+
+    await expect(services.loadEmojiHistory!()).resolves.toEqual([])
+    await expect(services.loadRecentNodes!()).resolves.toEqual([])
+    await expect(services.saveEmojiHistory!(['smile'])).resolves.toBeUndefined()
+    await expect(services.saveRecentNodes!(['root'])).resolves.toBeUndefined()
+    await expect(services.writeClipboardContent!({ kind: 'text', text: 'text' })).resolves.toBeUndefined()
+  })
+
   it('provides the current local calendar day without an IPC call', () => {
     vi.useFakeTimers()
     try {
@@ -197,6 +253,26 @@ describe('renderer Electron services', () => {
     expect(api.readAttachment).toHaveBeenCalledTimes(1)
   })
 
+  it('retains decoded images up to the configured 512 MiB budget and evicts beyond it', async () => {
+    const width = vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(4096)
+    const height = vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(4096)
+    api.readAttachment = vi.fn(async () => new Uint8Array([1]))
+    try {
+      const first = await attachmentImageCache.get('image-0')
+      for (let index = 1; index < 7; index += 1) await attachmentImageCache.get(`image-${index}`)
+
+      expect(attachmentImageCache.peek('image-0')).toBe(first)
+
+      await attachmentImageCache.get('image-7')
+
+      expect(attachmentImageCache.peek('image-0')).toBeUndefined()
+      expect(attachmentImageCache.peek('image-1')).toBeDefined()
+    } finally {
+      width.mockRestore()
+      height.mockRestore()
+    }
+  })
+
   it('keeps cached attachment read failures as rejected promises', async () => {
     const failure = new Error('renderer bridge failed')
     api.readAttachment = vi.fn(async () => {
@@ -228,5 +304,27 @@ describe('renderer Electron services', () => {
     image.release()
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:attachment')
+  })
+
+  it('creates a PNG blob and drops the image source when decoded pixels are released', async () => {
+    const element = document.createElement('img')
+    const constructor = vi.spyOn(globalThis, 'Image').mockImplementation(function () {
+      return element
+    })
+    const createUrl = vi.spyOn(URL, 'createObjectURL')
+    try {
+      const decoded = await decodeAttachmentImage(new Uint8Array([1, 2, 3]))
+
+      expect(createUrl).toHaveBeenCalledWith(expect.objectContaining({ type: 'image/png', size: 3 }))
+      expect(element.getAttribute('src')).toBe('blob:attachment')
+
+      decoded.release()
+
+      expect(element.hasAttribute('src')).toBe(false)
+      expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:attachment')
+    } finally {
+      constructor.mockRestore()
+      createUrl.mockRestore()
+    }
   })
 })

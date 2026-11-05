@@ -70,6 +70,25 @@ describe('handleRendererProtocol', () => {
     return protocol.handle.mock.calls[0]![1] as Handler
   }
 
+  it.each([
+    ['index.html', 'text/html; charset=utf-8'],
+    ['assets/app.js', 'text/javascript; charset=utf-8'],
+    ['assets/font.ttf', 'font/ttf'],
+    ['assets/icon.PNG', 'image/png'],
+  ])('serves %s with its browser content type', async (path, contentType) => {
+    const body = new Uint8Array([0, 127, 255])
+    const read = vi.fn(async () => body)
+    const handler = install(read)
+
+    const response = await handler(new Request(`app://tree/${path}`))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe(contentType)
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(body)
+    expect(read).toHaveBeenCalledExactlyOnceWith(join(root, path))
+  })
+
   it('serves a renderer file with its content type and nosniff', async () => {
     const readFile = vi.fn(async () => new TextEncoder().encode('body { }'))
     const handler = install(readFile)

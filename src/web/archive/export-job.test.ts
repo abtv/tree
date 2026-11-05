@@ -41,6 +41,70 @@ const chunksOf = (posts: Awaited<ReturnType<typeof run>>) =>
   posts.flatMap(({ message }) => (message.type === 'chunk' ? [new Uint8Array(message.chunk)] : []))
 
 describe('archive worker export job', () => {
+  it('bounds progress notifications for hundreds of images while retaining the final count', async () => {
+    const ids = Array.from({ length: 201 }, (_, index) => `image-${index}`)
+    const images = Object.fromEntries(ids.map((id) => [id, new Uint8Array([1])]))
+
+    const posts = await run(headWithImages(ids), images)
+
+    const progress = posts.flatMap(({ message }) => (message.type === 'progress' ? [message] : []))
+    expect(progress).toHaveLength(101)
+    expect(progress.map(({ imagesDone, imageCount }) => Math.floor((imagesDone * 100) / imageCount))).toEqual(
+      Array.from({ length: 101 }, (_, percent) => percent),
+    )
+    expect(progress.at(-1)).toEqual({ type: 'progress', imagesDone: 201, imageCount: 201 })
+    expect(posts.at(-1)!.message).toMatchObject({ type: 'done', summary: { imageCount: 201, missingImageCount: 0 } })
+  })
+
+  it('flushes accumulated small image chunks without losing their order or contents', async () => {
+    const images = {
+      a: new Uint8Array(400_000).fill(1),
+      b: new Uint8Array(400_000).fill(2),
+      c: new Uint8Array(400_000).fill(3),
+    }
+    const head = headWithImages(Object.keys(images))
+
+    const posts = await run(head, images)
+
+    expect(chunksOf(posts).length).toBeGreaterThan(1)
+    const entries = readArchive(concat(chunksOf(posts)))
+    expect([...entries.keys()]).toEqual([
+      'document.json',
+      'attachments/a.png',
+      'attachments/b.png',
+      'attachments/c.png',
+    ])
+    for (const [id, image] of Object.entries(images))
+      expect(sameBytes(entries.get(`attachments/${id}.png`), image)).toBe(true)
+    expect(posts.at(-1)!.message).toMatchObject({ type: 'done', summary: { imageCount: 3, missingImageCount: 0 } })
+  })
+
+  it('transfers an exact one-MiB image directly and does not merge it with pending headers', async () => {
+    const image = new Uint8Array(CHUNK_FLUSH_BYTES).fill(7)
+
+    const posts = await run(headWithImages(['boundary']), { boundary: image })
+
+    const chunks = chunksOf(posts)
+    expect(chunks.some((chunk) => chunk.buffer === image.buffer)).toBe(true)
+    expect(sameBytes(readArchive(concat(chunks)).get('attachments/boundary.png'), image)).toBe(true)
+  })
+
+  it('keeps the caller buffer intact when transferring a zero-offset partial view', async () => {
+    const backing = new Uint8Array(CHUNK_FLUSH_BYTES + 100).fill(9)
+    const image = backing.subarray(0, CHUNK_FLUSH_BYTES)
+    const messages: ArchiveWorkerMessage[] = []
+
+    await runExportJob(
+      { readHead: async () => headWithImages(['view']), readImage: async () => image },
+      (message, transfer = []) => messages.push(structuredClone(message, { transfer })),
+    )
+
+    expect(backing.byteLength).toBe(CHUNK_FLUSH_BYTES + 100)
+    const chunks = messages.flatMap((message) => (message.type === 'chunk' ? [new Uint8Array(message.chunk)] : []))
+    expect(sameBytes(readArchive(concat(chunks)).get('attachments/view.png'), image)).toBe(true)
+    expect(messages.at(-1)).toMatchObject({ type: 'done' })
+  })
+
   it('streams the archive as transferred chunks, then reports a summary', async () => {
     const head = headWithImages(['a', 'b'])
     const a = new Uint8Array([1, 2, 3])

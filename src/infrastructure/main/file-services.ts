@@ -382,7 +382,7 @@ export function createFileServices(
     } catch {
       return
     }
-    const safetyIndex = generations.findIndex((generation) => Date.now() - generation.modifiedMs >= SAFETY_WINDOW_MS)
+    const safetyIndex = generations.findIndex((generation) => Date.now() - generation.modifiedMs > SAFETY_WINDOW_MS)
     // Without an old-enough generation, the age rule cannot select a safety copy, so keep the newest MAX_RETAINED_GENERATIONS.
     // The autosave cadence makes this fallback unreachable during ordinary editing.
     const retainedCount =

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   mocks.readdir.mockImplementation((path) => actual.readdir(path))
   return {
     ...actual,
+    link: vi.fn(actual.link),
+    mkdir: vi.fn(actual.mkdir),
     open: vi.fn(actual.open),
     readFile: vi.fn(actual.readFile),
     readdir: mocks.readdir,
@@ -65,6 +67,209 @@ async function generationFiles(directory: string): Promise<string[]> {
 }
 
 describe('file services', () => {
+  it('leaves unrelated files in the attachment directory untouched during cleanup', async () => {
+    const { directory, services } = await servicesForTest()
+    await services.writeAttachment('orphan', new Uint8Array([1]))
+    const unrelated = join(directory, 'attachments', 'readme.txt')
+    await writeFile(unrelated, 'Unrelated contents')
+
+    await services.cleanupAttachments([])
+
+    expect(await readFile(unrelated, 'utf8')).toBe('Unrelated contents')
+    await expect(services.readAttachment('orphan')).resolves.toBeNull()
+  })
+
+  it('logs the original filesystem failure even when persistence debugging is disabled', async () => {
+    const { directory, services } = await servicesForTest()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const previous = process.env['TREE_PERSISTENCE_DEBUG']
+    delete process.env['TREE_PERSISTENCE_DEBUG']
+    const failure = Object.assign(new Error('image access denied'), { code: 'EACCES' })
+    vi.mocked(readFile).mockRejectedValueOnce(failure)
+
+    try {
+      await expect(services.readAttachment('image')).rejects.toBe(failure)
+
+      expect(errors).toHaveBeenCalledExactlyOnceWith(
+        `[persistence] readAttachment failure paths=${join(directory, 'attachments', 'image.png')} error=image access denied`,
+      )
+      expect(info).not.toHaveBeenCalled()
+    } finally {
+      if (previous === undefined) delete process.env['TREE_PERSISTENCE_DEBUG']
+      else process.env['TREE_PERSISTENCE_DEBUG'] = previous
+      errors.mockRestore()
+      info.mockRestore()
+    }
+  })
+
+  it('retains a generation strictly older than 30 seconds at the exact safety boundary', async () => {
+    const { directory, services } = await servicesForTest()
+    const now = new Date('2026-01-01T00:01:00Z').getTime()
+    for (let index = 1; index <= 22; index += 1) {
+      const path = join(directory, `document.${index}.json`)
+      await writeFile(path, JSON.stringify(stateWithoutImage(`Generation ${index}`)))
+      const age = index <= 20 ? index * 1000 : index === 21 ? 30_000 : 31_000
+      await utimes(path, (now - age) / 1000, (now - age) / 1000)
+    }
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    try {
+      await services.save(stateWithoutImage('New'))
+
+      expect(await generationFiles(directory)).toContain('document.22.json')
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it('fails recovery when the directory cannot be enumerated', async () => {
+    const { directory, services } = await servicesForTest()
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage()))
+    const failure = Object.assign(new Error('directory denied'), { code: 'EACCES' })
+    mocks.readdir.mockRejectedValueOnce(failure)
+
+    await expect(services.load()).rejects.toBe(failure)
+
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(stateWithoutImage())
+  })
+
+  it('reads the primary only once while selecting a recovery document', async () => {
+    const { directory, services } = await servicesForTest()
+    const path = join(directory, 'document.json')
+    await writeFile(path, JSON.stringify(stateWithoutImage()))
+    vi.mocked(readFile).mockClear()
+
+    await expect(services.load()).resolves.toEqual(stateWithoutImage())
+
+    expect(vi.mocked(readFile).mock.calls.filter(([file]) => file === path)).toHaveLength(1)
+  })
+
+  it.each([
+    ['document.0.json', 'document.json.bak'],
+    ['document.json.bak', 'document.0.json'],
+  ])('recovers generation zero with directory listing %j then %j', async (first, second) => {
+    const { directory, services } = await servicesForTest()
+    const when = new Date('2026-01-01T00:00:00Z')
+    for (const name of [first, second]) {
+      await writeFile(join(directory, name), JSON.stringify(stateWithoutImage(name)))
+      await utimes(join(directory, name), when, when)
+    }
+    mocks.readdir.mockResolvedValueOnce([first, second])
+
+    await expect(services.load()).resolves.toEqual(stateWithoutImage('document.0.json'))
+  })
+
+  it('preserves the newest read error when an older document fails validation', async () => {
+    const { directory } = await servicesForTest()
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage()))
+    await writeFile(join(directory, 'document.1.json'), '{"version":2,"document":{"roots":"invalid"}}')
+    await ageFile(join(directory, 'document.1.json'), 60)
+    const failure = Object.assign(new Error('primary access denied'), { code: 'EACCES' })
+    vi.mocked(readFile).mockRejectedValueOnce(failure)
+
+    await expect(findNewestValidDocument(directory)).resolves.toEqual({ error: failure })
+  })
+
+  it.each(['document.1.json', 'document.json'])(
+    'reports metadata access failure for %s instead of treating the profile as empty',
+    async (name) => {
+      const { directory, services } = await servicesForTest()
+      await writeFile(join(directory, name), JSON.stringify(stateWithoutImage()))
+      const failure = Object.assign(new Error('metadata denied'), { code: 'EACCES' })
+      vi.mocked(stat).mockRejectedValueOnce(failure)
+
+      await expect(services.load()).rejects.toBe(failure)
+
+      expect(JSON.parse(await readFile(join(directory, name), 'utf8'))).toEqual(stateWithoutImage())
+    },
+  )
+
+  it('continues recovery when a listed generation disappears before its metadata is read', async () => {
+    const { directory, services } = await servicesForTest()
+    await writeFile(join(directory, 'document.json'), JSON.stringify(stateWithoutImage()))
+    mocks.readdir.mockResolvedValueOnce(['document.1.json'])
+
+    await expect(services.load()).resolves.toEqual(stateWithoutImage())
+  })
+
+  it.each(['{ broken', '{"version":999}'])(
+    'reports the newest candidate failure when all recovery candidates are invalid: %s',
+    async (contents) => {
+      const { directory } = await servicesForTest()
+      await writeFile(join(directory, 'document.json'), contents)
+      const expected = await findNewestValidDocument(directory)
+      await writeFile(join(directory, 'document.1.json'), '{ different failure')
+      await ageFile(join(directory, 'document.1.json'), 60)
+
+      const result = await findNewestValidDocument(directory)
+
+      expect(result).toEqual(expected)
+      expect(result).toHaveProperty('error')
+      expect(await readFile(join(directory, 'document.json'), 'utf8')).toBe(contents)
+    },
+  )
+
+  it('preserves consecutive generations within one session without overwriting earlier states', async () => {
+    const { directory, services } = await servicesForTest()
+
+    for (const text of ['First', 'Second', 'Third', 'Fourth']) {
+      await services.save(stateWithoutImage(text))
+    }
+
+    expect(await generationFiles(directory)).toEqual(['document.1.json', 'document.2.json', 'document.3.json'])
+    for (const [index, text] of ['First', 'Second', 'Third'].entries()) {
+      expect(JSON.parse(await readFile(join(directory, `document.${index + 1}.json`), 'utf8'))).toEqual(
+        stateWithoutImage(text),
+      )
+    }
+  })
+
+  it.each(['prefix-document.99.json', 'document.99.json.extra'])(
+    'ignores the unrelated file %s during recovery and generation numbering',
+    async (name) => {
+      const { directory, services } = await servicesForTest()
+      const unrelated = JSON.stringify(stateWithoutImage('Unrelated'))
+      await writeFile(join(directory, name), unrelated)
+
+      await expect(services.load()).resolves.toBeNull()
+      await services.save(stateWithoutImage('First'))
+      await services.save(stateWithoutImage('Second'))
+
+      expect(await generationFiles(directory)).toEqual(['document.1.json'])
+      expect(await readFile(join(directory, name), 'utf8')).toBe(unrelated)
+    },
+  )
+
+  it.each([
+    ['document.json', 'document.json.tmp'],
+    ['document.json.tmp', 'document.1.json'],
+    ['document.0.json', 'document.json.bak'],
+  ])('prefers %s over %s when modification times tie', async (preferred, fallback) => {
+    const { directory } = await servicesForTest()
+    const when = new Date('2026-01-01T00:00:00Z')
+    for (const name of [fallback, preferred]) {
+      await writeFile(join(directory, name), JSON.stringify(stateWithoutImage(name)))
+      await utimes(join(directory, name), when, when)
+    }
+
+    await expect(findNewestValidDocument(directory)).resolves.toEqual({
+      path: join(directory, preferred),
+      value: stateWithoutImage(preferred),
+    })
+  })
+
+  it('retains a committed save when generation enumeration fails during pruning', async () => {
+    const { directory, services } = await servicesForTest()
+    await services.save(stateWithoutImage('First'))
+    mocks.readdir.mockRejectedValueOnce(new Error('pruning unavailable'))
+
+    await expect(services.save(stateWithoutImage('Second'))).resolves.toBeUndefined()
+
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(stateWithoutImage('Second'))
+    expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(stateWithoutImage('First'))
+  })
+
   it('saves and loads a versioned state without absolute attachment paths', async () => {
     const { directory, services } = await servicesForTest()
     const state = {
@@ -594,8 +799,13 @@ describe('file services', () => {
       expect.arrayContaining([
         expect.objectContaining({ operation: 'save', phase: 'start', paths: expect.arrayContaining([directory]) }),
         expect.objectContaining({ operation: 'save', phase: 'success' }),
-        expect.objectContaining({ operation: 'readAttachment', phase: 'success' }),
-        expect.objectContaining({ operation: 'writeAttachment', phase: 'failure', error: expect.any(String) }),
+        { operation: 'readAttachment', phase: 'success', paths: [join(directory, 'attachments', 'missing.png')] },
+        expect.objectContaining({
+          operation: 'writeAttachment',
+          phase: 'failure',
+          paths: [join(directory, 'attachments', 'bad/id.png')],
+          error: expect.any(String),
+        }),
       ]),
     )
   })
@@ -936,11 +1146,11 @@ describe('save interruption recovery', () => {
 describe('notes export and import support', () => {
   const NOW = new Date(2026, 9, 23, 14, 5, 9)
 
-  async function archiveServicesForTest() {
+  async function archiveServicesForTest(logger: Parameters<typeof createFileServices>[1] = () => {}) {
     const userData = await mkdtemp(join(tmpdir(), 'tree-file-services-archive-'))
     temporaryDirectories.push(userData)
     const directory = join(userData, 'data')
-    const create = () => createFileServices(directory, () => {}, { userDataDirectory: userData, now: () => NOW })
+    const create = () => createFileServices(directory, logger, { userDataDirectory: userData, now: () => NOW })
     return { userData, directory, services: create(), create }
   }
 
@@ -954,6 +1164,34 @@ describe('notes export and import support', () => {
     await writeFile(join(staging, 'attachments', `${imageId}.png`), 'imported image')
     return staging
   }
+
+  it('identifies affected paths in recovery, history, cleanup, snapshot and replacement diagnostics', async () => {
+    const logger = vi.fn()
+    const { directory, services } = await archiveServicesForTest(logger)
+
+    await services.load()
+    await services.saveRecentNodes!(['root'])
+    await services.loadRecentNodes!()
+    await services.cleanupAttachments([])
+    const snapshot = await services.snapshotDocuments()
+    const staging = await stageImport(services, stateWithImage('new'), 'new')
+    await services.replaceNotes(staging)
+
+    const operations = [
+      ['load', [join(directory, 'document.json'), join(directory, 'document.json.tmp'), directory]],
+      ['recentNodes', [directory]],
+      ['recentNodes', [directory]],
+      ['cleanupAttachments', [join(directory, 'attachments')]],
+      ['snapshotDocuments', [directory, snapshot]],
+      ['replaceNotes', [directory, staging]],
+    ] as const
+    expect(logger.mock.calls.map(([event]) => event)).toEqual(
+      operations.flatMap(([operation, paths]) => [
+        { operation, paths, phase: 'start' },
+        { operation, paths, phase: 'success' },
+      ]),
+    )
+  })
 
   it('replaces the notes and blocks the old session until the next load', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
@@ -1040,9 +1278,10 @@ describe('notes export and import support', () => {
     await mkdir(join(userData, '.notes-import'), { recursive: true })
     await writeFile(join(userData, '.notes-import', 'commit.json'), '{')
 
-    await expect(create().load()).rejects.toThrow(
-      'The notes import could not be completed: The import journal is damaged.',
-    )
+    await expect(create().load()).rejects.toMatchObject({
+      message: 'The notes import could not be completed: The import journal is damaged.',
+      cause: expect.objectContaining({ message: 'The import journal is damaged.' }),
+    })
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(saved)
   })
 
@@ -1186,6 +1425,119 @@ describe('notes export and import support', () => {
 
     expect(await readdir(snapshot)).toEqual([])
     expect(await findNewestValidDocument(snapshot)).toBeNull()
+  })
+
+  it('does not protect failed staging creation from abandoned-directory recovery', async () => {
+    const { userData, services } = await archiveServicesForTest()
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    let failedPath = ''
+    vi.mocked(mkdir).mockImplementationOnce(async (path) => {
+      failedPath = dirname(String(path))
+      throw new Error('staging unavailable')
+    })
+
+    await expect(services.createStagingDirectory()).rejects.toThrow('staging unavailable')
+    expect(failedPath).not.toBe('')
+    await real.mkdir(failedPath, { recursive: true })
+    await services.load()
+
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+  })
+
+  it('rejects a second replacement in the stale session without consuming its staging directory', async () => {
+    const { services } = await archiveServicesForTest()
+    await services.save(stateWithoutImage('Old'))
+    const first = await stageImport(services, stateWithImage('first'), 'first')
+    const second = await stageImport(services, stateWithImage('second'), 'second')
+    await services.replaceNotes(first)
+
+    await expect(services.replaceNotes(second)).rejects.toThrow('The notes were replaced.')
+
+    expect(JSON.parse(await readFile(join(second, 'document.json'), 'utf8'))).toEqual(stateWithImage('second'))
+    await expect(services.load()).resolves.toEqual(stateWithImage('first'))
+    await services.discardStagingDirectory(second)
+  })
+
+  it('preserves interrupted-save timestamps and recovery precedence in an export snapshot', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.save(stateWithoutImage('Primary'))
+    const temporary = join(directory, 'document.json.tmp')
+    await writeFile(temporary, JSON.stringify(stateWithoutImage('Older interrupted save')))
+    const accessed = new Date('2026-01-01T00:00:00Z')
+    const modified = new Date('2026-01-02T00:00:00Z')
+    await utimes(temporary, accessed, modified)
+
+    const snapshot = await services.snapshotDocuments()
+
+    expect((await stat(join(snapshot, 'document.json.tmp'))).mtimeMs).toBe(modified.getTime())
+    expect(await findNewestValidDocument(snapshot)).toEqual({
+      path: join(snapshot, 'document.json'),
+      value: stateWithoutImage('Primary'),
+    })
+    await services.releaseSnapshot(snapshot)
+  })
+
+  it('removes a partial export snapshot when linking an existing document fails', async () => {
+    const { userData, services } = await archiveServicesForTest()
+    await services.save(stateWithoutImage('Kept'))
+    const failure = Object.assign(new Error('link denied'), { code: 'EACCES' })
+    vi.mocked(link).mockRejectedValueOnce(failure)
+
+    await expect(services.snapshotDocuments()).rejects.toBe(failure)
+
+    expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+    await expect(services.load()).resolves.toEqual(stateWithoutImage('Kept'))
+  })
+
+  it('continues a snapshot when a listed generation disappears before it can be linked', async () => {
+    const { directory, services } = await archiveServicesForTest()
+    await services.save(stateWithoutImage('Primary'))
+    mocks.readdir.mockResolvedValueOnce(['document.1.json', 'document.json'])
+
+    const snapshot = await services.snapshotDocuments()
+
+    expect(await readdir(snapshot)).toEqual(['document.json'])
+    expect(await readFile(join(snapshot, 'document.json'), 'utf8')).toBe(
+      await readFile(join(directory, 'document.json'), 'utf8'),
+    )
+  })
+
+  it('rejects using a live export directory as an import staging directory', async () => {
+    const { services } = await archiveServicesForTest()
+    await services.save(stateWithoutImage('Kept'))
+    const snapshot = await services.snapshotDocuments()
+
+    await expect(services.replaceNotes(snapshot)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+    await expect(services.load()).resolves.toEqual(stateWithoutImage('Kept'))
+    await services.releaseSnapshot(snapshot)
+  })
+
+  it('does not allow a released snapshot path to become owned again merely by recreating it', async () => {
+    const { services } = await archiveServicesForTest()
+    const snapshot = await services.snapshotDocuments()
+    await services.releaseSnapshot(snapshot)
+    await mkdir(snapshot)
+    await writeFile(join(snapshot, 'unowned'), 'keep')
+
+    await expect(services.releaseSnapshot(snapshot)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+    expect(await readFile(join(snapshot, 'unowned'), 'utf8')).toBe('keep')
+  })
+
+  it('does not retain ownership of a consumed import staging directory', async () => {
+    const { services } = await archiveServicesForTest()
+    const staging = await stageImport(services, stateWithImage('imported'), 'imported')
+    await services.replaceNotes(staging)
+    await mkdir(staging, { recursive: true })
+    await writeFile(join(staging, 'unowned'), 'keep')
+
+    await expect(services.discardStagingDirectory(staging)).rejects.toThrow(
+      'The directory was not created by this application session.',
+    )
+    expect(await readFile(join(staging, 'unowned'), 'utf8')).toBe('keep')
   })
 
   it('refuses export and import operations when no user-data directory is configured', async () => {

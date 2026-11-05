@@ -3,6 +3,19 @@ import { folderSource } from './folder-source'
 import { ARCHIVE_LIMITS, NotesArchiveError } from '../../application/notes-archive/archive-policy'
 
 describe('folder source', () => {
+  it('preserves an existing archive error and reports a non-Error storage rejection', async () => {
+    const { source, folder } = setup()
+    const failure = new NotesArchiveError('The backup is incomplete.')
+    folder.getFileHandle.mockRejectedValueOnce(failure)
+
+    await expect(source.readDocument()).rejects.toBe(failure)
+
+    folder.getDirectoryHandle.mockRejectedValueOnce('volume disconnected')
+
+    await expect(source.readImage('image')).rejects.toThrow('The folder could not be read: volume disconnected')
+    expect(source.size).toBe(0)
+  })
+
   function setup() {
     const getFile = vi.fn(async () => new File(['{}'], 'document.json'))
     const getFileHandle = vi.fn(async (name: string) => ({ getFile, name }))

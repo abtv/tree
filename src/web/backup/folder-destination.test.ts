@@ -32,6 +32,32 @@ function fixture() {
 }
 
 describe('folder destination', () => {
+  it('reuses the attachment directory after creation and retries a failed lookup', async () => {
+    const { destination, folder, images } = fixture()
+    const failure = new DOMException('Denied', 'NotAllowedError')
+    folder.getDirectoryHandle.mockRejectedValueOnce(failure)
+
+    await expect(destination.listImages()).rejects.toBe(failure)
+    await expect(destination.listImages()).resolves.toEqual(new Set(['a.png']))
+    await destination.writeImage('b.png', new Uint8Array([2]))
+
+    expect(folder.getDirectoryHandle).toHaveBeenCalledTimes(2)
+    expect(folder.getDirectoryHandle).toHaveBeenLastCalledWith('attachments', { create: true })
+    expect(images.getFileHandle).toHaveBeenCalledWith('b.png', { create: true })
+  })
+
+  it.each(['write', 'close'] as const)('preserves the %s error when abort also fails', async (operation) => {
+    const { destination, stream } = fixture()
+    const failure = new DOMException('Storage full', 'QuotaExceededError')
+    stream[operation].mockRejectedValueOnce(failure)
+    stream.abort.mockRejectedValueOnce(new Error('Stream already closed'))
+
+    await expect(destination.writeImage('b.png', new Uint8Array([1]))).rejects.toBe(failure)
+
+    expect(stream.abort).toHaveBeenCalledOnce()
+    expect(stream.close).toHaveBeenCalledTimes(operation === 'close' ? 1 : 0)
+  })
+
   it('lists files only, writes into attachments and commits document.json by closing its stream', async () => {
     const { destination, folder, images, stream } = fixture()
 

@@ -185,6 +185,141 @@ const waitForWorker = async (scripted: ScriptedWorker[]) => {
 }
 
 describe('notes archive controller: export', () => {
+  it('rejects an import-only message from an export worker and releases its snapshot', async () => {
+    const { controller, scripted, fileServices, destinations } = await setup({ worker: 'scripted' })
+    const release = vi.spyOn(fileServices, 'releaseSnapshot')
+    await controller.chooseExportDestination()
+    const result = controller.startExport()
+    const worker = await waitForWorker(scripted)
+
+    worker.send({ type: 'staged' })
+
+    await expect(result).resolves.toEqual({
+      ok: false,
+      message: 'The notes could not be read: Unexpected archive worker message: staged.',
+    })
+    expect(worker.terminated).toBe(true)
+    expect(release).toHaveBeenCalledOnce()
+    expect(await readdir(destinations)).toEqual([])
+    expect(controller.isIdle!()).toBe(true)
+  })
+
+  it.each(['export', 'import'] as const)(
+    'allows replacing an unused %s choice with a new destination',
+    async (kind) => {
+      const { controller, dialogs, dependencies, destinations } = await setup()
+      if (kind === 'export') await controller.chooseExportDestination()
+      else await controller.chooseImportArchive()
+      dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: join(destinations, 'second.zip') })
+
+      await expect(controller.chooseExportDestination()).resolves.toEqual({ ok: true, fileName: 'second.zip' })
+
+      expect(dependencies.startWorker).not.toHaveBeenCalled()
+      await controller.cancel()
+      expect(controller.isIdle!()).toBe(true)
+    },
+  )
+
+  it('cancels while snapshot creation is pending and releases it without starting a worker', async () => {
+    const f = await setup({ worker: 'scripted' })
+    const snapshot = await f.fileServices.snapshotDocuments()
+    let finish!: (path: string) => void
+    vi.spyOn(f.fileServices, 'snapshotDocuments').mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await f.controller.chooseExportDestination()
+    const exported = f.controller.startExport()
+
+    const canceled = f.controller.cancel()
+    finish(snapshot)
+    await canceled
+
+    await expect(exported).resolves.toEqual({ ok: false, canceled: true })
+    expect(f.dependencies.startWorker).not.toHaveBeenCalled()
+    expect(await readdir(join(f.userData, '.notes-export'))).toEqual([])
+    expect(f.controller.isIdle!()).toBe(true)
+  })
+
+  it('preserves the destination when a completed archive cannot replace it', async () => {
+    const f = await setup({ worker: 'scripted' })
+    const destination = join(f.destinations, 'existing-folder')
+    await mkdir(destination)
+    await writeFile(join(destination, 'keep.txt'), 'keep')
+    f.dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: destination })
+    await f.controller.chooseExportDestination()
+    const exported = f.controller.startExport()
+    const worker = await waitForWorker(f.scripted)
+    if (worker.task.type !== 'export') throw new Error('Expected export task')
+    await writeFile(worker.task.temporaryPath, 'complete archive')
+
+    worker.send({ type: 'written', summary: { imageCount: 0, missingImageCount: 0, archiveBytes: 16 } })
+
+    await expect(exported).resolves.toMatchObject({ ok: false, message: expect.stringContaining('could not be saved') })
+    expect(await readFile(join(destination, 'keep.txt'), 'utf8')).toBe('keep')
+    expect(await readdir(f.destinations)).toEqual(['existing-folder'])
+    expect(await readdir(join(f.userData, '.notes-export'))).toEqual([])
+  })
+
+  it.each([undefined, ''])('treats an absent destination %j as cancellation and returns to idle', async (filePath) => {
+    const { controller, dialogs } = await setup()
+    dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: false, ...(filePath === undefined ? {} : { filePath }) })
+
+    await expect(controller.chooseExportDestination()).resolves.toEqual({ ok: false, canceled: true })
+    expect(controller.isIdle!()).toBe(true)
+    await expect(controller.startExport()).rejects.toThrow('No export destination was chosen.')
+  })
+
+  it('returns to idle after a native panel fails and permits another choice', async () => {
+    const { controller, dialogs } = await setup()
+    const error = new Error('panel failed')
+    dialogs.showSaveDialog.mockRejectedValueOnce(error)
+
+    await expect(controller.chooseExportDestination()).rejects.toBe(error)
+    expect(controller.isIdle!()).toBe(true)
+    await expect(controller.chooseExportDestination()).resolves.toMatchObject({ ok: true })
+    expect(controller.isIdle!()).toBe(false)
+    await controller.cancel()
+    expect(controller.isIdle!()).toBe(true)
+  })
+
+  it('releases the previous attachment pin before accepting a replacement pin set', async () => {
+    const { controller, fileServices, scripted } = await setup({ worker: 'scripted' })
+    const first = vi.fn()
+    const second = vi.fn()
+    vi.spyOn(fileServices, 'pinAttachments').mockReturnValueOnce(first).mockReturnValueOnce(second)
+    await controller.chooseExportDestination()
+    const result = controller.startExport()
+    const worker = await waitForWorker(scripted)
+
+    worker.send({ type: 'pin', ids: ['a'] })
+    worker.send({ type: 'pin', ids: ['b'] })
+    await vi.waitFor(() => expect(worker.replies).toHaveLength(2))
+
+    expect(first).toHaveBeenCalledOnce()
+    expect(second).not.toHaveBeenCalled()
+    await controller.cancel()
+    await expect(result).resolves.toEqual({ ok: false, canceled: true })
+    expect(second).toHaveBeenCalledOnce()
+  })
+
+  it('releases its snapshot if creating the worker fails', async () => {
+    const { controller, dependencies, userData } = await setup()
+    dependencies.startWorker.mockImplementationOnce(() => {
+      throw new Error('thread unavailable')
+    })
+    await controller.chooseExportDestination()
+
+    await expect(controller.startExport()).resolves.toEqual({
+      ok: false,
+      message: 'The notes could not be read: thread unavailable',
+    })
+    expect(await readdir(join(userData, '.notes-export'))).toEqual([])
+    expect(controller.isIdle!()).toBe(true)
+  })
+
   it('opens the save panel with the dated name and writes the archive only once it is complete', async () => {
     const { controller, dialogs, destinations, userData, dependencies, fileServices } = await setup()
     const pinned = vi.spyOn(fileServices, 'pinAttachments')
@@ -357,6 +492,120 @@ describe('notes archive controller: export', () => {
 })
 
 describe('notes archive controller: import', () => {
+  it('cancels while staging creation is pending and removes the eventual staging directory', async () => {
+    const f = await setup({ worker: 'scripted' })
+    const staging = await f.fileServices.createStagingDirectory()
+    let finish!: (path: string) => void
+    vi.spyOn(f.fileServices, 'createStagingDirectory').mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await f.controller.chooseImportArchive()
+    const prepared = f.controller.prepareImport()
+
+    const canceled = f.controller.cancel()
+    finish(staging)
+    await canceled
+
+    await expect(prepared).resolves.toEqual({ ok: false, canceled: true })
+    expect(f.dependencies.startWorker).not.toHaveBeenCalled()
+    expect(await readdir(join(f.userData, '.notes-import'))).toEqual([])
+    expect(f.controller.isIdle!()).toBe(true)
+  })
+
+  it('reports staging creation failure and permits another archive choice', async () => {
+    const f = await setup()
+    vi.spyOn(f.fileServices, 'createStagingDirectory').mockRejectedValueOnce(new Error('disk full'))
+    await f.controller.chooseImportArchive()
+
+    await expect(f.controller.prepareImport()).resolves.toEqual({
+      ok: false,
+      message: 'The archive could not be imported: disk full',
+    })
+
+    expect(f.dependencies.startWorker).not.toHaveBeenCalled()
+    expect(f.controller.isIdle!()).toBe(true)
+    await expect(f.controller.chooseImportArchive()).resolves.toMatchObject({ ok: true })
+  })
+
+  it('rejects an export-only worker message during import and cleans up its staging', async () => {
+    const f = await setup({ worker: 'scripted' })
+    await f.controller.chooseImportArchive()
+    const prepared = f.controller.prepareImport()
+    const worker = await waitForWorker(f.scripted)
+
+    worker.send({ type: 'pin', ids: ['unexpected'] })
+
+    await expect(prepared).resolves.toEqual({
+      ok: false,
+      message: 'The archive could not be imported: Unexpected archive worker message: pin.',
+    })
+    expect(worker.terminated).toBe(true)
+    expect(await readdir(join(f.userData, '.notes-import'))).toEqual([])
+  })
+
+  it.each([
+    { canceled: true, filePaths: ['ignored.zip'] },
+    { canceled: false, filePaths: [] },
+  ])('does not prepare an import after an empty or canceled choice %j', async (choice) => {
+    const { controller, dialogs, dependencies } = await setup()
+    dialogs.showOpenDialog.mockResolvedValueOnce(choice)
+
+    await expect(controller.chooseImportArchive()).resolves.toEqual({ ok: false, canceled: true })
+    await expect(controller.prepareImport()).rejects.toThrow('No archive was chosen.')
+    expect(controller.isIdle!()).toBe(true)
+    expect(dependencies.startWorker).not.toHaveBeenCalled()
+  })
+
+  it('recovers from an open panel error and permits cancelling a chosen import', async () => {
+    const { controller, dialogs } = await setup()
+    const error = new Error('panel unavailable')
+    dialogs.showOpenDialog.mockRejectedValueOnce(error)
+
+    await expect(controller.chooseImportArchive()).rejects.toBe(error)
+    expect(controller.isIdle!()).toBe(true)
+    await controller.chooseImportArchive()
+    expect(controller.isIdle!()).toBe(false)
+    await controller.cancel()
+    expect(controller.isIdle!()).toBe(true)
+    await expect(controller.prepareImport()).rejects.toThrow('No archive was chosen.')
+  })
+
+  it('forwards import progress and handles a worker crash without retaining staging', async () => {
+    const { controller, dependencies, scripted, userData } = await setup({ worker: 'scripted' })
+    await controller.chooseImportArchive()
+    const result = controller.prepareImport()
+    const worker = await waitForWorker(scripted)
+
+    worker.send({ type: 'progress', imagesDone: 2, imageCount: 5 })
+    await vi.waitFor(() =>
+      expect(dependencies.sendProgress).toHaveBeenCalledExactlyOnceWith({ imagesDone: 2, imageCount: 5 }),
+    )
+    worker.emit('error', new Error('thread failed'))
+
+    await expect(result).resolves.toEqual({ ok: false, message: 'The archive could not be imported: thread failed' })
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+    expect(controller.isIdle!()).toBe(true)
+  })
+
+  it('discards staging after a decoder exception and exposes its cause', async () => {
+    const { controller, dependencies, scripted, userData } = await setup({ worker: 'scripted' })
+    dependencies.decodePng.mockImplementationOnce(() => {
+      throw new Error('decoder failed')
+    })
+    await controller.chooseImportArchive()
+    const result = controller.prepareImport()
+    const worker = await waitForWorker(scripted)
+
+    worker.send({ type: 'validate-image', bytes: onePixelPng })
+
+    await expect(result).resolves.toEqual({ ok: false, message: 'The archive could not be imported: decoder failed' })
+    expect(worker.replies).toEqual([])
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+  })
+
   it('cancels both the export worker and the import retained behind it', async () => {
     const { controller, destinations, userData, dependencies } = await setup()
 
@@ -575,6 +824,44 @@ describe('notes archive controller: import', () => {
 })
 
 describe('notes archive controller: quitting', () => {
+  it.each(['export', 'import'] as const)('ignores a completed %s panel choice after shutdown began', async (kind) => {
+    const { controller, dialogs, dependencies, destinations } = await setup()
+    let finish!: () => void
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    dialogs.showSaveDialog.mockImplementationOnce(async () => {
+      await gate
+      return { canceled: false, filePath: join(destinations, 'late.zip') }
+    })
+    dialogs.showOpenDialog.mockImplementationOnce(async () => {
+      await gate
+      return { canceled: false, filePaths: [join(destinations, 'late.zip')] }
+    })
+    const choice = kind === 'export' ? controller.chooseExportDestination() : controller.chooseImportArchive()
+
+    expect(controller.shutdown()).toBeNull()
+    finish()
+
+    await expect(choice).resolves.toEqual({ ok: false, canceled: true })
+    expect(controller.isIdle!()).toBe(true)
+    expect(dependencies.startWorker).not.toHaveBeenCalled()
+    await expect(controller.chooseImportArchive()).rejects.toThrow('Tree is quitting.')
+  })
+
+  it.each(['export', 'import'] as const)('clears an unused %s choice during shutdown', async (kind) => {
+    const { controller, dependencies } = await setup()
+    if (kind === 'export') await controller.chooseExportDestination()
+    else await controller.chooseImportArchive()
+
+    expect(controller.shutdown()).toBeNull()
+
+    expect(controller.isIdle!()).toBe(true)
+    await expect(controller.startExport()).rejects.toThrow('No export destination was chosen.')
+    await expect(controller.prepareImport()).rejects.toThrow('No archive was chosen.')
+    expect(dependencies.startWorker).not.toHaveBeenCalled()
+  })
+
   it('has nothing to wait for when idle', async () => {
     const { controller } = await setup()
 

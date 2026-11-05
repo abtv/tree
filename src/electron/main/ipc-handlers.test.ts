@@ -5,6 +5,7 @@ import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
 import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
+import emojiCatalog from '../../domain/emoji-catalog.json'
 
 const rendererUrl = 'app://tree/index.html'
 const validState = {
@@ -69,7 +70,7 @@ function createHarness() {
   const setAppUpdateBlocked = vi.fn()
   const getUpdateCommands = vi.fn(() => ({ 'check-for-updates': true, 'update-app': false }))
   const runUpdateCommand = vi.fn()
-  const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn() }
+  const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn(), isApplying: vi.fn(() => false) }
   registerIpcHandlers({
     getUpdateCommands,
     runUpdateCommand,
@@ -130,6 +131,113 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it.each([null, 0, {}, 'stale-request'])(
+    'rejects invalid quit acknowledgment %j without beginning or confirming a quit',
+    (id) => {
+      const { handlers, quitHandshake, onQuitConfirmed } = createHarness()
+      quitHandshake.confirm.mockReturnValue(false)
+      const event = { senderFrame: { url: rendererUrl } }
+
+      expect(() => handlers.get(ipcChannels.quit)!(event, id)).toThrow('Invalid quit request.')
+
+      expect(quitHandshake.request).not.toHaveBeenCalled()
+      expect(onQuitConfirmed).not.toHaveBeenCalled()
+      expect(quitHandshake.confirm).toHaveBeenCalledTimes(typeof id === 'string' ? 1 : 0)
+    },
+  )
+
+  it('accepts one hundred distinct emoji names but refuses a larger valid history', async () => {
+    const { handlers, setEmojiHistory } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const names = Object.keys(emojiCatalog).slice(0, 101)
+
+    await handlers.get(ipcChannels.setEmojiHistory)!(event, names.slice(0, 100))
+
+    expect(setEmojiHistory).toHaveBeenCalledExactlyOnceWith(names.slice(0, 100))
+    expect(() => handlers.get(ipcChannels.setEmojiHistory)!(event, names)).toThrow('Invalid emoji history.')
+    expect(setEmojiHistory).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a mixed recent-node history before storing its valid prefix', () => {
+    const { handlers, setRecentNodes } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, ['valid', ''])).toThrow(
+      'Invalid recent node history.',
+    )
+    expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, ['valid'], 'extra')).toThrow(
+      'This request takes no arguments.',
+    )
+
+    expect(setRecentNodes).not.toHaveBeenCalled()
+  })
+
+  it('blocks notes operations during update application while allowing cancellation and a later retry', async () => {
+    const { handlers, appUpdates, notesArchive } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const channels = [
+      ipcChannels.chooseNotesExportDestination,
+      ipcChannels.startNotesExport,
+      ipcChannels.chooseNotesImportArchive,
+      ipcChannels.prepareNotesImport,
+      ipcChannels.commitNotesImport,
+      ipcChannels.takeNotesImportNotice,
+      ipcChannels.showReplacedNotesFolder,
+    ]
+    appUpdates.isApplying.mockReturnValue(true)
+
+    for (const channel of channels)
+      expect(() => handlers.get(channel)!(event)).toThrow('Wait for the app update to finish.')
+
+    for (const method of Object.values(notesArchive)) expect(method).not.toHaveBeenCalled()
+
+    await handlers.get(ipcChannels.cancelNotesOperation)!(event)
+
+    expect(notesArchive.cancel).toHaveBeenCalledExactlyOnceWith()
+
+    appUpdates.isApplying.mockReturnValue(false)
+    await handlers.get(ipcChannels.chooseNotesExportDestination)!(event)
+
+    expect(notesArchive.chooseExportDestination).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  it('accepts the maximum update acknowledgment ID and rejects malformed acknowledgments before forwarding', () => {
+    const { handlers, appUpdates } = createHarness()
+    const confirm = handlers.get(ipcChannels.confirmAppUpdate)!
+    const event = { senderFrame: { url: rendererUrl } }
+    const id = 'u'.repeat(100)
+
+    confirm(event, id, false)
+
+    expect(appUpdates.confirm).toHaveBeenCalledExactlyOnceWith(id, false)
+
+    for (const args of [
+      [null, true],
+      ['u'.repeat(101), true],
+      ['id', undefined],
+    ])
+      expect(() => confirm(event, ...args)).toThrow('Invalid update acknowledgment.')
+    expect(() => confirm(event, 'id', true, 'extra')).toThrow('This request takes no arguments.')
+
+    expect(appUpdates.confirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves maximum command and recent-node histories and rejects empty recent IDs', async () => {
+    const { handlers, setCommandHistory, setRecentNodes } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const commands = Array.from({ length: 100 }, (_, i) => `${i}`.padEnd(100, 'x'))
+    const recent = Array.from({ length: 100 }, (_, i) => `node-${i}`)
+
+    handlers.get(ipcChannels.setCommandHistory)!(event, commands)
+    await handlers.get(ipcChannels.setRecentNodes)!(event, recent)
+
+    expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(commands)
+    expect(setRecentNodes).toHaveBeenCalledExactlyOnceWith(recent)
+    for (const value of [null, {}, ['']])
+      expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, value)).toThrow('Invalid recent node history.')
+    expect(setRecentNodes).toHaveBeenCalledTimes(1)
+  })
+
   it('validates update commands and rechecks availability before executing', () => {
     const { handlers, getUpdateCommands, runUpdateCommand } = createHarness()
     const get = handlers.get('tree:get-update-commands')!
@@ -165,7 +273,7 @@ describe('main IPC handlers', () => {
     show(event, false)
     expect(setAboutOpen).toHaveBeenLastCalledWith(false)
 
-    expect(() => show(event, 'extra')).toThrow()
+    expect(() => show(event, 'extra')).toThrow('Invalid About state.')
     expect(() => show(event)).toThrow()
     expect(() => show(event, true, 'extra')).toThrow()
     expect(() => show({ senderFrame: { url: 'https://example.com' } }, true)).toThrow()
@@ -180,7 +288,7 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
     set(event, true)
     expect(setAppUpdateBlocked).toHaveBeenCalledWith(true)
-    expect(() => set(event, 'true')).toThrow()
+    expect(() => set(event, 'true')).toThrow('Invalid update availability.')
     expect(() => set(event, true, 'extra')).toThrow()
     expect(() => set({ senderFrame: { url: 'https://example.com' } }, true)).toThrow()
     setAppUpdateBlocked.mockImplementationOnce(() => {

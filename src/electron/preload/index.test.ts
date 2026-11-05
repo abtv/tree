@@ -18,6 +18,27 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('validates update lifecycle notifications and removes both listeners', async () => {
+    const { treeApi } = await import('./index')
+    const requested = vi.fn()
+    const finished = vi.fn()
+    mocks.on.mockClear()
+    const removeRequested = treeApi.onAppUpdateRequested!(requested)
+    const removeFinished = treeApi.onAppUpdateFinished!(finished)
+    const requestHandler = mocks.on.mock.calls.find(([channel]) => channel === ipcEvents.appUpdateRequested)![1]
+    const finishHandler = mocks.on.mock.calls.find(([channel]) => channel === ipcEvents.appUpdateFinished)![1]
+
+    for (const value of ['request-id', null, undefined, false, 1, {}]) requestHandler({}, value)
+    for (const value of ['failure', null, undefined, false, 1, {}]) finishHandler({}, value)
+
+    expect(requested.mock.calls).toEqual([['request-id']])
+    expect(finished.mock.calls).toEqual([['failure'], [null]])
+    removeRequested()
+    removeFinished()
+    expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appUpdateRequested, requestHandler)
+    expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appUpdateFinished, finishHandler)
+  })
+
   it('forwards update command state, execution, errors and validated notifications', async () => {
     const { treeApi } = await import('./index')
     const state = { 'check-for-updates': true, 'update-app': false }

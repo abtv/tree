@@ -83,6 +83,62 @@ it('disables main-window commands while About is modal but keeps About, Quit and
 })
 
 describe('application menu template', () => {
+  it.each([
+    [{}, true, true],
+    [{ updatesSupported: false }, false, true],
+    [{ updateReady: false }, true, false],
+    [{ updateChecking: true }, false, false],
+    [{ updateApplying: true }, false, false],
+    [{ updateBlocked: true }, false, false],
+    [{ modalOpen: true }, false, false],
+    [{ notes: { canExport: false, canImport: true } }, true, false],
+    [{ notes: { canExport: true, canImport: false } }, true, false],
+  ] as const)('applies independent update availability guards for %j', (overrides, canCheck, canUpdate) => {
+    const actions = createActions()
+    const template = applicationMenuTemplate(
+      {
+        ...state(),
+        updatesSupported: true,
+        updateReady: true,
+        notes: { canExport: true, canImport: true },
+        ...overrides,
+      },
+      actions,
+    )
+    const items = submenuItems(template, 'Tree')
+
+    expect(items.find((item) => item.id === 'check-for-updates')?.enabled).toBe(canCheck)
+    expect(items.find((item) => item.id === 'update-app')?.enabled).toBe(canUpdate)
+  })
+
+  it('routes Update App and all find commands through their own actions', () => {
+    const actions = createActions()
+    const template = applicationMenuTemplate(state(), actions)
+    const find = submenuItems(template, 'Edit').slice(0, 4)
+
+    for (const item of find) clickWithChecked(item, false)
+    clickWithChecked(
+      submenuItems(template, 'Tree').find((item) => item.id === 'update-app')!,
+      false,
+    )
+
+    expect(actions.findCommand.mock.calls).toEqual([['find'], ['next'], ['previous'], ['all']])
+    expect(actions.updateApp).toHaveBeenCalledOnce()
+    expect(find.map((item) => [item.enabled, item.registerAccelerator, item.accelerator])).toEqual([
+      [true, false, 'CommandOrControl+F'],
+      [true, false, 'CommandOrControl+G'],
+      [true, false, 'CommandOrControl+Shift+G'],
+      [true, false, 'CommandOrControl+;'],
+    ])
+    expect(
+      submenuItems(template, 'View')
+        .slice(0, 2)
+        .every((item) => item.enabled === true),
+    ).toBe(true)
+    expect(submenuItems(template, 'Window')[0]?.enabled).toBe(true)
+    expect(submenuItems(template, 'Edit').find((item) => item.label === 'Vim Editing')?.enabled).toBe(true)
+  })
+
   it('keeps both update commands visible and enables only available actions', () => {
     const actions = createActions()
     const initial = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')

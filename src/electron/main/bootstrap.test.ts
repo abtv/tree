@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   bootstrapApplication,
   type ApplicationLifecycle,
@@ -11,12 +11,14 @@ function createHarness(locked = true) {
   const listeners: {
     beforeQuit?: (event: BeforeQuitEvent) => void
     activate?: () => void
+    windowAllClosed?: () => void
   } = {}
   const windowListeners: { close?: (event: BeforeQuitEvent) => void } = {}
   const app: ApplicationLifecycle = {
     on: (event, listener) => {
       if (event === 'before-quit') listeners.beforeQuit = listener
       else if (event === 'activate') listeners.activate = listener as () => void
+      else if (event === 'window-all-closed') listeners.windowAllClosed = listener as () => void
     },
     whenReady: () => Promise.resolve(),
     quit: vi.fn(),
@@ -33,7 +35,7 @@ function createHarness(locked = true) {
   const dependencies = {
     app,
     hasSingleInstanceLock: locked,
-    getMainWindow: vi.fn(() => window),
+    getMainWindow: vi.fn<() => MainWindowReference | null>(() => window),
     setMainWindow: vi.fn(),
     createMainWindow: vi.fn(),
     getWindowCount: vi.fn(() => 1),
@@ -44,12 +46,114 @@ function createHarness(locked = true) {
     unregisterShortcut: vi.fn(),
     onStartupError: vi.fn(),
     settleBeforeQuit: vi.fn<() => Promise<void> | null>(() => null),
+    registerUpdateQuit: vi.fn<(prepare: () => () => void) => void>(),
   }
   bootstrapApplication(dependencies)
   return { app, window, windowListeners, listeners, dependencies, registerReadyServices }
 }
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('bootstrapApplication', () => {
+  it.each(['darwin', 'win32', 'linux'])('handles the last window closing on %s', async (platform) => {
+    vi.stubGlobal('process', { ...process, platform })
+    const f = createHarness()
+    await Promise.resolve()
+
+    f.listeners.windowAllClosed!()
+
+    expect(f.app.quit).toHaveBeenCalledTimes(platform === 'darwin' ? 0 : 1)
+  })
+
+  it('cleans up when no main window exists and does not attach a close handler', async () => {
+    const f = createHarness()
+    f.dependencies.getMainWindow.mockReturnValue(null)
+    await Promise.resolve()
+    const event = { preventDefault: vi.fn() }
+
+    f.listeners.beforeQuit!(event)
+
+    expect(f.windowListeners.close).toBeUndefined()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+    expect(f.dependencies.setMainWindow).toHaveBeenCalledExactlyOnceWith(null)
+    expect(f.dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+  })
+
+  it('completes the registered renderer save handshake before the final quit cleanup', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const [handshake, confirmed] = f.registerReadyServices.mock.calls[0]!
+    const first = { preventDefault: vi.fn() }
+    f.listeners.beforeQuit!(first)
+    const requestId = vi.mocked(f.window.webContents.send).mock.calls[0]![1] as string
+
+    expect(handshake.confirm(requestId)).toBe(true)
+    confirmed()
+    await Promise.resolve()
+
+    expect(f.app.quit).toHaveBeenCalledOnce()
+    const final = { preventDefault: vi.fn() }
+    f.listeners.beforeQuit!(final)
+    expect(final.preventDefault).not.toHaveBeenCalled()
+    expect(f.dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+    expect(f.window.webContents.send).toHaveBeenCalledOnce()
+  })
+
+  it('does not create a second window when activation finds an existing window', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+
+    f.listeners.activate!()
+
+    expect(f.dependencies.createMainWindow).toHaveBeenCalledOnce()
+  })
+  it('allows an update to close without another save, then restores normal close handling after rollback', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const prepare = f.dependencies.registerUpdateQuit.mock.calls[0]![0]
+    const rollback = prepare()
+    const updating = { preventDefault: vi.fn() }
+
+    f.windowListeners.close!(updating)
+
+    expect(updating.preventDefault).not.toHaveBeenCalled()
+    expect(f.app.quit).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+    rollback()
+    const ordinary = { preventDefault: vi.fn() }
+    f.windowListeners.close!(ordinary)
+
+    expect(ordinary.preventDefault).toHaveBeenCalledOnce()
+    expect(f.app.quit).toHaveBeenCalledOnce()
+  })
+
+  it('does not create another window on activation while an update is preparing to quit', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.dependencies.getWindowCount.mockReturnValue(0)
+    const rollback = f.dependencies.registerUpdateQuit.mock.calls[0]![0]()
+
+    f.listeners.activate!()
+    expect(f.dependencies.createMainWindow).toHaveBeenCalledOnce()
+    rollback()
+    f.listeners.activate!()
+
+    expect(f.dependencies.createMainWindow).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not intercept a destroyed window close', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    vi.spyOn(f.window, 'isDestroyed').mockReturnValue(true)
+    const event = { preventDefault: vi.fn() }
+
+    f.windowListeners.close!(event)
+
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(f.app.quit).not.toHaveBeenCalled()
+  })
+
   it('exits without registering application services when the instance lock is unavailable', async () => {
     const { app, dependencies } = createHarness(false)
 
@@ -264,7 +368,7 @@ describe('bootstrapApplication', () => {
 
   it('cleans up after a destroyed window and does not recreate windows after quitting', async () => {
     const { listeners, dependencies } = createHarness()
-    const window = dependencies.getMainWindow()
+    const window = dependencies.getMainWindow()!
     vi.spyOn(window, 'isDestroyed').mockReturnValue(true)
     const event: BeforeQuitEvent = { preventDefault: vi.fn() }
 

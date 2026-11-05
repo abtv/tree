@@ -26,6 +26,37 @@ const readHead = (page: Page) =>
       db.close()
     }
   })
+
+test('explains storage startup failure and recovers editing after the failed tab closes', async ({
+  newContext,
+  baseURL,
+}) => {
+  const context = await newContext()
+  const failed = await context.newPage()
+  await failed.addInitScript(() => {
+    IDBFactory.prototype.open = () => {
+      throw new DOMException('Storage unavailable', 'UnknownError')
+    }
+  })
+
+  await failed.goto(baseURL!)
+
+  await expect(failed.getByRole('alert')).toHaveText(
+    'Tree could not open local storage. Reload this tab to try again. To use Tree in another tab, close this tab first.',
+  )
+  await expect(failed.locator('.node-input')).toHaveCount(0)
+  await capture(failed, 'storage-startup-recovery.png')
+  const next = await context.newPage()
+  await next.goto(baseURL!)
+  await expect(next.getByRole('alert')).toContainText('already open in another tab')
+
+  await failed.close()
+  await next.reload()
+  await ready(next)
+
+  await expect(input(next)).toHaveValue('Welcome to Tree — edit this line')
+})
+
 test('preserves browser storage through restart and failure recovery', async ({
   persistentContext: launch,
   baseURL,

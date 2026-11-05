@@ -5,6 +5,7 @@ import { getSelectionEndpoints, setSelectionRange } from '../renderer/editor-dom
 
 afterEach(() => {
   window.dispatchEvent(new Event('pagehide'))
+  vi.restoreAllMocks()
   document.body.replaceChildren()
 })
 
@@ -32,6 +33,202 @@ function fixture(rich = false) {
   }
   return { editor, trigger, menu, item, focus, open }
 }
+
+it('preserves a new caret when an explicit command focuses the original editor', async () => {
+  const f = fixture()
+  f.editor.focus()
+  setSelectionRange(f.editor, 8, 8)
+  f.open()
+  setSelectionRange(f.editor, 2, 2)
+
+  f.editor.focus()
+  await Promise.resolve()
+
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 2, focus: 2 })
+})
+
+it('restores the editor when native dismissal leaves focus temporarily inside the menu', async () => {
+  const f = fixture()
+  f.editor.focus()
+  setSelectionRange(f.editor, 3, 6)
+  f.open()
+
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'closed' }))
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 3, focus: 6 })
+})
+
+it('removes active menu event handlers when disposed before the menu closes', async () => {
+  const f = fixture()
+  f.editor.focus()
+  f.open()
+
+  f.focus.dispose()
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  f.item.dispatchEvent(escape)
+  document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+  f.editor.focus()
+  await Promise.resolve()
+
+  expect(escape.defaultPrevented).toBe(false)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+  expect(document.activeElement).toBe(f.editor)
+})
+
+it('remembers selection when keyboard focus leaves the editor for the menu trigger', () => {
+  const f = fixture()
+  f.editor.focus()
+  setSelectionRange(f.editor, 7, 3)
+  f.editor.addEventListener('focusout', (event) => event.stopPropagation())
+
+  f.trigger.focus()
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'open' }))
+  f.item.focus()
+  f.focus.close()
+
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 7, focus: 3 })
+})
+
+it('restores and blurs the borrowed editor before a Tab destination retains focus', async () => {
+  const f = fixture()
+  const outside = document.createElement('button')
+  document.body.append(outside)
+  f.editor.focus()
+  f.open()
+  const events: string[] = []
+  const focusEditor = vi.spyOn(f.editor, 'focus')
+  const focusDestination = vi.spyOn(outside, 'focus')
+  f.editor.addEventListener('focus', () => events.push('editor focus'))
+  f.editor.addEventListener('blur', () => events.push('editor blur'))
+
+  outside.focus()
+  await Promise.resolve()
+
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+  expect(events).toEqual(['editor focus', 'editor blur'])
+  expect(focusEditor).toHaveBeenCalledExactlyOnceWith({ preventScroll: true })
+  expect(focusDestination).toHaveBeenLastCalledWith({ preventScroll: true })
+  expect(document.activeElement).toBe(outside)
+})
+
+it('does not intercept Escape dispatched outside the menu or while the menu is closed', () => {
+  const f = fixture()
+  f.editor.focus()
+  const closed = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  f.trigger.dispatchEvent(closed)
+  expect(closed.defaultPrevented).toBe(false)
+  f.open()
+  const outside = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+
+  document.body.dispatchEvent(outside)
+
+  expect(outside.defaultPrevented).toBe(false)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+})
+
+it('restores on native dismissal that temporarily focuses the body', async () => {
+  const f = fixture()
+  f.editor.focus()
+  setSelectionRange(f.editor, 4, 4)
+  f.open()
+
+  f.item.blur()
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'closed' }))
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 4, focus: 4 })
+})
+
+it('restores an agenda row after native dismissal without creating an editor selection', async () => {
+  const f = fixture()
+  const row = document.createElement('div')
+  row.className = 'agenda-row'
+  row.tabIndex = 0
+  document.body.append(row)
+  row.focus()
+  f.open()
+
+  f.menu.hidePopover()
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(row)
+})
+
+it('restores before an outside press and leaves its explicit destination focused', async () => {
+  const f = fixture()
+  const outside = document.createElement('button')
+  document.body.append(outside)
+  f.editor.focus()
+  setSelectionRange(f.editor, 6, 6)
+  f.open()
+
+  outside.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 6, focus: 6 })
+  outside.focus()
+  await Promise.resolve()
+  expect(document.activeElement).toBe(outside)
+})
+
+it('ignores inside presses and composing Escape while consuming an ordinary Escape', () => {
+  const f = fixture()
+  f.editor.focus()
+  f.open()
+  const composing = new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true, cancelable: true })
+
+  f.item.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+  f.item.dispatchEvent(composing)
+
+  expect(composing.defaultPrevented).toBe(false)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+  const bubble = vi.fn()
+  document.addEventListener('keydown', bubble)
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  f.trigger.dispatchEvent(escape)
+
+  expect(escape.defaultPrevented).toBe(true)
+  expect(bubble).not.toHaveBeenCalled()
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+  document.removeEventListener('keydown', bubble)
+})
+
+it('does not restore a stale snapshot after a close immediately followed by reopen', async () => {
+  const f = fixture()
+  f.editor.focus()
+  f.open()
+  f.menu.hidePopover()
+  f.open()
+
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(f.item)
+})
+
+it('removes document listeners and makes pending restoration inert after disposal', async () => {
+  const f = fixture()
+  f.editor.focus()
+  f.open()
+  f.menu.hidePopover()
+  f.focus.dispose()
+  await Promise.resolve()
+  vi.mocked(f.menu.hidePopover).mockClear()
+
+  f.item.focus()
+  f.item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+  f.focus.restore()
+
+  expect(document.activeElement).toBe(f.item)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+})
 
 // @requirement PRODUCT.md §1.4
 it.each([false, true])('restores backward selection after Escape (rich=%s)', async (rich) => {

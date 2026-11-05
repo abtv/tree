@@ -7,6 +7,7 @@ import {
   validateAttachmentId,
   validateAttachmentIds,
   validateClipboardWritePayload,
+  validateClipboardContent,
   validateEditorContextMenuRequest,
   validatePersistedEditorState,
 } from './ipc-security'
@@ -21,6 +22,67 @@ const state = {
 const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
+  it.each([null, [], { text: 1, html: '<b>x</b>' }, { text: 'x', html: 1 }])(
+    'rejects malformed rich clipboard value %j',
+    (value) => {
+      expect(() => validateClipboardWritePayload(value)).toThrow('Clipboard payload is invalid.')
+    },
+  )
+
+  it.each([null, [], {}, { kind: 'text', text: 1 }, { kind: 'unknown', text: 'x' }])(
+    'rejects malformed clipboard content %j',
+    (value) => {
+      expect(() => validateClipboardContent(value)).toThrow('Clipboard content is invalid.')
+    },
+  )
+
+  it('copies only the validated fields from clipboard content', () => {
+    expect(validateClipboardContent({ kind: 'text', text: '', attachmentId: '../secret' })).toEqual({
+      kind: 'text',
+      text: '',
+    })
+    expect(validateClipboardContent({ kind: 'image', attachmentId: 'safe-image', text: 'ignored' })).toEqual({
+      kind: 'image',
+      attachmentId: 'safe-image',
+    })
+    expect(() => validateClipboardContent({ kind: 'image', attachmentId: '../secret' })).toThrow('Attachment IDs')
+  })
+
+  it.each(['x', 'y', 'selectionText', 'canCut', 'canCopy', 'canPaste', 'canSelectAll'] as const)(
+    'rejects a context menu request whose %s has the wrong type',
+    (field) => {
+      const request = {
+        x: 4,
+        y: 8,
+        selectionText: 'label',
+        canCut: true,
+        canCopy: true,
+        canPaste: false,
+        canSelectAll: true,
+      }
+
+      expect(() => validateEditorContextMenuRequest({ ...request, [field]: null })).toThrow(
+        'Editor context menu request is invalid.',
+      )
+    },
+  )
+
+  it.each([254, 255, 256])('bounds a mixed Unicode context-menu selection of %i code points', (length) => {
+    const selectionText = 'x'.repeat(length - 1) + '😀'
+    const request = { x: 0, y: 0, selectionText, canCut: false, canCopy: false, canPaste: true, canSelectAll: false }
+
+    const result = validateEditorContextMenuRequest(request)
+
+    expect(result.selectionText).toBe(length <= 255 ? selectionText : 'x'.repeat(255) + '…')
+    expect(result).toMatchObject({ x: 0, y: 0, canCut: false, canCopy: false, canPaste: true, canSelectAll: false })
+  })
+
+  it('does not trust a matching renderer host and path under another protocol or port', () => {
+    expect(isTrustedRendererUrl('http://tree/index.html', 'app://tree/index.html')).toBe(false)
+    expect(isTrustedRendererUrl('http://localhost:5174/', 'http://localhost:5173/')).toBe(false)
+    expect(isTrustedRendererUrl('app://tree/index.html?view=tree#node', 'app://tree/index.html')).toBe(true)
+  })
+
   it('accepts only the expected renderer URL', () => {
     expect(isTrustedRendererUrl('app://tree/index.html', 'app://tree/index.html')).toBe(true)
     expect(isTrustedRendererUrl('app://tree/assets/index.js', 'app://tree/index.html')).toBe(false)

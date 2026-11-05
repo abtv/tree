@@ -1,9 +1,9 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { openSync, closeSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'fflate'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serializeState, type TreeNode } from '../../../domain/document'
 import { exportNotesArchive } from '../../../application/notes-archive/export-notes'
 import { buildZip } from '../../../application/test/zip-builder'
@@ -20,7 +20,13 @@ import { descriptorArchiveFile, runDesktopImport } from './desktop-import-job'
 
 const directories: string[] = []
 
+vi.mock('node:fs/promises', async (original) => {
+  const actual = await original<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
+
 afterEach(async () => {
+  vi.mocked(open).mockReset()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -57,9 +63,10 @@ interface Setup {
   /** Files of the current notes in the snapshot that main takes after staging. */
   readonly current?: Record<string, string>
   readonly decodable?: (bytes: Uint8Array) => boolean
+  readonly replyOverride?: ArchiveWorkerReply
 }
 
-async function runImport({ archive, current = {}, decodable = () => true }: Setup) {
+async function runImport({ archive, current = {}, decodable = () => true, replyOverride }: Setup) {
   const directory = await temporaryDirectory()
   const archivePath = join(directory, 'Tree Notes 2026-10-20.zip')
   await writeFile(archivePath, archive)
@@ -86,7 +93,7 @@ async function runImport({ archive, current = {}, decodable = () => true }: Setu
       } else {
         throw new Error(`Unexpected request ${message.type}`)
       }
-      return reply
+      return replyOverride ?? reply
     },
   }
   await runDesktopImport({ type: 'import', archivePath, stagingDirectory: staging }, channel)
@@ -97,6 +104,72 @@ const finalMessage = (messages: ArchiveWorkerMessage[]) => messages.at(-1)
 
 // @requirement PRODUCT.md §24.4
 describe('desktop import job', () => {
+  it('closes the image and archive handles when an image cannot be flushed', async () => {
+    const archive = await browserArchive(headWithImages(['a']), { a: onePixelPng })
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    const closed: string[] = []
+    vi.mocked(open).mockImplementation(async (path, flags, mode) => {
+      const file = await real.open(path, flags, mode)
+      const close = file.close.bind(file)
+      vi.spyOn(file, 'close').mockImplementation(async () => {
+        await close()
+        closed.push(String(path))
+      })
+      if (String(path).endsWith('a.png')) vi.spyOn(file, 'sync').mockRejectedValue(new Error('image flush failed'))
+      return file
+    })
+
+    const { messages, staging, archivePath } = await runImport({ archive })
+
+    expect(finalMessage(messages)).toMatchObject({
+      type: 'error',
+      message: expect.stringContaining('image flush failed'),
+    })
+    expect(closed).toEqual([join(staging, 'attachments', 'a.png'), archivePath])
+    expect(await readdir(staging)).toEqual(['attachments'])
+  })
+
+  it('refuses a mismatched image-validation reply before marking notes prepared', async () => {
+    const archive = await browserArchive(headWithImages(['a']), { a: onePixelPng })
+
+    const { messages, staging } = await runImport({ archive, replyOverride: { type: 'pinned' } })
+
+    expect(finalMessage(messages)).toMatchObject({
+      type: 'error',
+      message: expect.stringContaining('Attachment data is not a decodable PNG image.'),
+    })
+    expect(await readdir(staging)).toEqual(['attachments'])
+  })
+
+  it('refuses a mismatched current-note count reply instead of reporting prepared notes', async () => {
+    const archive = await browserArchive(headWithImages([]), {})
+
+    const { messages } = await runImport({ archive, replyOverride: { type: 'pinned' } })
+
+    expect(finalMessage(messages)).toMatchObject({
+      type: 'error',
+      message: expect.stringContaining('The current notes could not be counted.'),
+    })
+    expect(messages.some((message) => message.type === 'prepared')).toBe(false)
+  })
+
+  it('reports every percentage once while importing more than one hundred images', async () => {
+    const ids = Array.from({ length: 201 }, (_, index) => `image-${index}`)
+    const images = Object.fromEntries(ids.map((id) => [id, onePixelPng]))
+    const archive = await browserArchive(headWithImages(ids), images)
+
+    const { messages } = await runImport({ archive })
+
+    const progress = messages.filter((message) => message.type === 'progress')
+    expect(progress).toHaveLength(101)
+    expect(progress[0]).toEqual({ type: 'progress', imagesDone: 0, imageCount: 201 })
+    expect(progress.at(-1)).toEqual({ type: 'progress', imagesDone: 201, imageCount: 201 })
+    expect(progress.map(({ imagesDone }) => Math.floor((imagesDone * 100) / 201))).toEqual(
+      Array.from({ length: 101 }, (_, percent) => percent),
+    )
+    expect(finalMessage(messages)).toMatchObject({ type: 'prepared', incoming: { imageCount: 201 } })
+  })
+
   it('stages a browser-written archive and reports both note counts', async () => {
     const incoming = headWithImages(['a', 'b', 'missing'], 'Imported')
     const archive = await browserArchive(incoming, { a: onePixelPng, b: transparentPng })
@@ -126,6 +199,9 @@ describe('desktop import job', () => {
       const { messages } = await runImport({ archive, current })
 
       expect(finalMessage(messages)).toMatchObject({ type: 'prepared', current: expected })
+      expect(messages.filter((message) => message.type === 'progress')).toEqual([
+        { type: 'progress', imagesDone: 0, imageCount: 0 },
+      ])
     }
   })
 

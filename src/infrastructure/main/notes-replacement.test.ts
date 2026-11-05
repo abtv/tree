@@ -60,11 +60,52 @@ async function sortedEntries(path: string): Promise<string[]> {
 
 // @requirement PRODUCT.md §25.4
 describe('notes replacement', () => {
+  it('recovers single-segment staging and backup names beginning with dots', async () => {
+    const layout = await userData()
+    await seedOldNotes(layout)
+    await stage(layout, '..staged')
+    await writeFile(
+      join(layout.importDirectory, 'commit.json'),
+      JSON.stringify({ staging: '..staged', replaced: '.backup' }),
+    )
+
+    const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
+
+    expect(recovery).toEqual({ completed: true, replacedFolder: join(layout.replacedNotesDirectory, '.backup') })
+    expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('new document')
+  })
+
+  it.each(['journal', 'directory'] as const)('preserves staging after a %s access error', async (operation) => {
+    const layout = await userData()
+    await stage(layout)
+    const failure = Object.assign(new Error('access denied'), { code: 'EACCES' })
+    const fs: ReplacementFileSystem = {
+      ...nodeReplacementFileSystem,
+      readFile: async (path) => {
+        if (operation === 'journal') throw failure
+        return nodeReplacementFileSystem.readFile(path)
+      },
+      readdir: async () => {
+        throw failure
+      },
+    }
+
+    await expect(recoverReplacement(fs, layout, new Set())).rejects.toBe(failure)
+
+    expect(await readFile(join(layout.importDirectory, 'staged', 'document.json'), 'utf8')).toBe('new document')
+  })
+
   it('recognizes every document file and names the folder in local time', () => {
     for (const name of ['document.json', 'document.json.tmp', 'document.json.bak', 'document.12.json']) {
       expect(isDocumentFileName(name)).toBe(true)
     }
-    for (const name of ['appearance.json', 'document.json.tmp.old', 'document.x.json', 'attachments']) {
+    for (const name of [
+      'appearance.json',
+      'document.json.tmp.old',
+      'document.x.json',
+      'attachments',
+      'old-document.json',
+    ]) {
       expect(isDocumentFileName(name)).toBe(false)
     }
     expect(replacedFolderName(NOW)).toBe(FOLDER)
@@ -240,6 +281,18 @@ describe('notes replacement', () => {
     await stage(layout)
     for (const journal of [
       '{',
+      'null',
+      '[]',
+      'true',
+      '7',
+      '{}',
+      '{"replaced":"x"}',
+      '{"staging":7,"replaced":"x"}',
+      '{"staging":"staged","replaced":7}',
+      '{"staging":".","replaced":"x"}',
+      '{"staging":"..","replaced":"x"}',
+      '{"staging":"staged","replaced":".."}',
+      '{"staging":"staged","replaced":"../escape"}',
       '{"staging":"../data","replaced":"x"}',
       '{"staging":"staged"}',
       '{"staging":"staged","replaced":"x","archive":7}',
@@ -249,6 +302,7 @@ describe('notes replacement', () => {
       await expect(recoverReplacement(nodeReplacementFileSystem, layout, new Set())).rejects.toThrow(
         'The import journal is damaged.',
       )
+      expect(await readFile(join(layout.importDirectory, 'commit.json'), 'utf8')).toBe(journal)
     }
 
     expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('old document.json')

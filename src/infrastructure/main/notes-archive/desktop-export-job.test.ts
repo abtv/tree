@@ -1,5 +1,6 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { writeSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serializeState, type TreeNode } from '../../../domain/document'
@@ -16,8 +17,19 @@ import { runDesktopExport } from './desktop-export-job'
 
 const directories: string[] = []
 
+vi.mock('node:fs/promises', async (original) => {
+  const actual = await original<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
+vi.mock('node:fs', async (original) => {
+  const actual = await original<typeof import('node:fs')>()
+  return { ...actual, writeSync: vi.fn(actual.writeSync) }
+})
+
 afterEach(async () => {
   vi.useRealTimers()
+  vi.mocked(open).mockReset()
+  vi.mocked(writeSync).mockReset()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -69,6 +81,88 @@ async function savedNotes(head: ReturnType<typeof headWithImages>, images: Recor
 
 // @requirement PRODUCT.md §24.3
 describe('desktop export job', () => {
+  it('reports a disk-write failure and closes the incomplete archive', async () => {
+    const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
+    const channel = recordingChannel()
+    const temporaryPath = join(userData, '.archive.tmp')
+    vi.mocked(writeSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error('disk full'), { code: 'ENOSPC' })
+    })
+
+    await runDesktopExport(
+      { type: 'export', snapshotDirectory: snapshot, attachmentsDirectory: join(data, 'attachments'), temporaryPath },
+      channel,
+    )
+
+    expect(channel.messages.at(-1)).toEqual({ type: 'error', message: 'The archive could not be saved: disk full' })
+    expect(channel.messages.some((message) => message.type === 'written')).toBe(false)
+    const index = vi.mocked(open).mock.calls.findIndex(([path]) => path === temporaryPath)
+    expect(index).toBeGreaterThanOrEqual(0)
+    expect((await vi.mocked(open).mock.results[index]!.value).fd).toBe(-1)
+  })
+
+  it('flushes and closes the archive before reporting that it was written', async () => {
+    const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
+    const temporaryPath = join(userData, '.archive.tmp')
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    const events: string[] = []
+    vi.mocked(open).mockImplementation(async (path, flags, mode) => {
+      const file = await real.open(path, flags, mode)
+      if (String(path) === temporaryPath) {
+        const sync = file.sync.bind(file)
+        const close = file.close.bind(file)
+        vi.spyOn(file, 'sync').mockImplementation(async () => {
+          await sync()
+          events.push('synced')
+        })
+        vi.spyOn(file, 'close').mockImplementation(async () => {
+          await close()
+          events.push('closed')
+        })
+      }
+      return file
+    })
+    const channel = recordingChannel()
+    const post = channel.post
+    channel.post = (message) => {
+      if (message.type === 'written') events.push('written')
+      post(message)
+    }
+
+    await runDesktopExport(
+      { type: 'export', snapshotDirectory: snapshot, attachmentsDirectory: join(data, 'attachments'), temporaryPath },
+      channel,
+    )
+
+    expect(events).toEqual(['synced', 'closed', 'written'])
+    expect(channel.messages.at(-1)).toMatchObject({ type: 'written' })
+  })
+
+  it('reports percentage progress without flooding the main process for many images', async () => {
+    const ids = Array.from({ length: 201 }, (_, index) => `image-${index}`)
+    const { userData, data, snapshot } = await savedNotes(headWithImages(ids), {})
+    const channel = recordingChannel()
+
+    await runDesktopExport(
+      {
+        type: 'export',
+        snapshotDirectory: snapshot,
+        attachmentsDirectory: join(data, 'attachments'),
+        temporaryPath: join(userData, '.archive.tmp'),
+      },
+      channel,
+    )
+
+    const progress = channel.messages.filter((message) => message.type === 'progress')
+    expect(progress).toHaveLength(101)
+    expect(progress[0]).toEqual({ type: 'progress', imagesDone: 0, imageCount: 201 })
+    expect(progress.at(-1)).toEqual({ type: 'progress', imagesDone: 201, imageCount: 201 })
+    expect(progress.map(({ imagesDone }) => Math.floor((imagesDone * 100) / 201))).toEqual(
+      Array.from({ length: 101 }, (_, percent) => percent),
+    )
+    expect(channel.messages.at(-1)).toMatchObject({ type: 'written' })
+  })
+
   it('writes the snapshot head and available images as the archive the browser writes', async () => {
     // ZIP headers include wall-clock timestamps; both exports must use the same instant.
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -144,6 +238,9 @@ describe('desktop export job', () => {
     })
 
     expect(prepared.head).toEqual(older)
+    expect(channel.messages.filter((message) => message.type === 'progress')).toEqual([
+      { type: 'progress', imagesDone: 0, imageCount: 0 },
+    ])
   })
 
   it('refuses missing or invalid notes before creating a file or pinning images', async () => {
