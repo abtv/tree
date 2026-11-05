@@ -25,6 +25,13 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('desktop app updates', () => {
+  it('starts with no manual check or result notification in progress', () => {
+    const { updates } = harness()
+
+    expect(updates.isChecking()).toBe(false)
+    expect(updates.isNotifying()).toBe(false)
+  })
+
   it('notifies menu observers when a background check starts and finishes', async () => {
     const { updates, ports } = harness()
     const states: boolean[] = []

@@ -9,7 +9,8 @@ export function extractClipboardLinks(html: string, text: string): LinkRange[] {
   let searchFrom = 0
   let scanFrom = 0
   let anchorsExamined = 0
-  while (links.length < MAX_CLIPBOARD_LINKS && anchorsExamined < MAX_CLIPBOARD_LINKS) {
+  // Each examined anchor contributes at most one link, so this bounds both work and output.
+  while (anchorsExamined < MAX_CLIPBOARD_LINKS) {
     const opening = findAnchorTag(html, scanFrom, false)
     if (opening === undefined) break
     anchorsExamined += 1

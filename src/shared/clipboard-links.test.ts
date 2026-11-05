@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { extractClipboardLinks } from './clipboard-links'
 
 describe('clipboard link extraction', () => {
+  it('does not extract a link from an unterminated opening attribute matching literal clipboard text', () => {
+    expect(extractClipboardLinks('<a href="url>label</a>', '<a href="url>label')).toEqual([])
+  })
+
   it.each(['data=x" > href="url" extra="x', 'data=x" name> href="url" extra="x', 'data=x"> href="url" extra="x'])(
     'does not recover an href past a malformed attribute terminator: %s',
     (attributes) => {

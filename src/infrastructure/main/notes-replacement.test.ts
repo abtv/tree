@@ -75,10 +75,16 @@ describe('notes replacement', () => {
     expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('new document')
   })
 
-  it.each(['journal', 'directory'] as const)('preserves staging after a %s access error', async (operation) => {
+  it.each([
+    ['journal', Object.assign(new Error('access denied'), { code: 'EACCES' })],
+    ['directory', Object.assign(new Error('access denied'), { code: 'EACCES' })],
+    ['journal', null],
+    ['journal', 'access denied'],
+    ['directory', null],
+    ['directory', 'access denied'],
+  ] as const)('preserves staging after a %s access error (%j)', async (operation, failure) => {
     const layout = await userData()
     await stage(layout)
-    const failure = Object.assign(new Error('access denied'), { code: 'EACCES' })
     const fs: ReplacementFileSystem = {
       ...nodeReplacementFileSystem,
       readFile: async (path) => {

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, open, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { writeSync } from 'node:fs'
+import { readFileSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serializeState, type TreeNode } from '../../../domain/document'
@@ -23,13 +23,14 @@ vi.mock('node:fs/promises', async (original) => {
 })
 vi.mock('node:fs', async (original) => {
   const actual = await original<typeof import('node:fs')>()
-  return { ...actual, writeSync: vi.fn(actual.writeSync) }
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync), writeSync: vi.fn(actual.writeSync) }
 })
 
 afterEach(async () => {
   vi.useRealTimers()
   vi.mocked(open).mockReset()
   vi.mocked(writeSync).mockReset()
+  vi.mocked(readFileSync).mockReset()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -81,6 +82,64 @@ async function savedNotes(head: ReturnType<typeof headWithImages>, images: Recor
 
 // @requirement PRODUCT.md §24.3
 describe('desktop export job', () => {
+  it('reports a failed archive flush instead of announcing a completed export', async () => {
+    const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
+    const temporaryPath = join(userData, '.archive.tmp')
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    let output: Awaited<ReturnType<typeof open>> | undefined
+    vi.mocked(open).mockImplementation(async (path, flags, mode) => {
+      const file = await real.open(path, flags, mode)
+      if (path === temporaryPath) {
+        output = file
+        vi.spyOn(file, 'sync').mockRejectedValue(new Error('flush failed'))
+      }
+      return file
+    })
+    const channel = recordingChannel()
+
+    try {
+      await runDesktopExport(
+        { type: 'export', snapshotDirectory: snapshot, attachmentsDirectory: join(data, 'attachments'), temporaryPath },
+        channel,
+      )
+
+      expect(channel.messages.at(-1)).toEqual({
+        type: 'error',
+        message: 'The archive could not be saved: flush failed',
+      })
+      expect(channel.messages.some((message) => message.type === 'written')).toBe(false)
+    } finally {
+      await output?.close()
+    }
+  })
+
+  it.each([null, undefined, 'read failed', { code: 'EACCES' }])(
+    'reports an unexpected image-read failure without treating it as a missing image: %j',
+    async (failure) => {
+      const { userData, data, snapshot } = await savedNotes(headWithImages(['a']), {})
+      const channel = recordingChannel()
+      vi.mocked(readFileSync).mockImplementationOnce(() => {
+        throw failure
+      })
+
+      await runDesktopExport(
+        {
+          type: 'export',
+          snapshotDirectory: snapshot,
+          attachmentsDirectory: join(data, 'attachments'),
+          temporaryPath: join(userData, '.archive.tmp'),
+        },
+        channel,
+      )
+
+      expect(channel.messages.at(-1)).toEqual({
+        type: 'error',
+        message: `The notes could not be read: ${String(failure)}`,
+      })
+      expect(channel.messages.some((message) => message.type === 'written')).toBe(false)
+    },
+  )
+
   it('reports a disk-write failure and closes the incomplete archive', async () => {
     const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
     const channel = recordingChannel()
