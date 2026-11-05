@@ -1,8 +1,10 @@
 # Electron E2E maintainability follow-up
 
-Status: **In progress**. The initial items are delivered at `52d85cd` and
-`1875860`. On 2026-11-06 the owner authorized the deeper layering work below,
-in this session with logical commits and the existing npm advisory exception.
+Status: **Awaiting owner acceptance**. All authorized implementation and
+validation is complete. The initial items are delivered at `52d85cd` and
+`1875860`; the deeper layering work includes `de53989`, `ea8a9bc` and the commit
+containing this final Agenda/review update. The existing npm advisory remains
+the explicitly accepted exception.
 
 ## Authorization and boundaries
 
@@ -18,7 +20,7 @@ entries for this work; this is not a passing audit or permission to suppress it.
 ## Tasks
 
 The initial scope had five substantive implementation/investigation items. The
-authorized extension below brings the count to eight and permits more than four
+authorized extensions below bring the count to twelve and permit more than four
 logical commits in this session. Final
 owner acceptance is required before retiring this plan. No manual product check
 is expected because product behavior is unchanged.
@@ -43,9 +45,10 @@ production timing, state and process lifecycle are unchanged.
 
 ## Next action
 
-Complete tasks 9–12 below in this session. Final owner acceptance applies to
-the combined delivered result; no manual application check is expected for
-test-only changes. Continue autonomously unless a critical blocker arises.
+Await the owner's acceptance of the combined delivered result, then retire this
+plan and its index entry. No implementation task remains ready. Inspect the
+three layering commits and the coverage ownership guidance in Development §8;
+no manual application check is expected for these test-only changes.
 
 ## Authorized layering work (2026-11-06)
 
@@ -63,8 +66,8 @@ minimatch advisory remains an explicit exception, not a clean audit result.
 | --- | --- | --- |
 | 9 | Reduce repeated breadcrumb, completion-popup, Insert-date and typography PNGs; retain mode-sensitive rendering and geometry. Own the corresponding Electron specs/baselines and Development guidance. Inspect new cropped popup baselines and run all affected specs. | Done |
 | 10 | Add real App/NodeInput/popup/store completion integration coverage before reducing grammar/refinement E2E combinations in `agenda-completion.spec.ts`; preserve unique native paths and exact replacement/Undo. No replacement UI or production test hook. | Done |
-| 11 | Add real App/store Agenda command no-op coverage, shorten the repeated Electron command table, and ensure retained disk assertions wait for saves. Preserve native focus/caret and both modes. | In progress |
-| 12 | Validate the complete result, independently review coverage ownership, record measured costs and lasting guidance in Development, and commit remaining work. | Ready |
+| 11 | Add real App/store Agenda command no-op coverage, shorten the repeated Electron command table, and ensure retained disk assertions wait for saves. Preserve native focus/caret and both modes. | Done |
+| 12 | Validate the complete result, independently review coverage ownership, record measured costs and lasting guidance in Development, and commit remaining work. | Done |
 
 These are four additional substantive tasks. Use Low Risk affected checks for
 test-only changes: types, scoped lint/format/governance, focused unit and E2E.
@@ -74,7 +77,8 @@ unchanged; otherwise run its affected allocation. No product performance suite
 is needed. New visual baselines require real Electron capture and inspection.
 The prior 979-case report at `1875860` remains the full baseline. Use matched
 focused local measurements for selected families, without concurrent test
-processes. Temporary evidence lives in `.scratch/e2e-layering/`.
+processes. Temporary reports were diagnostic evidence; the conclusions below
+are self-contained and do not require the disposable scratch files.
 
 The review-before-removal rule is coverage based: identify the retained fast
 test and the distinct real-boundary representative for every removed matrix.
@@ -99,6 +103,34 @@ Twenty Electron grammar cases became four native Tab/visibility/caret cases;
 the retained completion spec passed all 22 cases in 12.1 seconds. Native
 mouse/keyboard, paste, hyperlink, focus, plain/rich and geometry checks remain.
 Renderer/E2E types, scoped lint, requirements and editing-mode guards passed.
+
+Task 11 adds eight real App/store Agenda cases for day, gap, context and match
+rows in both modes. They retain the complete prohibited-command matrix, assert
+the live document, focus/caret, selected row, Tree location, mode and save count,
+and prove Undo still reaches an earlier real edit. A temporary invalid edit
+failed both mode assertions while the save count was still unchanged. The
+retained native cases now advance idle saving and await the queued load before
+reading disk. All 24 Agenda Electron cases passed; the final mode assertion is
+also covered by the full run. The focused eight component cases and affected
+type/lint/format checks passed after strengthening the Undo assertion.
+
+Combined validation passed `npm run check`: 309 files / 5944 tests, types, lint,
+formatting, documentation, requirements, mode/permission guards, coverage and
+build. The full six-worker Electron run passed all 963 cases without retries or
+skips in 210.47 seconds; summed case time was 1119.80 seconds. Launches fell
+from 905 to 889. The prior 979-case run at `1875860` took 255.32 seconds, but
+launch-phase totals also changed from 774.26 to 626.29 seconds: do not attribute
+the entire wall-time difference to the migration. The durable gains are 18
+fewer PNGs, 16 fewer Electron launches and focused real-App coverage for future
+rule variants. The changed cases are macOS-only; unchanged Linux-tagged cases
+in the mixed completion spec and the unchanged product/fixture retain their
+earlier Linux runtime evidence. Full check revalidated allocation discovery.
+
+Independent review of the complete layering diff, including both new suites,
+the test harness, removed coverage and save ordering returned no meaningful
+issues. Primary review, final documentation/format checks and diff checks also
+passed. No product behavior, dependency or CI policy changed. No required check
+remains blocked or failing apart from the accepted npm advisory.
 
 ## Authorized local cost review
 

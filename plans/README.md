@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Electron E2E maintainability](e2e-maintainability.md) | In progress | Consolidate visual states and move repeated completion/Agenda matrices below E2E |
+| [Electron E2E maintainability](e2e-maintainability.md) | Awaiting owner acceptance | Accept the delivered visual consolidation and App/store coverage migration, then retire the plan |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

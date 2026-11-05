@@ -42,9 +42,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.9
   // @requirement PRODUCT.md §23.10
   // @requirement PRODUCT.md §23.13
-  test('Command Matrix no-ops preserve each selected non-editable row and direct-match caret', async ({
-    userDataDir,
-  }) => {
+  test('native no-ops preserve each selected non-editable row and direct-match caret', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
 
@@ -57,29 +55,20 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     const context = window.locator('.agenda-role-context').first()
     for (const target of [day, gap, context]) {
       await target.click()
-      const keys = ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+Enter', 'Backspace']
-      if (target !== day || mode === 'vim') keys.push('Enter')
-      if (mode === 'vim') {
-        keys.push('>', '<', 'i', 'a', 'R', 'd', 'd', 'p', 'P')
-        if (target !== day) keys.push('o', 'O')
-      } else keys.push('q')
-      if (target === gap) keys.push('Meta+.')
-      for (const key of keys) {
+      // App.agenda-policy.test.tsx owns the full command matrix with the real App/store.
+      // Retain native Tab focus suppression and a prohibited editing key for every row role.
+      for (const key of ['Tab', mode === 'vim' ? 'i' : 'Backspace']) {
         await window.keyboard.press(key)
 
         await expect(target).toBeFocused()
         await expect(target).toHaveAttribute('aria-selected', 'true')
         if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       }
-      if (mode === 'vim') {
-        for (const sequence of ['dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'gJ', 'gp', 'gP', 'd2j', 'c2k', 'y2j']) {
-          for (const key of sequence) await window.keyboard.press(key)
 
-          await expect(target).toBeFocused()
-          await expect(target).toHaveAttribute('aria-selected', 'true')
-          await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-        }
-      }
+      await fireIdleSave(window)
+      await window.evaluate(() =>
+        (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+      )
 
       expect(readPersisted(userDataDir).document).toEqual(original)
     }
@@ -98,23 +87,19 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
         return range.toString().length
       })
     const before = await cursor()
-    const keys = ['Tab', 'Shift+Tab', 'Meta+Backspace']
-    if (mode === 'vim') keys.push('>', '<')
-    for (const key of keys) {
+    for (const key of ['Tab', 'Shift+Tab']) {
       await window.keyboard.press(key)
 
       await expect(input).toBeFocused()
       expect(await cursor()).toBe(before)
+      if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
     }
-    if (mode === 'vim') {
-      for (const sequence of ['dj', 'dk', 'cj', 'ck', 'yj', 'yk', 'd2j', 'c2k', 'y2j', 'gJ', 'gp', 'gP']) {
-        for (const key of sequence) await window.keyboard.press(key)
 
-        await expect(input).toBeFocused()
-        expect(await cursor()).toBe(before)
-        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-      }
-    }
+    await fireIdleSave(window)
+    // A queued load waits for preceding saves; an immediate disk read could observe stale data.
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
 
     expect(readPersisted(userDataDir).document).toEqual(original)
   })
