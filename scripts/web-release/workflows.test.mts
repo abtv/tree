@@ -40,8 +40,10 @@ describe('automatic publication wiring', () => {
     expect(ci.jobs.check!.needs).toBeUndefined()
     expect(ci.jobs.audit!.needs).toBeUndefined()
     expect(ci.jobs.audit!.uses).toBe('./.github/workflows/audit-dependencies.yml')
-    for (const name of ['chrome', 'smoke']) expect(ci.jobs[name]!.needs).toEqual(['check', 'audit'])
-    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'chrome', 'smoke'])
+    expect(ci.jobs.smoke!.needs).toEqual(['check', 'audit'])
+    expect(ci.jobs.chrome!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.chrome!.if).toBe("needs.version.outputs.ready == 'true'")
+    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke'])
     expect(ci.jobs.candidate!.steps).toContainEqual(
       expect.objectContaining({ run: 'node scripts/web-release/cli.mts gate' }),
     )
@@ -75,6 +77,10 @@ describe('automatic publication wiring', () => {
       expect(value.on).toHaveProperty('workflow_call')
     }
     expect(workflow('audit-dependencies').on).toHaveProperty('schedule')
+    expect(workflow('run-web-e2e-tests').on).toMatchObject({
+      schedule: [{ cron: '0 3 * * 0' }],
+      workflow_dispatch: null,
+    })
     expect(text('audit-dependencies')).toContain('npm audit --audit-level=high')
     expect(text('audit-dependencies')).not.toContain('continue-on-error:')
   })

@@ -56,7 +56,8 @@ jobs:
 
   chrome:
     name: Run browser E2E tests
-    needs: [check, audit]
+    needs: [check, audit, version]
+    if: needs.version.outputs.ready == 'true'
     uses: ./.github/workflows/run-web-e2e-tests.yml
 
   smoke:
@@ -64,10 +65,8 @@ jobs:
     needs: [check, audit]
     uses: ./.github/workflows/run-smoke-tests.yml
 
-  candidate:
-    name: Check release version
-    needs: [check, audit, chrome, smoke]
-    if: ${{ !cancelled() }}
+  version:
+    name: Detect release version
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     outputs:
@@ -80,16 +79,33 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
-      - name: Require every validation job to succeed
-        env:
-          RELEASE_RESULTS: ${{ toJSON(needs) }}
-        run: node scripts/web-release/cli.mts gate
       - name: Check release version
         id: version
         if: github.event_name == 'push' && github.repository == 'abtv/tree'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/publication.mts version
+
+  candidate:
+    name: Check release version
+    needs: [check, audit, version, chrome, smoke]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    outputs:
+      ready: ${{ needs.version.outputs.ready }}
+      version: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+      - name: Require applicable validation jobs to succeed
+        env:
+          RELEASE_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/web-release/cli.mts gate
 
   dispatch:
     name: Start approved publications

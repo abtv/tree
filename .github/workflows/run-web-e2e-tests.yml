@@ -2,6 +2,9 @@ name: Run web E2E tests
 
 on:
   workflow_call:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +24,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Audit standalone suite dependencies
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: npm audit --audit-level=high
       # Google Chrome has no Linux arm64 build; the suite uses Playwright's Chromium there.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

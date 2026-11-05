@@ -102,8 +102,16 @@ export function validateManifest(input: unknown): Manifest {
   return manifest
 }
 
-export function validateGate(results: Record<string, { result: string | undefined }>) {
-  for (const key of ['check', 'audit', 'chrome', 'smoke']) {
+export function validateGate(
+  results: Record<string, { result: string | undefined; outputs?: { ready?: string | undefined } }>,
+) {
+  for (const key of ['check', 'audit', 'version', 'smoke']) {
     if (results[key]?.result !== 'success') throw new Error(`Release check ${key} did not succeed`)
   }
+
+  const ready = results.version?.outputs?.ready
+  if (ready !== undefined && ready !== '' && ready !== 'true' && ready !== 'false')
+    throw new Error('Invalid release readiness')
+  const expected = ready === 'true' ? 'success' : 'skipped'
+  if (results.chrome?.result !== expected) throw new Error('Release check chrome did not match release readiness')
 }

@@ -198,7 +198,18 @@ describe('release manifest and package', () => {
 })
 
 describe('release gates', () => {
-  const success = Object.fromEntries(['check', 'audit', 'chrome', 'smoke'].map((key) => [key, { result: 'success' }]))
+  const success = {
+    ...Object.fromEntries(['check', 'audit', 'chrome', 'smoke'].map((key) => [key, { result: 'success' }])),
+    version: { result: 'success', outputs: { ready: 'true' } },
+  }
+  it.each(['false', '', undefined])('allows skipped browser tests without a release (%s)', (ready) => {
+    expect(() =>
+      validateGate({ ...success, version: { result: 'success', outputs: { ready } }, chrome: { result: 'skipped' } }),
+    ).not.toThrow()
+    expect(() =>
+      validateGate({ ...success, version: { result: 'success', outputs: { ready } }, chrome: { result: 'failure' } }),
+    ).toThrow()
+  })
   it('requires every publication check including cross-platform smoke to succeed', () => {
     expect(() => validateGate(success)).not.toThrow()
 
@@ -207,7 +218,7 @@ describe('release gates', () => {
         expect(() => validateGate({ ...success, [key]: { result } })).toThrow()
       }
 
-      const missing = { ...success }
+      const missing: Parameters<typeof validateGate>[0] = { ...success }
       delete missing[key]
 
       expect(() => validateGate(missing)).toThrow()

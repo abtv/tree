@@ -473,8 +473,11 @@ The container's network restriction applies to test execution. It does not disab
 ### GitHub Actions
 
 On each PR and push to main, `Test and build app` runs code/documentation/unit checks
-alongside one dependency audit. After both succeed, browser E2E and Linux/macOS smoke
-run concurrently. The final `Check release version` job requires every result to succeed.
+alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
+Browser E2E runs only when the main push has an unpublished release version; it also
+runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
+job requires checks, audit, version detection and smoke to succeed, plus browser E2E
+for a release. A non-release run requires browser E2E to be skipped.
 PRs never dispatch publications or receive release credentials.
 
 A successful main run dispatches `Publish demo video and screenshots` and, only for
@@ -498,7 +501,7 @@ must remain available; an expired artifact or changed validation attempt fails c
 #### Cross-platform smoke checks
 
 `Run smoke tests` is reusable and runs inside `Test and build app` after code checks
-and audit pass. Its Linux and macOS jobs run in parallel with each other and browser E2E.
+and audit pass. Its Linux and macOS jobs run in parallel with each other and any release browser E2E.
 Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Safari.
 A failed Electron smoke does not skip browser smoke when its build succeeded.
 Both platform results gate publication. They supplement, rather than replace, full E2E.
