@@ -478,8 +478,16 @@ default to macOS; tests added to a Linux-owned file inherit that file's ownershi
 Keep image clipboard, native selection, window/updater integration and all screenshot
 comparisons on macOS. A passing Linux run does not establish native macOS behavior.
 The discovered union and exact overlap are checked by
-`scripts/electron-platforms.test.mts`, including a guard against Linux snapshot
-assertions. Do not add conditional skips or weaken assertions to move a case.
+`scripts/electron-platforms.test.mts`. Shared clipboard scenarios use stable
+`@shared-clipboard-text` and `@shared-clipboard-link` tags; discovery requires
+both editing modes on both platforms, independently of test titles.
+Electron tests and helpers import `expect` from `fixtures.ts` or
+`platform-expect.ts`. The latter rejects `toHaveScreenshot` and `toMatchSnapshot`
+on Linux at runtime, including assertions called through helpers; macOS keeps
+the original Playwright matchers. ESLint rejects direct Playwright `expect`
+imports and re-exports outside that owner. Diagnostic `page.screenshot()` calls
+remain available on both platforms. Do not add conditional skips or weaken
+assertions to move a case.
 
 The complete local command remains `npm run test:e2e`. Run just the macOS
 complement with `npm run test:e2e -- --config=config/testing/playwright.macos.config.ts`.

@@ -89,6 +89,29 @@ export default tseslint.config(
     },
   },
   {
+    files: ['e2e/electron/**/*.ts'],
+    ignores: ['e2e/electron/platform-expect.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              importNames: ['expect'],
+              message: 'Import expect from fixtures or platform-expect so Linux rejects snapshot assertions.',
+            },
+            {
+              name: 'playwright/test',
+              importNames: ['expect'],
+              message: 'Import expect from fixtures or platform-expect so Linux rejects snapshot assertions.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['e2e/**/*.cjs'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',

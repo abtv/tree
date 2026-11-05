@@ -1,4 +1,5 @@
-import { expect, type ElectronApplication } from '@playwright/test'
+import type { ElectronApplication } from '@playwright/test'
+import { expect } from './platform-expect'
 
 // Expire the real quit timeout without advancing unrelated main-process timers.
 export async function captureQuitTimer(

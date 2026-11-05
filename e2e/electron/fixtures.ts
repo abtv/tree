@@ -1,4 +1,5 @@
-import { _electron as electron, expect, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { expect } from './platform-expect'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

@@ -39,7 +39,7 @@ async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
 
 describeForEachEditingMode('clipboard (paste at the cursor)', () => {
   // @requirement PRODUCT.md §13
-  test('pastes plain text at the cursor', async ({ userDataDir }) => {
+  test('inserts plain clipboard text at the caret', { tag: '@shared-clipboard-text' }, async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
     await typeInto(node(window, 1), 'abcdef')
@@ -177,39 +177,43 @@ test.describe('clipboard (mode-independent)', () => {
 
 describeForEachEditingMode('clipboard (selection, links, and cut)', () => {
   // @requirement PRODUCT.md §13.1
-  test('cuts a hyperlink and pastes it into another node with its link preserved', async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir)
-    const first = node(window, 1)
+  test(
+    'preserves a hyperlink through cut and paste between nodes',
+    { tag: '@shared-clipboard-link' },
+    async ({ userDataDir }) => {
+      const { app, window } = await launchTree(userDataDir)
+      const first = node(window, 1)
 
-    await first.pressSequentially('See ')
-    await writeClipboardText(app, 'https://example.com')
-    await firePaste(first)
+      await first.pressSequentially('See ')
+      await writeClipboardText(app, 'https://example.com')
+      await firePaste(first)
 
-    await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
+      await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
 
-    await first.focus()
+      await first.focus()
 
-    await first.press('End')
-    await first.pressSequentially(' now')
+      await first.press('End')
+      await first.pressSequentially(' now')
 
-    await expect(first).toContainText('See https://example.com now')
+      await expect(first).toContainText('See https://example.com now')
 
-    await window.keyboard.press('Meta+a')
+      await window.keyboard.press('Meta+a')
 
-    await expect(first).toHaveClass(/select-all/)
+      await expect(first).toHaveClass(/select-all/)
 
-    await window.keyboard.press('Meta+x')
+      await window.keyboard.press('Meta+x')
 
-    await expect(window.getByRole('link')).toHaveCount(0)
+      await expect(window.getByRole('link')).toHaveCount(0)
 
-    await node(window, 1).focus()
+      await node(window, 1).focus()
 
-    await window.keyboard.press('Enter')
-    await firePaste(node(window, 2))
+      await window.keyboard.press('Enter')
+      await firePaste(node(window, 2))
 
-    await expect(node(window, 2)).toContainText('See https://example.com now')
-    await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
-  })
+      await expect(node(window, 2)).toContainText('See https://example.com now')
+      await expect(window.getByRole('link', { name: 'https://example.com' })).toHaveCount(1)
+    },
+  )
 
   test('copies a hyperlink and pastes it into another node with its link preserved', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)

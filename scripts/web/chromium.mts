@@ -81,6 +81,7 @@ export function containerSourceFiles(smoke = false) {
           // Only the launch/menu/cleanup dependencies of the smoke spec, never screenshot baselines.
           ...[
             'fixtures.ts',
+            'platform-expect.ts',
             'electron-process.ts',
             'clipboard-lock.ts',
             'electron-entry.cjs',

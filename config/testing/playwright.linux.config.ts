@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test'
 import regression from './playwright.config'
-import { linuxFiles, linuxTag, sharedFiles, sharedClipboardTitles, specPattern } from './electron-platforms'
+import { linuxFiles, linuxTag, sharedFiles, sharedClipboardTag, specPattern } from './electron-platforms'
 
 // The ordinary local macOS command still runs the full suite.
 export default defineConfig({
@@ -22,7 +22,7 @@ export default defineConfig({
       testMatch: /\/clipboard\.spec\.ts$/,
       // Native image clipboard and pointer selection remain macOS-owned. This overlap
       // exercises real text clipboard ownership through both editor modes.
-      grep: sharedClipboardTitles,
+      grep: sharedClipboardTag,
     },
   ],
 })

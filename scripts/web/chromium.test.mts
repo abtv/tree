@@ -65,6 +65,7 @@ it('streams smoke launch dependencies without baseline images, host output or cr
       'e2e/smoke/happy-path.spec.mts',
       'e2e/smoke/scenario.mts',
       'e2e/electron/fixtures.ts',
+      'e2e/electron/platform-expect.ts',
       'e2e/electron/electron-entry.cjs',
       'e2e/electron/hidden-windows.cjs',
       'e2e/electron/shortcut-stub.cjs',

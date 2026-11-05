@@ -1,12 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
-import ts from 'typescript'
+import { basename } from 'node:path'
 import { expect, it } from 'vitest'
-import { linuxFiles, sharedClipboardTitles, sharedFiles } from '../config/testing/electron-platforms.ts'
+import { linuxFiles, sharedClipboardTag, sharedFiles } from '../config/testing/electron-platforms.ts'
 
 interface Spec {
   title: string
+  tags: string[]
   file: string
   line: number
   tests: { expectedStatus: string }[]
@@ -46,7 +45,11 @@ function discover(config: string): Case[] {
     for (const spec of suite.specs ?? []) {
       expect(spec.tests).toHaveLength(1)
       expect(spec.tests[0]!.expectedStatus).toBe('passed')
-      cases.push({ ...spec, key: JSON.stringify([spec.file, ...path, spec.title]) })
+      cases.push({
+        ...spec,
+        tags: spec.tags.map((tag) => `@${tag}`),
+        key: JSON.stringify([spec.file, ...path, spec.title]),
+      })
     }
     for (const child of suite.suites ?? []) visit(child, path)
   }
@@ -64,6 +67,24 @@ it('allocates every discovered Electron case with only the declared platform ove
   const linuxKeys = keys(linux)
   const macosKeys = keys(macos)
 
+  // Both native text-clipboard boundaries must keep both editing modes, even if
+  // their human-readable titles change or a selector accidentally matches none.
+  for (const tag of ['@shared-clipboard-text', '@shared-clipboard-link']) {
+    const selected = full.filter((spec) => spec.tags.includes(tag))
+    expect(selected, tag).toHaveLength(2)
+    for (const mode of ['vim', 'standard']) {
+      expect(
+        selected.filter(({ key }) => key.includes(`[${mode} editing]`)),
+        `${tag}: ${mode}`,
+      ).toHaveLength(1)
+    }
+    for (const spec of selected) {
+      expect(basename(spec.file)).toBe('clipboard.spec.ts')
+      expect(linuxKeys.has(spec.key), spec.key).toBe(true)
+      expect(macosKeys.has(spec.key), spec.key).toBe(true)
+    }
+  }
+
   for (const file of [...linuxFiles, ...sharedFiles]) {
     expect(
       linux.some((spec) => basename(spec.file) === file),
@@ -73,32 +94,12 @@ it('allocates every discovered Electron case with only the declared platform ove
   expect(new Set([...linuxKeys, ...macosKeys])).toEqual(keys(full))
   const overlap = full.filter(({ key }) => linuxKeys.has(key) && macosKeys.has(key))
   const expectedOverlap = full.filter(
-    ({ file, title }) =>
+    ({ file, tags }) =>
       sharedFiles.includes(basename(file)) ||
-      (basename(file) === 'clipboard.spec.ts' && sharedClipboardTitles.test(title)),
+      (basename(file) === 'clipboard.spec.ts' && tags.some((tag) => sharedClipboardTag.test(tag))),
   )
   expect(keys(overlap)).toEqual(keys(expectedOverlap))
   console.info(
     `Electron allocation: ${full.length} total, ${linux.length} Linux, ${macos.length} macOS, ${overlap.length} shared`,
   )
-
-  for (const spec of linux) {
-    const path = resolve('e2e/electron', spec.file)
-    const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
-    let callback: ts.Node | undefined
-    const visit = (node: ts.Node) => {
-      if (
-        ts.isCallExpression(node) &&
-        node.expression.getText(source) === 'test' &&
-        source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 === spec.line
-      ) {
-        callback = node.arguments.at(-1)
-      }
-      ts.forEachChild(node, visit)
-    }
-    visit(source)
-
-    expect(callback, spec.key).toBeDefined()
-    expect(callback!.getText(source), spec.key).not.toMatch(/\b(?:toHaveScreenshot|toMatchSnapshot)\s*\(/)
-  }
 }, 120_000)

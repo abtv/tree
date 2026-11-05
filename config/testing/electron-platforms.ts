@@ -21,7 +21,7 @@ export const linuxFiles = [
 
 // Small deliberate overlap protects platform launch/persistence and fixture reuse.
 export const sharedFiles = ['initial-state.spec.ts', 'shared-application.spec.ts']
-export const sharedClipboardTitles = /pastes plain text at the cursor|cuts a hyperlink and pastes it into another node/
+export const sharedClipboardTag = /@shared-clipboard-(?:text|link)\b/
 
 export function specPattern(files: readonly string[]): RegExp {
   return new RegExp(`/(?:${files.map((file) => file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`)
