@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Electron E2E maintainability](e2e-maintainability.md) | Awaiting owner acceptance | Accept the completed audit, migrations and combined validation; then retire the plan |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
