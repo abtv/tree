@@ -474,10 +474,10 @@ The container's network restriction applies to test execution. It does not disab
 
 On each PR and push to main, `Test and build app` runs code/documentation/unit checks
 alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
-Browser E2E runs only when the main push has an unpublished release version; it also
+Browser and full macOS Electron E2E run when the main push has an unpublished release version; browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
 job requires checks, audit, version detection and smoke to succeed, plus browser E2E
-for a release. A non-release run requires browser E2E to be skipped.
+and Electron E2E for a release. A non-release run requires both full E2E jobs to be skipped.
 PRs never dispatch publications or receive release credentials.
 
 A successful main run dispatches `Publish demo video and screenshots` and, only for
@@ -490,8 +490,13 @@ The source Web job waits for target deployment and checks every hosted byte.
 The built-in source token gets Actions write only in the publication dispatcher, to start
 these two source workflows. The cross-repository publishing App remains Contents-only.
 A failed target deployment requires the owner's retry through the link in the source job.
-Retry failed release jobs afterward; do not retransfer a completed version. Rerun all jobs
-when retrying validation itself, so tested artifacts match its current attempt.
+Retry failed release jobs afterward; do not retransfer a completed version.
+Use **Re-run failed jobs** after an E2E or validation-prerequisite failure. The release gate reuses
+the successful browser job's immutable artifact ID, verifies its original identity
+and bytes, and preserves the package with the current attempt's provenance.
+Missing or expired artifacts require rerunning the producer and dependent jobs or all jobs.
+If only publication dispatch failed after the gate succeeded, rerun all jobs to renew
+the gate and package for the new attempt.
 
 Scheduled/manual dependency audits and Electron E2E/memory suites retain separate runs.
 Timing suites stay local. New source validation cancels superseded validation, but release
@@ -994,7 +999,7 @@ permissions remain unchanged. See [macOS releases](releasing.md) and
 
 A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 
-The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Timing and full functional suites remain governed by change risk; preparing a release does not add another full run.
+The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full macOS Electron E2E for a new release version.
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.

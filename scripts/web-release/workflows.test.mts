@@ -43,9 +43,24 @@ describe('automatic publication wiring', () => {
     expect(ci.jobs.smoke!.needs).toEqual(['check', 'audit'])
     expect(ci.jobs.chrome!.needs).toEqual(['check', 'audit', 'version'])
     expect(ci.jobs.chrome!.if).toBe("needs.version.outputs.ready == 'true'")
-    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke'])
+    expect(ci.jobs.electron!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.electron!.if).toBe("needs.version.outputs.ready == 'true'")
+    expect(ci.jobs.electron!.uses).toBe('./.github/workflows/run-electron-e2e-tests.yml')
+    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke', 'electron'])
     expect(ci.jobs.candidate!.steps).toContainEqual(
       expect.objectContaining({ run: 'node scripts/web-release/cli.mts gate' }),
+    )
+    expect(ci.jobs.candidate!.steps).toContainEqual(
+      expect.objectContaining({
+        uses: expect.stringContaining('actions/download-artifact@'),
+        with: { 'artifact-ids': '${{ needs.chrome.outputs.artifact_id }}', path: 'checked-browser' },
+      }),
+    )
+    expect(ci.jobs.candidate!.steps).toContainEqual(
+      expect.objectContaining({
+        run: 'node scripts/web-release/cli.mts seal checked-browser/web checked-browser/web-provenance.json',
+        env: { TESTED_BROWSER_ATTEMPT: '${{ needs.chrome.outputs.attempt }}' },
+      }),
     )
     expect(ci.jobs.dispatch!.needs).toBe('candidate')
     expect(ci.jobs.dispatch!.if).toContain("github.event_name == 'push'")
@@ -109,7 +124,7 @@ describe('automatic publication wiring', () => {
     const browser = text('run-web-e2e-tests')
     expect(browser).toContain('npm run test:web:built')
     expect(browser).not.toContain('--grep')
-    expect(browser).toContain('browser-${{ github.sha }}-${{ github.run_attempt }}')
+    expect(browser).toContain('tested-browser-${{ github.sha }}-${{ github.run_attempt }}')
     expect(browser).toContain('include-hidden-files: true')
   })
 

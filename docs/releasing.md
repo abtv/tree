@@ -17,7 +17,7 @@ commit. It runs no tests, makes no network requests and creates no tag.
 Optional `-- minor` and `-- major` select those increments. Push or merge the
 commit into `main` using the normal development workflow.
 
-The `Test and build app` main workflow runs code checks, audit, browser E2E and
+The `Test and build app` main workflow runs code checks, audit, browser and full macOS Electron E2E, and
 Linux/macOS smoke once. After success it dispatches the versioned release, whose
 Web and macOS branches run independently. The macOS branch calls
 `create-macos-release-draft.yml`.
@@ -48,8 +48,18 @@ The successful source workflow already checked code and audited its lockfile.
 Desktop preparation does not repeat formatting, lint, type checks, ordinary
 tests, audit or development Electron smoke. It installs the same locked
 dependencies, builds the checked source and verifies the newly packaged artifact.
-Full E2E and timing suites follow the development change-risk rules; a release
-alone does not add another full run. No dependency upgrades are automatic.
+Full macOS Electron E2E gates every new release version in the source workflow.
+Local E2E and timing suites follow the development change-risk rules. No dependency upgrades are automatic.
+
+If E2E or another validation prerequisite fails, select **Re-run failed jobs** in `Test and build app`.
+Successful prerequisite results and their outputs are reused for the same source SHA.
+The release gate reruns, downloads the successful browser job's package by immutable
+artifact ID, verifies its original run/SHA/attempt and file hashes, and records the
+current validation attempt before preserving the release package. Missing or expired
+artifacts block release; rerun their producer and dependent jobs, or all jobs.
+No new version or tag is needed. A newer main commit still supersedes the candidate.
+If only the final publication-dispatch job fails after the release gate succeeded,
+rerun all jobs so the successful gate and release package belong to the new attempt.
 
 Production fuses disable RunAsNode, NODE_OPTIONS, Node CLI inspection and extra
 file-protocol privileges, and require ASAR integrity and ASAR-only loading.

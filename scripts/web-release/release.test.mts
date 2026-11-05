@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createManifest, verifyPackage } from './package.mts'
 import { MAX_PACKAGE_BYTES, validateGate, validateManifest } from './policy.mts'
+import { sealPackage } from './seal.mts'
 
 const identity = {
   sourceRepository: 'abtv/tree',
@@ -29,6 +30,42 @@ async function fixture() {
 }
 
 describe('release manifest and package', () => {
+  it('reuses unchanged tested bytes from a successful earlier job without weakening run identity', async () => {
+    const dir = await fixture()
+    const manifest = await createManifest(dir, identity)
+    const env = {
+      GITHUB_EVENT_NAME: 'push',
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_REPOSITORY: identity.sourceRepository,
+      GITHUB_SHA: identity.sourceSha,
+      GITHUB_RUN_ID: identity.sourceRunId,
+      GITHUB_RUN_ATTEMPT: '2',
+      TESTED_BROWSER_ATTEMPT: '1',
+    }
+
+    await expect(sealPackage(dir, manifest, env)).resolves.toEqual({ ...manifest, sourceRunAttempt: 2 })
+    await expect(sealPackage(dir, manifest, { ...env, GITHUB_RUN_ATTEMPT: '1' })).resolves.toEqual(manifest)
+
+    for (const replacement of [
+      { GITHUB_EVENT_NAME: 'pull_request' },
+      { GITHUB_REF: 'refs/heads/other' },
+      { GITHUB_REPOSITORY: 'other/tree' },
+      { GITHUB_SHA: 'b'.repeat(40) },
+      { GITHUB_RUN_ID: '124' },
+      { GITHUB_RUN_ATTEMPT: '0' },
+      { TESTED_BROWSER_ATTEMPT: '' },
+      { TESTED_BROWSER_ATTEMPT: '2' },
+    ])
+      await expect(sealPackage(dir, manifest, { ...env, ...replacement })).rejects.toThrow('identity')
+
+    await expect(
+      sealPackage(dir, { ...manifest, sourceRunAttempt: 3 }, { ...env, TESTED_BROWSER_ATTEMPT: '3' }),
+    ).rejects.toThrow('identity')
+
+    await writeFile(join(dir, 'assets/app.js'), 'tampered')
+
+    await expect(sealPackage(dir, manifest, env)).rejects.toThrow('differs')
+  })
   it('verifies bundled About PNG assets and detects changed image bytes', async () => {
     const dir = await fixture()
     const path = 'assets/tree-icon-source-BZScDtwH.png'
@@ -199,12 +236,17 @@ describe('release manifest and package', () => {
 
 describe('release gates', () => {
   const success = {
-    ...Object.fromEntries(['check', 'audit', 'chrome', 'smoke'].map((key) => [key, { result: 'success' }])),
+    ...Object.fromEntries(['check', 'audit', 'chrome', 'smoke', 'electron'].map((key) => [key, { result: 'success' }])),
     version: { result: 'success', outputs: { ready: 'true' } },
   }
   it.each(['false', '', undefined])('allows skipped browser tests without a release (%s)', (ready) => {
     expect(() =>
-      validateGate({ ...success, version: { result: 'success', outputs: { ready } }, chrome: { result: 'skipped' } }),
+      validateGate({
+        ...success,
+        version: { result: 'success', outputs: { ready } },
+        chrome: { result: 'skipped' },
+        electron: { result: 'skipped' },
+      }),
     ).not.toThrow()
     expect(() =>
       validateGate({ ...success, version: { result: 'success', outputs: { ready } }, chrome: { result: 'failure' } }),

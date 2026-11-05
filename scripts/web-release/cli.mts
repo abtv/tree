@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { appendFile, readFile, writeFile } from 'node:fs/promises'
 import { validateGate } from './policy.mts'
 
 try {
@@ -13,6 +13,11 @@ try {
       sourceRunAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
     })
     await writeFile(second, `${JSON.stringify(manifest, null, 2)}\n`)
+    if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `attempt=${manifest.sourceRunAttempt}\n`)
+  } else if (command === 'seal' && first && second) {
+    const { sealPackage } = await import('./seal.mts')
+    const manifest = await sealPackage(first, JSON.parse(await readFile(second, 'utf8')), process.env)
+    await writeFile(second, `${JSON.stringify(manifest, null, 2)}\n`)
   } else if (command === 'prepare' && first && second) {
     const { dispatchedSource } = await import('../publication.mts')
     await dispatchedSource()
@@ -25,7 +30,7 @@ try {
     await verifyPackage(first, JSON.parse(await readFile(second, 'utf8')))
   } else if (command === 'gate' && !first) {
     validateGate(JSON.parse(process.env.RELEASE_RESULTS!))
-  } else throw new Error('Usage: cli.mts manifest|prepare|verify <directory> <manifest> | gate')
+  } else throw new Error('Usage: cli.mts manifest|seal|prepare|verify <directory> <manifest> | gate')
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
   process.exitCode = 1

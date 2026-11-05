@@ -113,5 +113,7 @@ export function validateGate(
   if (ready !== undefined && ready !== '' && ready !== 'true' && ready !== 'false')
     throw new Error('Invalid release readiness')
   const expected = ready === 'true' ? 'success' : 'skipped'
-  if (results.chrome?.result !== expected) throw new Error('Release check chrome did not match release readiness')
+  for (const key of ['chrome', 'electron']) {
+    if (results[key]?.result !== expected) throw new Error(`Release check ${key} did not match release readiness`)
+  }
 }

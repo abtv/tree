@@ -65,6 +65,12 @@ jobs:
     needs: [check, audit]
     uses: ./.github/workflows/run-smoke-tests.yml
 
+  electron:
+    name: Run release Electron E2E tests
+    needs: [check, audit, version]
+    if: needs.version.outputs.ready == 'true'
+    uses: ./.github/workflows/run-electron-e2e-tests.yml
+
   version:
     name: Detect release version
     runs-on: ubuntu-24.04
@@ -88,7 +94,7 @@ jobs:
 
   candidate:
     name: Check release version
-    needs: [check, audit, version, chrome, smoke]
+    needs: [check, audit, version, chrome, smoke, electron]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
@@ -106,6 +112,31 @@ jobs:
         env:
           RELEASE_RESULTS: ${{ toJSON(needs) }}
         run: node scripts/web-release/cli.mts gate
+      - name: Download the successful browser job's immutable package
+        if: needs.version.outputs.ready == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          artifact-ids: ${{ needs.chrome.outputs.artifact_id }}
+          path: checked-browser
+      - name: Install locked package verifier without lifecycle scripts
+        if: needs.version.outputs.ready == 'true'
+        run: npm ci --ignore-scripts
+      - name: Verify package and bind it to the successful validation attempt
+        if: needs.version.outputs.ready == 'true'
+        env:
+          TESTED_BROWSER_ATTEMPT: ${{ needs.chrome.outputs.attempt }}
+        run: node scripts/web-release/cli.mts seal checked-browser/web checked-browser/web-provenance.json
+      - name: Preserve release package for this validation attempt
+        if: needs.version.outputs.ready == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: browser-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            checked-browser/web/
+            checked-browser/web-provenance.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
   dispatch:
     name: Start approved publications

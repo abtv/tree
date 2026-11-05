@@ -167,8 +167,9 @@ through its existing text/image paste, size-limit, undo and save rules.
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, dependency audit, Chromium checks
 of the built package, and smoke checks in Electron on Linux/macOS, Chromium on Linux,
-and Safari on macOS. Full Electron integration and memory suites remain weekly/manual;
-timing suites remain local. Demo publication also waits for successful validation.
+and Safari on macOS. New releases also require full macOS Electron E2E.
+Electron E2E and memory suites retain weekly/manual runs; timing suites remain local.
+Demo publication also waits for successful validation.
 
 The versioned release has independent Web and macOS branches; a failure on either
 makes the overall release fail without undoing the other branch. The macOS result
