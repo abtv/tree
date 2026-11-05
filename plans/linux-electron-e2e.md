@@ -1,6 +1,7 @@
 # Linux Electron E2E allocation
 
-Status: **Awaiting owner acceptance**. All three implementation tasks are complete.
+Status: **Awaiting owner acceptance**. The migration and the owner-requested
+macOS flaky-test follow-up are complete.
 
 ## Objective and authorization
 
@@ -42,8 +43,10 @@ Sources: [development](../docs/DEVELOPMENT.md),
 | L1 | Portable fixture and bounded Linux pilot: `e2e/electron/fixtures.ts`, process cleanup, `config/testing/`, isolated container runner under `scripts/web/`, npm command and development instructions | None | High Risk: static/check stages, full local macOS E2E, Linux pilot and independent review passed; existing advisory accepted by owner | Done |
 | L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | Low Risk tooling/tests; both platform subsets, discovery union/overlap guards, unchanged baselines and independent review passed | Done |
 | L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: full check, selection/gate tests and independent review/verification passed; local platform evidence reused; hosted savings explicitly unverified | Done |
+| L4 | Investigate and correct the pointer-hold E2E timing flake observed in hosted run 42101828682: `e2e/electron/drag-and-drop.spec.ts` | L3 | Low Risk: reproduced with injected latency; corrected test passed 12 delayed-driver repetitions and all 20 affected drag tests; assertions preserved | Done |
 
-There are three substantive working tasks. Execute within this scope, using the
+There are four substantive working tasks, including the owner-approved hosted
+flake follow-up on 2026-11-05. Execute within this scope, using the
 standard limit of two unsuccessful recovery attempts at one unchanged blocker
 and at most four task commits per primary session. No numeric time or token
 budget was requested. Closure is a separate documentation-only step after owner
@@ -61,9 +64,9 @@ acceptance; waiting does not consume implementation work.
 - Docker and its Linux ARM64 daemon are available. The current prepared dependency
   image exists. The existing isolated Linux smoke command passed both Electron
   and Chromium on 2026-11-05. Agents must not prepare replacement images.
-- The allocated Linux functional subset is verified; new GitHub Linux AMD64
-  resource measurements remain unverified. Local ARM64
-  timings do not establish hosted runner savings.
+- The allocated Linux functional subset is verified locally and on GitHub.
+  The first hosted measurements are recorded below; they compare different
+  source snapshots and do not establish a controlled percentage saving.
 - The initial fixture used macOS scrollbar defaults and Darwin-only stale-process
   cleanup. L1 preserves the macOS geometry contract, uses native Linux scrollbar
   geometry and supports owned Linux processes plus known macOS bundle helpers.
@@ -117,8 +120,9 @@ suite applies because no production performance path changes.
 | Stage | Expected owner action | Gate |
 | --- | --- | --- |
 | L1–L2 | No manual product checks currently expected; automation exercises test infrastructure | Pre-commit automated validation and independent review |
-| L3 | No manual product check; distinguish historical hosted timings from local measurements of the new allocation | Read access verified; new hosted execution unverified |
-| Final result | Accept the delivered initiative, or identify remaining issues | One planned acceptance round after all three tasks |
+| L3 | The owner pushed the migration and dispatched its first hosted run | Hosted run passed; one macOS retry prompted L4 |
+| L4 | No manual product check; the final test correction is locally verified | Hosted rerun of the corrected test remains unverified |
+| Final result | Accept the delivered initiative, or identify remaining issues | One planned acceptance round after the migration and follow-up |
 
 Additional permission prompts use the tool's supported approval mechanism. A
 missing dependency image requires owner preparation with `make setup`.
@@ -156,8 +160,8 @@ Read-only GitHub access is verified. Historical
 [run 41289362290](https://github.com/abtv/tree/actions/runs/41289362290), SHA
 `572e1e6`, used 1367 seconds across six macOS jobs (22.78 runner-minutes), with
 individual job durations of 107–317 seconds. It is an older source snapshot, not
-a controlled comparison. New hosted savings require the first updated workflow
-run; local ARM64 numbers cannot establish them. No publication is authorized.
+a controlled comparison. The first updated hosted run is recorded below; local
+ARM64 numbers are not used as hosted measurements. Agent publication is not authorized.
 
 ## L3 result and limitations
 
@@ -177,15 +181,57 @@ Independent code review and workflow verification found no meaningful issues.
 
 This replaces 197 macOS case executions with Linux execution, reducing the macOS
 case count by about 20%, and reduces macOS dependency/build preparations from six
-to four. These facts do not establish a hosted time or monetary saving. The new
-workflow has not been published or executed on GitHub; observe its first hosted
-run before claiming runner-minute savings or tuning shard counts again.
+to four. The owner's first hosted run, on `243c5ff`, completed successfully:
+[run 42101828682](https://github.com/abtv/tree/actions/runs/42101828682).
+Linux passed all 219 cases without retries. macOS passed 781 on the first attempt;
+one pointer-hold case passed on retry and prompted the L4 correction below.
 
-Implementation commits: L1 `b2ec40d`, L2 `004cb1f`, and the L3 commit containing
-this final status. The standing Docker authorization is `7f7e3ee`. No unresolved
+The four macOS jobs used 239, 266, 318 and 212 seconds, totaling 1035 seconds
+(17.25 runner-minutes). Linux used 260 seconds (4.33 runner-minutes). Against the
+older six-macOS run above, this observation used 24.3% fewer macOS runner-minutes
+and 5.3% fewer total E2E job minutes. These sums include each test job's preparation
+and retries, exclude audit/aggregate jobs, and are not billed-minute calculations.
+Different source snapshots and runner variability prevent a controlled savings
+claim from this single comparison. Keep the initial shard allocation unchanged.
+
+Implementation commits: L1 `b2ec40d`, L2 `004cb1f`, L3 `243c5ff`, and the L4 commit
+containing this follow-up. The standing Docker authorization is `7f7e3ee`. No unresolved
 local validation failures remain; the earlier Linux native-image failure is
 covered by the retained, passing macOS scenario. The accepted minimatch risk
 remains as recorded above. Final owner acceptance is the only closure gate.
+
+## L4 pointer-hold timing correction
+
+The CI trace records the movement command taking 347.3 ms after a primary press;
+the application activates a held drag at 200 ms. Exact DOM event delivery times
+are not present in that trace. The test used wall-clock time, so delayed driver
+delivery could turn its intended move-before-hold gesture into a valid long hold.
+
+Before correction, injecting a 350 ms driver delay after mouse down reproduced
+the same failure: one dragging row instead of zero. The test now pauses the page
+clock before the press, advances it 100 ms before real mouse movement and 500 ms
+afterwards, then checks the original no-drag, no-drop-marker and unchanged-order
+assertions. This uses the existing clock approach from neighboring selection tests.
+Production code, fixtures, platform ownership and screenshot baselines are unchanged.
+
+Validation on the final test-only change:
+
+- Before correction, the focused test with an injected 350 ms delay failed as
+  expected: `npm run test:e2e -- drag-and-drop.spec.ts --grep 'does not start a drag when the pointer moves before the hold threshold' --workers=1 --retries=0`.
+- With the correction and the same delay, adding `--repeat-each=12 --workers=4`
+  passed all 12 runs without retries in 5.1 seconds. The temporary delay was removed.
+- `npm run test:e2e -- drag-and-drop.spec.ts --workers=4 --retries=0` passed all
+  20 cases in 23.0 seconds, including both editing modes and existing screenshots.
+- E2E type checking, scoped ESLint, changed-file formatting, requirement coverage,
+  editing-mode and documentation checks passed. Primary diff review found no
+  weakened assertions or unrelated changes. Broader L3 results remain valid for
+  unchanged inputs; this contained test correction does not require full regression.
+- `npm run fix:history -- e2e/electron/drag-and-drop.spec.ts e2e/electron/fixtures.ts`
+  found no fixes in the 14-day window and no recurring-fix bucket.
+
+The corrected test has not yet run on GitHub. The controlled local reproduction
+and delayed-driver verification establish the correction without repeating the
+full hosted suite merely for reassurance.
 
 ## Resume prompt
 

@@ -366,11 +366,16 @@ test.describe('drag and drop (mode-independent)', () => {
     if (box === null) throw new Error('The fourth row was not rendered.')
 
     await window.mouse.move(box.x + 8, box.y + box.height / 2)
+    // Driver delivery can exceed the 200 ms hold threshold. Keep the gesture's
+    // elapsed time explicit so this remains a move-before-hold cancellation test.
+    await window.clock.install()
+    await window.clock.pauseAt(Date.now() + 60_000)
     await window.mouse.down()
     const target = await rowBox(window, 1)
 
+    await window.clock.runFor(100)
     await window.mouse.move(target.x + 8, target.y + 4, { steps: 2 })
-    await window.waitForTimeout(HOLD_MS)
+    await window.clock.runFor(HOLD_MS)
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(0)
     await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(0)

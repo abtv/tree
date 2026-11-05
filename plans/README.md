@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Linux Electron E2E allocation](linux-electron-e2e.md) | Awaiting owner acceptance | Accept the delivered platform allocation, then retire the plan |
+| [Linux Electron E2E allocation](linux-electron-e2e.md) | Awaiting owner acceptance | Accept the migration and pointer-hold test correction, then retire the plan |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
