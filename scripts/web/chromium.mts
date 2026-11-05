@@ -53,6 +53,11 @@ export function runSmoke(args: string[]) {
   return runContainer(true)
 }
 
+export function runElectron(args: string[]) {
+  if (args.length) throw new Error('test:e2e:linux accepts no arguments; it runs the selected Linux Electron suite')
+  return runContainer(false, true)
+}
+
 export function containerSourceFiles(smoke = false) {
   return [
     'package.json',
@@ -87,7 +92,7 @@ export function containerSourceFiles(smoke = false) {
   ]
 }
 
-function runContainer(smoke: boolean) {
+function runContainer(smoke: boolean, electron = false) {
   const image = currentDependencyImage()
   const inspected = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { encoding: 'utf8' })
   if (inspected.error || inspected.status !== 0) {
@@ -96,7 +101,17 @@ function runContainer(smoke: boolean) {
     )
   }
   const dockerArgs = containerArguments(inspected.stdout.trim(), smoke)
-  const files = containerSourceFiles(smoke)
+  if (electron) dockerArgs.push('electron')
+  const files = electron
+    ? [
+        ...new Set([
+          ...containerSourceFiles(true),
+          'config/testing/playwright.config.ts',
+          'config/testing/playwright.linux.config.ts',
+          ...sourceFiles('e2e/electron').filter((path) => /\.(?:ts|cjs)$/.test(path)),
+        ]),
+      ]
+    : containerSourceFiles(smoke)
   // Only these source paths enter the container. No .git, credentials, scratch,
   // host dependencies, Docker socket, ports, or host environment are forwarded.
   // Match the image's root user without needing CAP_CHOWN during extraction.

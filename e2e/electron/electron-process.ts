@@ -1,15 +1,35 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { createRequire } from 'node:module'
+import { basename, join } from 'node:path'
 
 const execFileAsync = promisify(execFile)
 
+export function isOwnedElectronCommand(command: string, marker: string, executable: string): boolean {
+  if (!/^tree-e2e-(?:p\d+-)?$/.test(marker)) return false
+  const executables = [executable]
+  const mainSuffix = '/Contents/MacOS/Electron'
+  if (executable.endsWith(mainSuffix)) {
+    const bundle = executable.slice(0, -mainSuffix.length)
+    for (const suffix of ['', ' (Renderer)', ' (GPU)', ' (Plugin)']) {
+      executables.push(
+        `${bundle}/Contents/Frameworks/Electron Helper${suffix}.app/Contents/MacOS/Electron Helper${suffix}`,
+      )
+    }
+  }
+  if (!executables.some((path) => command.startsWith(`${path} `))) return false
+  const directory = command.match(/(?:^|\s)--user-data-dir=(\S+)(?:\s|$)/)?.[1]
+  return directory !== undefined && basename(directory).startsWith(marker)
+}
+
 export async function cleanupStaleElectronProcesses(marker: string): Promise<void> {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== 'darwin' && process.platform !== 'linux') return
 
   const processes = await listProcesses()
+  const executable = createRequire(join(process.cwd(), 'package.json'))('electron') as string
   const currentPid = process.pid
   const stalePids = processes
-    .filter(({ pid, command }) => pid !== currentPid && command.includes(marker) && command.includes('Electron'))
+    .filter(({ pid, command }) => pid !== currentPid && isOwnedElectronCommand(command, marker, executable))
     .map(({ pid }) => pid)
 
   for (const pid of stalePids) {

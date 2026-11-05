@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Linux Electron E2E allocation](linux-electron-e2e.md) | Blocked | L1: resolve existing dependency-audit gate; implementation remains uncommitted |
+| [Linux Electron E2E allocation](linux-electron-e2e.md) | In progress | L2: allocate portable functional coverage and retain macOS boundaries |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

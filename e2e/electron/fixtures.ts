@@ -727,6 +727,7 @@ export async function launchTree(
         app = await measure('electronLaunch', () =>
           electron.launch({
             args: [
+              ...(process.platform === 'linux' && process.env['CI'] ? ['--no-sandbox'] : []),
               ...(options.initialDeviceScaleFactor === undefined
                 ? []
                 : [`--force-device-scale-factor=${options.initialDeviceScaleFactor}`]),
@@ -740,8 +741,7 @@ export async function launchTree(
               // picks classic scrollbars when no trackpad is attached, as on CI runners, so fix the style
               // through the user-defaults argument domain. It follows the entry, or Electron would take the
               // value for the application path.
-              '-AppleShowScrollBars',
-              'WhenScrolling',
+              ...(process.platform === 'darwin' ? ['-AppleShowScrollBars', 'WhenScrolling'] : []),
               ...(options.appearance === undefined ? [] : [`--tree-test-appearance=${options.appearance}`]),
               ...(options.appUpdates ? ['--tree-test-app-updates'] : []),
             ],
@@ -792,7 +792,9 @@ export async function launchTree(
             `Expected E2E devicePixelRatio 1, got ${scale}. The launch-time rendering scale did not apply.`,
           )
         }
-        if (scrollbarWidth !== 0) {
+        // macOS baselines require overlay scrollbars. Linux functional coverage uses
+        // its native scrollbar geometry and never compares macOS screenshot baselines.
+        if (process.platform === 'darwin' && scrollbarWidth !== 0) {
           throw new Error(`Expected E2E overlay scrollbars, got a ${scrollbarWidth}px classic scrollbar.`)
         }
         if (shared !== undefined) {

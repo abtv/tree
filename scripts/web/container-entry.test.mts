@@ -14,9 +14,44 @@ beforeEach(() => {
 })
 
 it('rejects arbitrary container commands before starting a child', () => {
-  for (const args of [[], ['sh'], ['smoke', '--config=other.ts'], ['web', 'smoke']])
-    expect(() => run(args)).toThrow('only web or smoke')
+  for (const args of [[], ['sh'], ['smoke', '--config=other.ts'], ['web', 'smoke'], ['electron', 'sh']])
+    expect(() => run(args)).toThrow('only web, smoke or electron')
   expect(spawn).not.toHaveBeenCalled()
+})
+
+it('builds Electron and runs only its fixed Linux config under bounded Xvfb', () => {
+  expect(run(['electron'])).toBe(0)
+  expect(spawn.mock.calls[0]).toEqual(['npm', ['run', 'build'], { stdio: 'inherit' }])
+  expect(spawn.mock.calls[1]).toEqual([
+    'xvfb-run',
+    [
+      '--auto-servernum',
+      'npx',
+      '--no-install',
+      'playwright',
+      'test',
+      '-c',
+      'config/testing/playwright.linux.config.ts',
+    ],
+    expect.objectContaining({ env: expect.objectContaining({ CI: '1' }), timeout: 900_000, killSignal: 'SIGKILL' }),
+  ])
+})
+
+it('propagates Linux Electron build, test and timeout failures', () => {
+  spawn.mockReturnValueOnce({ status: 4 } as ReturnType<typeof spawnSync>)
+
+  expect(run(['electron'])).toBe(4)
+  expect(spawn).toHaveBeenCalledTimes(1)
+
+  spawn.mockReturnValueOnce({ status: 0 } as ReturnType<typeof spawnSync>)
+  spawn.mockReturnValueOnce({ status: 5 } as ReturnType<typeof spawnSync>)
+
+  expect(run(['electron'])).toBe(5)
+
+  spawn.mockReturnValueOnce({ status: 0 } as ReturnType<typeof spawnSync>)
+  spawn.mockReturnValueOnce({ status: null, error: new Error('timeout') } as ReturnType<typeof spawnSync>)
+
+  expect(run(['electron'])).toBe(1)
 })
 
 it('keeps the existing full browser command as the web mode', () => {

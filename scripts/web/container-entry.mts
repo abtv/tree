@@ -20,9 +20,34 @@ function command(executable: string, args: string[], smoke = false) {
 }
 
 export function run(args: string[]) {
-  if (args.length !== 1 || !['web', 'smoke'].includes(args[0]!))
-    throw new Error('The Linux test container accepts only web or smoke')
+  if (args.length !== 1 || !['web', 'smoke', 'electron'].includes(args[0]!))
+    throw new Error('The Linux test container accepts only web, smoke or electron')
   if (args[0] === 'web') return command('npm', ['run', 'test:web:built'])
+
+  if (args[0] === 'electron') {
+    const build = command('npm', ['run', 'build'])
+    if (build !== 0) return build
+    const result = spawnSync(
+      'xvfb-run',
+      [
+        '--auto-servernum',
+        'npx',
+        '--no-install',
+        'playwright',
+        'test',
+        '-c',
+        'config/testing/playwright.linux.config.ts',
+      ],
+      {
+        stdio: 'inherit',
+        env: { ...process.env, CI: '1' },
+        timeout: 15 * 60_000,
+        killSignal: 'SIGKILL',
+      },
+    )
+    if (result.error) console.error(result.error.message)
+    return result.error ? 1 : (result.status ?? 1)
+  }
 
   for (const build of ['build', 'build:web']) {
     const result = command('npm', ['run', build])

@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { containerArguments, containerSourceFiles, run, runSmoke } from './chromium.mts'
+import { containerArguments, containerSourceFiles, run, runSmoke, runElectron } from './chromium.mts'
 import { dependencyImage } from './chromium-image.mts'
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }))
@@ -11,8 +11,30 @@ it('rejects all supplied arguments before accessing Docker', () => {
   for (const arg of ['--privileged', '--network=host', '--help', 'sh', '--config=other.ts']) {
     expect(() => run([arg])).toThrow('accepts no arguments')
     expect(() => runSmoke([arg])).toThrow('accepts no arguments')
+    expect(() => runElectron([arg])).toThrow('accepts no arguments')
   }
   expect(spawn).not.toHaveBeenCalled()
+})
+
+it('runs the fixed Electron suite without copying macOS baselines or weakening isolation', () => {
+  const id = `sha256:${'d'.repeat(64)}`
+  spawn
+    .mockReturnValueOnce({ status: 0, stdout: `${id}\n` } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({ status: 8 } as ReturnType<typeof spawnSync>)
+
+  expect(runElectron([])).toBe(8)
+  expect(spawn.mock.calls[2]).toEqual([
+    'docker',
+    [...containerArguments(id), 'electron'],
+    { input: Buffer.from('archive'), stdio: ['pipe', 'inherit', 'inherit'] },
+  ])
+  const files = spawn.mock.calls[1]![1]!
+
+  expect(files).toContain('config/testing/playwright.linux.config.ts')
+  expect(files).toContain('e2e/electron/shared-application.spec.ts')
+  expect(files.some((path) => path.includes('-snapshots/'))).toBe(false)
+  expect(files.some((path) => /^(?:\.git|\.scratch|\.aws|\.codex|node_modules|out)(?:\/|$)/.test(path))).toBe(false)
 })
 
 it('selects only the fixed smoke mode with the same offline container restrictions', () => {

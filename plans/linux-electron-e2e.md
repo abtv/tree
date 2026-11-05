@@ -12,6 +12,13 @@ Docker on 2026-11-05; the durable record is in the development guide's container
 testing section. The earlier canceled execution request is superseded by this
 explicit permission, not bypassed.
 
+On 2026-11-05 the owner explicitly accepted the risk of the existing minimatch
+advisory GHSA-g3hv-75wg-m249 for this initiative and instructed the agent not to
+ask about it again. Treat this advisory and its transitive audit entries as an
+accepted exception to the initiative's audit gate. Keep audit results truthful;
+do not describe a failing audit as passing. This decision does not authorize
+dependency changes, global audit suppression or exceptions for other advisories.
+
 Use Codex. Preserve product behavior, Apple shortcut semantics in the Electron
 renderer, existing screenshot baselines, editing-mode coverage and failure paths.
 Do not increase scheduled execution frequency or add full E2E to ordinary PRs.
@@ -28,8 +35,8 @@ Sources: [development](../docs/DEVELOPMENT.md),
 
 | ID | Outcome and expected files | Dependencies | Validation and acceptance | Status |
 | --- | --- | --- | --- | --- |
-| L1 | Portable fixture and bounded Linux pilot: `e2e/electron/fixtures.ts`, process cleanup, `config/testing/`, isolated container runner under `scripts/web/`, npm command and development instructions | None | High Risk: `npm run check`, full local macOS E2E, audit, real Linux pilot and process/reset coverage; independent review | Blocked |
-| L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | High Risk where shared fixtures change; otherwise Low Risk tooling/tests with complete affected suites on both platforms. Demonstrate coverage union, intentional overlap and unchanged baselines; independent review | Planned |
+| L1 | Portable fixture and bounded Linux pilot: `e2e/electron/fixtures.ts`, process cleanup, `config/testing/`, isolated container runner under `scripts/web/`, npm command and development instructions | None | High Risk: static/check stages, full local macOS E2E, Linux pilot and independent review passed; existing advisory accepted by owner | Done |
+| L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | High Risk where shared fixtures change; otherwise Low Risk tooling/tests with complete affected suites on both platforms. Demonstrate coverage union, intentional overlap and unchanged baselines; independent review | Ready |
 | L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: `npm run check`, selection/gate tests, platform runs, resource measurements with environment limits; retain release gating and execution cadence | Planned |
 
 There are three substantive working tasks. Execute within this scope, using the
@@ -49,20 +56,23 @@ acceptance; waiting does not consume implementation work.
 - Docker and its Linux ARM64 daemon are available. The current prepared dependency
   image exists. The existing isolated Linux smoke command passed both Electron
   and Chromium on 2026-11-05. Agents must not prepare replacement images.
-- Full Linux fixture execution and GitHub Linux AMD64 resource measurements remain
-  unverified. Local ARM64 timings do not establish hosted runner savings.
-- The full fixture enforces macOS scrollbar defaults and Darwin-only stale-process
-  cleanup. Native shortcuts, updater activation and screenshot coverage need
+- The bounded Linux fixture pilot is verified; the rest of the functional suite
+  and GitHub Linux AMD64 resource measurements remain unverified. Local ARM64
+  timings do not establish hosted runner savings.
+- The initial fixture used macOS scrollbar defaults and Darwin-only stale-process
+  cleanup. L1 preserves the macOS geometry contract, uses native Linux scrollbar
+  geometry and supports owned Linux processes plus known macOS bundle helpers.
+  Native shortcuts, updater activation and screenshot coverage need
   explicit macOS ownership. Do not replace renderer `Meta` shortcuts globally.
 - Standing Docker authorization is committed as `7f7e3ee`, including Codex and
   OpenCode command rules. The live session also saved the execution prefix.
-- L1 implementation is uncommitted. The revised Linux pilot passed 46 cases;
+- L1 is delivered with this plan update. The revised Linux pilot passed 46 cases;
   the full macOS suite passed 979. All static/check stages and isolated coverage
   passed (5882 tests). An initial coverage timeout under concurrent E2E load
   resolved without changing tests. A reviewer-found macOS helper-matching omission
   was corrected with a failing-then-passing regression and 20 passing affected
   lifecycle cases. Independent review and workflow verification found no remaining
-  meaningful issues. Exact temporary evidence is in `WORKING_PLAN.md`.
+  meaningful issues. The reusable validation record is below.
 - The first exploratory Linux run exposed native image clipboard, pointer
   selection and one Vim linked-caret difference. Those cases remain macOS-owned;
   no assertions, production code or baselines were weakened. The bounded pilot
@@ -70,9 +80,32 @@ acceptance; waiting does not consume implementation work.
 - `npm run audit` fails on existing minimatch advisory
   [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
   Dependencies and lockfile are unchanged. npm reports no available fix for this
-  graph; the advisory lists upstream 11.0.1 as patched. The owner has been asked
-  whether to accept an initiative-scoped exception for this advisory, without
-  suppressing audit or changing dependencies. No response has been received.
+  graph; the advisory lists upstream 11.0.1 as patched. The owner accepted this
+  risk as recorded above. It no longer blocks initiative progress or task commits.
+
+## L1 validation reuse
+
+All results apply to the L1 source delivered with this plan update. The final
+correction only extends macOS stale-process matching to known helper paths in
+the same bundle; Linux behavior, production sources and snapshots are unchanged.
+
+| Check | Result and scope |
+| --- | --- |
+| `npm run test:e2e:linux` | 46 passed, 17.8 seconds; isolated Linux ARM64, four workers, no retries |
+| `npm run test:e2e` | 979 passed, 4.5 minutes; full macOS suite, six workers, unchanged snapshots |
+| `npm run check` | Static/governance stages passed; one coverage test timed out under simultaneous E2E load; later stages resolved below |
+| `npm run test:coverage` | Isolated retry: 304 files, 5882 tests and coverage thresholds passed in 22.86 seconds; no test weakening |
+| Production build | Passed within the full and final focused Electron commands on unchanged production inputs |
+| `npm test -- scripts/electron-process.test.mts scripts/web/chromium.test.mts scripts/web/container-entry.test.mts` | 24 passed before helper correction; then matcher-only run passed all three tests, including the new failing-before-fix regression |
+| `npm run test:e2e -- shared-application.spec.ts window-visibility.spec.ts renderer-failures.spec.ts` | After helper correction: 20 passed in 8.3 seconds |
+| `npm run typecheck:e2e`, `npm run typecheck:scripts`, focused ESLint and `npm run format:check:changed` | Passed after helper correction |
+| `npm run audit` | Existing minimatch advisory reported; owner-accepted risk, not a passing audit |
+| Independent review and workflow verification | No remaining meaningful issues; reviewer confirmed helper correction |
+
+`npm run fix:history` flagged repeated package.json fixes. Those dependency/release
+changes do not share the introduced process-matcher omission; no additional
+structural initiative is needed for that bucket. No Electron product performance
+suite applies because no production performance path changes.
 
 ## Owner involvement
 
@@ -87,12 +120,21 @@ missing dependency image requires owner preparation with `make setup`.
 
 ## Next task
 
-L1 cannot be committed or marked complete until the owner resolves the audit
-gate. If the owner authorizes the requested advisory-specific exception, record
-its exact scope, reuse valid evidence, remove `WORKING_PLAN.md` before the L1
-implementation commit and advance to L2. Otherwise retain the uncommitted work;
-dependency remediation is not authorized by the Linux migration scope. The
-planning record can be committed independently of the blocked implementation.
+Start L2 in a fresh task context. Introduce an explicit Linux allowlist and macOS
+complement, retaining the full local macOS config. New or unclassified tests must
+remain macOS-owned; assert that the platform union covers the full suite and that
+overlap is intentional. Keep native boundaries and all screenshots on macOS.
+
+Initial whole-file candidates are `initial-state`, `deletion`, `empty-node`,
+`tab-structure`, `undo-sessions`, `vim-counters`, `local-search`, `recent-nodes`,
+`agenda-search`, `tag-completion`, `emoji-completion`, `external-drop`, `csp`,
+`renderer-failures`, `attachment-cleanup`, `notes-archive-boundary` and
+`notes-replacement-recovery` under `e2e/electron/`. They still need real Linux
+execution; geometry and focus tests are not automatically portable. Review
+navigation separately because L1 found a native caret difference. Then inspect
+the large Vim/Agenda and expansion/windowing suites for useful functional splits
+without duplicating long interaction sequences or conditional screenshot skips.
+Do not migrate CI allocation until L2 validation and review pass.
 
 ## Resume prompt
 
