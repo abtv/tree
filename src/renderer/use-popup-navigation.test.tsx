@@ -140,6 +140,9 @@ it('focuses the first action on vertical popover opening and uses only j/k', () 
   const popup = first.parentElement!
   popup.dataset.popupNavigation = 'vertical'
   popup.setAttribute('popover', '')
+  // Synthetic toggle events do not open a popover. Model its open visibility so
+  // jsdom's focusability checks allow focus inside it.
+  popup.style.display = 'block'
   screen.getByLabelText('Editor').focus()
 
   fireEvent(popup, Object.assign(new Event('toggle'), { newState: 'open' }))
