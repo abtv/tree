@@ -174,37 +174,6 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
   })
 
   // @requirement PRODUCT.md §23.12
-  test('drags the focused editor and restores its focus and caret after the drop', async ({ userDataDir }) => {
-    seed(userDataDir)
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-    await row(window, nodeKey(10, 14, 'third'))
-      .locator('.agenda-text')
-      .click()
-    const input = window.getByRole('textbox', { name: 'Agenda node third', exact: true })
-
-    await expect(input).toBeFocused()
-
-    await startRowDrag(window, input)
-    // Oct 13 is an empty day inside the Today neighborhood, so it has a header.
-    const target = await centerOf(window, dayKey(10, 13))
-
-    await window.mouse.move(target.x, target.y, { steps: 5 })
-    await window.mouse.up()
-
-    await expect(input).toHaveText('2026-10-13 Plan 2026-10-15')
-    await expect(input).toBeFocused()
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => persistedTexts(userDataDir), idleSavePoll)
-      .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-13 Plan 2026-10-15'])
-  })
-
-  // @requirement PRODUCT.md §23.12
   test('restores the same caret after a drop as after a cancelled drag from the same point', async ({
     userDataDir,
   }) => {
@@ -248,6 +217,12 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
     await expect(input).toHaveText('2026-10-13 Plan 2026-10-15')
     await expect(input).toBeFocused()
     expect(await caret()).toBe(cancelled)
+
+    await fireIdleSave(window)
+
+    await expect
+      .poll(() => persistedTexts(userDataDir), idleSavePoll)
+      .toEqual(['2026-10-14 Prepare 2026-10-20', '2026-10-15 Review', '2026-10-13 Plan 2026-10-15'])
   })
 
   // @requirement PRODUCT.md §23.12
@@ -297,6 +272,15 @@ describeForEachEditingMode('Agenda moving occurrences', ({ screenshotName }) => 
     await window.mouse.up()
 
     await expect(row(window, nodeKey(10, 14, 'first'))).toHaveCount(1)
+    await expect(window.getByRole('textbox', { name: 'Agenda node first', exact: true })).toHaveText(
+      '2026-10-14 Prepare 2026-10-20',
+    )
+
+    await fireIdleSave(window)
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+
     expect(persistedTexts(userDataDir)).toEqual([
       '2026-10-14 Prepare 2026-10-20',
       '2026-10-15 Review',

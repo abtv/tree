@@ -286,26 +286,6 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     expect(bounds.map((box) => box!.x)).toEqual([bounds[0]!.x, bounds[0]!.x, bounds[0]!.x])
   })
 
-  test('expands and collapses a node’s children inline without entering it or moving the caret', async ({
-    userDataDir,
-  }) => {
-    seedDocument(userDataDir, nestedSeed())
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    const locationBefore = await window.getByLabel('Current location').innerText()
-
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
-
-    await window.getByRole('button', { name: 'Expand node 1' }).click()
-
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
-    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
-    await expect(node(window, 1)).toBeFocused()
-
-    await window.getByRole('button', { name: 'Collapse node 1' }).click()
-
-    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
-  })
-
   test('moves through expanded rows on ArrowDown, including entering a branch', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
@@ -527,10 +507,17 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
   test('matches the collapsed, expanded, nested, and focused disclosure appearance', async ({ userDataDir }) => {
     seedDocument(userDataDir, nestedSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const locationBefore = await window.getByLabel('Current location').innerText()
 
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-collapsed-light.png'))
 
     await window.getByRole('button', { name: 'Expand node 1' }).click()
+
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Alpha child one', 'Alpha child two', 'Bravo'])
+    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+    await expect(node(window, 1)).toBeFocused()
+
     await window.getByRole('button', { name: 'Expand node 2' }).click()
 
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-nested-light.png'))
@@ -540,6 +527,11 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('inline-expansion-nested-dark.png'))
 
     await window.emulateMedia({ colorScheme: 'light' })
+    await window.getByRole('button', { name: 'Collapse node 1' }).click()
+
+    expect(await nodeTexts(window)).toEqual(['Alpha', 'Bravo'])
+    await expect(window.getByLabel('Current location')).toHaveText(locationBefore)
+    await expect(node(window, 1)).toBeFocused()
   })
 
   test('keeps the outer ring and disclosure triangle distinguishable from the light document surface', async ({

@@ -632,47 +632,41 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await editor.press('i')
     await typeInto(editor, 'abcdef')
     await window.keyboard.press('Escape')
-    for (const exitKey of ['Escape', 'v']) {
-      for (const [keys, endpoint] of [
-        ['0lvll', 3],
-        ['$hvhh', 2],
-        ['0lvllo', 1],
-      ] as const) {
-        await window.keyboard.type(keys)
-        if (exitKey === 'Escape' && endpoint === 3) {
-          await window.screenshot({ path: 'test-results/vc2-tree-visual.png' })
-
-          await expect(window).toHaveScreenshot('vim-visual-active-endpoint.png')
-        }
-
-        await window.keyboard.press(exitKey)
-
-        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
-
-        const offset = await editor.evaluate((element) => {
-          if (element instanceof HTMLTextAreaElement) {
-            return {
-              cursor: element.selectionStart,
-              selected: element.value.slice(element.selectionStart, element.selectionEnd),
-            }
-          }
-          const selection = element.ownerDocument.getSelection()!
-          const range = element.ownerDocument.createRange()
-          range.selectNodeContents(element)
-          range.setEnd(selection.anchorNode!, selection.anchorOffset)
-          return { cursor: range.toString().length, selected: selection.toString() }
-        })
-
-        expect(offset).toEqual({ cursor: endpoint, selected: 'abcdef'[endpoint] })
-
-        if (exitKey === 'Escape' && endpoint === 3) {
-          await window.screenshot({ path: 'test-results/vc2-tree-normal.png' })
-
-          await expect(window).toHaveScreenshot('vim-normal-active-endpoint.png')
-        }
-
-        await expect(editor).toHaveValue('abcdef')
+    // The exact exit-key × direction × attachment table lives in editor-input-handlers.test.ts.
+    for (const [exitKey, keys, endpoint] of [
+      ['Escape', '0lvll', 3],
+      ['v', '0lvllo', 1],
+    ] as const) {
+      await window.keyboard.type(keys)
+      if (exitKey === 'Escape' && endpoint === 3) {
+        await expect(window).toHaveScreenshot('vim-visual-active-endpoint.png')
       }
+
+      await window.keyboard.press(exitKey)
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+      const offset = await editor.evaluate((element) => {
+        if (element instanceof HTMLTextAreaElement) {
+          return {
+            cursor: element.selectionStart,
+            selected: element.value.slice(element.selectionStart, element.selectionEnd),
+          }
+        }
+        const selection = element.ownerDocument.getSelection()!
+        const range = element.ownerDocument.createRange()
+        range.selectNodeContents(element)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return { cursor: range.toString().length, selected: selection.toString() }
+      })
+
+      expect(offset).toEqual({ cursor: endpoint, selected: 'abcdef'[endpoint] })
+
+      if (exitKey === 'Escape' && endpoint === 3) {
+        await expect(window).toHaveScreenshot('vim-normal-active-endpoint.png')
+      }
+
+      await expect(editor).toHaveValue('abcdef')
     }
   })
 
@@ -1579,7 +1573,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
   }
 
   // @requirement PRODUCT.md §20.2.19
-  for (const command of ['o', 'O', 'c', 's']) {
+  // App.vim-repeat.test.tsx owns o/O/c/s. Keep native node creation and Visual replacement.
+  for (const command of ['o', 's']) {
     test(`preserves the previous dot change after a pointer interrupts structural ${command}`, async ({
       userDataDir,
     }) => {
@@ -1591,9 +1586,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await node(window, 1).focus()
 
       await window.keyboard.press('x')
-      if (command === 'c' || command === 's') await pressShifted(window, 'V')
-      if (command === 'O') await pressShifted(window, 'O')
-      else await window.keyboard.press(command)
+      if (command === 's') await pressShifted(window, 'V')
+      await window.keyboard.press(command)
       const editor = node(window, command === 'o' ? 2 : 1)
 
       await window.keyboard.type('Opened')
@@ -1606,7 +1600,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('.')
 
       await expect(editor).toHaveValue('pened')
-      await expect(window.locator('.node-row')).toHaveCount(command === 'o' || command === 'O' ? 2 : 1)
+      await expect(window.locator('.node-row')).toHaveCount(command === 'o' ? 2 : 1)
     })
   }
   test.describe(() => {
@@ -3146,21 +3140,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await expect.poll(() => outline(window)).toEqual(before)
 
-      // `gJ` concatenates the texts unchanged.
-      await node(window, 1).focus()
-
-      await setCursor(node(window, 1), 0)
-      await window.keyboard.press('g')
-      await pressShifted(window, 'J')
-
-      await expect.poll(() => outline(window)).toEqual(['Alpha    Bravo', 'Charlie', 'Delta'])
-      await expect(node(window, 1)).toHaveJSProperty('selectionStart', 7)
-
-      await window.keyboard.press('u')
-
-      await expect.poll(() => outline(window)).toEqual(before)
-
-      // A count joins that many siblings as one undo step, clamped at the last sibling.
+      // Keep native counted dispatch and Undo; focused real-store tests own clamp/no-op rules.
       await node(window, 1).focus()
 
       await window.keyboard.press('3')
@@ -3172,23 +3152,6 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('u')
 
       await expect.poll(() => outline(window)).toEqual(before)
-
-      await node(window, 3).focus()
-
-      await window.keyboard.press('9')
-      await window.keyboard.press('g')
-      await pressShifted(window, 'J')
-
-      await expect.poll(() => outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
-
-      // The last sibling has nothing to join: no change and no error.
-      await node(window, 3).focus()
-
-      await window.keyboard.press('g')
-      await pressShifted(window, 'J')
-
-      await expect(window.getByRole('alert')).toHaveCount(0)
-      expect(await outline(window)).toEqual(['Alpha  ', '  Bravo', 'CharlieDelta'])
     },
   )
 

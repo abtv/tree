@@ -1069,11 +1069,11 @@ describe('editor keyboard handler', () => {
   // @requirement PRODUCT.md §20.2.20
   it.each(['Escape', 'v'])('leaves Visual at the active character with %s', (exitKey) => {
     for (const attachment of [undefined, { id: 'image', mimeType: 'image/png' as const }]) {
-      for (const keys of [
-        ['0', 'l', 'v', 'l', 'l'],
-        ['$', 'h', 'v', 'h', 'h'],
-        ['0', 'l', 'v', 'l', 'l', 'o'],
-      ]) {
+      for (const [keys, endpoint] of [
+        [['0', 'l', 'v', 'l', 'l'], 3],
+        [['$', 'h', 'v', 'h', 'h'], 2],
+        [['0', 'l', 'v', 'l', 'l', 'o'], 1],
+      ] as const) {
         const store = createStore()
         const input = document.createElement('textarea')
         input.value = 'abcdef'
@@ -1091,15 +1091,14 @@ describe('editor keyboard handler', () => {
         })
         if (attachment !== undefined) handle(keyEvent(input, 'j'))
         for (const key of keys) handle(keyEvent(input, key))
-        const activeEnd = commandState.visualFocus!
 
-        expect(activeEnd).toBeGreaterThan(0)
+        expect(commandState.visualFocus).toBe(endpoint)
 
         handle(keyEvent(input, exitKey))
 
         expect(vim.mode).toBe('normal')
-        expect(input.selectionStart).toBe(activeEnd)
-        expect(input.selectionEnd).toBe(activeEnd + 1)
+        expect(input.selectionStart).toBe(endpoint)
+        expect(input.selectionEnd).toBe(endpoint + 1)
         expectImageCaret(caretNodeId, caret, 'node', false)
         expect(vim.imageTextCursor.current).toBeUndefined()
 

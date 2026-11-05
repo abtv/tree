@@ -1,11 +1,11 @@
 # Electron E2E maintainability follow-up
 
-Status: **In progress**. Tasks 1–12 are delivered. The owner requested a further
-complete audit and implementation pass on 2026-11-06, without stopping after
-individual improvements. The initial items are delivered at `52d85cd` and
-`1875860`; the deeper layering work includes `de53989`, `ea8a9bc` and the commit
-containing this final Agenda/review update. The existing npm advisory remains
-the explicitly accepted exception.
+Status: **Awaiting owner acceptance**. All sixteen tasks are delivered, including
+the complete remaining-suite audit, all six justified interaction changes and
+combined validation/review. The initial items are delivered at `52d85cd` and
+`1875860`; layering at `de53989`, `ea8a9bc` and `d8e4713`; remaining visual
+consolidation at `22bddd6`; final interaction changes accompany this update.
+The existing npm advisory remains the explicitly accepted exception.
 
 ## Authorization and boundaries
 
@@ -46,9 +46,10 @@ production timing, state and process lifecycle are unchanged.
 
 ## Next action
 
-Complete tasks 13–16 below in this session. Do not return to an acceptance gate
-between the audit, its justified changes, and final verification. No manual
-application check is expected for these test-only changes.
+The authorized implementation and investigation are complete. The owner can
+inspect the coverage ownership in `docs/DEVELOPMENT.md` §8 and the outcomes
+below, then accept the delivered result so this plan can be retired under
+`AGENTS.md` §8. No implementation task or manual application check remains.
 
 ## Authorized remaining-suite pass (2026-11-06)
 
@@ -66,8 +67,8 @@ continue to apply. Logical commits may exceed four in this session.
 | --- | --- | --- |
 | 13 | Inventory all remaining PNG families and the five expensive spec families; identify unique risks, existing lower-level owners and safe migration candidates. Read-only independent planner for the interaction families. | Done |
 | 14 | Consolidate demonstrably repeated visual states, preserving distinct mode/caret/rendering evidence. Inspect changed baselines when needed and validate every affected visual spec. | Done |
-| 15 | Implement justified interaction-matrix and setup simplifications, adding missing real App/store coverage first and retaining native representatives. Validate affected fast and Electron cases. | In progress |
-| 16 | Verify the combined result, independently review retained coverage and maintainability, and document the final ownership and reasons for retained costly tests. | Ready |
+| 15 | Implement justified interaction-matrix and setup simplifications, adding missing real App/store coverage first and retaining native representatives. Validate affected fast and Electron cases. | Done |
+| 16 | Verify the combined result, independently review retained coverage and maintainability, and document the final ownership and reasons for retained costly tests. | Done |
 
 The pass is complete only when each inventoried family has a supported keep or
 change decision, every justified in-scope migration is delivered, and required
@@ -76,7 +77,8 @@ affected validation for local test edits, and full `npm run check` plus local
 Electron validation for the combined migration; retain affected Linux checks
 if selected cases change. Reuse verified capabilities and unchanged audit
 evidence from this session. No product performance suite is triggered.
-Temporary audit and timing evidence belongs in `.scratch/e2e-final-pass/`.
+The conclusions below and the ownership guidance in `docs/DEVELOPMENT.md` §8
+are self-contained; temporary inventory and timing reports are disposable.
 
 The remaining visual inventory covered all 34 directories / 220 PNGs. Seven
 families share Insert or non-editor appearance across modes: hyperlink, typed
@@ -97,6 +99,51 @@ expectations below a shorter native sample; one native counted/uncounted join
 flow over focused rule tables; and real App structural pointer-interruption
 coverage before shortening its o/O/c/s native table. Other costly cases retain
 distinct pointer, native key, geometry, remount, clipboard or restart risks.
+
+All six justified interaction changes are implemented. The complete existing
+App drag matrix remains; native representatives fell from twelve to seven.
+Agenda combines exact nonzero caret and disk assertions in one retained flow.
+Inline disclosure combines its native behavior and visual checks. Visual exit
+tables now assert fixed endpoints 3/2/1 independently of implementation state;
+native forward Escape and swapped v remain. gJ retains native uncounted/counted
+dispatch with children, caret and Undo; focused tests own clamp/no-op rules.
+Four new App cases cover structural pointer interruption with exact document
+IDs, text, caret, mode and Undo; native o/s and all clipboard interruptions stay.
+
+Controlled faults proved the stronger assertions: offset Visual's exit cursor,
+omit the real pointer handler's Insert finalization, and type an unexpected
+character before an idle save. The first two failed focused assertions; the
+last passed the old immediate disk read but failed the corrected awaited disk
+comparison in both modes. Every temporary fault was removed. The focused 450
+tests passed, followed by full `npm run check` (310 files / 5948 tests, types,
+lint, format, governance, coverage and build).
+
+The matched five-family run passed all 217 remaining cases, without retries or
+skips. Wall time changed from 81.34 to 74.98 seconds; summed time from 214.95 to
+205.04 seconds. Launches fell from 189 to 180 (two removed Vim cases reused an
+existing fixture). Median launch time remained 0.45 seconds; the unchanged drag
+file stayed near 27 summed seconds. This is a measured local comparison, not a
+guaranteed hosted-run speedup. The new total is 952 Electron cases and 199 PNGs.
+
+Combined validation passed: full local Electron, all 952 cases with no retries
+or skips and 880 launches; Linux, all 219 selected cases including the changed
+gJ flow; and the full fast check above. The full Electron run took 244.26 seconds,
+longer than the prior session's 210.47 seconds. Its median launch took 0.82
+seconds versus 0.45 in the matched subset. These separate runs do not establish
+an overall wall-time improvement; only the matched subset supports that claim.
+The independent reviewer examined the complete pass, including removed visual
+states, focused matrices, retained native coverage and validation evidence, and
+found no meaningful issues. Primary diff review and final documentation checks
+also passed. No required verification or review correction remains.
+
+The retained expensive cases have distinct risks: real pointer hold and native
+selection, rich editor remount, image sources, gap depth/invalid targets, fold
+and dot lifecycle across navigation/history, shifted native fold keys,
+wrapped/bidirectional/unmounted caret geometry, per-frame scrolling, clipboard
+and disk/restart. No further supported removal remains in the audited families.
+The history checker flagged three fixes co-located in the handler test file
+(external links, folded puts, first-child headings); these do not share a
+demonstrated defect mechanism, so a new structural initiative is not justified.
 
 ## Authorized layering work (2026-11-06)
 

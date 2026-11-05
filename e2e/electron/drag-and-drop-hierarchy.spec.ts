@@ -419,7 +419,9 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
     await window.mouse.up()
   })
 
-  for (const state of mode === 'vim' ? ['normal', 'insert', 'replace', 'visual', 'visual-node'] : ['insert']) {
+  // App.test.tsx owns the full state × destination matrix. Native breadcrumb cases retain
+  // Standard input, pending Replace finalization and character Visual through a remount.
+  for (const state of mode === 'vim' ? ['replace', 'visual'] : ['insert']) {
     test(`resolves ${state} mode and its caret after a breadcrumb drop`, async ({ userDataDir }) => {
       seedDocument(userDataDir, breadcrumbSeed())
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
@@ -454,7 +456,8 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
 // @requirement PRODUCT.md §11
 // @requirement PRODUCT.md §20.2.8
 describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
-  const states = mode === 'vim' ? ['normal', 'insert', 'replace', 'visual', 'visual-node'] : ['insert']
+  // The complementary native row cases retain Normal, pending Insert and whole-node Visual.
+  const states = mode === 'vim' ? ['normal', 'insert', 'visual-node'] : ['insert']
   for (const state of states) {
     test(`keeps the caret and resolves ${state} editing when dropping onto a row`, async ({ userDataDir }) => {
       seedDocument(userDataDir, hierarchySeed())
