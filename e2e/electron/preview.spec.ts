@@ -52,7 +52,7 @@ describeForEachEditingMode('image preview', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §17.1
   test('zooms and pans only the image, keeps the close button available, and resets on reopening', async ({
     userDataDir,
-  }, testInfo) => {
+  }) => {
     const { app, window } = await launchTree(userDataDir)
 
     await writeClipboardImageSized(app, 1200, 900)
@@ -90,7 +90,6 @@ describeForEachEditingMode('image preview', ({ mode, screenshotName }) => {
     expect(await window.evaluate(() => globalThis.visualViewport!.scale)).toBe(1)
     await expect(window).toHaveScreenshot(screenshotName('image-preview-zoomed.png'))
 
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('image-preview-zoomed.png')) })
     await window.keyboard.press('Meta+-')
 
     await expect.poll(async () => (await image.boundingBox())!.width).toBeCloseTo(initial.width, 0)

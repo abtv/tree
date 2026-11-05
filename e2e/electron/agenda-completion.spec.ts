@@ -944,14 +944,13 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
       expect(Math.abs(geometry.popupTop - geometry.rowBottom)).toBeLessThan(1)
       expect(Math.abs(geometry.popupLeft - geometry.expectedLeft)).toBeLessThan(2)
 
-      {
+      if (view === 'Tree' && mode === 'standard') {
         for (const appearance of ['light', 'dark'] as const) {
           await window.emulateMedia({ colorScheme: appearance })
           await window.mouse.move(600, 20)
 
-          await expect(window).toHaveScreenshot(
-            screenshotName(`date-popup-${view === 'Tree' ? 'tree-' : ''}${appearance}.png`),
-          )
+          // Placement and focus are checked in every editor path; appearance belongs to the shared popup.
+          await expect(window.locator('.date-popup')).toHaveScreenshot(`date-popup-${appearance}.png`)
         }
       }
 

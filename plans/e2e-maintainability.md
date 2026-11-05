@@ -1,8 +1,8 @@
 # Electron E2E maintainability follow-up
 
-Status: **Awaiting owner acceptance**. The initial five items are complete at
-`52d85cd`; the authorized local cost review is also implemented and validated.
-Its delivery commit is the commit containing this status update.
+Status: **In progress**. The initial items are delivered at `52d85cd` and
+`1875860`. On 2026-11-06 the owner authorized the deeper layering work below,
+in this session with logical commits and the existing npm advisory exception.
 
 ## Authorization and boundaries
 
@@ -43,10 +43,51 @@ production timing, state and process lifecycle are unchanged.
 
 ## Next action
 
-The implementation is finished. Await the owner's acceptance of the delivered
-test-maintainability result under AGENTS.md §8, then remove this plan and its
-index entry. No manual application check is required. No implementation tasks
-remain; closure needs only the documentation retirement and its checks.
+Complete tasks 9–12 below in this session. Final owner acceptance applies to
+the combined delivered result; no manual application check is expected for
+test-only changes. Continue autonomously unless a critical blocker arises.
+
+## Authorized layering work (2026-11-06)
+
+The owner approved the deeper analysis recommendation: reduce repeated visual
+states, move completion rule matrices into real App/store integration tests,
+then simplify Agenda command matrices while strengthening their no-op oracle.
+This expands the prior no-baseline-change boundary only for the selected
+visual families. Preserve real native input, caret/selection, popup placement,
+clipboard, persistence/restart and failure coverage. No production behavior,
+dependencies, browser test framework, process reuse, CI cadence or blanket
+editing-mode reduction is authorized. Do not use GitHub logs. The accepted
+minimatch advisory remains an explicit exception, not a clean audit result.
+
+| Item | Scope and acceptance | Status |
+| --- | --- | --- |
+| 9 | Reduce repeated breadcrumb, completion-popup, Insert-date and typography PNGs; retain mode-sensitive rendering and geometry. Own the corresponding Electron specs/baselines and Development guidance. Inspect new cropped popup baselines and run all affected specs. | Done |
+| 10 | Add real App/NodeInput/popup/store completion integration coverage before reducing grammar/refinement E2E combinations in `agenda-completion.spec.ts`; preserve unique native paths and exact replacement/Undo. No replacement UI or production test hook. | In progress |
+| 11 | Add real App/store Agenda command no-op coverage, shorten the repeated Electron command table, and ensure retained disk assertions wait for saves. Preserve native focus/caret and both modes. | Ready |
+| 12 | Validate the complete result, independently review coverage ownership, record measured costs and lasting guidance in Development, and commit remaining work. | Ready |
+
+These are four additional substantive tasks. Use Low Risk affected checks for
+test-only changes: types, scoped lint/format/governance, focused unit and E2E.
+Run the complete local `npm run check` and Electron suite for the final combined
+coverage migration. Reuse Linux validation when its exercised inputs remain
+unchanged; otherwise run its affected allocation. No product performance suite
+is needed. New visual baselines require real Electron capture and inspection.
+The prior 979-case report at `1875860` remains the full baseline. Use matched
+focused local measurements for selected families, without concurrent test
+processes. Temporary evidence lives in `.scratch/e2e-layering/`.
+
+The review-before-removal rule is coverage based: identify the retained fast
+test and the distinct real-boundary representative for every removed matrix.
+Demonstrate that new assertions detect controlled wrong outcomes before relying
+on them. Do not trade a lower test count for long coupled scenarios.
+
+Task 9 reduced the selected families from 32 PNGs to 14 (238 to 220 overall).
+Both new cropped popup baselines were captured and inspected in Electron.
+The six affected specs retained all 131 cases and passed without retries:
+matched six-worker runs took 80.55 seconds before and 80.05 seconds after.
+This reduces baseline maintenance, not demonstrated runtime cost. Native
+geometry, both editing modes and distinct Vim rendering remain covered.
+Affected E2E types, lint, formatting, documentation and mode checks passed.
 
 ## Authorized local cost review
 

@@ -11,7 +11,7 @@ import {
   typeInto,
 } from './fixtures'
 
-describeForEachEditingMode('typography', ({ screenshotName }) => {
+describeForEachEditingMode('typography', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.3
   test('typed URL characters render as typed, without font ligatures', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -28,7 +28,7 @@ describeForEachEditingMode('typography', ({ screenshotName }) => {
     await expect(editor).toHaveText('http://localhost:8080 test me')
     // The bundled font draws "://l" as a ligature that moves the second slash and reads as ": /l".
     await expect(editor).toHaveCSS('font-variant-ligatures', 'none')
-    await expect(editor).toHaveScreenshot(screenshotName('typed-url-without-ligatures.png'))
+    if (mode === 'standard') await expect(editor).toHaveScreenshot(screenshotName('typed-url-without-ligatures.png'))
   })
 
   // @requirement PRODUCT.md §20.3
@@ -45,6 +45,6 @@ describeForEachEditingMode('typography', ({ screenshotName }) => {
 
     await expect(editor).toHaveAttribute('contenteditable', 'true')
     await expect(editor).toHaveCSS('font-variant-ligatures', 'none')
-    await expect(editor).toHaveScreenshot(screenshotName('linked-url-without-ligatures.png'))
+    if (mode === 'standard') await expect(editor).toHaveScreenshot(screenshotName('linked-url-without-ligatures.png'))
   })
 })

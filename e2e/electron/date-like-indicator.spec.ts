@@ -159,7 +159,8 @@ describeForEachEditingMode('Date-like text indicator', ({ mode, screenshotName }
         await window.emulateMedia({ colorScheme: appearance })
         await window.mouse.move(600, 20)
 
-        await expect(window).toHaveScreenshot(screenshotName(`date-like-${view.toLowerCase()}-${appearance}.png`))
+        if (mode === 'standard')
+          await expect(window).toHaveScreenshot(screenshotName(`date-like-${view.toLowerCase()}-${appearance}.png`))
       }
 
       // A node that is no longer being edited shows the underline whatever the caret was doing.

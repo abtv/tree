@@ -409,11 +409,11 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
 
     expect(geometry.top).toBe(0)
     expect(geometry.bottom).toBeLessThanOrEqual(1)
-    await expect(toolbar).toHaveScreenshot(`breadcrumb-target-${mode}-light.png`)
+    if (mode === 'standard') await expect(toolbar).toHaveScreenshot('breadcrumb-target-standard-light.png')
 
     await window.emulateMedia({ colorScheme: 'dark' })
 
-    await expect(toolbar).toHaveScreenshot(`breadcrumb-target-${mode}-dark.png`)
+    if (mode === 'standard') await expect(toolbar).toHaveScreenshot('breadcrumb-target-standard-dark.png')
 
     await window.keyboard.press('Escape')
     await window.mouse.up()

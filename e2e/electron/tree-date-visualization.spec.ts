@@ -79,7 +79,8 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
 
         await window.mouse.move(600, 20)
 
-        await expect(window).toHaveScreenshot(screenshotName(`temporal-dates-${view}-${appearance}.png`))
+        if (mode === 'standard')
+          await expect(window).toHaveScreenshot(screenshotName(`temporal-dates-${view}-${appearance}.png`))
       }
     }
   })
