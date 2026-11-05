@@ -1,5 +1,7 @@
 # Linux Electron E2E allocation
 
+Status: **Awaiting owner acceptance**. All three implementation tasks are complete.
+
 ## Objective and authorization
 
 Reduce macOS GitHub runner consumption by executing portable functional tests in
@@ -39,7 +41,7 @@ Sources: [development](../docs/DEVELOPMENT.md),
 | --- | --- | --- | --- | --- |
 | L1 | Portable fixture and bounded Linux pilot: `e2e/electron/fixtures.ts`, process cleanup, `config/testing/`, isolated container runner under `scripts/web/`, npm command and development instructions | None | High Risk: static/check stages, full local macOS E2E, Linux pilot and independent review passed; existing advisory accepted by owner | Done |
 | L2 | Allocate portable functional coverage and split suitable mixed specs without losing macOS visual/native checks: selected `e2e/electron/*.spec.ts`, platform selection and selection guards | L1 | Low Risk tooling/tests; both platform subsets, discovery union/overlap guards, unchanged baselines and independent review passed | Done |
-| L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: `npm run check`, selection/gate tests, platform runs, resource measurements with environment limits; retain release gating and execution cadence | Ready |
+| L3 | Replace redundant macOS CI execution with measured Linux/macOS allocation: `.github/workflows/run-electron-e2e-tests.yml`, development documentation and related CI guards | L2 | Low Risk tooling: full check, selection/gate tests and independent review/verification passed; local platform evidence reused; hosted savings explicitly unverified | Done |
 
 There are three substantive working tasks. Execute within this scope, using the
 standard limit of two unsuccessful recovery attempts at one unchanged blocker
@@ -53,8 +55,9 @@ acceptance; waiting does not consume implementation work.
 - Test discovery listed 979 cases in 84 functional spec files. Thirty-six files
   contain screenshot comparisons and collectively contain 639 cases, many of
   which are functional. These are discovery counts, not duration estimates.
-- CI currently runs six macOS shards, four workers each, weekly/manually and for
-  release candidates. Ordinary PRs already use Linux and macOS smoke checks.
+- CI previously ran six macOS shards; the delivered workflow uses four macOS
+  shards and one Linux job, four workers each, weekly/manually and for release
+  candidates. Ordinary PRs still use Linux and macOS smoke checks.
 - Docker and its Linux ARM64 daemon are available. The current prepared dependency
   image exists. The existing isolated Linux smoke command passed both Electron
   and Chromium on 2026-11-05. Agents must not prepare replacement images.
@@ -122,12 +125,13 @@ missing dependency image requires owner preparation with `make setup`.
 
 ## Next task
 
-Continue L3 in this session. Use four macOS shards and one Linux job as the
-bounded initial allocation; preserve weekly/manual/release triggers and the
-stable aggregate check, requiring both groups to succeed. Give artifacts platform
-and shard identities. Install only the required Linux system dependencies; Electron
-already comes from npm. Retain audit behavior and the separate memory workflow.
-Add tests of real workflow selection and aggregate failure/cancellation/skip handling.
+No implementation task remains. The owner can inspect the platform allocation in
+`config/testing/electron-platforms.ts`, the two platform configurations, and
+`.github/workflows/run-electron-e2e-tests.yml`. The unchanged complete local command
+is `npm run test:e2e`; the approved isolated Linux command is `npm run test:e2e:linux`.
+Accept the delivered result or identify remaining issues. After acceptance, close
+this initiative by removing its plan and index entry. Do not request renewed
+Docker, minimatch or session-continuation approval. No publication is authorized.
 
 ## L2 result and reusable evidence
 
@@ -154,6 +158,34 @@ Read-only GitHub access is verified. Historical
 individual job durations of 107–317 seconds. It is an older source snapshot, not
 a controlled comparison. New hosted savings require the first updated workflow
 run; local ARM64 numbers cannot establish them. No publication is authorized.
+
+## L3 result and limitations
+
+Four macOS shards use the validated complement; one Linux job uses Xvfb and the
+validated Linux configuration. Each has a 12-minute deadline and four workers.
+The stable aggregate check requires both platform groups to succeed. Platform,
+shard and attempt distinguish failure artifacts. Scheduled/manual/release cadence,
+audit behavior, full local macOS validation and the memory workflow are unchanged.
+
+`npm run check` passed every stage (306 files, 5886 tests, coverage and build).
+`npm test -- scripts/electron-workflow.test.mts scripts/web-release/workflows.test.mts scripts/electron-platforms.test.mts`
+passed all ten focused tests. The workflow guard executes the actual aggregate
+shell for all 16 combinations of success, failure, cancellation and skip. The
+allocation guard loads the real Playwright configurations and test declarations.
+L2 platform runs remain valid: L3 changes neither tests nor their runtime inputs.
+Independent code review and workflow verification found no meaningful issues.
+
+This replaces 197 macOS case executions with Linux execution, reducing the macOS
+case count by about 20%, and reduces macOS dependency/build preparations from six
+to four. These facts do not establish a hosted time or monetary saving. The new
+workflow has not been published or executed on GitHub; observe its first hosted
+run before claiming runner-minute savings or tuning shard counts again.
+
+Implementation commits: L1 `b2ec40d`, L2 `004cb1f`, and the L3 commit containing
+this final status. The standing Docker authorization is `7f7e3ee`. No unresolved
+local validation failures remain; the earlier Linux native-image failure is
+covered by the retained, passing macOS scenario. The accepted minimatch risk
+remains as recorded above. Final owner acceptance is the only closure gate.
 
 ## Resume prompt
 

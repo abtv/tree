@@ -295,7 +295,7 @@ Use `npm run test:e2e:timing` to rebuild and measure the complete hidden E2E sui
 
 The ordinary E2E configuration excludes only `e2e/electron/shared-application-memory.spec.ts`. All reset/recovery tests remain in `e2e/electron/shared-application.spec.ts`. Run both long measurements with `npm run test:e2e -- --config=config/testing/playwright.memory.config.ts`; preview the two sets with `npm run test:e2e -- --list` and `npm run test:e2e -- --config=config/testing/playwright.memory.config.ts --list`. The memory configuration inherits the ordinary worker, isolation, cleanup and retry settings but replaces its projects with one memory-only project. It requires hidden execution and retains twelve eight-cycle bursts per control, existing resource assertions, annotations and JSON attachments. `TREE_E2E_MEMORY_BURST_SIZE` remains available for longer investigations.
 
-The `Run Electron memory tests` workflow owns these measurements on macOS: weekly on Sunday at 04:00 UTC and on manual dispatch. It does not run on pull requests or pushes and does not gate browser publication. It uploads the JSON report, both sample attachments and failure traces. Ordinary CI shards and `npm run check:full` use the regression configuration; they do not run the long memory controls. For related infrastructure changes, run the memory command locally as well as the required validation tier. These measurements remain required before broader reuse adoption under ADR 0021.
+The `Run Electron memory tests` workflow owns these measurements on macOS: weekly on Sunday at 04:00 UTC and on manual dispatch. It does not run on pull requests or pushes and does not gate browser publication. It uploads the JSON report, both sample attachments and failure traces. Ordinary CI uses the platform regression subsets and `npm run check:full` uses the full regression configuration; they do not run the long memory controls. For related infrastructure changes, run the memory command locally as well as the required validation tier. These measurements remain required before broader reuse adoption under ADR 0021.
 
 The memory separation on 2026-10-15 preserved the original combined coverage as disjoint sets of 785 ordinary and two memory cases, including all 16 ordinary shared-application infrastructure cases. Both memory controls passed with their sample attachments; the shared and fresh controls took 32.12 s and 74.55 s. One sequential same-host hidden six-worker comparison passed the original 787 cases in 219.31 s and the 785 ordinary cases in 195.45 s, excluding builds of 0.61 s and 0.70 s. Ordinary launches fell from 802 to 705. The 23.86 s / 10.9% wall-time reduction is one local comparison with host variance; separate scheduling moves the memory work rather than eliminating it. This result is separate from the reuse rollout measured below.
 
@@ -512,7 +512,7 @@ The container's network restriction applies to test execution. It does not disab
 
 On each PR and push to main, `Test and build app` runs code/documentation/unit checks
 alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
-Browser and full macOS Electron E2E run when the main push has an unpublished release version; browser E2E also
+Browser and full Electron coverage across Linux and macOS run when the main push has an unpublished release version; browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
 job requires checks, audit, version detection and smoke to succeed, plus browser E2E
 and Electron E2E for a release. A non-release run requires both full E2E jobs to be skipped.
@@ -540,6 +540,31 @@ Scheduled/manual dependency audits and Electron E2E/memory suites retain separat
 Timing suites stay local. New source validation cancels superseded validation, but release
 publication is serialized without canceling in-flight work. Required checks and artifacts
 must remain available; an expired artifact or changed validation attempt fails closed.
+
+Full Electron CI runs weekly on Sunday at 02:00 UTC, manually, and for release
+candidates. Four `macos-15` shards run `playwright.macos.config.ts`; one
+`ubuntu-24.04` job runs `playwright.linux.config.ts` under Xvfb. Both use four
+workers and 12-minute job limits. Linux retains zero retries; macOS retains the
+regression configuration's single CI retry. The stable
+`Require all Electron E2E shards to pass` check requires both platform groups to
+succeed, including every macOS shard. Failure, cancellation and unexpected skips
+fail the gate. Failure artifacts include the platform, shard and run attempt.
+The separate macOS memory workflow is unchanged.
+
+This allocation replaces six macOS preparations with four plus one Linux
+preparation. Independent functional tests move to Linux; macOS retains native
+integration and screenshot checks. The initial allocation has 219 Linux cases,
+782 macOS cases and 22 shared boundary cases, covering all 979 original cases.
+These counts describe the migration, not quotas. Keep long functional/visual
+sequences together on macOS when splitting would duplicate their interactions.
+
+Measure savings from actual job start/completion durations, summing each
+platform separately and including dependency installation, builds and retries.
+Keep queue delay and total workflow elapsed time separate. Compare the same
+source snapshot and runner configuration when making a controlled claim. Local
+ARM64 Docker and macOS results verify execution but do not establish hosted
+AMD64 Linux timings or a percentage saving in GitHub runner-minutes. Inspect the
+first updated hosted run before changing this initial shard allocation further.
 
 #### Cross-platform smoke checks
 
@@ -619,7 +644,7 @@ the work they invoke, and execution jobs by the stage they perform. For example,
 and the execution stage. Avoid generic names such as `Check`, `generate`, or
 `chrome`, and avoid repeating the entire workflow name at every nesting level.
 Matrix jobs include the distinguishing shard or layer, such as
-`Run Electron E2E tests (shard 1/6)` or `Run mutation testing (domain)`; aggregate
+`Run macOS Electron E2E tests (shard 1/4)` or `Run mutation testing (domain)`; aggregate
 jobs state their role, such as `Require all Electron E2E shards to pass`.
 
 Review the complete set of names together, including PR checks and nested
@@ -663,11 +688,11 @@ For selected Electron performance scenarios, use `npm run test:perf -- <specs>` 
 
 ### Local affected-spec E2E validation
 
-For contained changes below High Risk, run affected E2E specs locally and leave the complete suite to the weekly/manual macOS CI shards. `npm run test:e2e:changed` builds the application and runs Playwright with `--only-changed=HEAD`; it includes staged, unstaged and untracked nonignored changes before commit, then follows test imports. Preview its selection with `npm run test:e2e:changed -- --list`. After committing, compare with the task's starting commit using `npm run test:e2e:changed -- --only-changed=<starting-commit>`; the referenced commit must exist locally. Additional spec arguments restrict the selected set rather than adding missing specs.
+For contained changes below High Risk, run affected E2E specs locally and leave the complete suite to the weekly/manual Linux and macOS CI jobs. `npm run test:e2e:changed` builds the application and runs Playwright with `--only-changed=HEAD`; it includes staged, unstaged and untracked nonignored changes before commit, then follows test imports. Preview its selection with `npm run test:e2e:changed -- --list`. After committing, compare with the task's starting commit using `npm run test:e2e:changed -- --only-changed=<starting-commit>`; the referenced commit must exist locally. Additional spec arguments restrict the selected set rather than adding missing specs.
 
 The selector does not infer test coverage through the Electron production build, preload/IPC or product-requirement mapping. For each affected behavior, explicitly select its owning specs with `npm run test:e2e -- <specs>` when they are absent from the changed selection. Record the actual specs/cases exercised. Playwright can exit successfully with no selected cases; this is a selection result, not a passing boundary test. Documentation-only tasks do not acquire an E2E requirement merely because this command exists.
 
-Shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require full local functional validation under the High Risk row. Unbounded functional impact also requires broader coverage. Electron performance scope is selected separately. Weekly/manual CI continues to run every E2E spec in its existing shards; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in the next weekly or manual run.
+Shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require full local functional validation under the High Risk row. Unbounded functional impact also requires broader coverage. Electron performance scope is selected separately. Weekly/manual CI covers every regression case through the Linux/macOS union; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in the next weekly or manual run.
 
 For a contained change, use a concise conversation plan, a focused development loop, the tier's required validation, and a primary-agent diff review. Add a working plan, independent reviewer, or separate product verifier only under the triggers in `AGENTS.md` §§8 and 13. A user-visible change still needs product verification by the primary agent when no separate verifier is required. Keep defect-first regressions, boundary tests, and visual evidence whenever their specific triggers in `AGENTS.md` §9 apply.
 
@@ -1037,7 +1062,7 @@ permissions remain unchanged. See [macOS releases](releasing.md) and
 
 A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 
-The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full macOS Electron E2E for a new release version.
+The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full Electron coverage across Linux and macOS for a new release version.
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.
