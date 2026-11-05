@@ -9,7 +9,6 @@ import {
   clickApplicationMenuQuit,
   closeMainWindow,
   configureHiddenParallelTests,
-  delaySaveIpc,
   documentPath,
   exactMessage,
   expect,
@@ -23,7 +22,6 @@ import {
   test,
   tryReadPersisted,
   typeInto,
-  waitForDelayedSave,
 } from './fixtures'
 
 test.describe('shutdown failure handling', () => {
@@ -91,9 +89,24 @@ test.describe('shutdown failure handling', () => {
   test('suppresses duplicate quit requests, reports timeout, and permits retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+
     allowRendererError(/Operation failed: The application could not finish saving before quit\./)
     allowRendererError(/Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request\./)
-    await delaySaveIpc(app, 5_500)
+    const save = await app.evaluateHandle(() => {
+      const control = { started: false, release: () => {} }
+      const gate = new Promise<void>((resolve) => {
+        control.release = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        if (!control.started) {
+          control.started = true
+          await gate
+        }
+        return original(...args)
+      })
+      return control
+    })
     await window.evaluate(() => {
       const state = globalThis as typeof globalThis & {
         __quitRequestCount?: number
@@ -106,6 +119,8 @@ test.describe('shutdown failure handling', () => {
     })
 
     await typeInto(node(window, 1), 'delayed save')
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await clickApplicationMenuQuit(app)
     await clickApplicationMenuQuit(app)
 
@@ -114,12 +129,26 @@ test.describe('shutdown failure handling', () => {
         window.evaluate(() => (globalThis as typeof globalThis & { __quitRequestCount?: number }).__quitRequestCount),
       )
       .toBe(1)
+    await expect.poll(() => save.evaluate((control) => control.started)).toBe(true)
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+
+    await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
 
-    await waitForDelayedSave(app)
+    await save.evaluate((control) => control.release())
+
+    await expect(
+      window.getByText("Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request."),
+    ).toBeVisible()
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('delayed save')
+
+    await save.dispose()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
     await clickApplicationMenuQuit(app)
     await closed
@@ -292,10 +321,18 @@ test.describe('shutdown failure handling', () => {
 
     await expect(editor).toHaveValue('aXYd')
 
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await closeMainWindow(app)
 
     expect(app.process().exitCode).toBeNull()
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+
+    await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
@@ -438,6 +475,8 @@ test.describe('shutdown failure handling', () => {
 
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
 
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await closeMainWindow(app)
 
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
@@ -448,7 +487,12 @@ test.describe('shutdown failure handling', () => {
     expect(app.process().exitCode).toBeNull()
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible()
 
-    // The bounded quit handshake still expires after the cancellation before another close can be requested.
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+
+    await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })

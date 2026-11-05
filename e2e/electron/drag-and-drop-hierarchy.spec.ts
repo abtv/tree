@@ -48,6 +48,20 @@ function hierarchySeed(): { document: unknown; location: unknown } {
   }
 }
 
+function depthLimitSeed(): { version: number; document: unknown; location: unknown; view: unknown } {
+  const branch = (depth: number): { id: string; text: string; children: unknown[] } => ({
+    id: `depth-${depth}`,
+    text: `Depth ${depth}`,
+    children: depth === MAX_DOCUMENT_DEPTH ? [] : [branch(depth + 1)],
+  })
+  return {
+    version: 3,
+    document: { roots: [{ id: 'source', text: 'Source', children: [] }, branch(1)] },
+    location: { currentParentId: null, selectedNodeId: 'source' },
+    view: { expandedIds: Array.from({ length: MAX_DOCUMENT_DEPTH - 1 }, (_, index) => `depth-${index + 1}`) },
+  }
+}
+
 async function openAlpha(window: Parameters<typeof node>[0]): Promise<void> {
   if ((await window.getByRole('button', { name: 'Collapse node 1' }).count()) === 0)
     await window.getByRole('button', { name: 'Expand node 1' }).click()
@@ -644,19 +658,8 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
   })
 
   test('offers an over-depth row target and reports the operation error without moving', async ({ userDataDir }) => {
-    const branch = (depth: number): { id: string; text: string; children: unknown[] } => ({
-      id: `depth-${depth}`,
-      text: `Depth ${depth}`,
-      children: depth === MAX_DOCUMENT_DEPTH ? [] : [branch(depth + 1)],
-    })
-    seedDocument(userDataDir, {
-      document: { roots: [{ id: 'source', text: 'Source', children: [] }, branch(1)] },
-      location: { currentParentId: null, selectedNodeId: 'source' },
-    })
+    seedDocument(userDataDir, depthLimitSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    for (let depth = 1; depth < MAX_DOCUMENT_DEPTH; depth += 1) {
-      await window.locator(`.node-row[data-node-id="depth-${depth}"] .node-disclosure-triangle`).click()
-    }
     const message = `Operation failed: Nodes cannot be nested deeper than ${MAX_DOCUMENT_DEPTH} levels.`
 
     allowRendererError(exactMessage(message))
@@ -833,23 +836,12 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
 // @requirement PRODUCT.md §11
 test.describe('hierarchy drag depth limit', () => {
   test('reports an over-depth gap drop and preserves the document', async ({ userDataDir }) => {
-    const branch = (depth: number): { id: string; text: string; children: unknown[] } => ({
-      id: `level-${depth}`,
-      text: `Level ${depth}`,
-      children: depth === 20 ? [] : [branch(depth + 1)],
-    })
-    seedDocument(userDataDir, {
-      document: { roots: [{ id: 'source', text: 'Source', children: [] }, branch(1)] },
-      location: { currentParentId: null, selectedNodeId: 'source' },
-    })
+    seedDocument(userDataDir, depthLimitSeed())
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    for (let depth = 1; depth < 20; depth += 1) {
-      await window.locator(`.node-row[data-node-id="level-${depth}"] .node-disclosure-triangle`).click()
-    }
 
     allowRendererError(exactMessage('Operation failed: Nodes cannot be nested deeper than 20 levels.'))
 
-    const last = window.locator('.node-row[data-node-id="level-20"]')
+    const last = window.locator(`.node-row[data-node-id="depth-${MAX_DOCUMENT_DEPTH}"]`)
     const source = window.locator('.node-row[data-node-id="source"] .node-input')
     const sourceBox = await source.boundingBox()
     const lastBox = await last.boundingBox()

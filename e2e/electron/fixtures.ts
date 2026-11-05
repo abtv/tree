@@ -475,31 +475,6 @@ export async function readMainWindowBounds(app: ElectronApplication): Promise<Pe
   })
 }
 
-export async function delaySaveIpc(app: ElectronApplication, milliseconds: number): Promise<void> {
-  await app.evaluate(({}, delay) => {
-    const control = globalThis as typeof globalThis & { __delayedSaveResolved?: boolean }
-    control.__delayedSaveResolved = false
-    globalThis.__treeIpc.wrap(
-      'tree:save',
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(() => {
-            control.__delayedSaveResolved = true
-            resolve()
-          }, delay)
-        }),
-    )
-  }, milliseconds)
-}
-
-export async function waitForDelayedSave(app: ElectronApplication): Promise<void> {
-  await expect
-    .poll(() =>
-      app.evaluate(() => (globalThis as typeof globalThis & { __delayedSaveResolved?: boolean }).__delayedSaveResolved),
-    )
-    .toBe(true)
-}
-
 export async function blockSaves(app: ElectronApplication, options: { countAttempts?: boolean } = {}): Promise<void> {
   await app.evaluate(({ ipcMain }, counting) => {
     const control = globalThis as typeof globalThis & { saveAttempts?: number; restoreSave?: () => void }

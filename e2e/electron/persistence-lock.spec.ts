@@ -1,6 +1,7 @@
 // @editing-modes: independent
 import { existsSync } from 'node:fs'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../../src/domain/product-messages'
+import { captureQuitTimer } from './quit-timer'
 import {
   allowRendererError,
   blockSaves,
@@ -119,6 +120,8 @@ test.describe('save failure lock', () => {
 
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
 
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await clickApplicationMenuQuit(app)
 
     await expect(window.getByText(QUIT_WITHOUT_SAVING_PROMPT)).toBeVisible({ timeout: 8_000 })
@@ -135,7 +138,12 @@ test.describe('save failure lock', () => {
     await window.keyboard.press('Escape')
 
     await expect(window.getByRole('alertdialog')).toHaveCount(0)
-    // The existing main-process save handshake releases a rejected quit on its timeout.
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+
+    await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible()

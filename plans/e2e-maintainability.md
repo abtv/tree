@@ -1,6 +1,8 @@
 # Electron E2E maintainability follow-up
 
-Status: **Awaiting owner acceptance**. All five items are complete.
+Status: **Awaiting owner acceptance**. The initial five items are complete at
+`52d85cd`; the authorized local cost review is also implemented and validated.
+Its delivery commit is the commit containing this status update.
 
 ## Authorization and boundaries
 
@@ -15,8 +17,9 @@ entries for this work; this is not a passing audit or permission to suppress it.
 
 ## Tasks
 
-There are five substantive implementation/investigation items. Complete them in
-this session, grouping related changes into at most four logical commits. Final
+The initial scope had five substantive implementation/investigation items. The
+authorized extension below brings the count to eight and permits more than four
+logical commits in this session. Final
 owner acceptance is required before retiring this plan. No manual product check
 is expected because product behavior is unchanged.
 
@@ -40,12 +43,108 @@ production timing, state and process lifecycle are unchanged.
 
 ## Next action
 
-The owner can inspect the semantic tags and discovery guard in
-`config/testing/electron-platforms.ts` and `scripts/electron-platforms.test.mts`,
-and the runtime assertion owner in `e2e/electron/platform-expect.ts`.
-Accept the delivered five-item result or identify remaining issues. No manual
-application check is required. After acceptance, retire this plan and its index
-entry; no implementation or additional hosted run remains.
+The implementation is finished. Await the owner's acceptance of the delivered
+test-maintainability result under AGENTS.md §8, then remove this plan and its
+index entry. No manual application check is required. No implementation tasks
+remain; closure needs only the documentation retirement and its checks.
+
+## Authorized local cost review
+
+The owner authorized continuation in this session, including more than four
+logical commits if needed, and accepted the existing minimatch advisory for
+this extension. Do not access GitHub logs; collect timings locally. The owner
+will be away: interrupt only for completion or a critical blocker. Preserve
+production behavior, native boundary coverage, editor modes, failure paths,
+snapshots, CI allocation and frequency. No new dependencies or wider process
+reuse are implied. Current local capabilities were verified earlier this session.
+
+| Item | Scope and acceptance | Status |
+| --- | --- | --- |
+| 6 | Measure the full local suite with the existing diagnostic runner, choose a bounded set of costly scenarios, map their unique risks to lower-level coverage | Done |
+| 7 | Simplify repeated setup or proven redundant matrices in selected specs, preserve boundary assertions; use focused before/after timings and affected validation | Done |
+| 8 | Review the complete result, verify affected suites/platforms, document lasting test ownership and measurement limits | Done |
+
+Initial measurement: `npm run test:e2e:diagnose -- --json-output=.scratch/e2e-cost-review/baseline.json --workers=6 --reporter=dot,json`.
+This is measurement, not repetition solely for reassurance. The prior full run
+had no retained timing report. Keep before/after inputs and worker counts matched.
+No product performance suite is needed for test-only setup changes. Do not
+introduce new fixture lifecycle machinery merely to reduce launch counts.
+
+### Local selection and coverage mapping
+
+The baseline passed 979 cases in 223.05 seconds, with 1184.92 summed test
+seconds, 905 launches and no skips/retries. Launch phases accounted for 645.65
+summed seconds; widening process reuse is outside this bounded review.
+
+| Selected area | Baseline cost | Decision and retained evidence |
+| --- | --- | --- |
+| Quit failure/retry | Five slow cases total 35.32 seconds across shutdown, persistence reliability and lock specs | Use the existing captured quit timer instead of wall-clock expiry; retain menu/window, IPC, save/attachment failure, cancellation, retry and disk/restart assertions. `quit-handshake.test.ts` owns timer/duplicate rules. |
+| Drag setup | `drag-and-drop.spec.ts` totals 34.52 seconds | Measure replacing repeated typed sibling setup with synthetic seeds; preserve actual pointer gestures and pre-action focus, caret and mode. Enter/type/history remain in editing/history suites. |
+| Hierarchy drag | Highest file total: 112.47 seconds | Seed the expanded depth-limit tree instead of 19 disclosure clicks per case; retain real row/gap targeting, scrolling and depth errors. `inline-expansion.spec.ts` owns disclosure interactions. Keep remount, editor state, screenshots and restart cases; existing App/store matrices own abstract move combinations. |
+| Recent-node scrolling | Slowest case: 11.17 seconds | Retain frame-by-frame invariant and both appearances; unit tests cannot prove transient selection visibility. |
+| Vim wrapped-line scrolling | Two cases: 9.07 and 7.62 seconds | Retain real plain/rich geometry across both directions and oversized nodes; this is not a redundant rule matrix. |
+
+Focused repeated baseline (four workers, three repetitions):
+`npm run test:e2e:diagnose -- --json-output=.scratch/e2e-cost-review/focused-before.json shutdown-failures.spec.ts persistence-reliability.spec.ts persistence-lock.spec.ts drag-and-drop.spec.ts --repeat-each=3 --workers=4 --reporter=dot,json`.
+No product, architecture or dependency decision is needed. The configured planner
+confirmed the bounded timer and setup approach; no additional process reuse,
+test framework or speculative E2E deletion is planned.
+
+### Local implementation and validation
+
+- Five quit-failure cases now expire the original captured main-process timer
+  after observing the failure/cancellation and absence of a timeout message.
+  The duplicate-request case gates only the first production save, verifies the
+  disk write and rejected stale confirmation, then retries through the menu.
+  Its two obsolete shared delay helpers were removed. No quit callback or
+  persistence implementation was substituted.
+- Seven drag declarations use a seeded sibling document with explicit focus and
+  caret preparation. The gesture assertions and both editing modes remain.
+  Depth-limit tests share one expanded seed; all three real drag cases remain.
+  No E2E cases, restart checks, screenshots or matrix combinations were removed.
+- The focused baseline passed 138 executions in 56.24 seconds (205.96 summed
+  seconds); the identical command with `focused-after.json` passed in 42.73
+  seconds (136.34 summed). Both used four workers and three repetitions, with
+  zero retries/skips. The drag file alone did not improve (72.85 to 76.50 summed
+  seconds); launch time also increased. Keep that seed change for simpler,
+  independent preparation, without claiming a measured drag speedup.
+- Hierarchy comparison commands:
+  `npm run test:e2e:diagnose -- --json-output=.scratch/e2e-cost-review/hierarchy-before.json drag-and-drop-hierarchy.spec.ts --grep over-depth --repeat-each=3 --workers=4 --reporter=dot,json`
+  and the identical command with `hierarchy-after.json`. Both passed nine
+  executions, using three effective workers, without retries/skips. Wall time
+  fell from 6.85 to 5.07 seconds; summed time from 19.58 to 13.94 seconds, with
+  essentially unchanged launch time (4.14 versus 4.21 seconds).
+- Measurements are local same-machine samples, not a hosted CI savings
+  guarantee. Slow frame/geometry tests and lifecycle restarts remain because
+  they detect failures the lower-level suites cannot reproduce.
+- `npm run fix:history -- e2e/electron/shutdown-failures.spec.ts e2e/electron/persistence-reliability.spec.ts e2e/electron/persistence-lock.spec.ts e2e/electron/drag-and-drop.spec.ts e2e/electron/fixtures.ts`
+  found only the already-corrected pointer-hold fix `2fbdab2`, with no recurring
+  bucket. The separate hierarchy-spec check found no fixes in the window.
+- Shared helper removal uses High Risk validation: full `npm run check`, full
+  macOS E2E, and independent review. Reuse the same-session audit exception;
+  dependency inputs are unchanged. Linux allocation does not select any edited
+  spec, and the deleted exports had only the removed macOS consumer; the prior
+  Linux runtime result remains applicable to its exercised behavior. No new
+  product/native UI behavior requires manual verification.
+- `npm run check` passed type checks, lint, formatting, documentation/requirement
+  and editing-mode guards, all 5898 tests in 307 files, coverage and build.
+  Implementation snapshot: HEAD `52d85cd05fb3e98c04b220a09cd638f9a92285c7`,
+  `sha256:df80cef30c050645c85a10d5ed8544c80fc3528647b27ed608e80ef1a0c55e26`.
+  Subsequent evidence-only plan edits do not invalidate runtime results.
+- Final full measurement/validation command:
+  `npm run test:e2e:diagnose -- --json-output=.scratch/e2e-cost-review/full-after.json --workers=6 --reporter=dot,json`.
+  Passed all 979 cases without retries/skips in 255.32 seconds, against the same
+  production inputs and six-worker macOS environment as baseline. Summed time
+  was 1355.63 seconds; launches remained 905. Launch-phase total rose from
+  645.65 to 774.26 seconds, and unchanged suites also slowed. This broader run
+  proves retained coverage, not a measured whole-suite speedup. The narrower
+  repeated comparisons above isolate the useful timer and depth-setup savings.
+- Independent review of the full diff, save/quit ordering, drag preparation and
+  retained coverage returned `No meaningful issues found`. Primary diff review
+  and final documentation/formatting checks also passed. No unresolved check
+  failure remains except the explicitly accepted, unchanged npm advisory.
+  Lasting guidance is in `docs/DEVELOPMENT.md` §8; scratch reports are disposable
+  measurement evidence and are not required to understand the delivered result.
 
 ## Investigation outcomes
 

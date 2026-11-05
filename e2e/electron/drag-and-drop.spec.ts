@@ -7,6 +7,7 @@ import {
   node,
   nodeTexts,
   seedDocument,
+  setCursor,
   startRowDrag,
   test,
   typeInto,
@@ -15,14 +16,21 @@ import {
 
 const HOLD_MS = 500
 
-async function seedSiblings(window: Launched['window']): Promise<void> {
-  await typeInto(node(window, 1), 'A')
-  await window.keyboard.press('Enter')
-  await typeInto(node(window, 2), 'B')
-  await window.keyboard.press('Enter')
-  await typeInto(node(window, 3), 'C')
-  await window.keyboard.press('Enter')
-  await typeInto(node(window, 4), 'D')
+async function launchSiblings(userDataDir: string): Promise<Launched> {
+  seedDocument(userDataDir, {
+    document: {
+      roots: ['A', 'B', 'C', 'D'].map((text) => ({ id: text.toLowerCase(), text, children: [] })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'd' },
+  })
+  const launched = await launchTree(userDataDir)
+  const last = node(launched.window, 4)
+
+  await setCursor(last, 1)
+
+  await expect(last).toBeFocused()
+  await expect(last).toHaveJSProperty('selectionStart', 1)
+  return launched
 }
 
 async function rowBox(
@@ -42,8 +50,7 @@ const selectionColors = (field: ReturnType<typeof node>) =>
 
 describeForEachEditingMode('drag and drop', ({ mode }) => {
   test('places the caret on a quick click without reordering', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     const input = window.locator('.node-row').nth(2).locator('.node-input')
     const box = await input.boundingBox()
@@ -59,8 +66,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
 
   // @requirement PRODUCT.md §11
   test('reorders a focused sibling after holding the pointer and moving across a target', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     const source = window.locator('.node-row').nth(3)
 
@@ -90,8 +96,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
   })
 
   test('keeps the caret and mode when a drag is cancelled', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     const source = window.locator('.node-row').nth(2).locator('.node-input')
     const box = await source.boundingBox()
@@ -187,8 +192,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
   })
 
   test('cancels an active drag with Escape without moving', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     const source = window.locator('.node-row').nth(3).locator('.node-input')
 
@@ -358,8 +362,7 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
 
 test.describe('drag and drop (mode-independent)', () => {
   test('does not start a drag when the pointer moves before the hold threshold', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     const source = window.locator('.node-row').nth(3)
     const box = await source.locator('.node-input').boundingBox()
@@ -415,8 +418,7 @@ test.describe('drag and drop (mode-independent)', () => {
   })
 
   test('releases in place without reordering', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     await startRowDrag(window, window.locator('.node-row').nth(1).locator('.node-input'))
 
@@ -429,8 +431,7 @@ test.describe('drag and drop (mode-independent)', () => {
   })
 
   test('keeps a pending hold through a browser hover reset', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-    await seedSiblings(window)
+    const { window } = await launchSiblings(userDataDir)
 
     // Chromium resets the hovered element when the window loses focus and reports the reset with
     // no buttons pressed. The reset must not cancel the pending hold, so the drag still activates

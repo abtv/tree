@@ -376,6 +376,8 @@ test.describe('persistence reliability regressions', () => {
         control.quitRequested = true
       })
     })
+    const expireQuitTimer = await captureQuitTimer(app, 'native')
+
     await clickApplicationMenuQuit(app)
 
     await expect
@@ -387,6 +389,12 @@ test.describe('persistence reliability regressions', () => {
     )
 
     await expect(window.getByText(/Operation failed:.*attachment failed/)).toBeVisible()
+    await expect(
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
+    ).toHaveCount(0)
+
+    await expireQuitTimer()
+
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible({ timeout: 7_000 })
