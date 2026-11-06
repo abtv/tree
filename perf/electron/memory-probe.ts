@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ElectronApplication, Page, TestInfo } from '@playwright/test'
 import { assertMemoryBudget, type MemoryBudget, type MemoryMetrics } from '../memory-budget'
-import { collectWithGpuMemory } from './memory-processes'
+import { collectWithGpuMemory, renderMemoryFrame } from './memory-processes'
 
 const MIB = 1024 ** 2
 
@@ -30,18 +30,21 @@ export async function collectMemory({
   try {
     await session.send('HeapProfiler.collectGarbage')
     const heap = await session.send('Runtime.getHeapUsage')
-    const native = await collectWithGpuMemory(() =>
-      app.evaluate(({ app, BrowserWindow }) => {
-        const metrics = app.getAppMetrics()
-        const rendererPid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId()
-        return {
-          processes: metrics.map(({ type, memory }) => ({ type, workingSetSize: memory.workingSetSize })),
-          mainHeap: process.memoryUsage().heapUsed,
-          mainWorkingSet: (metrics.find((metric) => metric.pid === process.pid)?.memory.workingSetSize ?? 0) * 1024,
-          rendererWorkingSet: (metrics.find((metric) => metric.pid === rendererPid)?.memory.workingSetSize ?? 0) * 1024,
-          totalWorkingSet: metrics.reduce((sum, metric) => sum + metric.memory.workingSetSize * 1024, 0),
-        }
-      }),
+    const native = await collectWithGpuMemory(
+      () =>
+        app.evaluate(({ app, BrowserWindow }) => {
+          const metrics = app.getAppMetrics()
+          const rendererPid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId()
+          return {
+            processes: metrics.map(({ type, memory }) => ({ type, workingSetSize: memory.workingSetSize })),
+            mainHeap: process.memoryUsage().heapUsed,
+            mainWorkingSet: (metrics.find((metric) => metric.pid === process.pid)?.memory.workingSetSize ?? 0) * 1024,
+            rendererWorkingSet:
+              (metrics.find((metric) => metric.pid === rendererPid)?.memory.workingSetSize ?? 0) * 1024,
+            totalWorkingSet: metrics.reduce((sum, metric) => sum + metric.memory.workingSetSize * 1024, 0),
+          }
+        }),
+      () => renderMemoryFrame(app, window),
     )
     return {
       rendererHeap: heap.usedSize,

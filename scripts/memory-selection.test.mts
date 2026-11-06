@@ -39,6 +39,7 @@ it('selects the release memory guards and detector checks without timing tests o
     [
       'measures successive edit/reset bursts after warm-up',
       'measures matched fresh edit bursts as memory controls',
+      'warms missing GPU accounting without showing the hidden window',
       'fresh application process footprint',
       'sustained-10000 structural edits keep renderer memory bounded',
       'does not grow the renderer heap unboundedly when expanding many branches',

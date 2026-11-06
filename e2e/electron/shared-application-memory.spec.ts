@@ -2,7 +2,7 @@
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { MemoryProbe } from '../../perf/electron/memory-probe'
-import { collectWithGpuMemory } from '../../perf/electron/memory-processes'
+import { collectWithGpuMemory, renderMemoryFrame } from '../../perf/electron/memory-processes'
 import {
   closeApp,
   expect,
@@ -27,24 +27,26 @@ async function memorySample({ app, window }: Launched, probe: MemoryProbe, label
     const raw = await session.send('Runtime.getHeapUsage')
     await session.send('HeapProfiler.collectGarbage')
     const retained = await session.send('Runtime.getHeapUsage')
-    const native = await collectWithGpuMemory(() =>
-      app.evaluate(({ app, BrowserWindow, webContents, ipcMain }) => ({
-        mainHeap: process.memoryUsage(),
-        listeners: {
-          appActivate: app.listenerCount('activate'),
-          ipcChannels: ipcMain.eventNames().length,
-          bounds: BrowserWindow.getAllWindows().map((main) => ({
-            move: main.listenerCount('move'),
-            resize: main.listenerCount('resize'),
-            close: main.listenerCount('close'),
-          })),
-        },
-        processes: app.getAppMetrics().map(({ type, memory }) => ({ type, ...memory })),
-        windows: BrowserWindow.getAllWindows().length,
-        renderers: webContents.getAllWebContents().filter((contents) => contents.getType() === 'window').length,
-        pending: globalThis.__treeSharedTest?.pending() ?? 0,
-        errors: globalThis.__treeSharedTest?.errors() ?? 0,
-      })),
+    const native = await collectWithGpuMemory(
+      () =>
+        app.evaluate(({ app, BrowserWindow, webContents, ipcMain }) => ({
+          mainHeap: process.memoryUsage(),
+          listeners: {
+            appActivate: app.listenerCount('activate'),
+            ipcChannels: ipcMain.eventNames().length,
+            bounds: BrowserWindow.getAllWindows().map((main) => ({
+              move: main.listenerCount('move'),
+              resize: main.listenerCount('resize'),
+              close: main.listenerCount('close'),
+            })),
+          },
+          processes: app.getAppMetrics().map(({ type, memory }) => ({ type, ...memory })),
+          windows: BrowserWindow.getAllWindows().length,
+          renderers: webContents.getAllWebContents().filter((contents) => contents.getType() === 'window').length,
+          pending: globalThis.__treeSharedTest?.pending() ?? 0,
+          errors: globalThis.__treeSharedTest?.errors() ?? 0,
+        })),
+      () => renderMemoryFrame(app, window),
     )
 
     probe.record(
@@ -127,4 +129,31 @@ test('measures matched fresh edit bursts as memory controls', async ({ userDataD
   await test
     .info()
     .attach('fresh-memory.json', { body: JSON.stringify(samples, null, 2), contentType: 'application/json' })
+})
+
+test('warms missing GPU accounting without showing the hidden window', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir)
+  let rendered = false
+  const sample = await collectWithGpuMemory(
+    async () => {
+      const processes = await app.evaluate(({ app }) =>
+        app.getAppMetrics().map(({ type, memory }) => ({ type, workingSetSize: memory.workingSetSize })),
+      )
+      // Reproduce CI's missing GPU entry until the sampler requests real compositor work.
+      return { processes: rendered ? processes : processes.filter(({ type }) => type !== 'GPU') }
+    },
+    async () => {
+      await renderMemoryFrame(app, window)
+      rendered = true
+    },
+  )
+
+  expect(rendered).toBe(true)
+  expect(sample.processes.some(({ type, workingSetSize }) => type === 'GPU' && workingSetSize > 0)).toBe(true)
+  const main = await app.browserWindow(window)
+  try {
+    expect(await main.evaluate((main) => main.isVisible())).toBe(false)
+  } finally {
+    await main.dispose()
+  }
 })
