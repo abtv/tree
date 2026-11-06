@@ -13,7 +13,7 @@ Linux for the same source commit. It reuses that run's tested browser artifact
 instead of repeating those checks.
 Failed, missing, skipped or canceled checks block publication.
 Full Linux/macOS Electron E2E and Linux Electron memory measurements also gate new release versions and retain weekly/manual runs.
-The memory suite records usage without enforcing growth budgets; see [detection limits](../../docs/DEVELOPMENT.md#what-the-memory-suite-can-detect). Timing suites stay local.
+The memory suite enforces sampled growth and footprint budgets; see [detection limits](../../docs/DEVELOPMENT.md#what-the-memory-suite-can-detect). Timing suites stay local.
 Linux/macOS smoke, including Safari smoke, gate every release. Demo also waits for
 successful validation. Property soak and mutation testing remain separate.
 Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,

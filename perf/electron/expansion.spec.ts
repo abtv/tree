@@ -1,5 +1,6 @@
-import { collectRendererHeap, expect, largeSeed, launchTree, round, seedDocument, test } from './fixtures'
+import { expect, largeSeed, launchTree, round, seedDocument, test } from './fixtures'
 import { recordPerfResult } from '../results'
+import { MemoryProbe } from './memory-probe'
 
 const EXPANDED_TOP_LEVEL_COUNT = 250
 
@@ -174,57 +175,62 @@ test.describe('inline expansion at scale', () => {
     expect(paintMaxMs).toBeLessThan(100)
   })
 
-  test('does not grow the renderer heap unboundedly when expanding many branches', async ({ userDataDir }) => {
-    // 400 top-level roots alone stay under the 500-row windowing threshold; expanding 100 of them
-    // (400 + 100 * 2 = 600 visible rows) pushes past it, and collapsing them again must drop back
-    // under it, not merely revert the same row count some other way.
-    const topCount = 400
-    const expandedCount = 100
-    const seed = largeSeed(topCount, 2)
-    seed.location = { currentParentId: null, selectedNodeId: 'r0' }
-    seedDocument(userDataDir, seed)
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal', memoryProbe: true })
-    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
-    await input.focus()
+  test(
+    'does not grow the renderer heap unboundedly when expanding many branches',
+    { tag: '@memory' },
+    async ({ userDataDir }) => {
+      // 400 top-level roots alone stay under the 500-row windowing threshold; expanding 100 of them
+      // (400 + 100 * 2 = 600 visible rows) pushes past it, and collapsing them again must drop back
+      // under it, not merely revert the same row count some other way.
+      const topCount = 400
+      const expandedCount = 100
+      const seed = largeSeed(topCount, 2)
+      seed.location = { currentParentId: null, selectedNodeId: 'r0' }
+      seedDocument(userDataDir, seed)
+      const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', memoryProbe: true })
+      const probe = new MemoryProbe(test.info())
+      const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+      await input.focus()
 
-    await expect(input).toBeFocused()
-    expect(await window.locator('.node-list-spacer').count()).toBe(0)
+      await expect(input).toBeFocused()
+      expect(await window.locator('.node-list-spacer').count()).toBe(0)
 
-    const before = await collectRendererHeap(window)
-    await expandFirstTopLevelRoots(window, expandedCount)
+      const before = (await probe.sample('before', { app, window })).rendererHeap!
+      await expandFirstTopLevelRoots(window, expandedCount)
 
-    expect(await window.locator('.node-list-spacer').count()).toBe(2)
+      expect(await window.locator('.node-list-spacer').count()).toBe(2)
 
-    const afterExpand = await collectRendererHeap(window)
+      const afterExpand = (await probe.sample('expanded', { app, window })).rendererHeap!
 
-    // `zM` closes every fold in the location regardless of which rows are currently mounted (most of
-    // the 100 expanded roots have scrolled out of the windowed viewport by now, so re-clicking their
-    // own disclosure triangles is not an option). Closing them must release the flattened rows and
-    // expansion-id bookkeeping; heap usage should return close to the pre-expansion baseline rather
-    // than accumulate.
-    await window.keyboard.press('z')
-    await window.keyboard.press('M')
+      // `zM` closes every fold in the location regardless of which rows are currently mounted (most of
+      // the 100 expanded roots have scrolled out of the windowed viewport by now, so re-clicking their
+      // own disclosure triangles is not an option). Closing them must release the flattened rows and
+      // expansion-id bookkeeping; heap usage should return close to the pre-expansion baseline rather
+      // than accumulate.
+      await window.keyboard.press('z')
+      await window.keyboard.press('M')
 
-    await expect(window.locator('.node-list-spacer')).toHaveCount(0)
+      await expect(window.locator('.node-list-spacer')).toHaveCount(0)
 
-    const afterCollapse = await collectRendererHeap(window)
+      const afterCollapse = (await probe.sample('collapsed', { app, window })).rendererHeap!
 
-    const expandGrowthBytes = afterExpand - before
-    const residualGrowthBytes = afterCollapse - before
+      const expandGrowthBytes = afterExpand - before
+      const residualGrowthBytes = afterCollapse - before
 
-    recordPerfResult({
-      kind: 'state',
-      scenario: 'inline-expansion-heap-growth-100-branches',
-      metrics: {
-        beforeBytes: before,
-        afterExpandBytes: afterExpand,
-        afterCollapseBytes: afterCollapse,
-        expandGrowthBytes,
-        residualGrowthBytes,
-      },
-    })
+      recordPerfResult({
+        kind: 'state',
+        scenario: 'inline-expansion-heap-growth-100-branches',
+        metrics: {
+          beforeBytes: before,
+          afterExpandBytes: afterExpand,
+          afterCollapseBytes: afterCollapse,
+          expandGrowthBytes,
+          residualGrowthBytes,
+        },
+      })
 
-    expect(expandGrowthBytes).toBeLessThan(5_000_000)
-    expect(residualGrowthBytes).toBeLessThan(2_000_000)
-  })
+      expect(expandGrowthBytes).toBeLessThan(5_000_000)
+      expect(residualGrowthBytes).toBeLessThan(2_000_000)
+    },
+  )
 })

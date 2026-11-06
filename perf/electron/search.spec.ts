@@ -1,4 +1,5 @@
-import { agendaSeed, collectRendererHeap, expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
+import { agendaSeed, expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
+import { MemoryProbe } from './memory-probe'
 import { recordPerfResult } from '../results'
 import type { TreeNode } from '../../src/domain/document'
 
@@ -121,41 +122,51 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
   expect(timers.maxWorkMs).toBeLessThan(50)
 })
 
-test('releases canceled scans across query refinement and presentation switches', async ({ userDataDir }) => {
-  seedDocument(userDataDir, agendaSeed(3000))
-  const { window } = await launchTree(userDataDir, { initialMode: 'normal', memoryProbe: true })
-  const burst = async () => {
-    for (let index = 0; index < 12; index++) {
-      await window.keyboard.press('/')
-      const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+test(
+  'releases canceled scans across query refinement and presentation switches',
+  { tag: '@memory' },
+  async ({ userDataDir }) => {
+    seedDocument(userDataDir, agendaSeed(3000))
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', memoryProbe: true })
+    const probe = new MemoryProbe(test.info())
+    const burst = async () => {
+      for (let index = 0; index < 12; index++) {
+        await window.keyboard.press('/')
+        const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
 
-      await expect(prompt).toBeFocused()
+        await expect(prompt).toBeFocused()
 
-      await prompt.fill(`absent ${index}`)
-      await prompt.fill(`Item ${index}`)
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('Meta+p')
+        await prompt.fill(`absent ${index}`)
+        await prompt.fill(`Item ${index}`)
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('Meta+p')
+      }
+
+      await expect(window.locator('.search-count')).toHaveCount(0)
     }
 
-    await expect(window.locator('.search-count')).toHaveCount(0)
-  }
+    await burst()
+    const warm = (await probe.sample('warm', { app, window })).rendererHeap!
+    await burst()
+    const middle = (await probe.sample('middle', { app, window })).rendererHeap!
+    await burst()
+    const final = (await probe.sample('final', { app, window })).rendererHeap!
+    recordPerfResult({
+      kind: 'search',
+      scenario: 'canceled-search-retention',
+      metrics: {
+        warmHeapBytes: warm,
+        middleHeapBytes: middle,
+        finalHeapBytes: final,
+        retainedGrowthBytes: final - warm,
+      },
+    })
 
-  await burst()
-  const warm = await collectRendererHeap(window)
-  await burst()
-  const middle = await collectRendererHeap(window)
-  await burst()
-  const final = await collectRendererHeap(window)
-  recordPerfResult({
-    kind: 'search',
-    scenario: 'canceled-search-retention',
-    metrics: { warmHeapBytes: warm, middleHeapBytes: middle, finalHeapBytes: final, retainedGrowthBytes: final - warm },
-  })
-
-  // A retained complete corpus per abandoned job would exceed this across both bursts.
-  expect(final - warm).toBeLessThan(2_000_000)
-  expect(final - middle).toBeLessThan(1_000_000)
-})
+    // A retained complete corpus per abandoned job would exceed this across both bursts.
+    expect(final - warm).toBeLessThan(2_000_000)
+    expect(final - middle).toBeLessThan(1_000_000)
+  },
+)
 
 test('keeps draft input and current results responsive across a wide Tree', async ({ userDataDir }) => {
   seedDocument(userDataDir, wideSeed(10_000))

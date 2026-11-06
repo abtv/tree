@@ -45,7 +45,7 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Run shared and fresh memory measurements
+      - name: Run memory regression guards and detector self-checks
         run: xvfb-run --auto-servernum npx playwright test -c config/testing/playwright.memory.config.ts --reporter=list,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: reports/e2e-memory.json

@@ -1986,6 +1986,8 @@ The assessment must consider how the cost scales with document size and the numb
 
 Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded by the owning automated guard and its result artifacts.
 
+Pre-release Linux memory checks must reject fast retained-memory growth and excessive sampled footprint in the maintained scenarios. The checks must demonstrate detection with deliberately retained allocations and preserve measurements on failure. Slow leaks below their finite-run budgets remain an accepted testing risk, not a relaxation of the application's bounded-memory requirement.
+
 Text recognition must avoid quadratic retries over whitespace when joining nodes. Link reconciliation must consume word matches incrementally, retaining only recognized links. Relative-date count parsing must retain only the fields needed for validation, and Vim number case detection must not collect every letter merely to inspect the last one. These rules do not impose a new text-length limit.
 
 ### 22.2 Perceived Vim Editing Responsiveness

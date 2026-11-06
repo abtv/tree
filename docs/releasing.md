@@ -49,7 +49,7 @@ Desktop preparation does not repeat formatting, lint, type checks, ordinary
 tests, audit or development Electron smoke. It installs the same locked
 dependencies, builds the checked source and verifies the newly packaged artifact.
 Full Linux/macOS Electron E2E and Linux Electron memory measurements gate every new release version in the source workflow.
-The memory suite checks resource invariants and records memory usage; it does not enforce a growth budget.
+The memory suite enforces sampled memory-growth and footprint budgets and verifies its detector with retained allocations.
 See [memory detection limits](DEVELOPMENT.md#what-the-memory-suite-can-detect).
 Local E2E and timing suites follow the development change-risk rules. No dependency upgrades are automatic.
 

@@ -1,11 +1,21 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { containerArguments, containerSourceFiles, run, runSmoke, runElectron, runMemory } from './chromium.mts'
 import { dependencyImage } from './chromium-image.mts'
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }))
+vi.mock('node:fs', async (original) => ({
+  ...(await original<typeof import('node:fs')>()),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+}))
 const spawn = vi.mocked(spawnSync)
-beforeEach(() => spawn.mockReset())
+beforeEach(() => {
+  spawn.mockReset()
+  vi.mocked(mkdirSync).mockClear()
+  vi.mocked(writeFileSync).mockClear()
+})
 
 it('rejects all supplied arguments before accessing Docker', () => {
   for (const arg of ['--privileged', '--network=host', '--help', 'sh', '--config=other.ts']) {
@@ -31,7 +41,9 @@ it.each([
   expect(spawn.mock.calls[2]).toEqual([
     'docker',
     [...containerArguments(id), mode],
-    { input: Buffer.from('archive'), stdio: ['pipe', 'inherit', 'inherit'] },
+    mode === 'memory'
+      ? { input: Buffer.from('archive'), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+      : { input: Buffer.from('archive'), stdio: ['pipe', 'inherit', 'inherit'] },
   ])
   const files = spawn.mock.calls[1]![1]!
 
@@ -40,8 +52,35 @@ it.each([
   expect(files).toContain('e2e/electron/shared-application-memory.spec.ts')
   expect(files).toContain('config/testing/electron-platforms.ts')
   expect(files).toContain('e2e/electron/shared-application.spec.ts')
+  if (mode === 'memory') {
+    expect(files).toContain('perf/electron/memory-probe.ts')
+    expect(files).toContain('perf/electron/state.spec.ts')
+    expect(files).toContain('perf/memory-budget.ts')
+    expect(files).not.toContain('perf/electron/typing.spec.ts')
+  }
   expect(files.some((path) => path.includes('-snapshots/'))).toBe(false)
   expect(files.some((path) => /^(?:\.git|\.scratch|\.aws|\.codex|node_modules|out)(?:\/|$)/.test(path))).toBe(false)
+})
+
+it.each([false, true])('preserves partial memory output on failure (launch error=%s)', (launchError) => {
+  spawn
+    .mockReturnValueOnce({ status: 0, stdout: `sha256:${'d'.repeat(64)}\n` } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
+    .mockReturnValueOnce({
+      status: launchError ? null : 7,
+      stdout: 'MEMORY partial sample\n',
+      stderr: 'failed boundary\n',
+      ...(launchError ? { error: new Error('test timeout') } : {}),
+    } as ReturnType<typeof spawnSync>)
+
+  if (launchError) expect(() => runMemory([])).toThrow('test timeout')
+  else expect(runMemory([])).toBe(7)
+
+  expect(writeFileSync).toHaveBeenCalledWith(
+    expect.stringMatching(/reports\/electron-memory\/[^/]+\.log$/),
+    expect.stringContaining('MEMORY partial sample\n\nfailed boundary\n'),
+    { flag: 'wx' },
+  )
 })
 
 it('selects only the fixed smoke mode with the same offline container restrictions', () => {

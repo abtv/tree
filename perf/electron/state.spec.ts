@@ -1,5 +1,4 @@
 import {
-  collectRendererHeap,
   expect,
   firePaste,
   largeAttachmentSeed,
@@ -12,6 +11,7 @@ import {
   writeClipboardImageSized,
 } from './fixtures'
 import { recordPerfResult } from '../results'
+import { MemoryProbe } from './memory-probe'
 
 interface SaveControl {
   saves: number
@@ -77,7 +77,7 @@ async function readProbe(app: Awaited<ReturnType<typeof launchTree>>['app']): Pr
 
 // @requirement PRODUCT.md §22.1
 test.describe('state and persistence work', () => {
-  test('fresh application process footprint', async ({ userDataDir }) => {
+  test('fresh application process footprint', { tag: '@memory' }, async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 
     await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
@@ -94,6 +94,10 @@ test.describe('state and persistence work', () => {
         processCount: memory.processCount,
       },
     })
+
+    // Preserve the original pre-GC footprint guard alongside the retained-memory sample.
+    const probe = new MemoryProbe(test.info())
+    await probe.sample('fresh', { app, window })
 
     expect(memory.mainBytes).toBeGreaterThan(0)
     expect(memory.rendererBytes).toBeGreaterThan(0)
@@ -222,7 +226,7 @@ test.describe('state and persistence work', () => {
     expect(cleanupScanMs).toBeLessThan(100)
   })
 
-  test('sustained-10000 structural edits keep renderer memory bounded', async ({ userDataDir }) => {
+  test('sustained-10000 structural edits keep renderer memory bounded', { tag: '@memory' }, async ({ userDataDir }) => {
     seedDocument(userDataDir, largeSeed(100, 100))
     const { app, window } = await launchTree(userDataDir, { memoryProbe: true })
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
@@ -236,17 +240,18 @@ test.describe('state and persistence work', () => {
     }
     for (let index = 0; index < 50; index += 1) await structuralCycle()
 
-    const warmHeapBytes = await collectRendererHeap(window)
+    const probe = new MemoryProbe(test.info())
+    const warmHeapBytes = (await probe.sample('warm', { app, window })).rendererHeap!
     const warmProcess = await readProcessWorkingSet(app)
 
     const cycles = 250
     for (let index = 0; index < cycles; index += 1) await structuralCycle()
 
-    const middleHeapBytes = await collectRendererHeap(window)
+    const middleHeapBytes = (await probe.sample('middle', { app, window })).rendererHeap!
     const middleProcess = await readProcessWorkingSet(app)
     for (let index = 0; index < cycles; index += 1) await structuralCycle()
 
-    const finalHeapBytes = await collectRendererHeap(window)
+    const finalHeapBytes = (await probe.sample('final', { app, window })).rendererHeap!
     const finalProcess = await readProcessWorkingSet(app)
     const growthBytes = finalHeapBytes - warmHeapBytes
     const lateRendererWorkingSetGrowthBytes = finalProcess.rendererBytes - middleProcess.rendererBytes

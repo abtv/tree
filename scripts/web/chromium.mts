@@ -1,4 +1,5 @@
-import { lstatSync, readdirSync } from 'node:fs'
+import { lstatSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
@@ -116,6 +117,20 @@ function runContainer(smoke: boolean, electron?: 'electron' | 'memory') {
           'config/testing/playwright.linux.config.ts',
           'config/testing/playwright.memory.config.ts',
           'config/testing/electron-platforms.ts',
+          ...(electron === 'memory'
+            ? [
+                'perf/results.ts',
+                'perf/memory-budget.ts',
+                ...[
+                  'fixtures',
+                  'state.spec',
+                  'search.spec',
+                  'expansion.spec',
+                  'memory-detector.spec',
+                  'memory-probe',
+                ].map((name) => `perf/electron/${name}.ts`),
+              ]
+            : []),
           ...sourceFiles('e2e/electron').filter((path) => /\.(?:ts|cjs)$/.test(path)),
         ]),
       ]
@@ -133,7 +148,23 @@ function runContainer(smoke: boolean, electron?: 'electron' | 'memory') {
   })
   if (archive.error || archive.status !== 0)
     throw new Error(`Source archive failed: ${archive.error?.message ?? archive.stderr.toString()}`)
-  const result = spawnSync('docker', dockerArgs, { input: archive.stdout, stdio: ['pipe', 'inherit', 'inherit'] })
+  const result = spawnSync('docker', dockerArgs, {
+    input: archive.stdout,
+    ...(electron === 'memory'
+      ? { encoding: 'utf8' as const, maxBuffer: 64 * 1024 * 1024 }
+      : { stdio: ['pipe', 'inherit', 'inherit'] as const }),
+  })
+  if (electron === 'memory') {
+    const directory = resolve(root, 'reports/electron-memory')
+    mkdirSync(directory, { recursive: true })
+    const path = resolve(directory, `${Date.now()}-${randomUUID()}.log`)
+    const stdout = result.stdout?.toString() ?? ''
+    const stderr = result.stderr?.toString() ?? ''
+    writeFileSync(path, `${stdout}\n${stderr}\n${result.error?.message ?? ''}`, { flag: 'wx' })
+    process.stdout.write(stdout)
+    process.stderr.write(stderr)
+    console.log(`Linux memory evidence: ${path}`)
+  }
   if (result.error) throw result.error
   return result.status ?? 1
 }

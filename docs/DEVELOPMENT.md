@@ -96,8 +96,8 @@ Safari settings or prepares the image automatically. Run resource-intensive test
 targets separately to avoid concurrent workloads affecting measurements.
 
 The ordinary unit suite already includes property tests; `test-property` selects
-those tests with increased run counts. The memory suite reports measurements and
-does not promise an automated memory-growth threshold. Static code and repository
+those tests with increased run counts. The memory suite enforces sampled growth
+and footprint budgets and reports measurements. Static code and repository
 checks remain available through `npm run check`, which includes unit coverage and
 the Electron build but excludes E2E, smoke, and timing suites.
 
@@ -309,19 +309,23 @@ For Codex, Claude Code, and OpenCode, prefer `npm run test:e2e:visible -- <spec>
 
 Use `npm run test:e2e:timing` to rebuild and measure the complete hidden E2E suite. It writes the Playwright JSON report to `test-results/e2e-timing.json` and prints wall time, summed test time, duration buckets, per-file and editing-mode totals, the slowest tests, launch counts, launch phases, and fixture teardown time. Wall time covers Playwright execution, excluding the build and report summary; test totals include retry attempts. Each `launchTree` call records cleanup, Electron launch, first-window retrieval, and post-launch assertion durations as test annotations. The summary checks that these phases account for total launch time within 10%. Preserve the JSON report outside `test-results/` before another run when comparing measurements, and run timing and other Playwright invocations sequentially.
 
-The ordinary E2E configuration excludes only `e2e/electron/shared-application-memory.spec.ts`. All reset/recovery tests remain in `e2e/electron/shared-application.spec.ts`. Run both long measurements on Linux with `npm run test:e2e:memory` (or `make test-memory`), without arguments, using the prepared local Docker image described under [Chromium container tests](#chromium-container-tests). CI builds Electron and invokes the memory configuration directly under Xvfb. The memory configuration inherits ordinary isolation and cleanup, but uses one worker, no retries and one memory-only project. A failed measurement fails the run instead of becoming a passing retry. It requires hidden execution and retains twelve eight-cycle bursts per control, existing resource assertions, annotations and JSON attachments. Direct diagnostic runs through `test:e2e:diagnose` remain available on the host; `TREE_E2E_MEMORY_BURST_SIZE` changes their measurement length, not the fixed container command.
+The ordinary E2E configuration excludes only `e2e/electron/shared-application-memory.spec.ts`. All reset/recovery tests remain in `e2e/electron/shared-application.spec.ts`. Run the Linux memory suite with `npm run test:e2e:memory` (or `make test-memory`), without arguments, using the prepared local Docker image described under [Chromium container tests](#chromium-container-tests). CI builds Electron and invokes the memory configuration directly under Xvfb. It uses one worker and no retries. The `memory` project retains the hidden shared/fresh controls. The `memory-regressions` project selects only `@memory` cases from the existing perf specs and the detector self-checks: fresh footprint, sustained structural edits without reload, expansion/collapse, and canceled search with Tree/Agenda switches. Those cases keep the perf fixture's visible window under Xvfb; they contain no timing budgets. `scripts/memory-selection.test.mts` checks the exact discovered cases and rejects skipped coverage. Direct diagnostics through `test:e2e:diagnose` remain available on the host; `TREE_E2E_MEMORY_BURST_SIZE` changes shared/fresh measurement length, not the fixed container command or its budgets.
 
 The `Run Electron memory tests` workflow owns these measurements on Ubuntu: weekly on Sunday at 04:00 UTC, on manual dispatch, and as a reusable prerequisite for a new release version in `Test and build app`. Release runs reuse the caller's dependency audit. The publication gate requires memory success alongside browser and Electron E2E success; missing, failed, cancelled or skipped memory results block a release. Non-release pushes and pull requests skip the release suites. The workflow uploads the JSON report, both sample attachments and failure traces. `npm run check:full` retains the ordinary regression configuration and does not run these long controls. For related infrastructure changes, run the memory command locally as well as the required validation tier. These measurements remain required before broader reuse adoption under ADR 0021.
 
 #### What the memory suite can detect
 
-This is a resource-invariant gate and a measurement report, not an automated memory-growth budget. It asserts one window, one window renderer, one Tab process and zero pending/error IPC operations at each sample. Renderer heap, main-process heap, native working sets and listener counts are recorded, but their sizes and trends are not asserted. Shared and fresh samples are not compared automatically, and previous commits are not used as a baseline. A large increase in any recorded memory value can therefore pass if the resource assertions still hold; making the suite a release prerequisite does not change that limitation.
+The suite rejects a sampled absolute footprint above its ceiling or growth above its allowance relative to the first sample. Every sample is checked, so a later decrease does not erase an earlier violation. Missing, non-finite, zero or negative required measurements fail closed. The common budgets in `perf/electron/memory-probe.ts` cover GC-retained renderer heap, main-process heap, main/renderer working sets and summed process working sets. Existing tighter scenario-specific heap and native-memory assertions remain. Shared/fresh controls also retain their window, renderer and IPC invariants; listener counts remain diagnostic. Shared and fresh are independently checked against fixed budgets, not just against each other. No current run can automatically raise its own budget.
 
-The scenario edits two short rows, samples once per eight cycles and reloads the shared renderer after every cycle. The fresh control restarts the whole application. Neither measures a long uninterrupted editing session, large documents, images, search or Agenda use. Reload and forced renderer garbage collection can hide retention that matters before reload or collection, and sparse sampling can miss transient peaks. The first burst is available for warm-up analysis but the suite performs no trend analysis itself. The fresh control alone cannot detect accumulation across launches because each launch starts a new process.
+These selected perf scenarios now collect retained renderer heap through CDP, using the same method as shared/fresh checks. Re-record their old `performance.memory` comparison baselines before using `PERF_BASELINE`; the numerical measurements are not interchangeable. The original fresh native-footprint assertion still measures before forced collection. Common budget calibration is recorded beside the owning constants and comes from local Linux arm64 runs, not a hosted Ubuntu x64 measurement.
+
+The shared control edits two short rows and reloads after each cycle; fresh restarts the application. Their first sample follows the first edit burst. The sustained-editing and search cases warm the running application before measuring further bursts without reload; expansion checks before/expanded/collapsed states. These scenarios exercise fast accumulation and large sampled footprints. They do not establish bounds for every workflow, image use, native macOS behavior, or peaks between measurements. Forced renderer collection measures retained JS objects, not all transient allocations. Slow leaks below the finite-run budgets are an explicitly accepted testing risk; no multi-hour soak is required for this gate.
 
 Linux results do not establish macOS native-memory behavior. Local arm64 Docker and GitHub's Ubuntu runner are different measurement environments; historical macOS measurements below are not Linux budgets. Electron reports native working sets in kilobytes, whereas the renderer protocol and Node heap values use bytes. Working sets include memory shared with other processes, so summing them does not measure unique physical memory. See the [Electron memory structure](https://www.electronjs.org/docs/latest/api/structures/memory-info).
 
-To turn the report into an automatic degradation detector, first collect repeated Linux runs to estimate noise. Then set explicit post-warm-up retained-heap growth and native working-set budgets, compare early and late sample groups, and add a sustained session without renderer reload. Keep an absolute ceiling or a reviewed baseline as well: comparing shared with fresh alone misses regressions affecting both. Verify the detector with deliberately retained allocations above its budget and smaller allocations below it. Thresholds can still miss slow leaks, unexercised workflows and platform-specific regressions; no finite run proves memory remains bounded indefinitely.
+`perf/electron/memory-detector.spec.ts` uses the same sampler and budget checks as real scenarios. Small allocations must pass; deliberately retained renderer arrays, main-process arrays and a page-filled native buffer must trigger the corresponding budget error. Pure tests cover noisy bounded samples, intermediate spikes, a high starting footprint and invalid measurements. A failure of either a real scenario or the detector self-check blocks the existing release gate.
+
+Each `MemoryProbe` writes a `memory-samples.jsonl` attachment and a `MEMORY` JSON line before asserting its budget. Samples remain available when a subsequent interaction or budget assertion fails. Shared/fresh journal entries also include the raw diagnostic counters. CI uploads these partial attachments and traces through its existing always-run artifact step. Local Docker retains its offline, mount-free isolation and removes the container, but the host saves captured stdout/stderr to a unique log under `reports/electron-memory/`, including partial output on failure, before returning the original failure. These logs contain the per-sample JSON; local trace files remain inside the disposable container. The bounded output buffer fails the run if exhausted rather than reporting success.
 
 #### Historical macOS memory evidence
 
@@ -528,12 +532,12 @@ Electron before running `config/testing/playwright.linux.config.ts` under Xvfb.
 It uses four workers, no retries and a 15-minute child-process deadline. Failure
 or timeout fails the command; remaining descendants are removed with the container.
 
-Use `npm run test:e2e:memory`, without arguments, for both Linux Electron memory
-controls in the same prepared image. It selects a fixed `memory` container mode,
+Use `npm run test:e2e:memory`, without arguments, for the Linux Electron memory
+guards and detector self-checks in the same prepared image. It selects a fixed `memory` container mode,
 builds Electron, and runs `config/testing/playwright.memory.config.ts` under Xvfb
 with the same isolation and 15-minute deadline. No dependencies are installed and
-no host environment overrides are forwarded. Local attachments remain inside the
-disposable container; use the CI artifact for retained sample reports and traces.
+no host environment overrides are forwarded. The host preserves a unique output log
+under `reports/electron-memory/`; CI also retains sample attachments and failure traces.
 
 `config/testing/electron-platforms.ts` owns the explicit Linux file list and the
 small shared launch/reset/text-clipboard overlap. In mixed specs, `{ tag: '@linux' }`
@@ -695,8 +699,8 @@ names. A reader should understand the purpose without opening the YAML.
 * Keep names concise. Do not add category prefixes, local jargon such as
   `property soak`, or execution settings merely to describe implementation.
   Increased property-test counts and memory-report thresholds belong in suite
-  documentation. Use `memory tests` for the memory suite; that name does not
-  promise an automated memory-growth threshold.
+  documentation. Use `memory tests` for the memory suite and describe its actual
+  assertions and detection limits in that documentation.
 * Add a platform, browser, tool, or build-mode qualifier when it distinguishes
   the work. Use the actual implementation: the Linux web job uses Chromium,
   not Google Chrome. Put execution-specific detail in job names and descriptions

@@ -1,6 +1,7 @@
 // @editing-modes: independent
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { MemoryProbe } from '../../perf/electron/memory-probe'
 import {
   closeApp,
   expect,
@@ -19,7 +20,7 @@ function removeData(shared: SharedApplication): void {
   rmSync(join(shared.directory, 'data'), { recursive: true, force: true })
 }
 
-async function memorySample({ app, window }: Launched): Promise<unknown> {
+async function memorySample({ app, window }: Launched, probe: MemoryProbe, label: string) {
   const session = await window.context().newCDPSession(window)
   try {
     const raw = await session.send('Runtime.getHeapUsage')
@@ -42,6 +43,18 @@ async function memorySample({ app, window }: Launched): Promise<unknown> {
       pending: globalThis.__treeSharedTest?.pending() ?? 0,
       errors: globalThis.__treeSharedTest?.errors() ?? 0,
     }))
+
+    probe.record(
+      label,
+      {
+        rendererHeap: retained.usedSize,
+        mainHeap: native.mainHeap.heapUsed,
+        mainWorkingSet: (native.processes.find(({ type }) => type === 'Browser')?.workingSetSize ?? 0) * 1024,
+        rendererWorkingSet: (native.processes.find(({ type }) => type === 'Tab')?.workingSetSize ?? 0) * 1024,
+        totalWorkingSet: native.processes.reduce((sum, process) => sum + process.workingSetSize * 1024, 0),
+      },
+      { raw, retained, native },
+    )
 
     expect(native.windows).toBe(1)
     expect(native.renderers).toBe(1)
@@ -68,13 +81,14 @@ test.describe('subsequent shared owner', () => {
   test('measures successive edit/reset bursts after warm-up', async ({ userDataDir, sharedApplication }) => {
     test.setTimeout(300_000)
     const samples: unknown[] = []
+    const probe = new MemoryProbe(test.info())
     let launched = await launchTree(userDataDir)
     for (let burst = 0; burst < 12; burst += 1) {
       for (let cycle = 0; cycle < burstSize; cycle += 1) {
         await typeInto(node(launched.window, 1), `Synthetic burst ${burst} cycle ${cycle}`)
         await launched.window.keyboard.press('Enter')
         await typeInto(node(launched.window, 2), 'Synthetic second row')
-        if (cycle === burstSize - 1) samples.push(await memorySample(launched))
+        if (cycle === burstSize - 1) samples.push(await memorySample(launched, probe, `burst-${burst}`))
         await resetSharedApplication(sharedApplication)
         removeData(sharedApplication)
         launched = await launchTree(userDataDir)
@@ -92,13 +106,14 @@ test.describe('subsequent shared owner', () => {
 test('measures matched fresh edit bursts as memory controls', async ({ userDataDir }) => {
   test.setTimeout(600_000)
   const samples: unknown[] = []
+  const probe = new MemoryProbe(test.info())
   for (let burst = 0; burst < 12; burst += 1) {
     for (let cycle = 0; cycle < burstSize; cycle += 1) {
       const launched = await launchTree(userDataDir)
       await typeInto(node(launched.window, 1), `Synthetic burst ${burst} cycle ${cycle}`)
       await launched.window.keyboard.press('Enter')
       await typeInto(node(launched.window, 2), 'Synthetic second row')
-      if (cycle === burstSize - 1) samples.push(await memorySample(launched))
+      if (cycle === burstSize - 1) samples.push(await memorySample(launched, probe, `burst-${burst}`))
       await closeApp(launched.app)
       rmSync(join(userDataDir, 'data'), { recursive: true, force: true })
     }
