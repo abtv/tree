@@ -2,6 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { dayNumberOf } from '../domain/calendar-date'
+import { EditorSearch } from './editor-search'
+import { AgendaRowsCache } from './agenda-rows'
 
 const first = dayNumberOf({ year: 2026, month: 10, day: 22 })
 const second = dayNumberOf({ year: 2026, month: 10, day: 23 })
@@ -69,10 +71,12 @@ it('captures occurrence and synthetic origins using the current renderer caret',
 })
 
 it('falls back to the Tree selection while the selected Agenda row is unavailable', async () => {
-  const { store } = await setup()
-  vi.spyOn(store, 'getAgendaRows').mockReturnValue([])
+  const { state } = await setup()
+  const rows = new AgendaRowsCache()
+  vi.spyOn(rows, 'get').mockReturnValue([])
+  const search = new EditorSearch(vi.fn(), rows)
 
-  expect(store.searchOrigin(4)).toEqual({ nodeId: 'a', offset: 4 })
+  expect(search.origin(state(), 4)).toEqual({ nodeId: 'a', offset: 4 })
 })
 
 it('counts folded contextual occurrences and serializes same-node and cross-day jumps without saving', async () => {

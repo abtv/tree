@@ -1,14 +1,20 @@
-import { locateNode } from '../domain/document'
+import { locateNode, requireNode, type Location } from '../domain/document'
 import type { SearchScope } from '../domain/search-scope'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { SearchSession } from './search-session'
 import type { SearchDestination, SearchPosition, SearchResult } from './search-executor'
-import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
-import type { AgendaCommand } from './agenda-state'
+import { agendaAncestorKeys, AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { applyAgendaCommand, type AgendaCommand, type AgendaState } from './agenda-state'
+import { expandNode, isNodeExpanded, type ExpansionState } from './expansion-state'
+import type { FocusIntent } from './editor-store-types'
 
 type Navigation = Extract<SearchResult, { kind: 'navigate' }>
 
-/** Memory-only orchestration. Document selection and fold changes remain store commands. */
+type SearchView = { kind: 'tree'; expansion: ExpansionState } | { kind: 'agenda'; agenda: AgendaState }
+
+export type SearchReveal = SearchView & { location: Location; focus: Omit<FocusIntent, 'token'> }
+
+/** Owns search navigation and its temporary folds; the store publishes view changes and schedules saves. */
 export class EditorSearch {
   public readonly session = new SearchSession()
   private readonly opened = new Set<string>()
@@ -100,6 +106,87 @@ export class EditorSearch {
   public hide(): void {
     this.cancelNavigation()
     this.session.hide()
+  }
+
+  public origin(state: ReadySnapshot, offset: number): SearchPosition {
+    if (state.agenda !== undefined) {
+      const row = this.agendaRows.get(state.document, state.agenda).find((row) => row.key === state.agenda!.selectedKey)
+      if (row !== undefined) {
+        return row.kind === 'node'
+          ? { nodeId: row.nodeId, day: row.day, offset }
+          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
+      }
+    }
+    return { nodeId: state.location.selectedNodeId, offset }
+  }
+
+  /** Release search-owned folds except ancestors needed to keep the current selection visible. */
+  public hideView(state: ReadySnapshot): SearchView | undefined {
+    if (state.agenda !== undefined) {
+      const agenda = state.agenda
+      const selected = this.agendaRows.get(state.document, agenda).find((row) => row.key === agenda.selectedKey)
+      const projection = this.agendaRows.getProjection(state.document, agenda)
+      const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected) : [])
+      const collapsed = new Set(agenda.collapsed)
+      for (const key of this.takeFoldsToClose(keep)) collapsed.add(key)
+      this.hide()
+      return { kind: 'agenda', agenda: { ...agenda, collapsed } }
+    }
+    const keep = new Set(requireNode(state.document, state.location.selectedNodeId).ancestors.map((node) => node.id))
+    const expandedIds = new Set(state.expansion.expandedIds)
+    for (const id of this.takeFoldsToClose(keep)) expandedIds.delete(id)
+    this.hide()
+    return expandedIds.size === state.expansion.expandedIds.size
+      ? undefined
+      : { kind: 'tree', expansion: { expandedIds } }
+  }
+
+  /** Resolve a destination and retain ownership only of folds opened to reveal it. */
+  public revealView(state: ReadySnapshot, destination: SearchDestination): SearchReveal | undefined {
+    if (state.agenda !== undefined && destination.day !== undefined) {
+      const agenda = state.agenda
+      const occurrence = { nodeId: destination.nodeId, day: destination.day }
+      const projection = this.agendaRows.getProjection(state.document, agenda)
+      const path = agendaAncestorKeys(projection, occurrence)
+      if (path === undefined) return undefined
+      const collapsed = new Set(agenda.collapsed)
+      for (const key of path) {
+        if (collapsed.delete(key)) this.recordOpenedFold(key)
+      }
+      const revealed = { ...agenda, collapsed }
+      const rows = this.agendaRows.get(state.document, revealed)
+      const next = applyAgendaCommand(
+        revealed,
+        { kind: 'select', key: `node:${destination.day}:${destination.nodeId}`, cursor: destination.caret },
+        rows,
+      )
+      return {
+        kind: 'agenda',
+        agenda: next,
+        location: { ...state.location, selectedNodeId: destination.nodeId },
+        focus: { nodeId: destination.nodeId, cursor: destination.caret, revealLine: true },
+      }
+    }
+    const found = locateNode(state.document, destination.nodeId)
+    if (found === undefined || state.agenda !== undefined) return undefined
+    let expansion = state.expansion
+    let inScope = state.location.currentParentId === null
+    for (const ancestor of found.ancestors) {
+      if (ancestor.id === state.location.currentParentId) {
+        inScope = true
+        continue
+      }
+      if (inScope && !isNodeExpanded(expansion, ancestor.id)) {
+        this.recordOpenedFold(ancestor.id)
+        expansion = expandNode(expansion, ancestor.id)
+      }
+    }
+    return {
+      kind: 'tree',
+      expansion,
+      location: { ...state.location, selectedNodeId: destination.nodeId },
+      focus: { nodeId: destination.nodeId, cursor: destination.caret },
+    }
   }
 
   /** Newer user input takes authority without hiding the confirmed search. */

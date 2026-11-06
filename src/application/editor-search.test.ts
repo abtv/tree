@@ -458,6 +458,51 @@ it('serializes navigation, reveals only ancestors and cleans search-owned folds'
   expect(store.search.session.getSnapshot()).toMatchObject({ confirmed: 'apple', visible: false })
 })
 
+it('resolves a reveal without publishing or mutating the supplied view', async () => {
+  const { state } = await setup()
+  const before = state()
+  const apply = vi.fn()
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  const destination = { nodeId: 'b', start: 0, end: 5, caret: 0 }
+
+  const view = search.revealView(before, destination)
+
+  expect(view).toMatchObject({
+    kind: 'tree',
+    location: { currentParentId: null, selectedNodeId: 'b' },
+    focus: { nodeId: 'b', cursor: 0 },
+    expansion: { expandedIds: new Set(['a']) },
+  })
+  expect(view?.focus).not.toHaveProperty('token')
+  expect(state()).toBe(before)
+  expect(before.expansion.expandedIds.size).toBe(0)
+  expect(apply).not.toHaveBeenCalled()
+
+  expect(search.revealView(before, { ...destination, nodeId: 'missing' })).toBeUndefined()
+  expect(search.takeFoldsToClose(new Set())).toEqual(['a'])
+})
+
+it('disposes search without closing its revealed folds or publishing a new editor view', async () => {
+  const { store, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  const before = state()
+  const publish = vi.fn()
+  const unsubscribe = store.subscribe(publish)
+
+  store.disposeSearch()
+  await vi.runAllTimersAsync()
+
+  expect(state()).toBe(before)
+  expect(state().expansion.expandedIds).toEqual(new Set(['a']))
+  expect(store.search.session.getSnapshot().visible).toBe(false)
+  expect(publish).not.toHaveBeenCalled()
+  unsubscribe()
+})
+
 it('does not save query entry and preserves only confirmed recall across presentation changes', async () => {
   const { store, services, state } = await setup()
 

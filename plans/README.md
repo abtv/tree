@@ -4,6 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
+| [Repository quality follow-ups](repository-quality-followups.md) | Task 1 complete; remaining tasks not authorized | Owner selection and authorization of task 2 or 3 |
 
 Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

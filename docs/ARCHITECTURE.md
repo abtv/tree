@@ -189,10 +189,15 @@ later restoration cannot replace a newer manual selection.
 `editor-search.ts` connects Tree and Agenda input through `EditorStore`. Runtime publication updates
 its monotonic document revision, including Undo/Redo, before notifying subscribers.
 Scope identity stays stable across ordinary selection and folds. The controller serializes
-navigation and retains the raw match anchor separately from the grapheme caret. Store
-commands reveal ancestors; `EditorSearch` privately tracks search-owned expansion through
-explicit registration, manual Tree/Agenda fold transfer, and cleanup methods. The store
-applies returned cleanup keys without accessing the ownership set.
+navigation and retains the raw match anchor separately from the grapheme caret.
+`EditorSearch` resolves origins, reveals ancestors and restores search-owned folds,
+including manual Tree/Agenda fold ownership transfers. It returns explicit Tree or
+Agenda view changes with a target location and token-free focus for a reveal.
+`EditorStore` publishes those changes, creates focus tokens, ends the text session
+before Agenda reveal, and schedules Tree view persistence. Search disposal cancels
+work without changing the view. This keeps fold policy with its ownership set and
+publication effects in the store. The transition adds only a short-lived result;
+ancestor walks, projection-cache calls, retained state, writes and syncs are unchanged.
 Query entry suppresses document focus projection while keeping
 ordinary selection authority current underneath. Mounted inputs scan their own text in
 bounded asynchronous slices and compose highlights with link/date/caret intervals.

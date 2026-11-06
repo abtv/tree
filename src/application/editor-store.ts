@@ -83,7 +83,7 @@ import {
   type NodeFoldCommand,
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
-import { agendaAncestorKeys, AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
 import {
   createDayNodeTransition,
@@ -643,16 +643,7 @@ export class EditorStore {
   }
 
   public searchOrigin(offset: number): SearchPosition {
-    const state = this.runtime.ready()
-    if (state.agenda !== undefined) {
-      const row = this.getAgendaRows().find((candidate) => candidate.key === state.agenda!.selectedKey)
-      if (row !== undefined) {
-        return row.kind === 'node'
-          ? { nodeId: row.nodeId, day: row.day, offset }
-          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
-      }
-    }
-    return { nodeId: state.location.selectedNodeId, offset }
+    return this.searchOwner.origin(this.runtime.ready(), offset)
   }
 
   /** Retire asynchronous search on renderer unmount without changing folds or persisted view state. */
@@ -663,78 +654,33 @@ export class EditorStore {
   public hideSearch(): void {
     if (this.runtime.snapshot.status !== 'ready') return
     const state = this.runtime.ready()
-    if (state.agenda !== undefined) {
-      const agenda = state.agenda
-      const selected = this.getAgendaRows().find((row) => row.key === agenda.selectedKey)
-      const projection = this.agendaRowsCache.getProjection(state.document, agenda)
-      const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected) : [])
-      const collapsed = new Set(agenda.collapsed)
-      for (const key of this.searchOwner.takeFoldsToClose(keep)) collapsed.add(key)
-      this.searchOwner.hide()
-      this.runtime.replaceReady({ ...state, agenda: { ...agenda, collapsed } })
-      return
-    }
-    const keep = new Set(requireNode(state.document, state.location.selectedNodeId).ancestors.map((node) => node.id))
-    const expandedIds = new Set(state.expansion.expandedIds)
-    for (const id of this.searchOwner.takeFoldsToClose(keep)) expandedIds.delete(id)
-    this.searchOwner.hide()
-    if (expandedIds.size !== state.expansion.expandedIds.size) {
-      this.runtime.replaceReady({ ...state, expansion: { expandedIds } })
+    const view = this.searchOwner.hideView(state)
+    if (view?.kind === 'agenda') this.runtime.replaceReady({ ...state, agenda: view.agenda })
+    else if (view?.kind === 'tree') {
+      this.runtime.replaceReady({ ...state, expansion: view.expansion })
       this.markPersistedChange()
     }
   }
 
   private revealSearchDestination(destination: SearchDestination): void {
     const state = this.runtime.ready()
-    if (state.agenda !== undefined && destination.day !== undefined) {
-      const agenda = state.agenda
-      const occurrence = { nodeId: destination.nodeId, day: destination.day }
-      const projection = this.agendaRowsCache.getProjection(state.document, agenda)
-      const path = agendaAncestorKeys(projection, occurrence)
-      if (path === undefined) return
-      const collapsed = new Set(agenda.collapsed)
-      for (const key of path) {
-        if (collapsed.delete(key)) this.searchOwner.recordOpenedFold(key)
-      }
-      const revealed = { ...agenda, collapsed }
-      const rows = this.agendaRowsCache.get(state.document, revealed)
-      const next = applyAgendaCommand(
-        revealed,
-        {
-          kind: 'select',
-          key: `node:${destination.day}:${destination.nodeId}`,
-          cursor: destination.caret,
-        },
-        rows,
-      )
+    const view = this.searchOwner.revealView(state, destination)
+    if (view === undefined) return
+    if (view.kind === 'agenda') {
       this.endTextSession()
       this.runtime.replaceReady({
         ...state,
-        agenda: next,
-        location: { ...state.location, selectedNodeId: destination.nodeId },
-        focus: { ...this.runtime.newFocus(destination.nodeId, destination.caret), revealLine: true },
+        agenda: view.agenda,
+        location: view.location,
+        focus: { ...view.focus, ...this.runtime.newFocus(view.focus.nodeId, view.focus.cursor) },
       })
       return
     }
-    const found = locateNode(state.document, destination.nodeId)
-    if (found === undefined || state.agenda !== undefined) return
-    let expansion = state.expansion
-    let inScope = state.location.currentParentId === null
-    for (const ancestor of found.ancestors) {
-      if (ancestor.id === state.location.currentParentId) {
-        inScope = true
-        continue
-      }
-      if (inScope && !isNodeExpanded(expansion, ancestor.id)) {
-        this.searchOwner.recordOpenedFold(ancestor.id)
-        expansion = expandNode(expansion, ancestor.id)
-      }
-    }
     this.runtime.replaceReady({
       ...state,
-      expansion,
-      location: { ...state.location, selectedNodeId: destination.nodeId },
-      focus: this.runtime.newFocus(destination.nodeId, destination.caret),
+      expansion: view.expansion,
+      location: view.location,
+      focus: this.runtime.newFocus(view.focus.nodeId, view.focus.cursor),
     })
     this.markPersistedChange()
   }
