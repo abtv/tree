@@ -1,4 +1,5 @@
 import type { VimFindCommand, VimPendingCommand, VimRepeatChange, VimStructuralChange } from './vim-keyboard-types'
+import { parseCount } from './vim-text-commands'
 
 export type VimStructuralInsertSession =
   | { kind: 'open'; originNodeId: string; position: 'before' | 'after' }
@@ -54,6 +55,69 @@ export function createVimCommandState(): VimCommandState {
 /** Clear an unfinished command without disturbing dot-repeat, find, Visual, or structural state. */
 export function clearPending(state: VimCommandState): void {
   state.pending = undefined
+}
+
+/**
+ * Accumulate a command or operator-motion count. Zero without a preceding count remains a motion.
+ * Agenda rows deliberately recognize zero from the command count only and restart a non-operator
+ * assembly; editable text retains its assembly and recognizes a preceding motion count as well.
+ * Callers resolve awaited characters and their surface-specific prefixes before offering digits.
+ */
+export function appendVimCount(state: VimCommandState, key: string, surface: 'editor' | 'agenda-row'): boolean {
+  const pending = state.pending ?? { count: '', motionCount: '' }
+  const zeroContinues = pending.count !== '' || (surface === 'editor' && pending.motionCount !== '')
+  if (!/^[1-9]$/u.test(key) && !(key === '0' && zeroContinues)) return false
+
+  if (surface === 'agenda-row' && pending.operator === undefined)
+    state.pending = { count: pending.count + key, motionCount: '' }
+  else
+    state.pending =
+      pending.operator === undefined
+        ? { ...pending, count: pending.count + key }
+        : { ...pending, motionCount: pending.motionCount + key }
+  return true
+}
+
+/** Begin a character motion or Normal-mode replacement, retaining any operator and its counts. */
+export function beginVimCharacter(
+  state: VimCommandState,
+  key: string,
+  context: 'normal' | 'visual' | 'operator',
+): boolean {
+  if (!(['f', 'F', 't', 'T'].includes(key) || (key === 'r' && context === 'normal'))) return false
+  state.pending = {
+    ...(state.pending ?? { count: '', motionCount: '' }),
+    awaiting: key as NonNullable<VimPendingCommand['awaiting']>,
+  }
+  return true
+}
+
+type VimCharacterInput =
+  | { kind: 'cancelled' }
+  | { kind: 'replace'; count: number; character: string }
+  | { kind: 'find'; count: number; totalCount: number; motion: string; operator: VimPendingCommand['operator'] }
+
+/**
+ * Consume the awaited key before command classification. A command-shaped character is data;
+ * a non-character cancels, replacement does not overwrite the last find, and a find records its
+ * direction even when the caller cannot find a match. Execution stays with the surface adapter.
+ */
+export function takeVimCharacter(state: VimCommandState, key: string): VimCharacterInput | undefined {
+  const pending = state.pending
+  if (pending?.awaiting === undefined) return undefined
+  clearPending(state)
+  if (key.length !== 1) return { kind: 'cancelled' }
+
+  const count = parseCount(pending.count)
+  if (pending.awaiting === 'r') return { kind: 'replace', count, character: key }
+  state.lastFind = { kind: pending.awaiting, character: key }
+  return {
+    kind: 'find',
+    count,
+    totalCount: count * parseCount(pending.motionCount),
+    motion: pending.awaiting + key,
+    operator: pending.operator,
+  }
 }
 
 /** Record the most recent repeatable change by reference; the last write wins. */

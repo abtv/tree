@@ -115,7 +115,7 @@ export interface VimKeyboardState {
   /**
    * Finish the pending Insert session. Only Escape completes it (`completed = true`) and records its
    * diff for `.`; every other caller passes no flag, consumes the plain session, and keeps the
-   * previous repeatable change (PRODUCT §20.2.19). Structural sessions always capture.
+   * previous repeatable change (PRODUCT §20.2.19). Structural sessions follow the same rule.
    */
   finishInsert: (input: HTMLElement, completed?: boolean) => void
   beginReplace: (nodeId: string, input: HTMLElement, baseline: string, position: number) => void

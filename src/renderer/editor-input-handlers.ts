@@ -10,6 +10,7 @@ import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { APPLE_SHORTCUTS, isMappedPrimaryKey, type ShortcutProfile } from './shortcut-profile'
+import { prepareVimCommand, type VimTextCommandState } from './vim-session-finish'
 
 export type {
   VimFindCommand,
@@ -21,21 +22,6 @@ export type {
   VimTextChange,
   VimViewportMotion,
 } from './vim-keyboard-types'
-
-/**
- * Drops the command state that belongs to the node or level being left — the pending command and
- * both character-wise Visual endpoints — and leaves whole-node Visual for Normal mode, because its
- * range is relative to the displayed level and cannot survive a focus or level change. Character
- * Visual mode keeps its mode; only the stale slots clear, matching the pointer rule that preserves
- * the mode while re-anchoring.
- */
-function clearCommandAssemblyBeforeCommand(vim: VimKeyboardState | undefined): void {
-  if (vim === undefined) return
-  clearCommandAssembly(vim.commandState)
-  if (vim.mode !== 'visual-node') return
-  vim.nodeVisual.exit()
-  vim.setMode('normal')
-}
 
 /**
  * A Ctrl-modified Normal-mode command is dispatched here instead of in `handleVimKey`, so it must
@@ -50,72 +36,6 @@ function discardsUnfinishedCommand(vim: VimKeyboardState): boolean {
   if (vim.commandState.pending === undefined) return false
   clearPending(vim.commandState)
   return true
-}
-
-/**
- * The renderer-local state a text-editing application command must resolve before it runs. The
- * full `VimKeyboardState` satisfies it structurally; the narrowed shape lets the context-menu
- * command path resolve the same state — its mode and the command-state owner it clears through —
- * without receiving the whole keyboard surface.
- */
-export interface VimTextCommandState {
-  mode: VimKeyboardState['mode']
-  commandState: VimKeyboardState['commandState']
-  finishReplace?: VimKeyboardState['finishReplace']
-  finishInsert?: VimKeyboardState['finishInsert']
-  getCaretState?: VimKeyboardState['getCaretState']
-  applyCaretState?: VimKeyboardState['applyCaretState']
-  /** The unnamed register; Agenda rows without an editor yank their selected text into it. */
-  register?: VimKeyboardState['register']
-  setMode: VimKeyboardState['setMode']
-}
-
-/**
- * Commit a pending Replace edit as one edit without rewriting the DOM, then return to Normal. The
- * visible text already equals the committed text, so callers that keep acting on the selection
- * (cut/paste/select-all) must preserve it. No-op outside Replace mode.
- */
-function commitPendingReplace(vim: VimTextCommandState | undefined, input: HTMLElement): void {
-  if (vim === undefined || vim.mode !== 'replace') return
-  vim.finishReplace?.(input, false, true)
-  vim.setMode('normal')
-}
-
-/**
- * Resolve renderer-local session state before an application command that edits the focused node's
- * text through the store (`Cmd+V`/`Cmd+X`, context-menu Paste/Cut, and the native paste fallback).
- * A pending Replace edit commits as one edit first and returns to Normal without rewriting the DOM,
- * so a following Cut or Paste acts on what the user still sees selected. Insert repeat bookkeeping
- * is discarded while Insert mode stays active. Whole-node Visual mode and its range are untouched;
- * otherwise the unfinished command and both
- * character Visual endpoints clear while character Visual mode stays active.
- */
-export function finishVimSessionBeforeTextEdit(vim: VimTextCommandState | undefined, input: HTMLElement): void {
-  if (vim === undefined) return
-  if (vim.mode === 'replace') {
-    commitPendingReplace(vim, input)
-  } else if (vim.mode === 'insert') {
-    vim.finishInsert?.(input)
-    return
-  } else if (vim.mode === 'visual-node') return
-  clearCommandAssembly(vim.commandState)
-}
-
-/**
- * Finishes a pending Insert or Replace session before a command that moves focus off the current
- * node (`Cmd+.`, `Cmd+,`, `Cmd+Backspace`, undo, redo). A pending Insert session's text is already
- * live in the store, so consuming it without `completed` records nothing and keeps the previous
- * repeatable change, per PRODUCT §20.2.19; a pending Replace session commits its buffered text and
- * returns to Normal mode, matching the documented undo/redo rule. Character Visual mode's stale
- * command assembly clears while the mode stays active, and whole-node Visual mode ends because its
- * range belongs to the displayed level being left.
- */
-function finishVimSessionBeforeNavigation(vim: VimKeyboardState | undefined, input: HTMLElement): void {
-  vim?.finishInsert(input)
-  clearCommandAssemblyBeforeCommand(vim)
-  if (vim?.mode !== 'replace') return
-  vim.finishReplace(input, false)
-  vim.setMode('normal')
 }
 
 export function executeEditorContextMenuCommand(
@@ -134,10 +54,10 @@ export function executeEditorContextMenuCommand(
   if (command === 'copy' && selection.start !== selection.end) {
     void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
   } else if (command === 'cut' && selection.start !== selection.end) {
-    finishVimSessionBeforeTextEdit(vim, input)
+    prepareVimCommand(vim, 'text-edit', input)
     void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
   } else if (command === 'paste') {
-    finishVimSessionBeforeTextEdit(vim, input)
+    prepareVimCommand(vim, 'text-edit', input)
     void store.paste(node.id, getCaret(input)).catch((error: unknown) => store.reportError(error))
   }
 }
@@ -231,13 +151,13 @@ export function createEditorKeyDownHandler({
       }
       if (primary && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
         event.preventDefault()
-        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        prepareVimCommand(vim, 'navigation', event.currentTarget)
         store.closeAgenda()
         return
       }
       if (primary && event.key === '.') {
         event.preventDefault()
-        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        prepareVimCommand(vim, 'navigation', event.currentTarget)
         store.closeAgenda()
         store.selectNode(node.id, getCaret(event.currentTarget))
         store.enter()
@@ -247,14 +167,14 @@ export function createEditorKeyDownHandler({
       if (primary && event.key === ',') {
         event.preventDefault()
         if (agenda.focusedDay !== undefined) {
-          finishVimSessionBeforeNavigation(vim, event.currentTarget)
+          prepareVimCommand(vim, 'navigation', event.currentTarget)
           store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
         }
         return
       }
       if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
         event.preventDefault()
-        clearCommandAssemblyBeforeCommand(vim)
+        prepareVimCommand(vim, 'command')
         store.applyAgenda({ kind: 'toggle-fold', key: agenda.selectedKey })
         return
       }
@@ -266,7 +186,7 @@ export function createEditorKeyDownHandler({
         event.key.toLowerCase() === 'o'
       ) {
         event.preventDefault()
-        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        prepareVimCommand(vim, 'navigation', event.currentTarget)
         store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
         return
       }
@@ -276,7 +196,7 @@ export function createEditorKeyDownHandler({
         (((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !primary) ||
           (vim?.mode === 'normal' && event.ctrlKey && (event.key === 'd' || event.key === 'u')))
       ) {
-        finishVimSessionBeforeNavigation(vim, event.currentTarget)
+        prepareVimCommand(vim, 'navigation', event.currentTarget)
         createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
         return
       }
@@ -457,8 +377,7 @@ export function createEditorKeyDownHandler({
       // or character Visual endpoints. A pending Replace edit commits first without rewriting the
       // DOM, because the select-all feedback render would otherwise rewind the visible replacement
       // to the stored text.
-      commitPendingReplace(vim, event.currentTarget)
-      clearCommandAssemblyBeforeCommand(vim)
+      prepareVimCommand(vim, 'selection-command', event.currentTarget)
       const input = event.currentTarget
       selectAll(input)
       globalThis.queueMicrotask(() => {
@@ -475,7 +394,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       // A paste edits this node's text, so any session or command assembly describing the old text
       // must resolve before the store changes.
-      finishVimSessionBeforeTextEdit(vim, event.currentTarget)
+      prepareVimCommand(vim, 'text-edit', event.currentTarget)
       void store.paste(node.id, getCaret(event.currentTarget)).catch((error: unknown) => store.reportError(error))
     } else if (primary && event.key.toLowerCase() === 'x') {
       const selection = getSelectionRange(event.currentTarget)
@@ -483,23 +402,23 @@ export function createEditorKeyDownHandler({
         event.preventDefault()
         // A cut edits this node's text; resolve the session first and preserve the visible selection
         // so the cut removes exactly what the user selected.
-        finishVimSessionBeforeTextEdit(vim, event.currentTarget)
+        prepareVimCommand(vim, 'text-edit', event.currentTarget)
         void store.cut(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
       }
     } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
       event.preventDefault()
-      finishVimSessionBeforeNavigation(vim, event.currentTarget)
+      prepareVimCommand(vim, 'navigation', event.currentTarget)
       store.openAgenda(getCaret(event.currentTarget))
     } else if (primary && event.key === '.') {
       event.preventDefault()
-      finishVimSessionBeforeNavigation(vim, event.currentTarget)
+      prepareVimCommand(vim, 'navigation', event.currentTarget)
       store.enter()
       vim?.syncImageCaretToFocus()
     } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'e') {
       // Toggles the selected node's own fold like `za`. The caret and the Insert session are
       // untouched, so only the unfinished command assembly clears.
       event.preventDefault()
-      clearCommandAssemblyBeforeCommand(vim)
+      prepareVimCommand(vim, 'command')
       store.applyFold('toggle', node.id)
     } else if (primary && event.key === 'Enter') {
       // Every Cmd-modified Enter is claimed so it can never fall through to node creation; only the
@@ -510,8 +429,7 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       if (event.shiftKey || event.altKey) return
       const range = vim?.mode === 'visual-node' ? vim.nodeVisual.selection() : undefined
-      commitPendingReplace(vim, event.currentTarget)
-      clearCommandAssemblyBeforeCommand(vim)
+      prepareVimCommand(vim, 'selection-command', event.currentTarget)
       store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
     } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
       event.preventDefault()
@@ -520,22 +438,16 @@ export function createEditorKeyDownHandler({
       }
     } else if (primary && event.key === ',') {
       event.preventDefault()
-      finishVimSessionBeforeNavigation(vim, event.currentTarget)
+      prepareVimCommand(vim, 'navigation', event.currentTarget)
       store.leave()
       vim?.syncImageCaretToFocus()
     } else if (primary && event.key === 'Backspace') {
       event.preventDefault()
-      finishVimSessionBeforeNavigation(vim, event.currentTarget)
+      prepareVimCommand(vim, 'navigation', event.currentTarget)
       store.deleteSelected()
     } else if (primary && event.key.toLowerCase() === 'z') {
       event.preventDefault()
-      if (vim?.mode === 'replace') {
-        vim.finishReplace(event.currentTarget, true)
-        vim.setMode('normal')
-      } else if (vim?.mode === 'insert') {
-        vim.finishInsert(event.currentTarget)
-      }
-      clearCommandAssemblyBeforeCommand(vim)
+      prepareVimCommand(vim, 'history', event.currentTarget)
       if (event.shiftKey) store.redo()
       else store.undo()
       vim?.syncImageCaretToFocus()

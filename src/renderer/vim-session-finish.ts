@@ -10,14 +10,18 @@ import {
   type VimCommandState,
 } from './vim-command-state'
 import {
+  beginReplaceClick,
+  continueReplaceClickAfterBlur,
   insertRepeatChange,
   resolveReplaceCommit,
   takeInsertSession,
   takeReplaceSession,
+  takeReplaceClick,
   type VimEditSessionState,
 } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
 import type { NodeVisualSelection } from './node-input-types'
+import type { VimKeyboardState } from './vim-keyboard-types'
 
 type Authority = { nodeId?: string; caret: VimCaretState }
 type ApplyCaretState = (
@@ -27,6 +31,156 @@ type ApplyCaretState = (
   timing?: 'immediate' | 'after-edit' | 'preserve-selection',
 ) => void
 type FinishReplace = (input?: HTMLElement, retreatCursor?: boolean, preserveDomSelection?: boolean) => boolean
+
+/** Live session handles shared by keyboard, pointer, search and view commands. */
+export interface VimTextCommandState {
+  mode: VimKeyboardState['mode']
+  commandState: VimKeyboardState['commandState']
+  finishReplace?: VimKeyboardState['finishReplace']
+  finishInsert?: VimKeyboardState['finishInsert']
+  getCaretState?: VimKeyboardState['getCaretState']
+  applyCaretState?: VimKeyboardState['applyCaretState']
+  register?: VimKeyboardState['register']
+  nodeVisual?: Pick<VimKeyboardState['nodeVisual'], 'exit'>
+  setMode: VimKeyboardState['setMode']
+}
+
+type VimCommandInterruption =
+  | 'text-edit'
+  | 'navigation'
+  | 'view-change'
+  | 'search-open'
+  | 'search-jump'
+  | 'history'
+  | 'selection-command'
+  | 'command'
+
+function leaveCommandAssembly(vim: VimTextCommandState): void {
+  clearCommandAssembly(vim.commandState)
+  if (vim.mode !== 'visual-node') return
+  vim.nodeVisual?.exit()
+  vim.setMode('normal')
+}
+
+/**
+ * Resolve the session before an application command. Callers name the interruption rather than
+ * choosing commit flags, clearing owners and changing modes themselves. These policies deliberately
+ * differ: search borrows the current mode, text edits preserve selection, and history retreats the
+ * Replace caret. None captures an Insert change for dot-repeat (PRODUCT §20.2.5/6/19).
+ */
+export function prepareVimCommand(
+  vim: VimTextCommandState | undefined,
+  reason: VimCommandInterruption,
+  input?: HTMLElement,
+): void {
+  if (vim === undefined) return
+  const mode = vim.mode
+
+  switch (reason) {
+    case 'text-edit':
+      if (mode === 'insert') {
+        if (input !== undefined) vim.finishInsert?.(input)
+        return
+      }
+      if (mode === 'visual-node') return
+      if (mode === 'replace') {
+        vim.finishReplace?.(input, false, true)
+        vim.setMode('normal')
+      }
+      clearCommandAssembly(vim.commandState)
+      return
+    case 'navigation':
+      if (input !== undefined) vim.finishInsert?.(input)
+      leaveCommandAssembly(vim)
+      if (vim.mode === 'replace') {
+        vim.finishReplace?.(input, false)
+        vim.setMode('normal')
+      }
+      return
+    case 'view-change':
+      if (input !== undefined) {
+        vim.finishInsert?.(input)
+        if (mode === 'replace') vim.finishReplace?.(input, false)
+      }
+      clearCommandAssembly(vim.commandState)
+      if (mode === 'replace' || mode === 'visual-node') {
+        vim.nodeVisual?.exit()
+        vim.setMode('normal')
+      }
+      return
+    case 'search-open':
+      if (mode === 'replace') vim.finishReplace?.(input, false, true)
+      clearCommandAssembly(vim.commandState)
+      return
+    case 'search-jump':
+      if (input !== undefined) {
+        vim.finishInsert?.(input)
+        vim.finishReplace?.(input, false, true)
+      }
+      return
+    case 'history':
+      if (mode === 'replace') {
+        vim.finishReplace?.(input, true)
+        vim.setMode('normal')
+      } else if (mode === 'insert' && input !== undefined) vim.finishInsert?.(input)
+      leaveCommandAssembly(vim)
+      return
+    case 'selection-command':
+      if (mode === 'replace') {
+        vim.finishReplace?.(input, false, true)
+        vim.setMode('normal')
+      }
+      leaveCommandAssembly(vim)
+      return
+    case 'command':
+      leaveCommandAssembly(vim)
+  }
+}
+
+interface PointerSession {
+  session: VimEditSessionState
+  commandState: VimCommandState
+  getMode(): VimMode
+  changeVimMode(mode: VimMode): void
+  finishVimInsert(input: HTMLElement): void
+  finishVimReplace: FinishReplace
+}
+
+/** DOM adapters supply focus facts; this module owns their effect on the editing session. */
+export function finishVimBlur(
+  deps: PointerSession,
+  nodeId: string,
+  input: HTMLElement | undefined,
+  focus: { verticalArrival: boolean; windowFocused: boolean },
+): void {
+  const { commandState, session } = deps
+  const goal = commandState.verticalGoal
+  clearCommandAssembly(commandState)
+  if (focus.verticalArrival) commandState.verticalGoal = goal
+
+  // Creating a structural Insert session blurs its origin before the new input receives focus.
+  if (input !== undefined && commandState.structuralInsert?.originNodeId !== nodeId) deps.finishVimInsert(input)
+  deps.finishVimReplace()
+  if (deps.getMode() === 'replace' && !continueReplaceClickAfterBlur(session, focus.windowFocused))
+    deps.changeVimMode('normal')
+}
+
+/** Resolve a text press before native selection changes, without committing another node into this input. */
+export function prepareVimPointerPress(
+  deps: PointerSession,
+  nodeId: string,
+  input: HTMLElement,
+  press: { button: number; detail: number; contextMenu: boolean },
+): void {
+  deps.finishVimInsert(input)
+  const replacement = deps.session.replace
+  if (replacement === undefined || replacement.nodeId === nodeId)
+    deps.finishVimReplace(input, false, press.button === 2 || press.detail >= 2)
+
+  takeReplaceClick(deps.session)
+  if (deps.getMode() === 'replace' && press.button === 0 && !press.contextMenu) beginReplaceClick(deps.session)
+  clearCommandAssembly(deps.commandState)
+}
 
 export function finishStructuralInsertSession(deps: { commandState: VimCommandState }, input: HTMLElement): void {
   const { commandState } = deps

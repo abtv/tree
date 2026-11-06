@@ -2,15 +2,17 @@ import type { ClipboardEvent, FocusEvent, MouseEvent, SyntheticEvent } from 'rea
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import { getCaret, getSelectionRange, isCollapsedSelection, readEditableContent, setNormalCaret } from './editor-dom'
+import { executeEditorContextMenuCommand } from './editor-input-handlers'
 import {
-  executeEditorContextMenuCommand,
-  finishVimSessionBeforeTextEdit,
+  finishVimBlur,
+  prepareVimCommand,
+  prepareVimPointerPress,
   type VimTextCommandState,
-} from './editor-input-handlers'
+} from './vim-session-finish'
 import type { NodeInputBindings } from './NodeInput'
-import { clearCommandAssembly, type VimCommandState } from './vim-command-state'
+import type { VimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
-import { beginReplaceClick, beginReplaceSession, takeReplaceClick, type VimEditSessionState } from './vim-edit-session'
+import { beginReplaceSession, takeReplaceClick, type VimEditSessionState } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
 import type { EditorServices } from '../application/editor-store-types'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
@@ -67,8 +69,6 @@ export function createPointerHandlers(
     readAuthority,
     applyCaretState,
     changeVimMode,
-    finishVimInsert,
-    finishVimReplace,
     setSelectAllNodeId,
     shortcuts = APPLE_SHORTCUTS,
   } = deps
@@ -94,22 +94,7 @@ export function createPointerHandlers(
         snapshot.status === 'ready' &&
         snapshot.location.selectedNodeId === goal.nodeId &&
         snapshot.focus.token === goal.focusToken
-      clearCommandAssembly(commandState)
-      if (verticalArrival) commandState.verticalGoal = goal
-      // A structural session (o/O/whole-node-Visual c/s) begins by creating a new node and
-      // immediately moving focus onto it, which blurs *this* node as an incidental side effect
-      // before the user has typed anything into the new one. Only finish a structural session
-      // from blur once it is a different node's own blur — the one it actually began on.
-      const structuralBeganHere = commandState.structuralInsert?.originNodeId === node.id
-      if (input !== undefined && !structuralBeganHere) finishVimInsert(input)
-      finishVimReplace()
-      // An ordinary text click keeps Replace mode: its press is still pending when the previous
-      // node blurs, and the destination node continues the mode on release (PRODUCT §20.2.6).
-      // A blur caused by the window losing focus mid-press is not a click.
-      if (getMode() === 'replace') {
-        if (session.replaceClick === true && document.hasFocus()) session.replaceClickMoved = true
-        else changeVimMode('normal')
-      }
+      finishVimBlur(deps, node.id, input, { verticalArrival, windowFocused: document.hasFocus() })
       store.endTextSession()
     },
     onContextMenu: (event: MouseEvent<HTMLElement>) => {
@@ -177,19 +162,11 @@ export function createPointerHandlers(
       setSelectAllNodeId(undefined)
       getInput(node.id)?.classList.remove('select-all')
       store.endTextSession()
-      // Pointer interruption consumes both kinds of Insert bookkeeping without capturing text,
-      // including a same-input press that never produces blur (PRODUCT §20.2.19).
-      finishVimInsert(event.currentTarget)
-      // A right-click opens the context menu, which will run Cut or Paste against the visible
-      // selection, so this commit must not rewrite the DOM; a left click keeps the existing
-      // reset-to-typed-end behavior. A pending replacement of another node is committed by that
-      // node's blur, which must not write its text into this input.
-      const foreignSession = session.replace !== undefined && session.replace.nodeId !== node.id
-      if (!foreignSession) finishVimReplace(event.currentTarget, false, event.button === 2 || event.detail >= 2)
-      takeReplaceClick(session)
-      if (getMode() === 'replace' && event.button === 0 && !shortcuts.isContextMenuClick(event))
-        beginReplaceClick(session)
-      clearCommandAssembly(commandState)
+      prepareVimPointerPress(deps, node.id, event.currentTarget, {
+        button: event.button,
+        detail: event.detail,
+        contextMenu: shortcuts.isContextMenuClick(event),
+      })
     },
     onMouseUp: (event: MouseEvent<HTMLElement>) => {
       if (getMode() === 'replace') {
@@ -241,7 +218,7 @@ export function createPointerHandlers(
     onPaste: (event: ClipboardEvent<HTMLElement>) => {
       setSelectAllNodeId(undefined)
       event.preventDefault()
-      finishVimSessionBeforeTextEdit(vimTextCommandState, event.currentTarget)
+      prepareVimCommand(vimTextCommandState, 'text-edit', event.currentTarget)
       const source = capturePasteClipboard?.(event.clipboardData)
       void store
         .paste(node.id, getCaret(event.currentTarget), source)

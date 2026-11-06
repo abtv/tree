@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
-import { clearCommandAssembly, clearPending } from './vim-command-state'
-import type { VimTextCommandState } from './editor-input-handlers'
+import { appendVimCount, clearCommandAssembly, clearPending } from './vim-command-state'
+import type { VimTextCommandState } from './vim-session-finish'
 import { viewportBounds, viewportScrollEdges, viewportScroller } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
@@ -337,15 +337,7 @@ export function createAgendaKeyDownHandler({
       else store.search.navigate(origin, event.key === 'n' ? 1 : -1, Math.max(1, Number(pending?.count || '1')))
       return
     }
-    if (textMode && !event.ctrlKey && !event.altKey && /^[0-9]$/u.test(event.key)) {
-      if (event.key !== '0' || pending?.count) {
-        vim.commandState.pending =
-          pending?.operator === undefined
-            ? { count: `${pending?.count ?? ''}${event.key}`, motionCount: '' }
-            : { ...pending, motionCount: `${pending.motionCount}${event.key}` }
-        return
-      }
-    }
+    if (textMode && !event.ctrlKey && !event.altKey && appendVimCount(vim.commandState, event.key, 'agenda-row')) return
     if (textMode && !event.ctrlKey && !event.altKey && event.key === 'g' && pending?.prefix === undefined) {
       vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', prefix: 'g' }
       return

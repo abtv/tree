@@ -9,9 +9,12 @@ import {
   finishPendingEditSessions,
   finishReplaceSession,
   finishStructuralInsertSession,
+  prepareVimCommand,
   switchVimEditing,
+  type VimTextCommandState,
 } from './vim-session-finish'
 import type { VimCaretState } from './vim-caret-transition'
+import type { VimMode } from './vim-editing'
 
 afterEach(() => document.body.replaceChildren())
 
@@ -159,6 +162,137 @@ describe('Replace completion', () => {
       expect(f.applyCaretState).toHaveBeenCalledTimes(1)
     },
   )
+})
+
+describe('command interruption policy', () => {
+  async function commandFixture(initialMode: VimMode) {
+    const f = await fixture()
+    const element = input('Xello') as HTMLTextAreaElement
+    element.setSelectionRange(1, 3)
+    let mode = initialMode
+    let nodeVisual = true
+    const previous = { kind: 'delete' as const, motion: 'l', count: 1 }
+    f.commandState.lastChange = previous
+    f.commandState.pending = { count: '2', motionCount: '' }
+    f.commandState.visualAnchor = 1
+    f.commandState.visualFocus = 3
+    const vim: VimTextCommandState = {
+      get mode() {
+        return mode
+      },
+      commandState: f.commandState,
+      finishInsert: (input, completed) =>
+        finishInsertSession(
+          {
+            ...f.deps,
+            getInput: () => element,
+            finishStructuralInsert: (input) => finishStructuralInsertSession(f.deps, input),
+          },
+          input,
+          completed,
+        ),
+      finishReplace: (input, retreat, preserve) => finishReplaceSession(f.deps, input, retreat, preserve),
+      nodeVisual: {
+        exit: () => {
+          nodeVisual = false
+        },
+      },
+      setMode: (next) => {
+        mode = next
+      },
+    }
+    return { ...f, element, vim, previous, nodeVisual: () => nodeVisual }
+  }
+
+  it.each([
+    { reason: 'text-edit', normal: true, preserve: true, cursor: 1, clear: true },
+    { reason: 'navigation', normal: true, preserve: false, cursor: 1, clear: true },
+    { reason: 'view-change', normal: true, preserve: false, cursor: 1, clear: true },
+    { reason: 'search-open', normal: false, preserve: true, cursor: 1, clear: true },
+    { reason: 'search-jump', normal: false, preserve: true, cursor: 1, clear: false },
+    { reason: 'history', normal: true, preserve: false, cursor: 0, clear: true },
+    { reason: 'selection-command', normal: true, preserve: true, cursor: 1, clear: true },
+  ] as const)('resolves Replace for $reason without losing its command-specific outcome', async (expected) => {
+    const f = await commandFixture('replace')
+    beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 0 })
+    f.session.replace!.typed = 'X'
+
+    prepareVimCommand(f.vim, expected.reason, f.element)
+
+    expect(f.node().text).toBe('Xello')
+    expect(f.session.replace).toBeUndefined()
+    expect(f.vim.mode).toBe(expected.normal ? 'normal' : 'replace')
+    expect(f.commandState.pending === undefined).toBe(expected.clear)
+    expect(f.commandState.visualAnchor === undefined).toBe(expected.clear)
+    expect(f.commandState.lastChange).toEqual({ kind: 'overwrite', text: 'X', replaced: 1 })
+    expect(f.applyCaretState).toHaveBeenCalledWith(
+      'node',
+      { cursor: expected.cursor, imageActive: false },
+      false,
+      expected.preserve ? 'preserve-selection' : 'immediate',
+    )
+    if (expected.preserve) expect([f.element.selectionStart, f.element.selectionEnd]).toEqual([1, 3])
+  })
+
+  it.each([
+    { reason: 'text-edit', consumed: true, clear: false },
+    { reason: 'navigation', consumed: true, clear: true },
+    { reason: 'view-change', consumed: true, clear: true },
+    { reason: 'search-open', consumed: false, clear: true },
+    { reason: 'search-jump', consumed: true, clear: false },
+    { reason: 'history', consumed: true, clear: true },
+    { reason: 'selection-command', consumed: false, clear: true },
+    { reason: 'command', consumed: false, clear: true },
+  ] as const)('preserves Insert mode and previous repeat through $reason', async ({ reason, consumed, clear }) => {
+    const f = await commandFixture('insert')
+    beginInsertSession(f.session, {
+      nodeId: 'node',
+      baseline: 'hello',
+      position: 0,
+      change: { kind: 'insert', entry: 'i' },
+    })
+    beginStructuralOpen(f.commandState, 'origin', 'after')
+
+    prepareVimCommand(f.vim, reason, f.element)
+
+    expect(f.vim.mode).toBe('insert')
+    expect(f.session.insert === undefined).toBe(consumed)
+    expect(f.commandState.structuralInsert === undefined).toBe(consumed)
+    expect(f.commandState.pending === undefined).toBe(clear)
+    expect(f.commandState.lastChange).toBe(f.previous)
+    expect(f.node().text).toBe('hello')
+  })
+
+  it.each(['text-edit', 'navigation', 'view-change', 'history', 'selection-command', 'command'] as const)(
+    'retains a whole-node range only for a text edit (%s)',
+    async (reason) => {
+      const f = await commandFixture('visual-node')
+
+      prepareVimCommand(f.vim, reason, f.element)
+
+      expect(f.nodeVisual()).toBe(reason === 'text-edit')
+      expect(f.vim.mode).toBe(reason === 'text-edit' ? 'visual-node' : 'normal')
+      expect(f.commandState.lastChange).toBe(f.previous)
+    },
+  )
+
+  it('ends a view mode without an editor, while a search jump with no editor leaves sessions alone', async () => {
+    const f = await commandFixture('replace')
+    beginReplaceSession(f.session, { nodeId: 'node', baseline: 'hello', position: 0 })
+    f.session.replace!.typed = 'X'
+
+    prepareVimCommand(f.vim, 'search-jump')
+
+    expect(f.session.replace).toBeDefined()
+    expect(f.vim.mode).toBe('replace')
+
+    prepareVimCommand(f.vim, 'view-change')
+
+    expect(f.vim.mode).toBe('normal')
+    expect(f.nodeVisual()).toBe(false)
+    expect(f.node().text).toBe('hello')
+    expect(f.commandState.pending).toBeUndefined()
+  })
 })
 
 describe('pending edit flush', () => {

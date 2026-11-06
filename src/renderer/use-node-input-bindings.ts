@@ -15,7 +15,8 @@ import {
   updateDateLikeUnderline,
   updateSelectedLinks,
 } from './editor-dom'
-import { createEditorKeyDownHandler, type VimTextCommandState } from './editor-input-handlers'
+import { createEditorKeyDownHandler } from './editor-input-handlers'
+import type { VimTextCommandState } from './vim-session-finish'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { normalCaretTarget } from './link-caret'
 import { characterCaretTransition } from './vim-caret-transition'
@@ -512,6 +513,7 @@ export function useNodeInputBindings({
       finishReplace: (input, retreatCursor, preserveDomSelection) =>
         finishVimReplace(input, retreatCursor, preserveDomSelection),
       finishInsert: finishVimInsert,
+      nodeVisual: { exit: () => setNodeVisualSelection(undefined) },
       register: registerHandle,
       getCaretState: (nodeId, cursor, imageActive) =>
         caretProjection.current.authority.nodeId === nodeId
@@ -520,7 +522,15 @@ export function useNodeInputBindings({
       applyCaretState,
       setMode: changeVimMode,
     }),
-    [finishVimReplace, finishVimInsert, changeVimMode, vimCommandState, registerHandle, applyCaretState],
+    [
+      finishVimReplace,
+      finishVimInsert,
+      changeVimMode,
+      vimCommandState,
+      registerHandle,
+      applyCaretState,
+      setNodeVisualSelection,
+    ],
   )
 
   const moveVimViewport = useCallback(

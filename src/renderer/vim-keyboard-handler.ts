@@ -28,7 +28,6 @@ import {
   textMotion,
 } from './vim-text-commands'
 import type {
-  VimFindCommand,
   VimFoldCommand,
   VimKeyboardState,
   VimPendingCommand,
@@ -38,12 +37,15 @@ import type {
 } from './vim-keyboard-types'
 import { applySurroundEdits, surroundDelimiterKey, surroundLineRange } from './vim-surround'
 import {
+  appendVimCount,
+  beginVimCharacter,
   clearCommandAssembly,
   clearPending,
   clearVisualRange,
   recordRepeatChange,
   rememberTextVisual,
   setVisualRange,
+  takeVimCharacter,
 } from './vim-command-state'
 import { editCaretTransition } from './vim-caret-transition'
 import { navigateVertically } from './vim-vertical-navigation'
@@ -320,22 +322,16 @@ export function handleVimKey(
     return handled()
   }
 
-  if (pending.awaiting !== undefined) {
-    const awaiting = pending.awaiting
-    clearPending(commandState)
-    if (event.key.length !== 1) return handled()
-    if (awaiting === 'r') {
-      if (!visual) applyTextChange(store, node, input, cursor, vim, { kind: 'replace', count, character: event.key })
-      return handled()
-    }
-    const find = { kind: awaiting, character: event.key } as VimFindCommand
-    commandState.lastFind = find
-    const motion = awaiting + event.key
-    if (pending.operator !== undefined && !visual) {
-      applyOperatorMotion(pending.operator, motion, totalCount)
-    } else {
-      const range = textMotion(node.text, motionCursor, motion, count)
-      if (range !== undefined) move(range.target)
+  const character = takeVimCharacter(commandState, event.key)
+  if (character !== undefined) {
+    if (character.kind === 'replace' && !visual) applyTextChange(store, node, input, cursor, vim, character)
+    else if (character.kind === 'find') {
+      if (character.operator !== undefined && !visual)
+        applyOperatorMotion(character.operator, character.motion, character.totalCount)
+      else {
+        const range = textMotion(node.text, motionCursor, character.motion, character.count)
+        if (range !== undefined) move(range.target)
+      }
     }
     return handled()
   }
@@ -506,12 +502,7 @@ export function handleVimKey(
     return handled()
   }
 
-  if (/^[1-9]$/u.test(event.key) || (event.key === '0' && (pending.count !== '' || pending.motionCount !== ''))) {
-    if (pending.operator !== undefined) pending.motionCount += event.key
-    else pending.count += event.key
-    commandState.pending = pending
-    return handled()
-  }
+  if (appendVimCount(commandState, event.key, 'editor')) return handled()
 
   if (pending.operator !== undefined) {
     if (pending.operator !== 's' && event.key === pending.operator && pending.motionCount === '') {
@@ -588,11 +579,7 @@ export function handleVimKey(
       }
       return handled()
     }
-    if ('fFtT'.includes(event.key)) {
-      pending.awaiting = event.key as 'f' | 'F' | 't' | 'T'
-      commandState.pending = pending
-      return handled()
-    }
+    if (beginVimCharacter(commandState, event.key, 'operator')) return handled()
     if (event.key === 'g') {
       pending.prefix = 'g'
       commandState.pending = pending
@@ -624,11 +611,7 @@ export function handleVimKey(
     return handled()
   }
 
-  if ('fFtT'.includes(event.key)) {
-    pending.awaiting = event.key as 'f' | 'F' | 't' | 'T'
-    commandState.pending = pending
-    return handled()
-  }
+  if (beginVimCharacter(commandState, event.key, visual ? 'visual' : 'normal')) return handled()
   if (event.key === ';' || event.key === ',') {
     clearPending(commandState)
     const motion = repeatedFindMotion(commandState.lastFind, event.key === ',')
@@ -636,11 +619,6 @@ export function handleVimKey(
       const range = textMotion(node.text, motionCursor, motion, count)
       if (range !== undefined) move(range.target)
     }
-    return handled()
-  }
-  if (!visual && event.key === 'r') {
-    pending.awaiting = 'r'
-    commandState.pending = pending
     return handled()
   }
   if (!visual && (event.key === 'd' || event.key === 'y' || event.key === 'c')) {

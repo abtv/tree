@@ -1,7 +1,6 @@
-import type { VimTextCommandState } from './editor-input-handlers'
-import { clearPending } from './vim-command-state'
+import type { VimTextCommandState } from './vim-session-finish'
+import { beginVimCharacter, clearPending, takeVimCharacter } from './vim-command-state'
 import { moveWordBackward, moveWordEnd } from './vim-editing'
-import type { VimFindCommand } from './vim-keyboard-types'
 import { copyRange, clampCaret, selectionRange, type RowCaret, type RowCaretMode } from './agenda-row-caret'
 import { isTextMotion, parseCount, repeatedFindMotion, textMotion } from './vim-text-commands'
 import { moveCharacterOffset } from '../domain/text-characters'
@@ -92,14 +91,9 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
     const range = textMotion(text, caret.focus, name, count)
     if (range !== undefined) move(range.target)
   }
-  if (pending?.awaiting !== undefined) {
-    const awaiting = pending.awaiting
-    clearPending(commandState)
-    if (key.length === 1 && awaiting !== 'r') {
-      const find = { kind: awaiting, character: key } as VimFindCommand
-      commandState.lastFind = find
-      motion(awaiting + key, parseCount(pending.count))
-    }
+  const character = takeVimCharacter(commandState, key)
+  if (character !== undefined) {
+    if (character.kind === 'find') motion(character.motion, character.count)
     return true
   }
   if (pending?.prefix === 'g') {
@@ -109,14 +103,7 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
     return true
   }
   if (pending !== undefined && (pending.prefix !== undefined || pending.operator !== undefined)) return false
-  if ('fFtT'.includes(key) && key.length === 1) {
-    commandState.pending = { count: pending?.count ?? '', motionCount: '', awaiting: key as 'f' | 'F' | 't' | 'T' }
-    return true
-  }
-  if (key === 'r' && !visual) {
-    commandState.pending = { count: pending?.count ?? '', motionCount: '', awaiting: 'r' }
-    return true
-  }
+  if (beginVimCharacter(commandState, key, visual ? 'visual' : 'normal')) return true
   const count = parseCount(pending?.count ?? '')
   if (key === ';' || key === ',') {
     clearPending(commandState)

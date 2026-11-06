@@ -104,6 +104,13 @@ export function beginReplaceClick(state: VimEditSessionState, agendaKey?: string
   state.replaceClickAgendaKey = agendaKey
 }
 
+/** A press can carry Replace across input blur only while the window still has focus. */
+export function continueReplaceClickAfterBlur(state: VimEditSessionState, windowFocused: boolean): boolean {
+  if (state.replaceClick !== true || !windowFocused) return false
+  state.replaceClickMoved = true
+  return true
+}
+
 /** End the press intent, reporting whether one was pending. */
 export function takeReplaceClick(state: VimEditSessionState): boolean {
   const pending = state.replaceClick === true

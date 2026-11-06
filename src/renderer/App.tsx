@@ -22,6 +22,7 @@ import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
 import { clearCommandAssembly } from './vim-command-state'
+import { prepareVimCommand } from './vim-session-finish'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { SearchPrompt } from './SearchPrompt'
@@ -183,18 +184,13 @@ export function App({
     [setVimEditing, store],
   )
   const beforeViewChange = useCallback(() => {
-    const mode = vimTextCommandState.mode
     const active = document.activeElement
-    if (active instanceof HTMLElement && active.matches('.node-input')) {
-      vimTextCommandState.finishInsert?.(active)
-      if (mode === 'replace') vimTextCommandState.finishReplace?.(active, false)
-    }
-    clearCommandAssembly(vimTextCommandState.commandState)
-    if (mode === 'replace' || mode === 'visual-node') {
-      setNodeVisualSelection(undefined)
-      vimTextCommandState.setMode('normal')
-    }
-  }, [vimTextCommandState, setNodeVisualSelection])
+    prepareVimCommand(
+      vimTextCommandState,
+      'view-change',
+      active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
+    )
+  }, [vimTextCommandState])
   const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     showAbout,
@@ -234,21 +230,19 @@ export function App({
     restoreEditor: restoreSearchFocus,
     beforeOpen: () => {
       const active = document.activeElement
-      if (vimTextCommandState.mode === 'replace') {
-        vimTextCommandState.finishReplace?.(
-          active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
-          false,
-          true,
-        )
-      }
-      clearCommandAssembly(vimTextCommandState.commandState)
+      prepareVimCommand(
+        vimTextCommandState,
+        'search-open',
+        active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
+      )
     },
     beforeJump: () => {
       const active = document.activeElement
-      if (active instanceof HTMLElement && active.matches('.node-input')) {
-        vimTextCommandState.finishInsert?.(active)
-        vimTextCommandState.finishReplace?.(active, false, true)
-      }
+      prepareVimCommand(
+        vimTextCommandState,
+        'search-jump',
+        active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
+      )
     },
   })
   useEffect(() => {

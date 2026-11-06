@@ -11,7 +11,7 @@ import { pointerCaretTransition, type VimCaretState } from './vim-caret-transiti
 import { beginReplaceClick, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
 import { OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
-import type { VimTextCommandState } from './editor-input-handlers'
+import type { VimTextCommandState } from './vim-session-finish'
 
 afterEach(() => {
   document.body.replaceChildren()

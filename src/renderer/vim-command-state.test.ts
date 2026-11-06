@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { VimFindCommand, VimPendingCommand, VimRepeatChange } from './vim-keyboard-types'
 import {
+  appendVimCount,
+  beginVimCharacter,
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
@@ -15,6 +17,7 @@ import {
   structuralRepeatChange,
   swapNodeVisual,
   takeStructuralInsert,
+  takeVimCharacter,
   type VimCommandState,
 } from './vim-command-state'
 
@@ -58,6 +61,90 @@ describe('createVimCommandState', () => {
     expect(state.visualAnchor).toBeUndefined()
     expect(state.visualFocus).toBeUndefined()
     expect(state.structuralInsert).toBeUndefined()
+  })
+})
+
+describe('pending command input', () => {
+  it.each(['0', 'g', 'ArrowLeft'])('leaves a non-count key available to the command adapter (%s)', (key) => {
+    const state = createVimCommandState()
+
+    expect(appendVimCount(state, key, 'editor')).toBe(false)
+    expect(appendVimCount(state, key, 'agenda-row')).toBe(false)
+    expect(state.pending).toBeUndefined()
+  })
+
+  it.each(['editor', 'agenda-row'] as const)(
+    'accumulates command and operator counts independently (%s)',
+    (surface) => {
+      const state = createVimCommandState()
+      state.lastChange = change
+      state.lastFind = find
+
+      appendVimCount(state, '2', surface)
+      appendVimCount(state, '0', surface)
+      state.pending = { ...state.pending!, operator: 'd' }
+      appendVimCount(state, '3', surface)
+      appendVimCount(state, '0', surface)
+      beginVimCharacter(state, 'f', 'normal')
+      const result = takeVimCharacter(state, 'g')
+
+      expect(result).toEqual({ kind: 'find', count: 20, totalCount: 600, motion: 'fg', operator: 'd' })
+      expect(state.pending).toBeUndefined()
+      expect(state.lastFind).toEqual({ kind: 'f', character: 'g' })
+      expect(state.lastChange).toBe(change)
+    },
+  )
+
+  it.each(['editor', 'agenda-row'] as const)('keeps each surface’s zero and prefix rules (%s)', (surface) => {
+    const state = createVimCommandState()
+    state.pending = { count: '', motionCount: '2', operator: 'd' }
+
+    expect(appendVimCount(state, '0', surface)).toBe(surface === 'editor')
+    expect(state.pending.motionCount).toBe(surface === 'editor' ? '20' : '2')
+
+    state.pending = { count: '2', motionCount: '', prefix: 'g' }
+    appendVimCount(state, '3', surface)
+
+    expect(state.pending).toEqual(
+      surface === 'editor' ? { count: '23', motionCount: '', prefix: 'g' } : { count: '23', motionCount: '' },
+    )
+  })
+
+  it.each(['0', '2', 'g', 'd', '<', 'r'])('treats an awaited command-shaped character as data (%s)', (key) => {
+    const state = populatedState()
+
+    beginVimCharacter(state, 'F', 'normal')
+    const result = takeVimCharacter(state, key)
+
+    expect(result).toEqual({ kind: 'find', count: 2, totalCount: 2, motion: `F${key}`, operator: 'd' })
+    expect(takeVimCharacter(state, key)).toBeUndefined()
+    expect(state.lastFind).toEqual({ kind: 'F', character: key })
+    expect(state.lastChange).toBe(change)
+    expect([state.visualAnchor, state.visualFocus]).toEqual([1, 3])
+  })
+
+  it('cancels a non-character without overwriting the remembered find', () => {
+    const state = populatedState()
+    beginVimCharacter(state, 't', 'visual')
+
+    expect(takeVimCharacter(state, 'ArrowLeft')).toEqual({ kind: 'cancelled' })
+    expect(state.pending).toBeUndefined()
+    expect(state.lastFind).toBe(find)
+  })
+
+  it('begins replacement only in Normal and keeps the last find when consuming it', () => {
+    const state = populatedState()
+    const pending = state.pending
+
+    expect(beginVimCharacter(state, 'r', 'visual')).toBe(false)
+    expect(beginVimCharacter(state, 'r', 'operator')).toBe(false)
+    expect(beginVimCharacter(state, 'Escape', 'normal')).toBe(false)
+    expect(state.pending).toBe(pending)
+
+    beginVimCharacter(state, 'r', 'normal')
+
+    expect(takeVimCharacter(state, '0')).toEqual({ kind: 'replace', count: 2, character: '0' })
+    expect(state.lastFind).toBe(find)
   })
 })
 

@@ -2,6 +2,8 @@ import fc from 'fast-check'
 import { expect, it } from 'vitest'
 import type { VimFindCommand, VimPendingCommand, VimRepeatChange } from './vim-keyboard-types'
 import {
+  appendVimCount,
+  beginVimCharacter,
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
@@ -12,11 +14,46 @@ import {
   recordRepeatChange,
   structuralRepeatChange,
   takeStructuralInsert,
+  takeVimCharacter,
   type VimStructuralInsertSession,
 } from './vim-command-state'
 
 const characterKey = fc.integer({ min: 0x20, max: 0x7e }).map((code) => String.fromCharCode(code))
 const nodeId = fc.string({ minLength: 1, maxLength: 6 })
+
+it('preserves counted find meaning and consumes each sequence once across both surfaces', () => {
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 1, max: 999 }),
+      fc.integer({ min: 1, max: 999 }),
+      fc.constantFrom('f', 'F', 't', 'T'),
+      characterKey,
+      fc.constantFrom('editor' as const, 'agenda-row' as const),
+      (count, motionCount, command, character, surface) => {
+        const state = createVimCommandState()
+        const remembered = { kind: 'delete' as const, motion: 'w', count: 1 }
+        state.lastChange = remembered
+
+        for (const digit of String(count)) appendVimCount(state, digit, surface)
+        state.pending = { ...state.pending!, operator: 'd' }
+        for (const digit of String(motionCount)) appendVimCount(state, digit, surface)
+        beginVimCharacter(state, command, 'normal')
+        const completed = takeVimCharacter(state, character)
+
+        expect(completed).toEqual({
+          kind: 'find',
+          count,
+          totalCount: count * motionCount,
+          motion: command + character,
+          operator: 'd',
+        })
+        expect(takeVimCharacter(state, character)).toBeUndefined()
+        expect(state.lastChange).toBe(remembered)
+        expect(state.lastFind).toEqual({ kind: command, character })
+      },
+    ),
+  )
+})
 
 const sessionArbitrary: fc.Arbitrary<VimStructuralInsertSession> = fc.oneof(
   fc.record({
