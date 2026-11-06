@@ -94,9 +94,39 @@ it('collects the entire document, deduplicates exact spelling and ranks like emo
 
   expect(catalog.suggest('input', '#', 1)?.suggestions).toEqual(['Work', 'bobcat', 'cat', 'cat2', 'joy-cat', 'work'])
   expect(catalog.suggest('input', '#cat', 4)?.suggestions).toEqual(['cat', 'cat2', 'joy-cat', 'bobcat'])
-  expect(catalog.suggest('input', '#W', 2)?.suggestions).toEqual(['Work'])
-  expect(catalog.suggest('input', '#wk', 3)?.suggestions).toEqual(['work'])
+  expect(catalog.suggest('input', '#W', 2)?.suggestions).toEqual(['Work', 'work'])
+  expect(catalog.suggest('input', '#wk', 3)?.suggestions).toEqual(['Work', 'work'])
   expect(catalog.suggest('input', '#absent', 7)).toBeUndefined()
+})
+
+// @requirement PRODUCT.md §20.13
+it('ignores case for matching while preserving distinct names, draft exclusions and membership', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('a', '#Work'), node('b', '#work #План #𐐀bc')] })
+
+  expect(catalog.searchSuggestions('#WORK')).toEqual(['Work', 'work'])
+  expect(catalog.searchSuggestions('#пл')).toEqual(['План'])
+  expect(catalog.searchSuggestions('#𐐨B')).toEqual(['𐐀bc'])
+  expect(catalog.has('WORK')).toBe(false)
+  expect(catalog.has('Work')).toBe(true)
+  expect(catalog.suggest('a', '#W', 2)?.suggestions).toEqual(['work'])
+  expect(catalog.suggest('draft', '#Fresh #fr', 10)?.suggestions).toEqual(['Fresh'])
+
+  catalog.update({ roots: [node('b', '#work')] })
+
+  expect(catalog.searchSuggestions('#WORK')).toEqual(['work'])
+  expect(catalog.has('Work')).toBe(false)
+})
+
+// @requirement PRODUCT.md §20.13
+it('matches Greek sigma regardless of case or word-final position', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('a', '#ΟΣ #οσ #ος')] })
+
+  for (const query of ['#ΟΣ', '#οσ', '#ος', '#Σ', '#σ', '#ς']) {
+    expect(catalog.searchSuggestions(query)).toEqual(['ΟΣ', 'ος', 'οσ'])
+  }
+  expect(catalog.has('Οσ')).toBe(false)
 })
 
 // @requirement PRODUCT.md §20.13

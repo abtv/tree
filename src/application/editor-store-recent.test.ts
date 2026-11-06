@@ -131,7 +131,7 @@ it('omits only a sole exact tag suggestion and restores completion when the quer
   expect(store.searchNodeSuggestions('#作')).toEqual([])
   expect(store.searchNodeSuggestions('#p')).toEqual(['p1'])
   expect(store.searchNodeSuggestions('#Wor')).toEqual(['Work'])
-  expect(store.searchNodeSuggestions('#work')).toEqual([])
+  expect(store.searchNodeSuggestions('#work')).toEqual(['Work'])
   expect(store.searchNodeSuggestions('#unknown')).toEqual([])
   expect(store.getSnapshot()).toBe(before)
 

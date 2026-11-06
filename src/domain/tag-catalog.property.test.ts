@@ -25,6 +25,7 @@ it('keeps derived membership equal to literal document tags across edits and und
             ...new Set(document.roots.flatMap((node) => findTags(node.text).map((tag) => tag.name))),
           ].sort()
           expect(catalog.suggest('draft', '#', 1)?.suggestions ?? []).toEqual(expected)
+          expect(catalog.searchSuggestions('#WORK')).toEqual(expected.filter((name) => name.toLowerCase() === 'work'))
         }
         for (const tags of edits) {
           roots = [{ ...roots[0]!, text: tags.map((tag) => `#${tag}`).join(' ') }, roots[1]!]

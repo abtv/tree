@@ -116,7 +116,8 @@ describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
       await popup.getByRole('option').click()
       await window.keyboard.type(' #W')
 
-      await expect(popup.getByRole('option')).toHaveText(['#Work'])
+      await expect(popup.getByRole('option')).toHaveText(['#Work', '#work'])
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`tags-${view}-case.png`)) })
 
       await window.keyboard.press('Escape')
       await window.keyboard.type(' #New_2026-x ')

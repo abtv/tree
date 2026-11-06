@@ -85,7 +85,7 @@ it('matches complete case-sensitive tags, excluding links and prefixes', () => {
   tags.update(document)
 
   expect(tags.searchSuggestions('#')).toEqual(['Work', 'w', 'work', 'worker'])
-  expect(tags.searchSuggestions('#wrk')).toEqual(['work', 'worker'])
+  expect(tags.searchSuggestions('#wrk')).toEqual(['Work', 'work', 'worker'])
   expect(tags.has('new_tag')).toBe(false)
   expect(tags.searchSuggestions('text #w')).toEqual([])
   expect(tags.searchSuggestions('#work #w')).toEqual([])

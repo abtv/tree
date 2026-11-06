@@ -832,6 +832,7 @@ describe('useNodeInputBindings', () => {
 
     expect(f.result.current.completionPopup?.popup.suggestions.map((suggestion) => suggestion.replacement)).toEqual([
       '#Work',
+      '#work',
     ])
 
     f.press('Enter')

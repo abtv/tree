@@ -7,6 +7,11 @@ export interface TagMatch extends TagRange {
   readonly suggestions: readonly string[]
 }
 
+function matchingName(name: string): string {
+  // Fold both directions so contextual lowercase forms (such as final sigma) agree.
+  return name.toLowerCase().toUpperCase()
+}
+
 /** One current-document index. Unchanged immutable subtrees need no rescanning. */
 export class TagCatalog {
   private document: Document | undefined
@@ -67,7 +72,7 @@ export class TagCatalog {
       else this.counts.set(name, next)
       if (previous === 0 || next === 0) membershipChanged = true
       if (previous === 0 || next === 0) {
-        for (const character of new Set(name)) {
+        for (const character of new Set(matchingName(name))) {
           let bucket = this.characters.get(character)
           if (bucket === undefined) {
             bucket = new Set()
@@ -101,8 +106,9 @@ export class TagCatalog {
       if (tag.start !== fragment.start) deltas.set(tag.name, (deltas.get(tag.name) ?? 0) + 1)
     }
     let names = this.names
+    const query = matchingName(fragment.name)
     let smallest: Set<string> | undefined
-    for (const character of new Set(fragment.name)) {
+    for (const character of new Set(query)) {
       const bucket = this.characters.get(character)
       if (bucket === undefined) {
         names = []
@@ -125,7 +131,7 @@ export class TagCatalog {
     const fuzzy: { name: string; rank: readonly number[] }[] = []
     for (const name of names) {
       if ((this.counts.get(name) ?? 0) + (deltas.get(name) ?? 0) <= 0) continue
-      const rank = rankCompletionName(name, fragment.name, '_-', this.rankWorkspace)
+      const rank = rankCompletionName(matchingName(name), query, '_-', this.rankWorkspace)
       if (rank === undefined) continue
       if (rank[0]! < 4) groups[rank[0]!]!.push(name)
       else fuzzy.push({ name, rank })
