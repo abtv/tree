@@ -224,31 +224,35 @@ it('accepts tag suggestions with ordinary completion keys, keeps literal input o
   expect(screen.getByRole('listbox', { name: 'Tags' })).toBeInTheDocument()
 })
 
-it('refreshes on document replacement but does not reopen when visit finishes a buffered edit', () => {
-  const { store, beforeVisit } = setup()
-  let notify: () => void = () => undefined
-  vi.mocked(store.subscribe).mockImplementation((listener) => {
-    notify = listener
-    return () => undefined
-  })
-  const snapshot = store.getSnapshot()
-  if (snapshot.status !== 'ready') throw new Error('Expected ready store')
-  vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
-  const input = screen.getByRole('searchbox')
-  fireEvent.change(input, { target: { value: 'needle' } })
-  vi.mocked(store.searchNodes).mockClear()
-  vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
-
-  act(() => notify())
-  expect(store.searchNodes).toHaveBeenCalledOnce()
-
-  fireEvent.change(input, { target: { value: '' } })
-  beforeVisit.mockImplementation(() => {
+it.each(['keyboard', 'pointer'])(
+  'refreshes on document replacement but does not reopen when %s visit finishes a buffered edit',
+  (path) => {
+    const { store, beforeVisit } = setup()
+    let notify: () => void = () => undefined
+    vi.mocked(store.subscribe).mockImplementation((listener) => {
+      notify = listener
+      return () => undefined
+    })
+    const snapshot = store.getSnapshot()
+    if (snapshot.status !== 'ready') throw new Error('Expected ready store')
     vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
-    notify()
-  })
-  fireEvent.keyDown(input, { key: 'Enter' })
+    const input = screen.getByRole('searchbox')
+    fireEvent.change(input, { target: { value: 'needle' } })
+    vi.mocked(store.searchNodes).mockClear()
+    vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
 
-  expect(screen.queryByRole('dialog')).toBeNull()
-  expect(store.visitRecentNode).toHaveBeenCalledWith('0')
-})
+    act(() => notify())
+    expect(store.searchNodes).toHaveBeenCalledOnce()
+
+    fireEvent.change(input, { target: { value: '' } })
+    beforeVisit.mockImplementation(() => {
+      vi.mocked(store.getSnapshot).mockReturnValue({ ...snapshot, document: { roots: [] } })
+      notify()
+    })
+    if (path === 'keyboard') fireEvent.keyDown(input, { key: 'Enter' })
+    else fireEvent.click(screen.getAllByRole('option')[0]!)
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(store.visitRecentNode).toHaveBeenCalledWith('0')
+  },
+)

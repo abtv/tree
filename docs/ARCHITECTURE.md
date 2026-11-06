@@ -323,7 +323,7 @@ Registry entries declare required capabilities. The command-panel owner derives 
 The renderer command-panel owner captures the application shortcut before editor handlers. It saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions. Named view actions resolve sessions through the existing input owner before dispatching the store's idempotent Agenda open/close methods. They add no document mutation or separate view state.
 
 `captureFocusRestoration` in `editor-dom.ts` owns the shared capture/restore mechanics
-for the command panel, About and browser menu. Editor selections use
+for the command panel, About, global Search and browser menu. Editor selections use
 logical offsets, so text decoration can replace DOM nodes during borrowed focus.
 Native scopes retain each caller's existing textarea, input and document-selection
 support. A disconnected origin is inert. Each caller still decides when to restore,
@@ -614,6 +614,17 @@ Infrastructure should expose narrow interfaces to the application/domain where a
 `recent-nodes.ts` owns the bounded recent-node order and ready label/path projection specified in PRODUCT §20.14. The store records successful content changes and explicit visits independently of selection and undo history. Cached ancestor IDs and sibling slots resolve unchanged paths without rebuilding the document index; a displaced path is found directly in the tree. Only bounded history paths are retained. Runtime publication refreshes the projection before UI notification. The Search popup borrows editor focus and dispatches a store navigation command; it does not mutate document content.
 
 `node-search.ts` owns complete-document result enumeration for Search, reusing the domain literal matcher and recognized tag ranges. The store gates short text and unknown tags and provides suggestions from its existing tag catalog. Scheduled batches yield to input; cancellation releases obsolete generators and their snapshots. Only the active result projection is retained, and the popup windows result rows. The input/completion session stays separate from Vim search and document undo. Searching adds no persistence operations; confirming a result uses the existing recent-node visit transition.
+
+`global-search-session.ts` is the pure renderer-local owner of that popup's current
+query, completed results, pending work, selection, tags and composition. One subscribed
+snapshot replaces parallel React state. It invalidates obsolete callbacks and closes
+before returning a chosen result, so finishing a buffered edit cannot reopen Search
+through document publication. Keyboard and pointer visits share that transition.
+`RecentNodesPopup` adapts input and document notifications, restores focus, and owns
+DOM measurement, scrolling and the rendered row window. The session reuses the
+existing store's MRU, tag and search functions; it adds no index, document scan,
+history or persistence write. Retained memory is bounded by the current displayed
+results and one active request, released on close.
 
 `RecentNodePersistence` coalesces dirty history using the application clock and serializes flushes, retaining dirty state on failure and saving changes arriving during a write. Desktop uses trusted IPC and the file-service queue with an atomic `recent-nodes.json` replacement. Browser uses `preferences/recent-nodes` with existing session guards. Notes replacement clears the history through its existing transaction/journal. History is excluded from notes archives. CPU cost is bounded by retained results and ancestor paths in the common case, with tree search when a cached path moves; scale guards cover structural updates as well as retrieval. No history disk write occurs on the synchronous input path.
 

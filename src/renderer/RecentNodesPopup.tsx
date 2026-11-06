@@ -1,9 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { EditorStore } from '../application/editor-store'
-import type { RecentNode } from '../application/recent-nodes'
 import type { ShortcutProfile } from './shortcut-profile'
-import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
-import { moveSuggestionIndex } from './completion-controller'
+import { captureFocusRestoration } from './editor-dom'
+import { GlobalSearchSession } from './global-search-session'
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 
@@ -29,61 +28,56 @@ export function RecentNodesPopup({
   beforeVisit(): void
   openRef?: { current: (() => void) | undefined }
 }): React.JSX.Element | null {
-  const [items, setItems] = useState<readonly RecentNode[]>()
-  const [selected, setSelected] = useState(0)
-  const [query, setQuery] = useState('')
-  const [completedQuery, setCompletedQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<readonly string[]>([])
-  const [suggestionIndex, setSuggestionIndex] = useState(0)
-  const [pending, setPending] = useState(false)
+  const session = useMemo(
+    () =>
+      new GlobalSearchSession({
+        recent: () => store.recentNodes.getResults(),
+        suggestions: (query) => store.searchNodeSuggestions(query),
+        search: (query, publish) => store.searchNodes(query, publish),
+      }),
+    [store],
+  )
+  const { items, selected, query, completedQuery, suggestions, suggestionIndex, pending } = useSyncExternalStore(
+    session.subscribe,
+    session.getSnapshot,
+  )
   const [windowStart, setWindowStart] = useState(0)
   const input = useRef<HTMLInputElement>(null)
-  const composing = useRef(false)
-  const active = useRef(false)
-  const cancelSearch = useRef<() => void>(() => undefined)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const restore = useRef<() => void>(() => undefined)
 
-  const changeQuery = (value: string, complete = false): void => {
-    cancelSearch.current()
-    setQuery(value)
-    setSelected(0)
+  const resetScroll = (): void => {
     setWindowStart(0)
     if (panel.current) panel.current.scrollTop = 0
-    setSuggestionIndex(0)
-    setSuggestions(complete || composing.current ? [] : store.searchNodeSuggestions(value))
-    setPending(value.startsWith('#') || [...value].length >= 3)
-    if (value === '') {
-      setItems(store.recentNodes.getResults())
-      setCompletedQuery(value)
-      setPending(false)
-      return
-    }
-    cancelSearch.current = store.searchNodes(value, (results) => {
-      setItems(results)
-      setCompletedQuery(value)
-      setPending(false)
-    })
+  }
+  const changeQuery = (value: string): void => {
+    resetScroll()
+    session.edit(value)
+  }
+  const acceptSuggestion = (index?: number): void => {
+    resetScroll()
+    session.acceptSuggestion(index)
+  }
+  const visit = (index?: number): void => {
+    const id = session.takeResult(index)
+    if (id === undefined) return
+    restore.current()
+    beforeVisit()
+    store.visitRecentNode(id)
   }
 
-  useEffect(() => () => cancelSearch.current(), [])
+  useEffect(
+    () => () => {
+      session.close()
+    },
+    [session],
+  )
 
   useEffect(() => {
     const close = (): void => {
-      if (items === undefined) return
-      active.current = false
-      composing.current = false
-      cancelSearch.current()
-      setSuggestions([])
-      setItems(undefined)
-      restore.current()
-    }
-    const visit = (id: string): void => {
-      close()
-      beforeVisit()
-      store.visitRecentNode(id)
+      if (session.close()) restore.current()
     }
     const show = (): void => {
       if (
@@ -93,21 +87,8 @@ export function RecentNodesPopup({
       )
         return
       beforeOpen()
-      active.current = true
-      const origin = document.activeElement
-      const selection =
-        origin instanceof HTMLElement && origin.matches('.node-input') ? getSelectionEndpoints(origin) : undefined
-      restore.current = () => {
-        if (!(origin instanceof HTMLElement) || !origin.isConnected) return
-        origin.focus({ preventScroll: true })
-        if (selection !== undefined) setSelectionRange(origin, selection.anchor, selection.focus)
-      }
-      setItems(store.recentNodes.getResults())
-      setSelected(0)
-      setQuery('')
-      setCompletedQuery('')
-      setPending(false)
-      setSuggestions([])
+      restore.current = captureFocusRestoration()
+      session.open()
       setWindowStart(0)
     }
     if (openRef !== undefined) openRef.current = show
@@ -139,20 +120,19 @@ export function RecentNodesPopup({
           suggestions.length > 0 &&
           (direction !== undefined || (plain && ['Escape', 'Enter', 'Tab'].includes(event.key)))
         ) {
-          if (event.key === 'Escape') setSuggestions([])
-          else if (event.key === 'Enter' || event.key === 'Tab') changeQuery(`#${suggestions[suggestionIndex]!}`, true)
-          else setSuggestionIndex((index) => moveSuggestionIndex(index, direction!, suggestions.length))
+          if (event.key === 'Escape') session.dismissSuggestions()
+          else if (event.key === 'Enter' || event.key === 'Tab') acceptSuggestion()
+          else session.moveSuggestion(direction!)
         } else if (event.key === 'Escape') close()
         else if (pending && ['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
           event.preventDefault()
           event.stopImmediatePropagation()
           return
         } else if (event.key === 'Enter') {
-          const item = items[selected]
-          if (item !== undefined) visit(item.id)
+          visit()
         } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-          const next = moveSuggestionIndex(selected, event.key === 'ArrowDown' ? 1 : -1, items.length)
-          setSelected(next)
+          session.moveResult(event.key === 'ArrowDown' ? 1 : -1)
+          const next = session.getSnapshot().selected
           if (panel.current) {
             const top = next * 52
             const visibleTop = panel.current.scrollTop + RESULT_EDGE_INSET
@@ -255,18 +235,17 @@ export function RecentNodesPopup({
     const initial = store.getSnapshot()
     let document = initial.status === 'ready' ? initial.document : undefined
     return store.subscribe(() => {
-      if (!active.current) return
+      if (session.getSnapshot().items === undefined) return
       const state = store.getSnapshot()
       if (state.status !== 'ready') {
-        cancelSearch.current()
-        active.current = false
-        setItems(undefined)
+        session.close()
         return
       }
       const next = state.status === 'ready' ? state.document : undefined
       if (next === document) return
       document = next
-      changeQuery(query)
+      resetScroll()
+      session.refresh()
     })
   })
 
@@ -285,12 +264,11 @@ export function RecentNodesPopup({
         data-editor-focus-borrow=""
         onChange={(event) => changeQuery(event.target.value)}
         onCompositionStart={() => {
-          composing.current = true
-          setSuggestions([])
+          session.beginComposition()
         }}
         onCompositionEnd={(event) => {
-          composing.current = false
-          changeQuery(event.currentTarget.value)
+          resetScroll()
+          session.endComposition(event.currentTarget.value)
         }}
       />
       {suggestions.length > 0 && (
@@ -304,7 +282,7 @@ export function RecentNodesPopup({
                 aria-selected={index === suggestionIndex}
                 className={`node-search-tag${index === suggestionIndex ? ' command-row-selected' : ''}`}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => changeQuery(`#${name}`, true)}
+                onClick={() => acceptSuggestion(index)}
                 ref={(element) => {
                   if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
                 }}
@@ -365,16 +343,7 @@ export function RecentNodesPopup({
                   className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
                   style={{ position: 'absolute', top: index * 52, height: 52, width: '100%', boxSizing: 'border-box' }}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    if (pending) return
-                    active.current = false
-                    composing.current = false
-                    cancelSearch.current()
-                    setItems(undefined)
-                    restore.current()
-                    beforeVisit()
-                    store.visitRecentNode(item.id)
-                  }}
+                  onClick={() => visit(index)}
                 >
                   <span className="recent-node-text">{item.text}</span>
                   <span className="recent-node-path">
