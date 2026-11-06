@@ -13,8 +13,10 @@ import {
   screenshotContentSize,
   seedDocument,
   setAgendaToday,
+  setMainWindowBounds,
   setMainWindowContentSize,
   test,
+  tryReadWindowBounds,
 } from './fixtures'
 
 async function expectFocused(row: Locator): Promise<void> {
@@ -392,6 +394,10 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     async ({ userDataDir }) => {
       seed(userDataDir)
       const { window, app } = await launchTree(userDataDir)
+
+      // Settle native geometry persistence before checking that Agenda creates no files.
+      await setMainWindowBounds(app, { width: 900, height: 600 })
+      await expect.poll(() => tryReadWindowBounds(userDataDir)).toMatchObject({ width: 900, height: 600 })
 
       await setAgendaToday(window)
       const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
