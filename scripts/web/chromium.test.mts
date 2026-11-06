@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { containerArguments, containerSourceFiles, run, runSmoke, runElectron } from './chromium.mts'
+import { containerArguments, containerSourceFiles, run, runSmoke, runElectron, runMemory } from './chromium.mts'
 import { dependencyImage } from './chromium-image.mts'
 
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }))
@@ -12,26 +12,32 @@ it('rejects all supplied arguments before accessing Docker', () => {
     expect(() => run([arg])).toThrow('accepts no arguments')
     expect(() => runSmoke([arg])).toThrow('accepts no arguments')
     expect(() => runElectron([arg])).toThrow('accepts no arguments')
+    expect(() => runMemory([arg])).toThrow('accepts no arguments')
   }
   expect(spawn).not.toHaveBeenCalled()
 })
 
-it('runs the fixed Electron suite without copying macOS baselines or weakening isolation', () => {
+it.each([
+  ['electron', runElectron],
+  ['memory', runMemory],
+] as const)('runs the fixed %s suite without copying macOS baselines or weakening isolation', (mode, runSuite) => {
   const id = `sha256:${'d'.repeat(64)}`
   spawn
     .mockReturnValueOnce({ status: 0, stdout: `${id}\n` } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 0, stdout: Buffer.from('archive') } as ReturnType<typeof spawnSync>)
     .mockReturnValueOnce({ status: 8 } as ReturnType<typeof spawnSync>)
 
-  expect(runElectron([])).toBe(8)
+  expect(runSuite([])).toBe(8)
   expect(spawn.mock.calls[2]).toEqual([
     'docker',
-    [...containerArguments(id), 'electron'],
+    [...containerArguments(id), mode],
     { input: Buffer.from('archive'), stdio: ['pipe', 'inherit', 'inherit'] },
   ])
   const files = spawn.mock.calls[1]![1]!
 
   expect(files).toContain('config/testing/playwright.linux.config.ts')
+  expect(files).toContain('config/testing/playwright.memory.config.ts')
+  expect(files).toContain('e2e/electron/shared-application-memory.spec.ts')
   expect(files).toContain('config/testing/electron-platforms.ts')
   expect(files).toContain('e2e/electron/shared-application.spec.ts')
   expect(files.some((path) => path.includes('-snapshots/'))).toBe(false)

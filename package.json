@@ -63,7 +63,7 @@
     "test:e2e": "npm run build && playwright test -c config/testing/playwright.config.ts",
     "test:e2e:linux": "node scripts/web/linux-electron.mts",
     "test:e2e:diagnose": "node scripts/e2e-diagnose.mts",
-    "test:e2e:memory": "npm run test:e2e -- --config=config/testing/playwright.memory.config.ts",
+    "test:e2e:memory": "node scripts/web/linux-memory.mts",
     "test:e2e:changed": "npm run build && playwright test -c config/testing/playwright.config.ts --only-changed=HEAD",
     "test:e2e:timing": "npm run test:e2e:diagnose -- --json-output=test-results/e2e-timing.json --reporter=list,json && node scripts/e2e-timing.mts",
     "test:e2e:visible": "TREE_E2E_VISIBLE=1 npm run test:e2e --",

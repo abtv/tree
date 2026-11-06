@@ -13,7 +13,7 @@ help:
 	@echo "make test-unit      Run unit and property tests with coverage"
 	@echo "make test-smoke     Run all smoke checks on macOS and in Linux Docker"
 	@echo "make test-e2e       Run Electron E2E tests locally and web E2E tests in Docker"
-	@echo "make test-memory    Run Electron memory tests"
+	@echo "make test-memory    Run Linux Electron memory tests in Docker"
 	@echo "make test-perf      Run domain, Electron, web, and Safari comparison benchmarks"
 	@echo "make test-property  Run property tests with increased repetitions"
 	@echo "make test-mutation  Check whether tests detect deliberately introduced bugs"

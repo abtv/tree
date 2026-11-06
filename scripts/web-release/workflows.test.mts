@@ -46,7 +46,10 @@ describe('automatic publication wiring', () => {
     expect(ci.jobs.electron!.needs).toEqual(['check', 'audit', 'version'])
     expect(ci.jobs.electron!.if).toBe("needs.version.outputs.ready == 'true'")
     expect(ci.jobs.electron!.uses).toBe('./.github/workflows/run-electron-e2e-tests.yml')
-    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke', 'electron'])
+    expect(ci.jobs.memory!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.memory!.if).toBe("needs.version.outputs.ready == 'true'")
+    expect(ci.jobs.memory!.uses).toBe('./.github/workflows/run-electron-memory-tests.yml')
+    expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke', 'electron', 'memory'])
     expect(ci.jobs.candidate!.steps).toContainEqual(
       expect.objectContaining({ run: 'node scripts/web-release/cli.mts gate' }),
     )

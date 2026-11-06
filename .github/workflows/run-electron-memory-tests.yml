@@ -1,6 +1,7 @@
 name: Run Electron memory tests
 
 on:
+  workflow_call:
   schedule:
     - cron: '0 4 * * 0'
   workflow_dispatch:
@@ -14,14 +15,16 @@ concurrency:
 
 jobs:
   audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Audit Electron memory dependencies
     uses: ./.github/workflows/audit-dependencies.yml
     with:
       caller: e2e-memory
   memory:
     needs: audit
+    if: ${{ !cancelled() && (needs.audit.result == 'success' || needs.audit.result == 'skipped') }}
     name: Run Electron memory tests
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Check out repository
@@ -36,8 +39,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Linux display dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Build application
+        run: npm run build
+
       - name: Run shared and fresh memory measurements
-        run: npm run test:e2e:memory -- --reporter=list,json
+        run: xvfb-run --auto-servernum npx playwright test -c config/testing/playwright.memory.config.ts --reporter=list,json
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: reports/e2e-memory.json
 

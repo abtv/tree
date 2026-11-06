@@ -71,6 +71,12 @@ jobs:
     if: needs.version.outputs.ready == 'true'
     uses: ./.github/workflows/run-electron-e2e-tests.yml
 
+  memory:
+    name: Run release Electron memory tests
+    needs: [check, audit, version]
+    if: needs.version.outputs.ready == 'true'
+    uses: ./.github/workflows/run-electron-memory-tests.yml
+
   version:
     name: Detect release version
     runs-on: ubuntu-24.04
@@ -94,7 +100,7 @@ jobs:
 
   candidate:
     name: Check release version
-    needs: [check, audit, version, chrome, smoke, electron]
+    needs: [check, audit, version, chrome, smoke, electron, memory]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3

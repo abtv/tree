@@ -17,7 +17,7 @@ commit. It runs no tests, makes no network requests and creates no tag.
 Optional `-- minor` and `-- major` select those increments. Push or merge the
 commit into `main` using the normal development workflow.
 
-The `Test and build app` main workflow runs code checks, audit, browser and full macOS Electron E2E, and
+The `Test and build app` main workflow runs code checks, audit, browser and Linux/macOS Electron E2E, Linux Electron memory measurements, and
 Linux/macOS smoke once. After success it dispatches the versioned release, whose
 Web and macOS branches run independently. The macOS branch calls
 `create-macos-release-draft.yml`.
@@ -48,7 +48,9 @@ The successful source workflow already checked code and audited its lockfile.
 Desktop preparation does not repeat formatting, lint, type checks, ordinary
 tests, audit or development Electron smoke. It installs the same locked
 dependencies, builds the checked source and verifies the newly packaged artifact.
-Full macOS Electron E2E gates every new release version in the source workflow.
+Full Linux/macOS Electron E2E and Linux Electron memory measurements gate every new release version in the source workflow.
+The memory suite checks resource invariants and records memory usage; it does not enforce a growth budget.
+See [memory detection limits](DEVELOPMENT.md#what-the-memory-suite-can-detect).
 Local E2E and timing suites follow the development change-risk rules. No dependency upgrades are automatic.
 
 If E2E or another validation prerequisite fails, select **Re-run failed jobs** in `Test and build app`.

@@ -81,7 +81,7 @@ less frequent checks.
 | `make test-unit` | Unit and property tests with coverage | `npm run test:coverage` |
 | `make test-smoke` | All macOS smoke checks and Linux smoke checks in Docker | `npm run build`, `npm run test:safari`, `npm run test:smoke:electron`, `npm run test:smoke:chromium`, `npm run test:smoke:safari`, `npm run test:smoke:linux` |
 | `make test-e2e` | Local Electron E2E and web E2E in offline Docker Chromium | `npm run test:e2e`, `npm run test:web:chromium` |
-| `make test-memory` | Electron memory tests | `npm run test:e2e:memory` |
+| `make test-memory` | Linux Electron memory tests in Docker | `npm run test:e2e:memory` |
 | `make test-perf` | Domain, Electron, web, and Safari comparison benchmarks | `npm run test:performance`, `npm run test:perf`, `npm run test:perf:safari` |
 | `make test-property` | Property tests with increased repetitions | `npm run test:property` |
 | `make test-mutation` | Check whether tests detect deliberately introduced bugs | `npm run test:mutation` |
@@ -309,9 +309,21 @@ For Codex, Claude Code, and OpenCode, prefer `npm run test:e2e:visible -- <spec>
 
 Use `npm run test:e2e:timing` to rebuild and measure the complete hidden E2E suite. It writes the Playwright JSON report to `test-results/e2e-timing.json` and prints wall time, summed test time, duration buckets, per-file and editing-mode totals, the slowest tests, launch counts, launch phases, and fixture teardown time. Wall time covers Playwright execution, excluding the build and report summary; test totals include retry attempts. Each `launchTree` call records cleanup, Electron launch, first-window retrieval, and post-launch assertion durations as test annotations. The summary checks that these phases account for total launch time within 10%. Preserve the JSON report outside `test-results/` before another run when comparing measurements, and run timing and other Playwright invocations sequentially.
 
-The ordinary E2E configuration excludes only `e2e/electron/shared-application-memory.spec.ts`. All reset/recovery tests remain in `e2e/electron/shared-application.spec.ts`. Run both long measurements with `npm run test:e2e -- --config=config/testing/playwright.memory.config.ts`; preview the two sets with `npm run test:e2e -- --list` and `npm run test:e2e -- --config=config/testing/playwright.memory.config.ts --list`. The memory configuration inherits the ordinary worker, isolation, cleanup and retry settings but replaces its projects with one memory-only project. It requires hidden execution and retains twelve eight-cycle bursts per control, existing resource assertions, annotations and JSON attachments. `TREE_E2E_MEMORY_BURST_SIZE` remains available for longer investigations.
+The ordinary E2E configuration excludes only `e2e/electron/shared-application-memory.spec.ts`. All reset/recovery tests remain in `e2e/electron/shared-application.spec.ts`. Run both long measurements on Linux with `npm run test:e2e:memory` (or `make test-memory`), without arguments, using the prepared local Docker image described under [Chromium container tests](#chromium-container-tests). CI builds Electron and invokes the memory configuration directly under Xvfb. The memory configuration inherits ordinary isolation and cleanup, but uses one worker, no retries and one memory-only project. A failed measurement fails the run instead of becoming a passing retry. It requires hidden execution and retains twelve eight-cycle bursts per control, existing resource assertions, annotations and JSON attachments. Direct diagnostic runs through `test:e2e:diagnose` remain available on the host; `TREE_E2E_MEMORY_BURST_SIZE` changes their measurement length, not the fixed container command.
 
-The `Run Electron memory tests` workflow owns these measurements on macOS: weekly on Sunday at 04:00 UTC and on manual dispatch. It does not run on pull requests or pushes and does not gate browser publication. It uploads the JSON report, both sample attachments and failure traces. Ordinary CI uses the platform regression subsets and `npm run check:full` uses the full regression configuration; they do not run the long memory controls. For related infrastructure changes, run the memory command locally as well as the required validation tier. These measurements remain required before broader reuse adoption under ADR 0021.
+The `Run Electron memory tests` workflow owns these measurements on Ubuntu: weekly on Sunday at 04:00 UTC, on manual dispatch, and as a reusable prerequisite for a new release version in `Test and build app`. Release runs reuse the caller's dependency audit. The publication gate requires memory success alongside browser and Electron E2E success; missing, failed, cancelled or skipped memory results block a release. Non-release pushes and pull requests skip the release suites. The workflow uploads the JSON report, both sample attachments and failure traces. `npm run check:full` retains the ordinary regression configuration and does not run these long controls. For related infrastructure changes, run the memory command locally as well as the required validation tier. These measurements remain required before broader reuse adoption under ADR 0021.
+
+#### What the memory suite can detect
+
+This is a resource-invariant gate and a measurement report, not an automated memory-growth budget. It asserts one window, one window renderer, one Tab process and zero pending/error IPC operations at each sample. Renderer heap, main-process heap, native working sets and listener counts are recorded, but their sizes and trends are not asserted. Shared and fresh samples are not compared automatically, and previous commits are not used as a baseline. A large increase in any recorded memory value can therefore pass if the resource assertions still hold; making the suite a release prerequisite does not change that limitation.
+
+The scenario edits two short rows, samples once per eight cycles and reloads the shared renderer after every cycle. The fresh control restarts the whole application. Neither measures a long uninterrupted editing session, large documents, images, search or Agenda use. Reload and forced renderer garbage collection can hide retention that matters before reload or collection, and sparse sampling can miss transient peaks. The first burst is available for warm-up analysis but the suite performs no trend analysis itself. The fresh control alone cannot detect accumulation across launches because each launch starts a new process.
+
+Linux results do not establish macOS native-memory behavior. Local arm64 Docker and GitHub's Ubuntu runner are different measurement environments; historical macOS measurements below are not Linux budgets. Electron reports native working sets in kilobytes, whereas the renderer protocol and Node heap values use bytes. Working sets include memory shared with other processes, so summing them does not measure unique physical memory. See the [Electron memory structure](https://www.electronjs.org/docs/latest/api/structures/memory-info).
+
+To turn the report into an automatic degradation detector, first collect repeated Linux runs to estimate noise. Then set explicit post-warm-up retained-heap growth and native working-set budgets, compare early and late sample groups, and add a sustained session without renderer reload. Keep an absolute ceiling or a reviewed baseline as well: comparing shared with fresh alone misses regressions affecting both. Verify the detector with deliberately retained allocations above its budget and smaller allocations below it. Thresholds can still miss slow leaks, unexercised workflows and platform-specific regressions; no finite run proves memory remains bounded indefinitely.
+
+#### Historical macOS memory evidence
 
 The memory separation on 2026-10-15 preserved the original combined coverage as disjoint sets of 785 ordinary and two memory cases, including all 16 ordinary shared-application infrastructure cases. Both memory controls passed with their sample attachments; the shared and fresh controls took 32.12 s and 74.55 s. One sequential same-host hidden six-worker comparison passed the original 787 cases in 219.31 s and the 785 ordinary cases in 195.45 s, excluding builds of 0.61 s and 0.70 s. Ordinary launches fell from 802 to 705. The 23.86 s / 10.9% wall-time reduction is one local comparison with host variance; separate scheduling moves the memory work rather than eliminating it. This result is separate from the reuse rollout measured below.
 
@@ -508,13 +520,20 @@ dependencies, or accept other advisories.
 
 Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
 
-Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke or Electron E2E modes; it cannot select external scripts, profiles, origins or Docker options.
+Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke, Electron E2E or memory modes; it cannot select external scripts, profiles, origins or Docker options.
 
 Use `npm run test:e2e:linux`, without arguments, for the Linux Electron functional
 subset. The same prepared image receives current sources and builds
 Electron before running `config/testing/playwright.linux.config.ts` under Xvfb.
 It uses four workers, no retries and a 15-minute child-process deadline. Failure
 or timeout fails the command; remaining descendants are removed with the container.
+
+Use `npm run test:e2e:memory`, without arguments, for both Linux Electron memory
+controls in the same prepared image. It selects a fixed `memory` container mode,
+builds Electron, and runs `config/testing/playwright.memory.config.ts` under Xvfb
+with the same isolation and 15-minute deadline. No dependencies are installed and
+no host environment overrides are forwarded. Local attachments remain inside the
+disposable container; use the CI artifact for retained sample reports and traces.
 
 `config/testing/electron-platforms.ts` owns the explicit Linux file list and the
 small shared launch/reset/text-clipboard overlap. In mixed specs, `{ tag: '@linux' }`
@@ -608,7 +627,8 @@ regression configuration's single CI retry. The stable
 `Require all Electron E2E shards to pass` check requires both platform groups to
 succeed, including every macOS shard. Failure, cancellation and unexpected skips
 fail the gate. Failure artifacts include the platform, shard and run attempt.
-The separate macOS memory workflow is unchanged.
+The separate Linux memory workflow also gates release candidates; its scope and
+limitations are described under [What the memory suite can detect](#what-the-memory-suite-can-detect).
 
 This allocation replaces six macOS preparations with four plus one Linux
 preparation. Independent functional tests move to Linux; macOS retains native
@@ -1111,7 +1131,8 @@ npm run release
 The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. `make release` runs the same default patch bump. For minor or major use `npm run release -- minor` or `npm run release -- major`. It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `-- --help` for usage without side effects.
 
 Push or merge the version commit to main normally. `Test and build app` runs checks,
-audit, browser E2E and platform smoke once. After success, publication is dispatched only
+audit and platform smoke, plus browser E2E, Linux/macOS Electron E2E and Linux Electron
+memory measurements for a new release version. After success, publication is dispatched only
 when either platform has a new version. Eligibility compares the checked package version
 with platform release state, not the previous push. If a version-bump push fails validation,
 a later successful push can release that same version without another bump. Existing macOS
@@ -1130,7 +1151,7 @@ permissions remain unchanged. See [macOS releases](releasing.md) and
 
 A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
 
-The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full Electron coverage across Linux and macOS for a new release version.
+The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full Electron coverage across Linux and macOS and the Linux memory suite for a new release version. The memory suite's detection limits are described under [What the memory suite can detect](#what-the-memory-suite-can-detect).
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.

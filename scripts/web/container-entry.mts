@@ -20,11 +20,11 @@ function command(executable: string, args: string[], smoke = false) {
 }
 
 export function run(args: string[]) {
-  if (args.length !== 1 || !['web', 'smoke', 'electron'].includes(args[0]!))
-    throw new Error('The Linux test container accepts only web, smoke or electron')
+  if (args.length !== 1 || !['web', 'smoke', 'electron', 'memory'].includes(args[0]!))
+    throw new Error('The Linux test container accepts only web, smoke, electron or memory')
   if (args[0] === 'web') return command('npm', ['run', 'test:web:built'])
 
-  if (args[0] === 'electron') {
+  if (args[0] === 'electron' || args[0] === 'memory') {
     const build = command('npm', ['run', 'build'])
     if (build !== 0) return build
     const result = spawnSync(
@@ -36,7 +36,7 @@ export function run(args: string[]) {
         'playwright',
         'test',
         '-c',
-        'config/testing/playwright.linux.config.ts',
+        `config/testing/playwright.${args[0] === 'memory' ? 'memory' : 'linux'}.config.ts`,
       ],
       {
         stdio: 'inherit',

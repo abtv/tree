@@ -55,7 +55,12 @@ export function runSmoke(args: string[]) {
 
 export function runElectron(args: string[]) {
   if (args.length) throw new Error('test:e2e:linux accepts no arguments; it runs the selected Linux Electron suite')
-  return runContainer(false, true)
+  return runContainer(false, 'electron')
+}
+
+export function runMemory(args: string[]) {
+  if (args.length) throw new Error('test:e2e:memory accepts no arguments; it runs the Linux Electron memory suite')
+  return runContainer(false, 'memory')
 }
 
 export function containerSourceFiles(smoke = false) {
@@ -93,7 +98,7 @@ export function containerSourceFiles(smoke = false) {
   ]
 }
 
-function runContainer(smoke: boolean, electron = false) {
+function runContainer(smoke: boolean, electron?: 'electron' | 'memory') {
   const image = currentDependencyImage()
   const inspected = spawnSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], { encoding: 'utf8' })
   if (inspected.error || inspected.status !== 0) {
@@ -102,13 +107,14 @@ function runContainer(smoke: boolean, electron = false) {
     )
   }
   const dockerArgs = containerArguments(inspected.stdout.trim(), smoke)
-  if (electron) dockerArgs.push('electron')
+  if (electron) dockerArgs.push(electron)
   const files = electron
     ? [
         ...new Set([
           ...containerSourceFiles(true),
           'config/testing/playwright.config.ts',
           'config/testing/playwright.linux.config.ts',
+          'config/testing/playwright.memory.config.ts',
           'config/testing/electron-platforms.ts',
           ...sourceFiles('e2e/electron').filter((path) => /\.(?:ts|cjs)$/.test(path)),
         ]),

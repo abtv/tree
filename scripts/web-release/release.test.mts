@@ -236,16 +236,19 @@ describe('release manifest and package', () => {
 
 describe('release gates', () => {
   const success = {
-    ...Object.fromEntries(['check', 'audit', 'chrome', 'smoke', 'electron'].map((key) => [key, { result: 'success' }])),
+    ...Object.fromEntries(
+      ['check', 'audit', 'chrome', 'smoke', 'electron', 'memory'].map((key) => [key, { result: 'success' }]),
+    ),
     version: { result: 'success', outputs: { ready: 'true' } },
   }
-  it.each(['false', '', undefined])('allows skipped browser tests without a release (%s)', (ready) => {
+  it.each(['false', '', undefined])('allows skipped release suites without a release (%s)', (ready) => {
     expect(() =>
       validateGate({
         ...success,
         version: { result: 'success', outputs: { ready } },
         chrome: { result: 'skipped' },
         electron: { result: 'skipped' },
+        memory: { result: 'skipped' },
       }),
     ).not.toThrow()
     expect(() =>

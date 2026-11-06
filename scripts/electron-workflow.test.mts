@@ -27,6 +27,40 @@ const { load } = createRequire(import.meta.url)('js-yaml') as { load: (source: s
 const source = readFileSync('.github/workflows/run-electron-e2e-tests.yml', 'utf8')
 const workflow = load(source)
 
+it('runs reusable memory measurements on Linux with display dependencies and retained evidence', () => {
+  const memorySource = readFileSync('.github/workflows/run-electron-memory-tests.yml', 'utf8')
+  const memoryWorkflow = load(memorySource)
+  const memory = memoryWorkflow.jobs.memory!
+
+  expect(memoryWorkflow.on).toEqual({
+    workflow_call: null,
+    schedule: [{ cron: '0 4 * * 0' }],
+    workflow_dispatch: null,
+  })
+  expect(memoryWorkflow.permissions).toEqual({ contents: 'read' })
+  expect(memoryWorkflow.jobs.audit!.if).toBe(
+    "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+  )
+  expect(memory.needs).toBe('audit')
+  expect(memory.if).toBe("${{ !cancelled() && (needs.audit.result == 'success' || needs.audit.result == 'skipped') }}")
+  expect(memory['runs-on']).toBe('ubuntu-24.04')
+  expect(memory.steps).toContainEqual(expect.objectContaining({ run: 'npx playwright install-deps chromium' }))
+  expect(memory.steps).toContainEqual(expect.objectContaining({ run: 'npm run build' }))
+  expect(memory.steps).toContainEqual(
+    expect.objectContaining({
+      run: 'xvfb-run --auto-servernum npx playwright test -c config/testing/playwright.memory.config.ts --reporter=list,json',
+      env: { PLAYWRIGHT_JSON_OUTPUT_NAME: 'reports/e2e-memory.json' },
+    }),
+  )
+  expect(memory.steps).toContainEqual(
+    expect.objectContaining({
+      if: 'always()',
+      with: expect.objectContaining({ path: 'reports/e2e-memory.json\ntest-results/\n' }),
+    }),
+  )
+  expect(memorySource).not.toContain('continue-on-error')
+})
+
 it('runs complementary Electron configurations without adding automatic suite executions', () => {
   expect(workflow.on).toEqual({
     workflow_call: null,
