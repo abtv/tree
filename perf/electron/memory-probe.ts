@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ElectronApplication, Page, TestInfo } from '@playwright/test'
 import { assertMemoryBudget, type MemoryBudget, type MemoryMetrics } from '../memory-budget'
+import { collectWithGpuMemory } from './memory-processes'
 
 const MIB = 1024 ** 2
 
@@ -29,17 +30,26 @@ export async function collectMemory({
   try {
     await session.send('HeapProfiler.collectGarbage')
     const heap = await session.send('Runtime.getHeapUsage')
-    const native = await app.evaluate(({ app, BrowserWindow }) => {
-      const metrics = app.getAppMetrics()
-      const rendererPid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId()
-      return {
-        mainHeap: process.memoryUsage().heapUsed,
-        mainWorkingSet: (metrics.find((metric) => metric.pid === process.pid)?.memory.workingSetSize ?? 0) * 1024,
-        rendererWorkingSet: (metrics.find((metric) => metric.pid === rendererPid)?.memory.workingSetSize ?? 0) * 1024,
-        totalWorkingSet: metrics.reduce((sum, metric) => sum + metric.memory.workingSetSize * 1024, 0),
-      }
-    })
-    return { rendererHeap: heap.usedSize, ...native }
+    const native = await collectWithGpuMemory(() =>
+      app.evaluate(({ app, BrowserWindow }) => {
+        const metrics = app.getAppMetrics()
+        const rendererPid = BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId()
+        return {
+          processes: metrics.map(({ type, memory }) => ({ type, workingSetSize: memory.workingSetSize })),
+          mainHeap: process.memoryUsage().heapUsed,
+          mainWorkingSet: (metrics.find((metric) => metric.pid === process.pid)?.memory.workingSetSize ?? 0) * 1024,
+          rendererWorkingSet: (metrics.find((metric) => metric.pid === rendererPid)?.memory.workingSetSize ?? 0) * 1024,
+          totalWorkingSet: metrics.reduce((sum, metric) => sum + metric.memory.workingSetSize * 1024, 0),
+        }
+      }),
+    )
+    return {
+      rendererHeap: heap.usedSize,
+      mainHeap: native.mainHeap,
+      mainWorkingSet: native.mainWorkingSet,
+      rendererWorkingSet: native.rendererWorkingSet,
+      totalWorkingSet: native.totalWorkingSet,
+    }
   } finally {
     await session.detach()
   }

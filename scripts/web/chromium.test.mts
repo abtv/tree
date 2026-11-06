@@ -54,6 +54,7 @@ it.each([
   expect(files).toContain('e2e/electron/shared-application.spec.ts')
   if (mode === 'memory') {
     expect(files).toContain('perf/electron/memory-probe.ts')
+    expect(files).toContain('perf/electron/memory-processes.ts')
     expect(files).toContain('perf/electron/state.spec.ts')
     expect(files).toContain('perf/memory-budget.ts')
     expect(files).not.toContain('perf/electron/typing.spec.ts')

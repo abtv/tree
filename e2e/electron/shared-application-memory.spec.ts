@@ -2,6 +2,7 @@
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { MemoryProbe } from '../../perf/electron/memory-probe'
+import { collectWithGpuMemory } from '../../perf/electron/memory-processes'
 import {
   closeApp,
   expect,
@@ -26,23 +27,25 @@ async function memorySample({ app, window }: Launched, probe: MemoryProbe, label
     const raw = await session.send('Runtime.getHeapUsage')
     await session.send('HeapProfiler.collectGarbage')
     const retained = await session.send('Runtime.getHeapUsage')
-    const native = await app.evaluate(({ app, BrowserWindow, webContents, ipcMain }) => ({
-      mainHeap: process.memoryUsage(),
-      listeners: {
-        appActivate: app.listenerCount('activate'),
-        ipcChannels: ipcMain.eventNames().length,
-        bounds: BrowserWindow.getAllWindows().map((main) => ({
-          move: main.listenerCount('move'),
-          resize: main.listenerCount('resize'),
-          close: main.listenerCount('close'),
-        })),
-      },
-      processes: app.getAppMetrics().map(({ type, memory }) => ({ type, ...memory })),
-      windows: BrowserWindow.getAllWindows().length,
-      renderers: webContents.getAllWebContents().filter((contents) => contents.getType() === 'window').length,
-      pending: globalThis.__treeSharedTest?.pending() ?? 0,
-      errors: globalThis.__treeSharedTest?.errors() ?? 0,
-    }))
+    const native = await collectWithGpuMemory(() =>
+      app.evaluate(({ app, BrowserWindow, webContents, ipcMain }) => ({
+        mainHeap: process.memoryUsage(),
+        listeners: {
+          appActivate: app.listenerCount('activate'),
+          ipcChannels: ipcMain.eventNames().length,
+          bounds: BrowserWindow.getAllWindows().map((main) => ({
+            move: main.listenerCount('move'),
+            resize: main.listenerCount('resize'),
+            close: main.listenerCount('close'),
+          })),
+        },
+        processes: app.getAppMetrics().map(({ type, memory }) => ({ type, ...memory })),
+        windows: BrowserWindow.getAllWindows().length,
+        renderers: webContents.getAllWebContents().filter((contents) => contents.getType() === 'window').length,
+        pending: globalThis.__treeSharedTest?.pending() ?? 0,
+        errors: globalThis.__treeSharedTest?.errors() ?? 0,
+      })),
+    )
 
     probe.record(
       label,

@@ -128,6 +128,7 @@ function runContainer(smoke: boolean, electron?: 'electron' | 'memory') {
                   'expansion.spec',
                   'memory-detector.spec',
                   'memory-probe',
+                  'memory-processes',
                 ].map((name) => `perf/electron/${name}.ts`),
               ]
             : []),
