@@ -13,5 +13,5 @@ Layer-specific rules for `src/domain/`. The repository-wide rules in the root `A
 ## Tests
 
 * Tests run in the Node environment. Run `npm test -- src/domain`.
-* Add or update a `*.property.test.ts` guard when a change affects tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency.
+* Assess existing `*.property.test.ts` generators and assertions when a change affects tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency. Extend insufficient coverage; reuse an adequate guard under root procedure §9.
 * Assess the performance implications of state or persistence changes per `docs/PRODUCT.md` §22.1.

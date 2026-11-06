@@ -9,7 +9,6 @@ import {
   seedDocument,
   setCursor,
   test,
-  typeInto,
 } from './fixtures'
 
 describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
@@ -159,12 +158,19 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
   })
 
   test('deletes an empty node and focuses the previous sibling at the end', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'empty', text: '', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'empty' },
+    })
     const { window } = await launchTree(userDataDir)
 
-    await typeInto(node(window, 1), 'A')
-    await window.keyboard.press('Enter')
-
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
+    await expect(node(window, 2)).toBeFocused()
 
     await window.keyboard.press('Backspace')
 
@@ -175,13 +181,14 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
   })
 
   test('focuses the current parent when the empty first child is deleted', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'projects', text: 'Projects', children: [{ id: 'empty', text: '', children: [] }] }] },
+      location: { currentParentId: 'projects', selectedNodeId: 'empty' },
+    })
     const { window } = await launchTree(userDataDir)
 
-    await typeInto(node(window, 1), 'Projects')
-    await window.keyboard.press('Meta+.')
-    await window.keyboard.press('Enter')
-
     await expect(node(window, 1)).toHaveValue('')
+    await expect(node(window, 1)).toBeFocused()
 
     await window.keyboard.press('Backspace')
 
@@ -203,13 +210,19 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
   })
 
   test('selects the next root when the empty first root is deleted', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'empty', text: '', children: [] },
+          { id: 'second', text: 'Second', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'empty' },
+    })
     const { window } = await launchTree(userDataDir)
 
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 2), 'Second')
-    await window.keyboard.press('ArrowUp')
-
     await expect(node(window, 1)).toHaveValue('')
+    await expect(node(window, 1)).toBeFocused()
 
     await window.keyboard.press('Backspace')
 
@@ -220,10 +233,18 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
   })
 
   test('undoes a Backspace deletion', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'A', children: [] },
+          { id: 'empty', text: '', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'empty' },
+    })
     const { window } = await launchTree(userDataDir)
 
-    await typeInto(node(window, 1), 'A')
-    await window.keyboard.press('Enter')
+    await expect(node(window, 2)).toBeFocused()
     await window.keyboard.press('Backspace')
 
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(1)
@@ -231,5 +252,7 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
     await window.keyboard.press('Meta+z')
 
     await expect(window.locator('[aria-label^="Node "]')).toHaveCount(2)
+    expect(await nodeTexts(window)).toEqual(['A', ''])
+    await expect(window.locator('.node-row').nth(1)).toHaveAttribute('data-node-id', 'empty')
   })
 })

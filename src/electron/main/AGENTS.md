@@ -14,4 +14,4 @@ Layer-specific rules for `src/electron/main/`, `src/electron/preload/`, and `src
 ## Tests
 
 * Run `npm test -- src/electron/main src/electron/preload src/infrastructure/main`.
-* Every changed IPC channel needs a focused contract test for names, arguments, return values, and error propagation, plus a real Electron end-to-end test.
+* Changed IPC behavior must retain focused contract coverage for names, arguments, return values, and error propagation, plus representative real Electron boundary coverage. Existing tests may satisfy these obligations under root procedure §9. Keep payload and rule variants in focused tests unless they exercise a distinct runtime failure.

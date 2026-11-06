@@ -190,7 +190,9 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-numeric-prefix.png')) })
     await window.keyboard.type('00')
 
-    await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('100').length)
+    // Fixed catalog examples keep this oracle independent of the matching algorithm.
+    await expect(popup.getByRole('option')).toHaveCount(2)
+    await expect(popup.getByRole('option').filter({ hasText: ':clock1030:' })).toBeVisible()
     await expect(popup.getByRole('option', { selected: true })).toContainText(':100:')
 
     await window.keyboard.press('Enter')

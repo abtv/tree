@@ -154,43 +154,6 @@ test.describe('persistence reliability regressions', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Generation')
   })
 
-  test('loads the highest-numbered generation when generation write times tie', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: { roots: [{ id: 'root', text: 'Primary', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'root' },
-    })
-    const dataDirectory = join(userDataDir, 'data')
-    const olderPath = join(dataDirectory, 'document.1.json')
-    const newerPath = join(dataDirectory, 'document.2.json')
-
-    writeFileSync(
-      olderPath,
-      JSON.stringify({
-        version: 1,
-        document: { roots: [{ id: 'root', text: 'Older generation', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      }),
-    )
-    writeFileSync(
-      newerPath,
-      JSON.stringify({
-        version: 1,
-        document: { roots: [{ id: 'root', text: 'Newer generation', children: [] }] },
-        location: { currentParentId: null, selectedNodeId: 'root' },
-      }),
-    )
-    const tied = new Date()
-
-    utimesSync(olderPath, tied, tied)
-    utimesSync(newerPath, tied, tied)
-    writeFileSync(documentPath(userDataDir), '{ damaged')
-
-    const { window } = await launchTree(userDataDir)
-
-    await expect(node(window, 1)).toHaveValue('Newer generation')
-    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Newer generation')
-  })
-
   test('opens a recovery document whose image is missing', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

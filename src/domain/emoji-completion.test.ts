@@ -9,6 +9,21 @@ it('keeps only the first 100 distinct known history names', () => {
 })
 
 // @requirement PRODUCT.md §20.12
+it.each([
+  [
+    '100',
+    [
+      { shortcode: '100', emoji: '💯' },
+      { shortcode: 'clock1030', emoji: '🕥' },
+    ],
+  ],
+  ['+1', [{ shortcode: '+1', emoji: '👍' }]],
+  ['-1', [{ shortcode: '-1', emoji: '👎' }]],
+] as const)('keeps numeric and signed shortcode expectations independent of the matcher: %s', (query, expected) => {
+  expect(suggestEmoji(`:${query}`, query.length + 1)?.suggestions).toEqual(expected)
+})
+
+// @requirement PRODUCT.md §20.12
 it('matches English shortcode prefixes at whitespace boundaries without consuming surrounding text', () => {
   expect(suggestEmoji(':roc', 4)?.suggestions).toContainEqual({ shortcode: 'rocket', emoji: '🚀' })
   expect(suggestEmoji('Plan :ROCKE tomorrow', 11)).toMatchObject({

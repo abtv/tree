@@ -10,6 +10,7 @@ import {
   node,
   nodeTexts,
   readPersisted,
+  seedDocument,
   setCursor,
   test,
   tryReadPersisted,
@@ -75,22 +76,6 @@ describeForEachEditingMode('undo and redo', () => {
 test.describe('undo and redo (mode-independent)', () => {
   // @requirement PRODUCT.md §10
   // @requirement PRODUCT.md §18
-  test('keeps node IDs stable across undo and redo', async ({ userDataDir }) => {
-    const { window } = await launchTree(userDataDir)
-
-    await typeInto(node(window, 1), 'A')
-
-    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBeTruthy()
-
-    const rootId = readPersisted(userDataDir).document.roots[0]!.id
-
-    await window.keyboard.press('Enter')
-    await window.keyboard.press('Meta+z')
-    await window.keyboard.press('Meta+Shift+z')
-
-    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.id).toBe(rootId)
-  })
-
   test('undoes and redoes node and subtree deletion with stable IDs', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 
@@ -163,15 +148,14 @@ test.describe('undo and redo (mode-independent)', () => {
   })
 
   test('undoes and redoes sibling reordering', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: ['A', 'B', 'C', 'D'].map((text) => ({ id: text, text, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'D' },
+    })
     const { window } = await launchTree(userDataDir)
 
-    await typeInto(node(window, 1), 'A')
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 2), 'B')
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 3), 'C')
-    await window.keyboard.press('Enter')
-    await typeInto(node(window, 4), 'D')
+    await expect(node(window, 4)).toBeFocused()
+    expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
 
     await dragRow(window, 3, 1)
 

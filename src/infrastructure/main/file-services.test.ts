@@ -364,23 +364,31 @@ describe('file services', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.1.json'), 'utf8'))).toEqual(first)
   })
 
-  it('loads the highest-numbered generation when generation write times tie', async () => {
-    const { directory, services } = await servicesForTest()
-    const older = stateWithoutImage('Older')
-    const newer = stateWithoutImage('Newer')
+  it.each([
+    { version: 1, order: ['document.1.json', 'document.2.json'] },
+    { version: 1, order: ['document.2.json', 'document.1.json'] },
+    { version: 2, order: ['document.1.json', 'document.2.json'] },
+    { version: 2, order: ['document.2.json', 'document.1.json'] },
+  ])(
+    'loads the highest-numbered generation with tied times (version $version, order $order)',
+    async ({ version, order }) => {
+      const { directory, services } = await servicesForTest()
+      const older = { ...stateWithoutImage('Older'), version }
+      const newer = { ...stateWithoutImage('Newer'), version }
 
-    await writeFile(join(directory, 'document.1.json'), JSON.stringify(older), 'utf8')
-    await writeFile(join(directory, 'document.2.json'), JSON.stringify(newer), 'utf8')
-    const when = new Date(Date.now() - 1_000)
+      await writeFile(join(directory, 'document.1.json'), JSON.stringify(older), 'utf8')
+      await writeFile(join(directory, 'document.2.json'), JSON.stringify(newer), 'utf8')
+      const when = new Date(Date.now() - 1_000)
 
-    await utimes(join(directory, 'document.1.json'), when, when)
-    await utimes(join(directory, 'document.2.json'), when, when)
-    await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
-    mocks.readdir.mockResolvedValueOnce(['document.1.json', 'document.2.json'])
+      await utimes(join(directory, 'document.1.json'), when, when)
+      await utimes(join(directory, 'document.2.json'), when, when)
+      await writeFile(join(directory, 'document.json'), '{ damaged', 'utf8')
+      mocks.readdir.mockResolvedValueOnce(order)
 
-    await expect(services.load()).resolves.toEqual(newer)
-    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(newer)
-  })
+      await expect(services.load()).resolves.toEqual(newer)
+      expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(newer)
+    },
+  )
 
   it('loads a legacy backup as a recovery candidate', async () => {
     const { directory, services } = await servicesForTest()

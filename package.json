@@ -65,7 +65,7 @@
     "test:e2e:diagnose": "node scripts/e2e-diagnose.mts",
     "test:e2e:memory": "npm run test:e2e -- --config=config/testing/playwright.memory.config.ts",
     "test:e2e:changed": "npm run build && playwright test -c config/testing/playwright.config.ts --only-changed=HEAD",
-    "test:e2e:timing": "npm run build && PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e-timing.json playwright test -c config/testing/playwright.config.ts --reporter=list,json && node scripts/e2e-timing.mts",
+    "test:e2e:timing": "npm run test:e2e:diagnose -- --json-output=test-results/e2e-timing.json --reporter=list,json && node scripts/e2e-timing.mts",
     "test:e2e:visible": "TREE_E2E_VISIBLE=1 npm run test:e2e --",
     "test:perf": "npm run build && npm run build:web && playwright test -c config/testing/perf.config.ts",
     "test:perf:safari": "npm run build:web && npm run build && node perf/comparisons/safari-electron.mts",
