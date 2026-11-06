@@ -439,7 +439,17 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .line-numbered {
+  --row-gutter: 10px;
+  margin-left: -18px;
   padding-left: var(--line-number-gutter);
+}
+
+.line-numbered :is(.node-row, .agenda-row) {
+  --active-row-inset: calc(-18px - var(--row-depth, 0) * var(--row-indent));
+}
+
+.line-numbered .node-disclosure-triangle {
+  left: -16px;
 }
 
 .node-list.line-numbered > .node-row-pinned {
@@ -449,7 +459,7 @@ body:not(.node-drag-active) .location-link:hover {
 .line-number {
   position: absolute;
   top: 0;
-  left: calc(-28px - var(--row-depth, 0) * var(--row-indent) - var(--line-number-gutter));
+  left: calc(0px - var(--row-gutter, 28px) - var(--row-depth, 0) * var(--row-indent) - var(--line-number-gutter));
   width: calc(var(--line-number-gutter) - 8px);
   color: var(--color-secondary);
   font-size: 11px;
@@ -469,7 +479,7 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
   display: flow-root;
   min-height: var(--node-row-min-height);
-  margin-left: calc(28px + var(--row-depth, 0) * var(--row-indent));
+  margin-left: calc(var(--row-gutter, 28px) + var(--row-depth, 0) * var(--row-indent));
   padding-left: 21px;
 }
 

@@ -1,6 +1,7 @@
 // @editing-modes: both
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { Locator } from '@playwright/test'
 import {
   closeApp,
   describeForEachEditingMode,
@@ -59,20 +60,7 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
     await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
 
     await expect(window.locator('.line-number')).toHaveText(['1', '2', '3'])
-    const geometry = await window.locator('.node-row').evaluateAll((rows) =>
-      rows.map((row) => {
-        const number = row.querySelector('.line-number')!.getBoundingClientRect()
-        const text = row.querySelector('.node-input')!.getBoundingClientRect()
-        const bullet = row.querySelector('.node-enter-control')!.getBoundingClientRect()
-        return { x: number.right, top: number.top, textTop: text.top, bulletLeft: bullet.left }
-      }),
-    )
-
-    expect(new Set(geometry.map((row) => row.x)).size).toBe(1)
-    for (const row of geometry) {
-      expect(row.x).toBeLessThan(row.bulletLeft)
-      expect(Math.abs(row.top - row.textTop)).toBeLessThan(1)
-    }
+    await expectCompactNumbering(window.locator('.node-row'))
 
     await window.screenshot({ path: testInfo.outputPath(screenshotName('tree-light.png')) })
     await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
@@ -83,6 +71,7 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
 
     await expect(window.locator('.agenda-list .line-number')).toHaveText(['1', '2', '3'])
     await expect(window.locator('.agenda-row-day .line-number, .agenda-row-gap .line-number')).toHaveCount(0)
+    await expectCompactNumbering(window.locator('.agenda-row-node'))
     await window.screenshot({ path: testInfo.outputPath(screenshotName('agenda-dark.png')) })
     await window.keyboard.press('Control+l')
 
@@ -139,6 +128,7 @@ test.describe('windowed line numbers', () => {
 
     await expect(window.locator('[data-node-id="n1500"] .line-number')).toHaveText('1501')
     expect(await window.locator('.line-number').count()).toBeLessThan(150)
+    await expectCompactNumbering(window.locator('.node-row'))
 
     await window.keyboard.press('G')
 
@@ -148,6 +138,7 @@ test.describe('windowed line numbers', () => {
 
     await expect(window.locator('.agenda-row[data-node-id="n1999"] .line-number')).toHaveText('2000')
     expect(await window.locator('.line-number').count()).toBeLessThan(150)
+    await expectCompactNumbering(window.locator('.agenda-row-node'))
 
     await window.keyboard.press('g')
     await window.keyboard.press('g')
@@ -156,3 +147,42 @@ test.describe('windowed line numbers', () => {
     expect(await window.locator('.line-number').count()).toBeLessThan(150)
   })
 })
+
+async function expectCompactNumbering(rows: Locator): Promise<void> {
+  const geometry = await rows.evaluateAll((elements) =>
+    elements.map((row) => {
+      const number = row.querySelector('.line-number')!.getBoundingClientRect()
+      const editor = row.querySelector('.node-input, .agenda-text')!
+      const text = editor.getBoundingClientRect()
+      const textLeft = text.left + Number.parseFloat(getComputedStyle(editor).paddingLeft)
+      const bullet = row.querySelector('.node-enter-control')!.getBoundingClientRect()
+      const disclosure = row.querySelector('.node-disclosure-triangle')?.getBoundingClientRect()
+
+      return {
+        numberLeft: number.left,
+        numberRight: number.right,
+        numberTop: number.top,
+        textTop: text.top,
+        textLeft,
+        outlineGap: textLeft - number.right - Number(row.getAttribute('data-depth')) * 20,
+        bulletLeft: bullet.left,
+        bulletRight: bullet.right,
+        disclosureLeft: disclosure?.left,
+        disclosureRight: disclosure?.right,
+      }
+    }),
+  )
+
+  expect(new Set(geometry.map((row) => row.numberRight)).size).toBe(1)
+  for (const row of geometry) {
+    expect(row.numberLeft).toBeGreaterThanOrEqual(0)
+    expect(row.numberRight).toBeLessThan(row.bulletLeft)
+    expect(row.bulletRight).toBeLessThan(row.textLeft)
+    expect(Math.abs(row.numberTop - row.textTop)).toBeLessThan(1)
+    expect(row.outlineGap).toBe(45)
+    if (row.disclosureLeft !== undefined) {
+      expect(row.disclosureLeft).toBeGreaterThan(row.numberRight)
+      expect(row.disclosureRight).toBeLessThan(row.bulletLeft)
+    }
+  }
+}

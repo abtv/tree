@@ -311,6 +311,12 @@ controls, enter copied text, or change selection, caret, editing mode or pending
 Vim commands. Holding the shortcut does not repeatedly toggle. Modal dialogs,
 composition and command/search input keep their own keyboard handling.
 
+Numbered lists use the editor's left margin and compact the spaces around the
+disclosure control. Before hierarchy indentation, text begins 45px after the right
+edge of the number column. Number, disclosure, bullet and text remain separate;
+control sizes and the indentation step stay unchanged. Turning numbers off restores
+the ordinary outline spacing.
+
 This explicit Control shortcut follows the owner's keyboard-first choice (§1.3).
 Browsers may reserve Ctrl+L for their address bar; the command panel remains available.
 
