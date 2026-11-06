@@ -1,5 +1,5 @@
 import iconUrl from '../../assets/icons/tree-icon-source.png?url'
-import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
+import { captureFocusRestoration } from './editor-dom'
 import './about.css'
 
 /** One eagerly mounted dialog, shared by both platform entry points. */
@@ -66,36 +66,7 @@ export function installAboutDialog(version: string, changed: (open: boolean) => 
         button.focus()
         return
       }
-      const active = document.activeElement
-      const selection = window.getSelection()
-      const editorSelection =
-        active instanceof HTMLElement && active.matches('.node-input') ? getSelectionEndpoints(active) : undefined
-      const endpoints =
-        selection?.anchorNode && selection.focusNode
-          ? {
-              anchor: selection.anchorNode,
-              anchorOffset: selection.anchorOffset,
-              focus: selection.focusNode,
-              focusOffset: selection.focusOffset,
-            }
-          : undefined
-      const inputSelection =
-        active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement
-          ? { start: active.selectionStart, end: active.selectionEnd, direction: active.selectionDirection }
-          : undefined
-      restore = () => {
-        if (!(active instanceof HTMLElement) || !active.isConnected) return
-        active.focus({ preventScroll: true })
-        if (editorSelection !== undefined) setSelectionRange(active, editorSelection.anchor, editorSelection.focus)
-        else if (
-          (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) &&
-          inputSelection?.start != null &&
-          inputSelection.end != null
-        )
-          active.setSelectionRange(inputSelection.start, inputSelection.end, inputSelection.direction ?? undefined)
-        else if (endpoints?.anchor.isConnected && endpoints.focus.isConnected)
-          selection?.setBaseAndExtent(endpoints.anchor, endpoints.anchorOffset, endpoints.focus, endpoints.focusOffset)
-      }
+      restore = captureFocusRestoration(document.activeElement, 'native-with-input')
       dialog.showModal()
       open = true
       changed(true)

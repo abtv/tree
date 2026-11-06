@@ -446,6 +446,48 @@ export function getSelectionEndpoints(element: HTMLElement): { anchor: number; f
   }
 }
 
+/**
+ * Capture a temporary focus return without owning when it runs. Editor selections use logical
+ * offsets so decoration can replace text nodes. Broader native scopes preserve each caller's
+ * existing support for controls and document selections; they do not change popup dismissal rules.
+ */
+export function captureFocusRestoration(
+  element: Element | null = document.activeElement,
+  scope: 'editor' | 'native' | 'native-with-input' = 'editor',
+): () => void {
+  if (!(element instanceof HTMLElement)) return () => undefined
+  const editorSelection = element.matches('.node-input') ? getSelectionEndpoints(element) : undefined
+  const selection = scope === 'editor' ? undefined : window.getSelection()
+  const endpoints =
+    selection?.anchorNode && selection.focusNode
+      ? {
+          anchor: selection.anchorNode,
+          anchorOffset: selection.anchorOffset,
+          focus: selection.focusNode,
+          focusOffset: selection.focusOffset,
+        }
+      : undefined
+  const controlSelection =
+    scope !== 'editor' &&
+    (element instanceof HTMLTextAreaElement || (scope === 'native-with-input' && element instanceof HTMLInputElement))
+      ? { start: element.selectionStart, end: element.selectionEnd, direction: element.selectionDirection }
+      : undefined
+
+  return () => {
+    if (!element.isConnected) return
+    element.focus({ preventScroll: true })
+    if (editorSelection !== undefined) setSelectionRange(element, editorSelection.anchor, editorSelection.focus)
+    else if (
+      (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) &&
+      controlSelection?.start != null &&
+      controlSelection.end != null
+    )
+      element.setSelectionRange(controlSelection.start, controlSelection.end, controlSelection.direction ?? undefined)
+    else if (endpoints?.anchor.isConnected && endpoints.focus.isConnected)
+      selection?.setBaseAndExtent(endpoints.anchor, endpoints.anchorOffset, endpoints.focus, endpoints.focusOffset)
+  }
+}
+
 export function selectAll(element: HTMLElement): void {
   if (element instanceof HTMLTextAreaElement) {
     element.select()

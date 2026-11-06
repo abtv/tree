@@ -322,6 +322,15 @@ Registry entries declare required capabilities. The command-panel owner derives 
 
 The renderer command-panel owner captures the application shortcut before editor handlers. It saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions. Named view actions resolve sessions through the existing input owner before dispatching the store's idempotent Agenda open/close methods. They add no document mutation or separate view state.
 
+`captureFocusRestoration` in `editor-dom.ts` owns the shared capture/restore mechanics
+for the command panel, About and browser menu. Editor selections use
+logical offsets, so text decoration can replace DOM nodes during borrowed focus.
+Native scopes retain each caller's existing textarea, input and document-selection
+support. A disconnected origin is inert. Each caller still decides when to restore,
+including browser popover microtask ordering and explicit new focus destinations.
+This adds one bounded capture per existing focus owner, no document traversal or
+writes; it does not replace the editor's caret authority.
+
 The browser's `menu-focus.ts` owns the ellipsis menu's temporary focus transfer. It remembers one connected editing surface and directional selection, restores it synchronously before menu actions open dialogs, and defers native-dismissal restoration until the browser finishes restoring its trigger. Explicit pointer/Tab destinations and action-owned view changes retain focus. Menu surfaces declare `data-editor-focus-borrow`, which shares the input owner's temporary-blur exemption with the command panel. Data dialogs and activity messages return through the same focus owner on dismissal. The shared renderer registers its existing view commands with the browser menu so both menu and panel finish buffered edits before changing Tree/Agenda, without adding a save. Registration is released on unmount; menu view controls remain disabled until the renderer supplies its handlers. This adds bounded session-only DOM state, no document-scale work or writes beyond the existing edit-commit behavior.
 
 The desktop renderer registers the same view commands through `App.registerViewCommands`. Native View menu actions send the `tree:view-menu-command` main-to-renderer event; preload accepts only `tree` and `agenda` and returns a listener disposer. Registration follows the existing effect lifecycle, including Strict Mode and renderer reload. The main process caches the four native menu symbols once and reuses them across menu rebuilds. Browser menu icons are decorative CSS masks, so labels, picker activation and menu-command discovery retain their existing text and event paths.

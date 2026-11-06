@@ -13,7 +13,7 @@ import type { VimMode } from './vim-editing'
 import type { VimCommandState } from './vim-command-state'
 import { clearPending } from './vim-command-state'
 import { moveSuggestionIndex } from './completion-controller'
-import { getCaret, getSelectionEndpoints, setSelectionRange } from './editor-dom'
+import { captureFocusRestoration, getCaret } from './editor-dom'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCommandPanel(options: {
@@ -233,32 +233,7 @@ export function useCommandPanel(options: {
       event.stopImmediatePropagation()
       clearPending(commandState)
       beforeOpen?.()
-      const active = document.activeElement
-      const selection = window.getSelection()
-      const editorSelection =
-        active instanceof HTMLElement && active.matches('.node-input') ? getSelectionEndpoints(active) : undefined
-      const endpoints =
-        selection?.anchorNode && selection.focusNode
-          ? {
-              anchor: selection.anchorNode,
-              anchorOffset: selection.anchorOffset,
-              focus: selection.focusNode,
-              focusOffset: selection.focusOffset,
-            }
-          : undefined
-      const start = active instanceof HTMLTextAreaElement ? active.selectionStart : undefined
-      const end = active instanceof HTMLTextAreaElement ? active.selectionEnd : undefined
-      const direction = active instanceof HTMLTextAreaElement ? active.selectionDirection : undefined
-      restore.current = () => {
-        if (!(active instanceof HTMLElement) || !active.isConnected) return
-        active.focus({ preventScroll: true })
-        if (editorSelection !== undefined) setSelectionRange(active, editorSelection.anchor, editorSelection.focus)
-        else if (active instanceof HTMLTextAreaElement && start !== undefined && end !== undefined)
-          active.setSelectionRange(start, end, direction)
-        else if (endpoints?.anchor.isConnected && endpoints.focus.isConnected) {
-          selection?.setBaseAndExtent(endpoints.anchor, endpoints.anchorOffset, endpoints.focus, endpoints.focusOffset)
-        }
-      }
+      restore.current = captureFocusRestoration(document.activeElement, 'native')
       setInput('')
       setSelected(0)
       setOpen(true)

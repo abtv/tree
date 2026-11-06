@@ -1,4 +1,4 @@
-import { getSelectionEndpoints, setSelectionRange } from '../renderer/editor-dom'
+import { captureFocusRestoration } from '../renderer/editor-dom'
 
 /** The browser menu borrows editing focus; explicit destinations and dialogs retain ownership. */
 export interface MenuFocus {
@@ -8,19 +8,16 @@ export interface MenuFocus {
 }
 
 export function installMenuFocus(menu: HTMLElement, trigger: HTMLElement): MenuFocus {
-  let previous: { element: HTMLElement; anchor?: number; focus?: number } | undefined
+  let previous: { element: HTMLElement; restore(): void } | undefined
   let open = false
   let outside = false
   let disposed = false
   const remember = (element: EventTarget | null) => {
     if (!(element instanceof HTMLElement) || !element.matches('.node-input, .agenda-row')) return
-    previous = element.matches('.node-input') ? { element, ...getSelectionEndpoints(element) } : { element }
+    previous = { element, restore: captureFocusRestoration(element) }
   }
   const restore = () => {
-    if (disposed || previous === undefined || !previous.element.isConnected) return
-    const { element, anchor, focus } = previous
-    element.focus({ preventScroll: true })
-    if (anchor !== undefined && focus !== undefined) setSelectionRange(element, anchor, focus)
+    if (!disposed) previous?.restore()
   }
   const close = () => {
     if (!open) return // Command-panel actions also invoke the hidden menu's handlers.
