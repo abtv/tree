@@ -64,11 +64,10 @@ import {
   type NodeForest,
   type NodeVisualCommand,
 } from './editor-node-visual-transitions'
-import { EditorSaveScheduler } from './editor-save-scheduler'
+import { EditorSaveScheduler, type SaveSchedulerResult } from './editor-save-scheduler'
 import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
-import type { PersistenceFailureKind } from './persistence-coordinator'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
   applyNodeFold,
@@ -188,7 +187,7 @@ export class EditorStore {
         },
         referencedAttachmentIds: () => this.referencedAttachmentIds(),
         isPersistenceLocked: () => this.isPersistenceLocked(),
-        onPersistenceResult: (error, kind) => this.handlePersistenceResult(error, kind),
+        onPersistenceResult: (result) => this.handlePersistenceResult(result),
       },
       saveTiming,
     )
@@ -1639,12 +1638,11 @@ export class EditorStore {
     return ids
   }
 
-  private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
+  private handlePersistenceResult(result: SaveSchedulerResult): void {
     // Results arrive only for a state the coordinator captured while ready, and a store never leaves
     // ready, so this guard is an internal defense.
     if (this.runtime.snapshot.status !== 'ready') return
-    if (error === undefined) {
-      this.saveScheduler.resetFailures()
+    if (result.status === 'success') {
       // Locking and the quit prompt both follow a failure that set saveError, and only this success
       // path clears any of the three, so the saveError check alone decides whether to publish.
       const changed =
@@ -1659,21 +1657,10 @@ export class EditorStore {
       if (changed) this.runtime.emit()
       return
     }
-    if (kind === 'cleanup') {
-      const retry = this.saveScheduler.registerCleanupFailure()
-      this.runtime.snapshot = { ...this.runtime.snapshot, saveError: messageOf(error) }
-      if (retry) this.saveScheduler.scheduleCleanupRetry()
-      this.runtime.emit()
-      return
-    }
-    const retry = this.saveScheduler.registerSaveFailure(kind)
-    this.runtime.snapshot = { ...this.runtime.snapshot, saveError: messageOf(error) }
-    if (retry) {
-      this.saveScheduler.scheduleIdleSave()
-    } else {
-      this.saveScheduler.cancelSaveTimer()
-      this.runtime.snapshot = { ...this.runtime.snapshot, persistenceLocked: true }
-      this.saveScheduler.discardPendingSaves()
+    this.runtime.snapshot = {
+      ...this.runtime.snapshot,
+      saveError: messageOf(result.error),
+      ...(result.lock ? { persistenceLocked: true } : {}),
     }
     this.runtime.emit()
   }

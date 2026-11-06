@@ -18,8 +18,10 @@ export interface SaveSchedulerContext {
   currentState(): PersistedStateSource | undefined
   referencedAttachmentIds(): Iterable<AttachmentId>
   isPersistenceLocked(): boolean
-  onPersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void
+  onPersistenceResult(result: SaveSchedulerResult): void
 }
+
+export type SaveSchedulerResult = { status: 'success' } | { status: 'failure'; error: unknown; lock: boolean }
 
 export class EditorSaveScheduler {
   private readonly persistence: PersistenceCoordinator
@@ -43,7 +45,7 @@ export class EditorSaveScheduler {
       hasPendingDocumentChanges: () => this.changesPending,
       onSaveCaptured: () => this.handleSaveCaptured(),
       onDocumentSaved: () => this.handleDocumentSaved(),
-      onResult: (error, kind) => this.context.onPersistenceResult(error, kind),
+      onResult: (error, kind) => this.handlePersistenceResult(error, kind),
     })
   }
 
@@ -63,35 +65,14 @@ export class EditorSaveScheduler {
     this.persistence.requestAttachmentCleanup()
   }
 
-  public discardPendingSaves(): void {
-    this.persistence.discardPendingSaves()
-  }
-
   // Mutation triage: guards that only skip `clearTimeout(undefined)` are equivalent, because clearing
   // an unarmed timer is a no-op. A pending change with no armed timer (a locked editor) defers the
   // cleanup retry anyway, so returning early in `scheduleCleanupRetry` is equivalent there too.
-  public cancelSaveTimer(): void {
+  private cancelSaveTimer(): void {
     if (this.saveTimer !== undefined) {
       this.clock.clearTimeout(this.saveTimer)
       this.saveTimer = undefined
     }
-  }
-
-  public resetFailures(): void {
-    this.consecutiveSaveFailures = 0
-    this.consecutiveCleanupFailures = 0
-  }
-
-  public registerCleanupFailure(): boolean {
-    this.consecutiveCleanupFailures += 1
-    this.consecutiveSaveFailures = 0
-    return this.consecutiveCleanupFailures < CLEANUP_MAX_CONSECUTIVE_FAILURES
-  }
-
-  public registerSaveFailure(kind: PersistenceFailureKind | undefined): boolean {
-    if (kind === 'save') this.consecutiveSaveFailures += 1
-    this.changesPending = true
-    return this.consecutiveSaveFailures < SAVE_MAX_CONSECUTIVE_FAILURES
   }
 
   public markPersistedChange(): void {
@@ -126,15 +107,12 @@ export class EditorSaveScheduler {
 
   private requestPolicySave(): void {
     if (!this.changesPending) return
-    if (this.saveTimer !== undefined) {
-      this.clock.clearTimeout(this.saveTimer)
-      this.saveTimer = undefined
-    }
+    this.cancelSaveTimer()
     this.changesPending = false
     this.persistence.requestSave()
   }
 
-  public scheduleIdleSave(): void {
+  private scheduleIdleSave(): void {
     if (this.saveTimer !== undefined) this.clock.clearTimeout(this.saveTimer)
     this.saveTimer = this.clock.setTimeout(() => {
       this.saveTimer = undefined
@@ -142,7 +120,7 @@ export class EditorSaveScheduler {
     }, this.timing.idleMilliseconds)
   }
 
-  public scheduleCleanupRetry(): void {
+  private scheduleCleanupRetry(): void {
     // A pending change already has its idle save armed. The coordinator keeps the failed cleanup
     // requested, so that save retries it, and replacing the timer would postpone a save that
     // PRODUCT.md §16.1 requires at the idle interval.
@@ -152,6 +130,33 @@ export class EditorSaveScheduler {
       this.saveTimer = undefined
       this.persistence.requestAttachmentCleanup()
     }, this.timing.cleanupRetryMilliseconds)
+  }
+
+  private handlePersistenceResult(error: unknown | undefined, kind?: PersistenceFailureKind): void {
+    if (error === undefined) {
+      this.consecutiveSaveFailures = 0
+      this.consecutiveCleanupFailures = 0
+      this.context.onPersistenceResult({ status: 'success' })
+      return
+    }
+
+    let lock = false
+    if (kind === 'cleanup') {
+      this.consecutiveCleanupFailures += 1
+      this.consecutiveSaveFailures = 0
+      if (this.consecutiveCleanupFailures < CLEANUP_MAX_CONSECUTIVE_FAILURES) this.scheduleCleanupRetry()
+    } else {
+      // Cleanup-only work can report an earlier save error again without another save attempt.
+      if (kind === 'save') this.consecutiveSaveFailures += 1
+      this.changesPending = true
+      if (this.consecutiveSaveFailures < SAVE_MAX_CONSECUTIVE_FAILURES) this.scheduleIdleSave()
+      else {
+        this.cancelSaveTimer()
+        this.persistence.discardPendingSaves()
+        lock = true
+      }
+    }
+    this.context.onPersistenceResult({ status: 'failure', error, lock })
   }
 
   private handleSaveCaptured(): void {
