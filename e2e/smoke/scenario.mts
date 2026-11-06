@@ -2,7 +2,8 @@ export const parentText = 'Smoke parent'
 const today = new Date()
 const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 // Exceed the production word threshold after indenting, so persistence needs no idle wait or fake clock.
-export const childText = `${date} 🐱 Smoke child one two three four five six seven eight nine ten`
+const savedChildText = `${date} 🐱 Smoke child one two three four five six seven eight nine ten.`
+export const childText = `${savedChildText.slice(0, -1)}!`
 
 export interface SmokeDriver {
   click: (selector: string) => Promise<void>
@@ -22,15 +23,20 @@ export interface SmokeDriver {
       | 'Primary+z'
       | 'Primary+Shift+z'
       | 'Primary+;'
+      | 'Primary+q'
       | 'Control+o'
+      | 'Control+r'
       | 'g'
       | 'd'
       | '0'
+      | '$'
+      | 'R'
       | 'i'
       | 'z'
       | 'a'
       | 'k'
       | 'j'
+      | 'u'
       | 'Escape'
       | ':'
       | '/',
@@ -38,7 +44,7 @@ export interface SmokeDriver {
   type: (selector: string, text: string) => Promise<void>
   enableVim: () => Promise<void>
   showView: (view: 'tree' | 'agenda') => Promise<void>
-  reload: () => Promise<SmokeDriver>
+  quitAndReopen: () => Promise<SmokeDriver>
 }
 
 // Browser-only coverage: Electron has a different editing policy and no Tree menu.
@@ -155,14 +161,23 @@ export async function happyPath(driver: SmokeDriver) {
     ${textAt(focused)} === ${JSON.stringify(date + ' 🐱')} &&
     document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
     document.activeElement?.closest('.node-row')?.getAttribute('data-depth') === '1'`)
-  await driver.fill(focused, childText)
-  await driver.waitFor(rendered)
+  await driver.fill(focused, savedChildText)
   // Read through the real platform adapter. No seeded document, mocked save or store mutation.
   await driver.waitFor(`return window.treeApi.load().then(state => state.document.roots.some(root =>
-    root.text === ${JSON.stringify(parentText)} && root.children.some(child => child.text === ${JSON.stringify(childText)})))`)
-  const restored = await driver.reload()
+    root.text === ${JSON.stringify(parentText)} && root.children.some(child => child.text === ${JSON.stringify(savedChildText)})))`)
+
+  // Replace keeps the edit in its renderer buffer, outside both platforms' idle autosaves.
+  await driver.enableVim()
+  await driver.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL'`)
+  await driver.press(focused, '$')
+  await driver.press(focused, 'R')
+  await driver.type(focused, '!')
+  await driver.waitFor(rendered)
+  await driver.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'REPLACE'`)
+  await driver.waitFor(`return window.treeApi.load().then(state => state.document.roots.some(root =>
+    root.text === ${JSON.stringify(parentText)} && root.children.some(child => child.text === ${JSON.stringify(savedChildText)})))`)
+  const restored = await driver.quitAndReopen()
   await restored.waitFor(rendered)
-  await restored.enableVim()
   await restored.waitFor(`return document.querySelector('.vim-mode')?.textContent === 'NORMAL'`)
   await restored.waitFor(selectedText(childText))
   await restored.press(focused, '0')
@@ -220,27 +235,59 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.waitFor(`return document.activeElement?.closest('.agenda-role-match')?.getAttribute('aria-selected') === 'true' &&
     document.activeElement?.textContent === ${JSON.stringify('Vim ' + childText)}`)
   await restored.press(':focus', 'Escape')
+
+  const agendaText = 'Agenda Vim ' + childText
+  await restored.press(focused, '0')
+  await restored.press(focused, 'i')
+  await restored.type(focused, 'Agenda ')
+  await restored.press(focused, 'Escape')
+
+  await restored.waitFor(selectedText(agendaText))
+  await restored.press(focused, 'u')
+  await restored.waitFor(selectedText('Vim ' + childText))
+  await restored.press(focused, 'Control+r')
+  await restored.waitFor(`return ${textAt(focused)} === ${JSON.stringify(agendaText)} &&
+    document.querySelector('.vim-mode')?.textContent === 'NORMAL'`)
+
   await restored.showView('tree')
   await restored.waitFor(`return !document.querySelector('.agenda-list') &&
-    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+    ${textAt(focused)} === ${JSON.stringify(parentText)} &&
+    Array.from(document.querySelectorAll('.node-row .node-input')).some(input =>
+      ${editorText}(input) === ${JSON.stringify(agendaText)})`)
   const recent = '.recent-nodes-popup'
   await restored.press(focused, 'Primary+;')
   await restored.waitFor(
-    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`,
+    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(agendaText)}`,
   )
   await restored.press(':focus', 'ArrowDown')
   await restored.waitFor(
-    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify('Vim ' + childText)}`,
+    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`,
+  )
+  await restored.press(':focus', 'ArrowUp')
+  await restored.waitFor(
+    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(agendaText)}`,
   )
   await restored.press(':focus', 'Escape')
   await restored.waitFor(
     `return !document.querySelector('${recent}') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
   )
   await restored.press(focused, 'Primary+;')
-  await restored.press(':focus', 'ArrowDown')
   await restored.press(':focus', 'Enter')
   await restored.waitFor(`return !document.querySelector('${recent}') &&
     ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
-    ${textAt(focused)} === ${JSON.stringify('Vim ' + childText)}`)
+    ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
+
+  // Search outside the current parent, rather than selecting an unfiltered recent node.
+  const query = 'input[aria-label="Search query"]'
+  await restored.press(focused, 'Primary+;')
+  await restored.fill(query, parentText)
+  await restored.waitFor(`return document.querySelectorAll('${recent} [role="option"]').length === 1 &&
+    document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`)
+  await restored.press(query, 'Enter')
+
+  await restored.waitFor(`return !document.querySelector('${recent}') && !document.querySelector('.current-parent') &&
+    document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
+    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
+  return restored
 }

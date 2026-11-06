@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
 import { browserEditing, happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
+import { observeSafariErrors, readSafariErrors } from './safari-errors.mts'
 
 export const SAFARI_SMOKE_TIMEOUT_MS = 30_000
 
@@ -118,8 +119,39 @@ export async function runSafari(smoke = false) {
     const created = await request('/session', { capabilities: { alwaysMatch: { browserName: 'safari' } } })
     session = created.sessionId
     assert(session, 'SafariDriver did not create an isolated session')
-    await request(`/session/${session}/url`, { url: origin })
     const ready = 'return window.prototypeStore?.getSnapshot().status === "ready"'
+    let launcher: string | undefined
+    let smokeWindow: string | undefined
+    async function openSmokeWindow() {
+      await request(`/session/${session}/window`, { handle: launcher })
+      const link = await request(`/session/${session}/element`, { using: 'css selector', value: 'a' })
+      await request(`/session/${session}/element/${link['element-6066-11e4-a52e-4f735466cecf']}/click`, {})
+      const deadline = Date.now() + 5000
+      let handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
+      while (handles.length < 2) {
+        assert(Date.now() < deadline, 'Safari did not open the smoke application window')
+        await delay(50, undefined, { signal: controller.signal })
+        handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
+      }
+      assert.equal(handles.length, 2, 'Safari smoke must own only its launcher and application windows')
+      assert(handles.includes(launcher!), 'Safari lost the smoke launcher window')
+      smokeWindow = handles.find((handle) => handle !== launcher)
+      assert(smokeWindow, 'Safari did not open the smoke application window')
+      await request(`/session/${session}/window`, { handle: smokeWindow })
+      await waitFor(ready)
+      await evaluate(`(${observeSafariErrors.toString()})()`)
+    }
+    if (smoke) {
+      launcher = await request(`/session/${session}/window`, undefined, 'GET')
+      await evaluate(
+        `const link = document.createElement('a'); link.href = arguments[0];
+         link.target = '_blank'; link.textContent = 'Open Tree'; document.body.append(link);`,
+        [origin],
+      )
+      await openSmokeWindow()
+    } else {
+      await request(`/session/${session}/url`, { url: origin })
+    }
     await waitFor(ready)
     await request(`/session/${session}/execute/async`, {
       script:
@@ -129,11 +161,20 @@ export async function runSafari(smoke = false) {
     await request(`/session/${session}/refresh`, {})
     await waitFor(ready)
     if (smoke) {
+      await evaluate(`(${observeSafariErrors.toString()})()`)
       async function elementId(selector: string) {
         const element = await request(`/session/${session}/element`, { using: 'css selector', value: selector })
         const id = element['element-6066-11e4-a52e-4f735466cecf']
         assert(id, `Missing smoke editor: ${selector}`)
         return id
+      }
+      async function clickMenuItem(selector: string) {
+        await smokeDriver.click('#tree-menu-button')
+        // Wait for the popover's rendering step before Safari's next native pointer action.
+        await smokeDriver.waitFor(`await new Promise(requestAnimationFrame);
+          return document.querySelector('#tree-menu')?.matches(':popover-open') === true &&
+            document.querySelector(${JSON.stringify(selector)})?.disabled === false`)
+        await smokeDriver.click(selector)
       }
       const smokeDriver: SmokeDriver = {
         click: async (selector) => {
@@ -222,25 +263,28 @@ export async function runSafari(smoke = false) {
           const id = await elementId(selector)
           await request(`/session/${session}/element/${id}/value`, { text })
         },
-        enableVim: async () => {
-          for (const selector of ['#tree-menu-button', '#prototype-vim']) {
-            const id = await elementId(selector)
-            await request(`/session/${session}/element/${id}/click`, {})
+        enableVim: () => clickMenuItem('#prototype-vim'),
+        showView: (view) => clickMenuItem(`#prototype-${view}`),
+        quitAndReopen: async () => {
+          // SafariDriver does not deliver Cmd+Q here. Keep the Replace buffer focused during production Quit.
+          await evaluate('void window.treeApi.quit()').catch(async (error: unknown) => {
+            // Successful Quit can close the window before WebDriver acknowledges the command.
+            const handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
+            if (handles.includes(smokeWindow!)) throw error
+          })
+          const deadline = Date.now() + 5000
+          while (true) {
+            const handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
+            if (!handles.includes(smokeWindow!)) break
+            assert(Date.now() < deadline, 'Safari Quit did not close the application window')
+            await delay(50, undefined, { signal: controller.signal })
           }
-        },
-        showView: async (view) => {
-          for (const selector of ['#tree-menu-button', `#prototype-${view}`]) {
-            const id = await elementId(selector)
-            await request(`/session/${session}/element/${id}/click`, {})
-          }
-        },
-        reload: async () => {
-          await request(`/session/${session}/refresh`, {})
+          await openSmokeWindow()
           return smokeDriver
         },
       }
-      await happyPath(smokeDriver)
-      await browserEditing(smokeDriver)
+      await browserEditing(await happyPath(smokeDriver))
+      assert.deepEqual(await evaluate(`return (${readSafariErrors.toString()})()`), [], 'Unhandled Safari errors')
       console.log(`Safari ${created.capabilities.browserVersion}: happy path passed`)
       return
     }

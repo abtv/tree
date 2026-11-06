@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { browserEditing, happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
-import { clickApplicationMenuItem, closeApp } from '../electron/fixtures.ts'
+import { clickApplicationMenuItem, clickApplicationMenuQuit, closeApp } from '../electron/fixtures.ts'
 
 test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({ playwright }, testInfo) => {
   const errors: string[] = []
@@ -14,7 +14,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
   const observe = (page: import('@playwright/test').Page) => {
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('crash', () => errors.push('Renderer crashed'))
-    const driver: SmokeDriver = {
+    const driver: Omit<SmokeDriver, 'quitAndReopen'> = {
       click: (selector) => page.locator(selector).click(),
       waitFor: async (script) => {
         await expect.poll(() => page.evaluate(`(async () => { ${script} })()`), { message: script }).toBe(true)
@@ -31,10 +31,6 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
         await page.locator('#tree-menu-button').click()
         await page.locator(`#prototype-${view}`).click()
       },
-      reload: async () => {
-        await page.reload()
-        return driver
-      },
     }
     return driver
   }
@@ -42,9 +38,10 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
   if (testInfo.project.name === 'electron') {
     const profile = await mkdtemp(join(tmpdir(), `tree-smoke-p${process.pid}-`))
     let app: Awaited<ReturnType<typeof electron.launch>> | undefined
+    let appProcess: import('node:child_process').ChildProcess | undefined
     const stop = async () => {
       if (!app) return undefined
-      const child = app.process()
+      const child = appProcess!
 
       await closeApp(app)
 
@@ -54,6 +51,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       ).toBe(true)
 
       app = undefined
+      appProcess = undefined
       return child
     }
     const launch = async (): Promise<SmokeDriver> => {
@@ -68,6 +66,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
         timeout: 5000,
       })
       // Own the process before waiting for renderer readiness, including failed startup.
+      appProcess = app.process()
       const page = await app.firstWindow({ timeout: 5000 })
 
       expect(
@@ -81,7 +80,11 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
         ...observe(page),
         enableVim: () => clickApplicationMenuItem(owned, 'Edit', 'Vim Editing'),
         showView: (view) => clickApplicationMenuItem(owned, 'View', view === 'tree' ? 'Tree' : 'Agenda'),
-        reload: async () => {
+        quitAndReopen: async () => {
+          const child = owned.process()
+          await clickApplicationMenuQuit(owned)
+          // Observe production Quit before invoking fixture cleanup, which also requests closure.
+          await expect.poll(() => child.exitCode, { timeout: 5000 }).toBe(0)
           const previous = await stop()
 
           // A forced teardown must not count as a successful normal quit.
@@ -117,12 +120,26 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       const address = server.address()
       if (!address || typeof address === 'string') throw new Error('Missing smoke server port')
       browser = await playwright.chromium.launch({ channel: process.platform === 'darwin' ? 'chrome' : 'chromium' })
-      const page = await browser.newPage()
-      const driver = observe(page)
-
-      await page.goto(`http://localhost:${address.port}`)
-      await happyPath(driver)
-      await browserEditing(driver)
+      const opener = await browser.newPage()
+      await opener.setContent(`<a href="http://localhost:${address.port}" target="_blank">Open Tree</a>`)
+      const launch = async (): Promise<SmokeDriver> => {
+        const opened = opener.waitForEvent('popup')
+        await opener.getByRole('link', { name: 'Open Tree' }).click()
+        const page = await opened
+        const driver = observe(page)
+        return {
+          ...driver,
+          quitAndReopen: async () => {
+            const closed = page.waitForEvent('close', { timeout: 5000 })
+            await page.keyboard.press(`${primaryKey}+q`).catch((error) => {
+              if (!page.isClosed()) throw error
+            })
+            await closed
+            return launch()
+          },
+        }
+      }
+      await browserEditing(await happyPath(await launch()))
 
       expect(errors).toEqual([])
     } finally {
