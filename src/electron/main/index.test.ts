@@ -434,6 +434,7 @@ describe('desktop entry wiring', () => {
       ['emoji', '/profile/userData/data/emoji-history.json'],
       ['boolean', '/profile/userData/data/window-always-on-top.json'],
       ['boolean', '/profile/userData/data/vim-enabled.json'],
+      ['boolean', '/profile/userData/data/line-numbers.json'],
       ['appearance', '/profile/userData/data/appearance.json'],
       ['bounds', '/profile/userData/data/window-bounds.json'],
     ])

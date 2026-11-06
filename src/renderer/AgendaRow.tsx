@@ -26,6 +26,7 @@ function datedText(node: TreeNode, day: number, today: number, marks: readonly C
 const NO_MARKS: readonly CaretMark[] = []
 
 export const AgendaRow = memo(function AgendaRow({
+  lineNumber,
   row,
   node,
   today,
@@ -46,6 +47,7 @@ export const AgendaRow = memo(function AgendaRow({
   renderAttachment,
   renderText,
 }: {
+  lineNumber?: number | undefined
   row: Row
   node?: TreeNode | undefined
   today: number
@@ -91,6 +93,11 @@ export const AgendaRow = memo(function AgendaRow({
     >
       {row.kind === 'node' && row.role === 'match' && !mirror ? <TouchDragSurface /> : null}
       {selected ? <span aria-hidden="true" className="node-focus-marker" /> : null}
+      {lineNumber === undefined ? null : (
+        <span aria-hidden="true" className="line-number">
+          {lineNumber}
+        </span>
+      )}
       {row.kind === 'gap' ||
       (row.kind === 'day' && row.content) ||
       (row.kind === 'node' && row.hasProjectedChildren) ? (

@@ -28,6 +28,8 @@ export function useCommandPanel(options: {
   alwaysOnTop: boolean
   setAlwaysOnTop(value: boolean): void
   applyVimEnabled(value: boolean): Promise<void>
+  lineNumbers: boolean
+  applyLineNumbers(value: boolean): Promise<void>
   beforeViewChange(): void
   beforeOpen?: () => void
   shortcuts?: ShortcutProfile
@@ -36,6 +38,7 @@ export function useCommandPanel(options: {
   const { store, vimEnabled, vimMode, commandState, alwaysOnTop, setAlwaysOnTop, applyVimEnabled, beforeViewChange } =
     options
   const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
+  const { lineNumbers, applyLineNumbers } = options
   const beforeOpen = options.beforeOpen
   const searchCommand = options.searchCommand
   const showAbout = options.showAbout
@@ -138,6 +141,7 @@ export function useCommandPanel(options: {
             searchAllNodes: async () => searchCommand?.('all'),
             quit: () => window.treeApi.quit(),
             setVimEnabled: applyVimEnabled,
+            setLineNumbers: applyLineNumbers,
             showAgenda,
             showTree,
             setAlwaysOnTop: async (value) => {
@@ -149,7 +153,7 @@ export function useCommandPanel(options: {
               setAppearance(value)
             },
           },
-          { alwaysOnTop, appearance, vimEnabled, view },
+          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view },
         )
         if (command.name !== 'quit') {
           const next = rememberCommand(history, command.name)
@@ -173,6 +177,8 @@ export function useCommandPanel(options: {
       store,
       setAlwaysOnTop,
       applyVimEnabled,
+      applyLineNumbers,
+      lineNumbers,
       vimEnabled,
       view,
       showAgenda,
@@ -309,7 +315,7 @@ export function useCommandPanel(options: {
     bindInput,
     matches,
     total: commands.length,
-    context: { alwaysOnTop, appearance, vimEnabled, view },
+    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view },
     changeInput: (value: string) => {
       setInput(value)
       setSelected(0)

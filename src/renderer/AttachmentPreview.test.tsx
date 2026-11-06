@@ -32,6 +32,8 @@ function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
     getAlwaysOnTop: async () => false,
     setAlwaysOnTop: async () => undefined,
     getVimEnabled: async () => true,
+    getLineNumbers: async () => false,
+    setLineNumbers: async () => undefined,
     setVimEnabled: async () => undefined,
     ...overrides,
   }

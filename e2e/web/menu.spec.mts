@@ -288,8 +288,8 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     await device.keyboard.press('Meta+Shift+p')
     await device.locator('.command-panel').waitFor()
 
-    expect(await device.locator('.command-panel [role="option"]').count()).toBe(15)
-    await expect(device.locator('.command-count')).toHaveText('15 of 15')
+    expect(await device.locator('.command-panel [role="option"]').count()).toBe(16)
+    await expect(device.locator('.command-count')).toHaveText('16 of 16')
     expect(await device.locator('#command-toggle-always-on-top').count()).toBe(0)
     expect(await device.locator('.command-panel').getByText('toggle-vim-mode', { exact: true }).count()).toBe(0)
 

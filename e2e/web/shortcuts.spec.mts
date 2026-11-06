@@ -143,9 +143,10 @@ for (const [profile, modifier, otherModifier, label] of [
       'set-theme-light',
       'show-agenda',
       'show-tree',
+      'toggle-line-numbers',
       'toggle-vim-mode',
     ])
-    await expect(page.locator('.command-count')).toHaveText('16 of 16')
+    await expect(page.locator('.command-count')).toHaveText('17 of 17')
 
     await capture(page, `${profile}-available-commands.png`)
     const selected = () => panel.locator('[aria-selected="true"]').getAttribute('id')
@@ -182,12 +183,12 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.press('Escape')
     await page.keyboard.press(':')
 
-    await expect(panel.locator('.command-name')).toHaveCount(16)
+    await expect(panel.locator('.command-name')).toHaveCount(17)
 
     await page.getByRole('combobox', { name: 'Command', exact: true }).fill('toggle-always-on-top')
 
     await expect(panel.getByRole('option')).toHaveCount(0)
-    await expect(page.locator('.command-count')).toHaveText('0 of 16')
+    await expect(page.locator('.command-count')).toHaveText('0 of 17')
 
     await page.keyboard.press('Enter')
 

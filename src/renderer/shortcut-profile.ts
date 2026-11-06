@@ -16,6 +16,7 @@ export interface ShortcutModifierEvent {
 export interface ShortcutLabelSource {
   key: string
   shift?: boolean
+  control?: boolean
 }
 
 export interface ShortcutProfile {
@@ -51,7 +52,8 @@ export const APPLE_SHORTCUTS: ShortcutProfile = {
   primaryArrowToLineEdge: true,
   isContextMenuClick: (event) => event.ctrlKey,
   isWordMotion: (event) => event.altKey,
-  format: (shortcut) => `${shortcut.shift === true ? '⇧' : ''}⌘${shortcut.key.toUpperCase()}`,
+  format: (shortcut) =>
+    `${shortcut.shift === true ? '⇧' : ''}${shortcut.control ? '⌃' : '⌘'}${shortcut.key.toUpperCase()}`,
 }
 
 export const OTHER_SHORTCUTS: ShortcutProfile = {

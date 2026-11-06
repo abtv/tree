@@ -438,6 +438,28 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
 }
 
+.line-numbered {
+  padding-left: var(--line-number-gutter);
+}
+
+.node-list.line-numbered > .node-row-pinned {
+  left: var(--line-number-gutter);
+}
+
+.line-number {
+  position: absolute;
+  top: 0;
+  left: calc(-28px - var(--row-depth, 0) * var(--row-indent) - var(--line-number-gutter));
+  width: calc(var(--line-number-gutter) - 8px);
+  color: var(--color-secondary);
+  font-size: 11px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  pointer-events: none;
+}
+
 .node-list-spacer {
   width: 100%;
 }

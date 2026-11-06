@@ -78,6 +78,7 @@ beforeEach(() => {
   Object.assign(window, {
     treeApi: {
       getVimEnabled: mocks.getVim,
+      getLineNumbers: async () => false,
       setVimEnabled: mocks.setVim,
       getAppearance: mocks.getAppearance,
       setAppearance: mocks.setAppearance,

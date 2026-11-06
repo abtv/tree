@@ -104,6 +104,8 @@ describe('renderer Electron services', () => {
     getAlwaysOnTop: vi.fn(async () => false),
     setAlwaysOnTop: vi.fn(async () => undefined),
     getVimEnabled: vi.fn(async () => false),
+    getLineNumbers: vi.fn(async () => false),
+    setLineNumbers: vi.fn(async () => undefined),
     setVimEnabled: vi.fn(async () => undefined),
   }
 

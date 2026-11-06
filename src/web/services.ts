@@ -118,6 +118,7 @@ export async function installBrowserPrototype(): Promise<{
   }
   const vimAvailable = !isIPhoneOrIPad(navigator)
   let vimEnabled = vimAvailable && ((await read<boolean>('preferences', 'vim')) ?? false)
+  let lineNumbers = (await read<unknown>('preferences', 'line-numbers')) === true
   document.getElementById('prototype-vim-controls')!.hidden = !vimAvailable
   const savedAppearance = await read<string>('preferences', 'appearance')
   let appearance: 'system' | 'light' | 'dark' =
@@ -251,6 +252,13 @@ export async function installBrowserPrototype(): Promise<{
     },
     async getVimEnabled() {
       return vimEnabled
+    },
+    async getLineNumbers() {
+      return lineNumbers
+    },
+    async setLineNumbers(value) {
+      await write('preferences', 'line-numbers', value)
+      lineNumbers = value
     },
     async setVimEnabled(value) {
       if (!vimAvailable) return

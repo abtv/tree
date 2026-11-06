@@ -74,6 +74,7 @@ try {
         registerSearchCommands={registerSearchCommands}
         menuCommands={menuCommands}
         initialVimEnabled={await window.treeApi.getVimEnabled()}
+        initialLineNumbers={await window.treeApi.getLineNumbers()}
         vimAvailable={bridge.vimAvailable}
         alwaysOnTopAvailable={false}
         shortcutPlatform={isApplePlatform(navigator) ? 'apple' : 'other'}

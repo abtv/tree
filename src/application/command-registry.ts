@@ -17,6 +17,7 @@ export interface CommandServices {
   setAlwaysOnTop(value: boolean): Promise<void>
   setAppearance(value: CommandAppearance): Promise<void>
   setVimEnabled(value: boolean): Promise<void>
+  setLineNumbers(value: boolean): Promise<void>
   showAgenda(): Promise<void>
   showTree(): Promise<void>
 }
@@ -25,6 +26,7 @@ export interface CommandContext {
   alwaysOnTop: boolean
   appearance: CommandAppearance
   vimEnabled: boolean
+  lineNumbers: boolean
   view: 'tree' | 'agenda'
 }
 
@@ -32,6 +34,7 @@ export interface CommandContext {
 export interface CommandShortcut {
   key: string
   shift?: boolean
+  control?: boolean
 }
 
 export interface ApplicationCommand {
@@ -109,6 +112,14 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     description: 'Use Vim editing',
     active: (context) => context.vimEnabled,
     run: (services, context) => services.setVimEnabled(!context.vimEnabled),
+  },
+  {
+    name: 'toggle-line-numbers',
+    aliases: [],
+    description: 'Show line numbers',
+    shortcut: { key: 'L', control: true },
+    active: (context) => context.lineNumbers,
+    run: (services, context) => services.setLineNumbers(!context.lineNumbers),
   },
   ...(
     [

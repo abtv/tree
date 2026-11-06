@@ -76,22 +76,23 @@ const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'show
   })
 
 // An unreadable preference falls back to the first-run default, standard (non-Vim) editing.
-void window.treeApi
-  .getVimEnabled()
-  .catch(() => false)
-  .then((initialVimEnabled) => {
-    createRoot(rootElement).render(
-      <StrictMode>
-        <ErrorBoundary>
-          <App
-            showAbout={about.show}
-            initialVimEnabled={initialVimEnabled}
-            store={store}
-            dataOperations={dataOperations}
-            menuCommands={menuCommands}
-            registerViewCommands={registerViewCommands}
-          />
-        </ErrorBoundary>
-      </StrictMode>,
-    )
-  })
+void Promise.all([
+  window.treeApi.getVimEnabled().catch(() => false),
+  window.treeApi.getLineNumbers().catch(() => false),
+]).then(([initialVimEnabled, initialLineNumbers]) => {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App
+          showAbout={about.show}
+          initialVimEnabled={initialVimEnabled}
+          initialLineNumbers={initialLineNumbers}
+          store={store}
+          dataOperations={dataOperations}
+          menuCommands={menuCommands}
+          registerViewCommands={registerViewCommands}
+        />
+      </ErrorBoundary>
+    </StrictMode>,
+  )
+})

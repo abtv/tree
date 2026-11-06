@@ -54,6 +54,8 @@ beforeEach(() => {
     getAlwaysOnTop: async () => false,
     setAlwaysOnTop: async () => undefined,
     getVimEnabled: async () => true,
+    getLineNumbers: async () => false,
+    setLineNumbers: async () => undefined,
     setVimEnabled: async () => undefined,
   }
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:test' })
@@ -302,6 +304,48 @@ describe('App breadcrumb move matrix', () => {
       }
     }
   }
+})
+
+describe('line number editing states', () => {
+  // @requirement PRODUCT.md §2.1
+  it.each(['standard', 'normal', 'insert', 'replace', 'visual', 'visual-node'] as const)(
+    'preserves %s mode, caret and pending commands when toggling',
+    async (mode) => {
+      const store = await createSeededStore(
+        { roots: [{ id: 'root', text: 'abcdef', children: [] }] },
+        { currentParentId: null, selectedNodeId: 'root' },
+      )
+      renderReact(<App initialVimEnabled={mode !== 'standard'} store={store} />)
+      const input = screen.getByRole('textbox', { name: 'Node 1' }) as HTMLTextAreaElement
+      await act(async () => {
+        input.focus()
+      })
+      if (mode === 'insert') fireEvent.keyDown(input, { key: 'i' })
+      if (mode === 'replace') fireEvent.keyDown(input, { key: 'R' })
+      if (mode === 'visual') fireEvent.keyDown(input, { key: 'v' })
+      if (mode === 'visual-node') fireEvent.keyDown(input, { key: 'V' })
+      if (mode === 'normal') fireEvent.keyDown(input, { key: '2' })
+      const before = [input.selectionStart, input.selectionEnd]
+      const snapshot = store.getSnapshot()
+      const className = document.querySelector('main.tree-app')!.className
+
+      await act(async () => {
+        fireEvent.keyDown(input, { key: 'l', ctrlKey: true })
+      })
+
+      expect(document.querySelector('.line-number')).toHaveTextContent('1')
+      expect(input).toHaveFocus()
+      expect([input.selectionStart, input.selectionEnd]).toEqual(before)
+      expect(document.querySelector('main.tree-app')!.className).toBe(className)
+      expect(store.getSnapshot()).toBe(snapshot)
+
+      if (mode === 'normal') {
+        fireEvent.keyDown(input, { key: 'l' })
+
+        expect(input.selectionStart).toBe(2)
+      }
+    },
+  )
 })
 
 // @requirement PRODUCT.md §2.2

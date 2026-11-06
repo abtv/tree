@@ -172,6 +172,8 @@ describe('preload bridge', () => {
     await treeApi.setAlwaysOnTop(true)
     await treeApi.getVimEnabled()
     await treeApi.setVimEnabled(true)
+    await treeApi.getLineNumbers()
+    await treeApi.setLineNumbers(true)
     await treeApi.getAppearance()
     await treeApi.setAppearance('dark')
     await treeApi.getCommandHistory()
@@ -200,6 +202,8 @@ describe('preload bridge', () => {
       [ipcChannels.setAlwaysOnTop, true],
       [ipcChannels.getVimEnabled],
       [ipcChannels.setVimEnabled, true],
+      [ipcChannels.getLineNumbers],
+      [ipcChannels.setLineNumbers, true],
       [ipcChannels.getAppearance],
       [ipcChannels.setAppearance, 'dark'],
       [ipcChannels.getCommandHistory],

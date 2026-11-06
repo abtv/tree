@@ -4,6 +4,7 @@ import type { TreeNode } from '../domain/document'
 import { TouchDragSurface } from './TouchDragSurface'
 
 interface NodeRowProps {
+  lineNumber?: number | undefined
   node: TreeNode
   index: number
   depth?: number
@@ -28,6 +29,7 @@ interface NodeRowProps {
 }
 
 export const NodeRow = memo(function NodeRow({
+  lineNumber,
   node,
   index,
   depth = 0,
@@ -92,6 +94,11 @@ export const NodeRow = memo(function NodeRow({
       style={style}
     >
       <TouchDragSurface />
+      {lineNumber === undefined ? null : (
+        <span aria-hidden="true" className="line-number">
+          {lineNumber}
+        </span>
+      )}
       {focused ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       <button
         aria-label={`Enter node ${index + 1}`}

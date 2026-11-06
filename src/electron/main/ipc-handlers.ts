@@ -56,6 +56,8 @@ export interface IpcHandlerDependencies {
   setAlwaysOnTop: (alwaysOnTop: boolean) => void
   getVimEnabled: () => boolean
   setVimEnabled: (vimEnabled: boolean) => void
+  getLineNumbers: () => boolean
+  setLineNumbers: (value: boolean) => void
   notesArchive: NotesArchiveController
   setNotesMenuState: (state: NotesMenuState) => void
 }
@@ -86,6 +88,8 @@ export function registerIpcHandlers({
   setAlwaysOnTop,
   getVimEnabled,
   setVimEnabled,
+  getLineNumbers,
+  setLineNumbers,
   notesArchive,
   setNotesMenuState,
 }: IpcHandlerDependencies): void {
@@ -270,6 +274,17 @@ export function registerIpcHandlers({
   ipcMain.handle(ipcChannels.getVimEnabled, (event) => {
     requireTrustedRenderer(event)
     return getVimEnabled()
+  })
+  ipcMain.handle(ipcChannels.getLineNumbers, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return getLineNumbers()
+  })
+  ipcMain.handle(ipcChannels.setLineNumbers, (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof value !== 'boolean') throw new Error('Invalid line numbers setting.')
+    setLineNumbers(value)
   })
   ipcMain.handle(ipcChannels.setVimEnabled, (event, value) => {
     requireTrustedRenderer(event)

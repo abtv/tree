@@ -12,6 +12,7 @@ const names = (query: string, history: readonly string[] = []): string[] =>
   matchCommands(query, history).map((command) => command.name)
 
 describe('command registry', () => {
+  // @requirement PRODUCT.md §20.2.30
   // @requirement PRODUCT.md §20.2.28
   it.each(commandRegistry)('provides a nonempty description for $name in the command panel', (command) => {
     expect(command.description.trim().length).toBeGreaterThan(0)
@@ -36,20 +37,22 @@ describe('command registry', () => {
   it('keeps quit unchecked in every context', () => {
     const quit = commandRegistry.find((command) => command.name === 'quit')!
 
-    expect(quit.active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, view: 'agenda' })).toBe(false)
+    expect(
+      quit.active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
+    ).toBe(false)
     expect(
       commandRegistry
         .find((command) => command.name === 'show-tree')!
-        .active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, view: 'agenda' }),
+        .active({ alwaysOnTop: false, appearance: 'light', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(false)
   })
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 13],
-    [false, true, 12],
-    [false, false, 11],
-    [true, false, 12],
+    [true, true, 14],
+    [false, true, 13],
+    [false, false, 12],
+    [true, false, 13],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -75,6 +78,7 @@ describe('command registry', () => {
       'set-theme-light',
       'show-agenda',
       'show-tree',
+      'toggle-line-numbers',
     ])
     expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
   })
@@ -89,6 +93,7 @@ describe('command registry', () => {
       ['find-previous', { key: 'G', shift: true }],
       ['search-all-nodes', { key: ';', shift: false }],
       ['quit', { key: 'Q' }],
+      ['toggle-line-numbers', { key: 'L', control: true }],
     ])
   })
 
@@ -103,7 +108,7 @@ describe('command registry', () => {
     ['agenda', ['show-agenda']],
     ['tree', ['about-tree', 'show-tree']],
     ['about', ['about-tree']],
-    ['toggle', ['toggle-always-on-top', 'toggle-vim-mode']],
+    ['toggle', ['toggle-always-on-top', 'toggle-line-numbers', 'toggle-vim-mode']],
     ['q', ['quit']],
     ['qui', ['quit']],
     ['  dark  ', ['set-theme-dark']],
@@ -131,6 +136,7 @@ describe('command registry', () => {
       'show-agenda',
       'show-tree',
       'toggle-always-on-top',
+      'toggle-line-numbers',
       'toggle-vim-mode',
     ])
     expect(names('set-theme-dark', history)).toEqual(['set-theme-dark'])
@@ -160,11 +166,18 @@ describe('command registry', () => {
       setAlwaysOnTop: vi.fn(async () => undefined),
       setAppearance: vi.fn(async () => undefined),
       setVimEnabled: vi.fn(async () => undefined),
+      setLineNumbers: vi.fn(async () => undefined),
       showAgenda: vi.fn(async () => undefined),
       showTree: vi.fn(async () => undefined),
     }
     for (const command of commandRegistry)
-      await command.run(services, { alwaysOnTop: true, appearance: 'dark', vimEnabled: true, view: 'tree' })
+      await command.run(services, {
+        alwaysOnTop: true,
+        appearance: 'dark',
+        vimEnabled: true,
+        lineNumbers: true,
+        view: 'tree',
+      })
 
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
@@ -176,25 +189,34 @@ describe('command registry', () => {
     expect(services.quit).toHaveBeenCalledExactlyOnceWith()
     expect(services.setAlwaysOnTop).toHaveBeenCalledExactlyOnceWith(false)
     expect(services.setVimEnabled).toHaveBeenCalledExactlyOnceWith(false)
+    expect(services.setLineNumbers).toHaveBeenCalledExactlyOnceWith(false)
 
     const toggleVim = commandRegistry.find((command) => command.name === 'toggle-vim-mode')!
 
-    await toggleVim.run(services, { alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'agenda' })
+    await toggleVim.run(services, {
+      alwaysOnTop: false,
+      appearance: 'system',
+      vimEnabled: false,
+      lineNumbers: false,
+      view: 'agenda',
+    })
 
     expect(services.setVimEnabled).toHaveBeenLastCalledWith(true)
     expect(services.setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark']])
     expect(
       commandRegistry
-        .filter((command) => command.active({ alwaysOnTop: true, appearance: 'dark', vimEnabled: true, view: 'tree' }))
+        .filter((command) =>
+          command.active({ alwaysOnTop: true, appearance: 'dark', vimEnabled: true, lineNumbers: true, view: 'tree' }),
+        )
         .map((command) => command.name),
-    ).toEqual(['show-tree', 'toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
+    ).toEqual(['show-tree', 'toggle-always-on-top', 'toggle-vim-mode', 'toggle-line-numbers', 'set-theme-dark'])
     expect(
       commandRegistry
         .find((command) => command.name === 'show-agenda')!
-        .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'agenda' }),
+        .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(13)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(14)
   })
 
   it('keeps search actions unchecked and tolerates unavailable search services', async () => {
@@ -203,10 +225,17 @@ describe('command registry', () => {
       setAlwaysOnTop: vi.fn(async () => undefined),
       setAppearance: vi.fn(async () => undefined),
       setVimEnabled: vi.fn(async () => undefined),
+      setLineNumbers: vi.fn(async () => undefined),
       showAgenda: vi.fn(async () => undefined),
       showTree: vi.fn(async () => undefined),
     }
-    const state = { alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'tree' } as const
+    const state = {
+      alwaysOnTop: false,
+      appearance: 'system',
+      vimEnabled: false,
+      lineNumbers: false,
+      view: 'tree',
+    } as const
 
     for (const name of ['find', 'find-next', 'find-previous', 'search-all-nodes']) {
       const command = commandRegistry.find((candidate) => candidate.name === name)!

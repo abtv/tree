@@ -62,6 +62,7 @@ let mainWindow: BrowserWindow | null = null
 let appQuitting = false
 let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
+let lineNumbersStore: BooleanPreferenceStore | null = null
 let appearanceStore: AppearancePreferenceStore | null = null
 let requestQuitFromMenu: () => void = () => undefined
 let notesArchive: NotesArchiveController | null = null
@@ -379,6 +380,7 @@ bootstrapApplication({
     const emojiHistory = createEmojiHistoryStore(join(app.getPath('userData'), 'data', 'emoji-history.json'))
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
+    lineNumbersStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'line-numbers.json'))
     appearanceStore = createAppearancePreferenceStore(join(app.getPath('userData'), 'data', 'appearance.json'))
     // Leave the default untouched for Automatic so the system appearance applies as Electron starts it.
     const savedAppearance = appearanceStore.load()
@@ -435,6 +437,8 @@ bootstrapApplication({
         rebuildApplicationMenu()
       },
       getVimEnabled: isVimEnabled,
+      getLineNumbers: () => lineNumbersStore?.load() ?? false,
+      setLineNumbers: (value) => lineNumbersStore?.save(value),
       setVimEnabled: (value) => {
         vimEnabledStore?.save(value)
         rebuildApplicationMenu()

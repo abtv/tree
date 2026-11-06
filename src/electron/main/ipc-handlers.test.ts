@@ -42,6 +42,8 @@ function createHarness() {
   const setAlwaysOnTop = vi.fn()
   const getVimEnabled = vi.fn(() => true)
   const setVimEnabled = vi.fn()
+  const getLineNumbers = vi.fn(() => false)
+  const setLineNumbers = vi.fn()
   const decodePng = vi.fn(decodePngWithZlib)
   const getAppearance = vi.fn(() => 'system' as const)
   const setAppearance = vi.fn()
@@ -97,6 +99,8 @@ function createHarness() {
     setAlwaysOnTop,
     getVimEnabled,
     setVimEnabled,
+    getLineNumbers,
+    setLineNumbers,
     notesArchive,
     setNotesMenuState,
   })
@@ -127,10 +131,35 @@ function createHarness() {
     setAlwaysOnTop,
     getVimEnabled,
     setVimEnabled,
+    getLineNumbers,
+    setLineNumbers,
   }
 }
 
 describe('main IPC handlers', () => {
+  it('validates line number preferences before reading or writing and propagates save failures', () => {
+    const { handlers, getLineNumbers, setLineNumbers } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const get = handlers.get(ipcChannels.getLineNumbers)!
+    const set = handlers.get(ipcChannels.setLineNumbers)!
+
+    expect(get(event)).toBe(false)
+    set(event, true)
+
+    expect(getLineNumbers).toHaveBeenCalledOnce()
+    expect(setLineNumbers).toHaveBeenCalledExactlyOnceWith(true)
+    expect(() => set(event, 'true')).toThrow('Invalid line numbers setting.')
+    expect(() => set(event, true, 'extra')).toThrow()
+    expect(() => get(event, 'extra')).toThrow()
+    expect(() => set({ senderFrame: { url: 'https://example.com' } }, true)).toThrow('Untrusted')
+    expect(setLineNumbers).toHaveBeenCalledOnce()
+
+    setLineNumbers.mockImplementation(() => {
+      throw new Error('Disk full')
+    })
+
+    expect(() => set(event, false)).toThrow('Disk full')
+  })
   it.each([null, 0, {}, 'stale-request'])(
     'rejects invalid quit acknowledgment %j without beginning or confirming a quit',
     (id) => {

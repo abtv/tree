@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
+import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
 import { findCanonicalDates } from '../domain/date-recognition'
@@ -45,6 +46,7 @@ function isEditableOccurrence(
 }
 
 export function AgendaView({
+  lineNumbers = false,
   store,
   agenda,
   document,
@@ -58,6 +60,7 @@ export function AgendaView({
   shortcuts,
   searchCaretRef,
 }: {
+  lineNumbers?: boolean
   searchCaretRef?: { current: (() => number) | undefined }
   shortcuts?: ShortcutProfile
   store: EditorStore
@@ -156,6 +159,7 @@ export function AgendaView({
   const viewportReveal = useMemo(() => createViewportReveal(), [])
   useEffect(() => viewportReveal.mount(), [viewportReveal])
   const rows = store.getAgendaRows()
+  const numbers = useMemo(() => (lineNumbers ? agendaLineNumbers(rows) : undefined), [lineNumbers, rows])
   const lastPresentation = useRef(agenda)
   const restoreScroll = useRef<number | undefined>(undefined)
   useLayoutEffect(() => {
@@ -417,6 +421,7 @@ export function AgendaView({
     const editable = row.kind === 'node' && isEditableOccurrence(row, node!, agenda.activeOccurrence)
     return (
       <AgendaRow
+        lineNumber={numbers?.get(row.key)}
         key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
         row={row}
         node={node}
@@ -448,8 +453,13 @@ export function AgendaView({
   }
   return (
     <div
-      className={`agenda-list${range === undefined ? '' : ' agenda-list-windowed'}`}
-      style={range === undefined ? undefined : { height: layout.total }}
+      className={`agenda-list${lineNumbers ? ' line-numbered' : ''}${range === undefined ? '' : ' agenda-list-windowed'}`}
+      style={
+        {
+          ...(range === undefined ? {} : { height: layout.total }),
+          '--line-number-gutter': `${Math.max(2, String(numbers?.size ?? 0).length) * 8 + 12}px`,
+        } as React.CSSProperties
+      }
       ref={listRef}
       role="grid"
       aria-label={agenda.focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}

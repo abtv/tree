@@ -104,6 +104,8 @@ export const treeApi: TreeApi = {
   setAlwaysOnTop: (alwaysOnTop) => ipcRenderer.invoke(ipcChannels.setAlwaysOnTop, alwaysOnTop),
   getVimEnabled: () => ipcRenderer.invoke(ipcChannels.getVimEnabled),
   setVimEnabled: (vimEnabled) => ipcRenderer.invoke(ipcChannels.setVimEnabled, vimEnabled),
+  getLineNumbers: () => ipcRenderer.invoke(ipcChannels.getLineNumbers),
+  setLineNumbers: (value) => ipcRenderer.invoke(ipcChannels.setLineNumbers, value),
   onAlwaysOnTopChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, value: boolean): void => listener(value)
     ipcRenderer.on(ipcEvents.alwaysOnTopChanged, handler)

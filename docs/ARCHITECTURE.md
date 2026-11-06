@@ -382,6 +382,20 @@ Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, sel
 
 ## 8. UI Layer
 
+`use-line-numbers.ts` owns the shared Tree/Agenda line-number preference and its
+literal Control shortcut. The command panel uses the same setter. Both platform
+entries read it before mounting the editor; Electron uses the existing boolean
+preference store through validated IPC, and the browser uses its preferences
+object store. It does not enter document state or history. Tree uses visible-row
+indices; `line-numbers.ts` numbers projected Agenda node occurrences, independently
+of the mounted window. Only rendered rows receive number elements.
+
+Performance assessment (PRODUCT §22.1): each toggle writes one boolean preference,
+with no document write or sync. Tree numbering is constant work per mounted row;
+Agenda builds a bounded map only when its projection changes while numbers are
+enabled. No per-edit history or unbounded cache is retained. Large-list rendering
+coverage guards mounting bounds and numbering across window boundaries.
+
 `use-command-panel.ts` owns one transient command-panel session shared by Tree and Agenda. It captures Normal-mode `:` before editor dispatch, clears pending Vim assembly through its existing owner, and restores the previous DOM focus and selection on dismissal. `CommandPanel.tsx` presents the registry matches separately from inline completion. Its selection uses the shared `moveSuggestionIndex` wrapping rule from `completion-controller.ts`. The view overlays the document above the status bar, keeping document geometry unchanged. Platform commands cross the trusted preload API; the renderer never accesses preference files.
 
 `shortcut-profile.ts` is the renderer's single answer to "is this key event a primary-modifier shortcut". Two constant profiles, `apple` (Cmd) and `other` (Ctrl), also supply the bare-modifier key name, the left-modifier key code, the macOS-only context-menu click test, the word-motion modifier and shortcut labels. It has no React, DOM or Electron imports. `App` takes an optional `shortcutPlatform` prop (default `apple`, like `vimAvailable`), resolves the constant profile and passes it as an optional dependency, defaulting to `apple`, to the input bindings, the Agenda key handlers, the completion and command-panel hooks and the pointer handlers. The Electron entry point passes nothing. No module-level mutable state exists, and no key event allocates. Performance assessment (`docs/PRODUCT.md` §22.1): the change adds one constant-time predicate call per key event and no state, writes, syncs or retained memory, so no Electron performance run applies.

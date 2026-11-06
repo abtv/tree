@@ -290,6 +290,30 @@ At the root level, the first root node is positioned at the same height as the f
 * In Insert mode, and always while Vim editing is disabled, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
 * In Normal mode, the image can be the active character after the node's text; the image is visibly marked while active. For an image-only node, the image is its sole character.
 
+#### Line Numbers
+
+`Ctrl+L` and the `toggle-line-numbers` command toggle ordinary line numbers in
+Tree and Agenda, in standard editing and every Vim mode. Control is literal on
+every platform. Numbers are off initially; the preference survives restarts
+separately from the document and does not add undo history or save the document.
+
+Each visible node receives one number, starting at 1 in the current view and
+following its displayed order, including expanded descendants. Wrapped text and
+image-only nodes each receive one number. Collapsed descendants are excluded;
+scrolling and list virtualization do not restart numbering. The Tree parent
+heading and Agenda day/gap headings are not numbered. Agenda counts each visible
+node occurrence, including context ancestors and repeated occurrences on different
+days. Changing view, scope or folds recomputes the numbers for that view.
+
+Numbers occupy a separate, muted, right-aligned column to the left of the outline,
+aligned with each node's first text line. They do not replace bullets or fold
+controls, enter copied text, or change selection, caret, editing mode or pending
+Vim commands. Holding the shortcut does not repeatedly toggle. Modal dialogs,
+composition and command/search input keep their own keyboard handling.
+
+This explicit Control shortcut follows the owner's keyboard-first choice (§1.3).
+Browsers may reserve Ctrl+L for their address bar; the command panel remains available.
+
 ### 2.2 Location Path
 
 A thin toolbar at the top of the application displays the current location.
@@ -1664,6 +1688,22 @@ Temporarily disabled menu actions remain listed, visibly dimmed and marked disab
 
 An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select the next/previous row with wrapping, as in completion lists (§20.9). `Enter` or clicking a row runs the listed selection, even for a partial query such as `qui`; there is no separate prefix-abbreviation execution. With no matches, `Enter` closes the panel and displays `Not a command: <input>` at the left of the status bar for two seconds, or until the next key press if sooner. Expiry restores the ordinary status-bar content without changing editor focus, selection or mode.
 
+The available commands and their history rules are specified in §20.2.30.
+
+#### 20.2.29 Popup Navigation
+
+While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation and activity messages share this rule in desktop and browser versions where available. Image preview instead uses `h/j/k/l` to pan its image (§17.1).
+
+`Enter` activates the focused button; `Escape` cancels or dismisses the popup through its existing action. Busy operations retain their existing cancellation restrictions. In a focused activity message, Escape invokes its Cancel or OK action. Existing initial focus, Tab/Shift+Tab navigation and focus restoration remain unchanged. Moving focus must not edit notes or execute an editor command.
+
+The browser's vertical Tree menu uses `j` for the next button and `k` for the previous button, with the same visibility, enabled-state and non-wrapping rules. Opening this menu with Vim enabled focuses its first available button. Enter activates the focused item and Escape closes the menu. The horizontal `h/l` bindings do not apply to this vertical menu.
+
+Text-entry surfaces, including the command panel, search and date/emoji completions, retain literal letters and their existing navigation keys. Modified keys and native text composition retain their existing behavior. With Vim editing disabled, these extra letter bindings are inactive. System-owned menus, file pickers and permission prompts retain platform keyboard behavior.
+
+These application-control bindings extend the keyboard-first model (§1.3); they do not change Vim text editing.
+
+#### 20.2.30 Command Registry
+
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
 | `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.14) |
@@ -1676,6 +1716,7 @@ An input change selects the first row. `↓`/`↑` and `Ctrl+N`/`Ctrl+P` select 
 | `about-tree` | — | About Tree | — | — | Open About (§1.3, §1.4) |
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
 | `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
+| `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
 | `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
 | `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
 | `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
@@ -1699,18 +1740,6 @@ Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 
 **Vim divergence.** At the Product Owner's request, this panel lists application commands and runs the selected row, whereas Vim runs typed command-line text. Up/Down select rows rather than recalling history; history instead orders the list. This keyboard-first model is the deliberate platform difference under §1.3.
-
-#### 20.2.29 Popup Navigation
-
-While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation and activity messages share this rule in desktop and browser versions where available. Image preview instead uses `h/j/k/l` to pan its image (§17.1).
-
-`Enter` activates the focused button; `Escape` cancels or dismisses the popup through its existing action. Busy operations retain their existing cancellation restrictions. In a focused activity message, Escape invokes its Cancel or OK action. Existing initial focus, Tab/Shift+Tab navigation and focus restoration remain unchanged. Moving focus must not edit notes or execute an editor command.
-
-The browser's vertical Tree menu uses `j` for the next button and `k` for the previous button, with the same visibility, enabled-state and non-wrapping rules. Opening this menu with Vim enabled focuses its first available button. Enter activates the focused item and Escape closes the menu. The horizontal `h/l` bindings do not apply to this vertical menu.
-
-Text-entry surfaces, including the command panel, search and date/emoji completions, retain literal letters and their existing navigation keys. Modified keys and native text composition retain their existing behavior. With Vim editing disabled, these extra letter bindings are inactive. System-owned menus, file pickers and permission prompts retain platform keyboard behavior.
-
-These application-control bindings extend the keyboard-first model (§1.3); they do not change Vim text editing.
 
 ### 20.3 Typography
 

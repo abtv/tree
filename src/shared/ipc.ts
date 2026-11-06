@@ -28,6 +28,8 @@ export const ipcChannels = {
   setAlwaysOnTop: 'tree:set-always-on-top',
   getVimEnabled: 'tree:get-vim-enabled',
   setVimEnabled: 'tree:set-vim-enabled',
+  getLineNumbers: 'tree:get-line-numbers',
+  setLineNumbers: 'tree:set-line-numbers',
   getAppearance: 'tree:get-appearance',
   setAppearance: 'tree:set-appearance',
   getCommandHistory: 'tree:get-command-history',
@@ -182,6 +184,8 @@ export interface TreeApi {
   setAlwaysOnTop(alwaysOnTop: boolean): Promise<void>
   getVimEnabled(): Promise<boolean>
   setVimEnabled(vimEnabled: boolean): Promise<void>
+  getLineNumbers(): Promise<boolean>
+  setLineNumbers(value: boolean): Promise<void>
   /** Fires when the application menu changes the setting, so the renderer can follow it. */
   onAlwaysOnTopChanged?: (listener: (alwaysOnTop: boolean) => void) => () => void
   onVimEnabledChanged?: (listener: (vimEnabled: boolean) => void) => () => void

@@ -16,6 +16,12 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 ## Mode and command families
 
+`Ctrl+L` toggles visible-node line numbers in every editing mode (PRODUCT §2.1).
+**Vim divergence:** the owner requested this application shortcut instead of Vim's
+Normal-mode screen redraw. It preserves pending commands, selection and editing
+mode. The line-number hook tests and Electron line-number spec cover dispatch,
+presentation and persistence.
+
 Normal `Ctrl+A` and `Ctrl+X` follow PRODUCT §20.2.10 with Vim's `defaults.vim` number formats (`bin,hex`). Focused arithmetic and cursor cases live in `src/domain/vim-number.test.ts` and `vim-number.property.test.ts`; `src/renderer/editor-input-handlers.test.ts` covers counts, pending-command cancellation, register preservation, dot repeat, history and both modifier profiles. `e2e/electron/vim-counters.spec.ts` covers native dispatch, plain and rich caret projection, Undo/Redo and Agenda read-only rows.
 
 Normal `h` and `l` follow PRODUCT §4.3, §20.2.9 and §23.4. **Vim divergence:** they continue through visible Tree or Agenda rows at text/image boundaries, so horizontal navigation does not stop at every node. Counts consume grapheme and crossing steps; empty and image-only nodes each have one position. Visual and operators stay local. `src/renderer/vim-horizontal-navigation.property.test.ts` covers counted destinations, Unicode, empty nodes, image entry/return, clamping and bounded work; `src/renderer/vim-interaction.property.test.ts` covers focus and caret ownership across generated sequences. `e2e/electron/vim-navigation-and-visual.spec.ts` (“traverses visible outline boundaries with h and l while keeping Visual and operators local”) covers folds, heading transitions and command routing; `e2e/electron/vim-image-caret.spec.ts` (“crosses text, empty and image-only nodes with counted h and l”) covers native keyboard dispatch, image/text caret transitions and inspected renderer screenshots.

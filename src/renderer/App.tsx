@@ -41,6 +41,7 @@ import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 import type { DesktopDataOperations } from '../application/notes-archive/desktop-data-operations'
 import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
+import { useLineNumbers } from './use-line-numbers'
 
 interface AppProps {
   showAbout?: () => void
@@ -50,6 +51,7 @@ interface AppProps {
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
   initialVimEnabled: boolean
+  initialLineNumbers?: boolean
   /** Platforms that do not offer Vim also omit its command-panel entry. */
   vimAvailable?: boolean
   /** Whether the host can float its window above other applications. */
@@ -69,6 +71,7 @@ export function App({
   registerSearchCommands,
   store,
   initialVimEnabled,
+  initialLineNumbers = false,
   vimAvailable = true,
   alwaysOnTopAvailable = true,
   deferRichEditing = false,
@@ -80,6 +83,7 @@ export function App({
   registerViewCommands,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
+  const { lineNumbers, applyLineNumbers } = useLineNumbers(initialLineNumbers, store)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const agendaToday = state.status === 'ready' ? state.agenda?.today : undefined
   const treeToday = localToday()
@@ -208,6 +212,8 @@ export function App({
     alwaysOnTop,
     setAlwaysOnTop,
     applyVimEnabled,
+    lineNumbers,
+    applyLineNumbers,
     beforeOpen: () => {
       store.search.interruptNavigation()
       if (store.search.session.getSnapshot().draft !== undefined) {
@@ -594,6 +600,7 @@ export function App({
         >
           {agenda !== undefined ? (
             <AgendaView
+              lineNumbers={lineNumbers}
               searchCaretRef={searchCaret}
               store={store}
               agenda={agenda}
@@ -651,6 +658,7 @@ export function App({
                 </section>
               )}
               <NodeList
+                lineNumbers={lineNumbers}
                 colorDepthOffset={path.length}
                 breadcrumbTargets={breadcrumbTargets}
                 onBreadcrumbTarget={setBreadcrumbTarget}

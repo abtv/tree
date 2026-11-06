@@ -20,6 +20,7 @@ import { notifyViewportLayout, onViewportScroll, viewportBounds } from './scroll
 import { useNodeListDrag } from './use-node-list-drag'
 
 interface NodeListProps {
+  lineNumbers?: boolean
   nodes: readonly TreeNode[]
   visibleRows?: readonly VisibleRow[]
   colorDepthOffset?: number
@@ -41,6 +42,7 @@ interface NodeListProps {
 const NEVER_EXPANDED = (): boolean => false
 
 export function NodeList({
+  lineNumbers = false,
   nodes,
   visibleRows: suppliedVisibleRows,
   colorDepthOffset = 0,
@@ -241,6 +243,7 @@ export function NodeList({
       focused={focusedNodeId !== undefined && node.id === focusedNodeId}
       visualSelected={visualRange !== undefined && index >= visualRange.start && index <= visualRange.end}
       index={index}
+      lineNumber={lineNumbers ? index + 1 : undefined}
       key={node.id}
       node={node}
       {...(onActivate === undefined ? {} : { onActivate })}
@@ -258,14 +261,19 @@ export function NodeList({
   return (
     <section
       aria-label="Nodes"
-      className={`node-list${invalidDrop ? ' node-list-drop-invalid' : ''}`}
+      className={`node-list${lineNumbers ? ' line-numbered' : ''}${invalidDrop ? ' node-list-drop-invalid' : ''}`}
       onClickCapture={onListClick}
       onLostPointerCapture={onLostPointerCapture}
       onPointerCancel={onListPointerCancel}
       onPointerMove={onListPointerMove}
       onPointerUp={onListPointerUp}
       ref={listRef}
-      style={{ '--row-indent': `${DROP_LEVEL_STEP_PX}px` } as React.CSSProperties}
+      style={
+        {
+          '--row-indent': `${DROP_LEVEL_STEP_PX}px`,
+          '--line-number-gutter': `${Math.max(2, String(visibleRows.length).length) * 8 + 12}px`,
+        } as React.CSSProperties
+      }
     >
       <DropZone index={0} start />
       {listWindow === undefined

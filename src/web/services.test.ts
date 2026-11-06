@@ -604,6 +604,27 @@ describe('browser editing service contracts', () => {
     expect(changed).toHaveBeenCalledOnce()
   })
 
+  it.each([undefined, 'true', true, false])(
+    'loads and durably saves line numbers separately from notes (%j)',
+    async (saved) => {
+      const f = fixture()
+      f.values.set('preferences:line-numbers', saved)
+      await installBrowserPrototype()
+
+      expect(await window.treeApi.getLineNumbers()).toBe(saved === true)
+
+      const pending = window.treeApi.setLineNumbers(true)
+
+      expect(f.put).toHaveBeenLastCalledWith(true, 'line-numbers')
+      expect(f.db.transaction).toHaveBeenLastCalledWith('preferences', 'readwrite', { durability: 'strict' })
+
+      f.transactions[0]!.oncomplete!()
+      await pending
+
+      expect(await window.treeApi.getLineNumbers()).toBe(true)
+    },
+  )
+
   it('disables Vim on an iPad even with a saved enabled preference', async () => {
     const f = fixture()
     f.values.set('preferences:vim', true)

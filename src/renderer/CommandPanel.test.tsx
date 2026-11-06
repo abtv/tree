@@ -17,7 +17,13 @@ afterEach(() => {
   else Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView)
 })
 
-const context: CommandContext = { alwaysOnTop: false, appearance: 'system', vimEnabled: false, view: 'tree' }
+const context: CommandContext = {
+  alwaysOnTop: false,
+  appearance: 'system',
+  vimEnabled: false,
+  lineNumbers: false,
+  view: 'tree',
+}
 
 describe('command panel presentation', () => {
   // @requirement PRODUCT.md §20.2.28
