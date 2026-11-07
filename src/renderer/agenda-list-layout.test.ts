@@ -37,6 +37,7 @@ describe('Agenda occurrence layout', () => {
     expect(range.end - range.start).toBeLessThan(60)
     expect(range.pinnedIndex).toBe(900)
     expect(agendaListWindow(rows, layout, { start: 5000, end: 5600 }, rows[210]!.key)?.pinnedIndex).toBeUndefined()
-    expect(agendaListWindow(rows.slice(0, 500), layout, { start: 0, end: 600 }, rows[0]!.key)).toBeUndefined()
+    expect(agendaListWindow(rows.slice(0, 100), layout, { start: 0, end: 600 }, rows[0]!.key)).toBeUndefined()
+    expect(agendaListWindow(rows.slice(0, 101), layout, { start: 0, end: 600 }, rows[0]!.key)).toBeDefined()
   })
 })

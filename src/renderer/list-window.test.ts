@@ -8,15 +8,14 @@ import {
   ROW_HEIGHT_ESTIMATE,
   shouldWindow,
   WINDOW_OVERSCAN,
-  WINDOWING_THRESHOLD,
 } from './list-window'
 
 const uniform = (count: number, height = ROW_HEIGHT_ESTIMATE): number[] => Array.from({ length: count }, () => height)
 
 describe('shouldWindow', () => {
-  it('windows only above the threshold', () => {
-    expect(shouldWindow(WINDOWING_THRESHOLD)).toBe(false)
-    expect(shouldWindow(WINDOWING_THRESHOLD + 1)).toBe(true)
+  it('windows medium lists above 100 displayed rows', () => {
+    expect(shouldWindow(100)).toBe(false)
+    expect(shouldWindow(101)).toBe(true)
   })
 })
 

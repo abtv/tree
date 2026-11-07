@@ -1261,7 +1261,9 @@ The pointer shows the text-editing cursor only over a node editor that has focus
 
 ### 20.1 Very Wide Node Lists
 
-When the current location contains more than 500 visible rows, including inline descendants, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
+When the current location contains more than 100 visible rows, including inline descendants, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
+
+Windowing starts at this medium-list size to bound keyboard-driven row updates and browser layout work. It changes no document data, history entries, disk writes or syncs. Mounted DOM and per-row editor state remain bounded by the viewport and overscan, while the existing logical row projection and height offsets still scale with the displayed list. Splitting, merging or folding across the threshold must preserve focus, caret and text even when the rendering mode changes.
 
 The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
 
@@ -2123,7 +2125,7 @@ Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles the selected 
 
 ### 23.6 Large Timelines
 
-Agenda uses the windowing behavior of §20.1 above 500 projected rows, including day headers and gaps. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Folding, gap reveal and window resizing update the layout without losing selection or focus; windowing adds no document saves.
+Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers and gaps. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Folding, gap reveal and window resizing update the layout without losing selection or focus; windowing adds no document saves.
 
 Scrolling must populate the newly visible range before the next rendered frame, including large scrollbar jumps and rapid direction changes. The viewport must not flash empty while its rows are replaced. Scrolling preserves the selected occurrence, active editor, caret, text selection and editing mode.
 

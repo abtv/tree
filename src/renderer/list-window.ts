@@ -1,4 +1,4 @@
-export const WINDOWING_THRESHOLD = 500
+export const WINDOWING_THRESHOLD = 100
 export const WINDOW_OVERSCAN = 12
 export const ROW_HEIGHT_ESTIMATE = 25
 export const EDGE_SCROLL_MARGIN = 64

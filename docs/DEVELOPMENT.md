@@ -1174,6 +1174,10 @@ npm run test:perf -- --project=electron
 
 `make test-perf` combines domain timing guards, both performance projects, and the Safari/Electron comparison. For focused runs, use `npm run test:perf -- --project=electron` or run the [browser archive scenarios](../src/web/README.md#browser-archive-performance) with `npm run test:perf -- --project=web` when a change can affect browser archive work.
 
+Known Electron/macOS issue (observed on macOS 26.6.2, November 2026): the idle main-process delay guard in `perf/electron/notes-archive.spec.ts` can fail on Electron 45.2.1 and 45.2.3. Native sampling traced the wait to Chromium's window-occlusion checker calling AppKit's ordered-window query. The same failure reproduces on the unchanged commit before the windowing-threshold reduction; selecting Electron 44.10.1 removed this measured main delay in controlled runs. Electron 45.2.3 produced both passing and failing runs. These observations do not establish behavior on other systems, physical keyboard latency, or a validated production downgrade.
+
+The Product Owner classified this as a known runtime issue separate from the windowing optimization. Keep the test and its limits unchanged, report the failure explicitly, and do not describe the full performance suite as passing. A focused recheck with another runtime uses `npm run test:perf -- --project=electron notes-archive.spec.ts`; a native workaround or dependency change requires its own decision and validation.
+
 ### Preparing a macOS release
 
 Commit the intended application changes, then run this command from the repository root:

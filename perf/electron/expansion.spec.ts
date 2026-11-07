@@ -180,10 +180,10 @@ test.describe('inline expansion at scale', () => {
     'does not grow the renderer heap unboundedly when expanding many branches',
     { tag: '@memory' },
     async ({ userDataDir }) => {
-      // 400 top-level roots alone stay under the 500-row windowing threshold; expanding 100 of them
-      // (400 + 100 * 2 = 600 visible rows) pushes past it, and collapsing them again must drop back
+      // 100 top-level roots render unwindowed; expanding all 100 of them
+      // (100 + 100 * 2 = 300 visible rows) pushes past the threshold, and collapsing must drop back
       // under it, not merely revert the same row count some other way.
-      const topCount = 400
+      const topCount = 100
       const expandedCount = 100
       const seed = largeSeed(topCount, 2)
       seed.location = { currentParentId: null, selectedNodeId: 'r0' }

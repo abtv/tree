@@ -80,7 +80,7 @@ function View({ store }: { store: EditorStore }): React.JSX.Element {
 it('bounds mounted rows, pins distant selection and preserves its DOM across a fold threshold', async () => {
   const harness = await createRealStoreHarness({
     document: {
-      roots: Array.from({ length: 600 }, (_, index) => ({
+      roots: Array.from({ length: 200 }, (_, index) => ({
         id: `n${index}`,
         text: `2026-10-08 Node ${index}`,
         children: [],
@@ -95,7 +95,7 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
   expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
 
   const rows = harness.store.getAgendaRows()
-  const distant = rows.find((row) => row.kind === 'node' && row.nodeId === 'n599')!
+  const distant = rows.find((row) => row.kind === 'node' && row.nodeId === 'n199')!
 
   act(() => harness.store.applyAgenda({ kind: 'select', key: distant.key }))
   const element = container.querySelector(`[data-agenda-key="${distant.key}"]`)!

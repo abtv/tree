@@ -95,6 +95,42 @@ async function rowTilingProblems(window: Page): Promise<string[]> {
 }
 
 describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
+  // @requirement PRODUCT.md §20.1
+  test('preserves text, focus and caret while splitting and merging across 100 rows', async ({ userDataDir }) => {
+    seedDocument(userDataDir, wideSeed(100))
+    const { window } = await launchTree(userDataDir)
+    const input = row(window, 1)
+    await input.focus()
+    await input.evaluate((element: HTMLTextAreaElement) => {
+      element.setSelectionRange(element.value.length, element.value.length)
+    })
+
+    for (let index = 0; index < 3; index += 1) {
+      await expect(window.locator('.node-row')).toHaveCount(100)
+
+      await window.keyboard.press('Enter')
+
+      await expect(window.locator('.node-list')).toHaveClass(/node-list-windowed/)
+      expect(await window.locator('.node-row').count()).toBeLessThan(100)
+      await expect(row(window, 2)).toBeFocused()
+      await expect(row(window, 2)).toHaveValue('')
+
+      await window.keyboard.press('Backspace')
+
+      await expect(window.locator('.node-list')).not.toHaveClass(/node-list-windowed/)
+      await expect(input).toBeFocused()
+      await expect(input).toHaveValue('Child 0')
+      await expect(input).toHaveJSProperty('selectionStart', 7)
+      await expect(input).toHaveJSProperty('selectionEnd', 7)
+    }
+
+    await window.keyboard.type('!')
+
+    await expect(input).toHaveValue('Child 0!')
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Root')
+    await window.screenshot({ path: `.scratch/earlier-windowing/${screenshotName('threshold-boundary.png')}` })
+  })
+
   // @requirement PRODUCT.md §11
   test('keeps an unfocused drag source mounted while the viewport scrolls away', async ({ userDataDir }) => {
     seedDocument(userDataDir, wideSeed(600))
@@ -139,7 +175,7 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
   })
 
   test('keyboard navigation reaches and types into an off-screen row', async ({ userDataDir }) => {
-    seedDocument(userDataDir, wideSeed(600))
+    seedDocument(userDataDir, wideSeed(200))
     const { window } = await launchTree(userDataDir)
 
     await row(window, 1).focus()
@@ -230,7 +266,7 @@ test.describe('windowed node list (mode-independent)', () => {
 
   // @requirement PRODUCT.md §20.1
   test('dragging near the window edge auto-scrolls a list below the windowing threshold', async ({ userDataDir }) => {
-    seedDocument(userDataDir, wideSeed(120))
+    seedDocument(userDataDir, wideSeed(100))
     const { window } = await launchTree(userDataDir)
     const scrollTop = (): Promise<number> =>
       window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
@@ -241,7 +277,7 @@ test.describe('windowed node list (mode-independent)', () => {
     const innerHeight = await window.evaluate(() => globalThis.innerHeight)
     const x = box.x + box.width / 2
 
-    expect(await window.locator('.node-row').count()).toBeGreaterThan(100)
+    expect(await window.locator('.node-row').count()).toBe(100)
 
     await startRowDrag(window, source, { xOffset: box.width / 2 })
 

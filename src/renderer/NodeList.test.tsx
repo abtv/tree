@@ -1199,14 +1199,14 @@ describe('NodeList windowing', () => {
 
   it('mounts a bounded window while preserving the full list height above the threshold', () => {
     mockRows(0)
-    const { container } = renderList(600)
+    const { container } = renderList(200)
     const rows = container.querySelectorAll('.node-row')
 
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.length).toBeLessThan(100)
 
     expect(Number.parseFloat(container.querySelector<HTMLElement>('.node-list')!.style.height)).toBe(
-      600 * ROW_HEIGHT_ESTIMATE,
+      200 * ROW_HEIGHT_ESTIMATE,
     )
   })
 

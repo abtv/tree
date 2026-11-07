@@ -626,12 +626,12 @@ test.describe('inline node expansion (mode-independent)', () => {
   test('windows on the flattened visible row count once inline descendants push past the threshold', async ({
     userDataDir,
   }) => {
-    const topCount = 300
-    const expandedCount = 110
+    const topCount = 100
+    const expandedCount = 10
     seedDocument(userDataDir, wideNestedSeed(topCount, expandedCount))
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
-    // 300 top-level roots alone stay under the 500-row threshold and render unwindowed.
+    // 100 top-level roots render unwindowed, including at the threshold itself.
     await expect(window.locator('.node-list')).not.toHaveClass(/node-list-windowed/)
 
     // Expand by stable node id, not by rendered position: each expansion shifts every later
@@ -644,7 +644,7 @@ test.describe('inline node expansion (mode-independent)', () => {
       }
     }, expandedCount)
 
-    // 300 top-level rows + 110 * 2 expanded children = 520 visible rows, above the threshold.
+    // 100 top-level rows + 10 * 2 expanded children = 120 visible rows, above the threshold.
     await expect(window.locator('.node-list')).toHaveClass(/node-list-windowed/)
 
     const mountedRows = await window.locator('.node-row').count()

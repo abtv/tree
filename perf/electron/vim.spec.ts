@@ -827,7 +827,23 @@ test.describe('Vim interactions at scale', () => {
 
     const destinationChildren = window.locator('.node-row')
 
-    await expect(destinationChildren).toHaveCount(101)
+    expect(await destinationChildren.count()).toBeLessThan(101)
+    await expect(destinationChildren.first().getByRole('textbox')).toHaveValue('Root 0')
+
+    // Check the logical sibling count through navigation: 101 siblings no longer all mount.
+    await window.keyboard.press('G')
+
+    const lastChild = window.locator('.node-row[data-node-id="r1c99"]')
+
+    await expect(lastChild).toHaveAttribute('data-node-index', '100')
+    await expect(lastChild.getByRole('textbox')).toBeFocused()
+    await expect(lastChild.getByRole('textbox')).toHaveValue('Node 1.99')
+
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await window.keyboard.press('j')
+
+    await expect(destinationChildren.first().getByRole('textbox')).toBeFocused()
     await expect(destinationChildren.first().getByRole('textbox')).toHaveValue('Root 0')
 
     await window.keyboard.press('g')
