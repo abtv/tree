@@ -14,6 +14,49 @@ const lock = (electron: string, react = '19.0.0', vite = '8.0.0') => ({
 })
 
 describe('release notes', () => {
+  it('uses authored notes, deduplicates their text and suppresses explained internal changes', () => {
+    const result = formatReleaseNotes(
+      [
+        { subject: 'feat(editor): Technical subject', body: 'Release-Note: Show line numbers with Control-L.' },
+        { subject: 'fix(search): Retain paint', body: 'Release-Note: Keep search results visible while scrolling.' },
+        { subject: 'fix(search): Another subject', body: 'Release-Note: Keep search results visible while scrolling.' },
+        { subject: 'perf(renderer): Cache geometry', body: 'Release-Note: Scroll long outlines faster.' },
+        { subject: 'fix(renderer): Internal measurement', body: 'Release-Note: none: Synthetic test capture only.' },
+        { subject: 'feat(release): Internal scope opt-in', body: 'Release-Note: Download updates from the menu.' },
+        { subject: 'fix(tags): Legacy fix' },
+      ],
+      undefined,
+      lock('45'),
+      'link',
+    )
+
+    expect(result).toContain('## Added\n\n- Show line numbers with Control-L.\n- Download updates from the menu.')
+    expect(result).toContain('## Improved\n\n- Scroll long outlines faster.')
+    expect(result.match(/Keep search results visible while scrolling\./g)).toHaveLength(1)
+    expect(result).toContain('Legacy fix')
+    expect(result).not.toMatch(/Technical subject|Retain paint|Synthetic|Internal measurement/)
+  })
+
+  it('retains breaking warnings even when an old unchecked commit attempts to omit them', () => {
+    const result = formatReleaseNotes(
+      [
+        { subject: 'feat(editor)!: Technical', body: 'Release-Note: Upgrade macOS before installing.' },
+        {
+          subject: 'refactor(storage): Internal',
+          body: 'BREAKING CHANGE: Export notes before upgrading.\n\nRelease-Note: none: Internal.',
+        },
+      ],
+      undefined,
+      lock('45'),
+      'link',
+    )
+
+    expect(result).toContain('## Breaking changes')
+    expect(result).toContain('Upgrade macOS before installing.')
+    expect(result).toContain('Export notes before upgrading.')
+    expect(result).not.toContain('Technical')
+  })
+
   it('groups user changes, deduplicates entries and omits internal work', () => {
     const result = formatReleaseNotes(
       [
@@ -91,13 +134,17 @@ describe('release notes', () => {
       git('init')
       commit('feat(editor): Old feature', '44')
       git('tag', 'v1.0.0')
-      const sha = commit('fix(editor): Correct new behavior', '45')
+      const sha = commit(
+        'fix(editor): Correct new behavior\n\nRelease-Note: Keep text aligned when toggling numbers.',
+        '45',
+      )
       commit('feat(editor): Future feature', '46')
       git('tag', 'v2.0.0')
 
       const result = releaseNotes(sha, 'v1.0.0', cwd)
 
-      expect(result).toContain('Correct new behavior')
+      expect(result).toContain('Keep text aligned when toggling numbers.')
+      expect(result).not.toContain('Correct new behavior')
       expect(result).toContain('electron: 44 → 45')
       expect(result).not.toMatch(/Old feature|Future feature|45 → 46/)
       expect(result).toContain(`https://github.com/abtv/tree/compare/v1.0.0...${sha}`)

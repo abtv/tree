@@ -22,4 +22,4 @@ if grep -Eiq "generated (with|by) (claude|codex|opencode|chatgpt|copilot|gpt)" "
   exit 1
 fi
 
-exit 0
+node "$(dirname "$0")/../scripts/check-release-notes.mts" --message-file "$message_file"

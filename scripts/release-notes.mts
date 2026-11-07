@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { parseReleaseNote } from './release-note.mts'
 
 type Commit = { subject: string; body?: string }
 type Lock = { packages: Record<string, { version?: string; dependencies?: Record<string, string> }> }
@@ -12,11 +13,14 @@ export function formatReleaseNotes(commits: Commit[], before: Lock | undefined, 
     const match = /^(\w+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/.exec(subject)
     if (!match) continue
     const [, type, scope = '', breaking, text] = match
+    const note = parseReleaseNote(body)
     const warning = /^BREAKING[ -]CHANGE:\s*(.+)$/m.exec(body)?.[1]
-    if (breaking || warning) entries.get('Breaking changes')!.add(warning ?? text!)
-    else if (!internal.test(scope)) {
+    if (breaking || warning)
+      entries.get('Breaking changes')!.add(warning ?? (note && 'text' in note ? note.text : text!))
+    else if (note && 'reason' in note) continue
+    else if (note || !internal.test(scope)) {
       const section = { feat: 'Added', fix: 'Fixed', perf: 'Improved' }[type!]
-      if (section) entries.get(section)!.add(text!)
+      if (section) entries.get(section)!.add(note && 'text' in note ? note.text : text!)
     }
   }
   if (before) {

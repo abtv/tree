@@ -51,14 +51,32 @@ advance this baseline. The highest lower semantic version is used; a missing or
 non-ancestor baseline fails reservation before any write. The reservation checkout
 includes full history and tags. The first release uses all history through its SHA.
 
-Notes group features, fixes and performance changes, omit known internal scopes,
-and highlight breaking-change markers regardless of commit type. Repeated identical
-entries are removed. Dependency notes compare locked versions of Electron and direct
+New `feat`, `fix` and `perf` commits carry one single-line `Release-Note` field in
+their body. The agent writes and reviews it as part of the change, without a separate
+owner request:
+
+```text
+fix(search): retain painted results during native scrolling
+
+Release-Note: Prevent search results from briefly disappearing while scrolling.
+```
+
+Internal changes use `Release-Note: none: <reason>`. A reason is mandatory and is
+not published. Breaking changes cannot opt out. Explicit notes take precedence over
+technical subjects and internal-scope filtering. Legacy commits without a field
+retain subject-based notes and known internal-scope filtering. The legacy boundary
+is commit `667781e`; its ancestors are exempt from CI field requirements. Git history
+is not rewritten to add fields. Existing drafts retain their current text.
+
+Notes group features, fixes and performance changes and highlight breaking-change
+markers regardless of commit type. A `BREAKING CHANGE` body warning takes precedence
+so migration instructions are retained. Repeated identical entries are removed.
+Dependency notes compare locked versions of Electron and direct
 production dependencies, including Electron despite its development dependency placement.
 The first release has no dependency baseline. Other development dependencies are omitted.
 The full comparison is linked; no generated changelog is stored in Git.
 
-Review the draft before publishing: remove internal changes whose scopes were not
+Review the draft before publishing, especially legacy entries: remove internal changes whose scopes were not
 recognized, combine related entries, rewrite technical subjects for users, and add
 any known limitations or required user actions. Deterministic filtering cannot judge
 the significance of every commit. Retries reuse existing draft text without regeneration,

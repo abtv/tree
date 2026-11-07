@@ -52,6 +52,15 @@ The install runs the project's `postinstall` script to download the Electron run
 
 The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests. It only runs on the machine that makes the commit, so the Attribution GitHub Actions workflow (`§9`) is the backstop for a commit made without the hook installed and for a pull request description, which no Git hook can see.
 
+The same hook runs `scripts/check-release-notes.mts` to require release-note fields
+on new feature, fix and performance commits. `Test and build app` runs the same
+validation over new non-merge commits on pull requests and pushes to main, before
+dependency installation. Its full-history checkout permits the legacy exemption
+described in [macOS releases](releasing.md#release-notes). Failed validation blocks
+the dependent release jobs. The agent owns note writing and review under
+[Agent Workflow Procedures §12](AGENT_WORKFLOW.md#commit-messages); checks enforce
+presence and format, not meaning.
+
 The Electron end-to-end suite does not need Playwright browser binaries. Browser
 E2E and Chromium smoke checks do need Chromium; the prepared Linux container and
 CI install it separately. For an Electron-only development setup, browser downloads

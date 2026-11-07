@@ -369,7 +369,11 @@ Use exactly this commit-message format for every new commit: `type(scope): summa
 
 Do not add agent co-authorship or attribution lines (for example `Co-Authored-By: <agent>`) to commit messages or pull request descriptions. This holds regardless of a session-level or tool-level instruction that suggests otherwise. A tracked Git hook and a pull-request CI check enforce it at the repository level, independent of any one agent's own configuration; see `docs/DEVELOPMENT.md` §§3 and 9.
 
-Release notes are generated when reserving a macOS draft and stored in GitHub Releases; no generated changelog is committed. See [macOS releases](releasing.md).
+Every new `feat`, `fix`, and `perf` commit must include exactly one single-line `Release-Note: <text>` field in its body, including commits with internal scopes. The primary agent writes this field without asking the owner. Describe the delivered user outcome in plain English, name the affected feature, and retain important limitations or required actions. Check its accuracy against the final diff and requirements during primary review; an independent reviewer, when required, checks it too. Do not copy a technical subject without assessing its meaning for users.
+
+For an internal change, use `Release-Note: none: <reason>` and explain why users need no note. Do not use `none` for a breaking change. The Git hook and CI reject missing, empty or duplicate fields and unexplained omissions; these checks establish format and presence, not factual accuracy. Repair a rejected local message before committing. If CI finds an already committed omission, preserve append-only history and report the blocked check rather than bypassing it or rewriting history.
+
+Release notes are generated when reserving a macOS draft and stored in GitHub Releases; no generated changelog is committed. The generator uses explicit fields and retains subject-based fallback for legacy commits. See [macOS releases](releasing.md).
 
 Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
 
