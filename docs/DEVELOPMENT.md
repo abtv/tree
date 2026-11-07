@@ -767,7 +767,7 @@ installed separately in the hosting repository.
 | --- | --- |
 | Release new app version | `release-new-app-version.yml` |
 | Test and build app | `test-and-build-app.yml` |
-| Create macOS release draft (reusable) | `create-macos-release-draft.yml` |
+| Publish macOS release (reusable) | `create-macos-release-draft.yml` |
 | Run smoke tests (reusable) | `run-smoke-tests.yml` |
 | Run web E2E tests | `run-web-e2e-tests.yml` |
 | Run Electron E2E tests | `run-electron-e2e-tests.yml` |
@@ -1198,12 +1198,13 @@ attempt, then runs independent Web and macOS branches. The Web job waits for dep
 and verifies hosted bytes. The macOS branch reserves an owned draft, signs its installer,
 checks the application copied from that DMG on a fresh runner without signing secrets,
 and uploads the original signer artifact from a separate runner after SHA-256 verification.
+That runner publishes the complete release only after GitHub asset digests match the signer outputs.
 It does not rerun standard validation. Failed-only release retries keep successful
 work. A failed target deployment requires manual retry through the target-run link; App
 permissions remain unchanged. See [macOS releases](releasing.md) and
 [Browser publication](../deployment/github-pages/README.md) for recovery and trust details.
 
-A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Draft creation is serialized across versions. Publication remains the owner's explicit action. Full release, retry and signing details are in [macOS releases](releasing.md).
+A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Reservation, upload and automatic publication are serialized across versions. The owner selects releases through the local version command. Full release, retry and signing details are in [macOS releases](releasing.md).
 
 The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full Electron coverage across Linux and macOS and the Linux memory suite for a new release version. The memory suite's detection limits are described under [What the memory suite can detect](#what-the-memory-suite-can-detect).
 

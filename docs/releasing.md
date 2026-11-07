@@ -1,8 +1,10 @@
 # macOS releases
 
 After successful checks of a version commit on `main`, `Release new app version` builds Tree
-for Apple Silicon and uploads a verified DMG, update ZIP and metadata to a **draft** GitHub Release.
-Only the owner publishes the draft for users.
+for Apple Silicon, uploads a verified DMG, update ZIP and metadata to a temporary
+draft GitHub Release, and automatically publishes it after checking the uploaded
+asset digests against the original signer outputs. The owner selects releases by
+explicitly increasing the version; ordinary commits do not release a new desktop version.
 
 ## Create a release
 
@@ -35,12 +37,21 @@ main. One global desktop concurrency group serializes reservations and uploads.
 Arbitrary external tag pushes and manual draft publication are outside that lock.
 
 After a failed build, select **Re-run failed jobs** in `Release new app version`. It reuses only
-the same tag/SHA and its own empty draft; no deletion or version increment is
+the same tag/SHA and its own draft; no deletion or version increment is
 needed. Dispatch verification rejects stale source main and changed validation attempts;
 a newer reserved version also prevents uploading the older one. Published releases and
-complete uploaded artifact sets are skipped. Unknown drafts or partial/unknown assets
+complete uploaded artifact sets are skipped during candidate planning. Unknown drafts or partial/unknown assets
 stop for inspection. Existing tags and assets are never replaced. No automated
-step publishes a release or changes its published/draft state after creation.
+step changes release notes after reservation. The upload job publishes only the
+owned release after checking all three uploaded SHA-256 digests against signer
+outputs. Use **Re-run failed jobs** after upload or publication failure: it reuses
+the successful signing and verification jobs, skips already uploaded matching
+assets, and completes publication without rebuilding. If publication succeeded but
+its response was lost, the retry verifies the published assets without publishing
+again. A partial upload still requires inspection; it is never overwritten.
+Rerunning all jobs skips a complete existing draft rather than rebuilding or
+publishing it without the original successful job outputs. Existing drafts from
+before automatic publication remain for the owner's manual disposition.
 
 ## Release notes
 
@@ -76,12 +87,13 @@ production dependencies, including Electron despite its development dependency p
 The first release has no dependency baseline. Other development dependencies are omitted.
 The full comparison is linked; no generated changelog is stored in Git.
 
-Review the draft before publishing, especially legacy entries: remove internal changes whose scopes were not
-recognized, combine related entries, rewrite technical subjects for users, and add
-any known limitations or required user actions. Deterministic filtering cannot judge
-the significance of every commit. Retries reuse existing draft text without regeneration,
-preserving manual edits and the hidden source ownership marker. Keep that marker.
-The publication reminder appears in the reservation job summary, not in release notes.
+Review release-note fields before committing, and inspect legacy fallback entries
+before preparing a version: remove internal changes whose scopes were not recognized,
+combine related entries, use plain language, and retain known limitations or required
+user actions. Deterministic filtering cannot judge the significance of every commit.
+There is no manual review gate between draft creation and publication. Retries reuse
+existing draft text without regeneration, preserving any edits and the hidden source
+ownership marker. Keep that marker.
 
 ## Signing and packaging
 
@@ -177,9 +189,13 @@ Builder notarizes and staples the app; the workflow verifies its Developer ID
 signature, ticket and Gatekeeper acceptance, then notarizes and staples the DMG.
 The DMG is explicitly signed and its Developer ID authority and Gatekeeper
 acceptance are checked too. Immediately before upload, the release must still be
-a draft owned by the checked source run, with the pinned tag/SHA and no assets.
-Upload does not use `--clobber`.
-Missing credentials or any failed verification prevent asset upload. The built-in
+a draft owned by the checked source run, with the pinned tag/SHA and no assets
+for a new upload. A retry may reuse a complete matching artifact set.
+Upload does not use `--clobber`. Before publication, the uploader rechecks the
+source validation attempt, tag/SHA, draft ownership and complete asset set. GitHub's
+reported SHA-256 digest for every asset must match the original signer output.
+Only then does it change `draft` to `false`; it leaves the notes and assets intact.
+Missing credentials or any failed verification prevent asset upload or publication. The built-in
 GitHub token has `contents: read` and `actions: read` in preflight, signing and
 verification; only reservation and upload add `contents: write`.
 
@@ -188,14 +204,15 @@ updates (PRODUCT §26). The artifact recorder creates metadata from the final ZI
 and the verifier and uploader independently check all three signer-provided digests.
 The isolated verifier also checks and launches the ZIP application. Metadata points
 only to the ZIP, so later DMG stapling cannot invalidate its update hash.
-Publish the complete draft; a partial artifact set fails closed. The first build
+Only the complete draft is published; a partial artifact set fails closed. The first build
 containing the updater must be installed manually. Before declaring signed updates
 verified, test an actual older-to-newer signed installation with synthetic notes in
 a separate macOS account, confirming restart, version change and preserved edits.
 
-## Verify and publish
+## Optional manual diagnostics
 
-Download the draft DMG on an Apple Silicon Mac:
+The workflow verifies and publishes the signed release automatically. To investigate
+an installer independently, download its DMG on an Apple Silicon Mac:
 
 ```bash
 xcrun stapler validate Tree-0.1.0-arm64.dmg
@@ -209,9 +226,9 @@ spctl --assess --type execute --verbose=2 /Volumes/Tree\ 0.1.0-arm64/Tree.app
 
 Use the actual mount path reported by `hdiutil` if different. Confirm Developer ID
 Application authority and your team identifier. Test launch and normal workflows
-in a separate macOS test account to avoid touching personal Tree data. After the
-workflow succeeds and testing passes, open the draft on GitHub and select
-**Publish release** (or run `gh release edit v0.1.0 --draft=false`).
+in a separate macOS test account to avoid touching personal Tree data. These
+diagnostics are optional and do not block automatic publication. A draft left by
+a failed workflow remains unpublished until recovery succeeds.
 
 ## Troubleshooting
 

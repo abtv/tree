@@ -184,7 +184,27 @@ test('upload cannot consume verifier-controlled bytes and only follows successfu
   expect(upload.steps.some((step) => /npm ci|packaged-smoke|electron-builder/.test(step.run ?? ''))).toBe(false)
 })
 
-test('release retains authenticated source, reservation and immutable manual publication gates', () => {
+test('publication follows upload and receives only the original signer digests', () => {
+  const uploadIndex = upload.steps.findIndex((step) => step.run === 'node scripts/release-draft.mts upload')
+  const publishIndex = upload.steps.findIndex((step) => step.run === 'node scripts/release-draft.mts publish')
+  expect(uploadIndex).toBeGreaterThan(-1)
+  expect(publishIndex).toBe(uploadIndex + 1)
+  for (const step of upload.steps.slice(uploadIndex, publishIndex + 1)) {
+    expect(step.env).toEqual({
+      GH_TOKEN: '${{ github.token }}',
+      RELEASE_ID: '${{ needs.reserve.outputs.release_id }}',
+      EXPECTED_DMG_SHA256: '${{ needs.sign.outputs.sha256 }}',
+      EXPECTED_ZIP_SHA256: '${{ needs.sign.outputs.zip_sha256 }}',
+      EXPECTED_METADATA_SHA256: '${{ needs.sign.outputs.metadata_sha256 }}',
+    })
+    expect(step['continue-on-error']).toBeUndefined()
+  }
+  for (const job of [candidate, reserve, sign, verify]) {
+    expect(job.steps.some((step) => step.run?.includes('release-draft.mts publish'))).toBe(false)
+  }
+})
+
+test('release retains authenticated source, reservation and immutable artifact gates', () => {
   expect(workflow.permissions).toEqual({ contents: 'read', actions: 'read' })
   expect(candidate.if).toContain("github.event_name == 'workflow_dispatch'")
   expect(candidate.if).toContain("github.ref == 'refs/heads/main'")

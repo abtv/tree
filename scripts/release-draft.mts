@@ -26,8 +26,9 @@ type Release = {
   tag_name: string
   draft: boolean
   body: string | null
-  assets: { name: string; state: string; size: number }[]
+  assets: { name: string; state: string; size: number; digest?: string | null }[]
 }
+type Digests = { dmg: string; zip: string; metadata: string }
 type Candidate = {
   tag: string
   sha: string
@@ -127,6 +128,7 @@ export async function planDraft(
   event: { workflow_run: Run },
   texts: string[],
   api: Request,
+  includeCompleted = false,
 ): Promise<Candidate | undefined> {
   const run = await verifySource(event, api)
   const { version } = packageVersion(texts)
@@ -148,17 +150,20 @@ export async function planDraft(
   const release = existing[0]
   const marker = `<!-- tree-macos-release source=${run.head_sha} run=${run.id} -->`
   if (release) {
-    if (!release.draft) return undefined
+    if (!release.draft && !includeCompleted) return undefined
     if (!release.body?.includes(marker) || !existingTag)
       throw new Error('Existing draft is not owned by this source run')
+    if (!release.draft && !release.assets.length) throw new Error('Published release has no verified artifacts')
     if (release.assets.length) {
       if (
         release.assets.length === 3 &&
         [`Tree-${version}-arm64.dmg`, `Tree-${version}-arm64.zip`, 'latest-mac.yml'].every((name) =>
           release.assets.some((asset) => asset.name === name && asset.state === 'uploaded' && asset.size > 0),
         )
-      )
-        return undefined
+      ) {
+        if (!includeCompleted) return undefined
+        return { tag, sha: run.head_sha, runId: run.id, marker, release, tagged: true }
+      }
       throw new Error('Existing draft has partial or unknown assets; inspect it before retrying')
     }
   }
@@ -207,11 +212,52 @@ export async function reserveDraft(event: { workflow_run: Run }, texts: string[]
   return { ...candidate, release }
 }
 
-export async function verifyUpload(event: { workflow_run: Run }, texts: string[], releaseId: number, api: Request) {
-  const candidate = await planDraft(event, texts, api)
+function verifyAssetDigests(release: Release, tag: string, digests: Digests) {
+  const version = tag.slice(1)
+  const expected = [
+    [`Tree-${version}-arm64.dmg`, digests.dmg],
+    [`Tree-${version}-arm64.zip`, digests.zip],
+    ['latest-mac.yml', digests.metadata],
+  ] as const
+  const assets = release.assets
+  if (assets.length !== expected.length) throw new Error('Release artifact set is incomplete')
+  for (const [name, digest] of expected) {
+    if (!/^[a-f0-9]{64}$/.test(digest)) throw new Error('Invalid signer digest')
+    const asset = assets.find((item) => item.name === name)
+    if (!asset || asset.state !== 'uploaded' || asset.size <= 0 || asset.digest !== `sha256:${digest}`)
+      throw new Error(`Release asset differs from signed artifact: ${name}`)
+  }
+}
+
+export async function verifyUpload(
+  event: { workflow_run: Run },
+  texts: string[],
+  releaseId: number,
+  api: Request,
+  digests?: Digests,
+) {
+  const candidate = await planDraft(event, texts, api, digests !== undefined)
   if (!candidate?.release || candidate.release.id !== releaseId)
     throw new Error('Draft is no longer eligible for upload')
-  return candidate
+  if (candidate.release.assets.length && digests) verifyAssetDigests(candidate.release, candidate.tag, digests)
+  return { ...candidate, release: candidate.release }
+}
+
+export async function publishRelease(
+  event: { workflow_run: Run },
+  texts: string[],
+  releaseId: number,
+  digests: Digests,
+  api: Request,
+) {
+  const candidate = await verifyUpload(event, texts, releaseId, api, digests)
+  verifyAssetDigests(candidate.release, candidate.tag, digests)
+  if (!candidate.release.draft) return false
+
+  const published = (await api(`${root}/releases/${releaseId}`, 'PATCH', { draft: false })) as Release
+  if (published.id !== releaseId || published.tag_name !== candidate.tag || published.draft !== false)
+    throw new Error('Release publication was not confirmed; retry failed jobs')
+  return true
 }
 
 if (import.meta.main) {
@@ -238,8 +284,23 @@ if (import.meta.main) {
       console.log(
         candidate ? `Preparing draft ${candidate.tag} from ${candidate.sha}` : 'No new eligible macOS release version',
       )
-    } else if (command === 'upload') {
-      const candidate = await verifyUpload(event, texts, Number(process.env.RELEASE_ID), request)
+    } else if (command === 'upload' || command === 'publish') {
+      const digests = {
+        dmg: process.env.EXPECTED_DMG_SHA256 ?? '',
+        zip: process.env.EXPECTED_ZIP_SHA256 ?? '',
+        metadata: process.env.EXPECTED_METADATA_SHA256 ?? '',
+      }
+      const releaseId = Number(process.env.RELEASE_ID)
+      if (command === 'publish') {
+        const published = await publishRelease(event, texts, releaseId, digests, request)
+        console.log(published ? 'Published verified macOS release' : 'Verified macOS release is already published')
+        process.exit(0)
+      }
+      const candidate = await verifyUpload(event, texts, releaseId, request, digests)
+      if (candidate.release.assets.length) {
+        console.log(`Verified artifacts already uploaded to ${candidate.tag}`)
+        process.exit(0)
+      }
       const file = `dist/Tree-${candidate.tag.slice(1)}-arm64.dmg`
       const result = spawnSync(
         'gh',
@@ -259,9 +320,8 @@ if (import.meta.main) {
       )
       if (result.error || result.status !== 0)
         throw new Error('Draft asset upload failed; inspect draft before retrying')
-      // Do not PATCH draft state after upload: an owner may publish at any time.
-      console.log(`Uploaded verified DMG to ${candidate.tag}. Publication remains manual.`)
-    } else throw new Error('Usage: release-draft.mts plan|reserve|upload')
+      console.log(`Uploaded verified artifacts to ${candidate.tag}`)
+    } else throw new Error('Usage: release-draft.mts plan|reserve|upload|publish')
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

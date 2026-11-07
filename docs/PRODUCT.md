@@ -171,10 +171,11 @@ and Safari on macOS. New releases also require full Linux/macOS Electron E2E and
 Electron E2E and memory suites retain weekly/manual runs; timing suites remain local.
 Demo publication also waits for successful validation.
 
-The versioned release has independent Web and macOS branches; a failure on either
-makes the overall release fail without undoing the other branch. The macOS result
-is a draft, published manually by the owner. Publication transfers the tested package without rebuilding it. Failed
-checks, transfer or pre-deployment verification leave the active release intact.
+Web and macOS releases run independently. Either failure fails the release without
+undoing the other branch. macOS publishes automatically after
+verifying the complete uploaded artifact set against signer hashes. Publication
+transfers the tested package without rebuilding it. Failed checks, transfer or
+pre-deployment verification leave the active release intact.
 
 Scheduled or manual check runs must not cancel checks belonging to a publication.
 
@@ -2437,6 +2438,9 @@ Replace Notes moves the current `document.json`, its retained generations, any i
 The replacement is one unit. The imported notes start without retained generations, and a replaced document or generation is never opened again after the replacement begins. If Tree stops during the replacement, the next start completes it before opening the notes and shows the result of §25.3. Quitting during the replacement waits for it. If it cannot be completed, loading fails with `The notes import could not be completed: <reason>` and changes no files.
 
 ## 26. Desktop App Updates
+
+The owner selects desktop releases by explicitly increasing the version; ordinary
+commits do not release another desktop version.
 
 Packaged macOS builds check published stable GitHub releases at startup and when
 connectivity returns. Downloads run in the background without stealing focus;

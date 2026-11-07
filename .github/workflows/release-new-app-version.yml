@@ -183,7 +183,7 @@ jobs:
         run: node scripts/web-release/status.mts verify
 
   macos:
-    name: Create macOS release draft
+    name: Publish macOS release
     needs: gate
     uses: ./.github/workflows/create-macos-release-draft.yml
     with:

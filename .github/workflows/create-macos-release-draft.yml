@@ -1,4 +1,4 @@
-name: Create macOS release draft
+name: Publish macOS release
 
 on:
   workflow_call:
@@ -91,8 +91,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release-draft.mts reserve
-      - name: Publication reminder
-        run: echo 'Review the release notes and test the signed DMG after the macOS release job succeeds before publishing.' >> "$GITHUB_STEP_SUMMARY"
   sign:
     name: Sign macOS installer
     needs: [candidate, reserve]
@@ -250,4 +248,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ID: ${{ needs.reserve.outputs.release_id }}
+          EXPECTED_DMG_SHA256: ${{ needs.sign.outputs.sha256 }}
+          EXPECTED_ZIP_SHA256: ${{ needs.sign.outputs.zip_sha256 }}
+          EXPECTED_METADATA_SHA256: ${{ needs.sign.outputs.metadata_sha256 }}
         run: node scripts/release-draft.mts upload
+      - name: Publish complete verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.reserve.outputs.release_id }}
+          EXPECTED_DMG_SHA256: ${{ needs.sign.outputs.sha256 }}
+          EXPECTED_ZIP_SHA256: ${{ needs.sign.outputs.zip_sha256 }}
+          EXPECTED_METADATA_SHA256: ${{ needs.sign.outputs.metadata_sha256 }}
+        run: node scripts/release-draft.mts publish

@@ -5,10 +5,10 @@ A browser version is also available.
 This policy covers both applications, their build and publication pipelines, and
 the source on `main`.
 
-macOS installers for Apple Silicon are uploaded to draft GitHub Releases after
-verification. Only the owner publishes them for users on
-[GitHub Releases](https://github.com/abtv/tree/releases); drafts are visible only
-to repository maintainers.
+macOS installers for Apple Silicon are automatically published on
+[GitHub Releases](https://github.com/abtv/tree/releases) after verification and
+upload of the complete signed artifact set. The owner selects releases by
+explicitly increasing the version. Temporary drafts are visible only to repository maintainers.
 Desktop signing, verification and publication are described under
 [Desktop distribution](#desktop-distribution).
 
@@ -32,7 +32,7 @@ boundaries and update mechanisms differ:
 | Execution | Sandboxed Electron renderer with validated preload/IPC access to the main process | Browser sandbox and origin isolation |
 | Document storage | Local document and attachment files managed by the main process | IndexedDB in the browser profile for the site's origin |
 | Permissions | Main-process capabilities; renderer permission requests are denied | Browser-controlled clipboard and platform capabilities |
-| Distribution | Signed and notarized DMG uploaded to a draft release after verification; owner-controlled publication | HTTPS resources from the verified GitHub Pages publication |
+| Distribution | Signed and notarized artifacts automatically published after verification; owner-selected version | HTTPS resources from the verified GitHub Pages publication |
 
 Local storage does not protect against malicious code running with access to that
 storage. In the browser, application code served from the trusted origin can read
@@ -86,8 +86,10 @@ tests its renderer through Chromium CDP, without enabling the Node inspector. Se
 The release workflow builds the exact validated source SHA, reserves an immutable
 version tag and owned draft, and verifies Developer ID signatures, stapled tickets
 and Gatekeeper acceptance for the app and DMG before upload. Missing signing
-credentials or failed verification stop upload. Existing assets are never replaced,
-and no automated step publishes the draft. Signing credentials and release-write
+credentials or failed verification stop upload and publication. Existing assets are never replaced.
+Publication rechecks source validation, tag/SHA and ownership, requires exactly the
+DMG, ZIP and metadata, and matches their GitHub asset digests against original signer
+outputs before publishing the draft. Signing credentials and release-write
 access are privileged trust roots. Reservation, signing, application verification
 and upload run on separate fresh GitHub-hosted runners. Only signing receives
 Apple credentials; it never launches Tree and has no repository write permission.
@@ -336,7 +338,7 @@ local tests do not establish those controls.
 | Browser clipboard and images | `src/web/paste.test.ts`, shared clipboard and PNG validation tests | `e2e/web/paste.spec.mts`, `e2e/web/compatibility.spec.mts` |
 | Browser external-link opener and referrer isolation | `src/renderer/node-input-pointer-handlers.test.ts`, `src/renderer/editor-input-handlers.test.ts` | `e2e/web/external-links.spec.mts` against the built package |
 | Signed publication and publisher permissions | `scripts/web-release/*.test.mts` | Source release, target signature/package and hosted-byte checks; target `rejection_probe` rejects a corrupted isolated copy without deployment |
-| Desktop draft ownership, credentials and packaging policy | `scripts/release-draft.test.mts`, `scripts/release-guard.test.mts`, `scripts/release-security.test.mts` | `create-macos-release-draft.yml`: packaged fuse readback, CDP smoke, Developer ID signatures, notarization tickets and Gatekeeper checks before upload; owner verification before publication |
+| Desktop draft ownership, credentials and packaging policy | `scripts/release-draft.test.mts`, `scripts/release-guard.test.mts`, `scripts/release-security.test.mts` | `create-macos-release-draft.yml`: packaged fuse readback, CDP smoke, Developer ID signatures, notarization tickets and Gatekeeper checks before upload; complete GitHub asset set matched against original signer digests before automatic publication |
 | Renderer isolation | `src/electron/main/window.test.ts` | every `e2e/electron/*.spec.ts` launch |
 | Restricted navigation and external links | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
 | Renderer session permissions and network egress | `src/electron/main/window.test.ts` | `e2e/electron/csp.spec.ts`, `e2e/electron/hyperlink.spec.ts` |
