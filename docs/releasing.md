@@ -42,6 +42,29 @@ complete uploaded artifact sets are skipped. Unknown drafts or partial/unknown a
 stop for inspection. Existing tags and assets are never replaced. No automated
 step publishes a release or changes its published/draft state after creation.
 
+## Release notes
+
+Draft reservation generates notes from Conventional Commits between the previous
+published macOS version (identified by its versioned DMG asset) and the exact
+validated source SHA. Drafts and tags without a published desktop release do not
+advance this baseline. The highest lower semantic version is used; a missing or
+non-ancestor baseline fails reservation before any write. The reservation checkout
+includes full history and tags. The first release uses all history through its SHA.
+
+Notes group features, fixes and performance changes, omit known internal scopes,
+and highlight breaking-change markers regardless of commit type. Repeated identical
+entries are removed. Dependency notes compare locked versions of Electron and direct
+production dependencies, including Electron despite its development dependency placement.
+The first release has no dependency baseline. Other development dependencies are omitted.
+The full comparison is linked; no generated changelog is stored in Git.
+
+Review the draft before publishing: remove internal changes whose scopes were not
+recognized, combine related entries, rewrite technical subjects for users, and add
+any known limitations or required user actions. Deterministic filtering cannot judge
+the significance of every commit. Retries reuse existing draft text without regeneration,
+preserving manual edits and the hidden source ownership marker. Keep that marker.
+The publication reminder appears in the reservation job summary, not in release notes.
+
 ## Signing and packaging
 
 The successful source workflow already checked code and audited its lockfile.

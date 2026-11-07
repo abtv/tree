@@ -1271,7 +1271,7 @@ Electron Vite writes production build output to `out/`. This directory is genera
 
 ## 17. Reviewing the Git Change
 
-Git policy is owned by `AGENTS.md` §12. Run `npm run changelog` to regenerate `CHANGELOG.md` from Conventional Commit history.
+Git policy is owned by `AGENTS.md` §12. Release notes are generated into macOS GitHub Release drafts; see [macOS releases](releasing.md).
 
 Before committing, review the change with:
 

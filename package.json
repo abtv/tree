@@ -50,7 +50,6 @@
     "check:requirements": "node scripts/check-requirement-coverage.mts",
     "check:e2e-modes": "node scripts/check-e2e-editing-modes.mts",
     "check:opencode": "node scripts/check-opencode-permissions.mts",
-    "changelog": "node scripts/changelog.mts --write",
     "doctor": "node scripts/doctor.mts",
     "release": "node scripts/release-tag.mts",
     "audit": "npm audit",

@@ -70,7 +70,6 @@ const sandbox = [
   'check:requirements',
   'check:e2e-modes',
   'check:opencode',
-  'changelog',
   'doctor',
   'audit',
   'test:watch',

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { planDraft, reserveDraft, verifyUpload, verifySource, request, type Request } from './release-draft.mts'
+import {
+  planDraft,
+  reserveDraft as reserve,
+  verifyUpload,
+  verifySource,
+  request,
+  type Request,
+} from './release-draft.mts'
+
+const notes = vi.fn(() => '## Fixed\n\n- Synthetic correction.')
+const reserveDraft: typeof reserve = (event, texts, api) => reserve(event, texts, api, notes)
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -61,6 +71,44 @@ function fixture(version = '1.2.3') {
 }
 
 describe('verified main release drafts', () => {
+  it('uses the previous published desktop version and preserves manual draft edits on retry', async () => {
+    const f = fixture()
+    const published = (tag_name: string, draft = false, desktop = true) => ({
+      id: 10,
+      tag_name,
+      draft,
+      body: '',
+      assets: desktop ? [{ name: `Tree-${tag_name.slice(1)}-arm64.dmg`, state: 'uploaded', size: 100 }] : [],
+    })
+    f.releases.push(published('v1.2.0'), published('v1.2.1', true), published('v1.2.2', false, false))
+    f.tags.push({ name: 'v1.2.2', commit: { sha: other } })
+    notes.mockClear()
+
+    await reserveDraft(f.event, f.texts, f.api)
+
+    expect(notes).toHaveBeenCalledWith(sha, 'v1.2.0')
+    const release = f.releases.find((item) => item.tag_name === 'v1.2.3')!
+    expect(release.body).toContain('Synthetic correction')
+    release.body += '\nManual release notes'
+    notes.mockClear()
+
+    await reserveDraft(f.event, f.texts, f.api)
+
+    expect(notes).not.toHaveBeenCalled()
+    expect(release.body).toContain('Manual release notes')
+  })
+
+  it('does not reserve anything when notes generation fails', async () => {
+    const f = fixture()
+
+    await expect(
+      reserve(f.event, f.texts, f.api, () => {
+        throw new Error('Missing history')
+      }),
+    ).rejects.toThrow('Missing history')
+    expect(f.writes).toEqual([])
+  })
+
   it('plans without writes then reserves a tag and draft at the checked SHA', async () => {
     const f = fixture()
 

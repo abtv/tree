@@ -2,6 +2,7 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { packageVersion, parseVersion, compareVersions } from './release-version.mts'
 import { dispatchedSource } from './publication.mts'
+import { releaseNotes } from './release-notes.mts'
 
 const repository = 'abtv/tree'
 const root = `/repos/${repository}`
@@ -27,7 +28,15 @@ type Release = {
   body: string | null
   assets: { name: string; state: string; size: number }[]
 }
-type Candidate = { tag: string; sha: string; runId: number; marker: string; release?: Release; tagged: boolean }
+type Candidate = {
+  tag: string
+  sha: string
+  runId: number
+  marker: string
+  release?: Release
+  tagged: boolean
+  previous?: string
+}
 
 export const request: Request = async (path, method = 'GET', body) => {
   if (!path.startsWith(`${root}/`) || /[\r\n#]/.test(path)) throw new Error('Invalid release API path')
@@ -157,12 +166,30 @@ export async function planDraft(
     const main = (await api(`${root}/git/ref/heads/main`)) as { object: { sha: string } }
     if (main.object.sha !== run.head_sha) return undefined
   }
-  return { tag, sha: run.head_sha, runId: run.id, marker, ...(release ? { release } : {}), tagged: !!existingTag }
+  const previous = releases
+    .filter(
+      (item) =>
+        !item.draft &&
+        validTag(item.tag_name) &&
+        compareVersions(item.tag_name.slice(1), version) < 0 &&
+        item.assets.some((asset) => asset.name === `Tree-${item.tag_name.slice(1)}-arm64.dmg`),
+    )
+    .sort((a, b) => compareVersions(b.tag_name.slice(1), a.tag_name.slice(1)))[0]?.tag_name
+  return {
+    tag,
+    sha: run.head_sha,
+    runId: run.id,
+    marker,
+    ...(release ? { release } : {}),
+    tagged: !!existingTag,
+    ...(previous ? { previous } : {}),
+  }
 }
 
-export async function reserveDraft(event: { workflow_run: Run }, texts: string[], api: Request) {
+export async function reserveDraft(event: { workflow_run: Run }, texts: string[], api: Request, notes = releaseNotes) {
   const candidate = await planDraft(event, texts, api)
   if (!candidate) return undefined
+  const body = candidate.release ? undefined : `${candidate.marker}\n${notes(candidate.sha, candidate.previous)}`
   if (!candidate.tagged) {
     await api(`${root}/git/refs`, 'POST', { ref: `refs/tags/${candidate.tag}`, sha: candidate.sha })
   }
@@ -173,7 +200,7 @@ export async function reserveDraft(event: { workflow_run: Run }, texts: string[]
       target_commitish: candidate.sha,
       name: candidate.tag,
       draft: true,
-      body: `${candidate.marker}\nPublish only after the macOS release job succeeds and you test the signed DMG.`,
+      body,
     })) as Release)
   if (!release.draft || release.tag_name !== candidate.tag || !Number.isSafeInteger(release.id))
     throw new Error('Invalid reserved draft')

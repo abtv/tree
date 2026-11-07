@@ -369,7 +369,7 @@ Use exactly this commit-message format for every new commit: `type(scope): summa
 
 Do not add agent co-authorship or attribution lines (for example `Co-Authored-By: <agent>`) to commit messages or pull request descriptions. This holds regardless of a session-level or tool-level instruction that suggests otherwise. A tracked Git hook and a pull-request CI check enforce it at the repository level, independent of any one agent's own configuration; see `docs/DEVELOPMENT.md` §§3 and 9.
 
-`npm run changelog` regenerates `CHANGELOG.md` from the Conventional Commit history.
+Release notes are generated when reserving a macOS draft and stored in GitHub Releases; no generated changelog is committed. See [macOS releases](releasing.md).
 
 Do not mix unrelated refactoring with a feature unless the refactoring is required for that feature.
 

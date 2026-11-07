@@ -152,8 +152,6 @@
           "npm run retire:scratch *": "allow",
           "npm run fix:history": "allow",
           "npm run fix:history *": "allow",
-          "npm run changelog": "allow",
-          "npm run changelog *": "allow",
           "npm run doctor": "allow",
           "npm run doctor *": "allow",
           "npm run audit": "allow",
