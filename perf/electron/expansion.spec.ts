@@ -37,7 +37,8 @@ test.describe('inline expansion at scale', () => {
     // only the subsequent keyboard traversal is.
     await expandFirstTopLevelRoots(window, EXPANDED_TOP_LEVEL_COUNT)
 
-    expect(await window.locator('.node-list-spacer').count()).toBe(2)
+    await expect(window.locator('.node-list-windowed')).toHaveCount(1)
+    expect(await window.locator('.node-row').count()).toBeLessThan(1100)
 
     await window.evaluate(() => {
       const samples: number[] = []
@@ -149,8 +150,8 @@ test.describe('inline expansion at scale', () => {
     // directions repeatedly.
     await foldPair()
 
-    expect(await window.locator('.node-list-spacer').count()).toBe(2)
-    expect(await window.locator('.node-row').count()).toBeLessThan(600 + 600 * 2)
+    await expect(window.locator('.node-list-windowed')).toHaveCount(1)
+    expect(await window.locator('.node-row').count()).toBeLessThan(600)
 
     for (let index = 0; index < 4; index += 1) await foldPair()
     await window.waitForFunction(() => (window as unknown as { foldPaints: number[] }).foldPaints.length === 10)
@@ -193,12 +194,14 @@ test.describe('inline expansion at scale', () => {
       await input.focus()
 
       await expect(input).toBeFocused()
-      expect(await window.locator('.node-list-spacer').count()).toBe(0)
+      await expect(window.locator('.node-list-windowed')).toHaveCount(0)
+      await expect(window.locator('.node-row')).toHaveCount(topCount)
 
       const before = (await probe.sample('before', { app, window })).rendererHeap!
       await expandFirstTopLevelRoots(window, expandedCount)
 
-      expect(await window.locator('.node-list-spacer').count()).toBe(2)
+      await expect(window.locator('.node-list-windowed')).toHaveCount(1)
+      expect(await window.locator('.node-row').count()).toBeLessThan(topCount + expandedCount * 2)
 
       const afterExpand = (await probe.sample('expanded', { app, window })).rendererHeap!
 
@@ -210,7 +213,8 @@ test.describe('inline expansion at scale', () => {
       await window.keyboard.press('z')
       await window.keyboard.press('M')
 
-      await expect(window.locator('.node-list-spacer')).toHaveCount(0)
+      await expect(window.locator('.node-list-windowed')).toHaveCount(0)
+      await expect(window.locator('.node-row')).toHaveCount(topCount)
 
       const afterCollapse = (await probe.sample('collapsed', { app, window })).rendererHeap!
 

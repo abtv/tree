@@ -134,6 +134,7 @@ test('measures matched fresh edit bursts as memory controls', async ({ userDataD
 test('warms missing GPU accounting without showing the hidden window', async ({ userDataDir }) => {
   const { app, window } = await launchTree(userDataDir)
   let rendered = false
+  let captureAttempts = 0
   const sample = await collectWithGpuMemory(
     async () => {
       const processes = await app.evaluate(({ app }) =>
@@ -143,12 +144,16 @@ test('warms missing GPU accounting without showing the hidden window', async ({ 
       return { processes: rendered ? processes : processes.filter(({ type }) => type !== 'GPU') }
     },
     async () => {
+      captureAttempts += 1
+      // A hidden page may not have a compositor surface immediately after reload.
+      if (captureAttempts === 1) throw new Error('jsHandle.evaluate: Error: UnknownVizError')
       await renderMemoryFrame(app, window)
       rendered = true
     },
   )
 
   expect(rendered).toBe(true)
+  expect(captureAttempts).toBeGreaterThanOrEqual(2)
   expect(sample.processes.some(({ type, workingSetSize }) => type === 'GPU' && workingSetSize > 0)).toBe(true)
   const main = await app.browserWindow(window)
   try {

@@ -51,8 +51,15 @@ export async function collectWithGpuMemory<T extends { processes: ProcessMemory[
       return sample
 
     if (!rendered) {
-      await beforeDeadline(render)
-      rendered = true
+      try {
+        await beforeDeadline(render)
+        rendered = true
+      } catch (error) {
+        // A hidden renderer can have no compositor surface yet, especially after reload.
+        // Retry only this capture failure; collection failures and empty frames remain fatal.
+        if (!(error instanceof Error) || !/\bUnknownVizError$/.test(error.message)) throw error
+        await beforeDeadline(() => new Promise((resolve) => setTimeout(resolve, 100)))
+      }
     } else {
       await beforeDeadline(() => new Promise((resolve) => setTimeout(resolve, 100)))
     }

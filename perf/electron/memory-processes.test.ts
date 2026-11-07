@@ -4,6 +4,42 @@ import { collectWithGpuMemory } from './memory-processes'
 
 afterEach(() => vi.useRealTimers())
 
+it('retries transient compositor failures within the GPU readiness deadline', async () => {
+  vi.useFakeTimers()
+  const complete = { processes: [{ type: 'GPU', workingSetSize: 150628 }] }
+  let rendered = false
+  const collect = vi.fn(async () => (rendered ? complete : { processes: [] }))
+  const render = vi.fn().mockRejectedValueOnce(new Error('jsHandle.evaluate: Error: UnknownVizError'))
+  render.mockImplementationOnce(async () => {
+    rendered = true
+  })
+  const pending = expect(collectWithGpuMemory(collect, render)).resolves.toEqual(complete)
+
+  await vi.runAllTimersAsync()
+
+  await pending
+  expect(render).toHaveBeenCalledTimes(2)
+})
+
+it('bounds persistent compositor failures', async () => {
+  vi.useFakeTimers()
+  const render = vi.fn().mockRejectedValue(new Error('jsHandle.evaluate: Error: UnknownVizError'))
+  const pending = expect(collectWithGpuMemory(async () => ({ processes: [] }), render)).rejects.toThrow(
+    'GPU memory was unavailable for 10 seconds',
+  )
+
+  await vi.advanceTimersByTimeAsync(10_000)
+
+  await pending
+})
+
+it('propagates unexpected capture failures', async () => {
+  const render = vi.fn().mockRejectedValue(new Error('Application closed'))
+
+  await expect(collectWithGpuMemory(async () => ({ processes: [] }), render)).rejects.toThrow('Application closed')
+  expect(render).toHaveBeenCalledTimes(1)
+})
+
 it('requests a rendered frame when passive polling cannot start the GPU', async () => {
   vi.useFakeTimers()
   let rendered = false
