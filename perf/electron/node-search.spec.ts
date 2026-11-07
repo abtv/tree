@@ -43,6 +43,22 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     return { p95Ms: samples[Math.floor(samples.length * 0.95)]!, maxMs: samples.at(-1)! }
   })
   await expect(window.locator('[role="option"][aria-selected="true"]')).toContainText('Needle 24')
+  const scroll = await window.locator('.node-search-results').evaluate(async (element) => {
+    const maximum = element.scrollHeight - element.clientHeight
+    const frames: number[] = []
+    let mountedMax = 0
+    let previous = await new Promise<number>((resolve) => requestAnimationFrame(resolve))
+    for (let step = 0; step < 60; step++) {
+      const fraction = (step % 30) / 29
+      element.scrollTop = maximum * (step < 30 ? fraction : 1 - fraction)
+      const now = await new Promise<number>((resolve) => requestAnimationFrame(resolve))
+      frames.push(now - previous)
+      previous = now
+      mountedMax = Math.max(mountedMax, element.querySelectorAll('[role="option"]').length)
+    }
+    frames.sort((a, b) => a - b)
+    return { p95Ms: frames[Math.floor(frames.length * 0.95)]!, maxMs: frames.at(-1)!, mountedMax }
+  })
   const paintMs = await input.evaluate(async (element) => {
     const start = performance.now()
     const input = element as HTMLInputElement
@@ -58,9 +74,20 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     kind: 'node-search',
     scenario: 'wide-10000-results',
     samples: 1,
-    metrics: { completeMs, paintMs, arrowPaintP95Ms: arrowPaint.p95Ms, arrowPaintMaxMs: arrowPaint.maxMs },
+    metrics: {
+      completeMs,
+      paintMs,
+      arrowPaintP95Ms: arrowPaint.p95Ms,
+      arrowPaintMaxMs: arrowPaint.maxMs,
+      scrollFrameP95Ms: scroll.p95Ms,
+      scrollFrameMaxMs: scroll.maxMs,
+      scrollMountedMax: scroll.mountedMax,
+    },
   })
   expect(completeMs).toBeLessThan(2000)
   expect(paintMs).toBeLessThan(150)
   expect(arrowPaint.p95Ms).toBeLessThan(80)
+  expect(scroll.p95Ms).toBeLessThan(50)
+  expect(scroll.maxMs).toBeLessThan(100)
+  expect(scroll.mountedMax).toBeLessThanOrEqual(40)
 })

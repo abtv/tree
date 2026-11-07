@@ -637,6 +637,16 @@ Infrastructure should expose narrow interfaces to the application/domain where a
 
 `node-search.ts` owns complete-document result enumeration for Search, reusing the domain literal matcher and recognized tag ranges. The store gates short text and unknown tags and provides suggestions from its existing tag catalog. Scheduled batches yield to input; cancellation releases obsolete generators and their snapshots. Only the active result projection is retained, and the popup windows result rows. The input/completion session stays separate from Vim search and document undo. Searching adds no persistence operations; confirming a result uses the existing recent-node visit transition.
 
+The popup keeps its result window index and committed scroll origin in one renderer
+state record. A zero-height sticky anchor retains painted results until the native
+scroll handler synchronously replaces rows and their relative offset. The total-height
+container clips overflow, keeping the list's scroll range stable. Query, completion,
+composition, refresh and opening reset the same window record; arrow reveal updates it
+without changing result-session ownership. This reuses Tree/Agenda's retained-paint
+approach. Scroll work stays bounded to 40 rows plus constant state; it adds no document
+writes, syncs, result copies or animation-frame polling. The complete-document Search
+performance scenario and native scroll/frame regressions guard the affected costs.
+
 `global-search-session.ts` is the pure renderer-local owner of that popup's current
 query, completed results, pending work, selection, tags and composition. One subscribed
 snapshot replaces parallel React state. It invalidates obsolete callbacks and closes

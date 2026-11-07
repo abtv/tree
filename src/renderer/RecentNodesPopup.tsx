@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
@@ -41,15 +42,19 @@ export function RecentNodesPopup({
     session.subscribe,
     session.getSnapshot,
   )
-  const [windowStart, setWindowStart] = useState(0)
+  const [{ start: windowStart, top: windowTop }, setResultWindow] = useState({ start: 0, top: 0 })
   const input = useRef<HTMLInputElement>(null)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const restore = useRef<() => void>(() => undefined)
 
+  const updateResultWindow = (top: number, count: number): void => {
+    const start = Math.max(0, Math.min(Math.floor(top / 52) - 2, count - 40))
+    setResultWindow((previous) => (previous.start === start && previous.top === top ? previous : { start, top }))
+  }
   const resetScroll = (): void => {
-    setWindowStart(0)
+    updateResultWindow(0, 0)
     if (panel.current) panel.current.scrollTop = 0
   }
   const changeQuery = (value: string): void => {
@@ -89,7 +94,7 @@ export function RecentNodesPopup({
       beforeOpen()
       restore.current = captureFocusRestoration()
       session.open()
-      setWindowStart(0)
+      updateResultWindow(0, 0)
     }
     if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
@@ -143,7 +148,7 @@ export function RecentNodesPopup({
                   ? Math.max(0, top - RESULT_EDGE_INSET)
                   : top + 52 + RESULT_EDGE_INSET - panel.current.clientHeight
               updateResultEdges(panel.current)
-              setWindowStart(Math.max(0, Math.min(Math.floor(panel.current.scrollTop / 52) - 2, items.length - 40)))
+              updateResultWindow(panel.current.scrollTop, items.length)
             }
           }
         } else if (event.key !== 'Tab') return
@@ -315,7 +320,8 @@ export function RecentNodesPopup({
         className="node-search-results"
         onScroll={(event) => {
           updateResultEdges(event.currentTarget)
-          setWindowStart(Math.max(0, Math.min(Math.floor(event.currentTarget.scrollTop / 52) - 2, items.length - 40)))
+          // Retained paint and replacement rows must move together in this external scroll event.
+          flushSync(() => updateResultWindow(event.currentTarget.scrollTop, items.length))
         }}
         data-editor-focus-borrow=""
         aria-activedescendant={items[selected] === undefined ? undefined : `recent-node-${selected}`}
@@ -331,38 +337,46 @@ export function RecentNodesPopup({
             </div>
           )
         ) : (
-          <div style={{ height: items.length * 52, position: 'relative' }}>
-            {items.slice(windowStart, windowStart + 40).map((item, offset) => {
-              const index = windowStart + offset
-              return (
-                <div
-                  key={item.id}
-                  id={`recent-node-${index}`}
-                  role="option"
-                  aria-selected={suggestions.length === 0 && index === selected}
-                  className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
-                  style={{ position: 'absolute', top: index * 52, height: 52, width: '100%', boxSizing: 'border-box' }}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => visit(index)}
-                >
-                  <span className="recent-node-text">{item.text}</span>
-                  <span className="recent-node-path">
-                    {item.path === null ? (
-                      <span
-                        className="recent-node-root location-icon"
-                        role="img"
-                        aria-label="Top level"
-                        title="Top level"
-                      >
-                        <OutlineRootIcon />
-                      </span>
-                    ) : (
-                      item.path
-                    )}
-                  </span>
-                </div>
-              )
-            })}
+          <div style={{ height: items.length * 52, position: 'relative', overflow: 'clip' }}>
+            <div style={{ position: 'sticky', top: 0, height: 0 }}>
+              {items.slice(windowStart, windowStart + 40).map((item, offset) => {
+                const index = windowStart + offset
+                return (
+                  <div
+                    key={item.id}
+                    id={`recent-node-${index}`}
+                    role="option"
+                    aria-selected={suggestions.length === 0 && index === selected}
+                    className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
+                    style={{
+                      position: 'absolute',
+                      top: index * 52 - windowTop,
+                      height: 52,
+                      width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => visit(index)}
+                  >
+                    <span className="recent-node-text">{item.text}</span>
+                    <span className="recent-node-path">
+                      {item.path === null ? (
+                        <span
+                          className="recent-node-root location-icon"
+                          role="img"
+                          aria-label="Top level"
+                          title="Top level"
+                        >
+                          <OutlineRootIcon />
+                        </span>
+                      ) : (
+                        item.path
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>

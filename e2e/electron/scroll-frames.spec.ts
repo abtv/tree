@@ -13,6 +13,7 @@ async function capture(
   info: TestInfo,
   stage: string,
   action: () => Promise<void>,
+  region = { left: 100, top: 120, width: 380, height: 192 },
 ): Promise<void> {
   const session = await page.context().newCDPSession(page)
   const frames: string[] = []
@@ -35,26 +36,29 @@ async function capture(
     await Promise.all(acknowledgements)
     expect(overflow, 'Capture must remain bounded without silently discarding frames').toBe(false)
 
-    const failures = await app.evaluate(({ nativeImage }, images) => {
-      return images.flatMap((data, index) => {
-        const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'))
-        const { width, height } = image.getSize()
-        if (width < 600 || height < 400) return [{ index, band: -1 }]
-        const bitmap = image.toBitmap()
-        const missing: { index: number; band: number }[] = []
-        for (let top = 120; top < 312; top += 48) {
-          let ink = 0
-          for (let y = top; y < top + 48; y++) {
-            for (let x = 100; x < 480; x++) {
-              const offset = (y * width + x) * 4
-              if (Math.min(bitmap[offset]!, bitmap[offset + 1]!, bitmap[offset + 2]!) < 150) ink++
+    const failures = await app.evaluate(
+      ({ nativeImage }, { images, region }) => {
+        return images.flatMap((data, index) => {
+          const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'))
+          const { width, height } = image.getSize()
+          if (width < region.left + region.width || height < region.top + region.height) return [{ index, band: -1 }]
+          const bitmap = image.toBitmap()
+          const missing: { index: number; band: number }[] = []
+          for (let top = region.top; top < region.top + region.height; top += 48) {
+            let ink = 0
+            for (let y = top; y < top + 48; y++) {
+              for (let x = region.left; x < region.left + region.width; x++) {
+                const offset = (y * width + x) * 4
+                if (Math.min(bitmap[offset]!, bitmap[offset + 1]!, bitmap[offset + 2]!) < 150) ink++
+              }
             }
+            if (ink < 30) missing.push({ index, band: top })
           }
-          if (ink < 30) missing.push({ index, band: top })
-        }
-        return missing
-      })
-    }, frames)
+          return missing
+        })
+      },
+      { images: frames, region },
+    )
     const reportPath = info.outputPath(`${stage}-frames.json`)
     writeFileSync(reportPath, JSON.stringify({ captured: frames.length, failures }))
     await info.attach(`${stage}-frames`, { path: reportPath, contentType: 'application/json' })
@@ -68,6 +72,146 @@ async function capture(
     await session.detach()
   }
 }
+
+// @requirement PRODUCT.md §20.14
+test('Search paints continuous results during arrows, wheel reversal, refinement and resize', async ({
+  userDataDir,
+}, info) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: Array.from({ length: 1000 }, (_, index) => ({
+        id: `n${index}`,
+        text: `Result node ${index} Synthetic searchable content`,
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'n0' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', appearance: 'light' })
+  await window.emulateMedia({ colorScheme: 'light' })
+  await setMainWindowContentSize(app, { width: 800, height: 600 })
+  await window.keyboard.press('Meta+;')
+  const input = window.getByRole('searchbox')
+  const results = window.getByRole('listbox', { name: 'Search results' })
+  await input.fill('Result')
+  await expect(window.getByLabel('Result position')).toHaveText('1 / 1000')
+  const measureRegion = () =>
+    results.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      // Keep two complete bands inside the list, away from its header and edge fades.
+      return { left: Math.ceil(rect.left + 24), top: Math.ceil(rect.top + 48), width: 360, height: 96 }
+    })
+  let region = await measureRegion()
+
+  await capture(
+    app,
+    window,
+    info,
+    'search-arrows',
+    async () => {
+      for (const key of ['ArrowDown', 'ArrowUp']) {
+        for (let index = 0; index < 35; index++) {
+          await window.keyboard.press(key)
+          await window.waitForTimeout(10)
+        }
+      }
+    },
+    region,
+  )
+  await expect(window.getByLabel('Result position')).toHaveText('1 / 1000')
+
+  await window.mouse.move(region.left + 100, region.top + 30)
+  await capture(
+    app,
+    window,
+    info,
+    'search-wheel',
+    async () => {
+      for (const delta of [400, 400, 400, -400, -400]) {
+        const before = await results.evaluate((element) => element.scrollTop)
+        await window.mouse.wheel(0, delta)
+        const position = () => results.evaluate((element) => element.scrollTop)
+        if (delta > 0) await expect.poll(position).toBeGreaterThan(before)
+        else await expect.poll(position).toBeLessThan(before)
+      }
+    },
+    region,
+  )
+  expect(await results.getByRole('option').count()).toBeLessThanOrEqual(40)
+  await expect(input).toBeFocused()
+
+  await capture(
+    app,
+    window,
+    info,
+    'search-jumps',
+    async () => {
+      for (const fraction of [0.8, 0.1, 1, 0]) {
+        const visibleBeforeDelivery = await results.evaluate((element, fraction) => {
+          element.scrollTop = (element.scrollHeight - element.clientHeight) * fraction
+          const bounds = element.getBoundingClientRect()
+          return [...element.querySelectorAll('[role="option"]')].filter((row) => {
+            const rect = row.getBoundingClientRect()
+            return rect.bottom > bounds.top && rect.top < bounds.bottom
+          }).length
+        }, fraction)
+        expect(visibleBeforeDelivery, 'Retain results before the native scroll event is delivered').toBeGreaterThan(1)
+        await window.evaluate(
+          () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+        )
+      }
+    },
+    region,
+  )
+
+  await capture(
+    app,
+    window,
+    info,
+    'search-refinement',
+    async () => {
+      await input.fill('Result node')
+      await expect(window.getByLabel('Result position')).toHaveText('1 / 1000')
+      await expect(input).toHaveValue('Result node')
+    },
+    region,
+  )
+
+  await capture(
+    app,
+    window,
+    info,
+    'search-resize',
+    async () => {
+      await setMainWindowContentSize(app, { width: 760, height: 560 })
+    },
+    region,
+  )
+  region = await measureRegion()
+  await expect(input).toBeFocused()
+
+  await expect(
+    capture(
+      app,
+      window,
+      info,
+      'search-negative-control',
+      async () => {
+        await window.evaluate((region) => {
+          const mask = document.createElement('div')
+          mask.id = 'scroll-test-mask'
+          mask.style.cssText = `position:fixed;left:${region.left}px;top:${region.top}px;width:${region.width}px;height:48px;background:white;z-index:99999`
+          document.body.append(mask)
+        }, region)
+      },
+      region,
+    ),
+  ).rejects.toThrow('every captured central band must contain painted content')
+  await window.evaluate(() => document.getElementById('scroll-test-mask')?.remove())
+  await window.keyboard.press('Escape')
+  await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
+  await expect(window.locator('.node-input:focus')).toContainText('Result node 0')
+})
 
 for (const view of ['Tree', 'Agenda'] as const) {
   // @requirement PRODUCT.md §20.1

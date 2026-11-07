@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { RecentNodePersistence } from './recent-node-persistence'
 
 // @requirement PRODUCT.md §20.14
+// @requirement PRODUCT.md §20.14.1
 it('retires the pending timer on an explicit flush and gives later changes a fresh deadline', async () => {
   vi.useFakeTimers()
   try {

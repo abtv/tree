@@ -1996,11 +1996,14 @@ Creating or changing a node's content, explicitly entering it, or confirming a r
 
 * Without tag suggestions, Up/Down wrap result selection; they do not navigate the document.
 * Arrow navigation keeps visible results in place and scrolls only far enough to reveal the next selected row. Crossing the list boundary wraps to the opposite end. Selection changes the highlight, not the text size or row geometry.
+* Pointer scrolling and large scrollbar jumps retain the last painted results until replacement rows and their position are ready together. The results list must not flash empty while its rendered window changes. Scrolling preserves the query, result selection and input focus, with at most 40 result rows mounted.
 * A divider and gap separate the Results/Recent heading from its scrollable list. The list softly fades at an edge only while more content exists beyond that edge, so partially visible rows do not appear to overlap the heading or footer. Keyboard reveal leaves the selected row clear of the fades when space permits; a list that fits shows no fade.
 * Enter or clicking a result closes the popup, finishes buffered editing using the existing view-change rules, opens Tree at the result's real parent, selects that node and places the text caret at its start.
 * Escape, outside dismissal and window deactivation close without a jump and restore the originating editor selection and mode.
 * Opening borrows editing focus, clears unfinished Vim commands and cancels a pending search draft as the command panel does. Modal dialogs, IME composition and the open command panel retain their input.
 * Recent-node order stays fixed until the input changes or dismissal. There is no animation.
+
+#### 20.14.1 History Persistence
 
 History retains at most 100 IDs separately from document content, undo and notes export. Dirty history saves every 30 seconds and during normal persistence flush, including shutdown; an abrupt exit may lose the unsaved history interval. Writes are serialized and desktop replacement is atomic. Missing or unreadable history starts empty. Write failures use the existing operation-error surface; pending history can retry on the next flush. Notes replacement resets the history even when imported IDs coincide. Browser history uses the current profile's local storage and writer-session guards.
 
