@@ -1,7 +1,15 @@
 import type { ApiError, ApiOptions, Request, Reference, WorkflowRun, Job, ReleaseIdentity } from './types.mts'
 import { validateManifest } from './policy.mts'
+import { retry } from './retry.mts'
 
 export async function api(path: string, { token, method = 'GET', body }: ApiOptions = {}): Promise<unknown> {
+  const operation = () => singleRequest(path, { token, method, body })
+  // Only reads and immutable Git object creation may be replayed without reconciliation.
+  const safe = method === 'GET' || (method === 'POST' && /\/git\/(blobs|trees|commits)$/.test(path))
+  return safe ? retry(operation) : operation()
+}
+
+async function singleRequest(path: string, { token, method = 'GET', body }: ApiOptions): Promise<unknown> {
   if (!/^\/repos\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\//.test(path) || path.includes('..') || /[\r\n#]/.test(path)) {
     throw new Error('Invalid GitHub API path')
   }
@@ -19,6 +27,12 @@ export async function api(path: string, { token, method = 'GET', body }: ApiOpti
   if (!response.ok) {
     const error: ApiError = new Error(`GitHub API ${method} failed (${response.status})`)
     error.status = response.status
+    const retryAfter = response.headers?.get('retry-after')
+    if (retryAfter) {
+      const seconds = Number(retryAfter)
+      const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now()
+      if (Number.isFinite(delay)) error.retryAfterMs = Math.max(0, delay)
+    }
     // Keep remote text out of diagnostics. The probe establishes ordinary
     // Contents writes before accepting this documented permission denial.
     if (response.status === 403 && method === 'PUT' && path.includes('/contents/.github/workflows/')) {

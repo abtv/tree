@@ -245,6 +245,29 @@ describe('atomic package transfer', () => {
       'c'.repeat(40),
     )
   })
+  it('returns the transferred commit after GitHub applied the update but lost its response', async () => {
+    const { dir, manifest, request, ...auth } = await targetFixture()
+    let updated = false
+    const uncertainRequest = vi.fn(async (path: string, options: ApiOptions = {}) => {
+      if (options.method === 'PATCH') {
+        updated = true
+        const error: ApiError = new Error('GitHub API PATCH failed (500)')
+        error.status = 500
+        throw error
+      }
+      if (updated && path.endsWith('/git/ref/heads/main')) return { object: { sha: 'c'.repeat(40) } }
+      return request(path, options)
+    })
+
+    await expect(
+      transferPackage(dir, manifest, {
+        ...auth,
+        targetToken: 'target',
+        request: uncertainRequest,
+      }),
+    ).resolves.toBe('c'.repeat(40))
+    expect(uncertainRequest.mock.calls.filter(([, options]) => options?.method === 'PATCH')).toHaveLength(1)
+  })
   it.each(['0.1.2', '0.1.3'])(
     'refuses transfer after hosting has reached %s without writes',
     async (previousVersion) => {

@@ -183,6 +183,23 @@ signed package makes verification fail; it does not prune the authenticated mani
 
 ## Failures and ordering
 
+The web GitHub API client retries reads and immutable Git blob/tree/commit creation
+at most three times after the initial request, only for HTTP 500, 502, 503, 504,
+fetch connection failures or timeouts. Delays increase from 1 to 2 to 4 seconds,
+with up to one second of random jitter. `Retry-After` can lengthen a delay to
+60 seconds; a longer requested delay stops the operation instead. Replayed
+commit creation can leave unused Git objects but never appends another release
+commit to main. The client does not blindly retry temporary permission-probe
+branch creation, Contents writes or cleanup. Their failures still stop publication.
+Authorization errors, rate limits, conflicts and trust/verification failures are
+not retried or treated as permission-denial evidence.
+
+After a transient branch-update error, transfer reads main before repeating the
+same non-forced update. The expected new SHA means the write already succeeded;
+the original parent permits retry; another SHA stops publication. If that read
+fails, subsequent attempts must resolve it before issuing another write. These
+retries do not expand token permissions or repeat the whole publication job.
+
 After transfer, the source verifies provenance and deployment at the exact target
 commit returned by the write, avoiding a stale branch-head read immediately after
 publication. A retry that skips transfer resolves the existing target head instead.
@@ -203,8 +220,8 @@ remain in place. The release workflow itself preserves in-flight publication.
 
 The target also checks public source run metadata over GitHub's API, including its
 current attempt and successful gate. Public API rate limits or unavailable GitHub
-services stop the deployment. Anonymous public-source API reliability remains a
-deliberately deferred concern; the target token is used only within its own scope
+services after bounded retries stop the deployment. Additional anonymous public-source
+API reliability measures remain deferred; the target token is used only within its own scope
 and by detached-proof verification. No new source-reading credential is introduced.
 
 A stolen target-only publisher token cannot sign arbitrary bytes or change the

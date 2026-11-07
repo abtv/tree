@@ -8,6 +8,7 @@ import { verifyAttestation } from './attestation.mts'
 import { assertWorkflowWriteDenied } from './permission-check.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
 import { dispatchedSource } from '../publication.mts'
+import { advanceReference } from './retry.mts'
 
 export async function transferPackage(
   directory: string,
@@ -111,11 +112,7 @@ export async function transferPackage(
     },
   })
   // A concurrent target update makes this non-fast-forward request fail without changing main.
-  await request(`${root}/git/refs/heads/main`, {
-    ...options,
-    method: 'PATCH',
-    body: { sha: (next as Sha).sha, force: false },
-  })
+  await advanceReference(root, base.object.sha, (next as Sha).sha, request, targetToken)
   return (next as Sha).sha
 }
 
