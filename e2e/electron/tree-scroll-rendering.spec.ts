@@ -53,13 +53,17 @@ describeForEachEditingMode('Tree scroll rendering', () => {
               const bounds = viewport.getBoundingClientRect()
               const list = document.querySelector('.node-list')!.getBoundingClientRect()
               const visible = visibleRows()
+              let coveredUntil = bounds.top
+              let coverage = 0
+              for (const rect of visible.toSorted((a, b) => a.top - b.top)) {
+                const start = Math.max(bounds.top, rect.top, coveredUntil)
+                const end = Math.min(bounds.bottom, rect.bottom)
+                coverage += Math.max(0, end - start)
+                coveredUntil = Math.max(coveredUntil, end)
+              }
               samples.push({
                 visible: visible.length,
-                coverage:
-                  visible.length === 0
-                    ? 0
-                    : Math.min(bounds.bottom, Math.max(...visible.map((rect) => rect.bottom))) -
-                      Math.max(bounds.top, Math.min(...visible.map((rect) => rect.top))),
+                coverage,
                 expected: Math.min(bounds.bottom, list.bottom) - Math.max(bounds.top, list.top),
                 focused: document.activeElement === active && selected.isConnected,
                 caret: input.selectionStart === caret[0] && input.selectionEnd === caret[1],

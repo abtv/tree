@@ -58,14 +58,18 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
                 .map((row) => row.getBoundingClientRect())
                 .filter((rect) => rect.bottom > bounds.top && rect.top < bounds.bottom)
               const selection = getSelection()
+              let coveredUntil = bounds.top
+              let coverage = 0
+              for (const rect of visible.toSorted((a, b) => a.top - b.top)) {
+                const start = Math.max(bounds.top, rect.top, coveredUntil)
+                const end = Math.min(bounds.bottom, rect.bottom)
+                coverage += Math.max(0, end - start)
+                coveredUntil = Math.max(coveredUntil, end)
+              }
               samples.push({
                 visible: visible.length,
                 expectedCoverage: Math.min(bounds.bottom, listBounds.bottom) - Math.max(bounds.top, listBounds.top),
-                coverage:
-                  visible.length === 0
-                    ? 0
-                    : Math.min(bounds.bottom, Math.max(...visible.map((rect) => rect.bottom))) -
-                      Math.max(bounds.top, Math.min(...visible.map((rect) => rect.top))),
+                coverage,
                 focused: document.activeElement === active && selected.isConnected,
                 caret:
                   selection?.anchorNode === anchorNode &&

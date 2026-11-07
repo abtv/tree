@@ -59,3 +59,13 @@ jobs:
       - name: Check macOS Safari happy path
         if: ${{ !cancelled() && runner.os == 'macOS' && steps.web-build.outcome == 'success' }}
         run: npm run test:smoke:safari
+      - name: Check macOS scroll rendering
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        run: npm run test:e2e -- e2e/electron/tree-scroll-rendering.spec.ts e2e/electron/agenda-scroll-rendering.spec.ts e2e/electron/scroll-frames.spec.ts --workers=1 --retries=0
+      - name: Upload failed scroll rendering evidence
+        if: ${{ failure() && runner.os == 'macOS' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: scroll-rendering-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          retention-days: 7

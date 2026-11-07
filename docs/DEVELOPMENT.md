@@ -669,6 +669,22 @@ Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Sa
 A failed Electron smoke does not skip browser smoke when its build succeeded.
 Both platform results gate publication. They supplement, rather than replace, full E2E.
 
+The macOS job also runs `tree-scroll-rendering.spec.ts`, `agenda-scroll-rendering.spec.ts`
+and `scroll-frames.spec.ts` on every PR and main push, serially without retries.
+These are separate functional rendering checks, outside the smoke command's time budget.
+The first two check continuous row coverage after large scroll jumps and preserve
+the pinned editor/caret in both editing modes. Coverage sums the union of visible
+row intervals, so internal holes cannot pass through their outer bounding box.
+The frame checks exercise wheel direction changes, wrapped rows, window resizing
+and delayed attachment growth in Tree and Agenda. They decode sampled compositor
+PNGs through Electron and require ink in every 48-pixel band of a fixed central
+viewport region with dense synthetic text in light appearance. A painted blank
+band is the negative control: row geometry remains unchanged, but the detector
+must reject the captured pixels. Failure artifacts retain frame samples and traces.
+This detects empty sampled regions; it does not prove glyph fidelity, observe every
+presented frame, reproduce physical trackpad inertia, or enforce frame-time budgets.
+Timing checks remain local.
+
 The shared happy path opens the production build with isolated synthetic data, types a parent, creates a sibling with Enter, and indents it with Tab. In the child it types `today`, checks the selected date suggestion, and accepts it with Enter without creating a node. It then types ` :cat`, checks the selected emoji suggestion, and accepts 🐱 with Tab without changing the child's depth. Both acceptances close their popup and retain editor focus. Additional text crosses the normal word-volume save threshold; the checks verify the persisted text and parent/child relationship through the real platform adapter without waiting for the idle timer or mocking persistence. Each target enables Vim through its menu and checks Quit/reopen as described below, including the restored text, hierarchy and Normal mode. It enters Insert with `i`, types a prefix, and returns to Normal with Escape, asserting both the text and mode transitions. Vim `/` search must then move from the child to its parent in Tree. The check opens the command panel with `:`, types `agenda`, verifies that `show-agenda` is the single selected result, and executes it with Enter. It requires the panel to close and Agenda to show the child dated with today's local canonical date and its contextual parent, searches from the day header to the child, and returns to Tree through its menu with the original selection. Both local searches assert a unique match count, confirmed current highlight and destination focus. Electron uses the existing test entry for hidden windows and a stubbed global shortcut; its production main, preload, renderer and file storage still run. Browser checks use fresh contexts/origins. Safari uses an isolated automation session and native WebDriver input, not Playwright WebKit.
 
 After the volume-triggered save, the scenario replaces the child's final punctuation in Vim Replace and verifies both the visible buffered text and the unchanged stored document. It quits without blurring or ending Replace and requires the replacement to survive reopening. Ordinary autosave cannot persist that renderer buffer, including with the browser's shorter save interval. Electron uses the application-menu Quit and requires a clean process exit before fixture cleanup. Chromium uses the primary-modifier Quit shortcut. Safari invokes the production `treeApi.quit()` adapter while keeping editor focus because SafariDriver does not deliver that shortcut to the application. Both browsers require the script-opened application window to close, then reopen the same origin through an isolated launcher window. This Safari check verifies the real save-and-close boundary, not native Quit shortcut delivery. There is no mocked persistence, explicit test flush, clock override or idle wait.
