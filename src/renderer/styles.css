@@ -419,9 +419,9 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .editor-shell {
-  width: min(100%, 960px);
+  width: 100%;
   margin: 0 auto;
-  padding: 10px 28px 64px 18px;
+  padding: 10px 28px 64px 4px;
 }
 
 /* Matches a one-line heading block (30px line + 2px padding + 6px margin) so the first
@@ -438,29 +438,34 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
 }
 
-.line-numbered {
-  --row-gutter: 10px;
-  margin-left: -18px;
-  padding-left: var(--line-number-gutter);
+.node-list,
+.agenda-list {
+  --row-gutter: 16px;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 
-.line-numbered :is(.node-row, .agenda-row) {
-  --active-row-inset: calc(-18px - var(--row-depth, 0) * var(--row-indent));
+.line-number-sizer {
+  grid-column: 1;
+  grid-row: 1;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.line-numbered .node-disclosure-triangle {
-  left: -16px;
-}
-
-.node-list.line-numbered > .node-row-pinned {
-  left: var(--line-number-gutter);
+.outline-content {
+  grid-column: 2;
+  min-width: 0;
 }
 
 .line-number {
   position: absolute;
   top: 0;
-  left: calc(0px - var(--row-gutter, 28px) - var(--row-depth, 0) * var(--row-indent) - var(--line-number-gutter));
-  width: calc(var(--line-number-gutter) - 8px);
+  left: calc(0px - var(--row-gutter) - var(--row-depth, 0) * var(--row-indent) - var(--line-number-digits) * 1ch);
+  width: calc(var(--line-number-digits) * 1ch);
   color: var(--color-secondary);
   font-size: 11px;
   line-height: 20px;
@@ -470,8 +475,19 @@ body:not(.node-drag-active) .location-link:hover {
   pointer-events: none;
 }
 
-.node-list-spacer {
-  width: 100%;
+/* Keep the previous painted rows in place until scroll commits their replacement and offset. */
+.node-list-windowed {
+  overflow: clip;
+  margin-left: -4px;
+  padding-left: 4px;
+  margin-right: -28px;
+  padding-right: 28px;
+}
+
+.node-list-window-anchor {
+  position: sticky;
+  top: 0;
+  height: 0;
 }
 
 .node-row,
@@ -480,7 +496,7 @@ body:not(.node-drag-active) .location-link:hover {
   display: flow-root;
   min-height: var(--node-row-min-height);
   margin-left: calc(var(--row-gutter, 28px) + var(--row-depth, 0) * var(--row-indent));
-  padding-left: 21px;
+  padding-left: 18px;
 }
 
 .agenda-shell {
@@ -493,7 +509,9 @@ body:not(.node-drag-active) .location-link:hover {
 
 .agenda-focused-heading {
   --active-row-inset: -24px;
-  margin: 0 0 6px 24px;
+  --row-leading-space: calc(28px - var(--line-number-digits) * 1ch);
+  /* The heading's 24px font compensates the number column measured in its 11px font. */
+  margin: 0 0 6px calc(24px - var(--line-number-digits) * 1ch * 11 / 24);
   padding: 0 6px 2px;
   font-size: 24px;
   font-weight: 700;
@@ -511,6 +529,8 @@ body:not(.node-drag-active) .location-link:hover {
    and rows change together; the compositor never scrolls the old window into an empty spacer. */
 .agenda-list-windowed {
   overflow: clip;
+  margin-left: -4px;
+  padding-left: 4px;
   /* Include the empty trailing touch surface in the clip without widening the text rows. */
   margin-right: -28px;
   padding-right: 28px;
@@ -565,6 +585,7 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .agenda-text {
   display: block;
+  max-width: calc(120ch + 12px);
   padding: 0 6px;
   font-size: 15px;
   white-space: pre-wrap;
@@ -735,7 +756,7 @@ body:not(.node-drag-active) .location-link:hover {
 .node-disclosure-triangle {
   position: absolute;
   top: 1.5px;
-  left: -26px;
+  left: -16px;
   display: grid;
   place-items: center;
   width: 17px;
@@ -800,7 +821,12 @@ body:not(.node-drag-active)
   :is(.node-row:has(> .node-focus-marker), .agenda-row[aria-selected='true'])::after {
   content: '';
   position: absolute;
-  inset: 0 0 0 var(--active-row-inset, calc(-28px - var(--row-depth, 0) * var(--row-indent)));
+  /* Use the number font so ch measures the same column as the hidden sizer. */
+  font-size: 11px;
+  inset: 0 -28px 0
+    calc(
+      0px - var(--row-leading-space, 20px) - var(--line-number-digits) * 1ch - var(--row-depth, 0) * var(--row-indent)
+    );
   z-index: -1;
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   pointer-events: none;
@@ -839,6 +865,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 .node-input {
   display: block;
   width: 100%;
+  max-width: calc(120ch + 12px);
   min-width: 0;
   border: 0;
   border-radius: 3px;

@@ -52,12 +52,20 @@ export function scrollViewportBy(deltaY: number): void {
  */
 export function revealInViewport(element: Element, keepContext = false): void {
   const rect = element.getBoundingClientRect()
-  revealRectInViewport(rect, keepContext)
+  revealRectInViewport(rect, keepContext, element)
 }
 
 /** Apply the same context policy to a measured text line instead of a whole row. */
-export function revealRectInViewport(rect: DOMRect, keepContext = false): void {
+export function revealRectInViewport(rect: DOMRect, keepContext = false, element?: Element): void {
   const { top, bottom } = viewportBounds()
+  const list = element?.closest<HTMLElement>('[data-window-start]')
+  if (list !== undefined && list !== null) {
+    // A sticky window can still paint its previous position before native scroll is delivered.
+    // Reveal the destination's document position, not that deliberately retained paint.
+    const currentStart = Math.max(0, top - list.getBoundingClientRect().top)
+    const pendingScroll = currentStart - Number(list.dataset.windowStart)
+    if (pendingScroll !== 0) rect = new DOMRect(rect.left, rect.top - pendingScroll, rect.width, rect.height)
+  }
   // An element that is not laid out has no position to reveal.
   if (rect.width === 0 && rect.height === 0) return
   const height = bottom - top

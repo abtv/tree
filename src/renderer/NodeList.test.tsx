@@ -1189,15 +1189,15 @@ describe('NodeList windowing', () => {
     return renderRows({ focusedNodeId, list: buildNodes(count) })
   }
 
-  it('renders every row without spacers at the threshold', () => {
+  it('renders every row without a fixed-height window at the threshold', () => {
     mockRows(0)
     const { container } = renderList(WINDOWING_THRESHOLD)
 
     expect(container.querySelectorAll('.node-row')).toHaveLength(WINDOWING_THRESHOLD)
-    expect(container.querySelectorAll('.node-list-spacer')).toHaveLength(0)
+    expect(container.querySelector<HTMLElement>('.node-list')!.style.height).toBe('')
   })
 
-  it('mounts only a window of rows above the threshold and pads the rest with spacers', () => {
+  it('mounts a bounded window while preserving the full list height above the threshold', () => {
     mockRows(0)
     const { container } = renderList(600)
     const rows = container.querySelectorAll('.node-row')
@@ -1205,11 +1205,9 @@ describe('NodeList windowing', () => {
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.length).toBeLessThan(100)
 
-    const spacers = container.querySelectorAll<HTMLElement>('.node-list-spacer')
-
-    expect(spacers).toHaveLength(2)
-    expect(spacers[0]!.style.height).toBe('0px')
-    expect(Number.parseFloat(spacers[1]!.style.height)).toBeGreaterThan(0)
+    expect(Number.parseFloat(container.querySelector<HTMLElement>('.node-list')!.style.height)).toBe(
+      600 * ROW_HEIGHT_ESTIMATE,
+    )
   })
 
   it('updates measured height from a ResizeObserver border box and re-lays out', () => {
@@ -1218,9 +1216,9 @@ describe('NodeList windowing', () => {
     mockRows(0)
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
-    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const list = container.querySelector<HTMLElement>('.node-list')!
 
-    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const initialHeight = Number.parseFloat(list.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
@@ -1228,7 +1226,7 @@ describe('NodeList windowing', () => {
 
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
 
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
+    expect(Number.parseFloat(list.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
   })
 
   it('falls back to the row bounding-box height when a ResizeObserver entry has no border box', () => {
@@ -1237,9 +1235,9 @@ describe('NodeList windowing', () => {
     mockRows(0)
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
-    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const list = container.querySelector<HTMLElement>('.node-list')!
 
-    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const initialHeight = Number.parseFloat(list.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE + 30 : ROW_HEIGHT_ESTIMATE)
@@ -1247,7 +1245,7 @@ describe('NodeList windowing', () => {
 
     observer.trigger([resizeEntry(firstRow)])
 
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + 30)
+    expect(Number.parseFloat(list.style.height)).toBe(initialHeight + 30)
   })
 
   it('keeps a known height when ResizeObserver reports zero', () => {
@@ -1256,16 +1254,16 @@ describe('NodeList windowing', () => {
     mockRows(0)
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
-    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const list = container.querySelector<HTMLElement>('.node-list')!
 
-    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const initialHeight = Number.parseFloat(list.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
     })
 
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
-    const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
+    const measuredHeight = Number.parseFloat(list.style.height)
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       return rect(0, this.dataset.nodeId === 'n550' ? 0 : ROW_HEIGHT_ESTIMATE)
     })
@@ -1273,7 +1271,7 @@ describe('NodeList windowing', () => {
     observer.trigger([resizeEntry(firstRow, 0)])
 
     expect(measuredHeight).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(measuredHeight)
+    expect(Number.parseFloat(list.style.height)).toBe(measuredHeight)
   })
 
   it('clears and remeasures heights only when the window width changes', () => {
@@ -1283,17 +1281,17 @@ describe('NodeList windowing', () => {
     const originalWidth = globalThis.innerWidth
     const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
     const observer = TestResizeObserver.instances[0]!
-    const trailingSpacer = container.querySelectorAll<HTMLElement>('.node-list-spacer')[1]!
+    const list = container.querySelector<HTMLElement>('.node-list')!
 
-    const initialHeight = Number.parseFloat(trailingSpacer.style.height)
+    const initialHeight = Number.parseFloat(list.style.height)
     const firstRow = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
 
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 2)])
-    const measuredHeight = Number.parseFloat(trailingSpacer.style.height)
+    const measuredHeight = Number.parseFloat(list.style.height)
 
     act(() => globalThis.dispatchEvent(new Event('resize')))
 
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(measuredHeight)
+    expect(Number.parseFloat(list.style.height)).toBe(measuredHeight)
 
     Object.defineProperty(globalThis, 'innerWidth', { configurable: true, value: originalWidth + 1 })
 
@@ -1303,11 +1301,11 @@ describe('NodeList windowing', () => {
     fireEvent.resize(window)
     act(() => globalThis.dispatchEvent(new Event('resize')))
 
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight)
+    expect(Number.parseFloat(list.style.height)).toBe(initialHeight)
 
     observer.trigger([resizeEntry(firstRow, ROW_HEIGHT_ESTIMATE * 3)])
 
-    expect(Number.parseFloat(trailingSpacer.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE * 2)
+    expect(Number.parseFloat(list.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE * 2)
   })
 
   it('mounts the focused row even when it is outside the window', () => {
@@ -1345,7 +1343,7 @@ describe('NodeList windowing', () => {
     expect(later).toHaveFocus()
   })
 
-  it('targets the list edges from the leading and trailing spacers', () => {
+  it('targets the gaps outside the mounted rows', () => {
     vi.useFakeTimers()
     mockRowRects()
     const { container, onMove } = renderRows({ list: buildNodes(600) })

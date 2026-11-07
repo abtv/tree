@@ -632,7 +632,7 @@ test.describe('inline node expansion (mode-independent)', () => {
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
     // 300 top-level roots alone stay under the 500-row threshold and render unwindowed.
-    expect(await window.locator('.node-list-spacer').count()).toBe(0)
+    await expect(window.locator('.node-list')).not.toHaveClass(/node-list-windowed/)
 
     // Expand by stable node id, not by rendered position: each expansion shifts every later
     // top-level node's flattened row index, so a position-based label would drift mid-loop.
@@ -645,9 +645,7 @@ test.describe('inline node expansion (mode-independent)', () => {
     }, expandedCount)
 
     // 300 top-level rows + 110 * 2 expanded children = 520 visible rows, above the threshold.
-    const spacers = window.locator('.node-list-spacer')
-
-    await expect(spacers).toHaveCount(2)
+    await expect(window.locator('.node-list')).toHaveClass(/node-list-windowed/)
 
     const mountedRows = await window.locator('.node-row').count()
 

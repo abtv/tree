@@ -708,13 +708,13 @@ describeForEachEditingMode('hierarchy drag and drop', ({ mode }) => {
     await captureNodeList('light')
 
     const geometry = await movedRow.evaluate((row) => {
-      const listBox = row.closest('.node-list')!.getBoundingClientRect()
       const rowBox = row.getBoundingClientRect()
       const left = Number.parseFloat(getComputedStyle(row, '::before').left)
-      return { listLeft: listBox.left, rowLeft: rowBox.left, markerLeft: left }
+      const child = document.querySelector('[data-node-id="a1"]')!.getBoundingClientRect()
+      return { childLeft: child.left, rowLeft: rowBox.left, markerLeft: left }
     })
 
-    expect(geometry.rowLeft + geometry.markerLeft).toBeCloseTo(geometry.listLeft + 48, 0)
+    expect(geometry.rowLeft + geometry.markerLeft).toBeCloseTo(geometry.childLeft, 0)
 
     await window.emulateMedia({ colorScheme: 'dark' })
     await captureNodeList('dark')

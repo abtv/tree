@@ -462,7 +462,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await expect(node(window, 101)).toBeFocused()
       await expect.poll(() => caretOffset(node(window, 101))).toBe(secondLine)
-      await expect(window.locator('.node-list > [aria-hidden="true"].node-row')).toHaveCount(0)
+      await expect(window.locator('.node-list [aria-hidden="true"].node-row')).toHaveCount(0)
     })
 
     // @requirement PRODUCT.md §20.2.9

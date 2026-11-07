@@ -58,7 +58,7 @@ function rowRect(window: Page, index: number): Promise<ElementRect> {
 }
 
 test.describe('compact layout density', () => {
-  test('fits more rows into a small window and uses the raised width cap', async ({ userDataDir }) => {
+  test('fits more rows into a small window and uses its full width', async ({ userDataDir }) => {
     seedDocument(userDataDir, rootSeed(20))
     const { app, window } = await launchTree(userDataDir)
 
@@ -95,7 +95,7 @@ test.describe('compact layout density', () => {
       .locator('.editor-shell')
       .evaluate((element) => element.getBoundingClientRect().width)
 
-    expect(shellWidth).toBeCloseTo(960, 0)
+    expect(shellWidth).toBeCloseTo(await window.evaluate(() => globalThis.innerWidth), 0)
   })
 
   test('keeps the heading gap compact and expands edge drop zones only while dragging', async ({ userDataDir }) => {

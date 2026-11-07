@@ -273,9 +273,11 @@ Node text is always edited inline. A node must not have a persistent input borde
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
 
-Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks, so the text flows across visual lines according to the available width. `Enter` does not insert a line break; it creates a node (see 5.1). Long unbroken strings are broken so that text never overflows horizontally. Node rows end 28px short of the right edge of the content area, so wrapped text does not touch the window edge. The bullet remains aligned with the first line of the node's text, and the attached image remains beneath the full text. The editable current-parent heading wraps in the same way.
+Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks. Each visual line occupies at most 120 character cells of the editor's monospace font, wrapping earlier when the window or indentation leaves less room. This limits displayed width, not the stored text length. `Enter` does not insert a line break; it creates a node (see 5.1). Long unbroken strings are broken so that text never overflows horizontally.
 
-While the Tree or Agenda list contains keyboard focus, only its selected row has a subtle full-width background tint, including its indentation and full wrapped or image height. The tint mixes the ordinary text color at 8% over the document surface in either appearance. Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their existing feedback takes precedence.
+The editor uses the window width without a fixed centered page cap. Rows retain 28px of trailing space, and the text editor has its ordinary inner padding. The bullet remains aligned with the first text line, and an attached image remains beneath the full text. The editable current-parent heading wraps under the same character-cell limit.
+
+While the Tree or Agenda list contains keyboard focus, only its selected row has a subtle background tint extending from the leading to the trailing edge of the scrolling content area, including the number column, side margins, indentation and full wrapped or image height. Its width does not shrink to the text-width limit. The tint mixes the ordinary text color at 8% over the document surface in either appearance. Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their existing feedback takes precedence.
 
 The selected node retains its dark bullet without an additional more-options or selection-dot ornament. The editable Tree current-parent heading retains its ordinary background.
 
@@ -311,11 +313,16 @@ controls, enter copied text, or change selection, caret, editing mode or pending
 Vim commands. Holding the shortcut does not repeatedly toggle. Modal dialogs,
 composition and command/search input keep their own keyboard handling.
 
-Numbered lists use the editor's left margin and compact the spaces around the
-disclosure control. Before hierarchy indentation, text begins 45px after the right
-edge of the number column. Number, disclosure, bullet and text remain separate;
-control sizes and the indentation step stay unchanged. Turning numbers off restores
-the ordinary outline spacing.
+Tree and Agenda always reserve the same number column, including when numbers are
+hidden. Its width fits the number of digits in the full visible list, with a
+two-digit minimum; virtualization does not size it from only the mounted rows.
+Changing the preference hides or shows numbers without moving text, disclosure
+controls or bullets, changing text width, or changing wrapping. Adding rows or
+changing scope or folds may change the width when another digit is needed.
+
+The column begins 4px from the leading edge. Before hierarchy indentation, text
+begins 40px after its right edge. Number, disclosure, bullet and text remain
+separate; control sizes and the 20px indentation step stay unchanged in both states.
 
 This explicit Control shortcut follows the owner's keyboard-first choice (§1.3).
 Browsers may reserve Ctrl+L for their address bar; the command panel remains available.
@@ -1260,6 +1267,8 @@ The focused row stays mounted even when it is off-screen, so keyboard navigation
 A node drag that reaches the top or bottom edge of the content area scrolls the list automatically, so the node can be moved to a position outside the visible rows. This holds in every list that overflows the window, whether or not its rows are windowed; a list that fits the window does not scroll. Hovering the location toolbar does not scroll the list (§2.2).
 
 The content continues to scroll as a single document. The location bar stays fixed (§2.2); the current-parent heading scrolls with the content.
+
+During scrolling, the last painted rows remain visible until the replacement rows and their position are ready together. Large scroll jumps must not expose an empty viewport while waiting for the next visible range. This retains a bounded rendered window rather than mounting the full document, and preserves the selected input and caret.
 
 At or below 500 visible rows, the list renders every row, including inline descendants, without windowing.
 

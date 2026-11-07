@@ -81,7 +81,7 @@ describe('viewport reveal lifecycle', () => {
 
     expect(caretLineRect).toHaveBeenLastCalledWith(row, 80)
     expect(revealRectInViewport).toHaveBeenCalledTimes(2)
-    expect(revealRectInViewport).toHaveBeenLastCalledWith(new DOMRect(0, 700, 400, 20), true)
+    expect(revealRectInViewport).toHaveBeenLastCalledWith(new DOMRect(0, 700, 400, 20), true, row)
     expect(revealInViewport).not.toHaveBeenCalled()
 
     current = false

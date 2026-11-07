@@ -11,6 +11,7 @@ import {
   node,
   readPersisted,
   seedDocument,
+  setAgendaToday,
   setCursor,
   test,
 } from './fixtures'
@@ -20,9 +21,8 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
   // @requirement PRODUCT.md §20.2.28
   test('toggles through Control+L and the command panel, preserving selection and saved preference', async ({
     userDataDir,
-  }, testInfo) => {
-    const today = new Date()
-    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  }) => {
+    const date = '2026-10-08'
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -48,13 +48,15 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
         return [input.selectionStart, input.selectionEnd]
       })
     const before = await selection()
-    await window.clock.install()
+    const beforeNumbers = await outlineGeometry(window.locator('.node-row'))
+    await setAgendaToday(window)
 
     await window.keyboard.press('Control+l')
 
     await expect(window.locator('.line-number')).toHaveText(['1', '2'])
     await expect(editor).toBeFocused()
     expect(await selection()).toEqual(before)
+    expect(await outlineGeometry(window.locator('.node-row'))).toEqual(beforeNumbers)
     await expect.poll(() => JSON.parse(readFileSync(join(userDataDir, 'data', 'line-numbers.json'), 'utf8'))).toBe(true)
 
     await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
@@ -62,20 +64,22 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
     await expect(window.locator('.line-number')).toHaveText(['1', '2', '3'])
     await expectCompactNumbering(window.locator('.node-row'))
 
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('tree-light.png')) })
+    await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('line-numbers-tree-light.png'))
     await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
     await window.emulateMedia({ colorScheme: 'dark' })
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('tree-dark.png')) })
+    await expect(window.locator('.node-list')).toHaveScreenshot(screenshotName('line-numbers-tree-dark.png'))
     await editor.focus()
     await window.keyboard.press('Meta+p')
 
     await expect(window.locator('.agenda-list .line-number')).toHaveText(['1', '2', '3'])
     await expect(window.locator('.agenda-row-day .line-number, .agenda-row-gap .line-number')).toHaveCount(0)
     await expectCompactNumbering(window.locator('.agenda-row-node'))
-    await window.screenshot({ path: testInfo.outputPath(screenshotName('agenda-dark.png')) })
+    await expect(window.locator('.agenda-list')).toHaveScreenshot(screenshotName('line-numbers-agenda-dark.png'))
+    const agendaGeometry = await outlineGeometry(window.locator('.agenda-row'))
     await window.keyboard.press('Control+l')
 
     await expect(window.locator('.line-number')).toHaveCount(0)
+    expect(await outlineGeometry(window.locator('.agenda-row'))).toEqual(agendaGeometry)
 
     await window.keyboard.press('Control+l')
     await fireIdleSave(window)
@@ -117,28 +121,38 @@ test.describe('windowed line numbers', () => {
     const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     seedDocument(userDataDir, {
       document: {
-        roots: Array.from({ length: 2000 }, (_, i) => ({ id: `n${i}`, text: `${date} Task ${i + 1}`, children: [] })),
+        roots: Array.from({ length: 9000 }, (_, i) => ({ id: `n${i}`, text: `${date} Task ${i + 1}`, children: [] })),
       },
-      location: { currentParentId: null, selectedNodeId: 'n1500' },
+      location: { currentParentId: null, selectedNodeId: 'n8500' },
     })
     const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-    await node(window, 1501).focus()
+    await node(window, 8501).focus()
+    const treeGeometry = await outlineGeometry(window.locator('.node-row'))
 
     await window.keyboard.press('Control+l')
 
-    await expect(window.locator('[data-node-id="n1500"] .line-number')).toHaveText('1501')
+    await expect(window.locator('[data-node-id="n8500"] .line-number')).toHaveText('8501')
+    expect(await outlineGeometry(window.locator('.node-row'))).toEqual(treeGeometry)
     expect(await window.locator('.line-number').count()).toBeLessThan(150)
     await expectCompactNumbering(window.locator('.node-row'))
 
     await window.keyboard.press('G')
 
-    await expect(window.locator('[data-node-id="n1999"] .line-number')).toHaveText('2000')
+    await expect(window.locator('[data-node-id="n8999"] .line-number')).toHaveText('9000')
     await window.keyboard.press('Meta+p')
-    await window.keyboard.type('2000j')
+    await window.keyboard.type('9000j')
 
-    await expect(window.locator('.agenda-row[data-node-id="n1999"] .line-number')).toHaveText('2000')
+    await expect(window.locator('.agenda-row[data-node-id="n8999"] .line-number')).toHaveText('9000')
     expect(await window.locator('.line-number').count()).toBeLessThan(150)
     await expectCompactNumbering(window.locator('.agenda-row-node'))
+    const agendaGeometry = await outlineGeometry(window.locator('.agenda-row'))
+
+    await window.keyboard.press('Control+l')
+
+    await expect(window.locator('.line-number')).toHaveCount(0)
+    expect(await outlineGeometry(window.locator('.agenda-row'))).toEqual(agendaGeometry)
+
+    await window.keyboard.press('Control+l')
 
     await window.keyboard.press('g')
     await window.keyboard.press('g')
@@ -179,10 +193,25 @@ async function expectCompactNumbering(rows: Locator): Promise<void> {
     expect(row.numberRight).toBeLessThan(row.bulletLeft)
     expect(row.bulletRight).toBeLessThan(row.textLeft)
     expect(Math.abs(row.numberTop - row.textTop)).toBeLessThan(1)
-    expect(row.outlineGap).toBe(45)
+    expect(row.outlineGap).toBe(40)
     if (row.disclosureLeft !== undefined) {
-      expect(row.disclosureLeft).toBeGreaterThan(row.numberRight)
+      expect(row.disclosureLeft).toBeGreaterThanOrEqual(row.numberRight)
       expect(row.disclosureRight).toBeLessThan(row.bulletLeft)
     }
   }
+}
+
+async function outlineGeometry(rows: Locator) {
+  return rows.evaluateAll((elements) =>
+    elements.map((row) => {
+      const editor = row.querySelector('.node-input, .agenda-text') ?? row
+      const text = editor.getBoundingClientRect()
+      return {
+        id: row.getAttribute('data-node-id') ?? row.getAttribute('data-agenda-key'),
+        left: text.left,
+        right: text.right,
+        height: text.height,
+      }
+    }),
+  )
 }

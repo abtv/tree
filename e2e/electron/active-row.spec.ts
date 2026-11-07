@@ -6,7 +6,8 @@ async function highlight(row: Locator) {
   return row.evaluate((element) => {
     const style = getComputedStyle(element, '::after')
     const bounds = element.getBoundingClientRect()
-    const list = element.closest('.node-list, .agenda-list')!.getBoundingClientRect()
+    const viewport = element.closest('.scroll-viewport')!
+    const list = viewport.getBoundingClientRect()
     return {
       content: style.content,
       left: bounds.left + Number.parseFloat(style.left),
@@ -14,7 +15,7 @@ async function highlight(row: Locator) {
       height: Number.parseFloat(style.height),
       rowHeight: bounds.height,
       listLeft: list.left,
-      listRight: list.right,
+      listRight: list.left + viewport.clientWidth,
     }
   })
 }

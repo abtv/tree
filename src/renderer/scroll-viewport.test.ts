@@ -62,6 +62,36 @@ describe('scroll viewport', () => {
   })
 
   describe('revealInViewport', () => {
+    // @requirement PRODUCT.md §20.1
+    it.each([
+      { committed: 1000, current: 1200, paintedTop: 700, correction: undefined },
+      { committed: 1200, current: 1000, paintedTop: -100, correction: undefined },
+      { committed: 1000, current: 1200, paintedTop: 900, correction: 115 },
+    ])(
+      'uses the document position while anchored paint waits for scroll delivery ($committed -> $current)',
+      ({ committed, current, paintedTop, correction }) => {
+        const viewport = mountScroller({ top: 30, bottom: 630 })
+        viewport.scrollBy = vi.fn()
+        Object.defineProperties(viewport, {
+          scrollTop: { value: 5000 },
+          scrollHeight: { value: 10000 },
+          clientHeight: { value: 600 },
+        })
+        const list = document.createElement('section')
+        list.dataset.windowStart = String(committed)
+        vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 30 - current, 600, 10000))
+        const row = document.createElement('div')
+        vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, paintedTop, 400, 20))
+        list.append(row)
+        viewport.append(list)
+
+        revealInViewport(row, true)
+
+        if (correction === undefined) expect(viewport.scrollBy).not.toHaveBeenCalled()
+        else expect(viewport.scrollBy).toHaveBeenCalledExactlyOnceWith(0, correction)
+      },
+    )
+
     // The content area spans 30 to 630, so it is 600 high and half of it is 300. The context is one
     // 25px row. By default it is scrolled far from both ends of the content, so no edge snap applies.
     function mountRow(

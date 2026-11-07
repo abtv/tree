@@ -109,20 +109,26 @@ describe('visual text geometry', () => {
   it('uses an isolated row with the destination indentation and removes it after measurement', () => {
     const list = document.createElement('section')
     list.className = 'node-list'
+    const column = document.createElement('div')
+    column.className = 'outline-content'
+    const content = document.createElement('div')
+    column.append(content)
+    list.append(column)
     document.body.append(list)
     try {
       const geometry = unmountedNodeGeometry(node('long text'), 3)
 
       expect(geometry).toBeDefined()
 
-      const row = list.firstElementChild as HTMLElement
+      const row = content.firstElementChild as HTMLElement
 
       expect(row.style.getPropertyValue('--row-depth')).toBe('3')
       expect(row.getAttribute('aria-hidden')).toBe('true')
 
       geometry?.dispose()
 
-      expect(list.children).toHaveLength(0)
+      expect(content.children).toHaveLength(0)
+      expect(list.firstElementChild).toBe(column)
     } finally {
       list.remove()
     }

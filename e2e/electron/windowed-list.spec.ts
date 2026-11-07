@@ -163,6 +163,7 @@ describeForEachEditingMode('windowed node list', ({ screenshotName }) => {
     for (let index = 0; index < 40; index += 1) await window.keyboard.press('ArrowDown')
 
     await expect(row(window, 41)).toBeFocused()
+    await expect(row(window, 41)).toBeInViewport()
     await expect
       .poll(() => window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0))
       .toBeGreaterThan(0)

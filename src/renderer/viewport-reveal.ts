@@ -44,7 +44,7 @@ export function createViewportReveal() {
     if (element === undefined) return
     if (!element.isConnected) return cancel()
     if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
-    else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext)
+    else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext, element)
     const { top, max } = metrics()
     expectedScroll = top
     expectedMax = max

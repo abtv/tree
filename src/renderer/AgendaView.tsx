@@ -160,6 +160,8 @@ export function AgendaView({
   useEffect(() => viewportReveal.mount(), [viewportReveal])
   const rows = store.getAgendaRows()
   const numbers = useMemo(() => (lineNumbers ? agendaLineNumbers(rows) : undefined), [lineNumbers, rows])
+  const lineNumberCount = useMemo(() => rows.reduce((count, row) => count + Number(row.kind === 'node'), 0), [rows])
+  const lineNumberDigits = Math.max(2, String(lineNumberCount).length)
   const lastPresentation = useRef(agenda)
   const restoreScroll = useRef<number | undefined>(undefined)
   useLayoutEffect(() => {
@@ -454,10 +456,11 @@ export function AgendaView({
   return (
     <div
       className={`agenda-list${lineNumbers ? ' line-numbered' : ''}${range === undefined ? '' : ' agenda-list-windowed'}`}
+      data-window-start={range === undefined ? undefined : viewport.start}
       style={
         {
           ...(range === undefined ? {} : { height: layout.total }),
-          '--line-number-gutter': `${Math.max(2, String(numbers?.size ?? 0).length) * 8 + 12}px`,
+          '--line-number-digits': lineNumberDigits,
         } as React.CSSProperties
       }
       ref={listRef}
@@ -484,7 +487,10 @@ export function AgendaView({
         })(event)
       }
     >
-      <div className={range === undefined ? undefined : 'agenda-window-anchor'}>
+      <span aria-hidden="true" className="line-number-sizer">
+        {'9'.repeat(lineNumberDigits)}
+      </span>
+      <div className={`outline-content${range === undefined ? '' : ' agenda-window-anchor'}`}>
         <div style={range === undefined ? undefined : { position: 'relative', top: windowOffset - viewport.start }}>
           {children}
         </div>

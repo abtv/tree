@@ -524,6 +524,11 @@ Do not request that initiative's risk acceptance again. This was a scoped
 exception, not a passing audit or authorization to suppress audits, change
 dependencies, or accept other advisories.
 
+For the stable outline spacing and scroll-rendering change, the owner accepted
+the same existing minimatch advisory and its 17 moderate transitive audit entries
+on 2026-11-07, without dependency changes. This exception covers that UI change
+only; it does not make the audit pass or extend acceptance to future tasks.
+
 Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
 
 Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke, Electron E2E or memory modes; it cannot select external scripts, profiles, origins or Docker options.

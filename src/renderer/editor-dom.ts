@@ -8,8 +8,8 @@ export function unmountedNodeGeometry(
   node: TreeNode,
   depth: number,
 ): ReturnType<typeof visualTextGeometry> | undefined {
-  const list = document.querySelector<HTMLElement>('.node-list')
-  if (list === null) return undefined
+  const content = document.querySelector<HTMLElement>('.node-list > .outline-content > div')
+  if (content === null) return undefined
   const row = document.createElement('div')
   row.className = 'node-row'
   row.style.setProperty('--row-depth', String(depth))
@@ -26,7 +26,7 @@ export function unmountedNodeGeometry(
   input.className = 'node-input'
   input.innerHTML = richTextHtml(node)
   row.append(input)
-  list.append(row)
+  content.append(row)
   try {
     const geometry = visualTextGeometry(input)
     return {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import { buildVisibleRows, selectedSubtreeRowRange, type VisibleRow } from '../application/visible-rows'
@@ -71,6 +72,7 @@ export function NodeList({
   // expanded node's descendants (docs/PRODUCT.md §2.4), not `nodes` itself; a collapsed subtree still
   // costs exactly one row here regardless of its own size (`buildVisibleRows`).
   const visibleRows = suppliedVisibleRows ?? buildVisibleRows(nodes, isExpanded)
+  const lineNumberDigits = Math.max(2, String(visibleRows.length).length)
   const [layoutState, setLayoutState] = useState<LayoutState>(() => ({
     key: `initial:${visibleRows.length}`,
     layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, EMPTY_HEIGHTS) : EMPTY_LAYOUT,
@@ -107,7 +109,8 @@ export function NodeList({
           changed = true
         }
       }
-      if (changed) setMeasureRevision((revision) => revision + 1)
+      // Content growth must expand the scroll range before reveal observers run in this frame.
+      if (changed) flushSync(() => setMeasureRevision((revision) => revision + 1))
     })
     observerRef.current = observer
     observedElementsRef.current.forEach((element) => observer.observe(element))
@@ -144,24 +147,26 @@ export function NodeList({
     const element = listRef.current
     if (element === null) return
     const { top } = element.getBoundingClientRect()
-    const start = Math.max(0, -top)
-    const end = Math.max(0, viewportBounds().bottom - top)
+    const bounds = viewportBounds()
+    const start = Math.max(0, bounds.top - top)
+    const end = Math.max(0, bounds.bottom - top)
     setViewport((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
   }, [])
 
   useLayoutEffect(() => {
-    if (windowed) updateViewport()
     notifyViewportLayout()
+    // Revealing a grown row can scroll synchronously; anchor to that resulting position.
+    if (windowed) updateViewport()
   }, [layoutState.key, measureRevision, structuralVersion, updateViewport, windowed])
 
   useEffect(() => {
     if (!windowed) return undefined
-    const onScroll = (): void => updateViewport()
-    const unsubscribe = onViewportScroll(onScroll)
-    globalThis.addEventListener('resize', onScroll)
+    // Commit the rows and their anchored offset together when native scroll is delivered.
+    const unsubscribe = onViewportScroll(() => flushSync(updateViewport))
+    globalThis.addEventListener('resize', updateViewport)
     return () => {
       unsubscribe()
-      globalThis.removeEventListener('resize', onScroll)
+      globalThis.removeEventListener('resize', updateViewport)
     }
   }, [updateViewport, windowed])
 
@@ -216,6 +221,7 @@ export function NodeList({
       ? sourceIndex
       : undefined
   const visualRange = selectedSubtreeRowRange(visibleRows, visualNodeSelection)
+  const windowOffset = listWindow === undefined ? 0 : (layout.offsets[listWindow.start] ?? 0)
   const dropMarker = dropMarkerFor(
     freeze === undefined ? undefined : dropIndex,
     visibleRows.length,
@@ -261,7 +267,8 @@ export function NodeList({
   return (
     <section
       aria-label="Nodes"
-      className={`node-list${lineNumbers ? ' line-numbered' : ''}${invalidDrop ? ' node-list-drop-invalid' : ''}`}
+      data-window-start={listWindow === undefined ? undefined : viewport.start}
+      className={`node-list${lineNumbers ? ' line-numbered' : ''}${listWindow === undefined ? '' : ' node-list-windowed'}${invalidDrop ? ' node-list-drop-invalid' : ''}`}
       onClickCapture={onListClick}
       onLostPointerCapture={onLostPointerCapture}
       onPointerCancel={onListPointerCancel}
@@ -270,43 +277,60 @@ export function NodeList({
       ref={listRef}
       style={
         {
+          ...(listWindow === undefined ? {} : { height: layout.total }),
           '--row-indent': `${DROP_LEVEL_STEP_PX}px`,
-          '--line-number-gutter': `${Math.max(2, String(visibleRows.length).length) * 8 + 12}px`,
+          '--line-number-digits': lineNumberDigits,
         } as React.CSSProperties
       }
     >
-      <DropZone index={0} start />
-      {listWindow === undefined
-        ? visibleRows.map((row, index) => renderRow(row.node, row.depth, index))
-        : renderWindowed(listWindow)}
-      <DropZone end index={visibleRows.length} />
+      <span aria-hidden="true" className="line-number-sizer">
+        {'9'.repeat(lineNumberDigits)}
+      </span>
+      <div className={`outline-content${listWindow === undefined ? '' : ' node-list-window-anchor'}`}>
+        <div
+          style={{ position: 'relative', ...(listWindow === undefined ? {} : { top: windowOffset - viewport.start }) }}
+        >
+          <DropZone index={0} start />
+          {listWindow === undefined
+            ? visibleRows.map((row, index) => renderRow(row.node, row.depth, index))
+            : renderWindowed(listWindow)}
+          <DropZone end index={visibleRows.length} />
+        </div>
+      </div>
     </section>
   )
 
   function renderWindowed(windowRange: ListWindow): ReactNode {
-    const leadingHeight = layout.offsets[windowRange.start] ?? 0
-    const trailingHeight = layout.total - (layout.offsets[windowRange.end] ?? 0)
     const pinnedIndex = windowRange.pinnedIndex
     const pinnedRow = pinnedIndex === undefined ? undefined : visibleRows[pinnedIndex]
-    const children: ReactNode[] = [
-      <div aria-hidden="true" className="node-list-spacer" key="leading-spacer" style={{ height: leadingHeight }} />,
-    ]
+    const children: ReactNode[] = []
     for (let index = windowRange.start; index < windowRange.end; index += 1) {
       const row = visibleRows[index]
       if (row !== undefined) children.push(renderRow(row.node, row.depth, index))
     }
     if (pinnedIndex !== undefined && pinnedRow !== undefined) {
-      children.push(renderRow(pinnedRow.node, pinnedRow.depth, pinnedIndex, true, layout.offsets[pinnedIndex] ?? 0))
+      children.push(
+        renderRow(
+          pinnedRow.node,
+          pinnedRow.depth,
+          pinnedIndex,
+          true,
+          (layout.offsets[pinnedIndex] ?? 0) - windowOffset,
+        ),
+      )
     }
     if (pinnedSourceIndex !== undefined) {
       const sourceRow = visibleRows[pinnedSourceIndex]!
       children.push(
-        renderRow(sourceRow.node, sourceRow.depth, pinnedSourceIndex, true, layout.offsets[pinnedSourceIndex] ?? 0),
+        renderRow(
+          sourceRow.node,
+          sourceRow.depth,
+          pinnedSourceIndex,
+          true,
+          (layout.offsets[pinnedSourceIndex] ?? 0) - windowOffset,
+        ),
       )
     }
-    children.push(
-      <div aria-hidden="true" className="node-list-spacer" key="trailing-spacer" style={{ height: trailingHeight }} />,
-    )
     return children
   }
 }

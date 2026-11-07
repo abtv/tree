@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { expect, launchTree, node, parent, test } from './fixtures'
+import { expect, launchTree, node, parent, setMainWindowContentSize, test } from './fixtures'
 
 function metrics(locator: ReturnType<typeof node>) {
   return locator.evaluate((element) => {
@@ -14,6 +14,47 @@ function metrics(locator: ReturnType<typeof node>) {
 }
 
 test.describe('long text wrapping', () => {
+  // @requirement PRODUCT.md §2.1
+  test('caps text at 120 character cells in a wide window and wraps earlier in a narrow one', async ({
+    userDataDir,
+  }) => {
+    const { app, window } = await launchTree(userDataDir)
+
+    await setMainWindowContentSize(app, { width: 1600, height: 800 })
+    await node(window, 1).fill('x'.repeat(120))
+
+    const wide = await metrics(node(window, 1))
+
+    expect(wide.height).toBe(20)
+    const width = await node(window, 1).evaluate((element) => {
+      const style = getComputedStyle(element)
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')!
+      context.font = `${style.fontSize} ${style.fontFamily}`
+      return {
+        text:
+          element.getBoundingClientRect().width -
+          Number.parseFloat(style.paddingLeft) -
+          Number.parseFloat(style.paddingRight),
+        limit: context.measureText('x'.repeat(120)).width,
+        viewport: innerWidth,
+      }
+    })
+
+    expect(width.viewport).toBeGreaterThan(width.limit + 100)
+    expect(width.text).toBeCloseTo(width.limit, 0)
+
+    await node(window, 1).fill('x'.repeat(121))
+
+    expect((await metrics(node(window, 1))).height).toBe(40)
+
+    await setMainWindowContentSize(app, { width: 640, height: 800 })
+
+    await expect.poll(async () => (await metrics(node(window, 1))).clientWidth).toBeLessThan(wide.clientWidth)
+    expect((await metrics(node(window, 1))).height).toBeGreaterThan(40)
+    await expect(node(window, 1)).toHaveValue('x'.repeat(121))
+  })
+
   test('wraps a long node so the whole text is shown without horizontal overflow', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
     const text = 'The quick brown fox jumps over the lazy dog. '.repeat(6).trim()
