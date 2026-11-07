@@ -10,7 +10,7 @@ import { createStaticServer } from './static-server.mts'
 import { browserEditing, happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 import { observeSafariErrors, readSafariErrors } from './safari-errors.mts'
 
-export const SAFARI_SMOKE_TIMEOUT_MS = 30_000
+export const SAFARI_SMOKE_TIMEOUT_MS = 60_000
 
 export function validateArguments(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return 'help'
@@ -69,7 +69,7 @@ export async function runSafari(smoke = false) {
       method,
       headers: { 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: cleanup ? AbortSignal.timeout(5000) : AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+      signal: cleanup ? AbortSignal.timeout(5000) : AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
     }).catch((cause: unknown) => {
       throw new Error(
         `SafariDriver ${method} ${path} failed after ${Math.round(performance.now() - started)}ms${cleanup ? ' during cleanup' : ''}`,

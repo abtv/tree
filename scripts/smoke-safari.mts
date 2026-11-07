@@ -7,6 +7,6 @@ await runSafari(true)
 const elapsed = performance.now() - started
 assert(
   elapsed <= SAFARI_SMOKE_TIMEOUT_MS,
-  `Safari smoke including cleanup exceeded 30 seconds: ${elapsed.toFixed(0)}ms`,
+  `Safari smoke including cleanup exceeded ${SAFARI_SMOKE_TIMEOUT_MS / 1000} seconds: ${elapsed.toFixed(0)}ms`,
 )
 console.log(`Safari smoke including startup and cleanup: ${(elapsed / 1000).toFixed(2)}s`)
