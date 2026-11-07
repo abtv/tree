@@ -29,7 +29,8 @@ const percentile = (values: number[], fraction: number) =>
 
 test('folder backup keeps typing responsive and bounds document writes on a large profile', async ({ browser }) => {
   test.setTimeout(300_000)
-  const context = await browser.newContext({ viewport: { width: 1100, height: 760 } })
+  // Worker response instrumentation must reach the network instead of the offline package cache.
+  const context = await browser.newContext({ viewport: { width: 1100, height: 760 }, serviceWorkers: 'block' })
   try {
     await installBackupPicker(context)
     // Observe real worker writes without a production hook. Metric messages are consumed before
@@ -71,6 +72,7 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
     })
     const page = await context.newPage()
 
+    let instrumentedWorkers = 0
     await page.route(/backup\.worker.*\.js/, async (route) => {
       const response = await route.fetch()
       const patch = `{
@@ -88,6 +90,7 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
         };
       }\n`
       await route.fulfill({ response, body: patch + (await response.text()) })
+      instrumentedWorkers += 1
     })
     await page.goto(origin)
     await ready(page)
@@ -104,6 +107,11 @@ test('folder backup keeps typing responsive and bounds document writes on a larg
         if (index > 1) await occupied.getByRole('button', { name: 'Replace Backup with Current Notes' }).click()
 
         await expect(page.locator('#backup-status')).toContainText('Backed up', { timeout: 90_000 })
+
+        expect(instrumentedWorkers).toBeGreaterThan(0)
+        expect(
+          await page.evaluate(() => window.backupMeasurements.writes.some((write) => write.name === 'document.json')),
+        ).toBe(true)
       } else if (index > 0) await chooseMenuItem(page, 'Stop Backing Up')
       const input = page.locator('[data-node-id="r0"] .node-input')
 
