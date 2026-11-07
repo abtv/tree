@@ -14,6 +14,7 @@ async function capture(
   stage: string,
   action: () => Promise<void>,
   region = { left: 100, top: 120, width: 380, height: 192 },
+  waitForBlank = false,
 ): Promise<void> {
   const session = await page.context().newCDPSession(page)
   const frames: string[] = []
@@ -32,33 +33,38 @@ async function capture(
     await action()
 
     await expect.poll(() => frames.length).toBeGreaterThan(before)
+    const readFailures = () =>
+      app.evaluate(
+        ({ nativeImage }, { images, region }) => {
+          return images.flatMap((data, index) => {
+            const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'))
+            const { width, height } = image.getSize()
+            if (width < region.left + region.width || height < region.top + region.height) return [{ index, band: -1 }]
+            const bitmap = image.toBitmap()
+            const missing: { index: number; band: number }[] = []
+            for (let top = region.top; top < region.top + region.height; top += 48) {
+              let ink = 0
+              for (let y = top; y < top + 48; y++) {
+                for (let x = region.left; x < region.left + region.width; x++) {
+                  const offset = (y * width + x) * 4
+                  if (Math.min(bitmap[offset]!, bitmap[offset + 1]!, bitmap[offset + 2]!) < 150) ink++
+                }
+              }
+              if (ink < 30) missing.push({ index, band: top })
+            }
+            return missing
+          })
+        },
+        { images: frames, region },
+      )
+    // A frame delivered during the action can still precede its paint. Negative controls
+    // must observe the obstruction in compositor output before ending the capture.
+    if (waitForBlank) await expect.poll(async () => (await readFailures()).length).toBeGreaterThan(0)
     await session.send('Page.stopScreencast')
     await Promise.all(acknowledgements)
     expect(overflow, 'Capture must remain bounded without silently discarding frames').toBe(false)
 
-    const failures = await app.evaluate(
-      ({ nativeImage }, { images, region }) => {
-        return images.flatMap((data, index) => {
-          const image = nativeImage.createFromBuffer(Buffer.from(data, 'base64'))
-          const { width, height } = image.getSize()
-          if (width < region.left + region.width || height < region.top + region.height) return [{ index, band: -1 }]
-          const bitmap = image.toBitmap()
-          const missing: { index: number; band: number }[] = []
-          for (let top = region.top; top < region.top + region.height; top += 48) {
-            let ink = 0
-            for (let y = top; y < top + 48; y++) {
-              for (let x = region.left; x < region.left + region.width; x++) {
-                const offset = (y * width + x) * 4
-                if (Math.min(bitmap[offset]!, bitmap[offset + 1]!, bitmap[offset + 2]!) < 150) ink++
-              }
-            }
-            if (ink < 30) missing.push({ index, band: top })
-          }
-          return missing
-        })
-      },
-      { images: frames, region },
-    )
+    const failures = await readFailures()
     const reportPath = info.outputPath(`${stage}-frames.json`)
     writeFileSync(reportPath, JSON.stringify({ captured: frames.length, failures }))
     await info.attach(`${stage}-frames`, { path: reportPath, contentType: 'application/json' })
@@ -205,6 +211,7 @@ test('Search paints continuous results during arrows, wheel reversal, refinement
         }, region)
       },
       region,
+      true,
     ),
   ).rejects.toThrow('every captured central band must contain painted content')
   await window.evaluate(() => document.getElementById('scroll-test-mask')?.remove())
@@ -299,15 +306,23 @@ for (const view of ['Tree', 'Agenda'] as const) {
     // This painted obstruction leaves row geometry intact. The pixel detector must reject an
     // internal blank band even though both the topmost and bottommost rows remain visible.
     await expect(
-      capture(app, window, info, 'negative-control', async () => {
-        await window.evaluate(() => {
-          const mask = document.createElement('div')
-          mask.id = 'scroll-test-mask'
-          mask.style.cssText =
-            'position:fixed;left:100px;top:168px;width:380px;height:48px;background:white;z-index:99999'
-          document.body.append(mask)
-        })
-      }),
+      capture(
+        app,
+        window,
+        info,
+        'negative-control',
+        async () => {
+          await window.evaluate(() => {
+            const mask = document.createElement('div')
+            mask.id = 'scroll-test-mask'
+            mask.style.cssText =
+              'position:fixed;left:100px;top:168px;width:380px;height:48px;background:white;z-index:99999'
+            document.body.append(mask)
+          })
+        },
+        undefined,
+        true,
+      ),
     ).rejects.toThrow('every captured central band must contain painted content')
     await window.evaluate(() => document.getElementById('scroll-test-mask')?.remove())
   })
