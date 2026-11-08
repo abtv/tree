@@ -166,8 +166,8 @@ async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean
     const driverPort = await listen(reservation)
     await closeServer(reservation)
     driverOrigin = `http://127.0.0.1:${driverPort}`
-    log(`Starting SafariDriver${ci ? ' with diagnostics in ~/Library/Logs/com.apple.WebDriver/' : ''}`)
-    driver = spawn('/usr/bin/safaridriver', [...(ci ? ['--diagnose'] : []), '--port', String(driverPort)], {
+    log('Starting SafariDriver')
+    driver = spawn('/usr/bin/safaridriver', ['--port', String(driverPort)], {
       stdio: 'inherit',
     })
     driver.on('error', (error) => {

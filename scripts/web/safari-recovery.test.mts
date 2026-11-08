@@ -83,10 +83,7 @@ it('restarts the driver only after cleanup and never retries a later application
     'browser cleanup',
   ])
   expect(spawn).toHaveBeenCalledTimes(2)
-  expect(vi.mocked(spawn).mock.calls[0]?.slice(0, 2)).toEqual([
-    '/usr/bin/safaridriver',
-    ['--diagnose', '--port', expect.any(String)],
-  ])
+  expect(vi.mocked(spawn).mock.calls[0]?.slice(0, 2)).toEqual(['/usr/bin/safaridriver', ['--port', expect.any(String)]])
   const sessionRequests = fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === '/session')
   expect(sessionRequests).toHaveLength(2)
 })
