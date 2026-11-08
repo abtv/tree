@@ -643,8 +643,8 @@ must remain available; an expired artifact or changed validation attempt fails c
 
 Full Electron CI runs weekly on Sunday at 02:00 UTC, manually, and for release
 candidates. Four `macos-15` shards run `playwright.macos.config.ts`; one
-`ubuntu-24.04` job runs `playwright.linux.config.ts` under Xvfb. Both use four
-workers and 12-minute job limits. Linux retains zero retries; macOS retains the
+`ubuntu-24.04` job runs `playwright.linux.config.ts` under Xvfb. Each macOS shard uses
+three workers; Linux uses four. Both have 12-minute job limits. Linux retains zero retries; macOS retains the
 regression configuration's single CI retry. The stable
 `Require all Electron E2E shards to pass` check requires both platform groups to
 succeed, including every macOS shard. Failure, cancellation and unexpected skips

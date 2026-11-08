@@ -76,7 +76,7 @@ it('runs complementary Electron configurations without adding automatic suite ex
   expect(macos.strategy).toEqual({ 'fail-fast': false, matrix: { shard: [1, 2, 3, 4] } })
   expect(macos.steps).toContainEqual(
     expect.objectContaining({
-      run: 'npx playwright test -c config/testing/playwright.macos.config.ts --shard=${{ matrix.shard }}/4',
+      run: 'npx playwright test -c config/testing/playwright.macos.config.ts --shard=${{ matrix.shard }}/4 --workers=3',
     }),
   )
   expect(linux['runs-on']).toBe('ubuntu-24.04')
