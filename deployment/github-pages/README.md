@@ -184,6 +184,19 @@ signed package makes verification fail; it does not prune the authenticated mani
 
 ## Failures and ordering
 
+The hosting workflow's source-head resolution and pre-deployment head checks make
+at most four attempts for connection failures, timeouts and HTTP 500/502/503/504.
+They also retry HTTP 429 or HTTP 403 with explicit rate-limit headers, honoring
+`Retry-After` or the rate-limit reset with a two-minute total budget. Other access
+errors, malformed responses and superseded candidates stop immediately. Each
+request has a 15-second timeout; retries recheck both heads before deployment.
+Only `Retry #1`, `Retry #2` and `Retry #3` are logged for retries. Failures use a
+fixed message without remote response bodies, header values or exception details.
+The two checks share an inline workflow script through a YAML anchor; the deploy
+job still checks out and executes no repository code. Install the updated workflow
+in the hosting repository to enable these retries; updating this template alone
+does not change the installed workflow or rerun a failed deployment.
+
 The web GitHub API client retries reads and immutable Git blob/tree/commit creation
 at most three times after the initial request, only for HTTP 500, 502, 503, 504,
 fetch connection failures or timeouts. Delays increase from 1 to 2 to 4 seconds,
@@ -221,8 +234,7 @@ remain in place. The release workflow itself preserves in-flight publication.
 
 The target also checks public source run metadata over GitHub's API, including its
 current attempt and successful gate. Public API rate limits or unavailable GitHub
-services after bounded retries stop the deployment. Additional anonymous public-source
-API reliability measures remain deferred; the target token is used only within its own scope
+services after bounded retries stop the deployment. The target token is used only within its own scope
 and by detached-proof verification. No new source-reading credential is introduced.
 
 A stolen target-only publisher token cannot sign arbitrary bytes or change the
