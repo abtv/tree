@@ -800,21 +800,38 @@ export async function launchTree(
               }),
             )
             .toEqual(expectedLoaded)
-          const beforeUndo = await nodeTexts(window)
           expect(initial?.location.currentParentId ?? null).toBeNull()
           expect(initial?.view?.expandedIds ?? []).toEqual([])
-          expect(beforeUndo).toEqual(initial?.document.roots.map((root) => root.text) ?? [''])
           const selected =
             initial === null
               ? node(window, 1)
               : window.locator(`.node-row[data-node-id="${initial.location.selectedNodeId}"] .node-input`)
           await expect(selected).toBeFocused()
+          // Windowed lists expose only mounted rows. The load assertion above checks the full seed;
+          // match each mounted editor to its logical root before checking empty undo/redo history.
+          const mountedRows = () =>
+            window.locator('.node-row').evaluateAll((rows) =>
+              rows.map((row) => {
+                const input = row.querySelector('.node-input')!
+                return {
+                  id: row.getAttribute('data-node-id'),
+                  index: Number(row.getAttribute('data-node-index')),
+                  text: input instanceof HTMLTextAreaElement ? input.value : (input.textContent ?? ''),
+                }
+              }),
+            )
+          const beforeUndo = await mountedRows()
+          const roots = expectedLoaded.document.roots
+          expect(beforeUndo.length).toBeGreaterThan(0)
+          expect(beforeUndo).toEqual(
+            beforeUndo.map(({ index }) => ({ id: roots[index]?.id, index, text: roots[index]?.text })),
+          )
           if (vimPreference === true) await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
           else await expect(window.getByLabel('Vim mode')).toHaveCount(0)
           await window.keyboard.press('Meta+z')
-          expect(await nodeTexts(window)).toEqual(beforeUndo)
+          await expect.poll(mountedRows).toEqual(beforeUndo)
           await window.keyboard.press('Meta+Shift+z')
-          expect(await nodeTexts(window)).toEqual(beforeUndo)
+          await expect.poll(mountedRows).toEqual(beforeUndo)
           // Synchronize the retained application menu through the existing production command.
           await window.evaluate(
             (enabled) =>

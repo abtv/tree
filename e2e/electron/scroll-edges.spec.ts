@@ -42,7 +42,7 @@ test.describe('scroll edges', () => {
     seedRoots(userDataDir, 200)
     const { window: page } = await launchTree(userDataDir)
 
-    await expect(page.locator('.node-row')).toHaveCount(200)
+    await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('Root 0')
 
     await scrollContentTo(page, 'start')
 
@@ -81,7 +81,7 @@ test.describe('scroll edges', () => {
     seedRoots(userDataDir, 200)
     const { window: page } = await launchTree(userDataDir)
 
-    await expect(page.locator('.node-row')).toHaveCount(200)
+    await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('Root 0')
 
     await scrollContentTo(page, 512)
 
@@ -150,7 +150,7 @@ test.describe('scroll edges', () => {
       // Playwright's browser context defaults to light media independently of nativeTheme.
       await page.emulateMedia({ colorScheme: appearance })
 
-      await expect(page.locator('.node-row')).toHaveCount(200)
+      await expect(page.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('Root 0')
       // The window resize reaches the renderer asynchronously and re-applies the initial selection
       // reveal (PRODUCT.md §20.8) until the scroll below relinquishes it, so settle the geometry first.
       await expect

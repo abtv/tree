@@ -59,6 +59,42 @@ if (hiddenInfrastructure) {
     // Infrastructure fault injection is deliberately outside adopted editing tests.
     test.use({ sharedApplicationReset: 'reload' })
 
+    test('validates a windowed seed after discarding edits from the previous renderer', async ({
+      userDataDir,
+      sharedApplication,
+    }) => {
+      const first = await launchTree(userDataDir)
+      await typeInto(node(first.window, 1), 'Discarded edits')
+
+      await resetSharedApplication(sharedApplication)
+      removeData(sharedApplication)
+      seedDocument(userDataDir, {
+        document: {
+          roots: Array.from({ length: 301 }, (_, index) => ({
+            id: `root-${index}`,
+            text: `Seeded root ${index}`,
+            children: [],
+          })),
+        },
+        location: { currentParentId: null, selectedNodeId: 'root-0' },
+      })
+
+      const second = await launchTree(userDataDir)
+
+      expect(second.app).toBe(first.app)
+      await expect(second.window.locator('.node-list')).toHaveClass(/node-list-windowed/)
+      expect(await second.window.locator('.node-row').count()).toBeLessThan(301)
+      const firstRoot = second.window.getByRole('textbox', { name: 'Node 1', exact: true })
+      await expect(firstRoot).toHaveValue('Seeded root 0')
+      await expect(firstRoot).toBeFocused()
+      await second.window.locator('.scroll-viewport').evaluate((viewport) => {
+        viewport.scrollTop = viewport.scrollHeight
+      })
+
+      await expect(node(second.window, 301)).toHaveValue('Seeded root 300')
+      await expect(firstRoot).toBeFocused()
+    })
+
     test('disposes the renderer, drains IPC and restores native state before deleting data', async ({
       userDataDir,
       sharedApplication,

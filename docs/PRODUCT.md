@@ -1273,7 +1273,7 @@ The content continues to scroll as a single document. The location bar stays fix
 
 During scrolling, the last painted rows remain visible until the replacement rows and their position are ready together. Large scroll jumps must not expose an empty viewport while waiting for the next visible range. This retains a bounded rendered window rather than mounting the full document, and preserves the selected input and caret.
 
-At or below 500 visible rows, the list renders every row, including inline descendants, without windowing.
+At or below 100 visible rows, the list renders every row, including inline descendants, without windowing.
 
 ### 20.2 Vim-Inspired Editing
 
