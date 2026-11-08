@@ -2018,13 +2018,14 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 * Empty nodes use `Empty node`; image-only nodes use `Image`.
 * Both recent nodes and Search results display the complete node text with preserved line breaks and wrapping, without a character cutoff.
 * Ancestor labels in paths remain single-line previews bounded to their first 160 characters.
+* Consecutive entries with the same displayed parent path share one path heading above them, in both Recent and Results. A different path starts a new group; a path that recurs after another group is shown again. Grouping never reorders entries or shortens their text. Each option retains its own parent path as an accessible description. Top-level entries retain their root icon and have no path heading.
 * Nonempty whitespace text is preserved like other node content.
 * Top-level nodes show a small muted tree icon beside the title, with the accessible label `Top level`; they have no path line.
-* Titles align to the top of each row, use the same 15 px font size as tree text, and paths use 12 px with sufficient contrast.
+* Titles align to the top of each row, use the same 15 px font size as tree text, and path headings use 12 px with sufficient contrast. Space and a thin divider distinguish each new path group; separators between node rows appear only inside the same group. Selection frames cover only the node, not the path heading.
 * Row heights adapt to content with equal vertical padding. A node without a parent path reserves no empty path line. Thin separators span the same width as selection and appear only between items, not after the final item. The selected row's frame replaces its adjacent separators, avoiding doubled boundaries or lines extending beyond its rounded corners. Tag suggestions use the same row padding and separators.
 * Selected nodes and tag suggestions use a distinct fill and a complete inset frame with 4 px rounded corners, adapted to Light, Dark and Automatic appearance. Selection does not change row geometry or text alignment.
 * Trailing scroll space is reserved only for overflowing node results. A list that fits has no extra trailing space. Tags and node results use the same gap before the footer.
-* Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in the selected node title also have a visible underline, including short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.
+* Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in every node title also have a visible underline, including unselected nodes and short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.
 * Tag results highlight only complete, case-sensitive recognized tags, excluding hyperlink ranges.
 * Tag suggestions highlight only the continuous matched fragment, preserving the suggestion's original spelling; a matching prefix includes its leading `#`.
 * Bare `#` does not highlight every suggestion.

@@ -282,8 +282,14 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         }),
       )
       expect(rows[1]!.height).toBeGreaterThan(rows[0]!.height)
-      expect(rows[0]!.bottom).toBe(rows[1]!.top)
+      const pathBox = (await results.locator('.recent-node-group-path').boundingBox())!
+      expect(rows[0]!.bottom).toBeLessThan(pathBox.y)
+      expect(pathBox.y + pathBox.height).toBe(rows[1]!.top)
       expect(rows[1]!.bottom).toBe(rows[2]!.top)
+      for (const match of await results.locator('.recent-node-text .node-search-match').all()) {
+        await expect(match).toHaveCSS('text-decoration-line', 'underline')
+      }
+      await expect(results.locator('.recent-node-path .node-search-match')).toHaveCSS('text-decoration-line', 'none')
       await expect(popup).toHaveCSS('width', '652px')
       await expect(window).toHaveScreenshot(`search-results-presentation-${appearance}.png`)
 
@@ -315,6 +321,73 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await expect(popup).toHaveCount(0)
     })
   }
+
+  // @requirement PRODUCT.md §20.14.2
+  test('groups consecutive recent paths and remeasures grouped results through scroll and resize', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: ['Project A', 'Project B'].map((text, group) => ({
+          id: `p${group}`,
+          text,
+          children: Array.from({ length: 45 }, (_, index) => ({
+            id: `p${group}-${index}`,
+            text: `Needle ${group}-${index}\n${'Full result text '.repeat(index % 3 === 0 ? 12 : 1)}`,
+            children: [],
+          })),
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'p0' },
+    })
+    writeFileSync(
+      join(userDataDir, 'data', 'recent-nodes.json'),
+      JSON.stringify(['p0-0', 'p0-1', 'p1-0', 'p0-2', 'p0-3']),
+    )
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 700, height: 740 })
+    await window.keyboard.press('Meta+;')
+    const list = window.locator('.node-search-results')
+    const input = window.getByRole('searchbox')
+    await expect(list.locator('.recent-node-group-path')).toHaveText(['Project A', 'Project B', 'Project A'])
+    await expect(list.getByRole('option')).toHaveCount(5)
+    const entries = await list.locator('.recent-node-entry').evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect()
+        return { top: box.top, bottom: box.bottom }
+      }),
+    )
+    for (let index = 1; index < entries.length; index++) {
+      expect(entries[index]!.top).toBe(entries[index - 1]!.bottom)
+    }
+    await window.screenshot({ path: '.scratch/search-path-groups/recent-grouped.png' })
+
+    await list.locator('.recent-node-group-path').first().click()
+    await expect(input).toBeFocused()
+    await window.keyboard.type('Needle')
+    await expect(input).toHaveValue('Needle')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 90')
+    await window.keyboard.press('ArrowUp')
+    await expect(window.getByLabel('Result position')).toHaveText('90 / 90')
+    await setMainWindowBounds(app, { width: 520, height: 520 })
+    await expect
+      .poll(() =>
+        list.locator('[aria-selected="true"]').evaluate((element) => {
+          const row = element.getBoundingClientRect()
+          const viewport = element.closest('.node-search-results')!.getBoundingClientRect()
+          return row.top >= viewport.top && row.bottom <= viewport.bottom
+        }),
+      )
+      .toBe(true)
+    expect(await list.getByRole('option').count()).toBeLessThanOrEqual(40)
+    await expect(input).toBeFocused()
+    await window.keyboard.press('Enter')
+    await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
+    await window.keyboard.press('Meta+;')
+    await expect(list.getByRole('option').first()).toContainText('Needle 1-44')
+    await window.keyboard.press('Escape')
+    await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
+  })
 
   // @requirement PRODUCT.md §20.14.2
   test('wraps full results and reveals a distant match across navigation, resize and appearances', async ({

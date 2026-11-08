@@ -134,6 +134,39 @@ function setup(empty = false) {
   return { store, input, beforeVisit }
 }
 
+// @requirement PRODUCT.md §20.14.2
+it('shares only consecutive path headings without changing result order or keyboard targets', () => {
+  const { store } = setup()
+  const results = [
+    { id: 'a', text: 'First needle\nFull second line', path: 'Project' },
+    { id: 'b', text: 'Second needle', path: 'Project' },
+    { id: 'c', text: 'Third needle', path: 'Other' },
+    { id: 'd', text: 'Fourth needle', path: 'Project' },
+    { id: 'root', text: 'Root needle', path: null },
+  ]
+  vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+    publish(results)
+    return vi.fn()
+  })
+
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: 'needle' } })
+
+  expect(screen.getAllByText('Project')).toHaveLength(2)
+  expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+    ...results.slice(0, 4).map((item) => item.text),
+    'Root needle',
+  ])
+  expect(screen.getAllByRole('option')[1]).toHaveAccessibleDescription('Project')
+  expect(screen.getAllByRole('option')[3]).toHaveAccessibleDescription('Project')
+
+  fireEvent.keyDown(input, { key: 'ArrowDown' })
+  fireEvent.keyDown(input, { key: 'ArrowDown' })
+  fireEvent.keyDown(input, { key: 'Enter' })
+
+  expect(store.visitRecentNode).toHaveBeenCalledWith('c')
+})
+
 // @requirement PRODUCT.md §20.14
 it('borrows focus, wraps eight results and restores a directional selection without visiting', () => {
   const { input, store } = setup()

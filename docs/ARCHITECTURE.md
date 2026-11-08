@@ -651,6 +651,18 @@ come from the application projection. No document writes, syncs or animation-fra
 polling are added. Search and MRU scale scenarios and native scroll/frame regressions
 guard the affected costs.
 
+Consecutive results with equal displayed parent paths share a heading. The renderer
+compares adjacent result paths without reordering or traversing the document. Each
+measured entry includes its optional heading and one selectable node; only the node
+receives the selection frame. Each option exposes its path as an accessible
+description even when its group's heading is outside the rendered window. Grouping
+compares adjacent paths in the existing offset pass and rendered window, without new
+persistent state; current-result height storage and bounded row mounting remain
+unchanged. The list's flex basis uses
+the measured entries without the conditional trailing inset, so adding scroll space
+cannot resize the viewport and repeatedly toggle its own overflow condition. The
+node-search scale scenario covers the changed measurement and scrolling cost.
+
 `global-search-session.ts` is the pure renderer-local owner of that popup's current
 query, completed results, pending work, selection, tags and composition. One subscribed
 snapshot replaces parallel React state. It invalidates obsolete callbacks and closes

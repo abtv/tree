@@ -1825,7 +1825,7 @@ body.node-drag-invalid * {
   background: transparent;
 }
 
-.recent-node-row[aria-selected='true'] .recent-node-text .node-search-match {
+.recent-node-row .recent-node-text .node-search-match {
   text-decoration-line: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
@@ -1839,6 +1839,16 @@ body.node-drag-invalid * {
   font-size: 12px;
   line-height: 16px;
   opacity: 0.85;
+}
+
+.recent-node-entry {
+  display: flow-root;
+}
+
+.recent-node-group-path {
+  margin-top: 10px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--color-location-border);
 }
 
 .recent-node-root {

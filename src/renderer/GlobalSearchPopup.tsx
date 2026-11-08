@@ -122,7 +122,13 @@ export function GlobalSearchPopup({
   const heights = measurement?.epoch === measurementEpoch ? measurement.heights : NO_HEIGHTS
   const viewportHeight = measurement?.epoch === measurementEpoch ? measurement.viewportHeight : 560
   const layout = useMemo(
-    () => computeOffsets(items?.map((item) => heights.get(item.id) ?? (item.path === null ? 34 : 52)) ?? []),
+    () =>
+      computeOffsets(
+        items?.map(
+          (item, index) =>
+            heights.get(item.id) ?? (item.path !== null && item.path !== items?.[index - 1]?.path ? 73 : 34),
+        ) ?? [],
+      ),
     [items, heights],
   )
   const input = useRef<HTMLInputElement>(null)
@@ -344,7 +350,7 @@ export function GlobalSearchPopup({
       if (widthChanged) revealPending.current = true
       panelSize.current = size
       const next = new Map(widthChanged ? NO_HEIGHTS : heights)
-      for (const row of element.querySelectorAll<HTMLElement>('.recent-node-row')) {
+      for (const row of element.querySelectorAll<HTMLElement>('.recent-node-entry')) {
         const id = row.dataset.resultId!
         const height = row.getBoundingClientRect().height
         if (height > 0 && next.get(id) !== height) {
@@ -375,7 +381,7 @@ export function GlobalSearchPopup({
     measure()
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
     observer?.observe(element)
-    element.querySelectorAll('.recent-node-row').forEach((row) => observer?.observe(row))
+    element.querySelectorAll('.recent-node-entry').forEach((row) => observer?.observe(row))
     return () => observer?.disconnect()
   }, [
     items,
@@ -498,6 +504,7 @@ export function GlobalSearchPopup({
         aria-label={query === '' ? 'Recent nodes' : 'Search results'}
         aria-busy={pending}
         className="node-search-results"
+        style={{ flexBasis: items.length > 0 ? layout.total : undefined }}
         onScroll={(event) => {
           updateResultEdges(event.currentTarget)
           // Retained paint and replacement rows must move together in this external scroll event.
@@ -521,61 +528,69 @@ export function GlobalSearchPopup({
             <div style={{ position: 'sticky', top: 0, height: 0 }}>
               {renderedIndices.map((index) => {
                 const item = items[index]!
+                const startsGroup = item.path !== null && item.path !== items[index - 1]?.path
                 return (
                   <div
                     key={item.id}
-                    id={`recent-node-${index}`}
+                    className="recent-node-entry"
                     data-result-id={item.id}
-                    data-result-divider={
-                      index < items.length - 1 &&
-                      (suggestions.length > 0 || (index !== selected && index + 1 !== selected))
-                        ? ''
-                        : undefined
-                    }
-                    role="option"
-                    aria-selected={suggestions.length === 0 && index === selected}
-                    className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
+                    onMouseDown={(event) => event.preventDefault()}
                     style={{
                       position: 'absolute',
                       top: layout.offsets[index]! - windowTop,
                       width: '100%',
                       boxSizing: 'border-box',
                     }}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => visit(index)}
                   >
-                    <span className="recent-node-title-line">
-                      <span className="recent-node-text">
-                        <SearchResultText
-                          text={item.text}
-                          query={displayedQuery}
-                          tagMatches={item.tagMatches}
-                          active={suggestions.length === 0 && index === selected && !pending}
-                          onReveal={requestReveal}
-                        />
-                      </span>
-                      {item.path === null && (
-                        <span
-                          className="recent-node-root location-icon"
-                          role="img"
-                          aria-label="Top level"
-                          title="Top level"
-                        >
-                          <OutlineRootIcon />
-                        </span>
-                      )}
-                    </span>
-                    {item.path !== null && (
-                      <span className="recent-node-path">
+                    {startsGroup && item.path !== null && (
+                      <div className="recent-node-group-path recent-node-path">
                         <SearchResultText
                           text={item.path}
                           query={displayedQuery}
                           tagMatches={item.pathTagMatches}
-                          active={suggestions.length === 0 && index === selected && !pending}
+                          active={false}
                           onReveal={requestReveal}
                         />
-                      </span>
+                      </div>
                     )}
+                    <div
+                      id={`recent-node-${index}`}
+                      data-result-divider={
+                        index < items.length - 1 &&
+                        item.path === items[index + 1]?.path &&
+                        (suggestions.length > 0 || (index !== selected && index + 1 !== selected))
+                          ? ''
+                          : undefined
+                      }
+                      role="option"
+                      aria-selected={suggestions.length === 0 && index === selected}
+                      aria-description={item.path ?? undefined}
+                      className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
+                      style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}
+                      onClick={() => visit(index)}
+                    >
+                      <span className="recent-node-title-line">
+                        <span className="recent-node-text">
+                          <SearchResultText
+                            text={item.text}
+                            query={displayedQuery}
+                            tagMatches={item.tagMatches}
+                            active={suggestions.length === 0 && index === selected && !pending}
+                            onReveal={requestReveal}
+                          />
+                        </span>
+                        {item.path === null && (
+                          <span
+                            className="recent-node-root location-icon"
+                            role="img"
+                            aria-label="Top level"
+                            title="Top level"
+                          >
+                            <OutlineRootIcon />
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   </div>
                 )
               })}
