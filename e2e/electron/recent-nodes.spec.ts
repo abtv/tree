@@ -367,6 +367,8 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.keyboard.type('Needle')
     await expect(input).toHaveValue('Needle')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 90')
+    // Earlier query prefixes have the same count; wait until the final query permits navigation.
+    await expect(list).toHaveAttribute('aria-busy', 'false')
     await window.keyboard.press('ArrowUp')
     await expect(window.getByLabel('Result position')).toHaveText('90 / 90')
     await setMainWindowBounds(app, { width: 520, height: 520 })
