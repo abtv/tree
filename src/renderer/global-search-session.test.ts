@@ -28,35 +28,38 @@ function fixture() {
 }
 
 describe('global Search session', () => {
-  it('keeps completed results during refinement and forbids stale selection until replacement', () => {
-    const { session, requests } = fixture()
-    session.edit('first')
-    requests[0]!.publish([recent[0]!])
+  it.each(['s', 'se', 'second', '😀'])(
+    'keeps completed results while refining to %s and forbids stale selection until replacement',
+    (query) => {
+      const { session, requests } = fixture()
+      session.edit('first')
+      requests[0]!.publish([recent[0]!])
 
-    session.edit('second')
-    session.moveResult(1)
+      session.edit(query)
+      session.moveResult(1)
 
-    expect(requests[0]!.cancel).toHaveBeenCalledOnce()
-    expect(session.getSnapshot()).toMatchObject({
-      query: 'second',
-      completedQuery: 'first',
-      items: [recent[0]],
-      pending: true,
-      selected: 0,
-    })
-    expect(session.takeResult()).toBeUndefined()
+      expect(requests[0]!.cancel).toHaveBeenCalledOnce()
+      expect(session.getSnapshot()).toMatchObject({
+        query,
+        completedQuery: 'first',
+        items: [recent[0]],
+        pending: true,
+        selected: 0,
+      })
+      expect(session.takeResult()).toBeUndefined()
 
-    requests[0]!.publish([])
+      requests[0]!.publish([])
 
-    expect(session.getSnapshot().pending).toBe(true)
-    expect(session.getSnapshot().items).toEqual([recent[0]])
+      expect(session.getSnapshot().pending).toBe(true)
+      expect(session.getSnapshot().items).toEqual([recent[0]])
 
-    requests[1]!.publish([recent[1]!])
+      requests[1]!.publish([recent[1]!])
 
-    expect(session.getSnapshot()).toMatchObject({ completedQuery: 'second', items: [recent[1]], pending: false })
-    expect(session.takeResult()).toBe('second')
-    expect(session.getSnapshot().items).toBeUndefined()
-  })
+      expect(session.getSnapshot()).toMatchObject({ completedQuery: query, items: [recent[1]], pending: false })
+      expect(session.takeResult()).toBe('second')
+      expect(session.getSnapshot().items).toBeUndefined()
+    },
+  )
 
   it('cancels clear, close and reopen without allowing old callbacks to revive the session', () => {
     const { session, requests } = fixture()
@@ -109,7 +112,7 @@ describe('global Search session', () => {
     expect(session.getSnapshot()).toMatchObject({ items: [], completedQuery: 'first', pending: false })
   })
 
-  it('accepts synchronous empty or short-query results without leaving pending work', () => {
+  it('accepts synchronous no-match results without leaving pending work', () => {
     const { session, source } = fixture()
     source.search.mockImplementation((_query, publish) => {
       publish([])

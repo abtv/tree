@@ -203,7 +203,7 @@ export class EditorStore {
   }
 
   public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
-    if (query.startsWith('#') ? !this.tags.has(query.slice(1)) : [...query].length < 3) {
+    if (query === '' || (query.startsWith('#') && !this.tags.has(query.slice(1)))) {
       publish([])
       return () => undefined
     }

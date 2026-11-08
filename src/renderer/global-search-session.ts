@@ -68,7 +68,7 @@ export class GlobalSearchSession {
       selected: 0,
       suggestionIndex: 0,
       suggestions: completedTag || this.composing ? [] : this.source.suggestions(query),
-      pending: query.startsWith('#') || [...query].length >= 3,
+      pending: query !== '',
     })
     if (query === '') {
       this.set({ ...this.snapshot, items: this.source.recent(), completedQuery: query, pending: false })

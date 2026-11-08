@@ -22,7 +22,7 @@ it('retains empty feedback and shows only one delayed pending label', () => {
   })
   const input = screen.getByRole('searchbox')
 
-  fireEvent.change(input, { target: { value: 'absent' } })
+  fireEvent.change(input, { target: { value: 'x' } })
   act(() => vi.advanceTimersByTime(199))
 
   expect(screen.getByText('No recent nodes')).toBeInTheDocument()
@@ -39,7 +39,7 @@ it('retains empty feedback and shows only one delayed pending label', () => {
   expect(screen.getByText('No results')).toBeInTheDocument()
   expect(screen.queryByText('Searching…')).toBeNull()
 
-  fireEvent.change(input, { target: { value: 'next' } })
+  fireEvent.change(input, { target: { value: 'xy' } })
   act(() => vi.advanceTimersByTime(100))
 
   expect(screen.getByText('No results')).toBeInTheDocument()
@@ -88,10 +88,10 @@ it('retains rows during refinement without allowing stale activation, then repla
     return vi.fn()
   })
   const input = screen.getByRole('searchbox')
-  fireEvent.change(input, { target: { value: 'nod' } })
+  fireEvent.change(input, { target: { value: 'n' } })
   act(() => publish([{ id: 'result', text: 'Node result', path: null }]))
 
-  fireEvent.change(input, { target: { value: 'node' } })
+  fireEvent.change(input, { target: { value: 'no' } })
 
   expect(screen.getByRole('option')).toHaveTextContent('Node result')
   expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'true')

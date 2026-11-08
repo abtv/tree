@@ -69,13 +69,26 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     return performance.now() - start
   })
   await expect(window.getByText('No results', { exact: true })).toBeVisible()
+  const shortCompleteMs: number[] = []
+  for (const query of ['N', 'Ne']) {
+    const start = performance.now()
+    await input.fill(query)
+    await expect(window.getByRole('listbox', { name: 'Search results' })).toHaveAttribute('aria-busy', 'false')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 10000')
+    await expect(window.getByRole('option').first()).toContainText('Needle 0')
+    shortCompleteMs.push(performance.now() - start)
+    expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
+    await expect(input).toBeFocused()
+  }
   await expect(window.locator('[data-node-id="parent"] .node-input')).toHaveValue('Parent')
+  await window.screenshot({ path: 'test-results/search-short-query-scale.png' })
   recordPerfResult({
     kind: 'node-search',
     scenario: 'wide-10000-results',
     samples: 1,
     metrics: {
       completeMs,
+      shortQueryMaxCompleteMs: Math.max(...shortCompleteMs),
       paintMs,
       arrowPaintP95Ms: arrowPaint.p95Ms,
       arrowPaintMaxMs: arrowPaint.maxMs,
@@ -85,6 +98,7 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     },
   })
   expect(completeMs).toBeLessThan(2000)
+  expect(Math.max(...shortCompleteMs)).toBeLessThan(2000)
   expect(paintMs).toBeLessThan(150)
   expect(arrowPaint.p95Ms).toBeLessThan(80)
   expect(scroll.p95Ms).toBeLessThan(50)

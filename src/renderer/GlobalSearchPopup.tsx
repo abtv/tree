@@ -327,13 +327,7 @@ export function GlobalSearchPopup({
       >
         {items.length === 0 ? (
           suggestions.length > 0 ? null : (
-            <div className="recent-node-empty">
-              {displayedQuery === ''
-                ? 'No recent nodes'
-                : !displayedQuery.startsWith('#') && [...displayedQuery].length < 3
-                  ? 'Enter at least 3 characters'
-                  : 'No results'}
-            </div>
+            <div className="recent-node-empty">{displayedQuery === '' ? 'No recent nodes' : 'No results'}</div>
           )
         ) : (
           <div style={{ height: items.length * 52, position: 'relative', overflow: 'clip' }}>

@@ -4,10 +4,15 @@ import { EditorStore, type EditorServices } from './editor-store'
 afterEach(() => vi.useRealTimers())
 
 it.each([
+  ['', []],
+  ['A', ['a']],
+  ['Al', ['a']],
   ['Alp', ['a']],
-  ['😀😀', []],
+  ['😀', ['a']],
+  ['😀😀', ['a']],
   ['😀😀😀', ['a']],
-])('searches at three Unicode characters and gates shorter text: %s', async (query, expected) => {
+  ['Z', []],
+])('searches every nonempty text query, including short Unicode text: %s', async (query, expected) => {
   vi.useFakeTimers()
   const { store } = await setup()
   store.editText('a', 'Alpha 😀😀😀')
@@ -145,17 +150,23 @@ it('omits only a sole exact tag suggestion and restores completion when the quer
 })
 
 // @requirement PRODUCT.md §20.14
-it('gates short and unknown queries without changing tags, document, selection or history', async () => {
+it('gates empty and unknown-tag queries and searches short text without changing editor state', async () => {
   const { store } = await setup()
   store.editText('a', 'Alpha #w')
   const before = store.getSnapshot()
   const recent = store.recentNodes.getIds()
   const publish = vi.fn()
 
-  store.searchNodes('Al', publish)
+  store.searchNodes('', publish)
   store.searchNodes('#new_tag', publish)
   expect(publish.mock.calls).toEqual([[[]], [[]]])
   expect(store.searchNodeSuggestions('#')).toEqual(['w'])
+  await new Promise<void>((resolve) =>
+    store.searchNodes('Al', (results) => {
+      expect(results.map(({ id }) => id)).toEqual(['a'])
+      resolve()
+    }),
+  )
   await new Promise<void>((resolve) =>
     store.searchNodes('#w', (results) => {
       expect(results.map(({ id }) => id)).toEqual(['a'])
