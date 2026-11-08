@@ -12,7 +12,8 @@ const config = {
   // Instrumentation measures mutated code, so submillisecond timing guards
   // run in ordinary Vitest validation instead of mutation workers. Agent scratch
   // directories can hold browser profiles with dangling links that the sandbox copy rejects.
-  ignorePatterns: ['src/**/*.performance.test.ts', '.scratch'],
+  // Claude skill aliases point to directories, which Stryker cannot copy as regular files.
+  ignorePatterns: ['src/**/*.performance.test.ts', '.scratch', '.claude/skills'],
   coverageAnalysis: 'perTest',
   mutate: [
     'src/domain/**/*.ts',

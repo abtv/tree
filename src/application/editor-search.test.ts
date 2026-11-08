@@ -394,6 +394,30 @@ it('keeps different repeat counts distinct while navigation is pending', async (
   expect(state().location.selectedNodeId).toBe('d')
 })
 
+it('releases scheduled corpus work when manual input interrupts navigation', async () => {
+  const { state } = await setup(2000)
+  const apply = vi.fn()
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  search.update(state())
+  search.begin({ nodeId: 'a', offset: 0 })
+  search.edit('apple')
+  search.confirm()
+  await vi.runAllTimersAsync()
+  apply.mockClear()
+
+  search.navigate({ nodeId: 'a', offset: 6 }, 1, 1500)
+
+  expect(vi.getTimerCount()).toBe(1)
+
+  search.interruptNavigation()
+
+  expect(vi.getTimerCount()).toBe(0)
+
+  await vi.runAllTimersAsync()
+
+  expect(apply).not.toHaveBeenCalled()
+})
+
 it('confirms backward through the editor from the captured caret', async () => {
   const { store, state } = await setup()
   store.search.begin({ nodeId: 'a', offset: 6 })

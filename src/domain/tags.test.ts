@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { findTags, tagFragment } from './tags'
+import { findTags, nodeTags, tagFragment } from './tags'
+import type { TreeNode } from './document-types'
 
 // @requirement PRODUCT.md §20.13
 describe('literal tags', () => {
+  it('scans each immutable node once and refreshes tags for a replacement with the same ID', () => {
+    let reads = 0
+    const original: TreeNode = {
+      id: 'node',
+      get text() {
+        reads += 1
+        return '#Work'
+      },
+      children: [],
+    }
+    const replacement: TreeNode = { id: 'node', text: '#Personal', children: [] }
+
+    expect(nodeTags(original)).toEqual([{ start: 0, end: 5, name: 'Work' }])
+    expect(nodeTags(original)).toEqual([{ start: 0, end: 5, name: 'Work' }])
+    expect(nodeTags(replacement)).toEqual([{ start: 0, end: 9, name: 'Personal' }])
+    expect(nodeTags(original)).toEqual([{ start: 0, end: 5, name: 'Work' }])
+    expect(reads).toBe(1)
+  })
+
   it('keeps tags adjacent to excluded ranges', () => {
     expect(
       findTags('x #tag y', [

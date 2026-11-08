@@ -219,7 +219,7 @@ describe('command registry', () => {
     expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(14)
   })
 
-  it('keeps search actions unchecked and tolerates unavailable search services', async () => {
+  it('keeps optional actions unchecked and tolerates unavailable services', async () => {
     const services = {
       quit: vi.fn(async () => undefined),
       setAlwaysOnTop: vi.fn(async () => undefined),
@@ -237,7 +237,7 @@ describe('command registry', () => {
       view: 'tree',
     } as const
 
-    for (const name of ['find', 'find-next', 'find-previous', 'search-all-nodes']) {
+    for (const name of ['about-tree', 'find', 'find-next', 'find-previous', 'search-all-nodes']) {
       const command = commandRegistry.find((candidate) => candidate.name === name)!
 
       expect(command.active(state)).toBe(false)

@@ -350,6 +350,30 @@ describe('link normalization and edit outcomes', () => {
     })
   })
 
+  it('does not retain overwritten link metadata when a replacement repeats the same URL text', () => {
+    const before = 'https://before.test'
+    const after = 'https://after.test'
+    const text = `${before} old ${url} end ${after}`
+    const middleStart = before.length + 5
+    const lastStart = text.length - after.length
+    const firstLink = { start: 0, end: before.length, url: before }
+    const lastLink = { start: lastStart, end: text.length, url: after }
+
+    const result = replaceLinkedText(
+      text,
+      [firstLink, { start: middleStart, end: middleStart + url.length, url }, lastLink],
+      before.length + 1,
+      lastStart - 1,
+      `new ${url} fin`,
+    )
+
+    expect(result).toEqual({
+      text: `${before} new ${url} fin ${after}`,
+      links: [firstLink, lastLink],
+      createsNewLink: false,
+    })
+  })
+
   it('maps rich ranges for each line and excludes ranges that cross a newline', () => {
     const lines = [url, '', 'https://b.test']
     const start = url.length + 2

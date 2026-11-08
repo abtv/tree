@@ -57,10 +57,11 @@ const document = {
   ],
 }
 
-async function setup() {
+async function setup({ emptyDocument = false } = {}) {
   const saveRecentNodes = vi.fn<(ids: readonly string[]) => Promise<void>>(async () => undefined)
   const services: EditorServices = {
-    load: async () => ({ version: 1, document, location: { currentParentId: null, selectedNodeId: 'a' } }),
+    load: async () =>
+      emptyDocument ? null : { version: 1, document, location: { currentParentId: null, selectedNodeId: 'a' } },
     save: async () => undefined,
     loadRecentNodes: async () => ['child'],
     saveRecentNodes,
@@ -76,6 +77,21 @@ async function setup() {
   await store.initialize()
   return { store, saveRecentNodes }
 }
+
+it('removes and persists stale recent IDs when initialization creates a new document', async () => {
+  const { store, saveRecentNodes } = await setup({ emptyDocument: true })
+
+  expect(store.getSnapshot()).toMatchObject({
+    status: 'ready',
+    location: { currentParentId: null, selectedNodeId: 'created0' },
+  })
+  expect(store.recentNodes.getIds()).toEqual([])
+  expect(store.recentNodes.getResults()).toEqual([])
+
+  await store.flushPersistence()
+
+  expect(saveRecentNodes).toHaveBeenLastCalledWith([])
+})
 
 // @requirement PRODUCT.md §20.14
 it('records successful edits, creation and entry, excluding ordinary navigation, folds and undo', async () => {

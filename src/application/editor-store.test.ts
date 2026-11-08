@@ -1183,7 +1183,7 @@ describe('EditorStore', () => {
 
   // @requirement PRODUCT.md §17
   // @requirement PRODUCT.md §10
-  it.each(['visual deletion', 'empty deletion', 'case'] as const)(
+  it.each(['visual deletion', 'single deletion', 'counted deletion', 'empty deletion', 'case'] as const)(
     'performs only the required attachment cleanup after %s',
     async (command) => {
       const services = loadedState(
@@ -1213,6 +1213,9 @@ describe('EditorStore', () => {
       await store.flushPersistence()
       events.length = 0
       if (command === 'visual deletion') store.applyNodeVisual('d', 'root', 'root')
+      else if (command === 'single deletion') expect(store.deleteSelected()).toBe(true)
+      else if (command === 'counted deletion')
+        expect(store.deleteSiblingRange(1)?.map((node) => node.id)).toEqual(['root'])
       else if (command === 'empty deletion') store.deleteEmptySelected()
       else store.applyNodeVisual('U', 'root', 'root')
       await store.flushPersistence()

@@ -47,6 +47,7 @@ describe('countInsertedWords', () => {
   })
 
   it('counts a word repeated after text that already ends with it', () => {
+    expect(countInsertedWords('a', 'a a')).toBe(1)
     expect(countInsertedWords('ab', 'ab ab')).toBe(1)
   })
 })

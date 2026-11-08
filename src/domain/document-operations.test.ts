@@ -11,14 +11,19 @@ import {
   editNodeText,
   ensureRoot,
   insertSiblingAfter,
+  insertSiblingBefore,
   insertSubtreeSibling,
+  joinSiblingRange,
   moveSibling,
+  moveSubtree,
   pasteMultilineText,
   pasteText,
   normalizeVisibleLocation,
   removeTextRange,
   replaceSiblingRange,
+  shiftSiblingRange,
   splitNode,
+  toggleStrikethrough,
   type Document,
   type TreeNode,
 } from './document'
@@ -101,21 +106,40 @@ describe('document operation content and retention outcomes', () => {
   it('shares attachment summaries across operations that preserve their occurrences', () => {
     const document: Document = {
       roots: [
-        { id: 'root', text: url, links: [link], attachment, children: [] },
+        {
+          id: 'root',
+          text: url,
+          links: [link],
+          attachment,
+          children: [{ id: 'nested', text: '', children: [] }],
+        },
         { id: 'other', text: '', children: [] },
       ],
     }
     const summary = attachmentSummary(document)
+
+    const structural = [
+      moveSubtree(document, 'other', 'root', 0),
+      shiftSiblingRange(document, 'other', 1, 'in'),
+      shiftSiblingRange(document, 'nested', 1, 'out'),
+      joinSiblingRange(document, 'root', 2, false),
+    ]
     const results = [
       deleteLink(document, 'root', url.length)!,
       removeTextRange(document, 'root', 0, 1),
       createFirstChild(document, 'root', 'child'),
+      insertSiblingBefore(document, 'root', 'before'),
       splitNode(document, 'root', 1, 'new'),
       moveSibling(document, 'root', 1),
       pasteText(document, 'root', 0, '!'),
       pasteMultilineText(document, 'root', 0, ['a', 'b'], ['new']),
       attachImage(document, 'root', attachment),
       insertSubtreeSibling(document, 'root', 'after', { id: 'source', text: '', children: [] }, () => 'copy'),
+      toggleStrikethrough(document, 'root', 'other')!,
+      ...structural.map((result) => {
+        if (!('document' in result)) throw new Error(`Expected a structural change, got ${result.kind}`)
+        return result.document
+      }),
     ]
 
     for (const result of results) {

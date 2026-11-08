@@ -774,6 +774,24 @@ describe('document invariants', () => {
     )
   })
 
+  it('accepts a location only when its parent contains the selected node', () => {
+    fc.assert(
+      fc.property(forest, fc.nat(), (rawForest, seed) => {
+        const document = materialize(rawForest)
+        const selected = pick(document, seed)
+
+        expect(isValidLocation(document, { currentParentId: null, selectedNodeId: selected.id })).toBe(true)
+
+        for (const parent of allNodes(document)) {
+          expect(isValidLocation(document, { currentParentId: parent.id, selectedNodeId: selected.id })).toBe(
+            subtreeIds(parent).includes(selected.id),
+          )
+        }
+      }),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
   it('rejects a location that does not match the tree', () => {
     fc.assert(
       fc.property(forest, fc.nat(), (rawForest, seed) => {

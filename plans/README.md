@@ -2,9 +2,7 @@
 
 This index lists work that spans multiple sessions: initiatives and review follow-up batches. The linked plan records whether the Product Owner authorized the whole scope or requires task-by-task approval. Read it before continuing its work. The workflow and plan format are in [Development Guide §11](../docs/DEVELOPMENT.md#11-multi-session-initiatives); authorization and session rules are in [AGENTS.md](../AGENTS.md).
 
-| Initiative | Status | Next task |
-| --- | --- | --- |
-| [Domain and application mutation sweep](domain-application-mutation-sweep.md) | Paused by owner; partial results saved | On explicit resumption, finish document-links.ts, then remaining domain/application files |
+There are no active plans.
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

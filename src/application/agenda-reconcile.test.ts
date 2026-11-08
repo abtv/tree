@@ -51,6 +51,26 @@ it('tracks explicit active occurrences, keeps added dates stable, and chooses th
   expect(reconcileAgenda(removed, state)).toMatchObject({ selectedKey: 'node:98:match', activeOccurrence: { day: 98 } })
 })
 
+it('reuses focused-day state when the active date and visible path are unchanged', () => {
+  const timeline = selected()
+  const focused = applyAgendaCommand(
+    timeline,
+    { kind: 'focus-day', key: 'day:100', scrollTop: 24 },
+    buildAgendaRows(agendaProjection(document, timeline), timeline),
+  )
+  const state = applyAgendaCommand(
+    focused,
+    { kind: 'select', key: 'node:100:match' },
+    buildAgendaRows(agendaProjection(document, focused), focused),
+  )
+
+  const result = reconcileAgenda(document, state)
+
+  expect(state.focusedDay).toBe(100)
+  expect(state.activeOccurrence).toEqual({ nodeId: 'match', day: 100 })
+  expect(result).toBe(state)
+})
+
 // @requirement PRODUCT.md §23.13
 it('drops a pending move on every reconciliation but keeps everything else', () => {
   const state = { ...selected(), pendingMove: [{ nodeId: 'match', day: 100 }] }
