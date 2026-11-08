@@ -1,6 +1,0 @@
-interface:
-  display_name: 'Mutation Sweep'
-  short_description: 'Improve mutation coverage with resumable checkpoints'
-  default_prompt: 'Use $mutation-sweep to improve mutation coverage in the area I specify, or resume the sole unfinished sweep; leave changes uncommitted.'
-policy:
-  allow_implicit_invocation: false

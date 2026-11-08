@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { lstatSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,7 +24,9 @@ export function comparePaths(left: string, right: string) {
 export function collectChangedFiles({ rootDirectory = ROOT, runGit = git } = {}) {
   const tracked = nulSeparated(runGit(['diff', '--name-only', '--diff-filter=ACMRTUXB', '-z', 'HEAD'], rootDirectory))
   const untracked = nulSeparated(runGit(['ls-files', '--others', '--exclude-standard', '-z'], rootDirectory))
-  return [...new Set([...tracked, ...untracked])].sort(comparePaths)
+  return [...new Set([...tracked, ...untracked])]
+    .filter((file) => !lstatSync(resolve(rootDirectory, file)).isSymbolicLink())
+    .sort(comparePaths)
 }
 
 export function prettierArguments(files: string[]) {

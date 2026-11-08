@@ -1,9 +1,9 @@
 ---
-name: mutation-sweep
+name: improve-mutation-tests
 description: Run a resumable, file-by-file mutation-testing improvement sweep in a specified source area, preserving thresholds and leaving changes uncommitted for owner review.
 ---
 
-# Mutation sweep
+# Improve mutation tests
 
 Improve meaningful defect detection across a bounded source area. Invocation authorizes investigation, test changes, and required validation within that area. Do not stage changes or commit. Production defects require separate owner review before fixes. Follow the repository's existing workflows and execution permissions.
 

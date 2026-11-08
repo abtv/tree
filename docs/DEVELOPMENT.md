@@ -843,7 +843,7 @@ For a contained change, use a concise conversation plan, a focused development l
 
 Classify the complete change, not only its purpose. For example, a workflow-documentation change that also modifies a validation script or its tests is Low Risk because executable validation tooling changed.
 
-`npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. The full-repository `npm run format:check` remains part of broader validation.
+`npm run format:check:changed` is the canonical scoped formatting check. It checks supported staged, unstaged, and non-ignored untracked files relative to `HEAD`, excludes deleted files and symbolic links, safely passes filenames without shell interpolation, and succeeds with an explicit message when there are no eligible files. Changed source files remain eligible even when another path links to them. The full-repository `npm run format:check` remains part of broader validation.
 
 ### README Screenshot Maintenance
 

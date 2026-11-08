@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -56,6 +56,20 @@ describe('collectChangedFiles', () => {
     unlinkSync(join(root, 'deleted.md'))
 
     expect(collectChangedFiles({ rootDirectory: root })).toEqual([])
+  })
+
+  it('excludes symbolic links while retaining changed source files', () => {
+    const root = createRepository()
+    write(root, 'docs/SKILL.md', '# Skill\n')
+    write(root, 'tracked.js', 'const value = 2\n')
+    symlinkSync('docs', join(root, 'linked-docs'), 'dir')
+    symlinkSync('tracked.js', join(root, 'linked.js'), 'file')
+    symlinkSync('missing.md', join(root, 'broken.md'), 'file')
+    execFileSync('git', ['add', 'linked-docs'], { cwd: root })
+
+    const files = collectChangedFiles({ rootDirectory: root })
+
+    expect(files).toEqual(['docs/SKILL.md', 'tracked.js'])
   })
 
   it('deduplicates a file with staged and unstaged changes', () => {

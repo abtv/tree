@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Improve Docs'
+  short_description: 'Reconcile Tree docs and wait for commit approval'
+  default_prompt: 'Use $improve-docs to review all Markdown documentation in Tree, fix unambiguous inconsistencies, and show a short Russian summary before waiting for my approval to commit.'
