@@ -157,8 +157,9 @@ names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
 No archive is extracted, and no transferred JavaScript is executed in CI.
 The verifier parses HTML with the locked `parse5` dependency. It checks parsed
 `src` and `href` attributes, including unquoted values and template contents;
-only an HTML anchor pointing exactly to `https://github.com/abtv/tree` is exempt
-from package-reference checks. This is not an HTML sanitizer or a check of every
+only HTML anchors pointing exactly to `https://github.com/abtv/tree` or
+`https://github.com/abtv/tree/blob/main/LICENSE` are exempt from package-reference
+checks. This is not an HTML sanitizer or a check of every
 network access that trusted JavaScript or CSS can initiate.
 Signing, transfer and target verification install the trusted source lockfile with
 `npm ci --ignore-scripts`; candidate files never supply dependencies or install scripts.

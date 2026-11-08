@@ -1724,9 +1724,9 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
-| `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.14) |
-| `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.14) |
-| `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.14) |
+| `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |
+| `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.2.26) |
+| `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |
 | `search-all-nodes` | — | Search all nodes | — | `⌘;` | Open document-wide node and tag search (§20.14) |
 | `quit` | `q` | Quit Tree | — | `⌘Q` (`Ctrl+Q` outside Apple platforms, §1.5) | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
 | `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |

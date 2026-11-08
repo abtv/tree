@@ -28,11 +28,10 @@ The development environment requires:
 
 The Node.js version is pinned in `.nvmrc`. The supported Node.js and npm ranges are also declared in `package.json`.
 
-On macOS, development, preview and build preparation install `assets/about/Credits.html`
-in the local Electron bundle. The packaged application includes the same file through
-`electron-builder.yml`'s `extraResources`. AppKit loads this resource for the native
-About panel's clickable repository link; do not replace it with Electron's plain-text
-`credits` option.
+Both platform entry points use the shared inline About dialog in
+`src/renderer/about-dialog.ts`, as specified in PRODUCT §1.3–§1.4.
+Its icon and links are bundled with the renderer; no native About-panel resource
+needs to be installed in the Electron bundle.
 
 Do not assume a different Node.js version without checking the project configuration first.
 
@@ -292,7 +291,7 @@ Electron end-to-end tests live in `e2e/electron/` and run with:
 npm run test:e2e
 ```
 
-This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. Hidden runs execute spec files in parallel across six workers locally or four in CI, and selected long-running suites distribute their independent tests across those same workers; visible runs stay serial. Parallel execution is safe because each worker cleans only its own `tree-e2e-p<pid>-` applications, the machine-global `Cmd+0` shortcut is stubbed for every launch except the serial `e2e/electron/shortcut.spec.ts`, and the shared system clipboard is serialized through a cross-process lock. The execution model and its rationale are recorded in `docs/decisions/0012-parallel-e2e-execution.md`. Use Playwright's `--workers` option when a local or CI environment needs a different concurrency limit. The suite is macOS-only, requires a display, and must not run as two concurrent Playwright invocations.
+This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. Hidden runs execute spec files in parallel across six workers locally or four in CI, and selected long-running suites distribute their independent tests across those same workers; visible runs stay serial. Parallel execution is safe because each worker cleans only its own `tree-e2e-p<pid>-` applications, the machine-global `Cmd+0` shortcut is stubbed for every launch except the serial `e2e/electron/shortcut.spec.ts`, and the shared system clipboard is serialized through a cross-process lock. The execution model and its rationale are recorded in `docs/decisions/0012-parallel-e2e-execution.md`. Use Playwright's `--workers` option when a local or CI environment needs a different concurrency limit. The complete local regression and screenshot run requires macOS with a display; the Linux functional subset runs under Xvfb as described in §9. Never run two Playwright invocations concurrently.
 
 Application windows are created hidden by default so the suite does not steal desktop focus. The test-owned entry `e2e/electron/electron-entry.cjs` applies hidden mode through `e2e/electron/hidden-windows.cjs` before the application bundle loads, and every launch asserts the selected window mode, so an Electron or Node upgrade that invalidates the override fails on the first launch instead of silently showing windows. Run with visible windows when observing the real UI, for example during product verification:
 
@@ -710,7 +709,8 @@ workflow retains failure artifacts. Neither check observes every presented frame
 #### Cross-platform smoke checks
 
 `Run smoke tests` is reusable and runs inside `Test and build app` after code checks
-and audit pass. Its Linux and macOS jobs run in parallel with each other and any release browser E2E.
+and audit pass. Its Linux and macOS jobs run in parallel with each other;
+release browser E2E starts only after both succeed.
 Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Safari.
 A failed Electron smoke does not skip browser smoke when its build succeeded.
 Both platform results gate publication. They supplement, rather than replace, full E2E.
@@ -882,8 +882,8 @@ The investigation on 2026-10-05 at `b47725a` reproduced a scale mismatch without
 `e2e/electron/screenshot-stability.spec.ts` checks both editing modes and appearances, repeated exact PNG captures across conflicting startup scale arguments, the received Chromium switch, and the effective renderer scale. It also verifies that a one-pixel text translation changes the image. Run its serial and parallel repeat guards after changing rendering or launch infrastructure:
 
 ```bash
-npx playwright test e2e/electron/screenshot-stability.spec.ts --repeat-each=5 --workers=1
-npx playwright test e2e/electron/screenshot-stability.spec.ts --repeat-each=12 --workers=6
+npm run test:e2e -- e2e/electron/screenshot-stability.spec.ts --repeat-each=5 --workers=1
+npm run test:e2e -- e2e/electron/screenshot-stability.spec.ts --repeat-each=12 --workers=6
 ```
 
 Also repeat an existing `toHaveScreenshot` test, such as `e2e/electron/typed-input.spec.ts --grep 'operator-like punctuation'`, under both worker counts. Do not regenerate baselines merely because a comparison failed: first verify the canonical scale and inspect actual, expected, and diff images. Regenerate only baselines that disagree with confirmed stable rendering, and inspect every changed baseline under the visual workflow below. The scale decision is recorded in [ADR 0019](decisions/0019-canonical-e2e-rendering-scale.md). These checks cover canonical screenshot rendering. Verify native Retina presentation through the regular application (`npm run dev`) on a Retina display during product verification.

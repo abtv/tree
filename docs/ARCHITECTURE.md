@@ -53,7 +53,8 @@ This adds no document writes, syncs, retained snapshots or document traversal.
 Mode changes update attributes on the bounded set of mounted inputs.
 
 The validation workflow runs code/unit checks alongside dependency audit, then
-Chromium package tests and Linux/macOS smoke jobs concurrently. Its successful
+Linux/macOS smoke jobs. For a new release version, Chromium package tests,
+Linux/macOS Electron E2E and Linux memory checks follow successful smoke in parallel. Its successful
 main run dispatches demo publication and, only for a new version, the combined
 Web/macOS release. Dispatch consumers authenticate the exact successful validation
 run and attempt through GitHub; signed provenance retains that validation identity
@@ -93,9 +94,8 @@ The application is organized conceptually into the following layers:
 ┌─────────────────────────────┐
 │         Domain              │
 │ Tree / Navigation / History │
-└──────────────┬──────────────┘
-               │
-               ▼
+└────────────────────────────┘
+
 ┌─────────────────────────────┐
 │       Infrastructure        │
 │ Persistence / Clipboard /   │
@@ -104,6 +104,9 @@ The application is organized conceptually into the following layers:
 ```
 
 These are logical boundaries.
+
+Arrows show dependency direction. Infrastructure implements application/domain
+interfaces; the domain does not depend on infrastructure implementations (§18).
 
 They do not require a separate npm package or process for every layer.
 
@@ -928,7 +931,7 @@ prevents default insertion and resolves Vim sessions before dispatching the edit
 This avoids a separate programmatic clipboard-read permission prompt. Electron
 retains the shortcut ownership described below.
 
-The application installs only a minimal application menu, so macOS does not route the standard editing commands (Undo, Redo, Cut, Copy, Paste, Select All) to the renderer, and the native `copy`, `cut`, and `paste` DOM events do not fire. The editor key handler must own these commands: intercept the shortcut, prevent the native default, and perform the operation through the editor store and the clipboard service. The application must not rely on native menu roles or native clipboard DOM events. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
+The desktop application's Edit menu exposes Find, global Search and Vim Editing (§7), but no native roles for Undo, Redo, Cut, Copy, Paste or Select All. The editor key handler owns those standard editing commands: it intercepts the shortcut, prevents the native default, and performs the operation through the editor store and the clipboard service. The desktop application must not rely on native menu roles or native clipboard DOM events as the primary route. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
 
 Editable node fields also expose a native macOS contextual menu. The renderer captures the node's selection and capabilities, the main process presents the platform menu, and the selected Cut, Copy, Paste, or Select All command returns to the renderer and uses the same editor-store path as the keyboard command. Look Up uses Electron's native definition service and Search with Google opens the selected text externally. The menu is attached only to editable node inputs, so other controls do not acquire editor commands.
 
