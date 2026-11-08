@@ -201,7 +201,31 @@ it('cancels obsolete searches, restores recent nodes on clear and starts empty w
   expect(screen.getByRole('searchbox')).toHaveFocus()
 })
 
-it('accepts tag suggestions with ordinary completion keys, keeps literal input on Escape and respects IME', () => {
+it.each(['#', '#work'])('closes Search on the first Escape with %s tag suggestions and restores selection', (query) => {
+  const { store, input: editor, beforeVisit } = setup()
+  const cancel = vi.fn()
+  vi.mocked(store.searchNodeSuggestions).mockReturnValue(['work', 'worker'])
+  vi.mocked(store.searchNodes).mockReturnValue(cancel)
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: query } })
+  expect(screen.getByRole('listbox', { name: 'Tags' })).toBeInTheDocument()
+
+  fireEvent.keyDown(input, { key: 'Escape' })
+
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(editor).toHaveFocus()
+  expect([editor.selectionStart, editor.selectionEnd, editor.selectionDirection]).toEqual([2, 7, 'backward'])
+  expect(cancel).toHaveBeenCalledOnce()
+  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(beforeVisit).not.toHaveBeenCalled()
+
+  fireEvent.keyDown(editor, { key: ';', metaKey: true })
+
+  expect(screen.getByRole('searchbox')).toHaveValue('')
+  expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
+})
+
+it('accepts tag suggestions with ordinary completion keys and respects IME', () => {
   const { store } = setup()
   vi.mocked(store.searchNodeSuggestions).mockReturnValue(['work', 'worker'])
   const input = screen.getByRole('searchbox')
@@ -212,12 +236,11 @@ it('accepts tag suggestions with ordinary completion keys, keeps literal input o
   expect(store.visitRecentNode).not.toHaveBeenCalled()
   expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
   fireEvent.change(input, { target: { value: '#work' } })
-  fireEvent.keyDown(input, { key: 'Escape' })
-  expect(input).toHaveValue('#work')
-  expect(input).toHaveFocus()
   fireEvent.compositionStart(input)
   fireEvent.change(input, { target: { value: '#作' } })
+  fireEvent.keyDown(input, { key: 'Escape', isComposing: true })
   fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+  expect(input).toHaveFocus()
   expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
   expect(input).toHaveValue('#作')
   fireEvent.compositionEnd(input)

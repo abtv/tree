@@ -121,15 +121,14 @@ export function RecentNodesPopup({
                 (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.key === 'p')
               ? -1
               : undefined
-        if (
+        if (event.key === 'Escape') close()
+        else if (
           suggestions.length > 0 &&
-          (direction !== undefined || (plain && ['Escape', 'Enter', 'Tab'].includes(event.key)))
+          (direction !== undefined || (plain && ['Enter', 'Tab'].includes(event.key)))
         ) {
-          if (event.key === 'Escape') session.dismissSuggestions()
-          else if (event.key === 'Enter' || event.key === 'Tab') acceptSuggestion()
+          if (event.key === 'Enter' || event.key === 'Tab') acceptSuggestion()
           else session.moveSuggestion(direction!)
-        } else if (event.key === 'Escape') close()
-        else if (pending && ['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+        } else if (pending && ['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
           event.preventDefault()
           event.stopImmediatePropagation()
           return
@@ -385,7 +384,7 @@ export function RecentNodesPopup({
           {pending && suggestions.length === 0 ? (
             <SearchPendingLabel previous="↑ ↓ select · Enter open · Esc close" />
           ) : suggestions.length > 0 ? (
-            '↑ ↓ select · Enter/Tab apply · Esc dismiss'
+            '↑ ↓ select · Enter/Tab apply · Esc close'
           ) : (
             '↑ ↓ select · Enter open · Esc close'
           )}
