@@ -44,6 +44,8 @@
   --color-popup-shadow: rgba(0, 0, 0, 0.12);
   --color-search-shadow: #0002;
   --color-search-backdrop: rgba(0, 0, 0, 0.18);
+  --color-search-selection-background: #ebd89f;
+  --color-search-selection-border: #8c784d;
   --color-data-activity-shadow: rgba(0, 0, 0, 0.2);
   --color-import-backdrop: rgba(0, 0, 0, 0.3);
   /* Every color is defined once here or in the single dark override. The selection highlight is
@@ -1542,6 +1544,8 @@ body.node-drag-invalid * {
      focusing a parent preserves each node's color (docs/PRODUCT.md §20.5). */
   :root {
     --color-search-backdrop: rgba(0, 0, 0, 0.3);
+    --color-search-selection-background: #242424;
+    --color-search-selection-border: #989888;
     --color-grid-dot: transparent;
     --color-text: #dcdccc;
     --color-background: #3f3f3f;
@@ -1706,7 +1710,10 @@ body.node-drag-invalid * {
   max-height: 204px;
   flex: 0 1 auto;
   min-height: 0;
-  margin-bottom: 8px;
+}
+
+.node-search-tags + .node-search-results-heading {
+  margin-top: 8px;
 }
 
 .node-search-results:empty {
@@ -1761,6 +1768,12 @@ body.node-drag-invalid * {
   outline: none;
 }
 
+.recent-nodes-popup .command-row-selected {
+  background: var(--color-search-selection-background);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--color-search-selection-border);
+}
+
 .recent-node-row {
   scroll-margin-block: 12px;
   display: flex;
@@ -1773,7 +1786,7 @@ body.node-drag-invalid * {
 }
 
 .recent-node-row[data-result-divider]::after,
-.node-search-tag:not(:last-child)::after {
+.node-search-tag[data-result-divider]::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -1806,6 +1819,20 @@ body.node-drag-invalid * {
   color: var(--color-node-search-match);
   background: var(--color-node-search-match-background);
   border-radius: 2px;
+}
+
+.recent-nodes-popup .node-search-match {
+  background: transparent;
+}
+
+.recent-node-row[aria-selected='true'] .recent-node-text .node-search-match {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.recent-node-path .node-search-match {
+  color: inherit;
 }
 
 .recent-node-path {

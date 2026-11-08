@@ -253,7 +253,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
           roots: [
             {
               id: 'project',
-              text: 'Example project #alpha #beta #gamma',
+              text: 'Example project updates #alpha #beta #gamma',
               children: [
                 { id: 'note', text: 'Example note\nAdditional context for the selected result', children: [] },
               ],
@@ -288,6 +288,11 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await expect(window).toHaveScreenshot(`search-results-presentation-${appearance}.png`)
 
       const resultBounds = (await results.boundingBox())!
+      await input.fill('tes')
+      await expect(results.getByRole('option')).toHaveCount(1)
+      await expect(results.getByRole('option')).toHaveAttribute('aria-selected', 'true')
+      await expect(popup).toHaveScreenshot(`search-selected-fragment-${appearance}.png`)
+
       await input.fill('#')
       const tags = popup.getByRole('listbox', { name: 'Tags' })
       await expect(tags.getByRole('option')).toHaveCount(3)

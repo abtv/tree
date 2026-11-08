@@ -2021,8 +2021,10 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 * Nonempty whitespace text is preserved like other node content.
 * Top-level nodes show a small muted tree icon beside the title, with the accessible label `Top level`; they have no path line.
 * Titles align to the top of each row, use the same 15 px font size as tree text, and paths use 12 px with sufficient contrast.
-* Row heights adapt to content with equal vertical padding. A node without a parent path reserves no empty path line. Thin separators span the same width as selection, remain above and below a selected row, and appear only between items, not after the final item. Tag suggestions use the same row padding and separators.
-* Literal text matches in titles and paths use bold text and a colored foreground/background pair adapted to Light, Dark and Automatic appearance, including the selected row.
+* Row heights adapt to content with equal vertical padding. A node without a parent path reserves no empty path line. Thin separators span the same width as selection and appear only between items, not after the final item. The selected row's frame replaces its adjacent separators, avoiding doubled boundaries or lines extending beyond its rounded corners. Tag suggestions use the same row padding and separators.
+* Selected nodes and tag suggestions use a distinct fill and a complete inset frame with 4 px rounded corners, adapted to Light, Dark and Automatic appearance. Selection does not change row geometry or text alignment.
+* Trailing scroll space is reserved only for overflowing node results. A list that fits has no extra trailing space. Tags and node results use the same gap before the footer.
+* Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in the selected node title also have a visible underline, including short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.
 * Tag results highlight only complete, case-sensitive recognized tags, excluding hyperlink ranges.
 * Tag suggestions highlight only the continuous matched fragment, preserving the suggestion's original spelling; a matching prefix includes its leading `#`.
 * Bare `#` does not highlight every suggestion.

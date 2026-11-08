@@ -459,6 +459,11 @@ export function GlobalSearchPopup({
               <div
                 key={name}
                 role="option"
+                data-result-divider={
+                  index < suggestions.length - 1 && index !== suggestionIndex && index + 1 !== suggestionIndex
+                    ? ''
+                    : undefined
+                }
                 aria-selected={index === suggestionIndex}
                 className={`node-search-tag${index === suggestionIndex ? ' command-row-selected' : ''}`}
                 onMouseDown={(event) => event.preventDefault()}
@@ -506,7 +511,13 @@ export function GlobalSearchPopup({
             <div className="recent-node-empty">{displayedQuery === '' ? 'No recent nodes' : 'No results'}</div>
           )
         ) : (
-          <div style={{ height: layout.total + RESULT_EDGE_INSET, position: 'relative', overflow: 'clip' }}>
+          <div
+            style={{
+              height: layout.total + (layout.total > viewportHeight ? RESULT_EDGE_INSET : 0),
+              position: 'relative',
+              overflow: 'clip',
+            }}
+          >
             <div style={{ position: 'sticky', top: 0, height: 0 }}>
               {renderedIndices.map((index) => {
                 const item = items[index]!
@@ -515,7 +526,12 @@ export function GlobalSearchPopup({
                     key={item.id}
                     id={`recent-node-${index}`}
                     data-result-id={item.id}
-                    data-result-divider={index < items.length - 1 ? '' : undefined}
+                    data-result-divider={
+                      index < items.length - 1 &&
+                      (suggestions.length > 0 || (index !== selected && index + 1 !== selected))
+                        ? ''
+                        : undefined
+                    }
                     role="option"
                     aria-selected={suggestions.length === 0 && index === selected}
                     className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
