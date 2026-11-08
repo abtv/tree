@@ -11,6 +11,7 @@ function harness() {
     requestSave: vi.fn(),
     finished: vi.fn(),
     changed: vi.fn(),
+    progressChanged: vi.fn(),
     notifyCheck: vi.fn<(result: 'ready' | 'current' | 'failed') => Promise<void>>(async () => undefined),
   }
   const updates = new AppUpdates(ports)
@@ -25,6 +26,91 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('desktop app updates', () => {
+  it('replaces readiness before downloading another package and exposes its version only on completion', () => {
+    const { updates, ports } = harness()
+    updates.downloaded('1.2.4')
+    expect(updates.getVersion()).toBe('1.2.4')
+
+    updates.available()
+    updates.downloading(42)
+    updates.request()
+
+    expect(updates.isReady()).toBe(false)
+    expect(updates.getVersion()).toBeUndefined()
+    expect(updates.getStatus()).toBe(42)
+    expect(ports.requestSave).not.toHaveBeenCalled()
+
+    updates.fail('offline')
+    expect(updates.isReady()).toBe(false)
+    expect(updates.getStatus()).toBe('failed')
+    updates.available()
+    expect(updates.getStatus()).toBe(0)
+    updates.downloaded('1.2.5')
+    expect(updates.getVersion()).toBe('1.2.5')
+    expect(updates.getStatus()).toBe('ready')
+  })
+
+  it('blocks installation throughout a background recheck', async () => {
+    const { updates, ports } = harness()
+    updates.downloaded('1.2.4')
+    let finish!: () => void
+    ports.check.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const checking = updates.check()
+    await Promise.resolve()
+
+    updates.request()
+    expect(ports.requestSave).not.toHaveBeenCalled()
+    finish()
+    await checking
+    updates.request()
+    expect(updates.getStatus()).toBe('installing')
+    updates.cancelSaving()
+  })
+  it('checks the server again even when a package is already ready', async () => {
+    const { updates, ports } = harness()
+    updates.downloaded()
+
+    await updates.checkManually()
+
+    expect(ports.check).toHaveBeenCalledOnce()
+  })
+
+  it('reports a failed recheck instead of claiming the existing package is current', async () => {
+    const { updates, ports } = harness()
+    updates.downloaded()
+    ports.check.mockRejectedValueOnce(new Error('offline'))
+
+    await updates.checkManually()
+
+    expect(ports.notifyCheck).toHaveBeenCalledWith('failed')
+  })
+  it('publishes bounded whole percentages and clears failed downloads', async () => {
+    const { updates, ports } = harness()
+    for (let i = 0; i < 10000; i++) updates.downloading(i / 100)
+    expect(ports.progressChanged).toHaveBeenCalledTimes(100)
+    expect(ports.changed).not.toHaveBeenCalled()
+    expect(updates.getStatus()).toBe(99)
+    updates.downloading(Number.NaN)
+    expect(updates.getStatus()).toBe(99)
+
+    updates.fail('offline')
+    expect(updates.getStatus()).toBe('failed')
+    ports.check.mockImplementationOnce(async () => {
+      updates.downloading(42)
+      throw new Error('offline')
+    })
+    await updates.check()
+    expect(updates.getStatus()).toBe('failed')
+
+    updates.downloaded()
+    updates.downloading(12)
+    expect(updates.getStatus()).toBe('ready')
+  })
   it('starts with no manual check or result notification in progress', () => {
     const { updates } = harness()
 
@@ -140,7 +226,7 @@ describe('desktop app updates', () => {
     expect(updates.isApplying()).toBe(true)
     expect(ports.finished).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
-    expect(ports.finished).toHaveBeenLastCalledWith('Saving took too long. Try Update App again.')
+    expect(ports.finished).toHaveBeenLastCalledWith('Saving took too long. Try Restart and Install again.')
 
     updates.confirm(request(), true)
     vi.advanceTimersByTime(59_999)
@@ -148,7 +234,7 @@ describe('desktop app updates', () => {
     expect(updates.isInstalling()).toBe(true)
     vi.advanceTimersByTime(1)
 
-    expect(ports.finished).toHaveBeenLastCalledWith('Update preparation took too long. Try Update App again.')
+    expect(ports.finished).toHaveBeenLastCalledWith('Update preparation took too long. Try Restart and Install again.')
     expect(release).toHaveBeenCalledOnce()
     expect(updates.isApplying()).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
@@ -179,7 +265,7 @@ describe('desktop app updates', () => {
     updates.fail('late error')
 
     expect(release).toHaveBeenCalledOnce()
-    expect(ports.finished).toHaveBeenCalledExactlyOnceWith('Update failed. Try Update App again.')
+    expect(ports.finished).toHaveBeenCalledExactlyOnceWith('Update failed. Try Restart and Install again.')
     expect(vi.getTimerCount()).toBe(0)
   })
 
@@ -255,7 +341,7 @@ describe('desktop app updates', () => {
     expect(ports.check).toHaveBeenCalledTimes(3)
     updates.downloaded()
     await updates.check()
-    expect(ports.check).toHaveBeenCalledTimes(3)
+    expect(ports.check).toHaveBeenCalledTimes(4)
   })
 
   it('revokes quit permission if native staging never responds', () => {
@@ -278,7 +364,7 @@ describe('desktop app updates', () => {
     updates.downloaded()
     await updates.checkManually()
     expect(ports.notifyCheck).toHaveBeenLastCalledWith('ready')
-    expect(ports.check).toHaveBeenCalledTimes(2)
+    expect(ports.check).toHaveBeenCalledTimes(3)
     expect(ports.install).not.toHaveBeenCalled()
   })
 

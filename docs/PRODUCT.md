@@ -50,7 +50,7 @@ The application is a native-feeling macOS application and follows Apple's Human 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
 The desktop application menu starts with **About Tree**, **Check for Updates…** and
-**Update App** (§26), followed by a separator before Quit Tree. About Tree opens an inline modal dialog and shows the
+**Restart and Install Update** (§26), followed by a separator before Quit Tree. About Tree opens an inline modal dialog and shows the
 application version from the root `package.json`, also used for the packaged app,
 followed by its UTC build date in English. The panel also shows a clickable
 **GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
@@ -2467,21 +2467,45 @@ connectivity returns. Downloads run in the background without stealing focus;
 offline or failed downloads leave the installed application usable. Development
 builds do not check. No notes are sent. Prereleases and downgrades are excluded.
 
+During a download, the left side of the desktop status bar shows the noninteractive
+text `Downloading update… <percent>%`. Once the package is downloaded it shows
+`Update ready`, without a button or click action. Installation remains available
+through the Tree menu and its command-panel equivalent. Command input, command
+feedback and current-action status messages take priority over this indicator.
+Downloading continues while the indicator is hidden; dismissing higher-priority
+content restores the current download status. Background checks alone show no status.
+
+Failed checks or downloads show `Update failed. Check for Updates to retry.` instead
+of leaving a stale percentage. Saving and preparing installation show
+`Preparing to restart…`. These messages have the same low priority as download progress.
+Progress is published only when the whole percentage changes, uses bounded memory,
+and performs no document writes, traversal or editor rerenders.
+
 The native Tree menu always contains **Check for Updates…** after About Tree, followed
-by **Update App**. Check for Updates checks and downloads an available update, then
+by **Restart and Install Update**, which becomes `Restart and Install <version>`
+when a package is ready. The command panel shows the same version in its description.
+
+Check for Updates checks and downloads an available update, then
 shows a native result dialog: `Tree is up to date.`, `An update is ready to install.`
-with instructions to choose Update App, or `Could not check for updates.` with retry
+with instructions to restart and install that version, or `Could not check for updates.` with retry
 guidance. Manual and background checks share one in-flight request; repeated manual
 requests show at most one result dialog. Both commands are disabled while checking,
 applying, or displaying a modal. Development builds disable both commands.
 
-Update App stays disabled until the package is downloaded, following the native
+Checks still contact the release provider when a package is ready. A failed recheck
+reports failure even if the previous package remains ready. Once another available
+package begins downloading, the previous package is no longer offered for installation;
+only the newly completed package becomes installable. A failed download can be retried
+through Check for Updates. Checks and installation cannot run concurrently.
+
+Restart and Install stays disabled until the package is downloaded, following the native
 menu convention of keeping unavailable commands visible. It is also unavailable
 during a notes operation. Applying
 it blocks editing, saves pending work including Vim buffers and attachments, and
 asks the macOS installer to verify, install and restart Tree. A failed or timed-out
 save leaves the application open and editable; it never offers to discard notes
 to install an update. Repeated requests do not start concurrent installations.
+
 An installation error or preparation timeout restores editing and allows another attempt. Ordinary Quit
 does not initiate installation of an update the user has not requested.
 

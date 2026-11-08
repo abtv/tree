@@ -115,9 +115,12 @@ let menuIcons: MenuIcons | undefined
 
 function getUpdateCommands() {
   const menu = Menu.getApplicationMenu()
+  const version = appUpdates?.getVersion()
   return {
     'check-for-updates': menu?.getMenuItemById('check-for-updates')?.enabled === true,
     'update-app': menu?.getMenuItemById('update-app')?.enabled === true,
+    status: appUpdates?.getStatus() ?? null,
+    ...(version ? { version } : {}),
   }
 }
 
@@ -135,6 +138,7 @@ function rebuildApplicationMenu(): void {
           updatesSupported: appUpdates !== undefined,
           updateChecking: appUpdates?.isChecking() ?? false,
           updateReady: appUpdates?.isReady() ?? false,
+          updateVersion: appUpdates?.getVersion(),
           updateBlocked: appUpdateBlocked,
           updateApplying: appUpdates?.isApplying() ?? false,
         },
@@ -271,7 +275,22 @@ bootstrapApplication({
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
     if (app.isPackaged && process.platform === 'darwin') {
-      let nativeStaged = false
+      let nativeStagedVersion: string | undefined
+      let stagingVersion: string | undefined
+      const install = () => {
+        const version = appUpdates?.getVersion()
+        if (!version) throw new Error('No downloaded update version.')
+        if (nativeStagedVersion === version) nativeUpdater.quitAndInstall()
+        else if (stagingVersion === undefined) {
+          stagingVersion = version
+          try {
+            nativeUpdater.checkForUpdates()
+          } catch (error) {
+            stagingVersion = undefined
+            throw error
+          }
+        }
+      }
       autoUpdater.autoInstallOnAppQuit = false
       autoUpdater.autoDownload = true
       autoUpdater.allowPrerelease = false
@@ -282,7 +301,7 @@ bootstrapApplication({
           const result = await autoUpdater.checkForUpdates()
           await result?.downloadPromise
         },
-        install: () => (nativeStaged ? nativeUpdater.quitAndInstall() : nativeUpdater.checkForUpdates()),
+        install,
         canInstall: () =>
           !!mainWindow &&
           !mainWindow.isDestroyed() &&
@@ -303,6 +322,11 @@ bootstrapApplication({
         requestSave: (id) => mainWindow?.webContents.send(ipcEvents.appUpdateRequested, id),
         finished: (message) => mainWindow?.webContents.send(ipcEvents.appUpdateFinished, message),
         changed: rebuildApplicationMenu,
+        progressChanged: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send(ipcEvents.updateCommandsChanged, getUpdateCommands())
+          }
+        },
         notifyCheck: async (result) => {
           if (!mainWindow || mainWindow.isDestroyed() || appQuitting) return
           await dialog.showMessageBox(mainWindow, {
@@ -315,7 +339,7 @@ bootstrapApplication({
                   : 'Tree is up to date.',
             detail:
               result === 'ready'
-                ? 'Choose Tree > Update App to save your work and restart with the new version.'
+                ? `Choose Tree > Restart and Install ${appUpdates?.getVersion()} to save your work and restart with the new version.`
                 : result === 'failed'
                   ? 'Check your Internet connection and try again.'
                   : `You are using Tree ${app.getVersion()}.`,
@@ -327,18 +351,24 @@ bootstrapApplication({
       })
       // Start native staging only after explicit consent and a successful save. Keep one
       // listener rather than MacUpdater.quitAndInstall's accumulating deferred callbacks.
-      autoUpdater.on('update-downloaded', () => appUpdates?.downloaded())
+      autoUpdater.on('update-downloaded', (info) => appUpdates?.downloaded(info.version))
+      autoUpdater.on('update-available', () => appUpdates?.available())
+      autoUpdater.on('download-progress', (progress) => appUpdates?.downloading(progress.percent))
       nativeUpdater.on('update-downloaded', () => {
-        nativeStaged = true
+        nativeStagedVersion = stagingVersion
+        stagingVersion = undefined
         if (appUpdates?.isInstalling()) {
           try {
-            nativeUpdater.quitAndInstall()
+            install()
           } catch {
-            appUpdates.fail('Update failed. Try Update App again.')
+            appUpdates.fail('Update failed. Try Restart and Install again.')
           }
         }
       })
-      autoUpdater.on('error', () => appUpdates?.fail('Update failed. Try Update App again.'))
+      nativeUpdater.on('error', () => {
+        stagingVersion = undefined
+      })
+      autoUpdater.on('error', () => appUpdates?.fail('Update failed. Try Restart and Install again.'))
       app.on('before-quit', () => appUpdates?.cancelSaving())
       void appUpdates.check()
     }

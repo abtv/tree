@@ -15,15 +15,34 @@ if (process.argv.includes('--tree-test-app-updates')) {
   updater.checkForUpdates = async () => {
     probe.checks++
     if (probe.checkFails) throw new Error('test offline')
+    if (probe.nextVersion) {
+      const version = probe.nextVersion
+      updater.emit('update-available', { version })
+      return {
+        downloadPromise: new Promise((resolve, reject) => {
+          probe.finishDownload = (failed = false) => {
+            if (failed) {
+              updater.emit('error', new Error('test download failure'))
+              reject(new Error('test download failure'))
+            } else {
+              updater.emit('update-downloaded', { version })
+              resolve([])
+            }
+          }
+        }),
+      }
+    }
     return null
   }
   native.checkForUpdates = () => {
     probe.installs++
-    if (probe.fail) updater.emit('error', new Error('test install failure'))
+    if (probe.fail) native.emit('error', new Error('test install failure'))
     else native.emit('update-downloaded')
   }
   native.quitAndInstall = () => app.quit()
-  probe.downloaded = () => updater.emit('update-downloaded')
+  probe.downloaded = (version = '1.2.4') => updater.emit('update-downloaded', { version })
+  probe.available = () => updater.emit('update-available')
+  probe.progress = (percent) => updater.emit('download-progress', { percent })
   globalThis.__treeUpdates = probe
 }
 

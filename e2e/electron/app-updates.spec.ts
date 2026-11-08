@@ -17,6 +17,78 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { onePixelPng } from '../../src/electron/main/png-test-utils'
 
+// @requirement PRODUCT.md §26
+test('rechecks a ready package, replaces it only after a successful download and reports failure', async ({
+  userDataDir,
+}) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, initialMode: 'normal' })
+  await app.evaluate(() => {
+    const probe = (globalThis as unknown as { __treeUpdates: { downloaded(): void; nextVersion: string } })
+      .__treeUpdates
+    probe.downloaded()
+    probe.nextVersion = '1.2.5'
+  })
+  const menu = () =>
+    app.evaluate(({ Menu }) => {
+      const item = Menu.getApplicationMenu()!.getMenuItemById('update-app')!
+      return { label: item.label, enabled: item.enabled }
+    })
+  await expect.poll(menu).toEqual({ label: 'Restart and Install 1.2.4', enabled: true })
+
+  await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
+  await expect.poll(menu).toEqual({ label: 'Restart and Install Update', enabled: false })
+  await expect(window.locator('.update-status')).toHaveText('Downloading update… 0%')
+  await app.evaluate(() => {
+    ;(
+      globalThis as unknown as { __treeUpdates: { finishDownload(failed: boolean): void } }
+    ).__treeUpdates.finishDownload(true)
+  })
+  await expect(window.locator('.update-status')).toHaveText('Update failed. Check for Updates to retry.')
+  await expect.poll(menu).toEqual({ label: 'Restart and Install Update', enabled: false })
+  await window.screenshot({ path: 'test-results/update-status-failed.png' })
+
+  await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
+  await expect(window.locator('.update-status')).toHaveText('Downloading update… 0%')
+  await app.evaluate(() => {
+    ;(
+      globalThis as unknown as { __treeUpdates: { finishDownload(failed: boolean): void } }
+    ).__treeUpdates.finishDownload(false)
+  })
+  await expect.poll(menu).toEqual({ label: 'Restart and Install 1.2.5', enabled: true })
+  await expect(window.locator('.update-status')).toHaveText('Update ready')
+  await window.keyboard.press(':')
+  await window.locator('.command-input-line input').fill('update-app')
+  await expect(window.locator('#command-update-app')).toContainText('Restart and Install 1.2.5')
+})
+
+// @requirement PRODUCT.md §26
+test('download status yields to colon input and restores current readiness after reload', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, initialMode: 'normal' })
+  await app.evaluate(() => {
+    ;(globalThis as unknown as { __treeUpdates: { progress(percent: number): void } }).__treeUpdates.progress(42.8)
+  })
+  const status = window.locator('.update-status')
+  await expect(status).toHaveText('Downloading update… 42%')
+  await expect(status.locator('button, a')).toHaveCount(0)
+  const bounds = await status.boundingBox()
+  const footer = await window.locator('.status-bar').boundingBox()
+  expect(bounds!.x - footer!.x).toBe(12)
+  await window.screenshot({ path: 'test-results/update-status-downloading.png' })
+
+  await window.keyboard.press(':')
+  await expect(window.locator('.command-input-line input')).toBeVisible()
+  await expect(status).toHaveCount(0)
+  await app.evaluate(() => {
+    ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
+  })
+  await window.keyboard.press('Escape')
+  await expect(status).toHaveText('Update ready')
+  await window.screenshot({ path: 'test-results/update-status-ready.png' })
+
+  await window.reload()
+  await expect(status).toHaveText('Update ready')
+})
+
 // @requirement PRODUCT.md §20.2.28
 test('command panel shares live update availability and runs the manual check', async ({ userDataDir }) => {
   const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
@@ -88,7 +160,7 @@ test('updates only on request, flushes edits, and keeps normal quit safe after i
     probe.downloaded()
   })
   allowRendererError(/Update failed/)
-  await clickApplicationMenuItem(app, 'Tree', 'Update App')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
   await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text).toBe('Saved before update')
   await expect.poll(() => window.evaluate(() => document.getElementById('root')!.inert)).toBe(false)
   await window.screenshot({ path: 'test-results/app-update-error.png' })
@@ -142,7 +214,7 @@ test('failed update save retains the pending Vim Replace edit without starting i
     ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
   })
 
-  await clickApplicationMenuItem(app, 'Tree', 'Update App')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
   await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
   await expect.poll(() => window.evaluate(() => document.getElementById('root')!.inert)).toBe(false)
   expect(
@@ -151,7 +223,7 @@ test('failed update save retains the pending Vim Replace edit without starting i
   expect(app.process().exitCode).toBeNull()
   await restoreSaves(app)
   const closed = app.waitForEvent('close')
-  await clickApplicationMenuItem(app, 'Tree', 'Update App')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
   await closed
   expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('aXYd')
 })
@@ -170,11 +242,7 @@ test('disables Update App while image preview is open and restores it on close',
   await app.evaluate(() => {
     ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
   })
-  const enabled = () =>
-    app.evaluate(
-      ({ Menu }) =>
-        Menu.getApplicationMenu()!.items[0]!.submenu!.items.find((item) => item.label === 'Update App')!.enabled,
-    )
+  const enabled = () => app.evaluate(({ Menu }) => Menu.getApplicationMenu()!.getMenuItemById('update-app')!.enabled)
   await expect.poll(enabled).toBe(true)
   await window.getByRole('button', { name: 'Open image preview' }).click()
   await expect.poll(enabled).toBe(false)

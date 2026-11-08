@@ -41,7 +41,7 @@ describe('preload bridge', () => {
 
   it('forwards update command state, execution, errors and validated notifications', async () => {
     const { treeApi } = await import('./index')
-    const state = { 'check-for-updates': true, 'update-app': false }
+    const state = { 'check-for-updates': true, 'update-app': false, status: 42, version: '1.2.4' }
     mocks.invoke.mockResolvedValueOnce(state)
 
     await expect(treeApi.getUpdateCommands!()).resolves.toEqual(state)
@@ -57,6 +57,8 @@ describe('preload bridge', () => {
 
     handler({}, null)
     handler({}, { 'check-for-updates': true, 'update-app': 'yes' })
+    for (const status of [-1, 101, 0.5, NaN, 'download', {}]) handler({}, { ...state, status })
+    for (const version of [1, {}, '', 'invalid', '1.2.3&Quit']) handler({}, { ...state, version })
     handler({}, state)
 
     expect(listener).toHaveBeenCalledExactlyOnceWith(state)

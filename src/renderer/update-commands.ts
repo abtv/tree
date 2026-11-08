@@ -12,6 +12,9 @@ export function installUpdateCommands(api: TreeApi, data: MenuCommandSource, rep
       (['check-for-updates', 'update-app'] as const).map((name) => ({
         name,
         enabled: state[name],
+        ...(name === 'update-app'
+          ? { description: state.version ? `Restart and Install ${state.version}` : 'Restart and Install Update' }
+          : {}),
         run: () => api.runUpdateCommand!(name),
       })),
     )

@@ -42,6 +42,7 @@ import type { DesktopDataOperations } from '../application/notes-archive/desktop
 import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 import { useLineNumbers } from './use-line-numbers'
+import { UpdateStatus } from './UpdateStatus'
 
 interface AppProps {
   showAbout?: () => void
@@ -775,7 +776,7 @@ export function App({
             {statusMessage}
           </span>
         ) : (
-          <span aria-hidden="true" className="status-bar-spacer" />
+          <UpdateStatus hidden={commandPanel.message !== undefined} />
         )}
         {vimEnabled ? (
           <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">

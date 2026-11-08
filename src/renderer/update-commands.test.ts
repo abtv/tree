@@ -29,6 +29,14 @@ it('keeps live menu availability ahead of a stale initial read and disposes subs
   await Promise.resolve()
 
   expect(source.getSnapshot().map((entry) => entry.enabled)).toEqual([true, true])
+  notify({ 'check-for-updates': true, 'update-app': true, version: '1.2.4' })
+  expect(source.getSnapshot().find((entry) => entry.name === 'update-app')?.description).toBe(
+    'Restart and Install 1.2.4',
+  )
+  notify({ 'check-for-updates': true, 'update-app': true, version: '1.2.5' })
+  expect(source.getSnapshot().find((entry) => entry.name === 'update-app')?.description).toBe(
+    'Restart and Install 1.2.5',
+  )
   data.update([{ name: 'import-notes', enabled: true, run: vi.fn() }])
   expect(source.getSnapshot().map((entry) => entry.name)).toEqual(['import-notes', 'check-for-updates', 'update-app'])
   source.dispose()

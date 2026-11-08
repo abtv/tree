@@ -65,7 +65,8 @@ export const ipcEvents = {
 } as const
 
 export type UpdateCommand = 'check-for-updates' | 'update-app'
-export type UpdateCommandsState = Record<UpdateCommand, boolean>
+export type AppUpdateStatus = number | 'ready' | 'failed' | 'installing' | null
+export type UpdateCommandsState = Record<UpdateCommand, boolean> & { status?: AppUpdateStatus; version?: string }
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
 export interface NotesOperationCanceled {

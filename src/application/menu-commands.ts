@@ -27,17 +27,27 @@ export class MenuCommands implements MenuCommandSource {
     return () => this.listeners.delete(listener)
   }
 
-  update(entries: readonly { name: DataMenuCommandName; enabled: boolean; run(): void | Promise<void> }[]): void {
+  update(
+    entries: readonly {
+      name: DataMenuCommandName
+      enabled: boolean
+      description?: string
+      run(): void | Promise<void>
+    }[],
+  ): void {
     if (
       entries.length === this.commands.length &&
       entries.every(
-        (entry, index) => entry.name === this.commands[index]?.name && entry.enabled === this.commands[index]?.enabled,
+        (entry, index) =>
+          entry.name === this.commands[index]?.name &&
+          entry.enabled === this.commands[index]?.enabled &&
+          (entry.description ?? dataMenuCommands[entry.name]) === this.commands[index]?.description,
       )
     )
       return
     this.commands = entries.map((entry) => ({
       name: entry.name,
-      description: dataMenuCommands[entry.name],
+      description: entry.description ?? dataMenuCommands[entry.name],
       aliases: [],
       enabled: entry.enabled,
       active: () => false,

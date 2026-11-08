@@ -311,13 +311,23 @@ packaged GitHub configuration. `AppUpdates` owns a separate bounded save acknowl
 and rollback of the bootstrap quit permission; the ordinary QuitHandshake is unchanged.
 The native Tree menu requests a renderer flush through trusted IPC. Renderer input is
 blocked until installation or failure. Automatic installation on quit is disabled.
-The ZIP-download notification enables Update App; only after successful saving does
+The ZIP-download notification enables Restart and Install; only after successful saving does
 the main process ask Squirrel.Mac to stage and verify it, then quit and install.
 One persistent native listener avoids accumulating deferred installation callbacks on retry.
 The permanent Check for Updates command shares an in-flight background request and
 shows one native result dialog without authorizing installation. Its check/dialog state
-disables duplicate commands; Update App remains a separate explicit save-and-install action.
+disables duplicate commands; Restart and Install remains a separate explicit save-and-install action.
 Checks and download bytes do not touch the notes store or renderer network permissions.
+The existing update-command snapshot and notification also carry download status:
+null, a whole percentage, downloaded readiness, failure or installation preparation,
+plus the ready package version. Main coalesces percentage changes
+without rebuilding the native menu. `UpdateStatus` subscribes as an isolated renderer
+leaf, ignores stale initial snapshots after notifications, and releases its listener
+on unmount. Its bounded state adds no document work, persistence or editor rerenders.
+Checks continue querying the provider after download. A new available package revokes
+previous readiness before downloading. Native staging is associated with its package
+version; late completion of an older staging attempt cannot install that version in
+response to a newer request. At most one native staging attempt runs at a time.
 
 `command-registry.ts` owns the application command panel's base registry: command names, aliases, descriptions, shortcut data (a key and a Shift flag; the renderer formats the label), state queries and run actions. `menu-commands.ts` defines data-menu command metadata and an observable source of supported actions and their enabled state. The desktop data coordinator publishes its existing menu availability. The browser Data and backup controllers publish explicit command identities and availability through `BrowserMenuCommands`, which projects that state into the buttons and the panel. Both call the same stable handlers synchronously, retaining picker user activation and rechecking current availability. Labels and DOM mutation observation do not determine command identity. The panel merges these entries with the base registry and rechecks current availability before execution. Actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical order is prepared when the available entries change; each input change scans registry entries and bounded history without document traversal.
 

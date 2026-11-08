@@ -143,10 +143,16 @@ describe('application menu template', () => {
     const actions = createActions()
     const initial = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
     expect(initial.find((item) => item.label === 'Check for Updates…')?.enabled).toBe(false)
-    expect(initial.find((item) => item.label === 'Update App')?.enabled).toBe(false)
+    expect(initial.find((item) => item.label === 'Restart and Install Update')?.enabled).toBe(false)
     const available = submenuItems(
       applicationMenuTemplate(
-        { ...state(), updatesSupported: true, updateReady: true, notes: { canExport: true, canImport: true } },
+        {
+          ...state(),
+          updatesSupported: true,
+          updateReady: true,
+          updateVersion: '1.2.4',
+          notes: { canExport: true, canImport: true },
+        },
         actions,
       ),
       'Tree',
@@ -156,6 +162,7 @@ describe('application menu template', () => {
       false,
     )
     expect(actions.checkForUpdates).toHaveBeenCalledOnce()
+    expect(available.find((item) => item.id === 'update-app')?.label).toBe('Restart and Install 1.2.4')
     expect(actions.updateApp).not.toHaveBeenCalled()
     const busy = submenuItems(
       applicationMenuTemplate({ ...state(), updatesSupported: true, updateReady: true, updateChecking: true }, actions),
@@ -163,7 +170,7 @@ describe('application menu template', () => {
     )
     expect(
       busy
-        .filter((item) => item.label === 'Check for Updates…' || item.label === 'Update App')
+        .filter((item) => item.id === 'check-for-updates' || item.id === 'update-app')
         .every((item) => item.enabled === false),
     ).toBe(true)
   })
@@ -191,7 +198,7 @@ describe('application menu template', () => {
     expect(submenuItems(template, 'Tree').map((item) => item.label)).toEqual([
       'About Tree',
       'Check for Updates…',
-      'Update App',
+      'Restart and Install Update',
       undefined,
       'Quit Tree',
     ])

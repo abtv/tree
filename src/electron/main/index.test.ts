@@ -191,9 +191,9 @@ async function packagedSetup() {
   const prepare = vi.fn(() => release)
   f.lifecycle.registerUpdateQuit!(prepare)
   const updates = f.ipc.appUpdates as AppUpdates
-  const downloaded = () =>
+  const downloaded = (version = '1.2.4') =>
     autoUpdater.emit('update-downloaded', {
-      version: '1.2.4',
+      version,
       files: [],
       releaseDate: '2026-11-05',
       downloadedFile: '/update.zip',
@@ -202,6 +202,34 @@ async function packagedSetup() {
     })
   return { ...f, updater: autoUpdater, updates, downloaded, prepare, release }
 }
+
+it('does not install an older late-staged package after a newer package is downloaded', async () => {
+  const f = await packagedSetup()
+  f.downloaded()
+  f.updates.request()
+  f.updates.confirm(requestedUpdateId(f.window), true)
+  await vi.advanceTimersByTimeAsync(60_000)
+
+  f.updater.emit('update-available', {
+    version: '1.2.5',
+    files: [],
+    path: '/update.zip',
+    sha512: 'test-digest',
+    releaseDate: '2026-11-05',
+  })
+  f.downloaded('1.2.5')
+  vi.mocked(f.window.webContents.send).mockClear()
+  f.updates.request()
+  f.updates.confirm(requestedUpdateId(f.window), true)
+  expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+
+  f.electron.autoUpdater.emit('update-downloaded')
+  expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+  expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+  f.electron.autoUpdater.emit('update-downloaded')
+  expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+  f.updates.fail(null)
+})
 
 function requestedUpdateId(window: Awaited<ReturnType<typeof setup>>['window']): string {
   const call = vi
@@ -223,8 +251,8 @@ describe('packaged desktop update wiring', () => {
     f.actions().updateApp!()
     f.ipc.appUpdates!.confirm(requestedUpdateId(f.window), true)
     expect(f.prepare).toHaveBeenCalledOnce()
-    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
-    expect(f.electron.autoUpdater.checkForUpdates).not.toHaveBeenCalled()
+    expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledOnce()
     f.updates.fail(null)
   })
 
@@ -290,7 +318,7 @@ describe('packaged desktop update wiring', () => {
       expect(f.updates.isApplying()).toBe(false)
       expect(f.window.webContents.send).toHaveBeenCalledWith(
         ipcEvents.appUpdateFinished,
-        event === 'error' ? 'Update failed. Try Update App again.' : null,
+        event === 'error' ? 'Update failed. Try Restart and Install again.' : null,
       )
       expect(f.prepare).not.toHaveBeenCalled()
       expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
@@ -386,7 +414,7 @@ describe('packaged desktop update wiring', () => {
     expect(f.release).toHaveBeenCalledOnce()
     expect(f.window.webContents.send).toHaveBeenCalledWith(
       ipcEvents.appUpdateFinished,
-      'Update failed. Try Update App again.',
+      'Update failed. Try Restart and Install again.',
     )
     expect(f.updates.isApplying()).toBe(false)
     vi.mocked(f.window.webContents.send).mockClear()
@@ -414,7 +442,7 @@ describe('packaged desktop update wiring', () => {
             : 'Tree is up to date.',
       detail:
         result === 'ready'
-          ? 'Choose Tree > Update App to save your work and restart with the new version.'
+          ? 'Choose Tree > Restart and Install 1.2.4 to save your work and restart with the new version.'
           : result === 'failed'
             ? 'Check your Internet connection and try again.'
             : 'You are using Tree 1.2.3.',
@@ -479,7 +507,11 @@ describe('desktop entry wiring', () => {
 
       f.ipc.setVimEnabled!(true)
 
-      const expected = { 'check-for-updates': command === 'check-for-updates', 'update-app': command === 'update-app' }
+      const expected = {
+        'check-for-updates': command === 'check-for-updates',
+        'update-app': command === 'update-app',
+        status: null,
+      }
       expect(f.ipc.getUpdateCommands!()).toEqual(expected)
       expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith(ipcEvents.updateCommandsChanged, expected)
     },
@@ -675,7 +707,7 @@ describe('desktop entry wiring', () => {
     const getMenuItemById = vi.fn((id: string) => (id === 'update-app' ? item : undefined))
     vi.mocked(f.electron.Menu.getApplicationMenu).mockReturnValue({ getMenuItemById } as never)
 
-    expect(f.ipc.getUpdateCommands!()).toEqual({ 'check-for-updates': false, 'update-app': enabled })
+    expect(f.ipc.getUpdateCommands!()).toEqual({ 'check-for-updates': false, 'update-app': enabled, status: null })
     f.ipc.runUpdateCommand!('update-app')
     f.ipc.runUpdateCommand!('check-for-updates')
 

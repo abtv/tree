@@ -8,6 +8,7 @@ export interface ApplicationMenuState {
   updateChecking?: boolean
   updateBlocked?: boolean
   updateReady?: boolean
+  updateVersion?: string | undefined
   updateApplying?: boolean
   modalOpen: boolean
   vimEnabled: boolean
@@ -60,7 +61,7 @@ export function applicationMenuTemplate(
           click: () => actions.checkForUpdates?.(),
         },
         {
-          label: 'Update App',
+          label: state.updateVersion ? `Restart and Install ${state.updateVersion}` : 'Restart and Install Update',
           id: 'update-app',
           enabled:
             state.updateReady === true &&

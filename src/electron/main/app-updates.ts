@@ -1,6 +1,9 @@
 /** Coordinates installation separately from ordinary quit: a failed save never permits installation. */
 export class AppUpdates {
+  private percent: number | null = null
   private ready = false
+  private readyVersion: string | undefined
+  private failed = false
   private checking = false
   private pendingCheck: Promise<void> | undefined
   private manualCheck = false
@@ -19,12 +22,37 @@ export class AppUpdates {
       requestSave(id: string): void
       finished(message: string | null): void
       changed(): void
+      progressChanged?(): void
       notifyCheck?(result: 'ready' | 'current' | 'failed'): Promise<void>
     },
   ) {}
 
   public isReady(): boolean {
     return this.ready
+  }
+  public getVersion(): string | undefined {
+    return this.readyVersion
+  }
+  public getStatus(): number | 'ready' | 'failed' | 'installing' | null {
+    if (this.isApplying()) return 'installing'
+    if (this.failed) return 'failed'
+    return this.ready ? 'ready' : this.percent
+  }
+
+  public available(): void {
+    this.ready = false
+    this.readyVersion = undefined
+    this.failed = false
+    this.percent = 0
+    this.ports.changed()
+  }
+
+  public downloading(percent: number): void {
+    if (this.ready || !Number.isFinite(percent)) return
+    const next = Math.max(0, Math.min(100, Math.floor(percent)))
+    if (this.percent === next) return
+    this.percent = next
+    this.ports.progressChanged?.()
   }
   public isChecking(): boolean {
     return this.checking || this.manualCheck
@@ -42,25 +70,31 @@ export class AppUpdates {
     if (this.requestId !== undefined) this.fail(null)
   }
 
-  public downloaded(): void {
+  public downloaded(version?: string): void {
     this.ready = true
+    this.readyVersion = version
+    this.failed = false
     this.ports.changed()
   }
 
   public check(): Promise<void> {
     if (this.pendingCheck) return this.pendingCheck
-    if (this.ready || this.isApplying()) return Promise.resolve()
+    if (this.isApplying()) return Promise.resolve()
     this.checking = true
     this.checkFailed = false
+    this.failed = false
+    this.percent = null
     this.pendingCheck = Promise.resolve()
       .then(() => this.ports.check())
       .then(
         () => undefined,
         () => {
           this.checkFailed = true
+          this.failed = true
         },
       )
       .finally(() => {
+        this.percent = null
         this.checking = false
         this.pendingCheck = undefined
         this.ports.changed()
@@ -77,7 +111,7 @@ export class AppUpdates {
       await this.check()
       this.notifying = true
       this.ports.changed()
-      await this.ports.notifyCheck?.(this.ready ? 'ready' : this.checkFailed ? 'failed' : 'current')
+      await this.ports.notifyCheck?.(this.checkFailed ? 'failed' : this.ready ? 'ready' : 'current')
     } finally {
       this.manualCheck = false
       this.notifying = false
@@ -86,9 +120,10 @@ export class AppUpdates {
   }
 
   public request(): void {
-    if (!this.ready || this.manualCheck || this.isApplying() || !this.ports.canInstall()) return
+    if (!this.ready || this.isChecking() || this.isApplying() || !this.ports.canInstall()) return
+    this.failed = false
     this.requestId = crypto.randomUUID()
-    this.timer = setTimeout(() => this.fail('Saving took too long. Try Update App again.'), 15_000)
+    this.timer = setTimeout(() => this.fail('Saving took too long. Try Restart and Install again.'), 15_000)
     this.ports.changed()
     this.ports.requestSave(this.requestId)
   }
@@ -102,15 +137,17 @@ export class AppUpdates {
     clearTimeout(this.timer)
     this.requestId = undefined
     this.releaseQuit = this.ports.prepareQuit()
-    this.timer = setTimeout(() => this.fail('Update preparation took too long. Try Update App again.'), 60_000)
+    this.timer = setTimeout(() => this.fail('Update preparation took too long. Try Restart and Install again.'), 60_000)
     try {
       this.ports.install()
     } catch {
-      this.fail('Update failed. Try Update App again.')
+      this.fail('Update failed. Try Restart and Install again.')
     }
   }
 
   public fail(message: string | null): void {
+    this.percent = null
+    if (message !== null) this.failed = true
     const applying = this.isApplying()
     clearTimeout(this.timer)
     this.requestId = undefined

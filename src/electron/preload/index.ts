@@ -21,7 +21,28 @@ export const treeApi: TreeApi = {
         typeof state['check-for-updates'] === 'boolean' &&
         typeof state['update-app'] === 'boolean'
       ) {
-        listener({ 'check-for-updates': state['check-for-updates'], 'update-app': state['update-app'] })
+        const status = 'status' in state ? state.status : undefined
+        if (
+          status !== undefined &&
+          status !== null &&
+          status !== 'ready' &&
+          status !== 'failed' &&
+          status !== 'installing' &&
+          !(typeof status === 'number' && Number.isInteger(status) && status >= 0 && status <= 100)
+        )
+          return
+        const version = 'version' in state ? state.version : undefined
+        if (
+          version !== undefined &&
+          !(typeof version === 'string' && version.length <= 128 && /^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(version))
+        )
+          return
+        listener({
+          'check-for-updates': state['check-for-updates'],
+          'update-app': state['update-app'],
+          ...(status !== undefined ? { status } : {}),
+          ...(version !== undefined ? { version } : {}),
+        })
       }
     }
     ipcRenderer.on(ipcEvents.updateCommandsChanged, handler)
