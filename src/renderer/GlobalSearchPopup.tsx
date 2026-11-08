@@ -14,7 +14,7 @@ function updateResultEdges(element: HTMLElement): void {
   element.toggleAttribute('data-scroll-after', element.scrollHeight - element.clientHeight - element.scrollTop > 1)
 }
 
-export function RecentNodesPopup({
+export function GlobalSearchPopup({
   store,
   shortcuts,
   blocked,

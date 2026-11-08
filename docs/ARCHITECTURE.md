@@ -652,7 +652,7 @@ query, completed results, pending work, selection, tags and composition. One sub
 snapshot replaces parallel React state. It invalidates obsolete callbacks and closes
 before returning a chosen result, so finishing a buffered edit cannot reopen Search
 through document publication. Keyboard and pointer visits share that transition.
-`RecentNodesPopup` adapts input and document notifications, restores focus, and owns
+`GlobalSearchPopup` adapts input and document notifications, restores focus, and owns
 DOM measurement, scrolling and the rendered row window. The session reuses the
 existing store's MRU, tag and search functions; it adds no index, document scan,
 history or persistence write. Retained memory is bounded by the current displayed

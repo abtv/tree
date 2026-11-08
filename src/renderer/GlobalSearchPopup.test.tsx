@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { RecentNodesPopup } from './RecentNodesPopup'
+import { GlobalSearchPopup } from './GlobalSearchPopup'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { APPLE_SHORTCUTS } from './shortcut-profile'
 import { RecentNodes, type RecentNode } from '../application/recent-nodes'
@@ -118,7 +118,7 @@ function setup(empty = false) {
   render(
     <>
       <textarea className="node-input" defaultValue="alpha beta" aria-label="Editor" />
-      <RecentNodesPopup
+      <GlobalSearchPopup
         store={store}
         shortcuts={APPLE_SHORTCUTS}
         blocked={false}

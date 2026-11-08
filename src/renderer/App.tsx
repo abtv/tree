@@ -15,7 +15,7 @@ import { AgendaView } from './AgendaView'
 import { AgendaSearchText } from './AgendaSearchText'
 import { CompletionPopup } from './CompletionPopup'
 import { CommandPanel } from './CommandPanel'
-import { RecentNodesPopup } from './RecentNodesPopup'
+import { GlobalSearchPopup } from './GlobalSearchPopup'
 import { useCommandPanel } from './use-command-panel'
 import { agendaDecorations, localToday, treeDecorations } from './date-decorations'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
@@ -564,7 +564,7 @@ export function App({
           dropParentId={breadcrumbTarget}
         />
       )}
-      <RecentNodesPopup
+      <GlobalSearchPopup
         openRef={openGlobalSearch}
         store={store}
         shortcuts={shortcuts}
