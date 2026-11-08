@@ -4,8 +4,8 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Initiative | Status | Next task |
 | --- | --- | --- |
-| [Global Search mutation check](global-search-mutation-check.md) | Deferred by owner | S1: complete domain/application Stryker checks when explicitly resumed |
+| [Domain and application mutation sweep](domain-application-mutation-sweep.md) | Paused by owner; partial results saved | On explicit resumption, finish document-links.ts, then remaining domain/application files |
 
-Deferred plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
+Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
 An empty index means no multi-session or review-batch work is known to be outstanding. Retain initiatives with three or more working tasks as `Awaiting owner acceptance` after implementation; remove their plan and row only after explicit acceptance under `AGENTS.md` §8. Review batches also require confirmation that no further tasks remain. Git history retains the completed record.

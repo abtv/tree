@@ -4,6 +4,21 @@ import type { TreeNode } from './document-types'
 
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
+it('offers no global tag suggestions in a document without tags or after the last tag is removed', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('source', 'No tags')] })
+
+  expect(catalog.searchSuggestions('#')).toEqual([])
+
+  catalog.update({ roots: [node('source', '#road')] })
+
+  expect(catalog.searchSuggestions('#')).toEqual(['road'])
+
+  catalog.update({ roots: [node('source', 'No tags')] })
+
+  expect(catalog.searchSuggestions('#')).toEqual([])
+})
+
 it('restricts global suggestions to continuous matches while retaining inline fuzzy completion and ranking', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [node('source', '#tag #tagged #new_tag #newtag #ai-automation-meeting')] })
@@ -80,6 +95,34 @@ it('returns fuzzy names ordered by word boundaries before proximity', () => {
   catalog.update({ roots: [node('catalog', '#abc #a_b_c #abbc')] })
 
   expect(catalog.suggest('draft', '#ac', 3)?.suggestions).toEqual(['a_b_c', 'abc', 'abbc'])
+})
+
+it('rejects inline candidates without the requested character order or repetitions', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('catalog', '#ab #ba #a_b_a')] })
+
+  expect(catalog.suggest('draft', '#aa', 3)?.suggestions).toEqual(['a_b_a'])
+  expect(catalog.suggest('draft', '#aba', 4)?.suggestions).toEqual(['a_b_a'])
+})
+
+it('refreshes warmed suggestions after adding, removing and restoring names in the same character bucket', () => {
+  const catalog = new TagCatalog()
+  const first = { roots: [node('catalog', '#road')] }
+  catalog.update(first)
+
+  expect(catalog.suggest('draft', '#ro', 3)?.suggestions).toEqual(['road'])
+
+  catalog.update({ roots: [node('catalog', '#road #roof')] })
+
+  expect(catalog.suggest('draft', '#ro', 3)?.suggestions).toEqual(['road', 'roof'])
+
+  catalog.update({ roots: [node('catalog', '#roof')] })
+
+  expect(catalog.suggest('draft', '#ro', 3)?.suggestions).toEqual(['roof'])
+
+  catalog.update(first)
+
+  expect(catalog.suggest('draft', '#ro', 3)?.suggestions).toEqual(['road'])
 })
 
 it('allows excluded ranges touching either edge of the active fragment', () => {
