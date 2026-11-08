@@ -8,7 +8,6 @@ export const linuxFiles = [
   'undo-sessions',
   'vim-counters',
   'local-search',
-  'recent-nodes',
   'agenda-search',
   'tag-completion',
   'emoji-completion',

@@ -67,6 +67,21 @@ it('allocates every discovered Electron case with only the declared platform ove
   const linuxKeys = keys(linux)
   const macosKeys = keys(macos)
 
+  const searchPresentation = full.filter(
+    (spec) => basename(spec.file) === 'recent-nodes.spec.ts' && spec.title.startsWith('presents separated results'),
+  )
+  expect(searchPresentation).toHaveLength(2)
+  for (const spec of searchPresentation) {
+    expect(linuxKeys.has(spec.key), spec.key).toBe(false)
+    expect(macosKeys.has(spec.key), spec.key).toBe(true)
+  }
+  for (const spec of full.filter(
+    (spec) => basename(spec.file) === 'recent-nodes.spec.ts' && !searchPresentation.includes(spec),
+  )) {
+    expect(linuxKeys.has(spec.key), spec.key).toBe(true)
+    expect(macosKeys.has(spec.key), spec.key).toBe(false)
+  }
+
   // Both native text-clipboard boundaries must keep both editing modes, even if
   // their human-readable titles change or a selector accidentally matches none.
   for (const tag of ['@shared-clipboard-text', '@shared-clipboard-link']) {

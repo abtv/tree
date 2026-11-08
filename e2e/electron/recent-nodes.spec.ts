@@ -13,7 +13,7 @@ import {
   setMainWindowBounds,
 } from './fixtures'
 
-describeForEachEditingMode('Recent nodes', (mode) => {
+describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
   test('opens a sole exact tag result with one Enter and restores suggestions for a fragment', async ({
     userDataDir,
@@ -205,7 +205,7 @@ describeForEachEditingMode('Recent nodes', (mode) => {
   })
 })
 
-test.describe('Recent-node buffered editing', () => {
+test.describe('Recent-node buffered editing', { tag: '@linux' }, () => {
   test.use({ editingMode: 'vim' })
   // @requirement PRODUCT.md §20.14
   test('preserves Replace on cancel and finishes it before a nested jump', async ({ userDataDir }) => {
@@ -323,7 +323,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   }
 
   // @requirement PRODUCT.md §20.14.2
-  test('groups consecutive recent paths and remeasures grouped results through scroll and resize', async ({
+  test('groups consecutive recent paths and remeasures grouped results through scroll and resize @linux', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
@@ -392,7 +392,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14.2
-  test('wraps full results and reveals a distant match across navigation, resize and appearances', async ({
+  test('wraps full results and reveals a distant match across navigation, resize and appearances @linux', async ({
     userDataDir,
   }) => {
     const longText = `${'Introduction without the query\n'.repeat(45)}needle at the end`
@@ -477,7 +477,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('keeps the result list in place while an extra character is being searched', async ({ userDataDir }) => {
+  test('keeps the result list in place while an extra character is being searched @linux', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 21 }, (_, i) => ({ id: `n${i}`, text: `Result node ${i}`, children: [] })),
@@ -507,7 +507,9 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('keeps selection visible in every animation frame during repeated arrow scrolling', async ({ userDataDir }) => {
+  test('keeps selection visible in every animation frame during repeated arrow scrolling @linux', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 100 }, (_, i) => ({ id: `n${i}`, text: `Result node ${i}`, children: [] })),
@@ -574,7 +576,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('separates the heading from partially scrolled results and fades only overflow edges', async ({
+  test('separates the heading from partially scrolled results and fades only overflow edges @linux', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
@@ -627,7 +629,9 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('scrolls arrow navigation by only the space needed to reveal the next result', async ({ userDataDir }) => {
+  test('scrolls arrow navigation by only the space needed to reveal the next result @linux', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 80 }, (_, i) => ({ id: `n${i}`, text: `Result node ${i}`, children: [] })),
@@ -673,7 +677,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('keeps the popup and input stationary while refining queries and avoids contradictory tag feedback', async ({
+  test('keeps the popup and input stationary while refining queries and avoids contradictory tag feedback @linux', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
@@ -764,7 +768,9 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('reveals the last result in a short window and restores focus on an outside click', async ({ userDataDir }) => {
+  test('reveals the last result in a short window and restores focus on an outside click @linux', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: { roots: Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
       location: { currentParentId: null, selectedNodeId: 'n0' },
