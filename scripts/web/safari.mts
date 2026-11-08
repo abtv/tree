@@ -9,8 +9,15 @@ import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
 import { browserEditing, happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 import { observeSafariErrors, readSafariErrors } from './safari-errors.mts'
+import {
+  createSafariSession,
+  isSafariSessionTimeout,
+  readSafariProcesses,
+  SafariSessionTimeoutError,
+  stopOwnedSafari,
+} from './safari-startup.mts'
 
-export const SAFARI_SMOKE_TIMEOUT_MS = 60_000
+export const SAFARI_SMOKE_TIMEOUT_MS = 100_000
 
 export function validateArguments(args: string[]) {
   if (args.length === 1 && args[0] === '--help') return 'help'
@@ -50,18 +57,43 @@ async function stopDriver(child: ChildProcess) {
 
 export async function runSafari(smoke = false) {
   assert.equal(process.platform, 'darwin', 'Safari checks require macOS')
-  const server = createStaticServer()
-  const reservation = createServer()
   const controller = new AbortController()
   const interrupt = () => controller.abort(new Error('Safari checks interrupted'))
   process.on('SIGINT', interrupt)
   process.on('SIGTERM', interrupt)
   const budget = smoke ? SAFARI_SMOKE_TIMEOUT_MS : 120_000
   const timeout = setTimeout(() => controller.abort(new Error(`Safari checks exceeded ${budget}ms`)), budget)
+  const ci = process.env.GITHUB_ACTIONS === 'true'
+  try {
+    await createSafariSession(
+      (attempt) => runSafariAttempt(smoke, controller.signal, ci, attempt),
+      ci,
+      controller.signal,
+      console.log,
+    )
+  } finally {
+    clearTimeout(timeout)
+    process.off('SIGINT', interrupt)
+    process.off('SIGTERM', interrupt)
+  }
+}
+
+async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean, attempt: number) {
+  signal.throwIfAborted()
+  // A disposable Actions runner has one job and no personal browser. Refuse existing processes
+  // before claiming ownership; local runs must never terminate the owner's Safari.
+  if (ci)
+    assert.equal((await readSafariProcesses()).length, 0, 'CI Safari checks require no existing Safari/SafariDriver')
+  const server = createStaticServer()
+  const reservation = createServer()
+  const started = performance.now()
+  const log = (message: string) =>
+    console.log(`Safari attempt ${attempt} +${Math.round(performance.now() - started)}ms: ${message}`)
   let driver: ChildProcess | undefined
   let session: string | undefined
   let driverError: Error | undefined
   let driverOrigin = ''
+  let failure: unknown
 
   async function request(path: string, body?: unknown, method = 'POST', cleanup = false) {
     const started = performance.now()
@@ -69,9 +101,10 @@ export async function runSafari(smoke = false) {
       method,
       headers: { 'Content-Type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: cleanup ? AbortSignal.timeout(5000) : AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
+      signal: cleanup ? AbortSignal.timeout(5000) : AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
     }).catch((cause: unknown) => {
-      throw new Error(
+      const Failure = isSafariSessionTimeout(path, cause, signal) ? SafariSessionTimeoutError : Error
+      throw new Failure(
         `SafariDriver ${method} ${path} failed after ${Math.round(performance.now() - started)}ms${cleanup ? ' during cleanup' : ''}`,
         { cause },
       )
@@ -89,10 +122,43 @@ export async function runSafari(smoke = false) {
     const deadline = Date.now() + 15_000
     do {
       if (await evaluate(script)) return
-      await delay(100, undefined, { signal: controller.signal })
+      await delay(100, undefined, { signal })
     } while (Date.now() < deadline)
     const page = await evaluate('return {url: location.href, text: document.body.innerText}')
     throw new Error(`Safari condition timed out: ${script}\n${JSON.stringify(page)}`)
+  }
+
+  async function cleanup() {
+    log(`Cleaning up session and SafariDriver${ci ? ', plus owned CI Safari' : ''}`)
+    const errors: unknown[] = []
+    const steps = [
+      async () => {
+        if (session) await request(`/session/${session}`, undefined, 'DELETE', true)
+      },
+      async () => {
+        if (driver) await stopDriver(driver)
+      },
+      async () => {
+        if (ci) await stopOwnedSafari()
+      },
+      () => closeServer(reservation),
+      () => closeServer(server),
+    ]
+
+    for (const step of steps) {
+      try {
+        await step()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+
+    if (errors.length) {
+      throw new AggregateError([...(failure ? [failure] : []), ...errors], 'Safari cleanup failed; refusing to retry', {
+        cause: errors[0],
+      })
+    }
+    log('Cleanup completed')
   }
 
   try {
@@ -100,7 +166,10 @@ export async function runSafari(smoke = false) {
     const driverPort = await listen(reservation)
     await closeServer(reservation)
     driverOrigin = `http://127.0.0.1:${driverPort}`
-    driver = spawn('/usr/bin/safaridriver', ['--port', String(driverPort)], { stdio: 'inherit' })
+    log(`Starting SafariDriver${ci ? ' with diagnostics in ~/Library/Logs/com.apple.WebDriver/' : ''}`)
+    driver = spawn('/usr/bin/safaridriver', [...(ci ? ['--diagnose'] : []), '--port', String(driverPort)], {
+      stdio: 'inherit',
+    })
     driver.on('error', (error) => {
       driverError = error
     })
@@ -112,13 +181,15 @@ export async function runSafari(smoke = false) {
         await request('/status', undefined, 'GET')
         break
       } catch (error) {
-        if (controller.signal.aborted || Date.now() >= deadline) throw error
-        await delay(100, undefined, { signal: controller.signal })
+        if (signal.aborted || Date.now() >= deadline) throw error
+        await delay(100, undefined, { signal })
       }
     }
+    log('SafariDriver ready; creating session (30-second request limit)')
     const created = await request('/session', { capabilities: { alwaysMatch: { browserName: 'safari' } } })
     session = created.sessionId
     assert(session, 'SafariDriver did not create an isolated session')
+    log(`Session created, Safari ${created.capabilities.browserVersion}; starting application checks`)
     const ready = 'return window.prototypeStore?.getSnapshot().status === "ready"'
     let launcher: string | undefined
     let smokeWindow: string | undefined
@@ -130,7 +201,7 @@ export async function runSafari(smoke = false) {
       let handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
       while (handles.length < 2) {
         assert(Date.now() < deadline, 'Safari did not open the smoke application window')
-        await delay(50, undefined, { signal: controller.signal })
+        await delay(50, undefined, { signal })
         handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
       }
       assert.equal(handles.length, 2, 'Safari smoke must own only its launcher and application windows')
@@ -184,7 +255,7 @@ export async function runSafari(smoke = false) {
         countRows: () => evaluate("return document.querySelectorAll('.node-row').length"),
         waitFor: async (script) => {
           const deadline = Date.now() + 5000
-          while (!controller.signal.aborted) {
+          while (!signal.aborted) {
             const result = await request(`/session/${session}/execute/async`, {
               script: `const done = arguments[arguments.length - 1];
                 (async () => { ${script} })().then(value => done({value}), error => done({error: String(error)}));`,
@@ -198,9 +269,9 @@ export async function runSafari(smoke = false) {
               )
               throw new Error(`Safari smoke condition timed out: ${script}\n${JSON.stringify(state)}`)
             }
-            await delay(50, undefined, { signal: controller.signal })
+            await delay(50, undefined, { signal })
           }
-          controller.signal.throwIfAborted()
+          signal.throwIfAborted()
         },
         fill: async (selector, text) => {
           const id = await elementId(selector)
@@ -277,7 +348,7 @@ export async function runSafari(smoke = false) {
             const handles = (await request(`/session/${session}/window/handles`, undefined, 'GET')) as string[]
             if (!handles.includes(smokeWindow!)) break
             assert(Date.now() < deadline, 'Safari Quit did not close the application window')
-            await delay(50, undefined, { signal: controller.signal })
+            await delay(50, undefined, { signal })
           }
           await openSmokeWindow()
           return smokeDriver
@@ -330,20 +401,12 @@ export async function runSafari(smoke = false) {
     await writeFile(resolve(output, 'smoke.png'), Buffer.from(screenshot, 'base64'))
     console.log(`Safari ${created.capabilities.browserVersion}: typing, synthetic URL paste and reload passed`)
     console.log('Screenshot: test-results/safari/smoke.png')
+  } catch (error) {
+    failure = error
+    log(`Failed: ${error instanceof Error ? error.message : String(error)}`)
+    throw error
   } finally {
-    clearTimeout(timeout)
-    try {
-      if (session) await request(`/session/${session}`, undefined, 'DELETE', true)
-    } finally {
-      try {
-        if (driver) await stopDriver(driver)
-      } finally {
-        await closeServer(reservation)
-        await closeServer(server)
-        process.off('SIGINT', interrupt)
-        process.off('SIGTERM', interrupt)
-      }
-    }
+    await cleanup()
   }
 }
 
