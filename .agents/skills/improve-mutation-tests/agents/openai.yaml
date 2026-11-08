@@ -1,6 +1,6 @@
 interface:
   display_name: 'Improve Mutation Tests'
-  short_description: 'Improve mutation coverage with resumable checkpoints'
-  default_prompt: 'Use $improve-mutation-tests to improve mutation coverage in the area I specify, or resume the sole unfinished sweep; leave changes uncommitted.'
+  short_description: 'Improve mutation tests within total and per-file budgets'
+  default_prompt: 'Use $improve-mutation-tests in the area I specify, or resume the sole unfinished authorized sweep. Use six hours total and thirty minutes per file, reserving the final thirty minutes for validation and reporting. Preserve consumed budgets on resume, save partial progress, and leave changes uncommitted.'
 policy:
   allow_implicit_invocation: false
