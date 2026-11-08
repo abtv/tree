@@ -64,7 +64,7 @@ jobs:
 
   chrome:
     name: Run browser E2E tests
-    needs: [check, audit, version]
+    needs: [check, audit, version, smoke]
     if: needs.version.outputs.ready == 'true'
     uses: ./.github/workflows/run-web-e2e-tests.yml
 
@@ -75,13 +75,13 @@ jobs:
 
   electron:
     name: Run release Electron E2E tests
-    needs: [check, audit, version]
+    needs: [check, audit, version, smoke]
     if: needs.version.outputs.ready == 'true'
     uses: ./.github/workflows/run-electron-e2e-tests.yml
 
   memory:
     name: Run release Electron memory tests
-    needs: [check, audit, version]
+    needs: [check, audit, version, smoke]
     if: needs.version.outputs.ready == 'true'
     uses: ./.github/workflows/run-electron-memory-tests.yml
 

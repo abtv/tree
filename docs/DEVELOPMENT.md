@@ -610,7 +610,10 @@ The container's network restriction applies to test execution. It does not disab
 
 On each PR and push to main, `Test and build app` runs code/documentation/unit checks
 alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
-Browser and full Electron coverage across Linux and macOS run when the main push has an unpublished release version; browser E2E also
+After both platform smoke jobs succeed, browser E2E, full Electron coverage across Linux
+and macOS, and Linux Electron memory tests run in parallel when the main push has an
+unpublished release version. A failed smoke job prevents these release suites from starting.
+Browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
 job requires checks, audit, version detection and smoke to succeed, plus browser E2E
 and Electron E2E for a release. A non-release run requires both full E2E jobs to be skipped.

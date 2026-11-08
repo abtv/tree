@@ -33,7 +33,7 @@ const workflow = (name: string) => load(text(name))
 
 // @requirement PRODUCT.md §1.4
 describe('automatic publication wiring', () => {
-  it('runs code and audit in parallel, then browser and smoke, and gates dispatch on every result', () => {
+  it('runs code and audit in parallel, gates release suites on smoke, and gates dispatch on every result', () => {
     const ci = workflow('test-and-build-app')
 
     expect(ci.on).toMatchObject({ push: { branches: ['main'] }, pull_request: null })
@@ -41,12 +41,12 @@ describe('automatic publication wiring', () => {
     expect(ci.jobs.audit!.needs).toBeUndefined()
     expect(ci.jobs.audit!.uses).toBe('./.github/workflows/audit-dependencies.yml')
     expect(ci.jobs.smoke!.needs).toEqual(['check', 'audit'])
-    expect(ci.jobs.chrome!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.chrome!.needs).toEqual(['check', 'audit', 'version', 'smoke'])
     expect(ci.jobs.chrome!.if).toBe("needs.version.outputs.ready == 'true'")
-    expect(ci.jobs.electron!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.electron!.needs).toEqual(['check', 'audit', 'version', 'smoke'])
     expect(ci.jobs.electron!.if).toBe("needs.version.outputs.ready == 'true'")
     expect(ci.jobs.electron!.uses).toBe('./.github/workflows/run-electron-e2e-tests.yml')
-    expect(ci.jobs.memory!.needs).toEqual(['check', 'audit', 'version'])
+    expect(ci.jobs.memory!.needs).toEqual(['check', 'audit', 'version', 'smoke'])
     expect(ci.jobs.memory!.if).toBe("needs.version.outputs.ready == 'true'")
     expect(ci.jobs.memory!.uses).toBe('./.github/workflows/run-electron-memory-tests.yml')
     expect(ci.jobs.candidate!.needs).toEqual(['check', 'audit', 'version', 'chrome', 'smoke', 'electron', 'memory'])
