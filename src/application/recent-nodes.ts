@@ -1,4 +1,5 @@
 import { type Document, type TreeNode } from '../domain/document'
+import type { TextMatch } from '../domain/text-search'
 
 export const RECENT_NODE_LIMIT = 100
 export const RECENT_NODE_RESULTS = 8
@@ -7,6 +8,8 @@ export interface RecentNode {
   readonly id: string
   readonly text: string
   readonly path: string | null
+  readonly tagMatches?: readonly TextMatch[]
+  readonly pathTagMatches?: readonly TextMatch[]
 }
 
 export function normalizeRecentNodes(value: unknown): string[] {
@@ -105,7 +108,7 @@ export class RecentNodes {
       }
       results.push({
         id,
-        text: label(found.at(-1)!),
+        text: resultText(found.at(-1)!),
         path: found.length === 1 ? null : found.slice(0, -1).map(label).join(' › '),
       })
       if (results.length === RECENT_NODE_RESULTS) break
@@ -123,4 +126,8 @@ export class RecentNodes {
 export function label(node: TreeNode): string {
   const text = node.text.slice(0, 160).replace(/\s+/g, ' ').trim()
   return text || (node.attachment === undefined ? 'Empty node' : 'Image')
+}
+
+export function resultText(node: TreeNode): string {
+  return node.text || label(node)
 }

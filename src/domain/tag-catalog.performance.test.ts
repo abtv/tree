@@ -1,6 +1,31 @@
 import { expect, it } from 'vitest'
 import { TagCatalog } from './tag-catalog'
 
+// @requirement PRODUCT.md §20.14
+it('keeps continuous global Search suggestions within the catalog scale budget', () => {
+  const catalog = new TagCatalog()
+  catalog.update({
+    roots: Array.from({ length: 10_000 }, (_, index) => ({
+      id: String(index),
+      text: `#project_${index} #Work`,
+      children: [],
+    })),
+  })
+  const samples: number[] = []
+
+  for (let batch = 0; batch < 100; batch++) {
+    for (const query of ['#', '#project_9', '#pt9', '#Work']) {
+      const start = performance.now()
+      catalog.searchSuggestions(query)
+      samples.push(performance.now() - start)
+    }
+  }
+  const p99Ms = samples.toSorted((a, b) => a - b)[Math.ceil(samples.length * 0.99) - 1]!
+
+  console.log('PERF global-tag-catalog', { p99Ms })
+  expect(p99Ms).toBeLessThan(5)
+})
+
 // @requirement PRODUCT.md §20.13
 // @requirement PRODUCT.md §22.1
 it('obtains tag suggestions below five milliseconds in a 10000-tag document', () => {

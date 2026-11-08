@@ -85,10 +85,75 @@ it('matches complete case-sensitive tags, excluding links and prefixes', () => {
   tags.update(document)
 
   expect(tags.searchSuggestions('#')).toEqual(['Work', 'w', 'work', 'worker'])
-  expect(tags.searchSuggestions('#wrk')).toEqual(['Work', 'work', 'worker'])
+  expect(tags.searchSuggestions('#wrk')).toEqual([])
+  expect(tags.suggest('', '#wrk', 4)?.suggestions).toEqual(['Work', 'work', 'worker'])
   expect(tags.has('new_tag')).toBe(false)
   expect(tags.searchSuggestions('text #w')).toEqual([])
   expect(tags.searchSuggestions('#work #w')).toEqual([])
+})
+
+it('keeps complete multiline text and projects only real tag matches through normalized ancestor paths', () => {
+  const parent = '  Project\n  #tag  #tag'
+  const text = `${'long '.repeat(50)}\n#tag #tag #tagged`
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'parent',
+          text: parent,
+          links: [{ start: parent.lastIndexOf('#tag'), end: parent.length, url: 'https://example.com' }],
+          children: [
+            {
+              id: 'child',
+              text,
+              links: [{ start: text.indexOf('#tag'), end: text.indexOf('#tag') + 4, url: 'https://example.com' }],
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+    '#tag',
+  )
+  let next = work.next()
+  while (!next.done) next = work.next()
+  const child = next.value.find((item) => item.id === 'child')!
+
+  expect(child.text).toBe(text)
+  expect(child.path).toBe('Project #tag #tag')
+  expect(child.tagMatches?.map((match) => child.text.slice(match.start, match.end))).toEqual(['#tag'])
+  expect(child.tagMatches?.[0]?.start).toBe(text.lastIndexOf('#tag #tagged'))
+  expect(child.pathTagMatches).toEqual([{ start: 8, end: 12 }])
+})
+
+it('maps multiple ancestor levels and includes a whole tag ending exactly at the label cutoff', () => {
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'root',
+          text: '  #other   #tag   ',
+          children: [
+            {
+              id: 'parent',
+              text: `${'a'.repeat(155)} #tag #tag`,
+              children: [{ id: 'leaf', text: '#tag', children: [] }],
+            },
+          ],
+        },
+      ],
+    },
+    '#tag',
+  )
+  let next = work.next()
+  while (!next.done) next = work.next()
+  const leaf = next.value.find((item) => item.id === 'leaf')!
+
+  expect(leaf.path).toBe(`#other #tag › ${'a'.repeat(155)} #tag`)
+  expect(leaf.pathTagMatches).toEqual([
+    { start: 7, end: 11 },
+    { start: 170, end: 174 },
+  ])
 })
 
 it('yields on long unmatched text and cancellation prevents stale publication', () => {

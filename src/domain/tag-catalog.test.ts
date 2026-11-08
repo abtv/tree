@@ -4,6 +4,21 @@ import type { TreeNode } from './document-types'
 
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
+it('restricts global suggestions to continuous matches while retaining inline fuzzy completion and ranking', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [node('source', '#tag #tagged #new_tag #newtag #ai-automation-meeting')] })
+
+  expect(catalog.searchSuggestions('#tag')).toEqual(['tag', 'tagged', 'new_tag', 'newtag'])
+  expect(catalog.searchSuggestions('#TAG')).toEqual(['tag', 'tagged', 'new_tag', 'newtag'])
+  expect(catalog.searchSuggestions('#missing')).toEqual([])
+  expect(catalog.searchSuggestions('#')).toEqual(['ai-automation-meeting', 'new_tag', 'newtag', 'tag', 'tagged'])
+  expect(catalog.suggest('draft', '#tag', 4)?.suggestions).toContain('ai-automation-meeting')
+
+  catalog.update({ roots: [node('source', '#atag #z_tag')] })
+
+  expect(catalog.searchSuggestions('#tag')).toEqual(['z_tag', 'atag'])
+})
+
 it('rejects search queries that are not a complete tag fragment without throwing', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [node('source', '#alpha')] })

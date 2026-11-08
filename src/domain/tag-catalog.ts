@@ -2,14 +2,10 @@ import type { DateTextRange } from './date-recognition'
 import type { Document, TreeNode } from './document-types'
 import { compareCompletionRank, CompletionRankWorkspace, rankCompletionName } from './completion-ranking'
 import { findTags, nodeTags, tagFragment, type TagRange } from './tags'
+import { foldTagName } from './tag-search'
 
 export interface TagMatch extends TagRange {
   readonly suggestions: readonly string[]
-}
-
-function matchingName(name: string): string {
-  // Fold both directions so contextual lowercase forms (such as final sigma) agree.
-  return name.toLowerCase().toUpperCase()
 }
 
 /** One current-document index. Unchanged immutable subtrees need no rescanning. */
@@ -27,8 +23,17 @@ export class TagCatalog {
   }
 
   public searchSuggestions(query: string): readonly string[] {
-    if (tagFragment(query, query.length)?.start !== 0) return []
-    return this.suggest('', query, query.length)?.suggestions ?? []
+    const fragment = tagFragment(query, query.length)
+    if (fragment?.start !== 0) return []
+    const needle = foldTagName(fragment.name)
+    const groups: string[][] = [[], [], [], []]
+    for (const name of this.names) {
+      const folded = foldTagName(name)
+      if (!folded.includes(needle)) continue
+      const rank = rankCompletionName(folded, needle, '_-', this.rankWorkspace)!
+      groups[rank[0]!]!.push(name)
+    }
+    return groups.flat()
   }
 
   public update(document: Document): void {
@@ -72,7 +77,7 @@ export class TagCatalog {
       else this.counts.set(name, next)
       if (previous === 0 || next === 0) membershipChanged = true
       if (previous === 0 || next === 0) {
-        for (const character of new Set(matchingName(name))) {
+        for (const character of new Set(foldTagName(name))) {
           let bucket = this.characters.get(character)
           if (bucket === undefined) {
             bucket = new Set()
@@ -106,7 +111,7 @@ export class TagCatalog {
       if (tag.start !== fragment.start) deltas.set(tag.name, (deltas.get(tag.name) ?? 0) + 1)
     }
     let names = this.names
-    const query = matchingName(fragment.name)
+    const query = foldTagName(fragment.name)
     let smallest: Set<string> | undefined
     for (const character of new Set(query)) {
       const bucket = this.characters.get(character)
@@ -131,7 +136,7 @@ export class TagCatalog {
     const fuzzy: { name: string; rank: readonly number[] }[] = []
     for (const name of names) {
       if ((this.counts.get(name) ?? 0) + (deltas.get(name) ?? 0) <= 0) continue
-      const rank = rankCompletionName(matchingName(name), query, '_-', this.rankWorkspace)
+      const rank = rankCompletionName(foldTagName(name), query, '_-', this.rankWorkspace)
       if (rank === undefined) continue
       if (rank[0]! < 4) groups[rank[0]!]!.push(name)
       else fuzzy.push({ name, rank })

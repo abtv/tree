@@ -1,8 +1,24 @@
 import type { Document, TreeNode } from '../domain/document'
 import { nodeTags } from '../domain/tags'
 import { prepareSearch, searchText } from '../domain/text-search'
-import { label, type RecentNode } from './recent-nodes'
+import { label, resultText, type RecentNode } from './recent-nodes'
 import { searchScheduler, type SearchScheduler } from './search-executor'
+import type { TextMatch } from '../domain/text-search'
+
+function pathTagMatches(ancestors: readonly TreeNode[], tag: string): readonly TextMatch[] {
+  const matches: TextMatch[] = []
+  let offset = 0
+  for (const ancestor of ancestors) {
+    const text = ancestor.text.slice(0, 160)
+    for (const match of nodeTags(ancestor)) {
+      if (match.name !== tag || match.end > text.length) continue
+      const start = text.slice(0, match.start).replace(/\s+/g, ' ').trimStart().length
+      matches.push({ start: offset + start, end: offset + start + tag.length + 1 })
+    }
+    offset += label(ancestor).length + 3
+  }
+  return matches
+}
 
 export function* searchNodes(document: Document, query: string): Generator<undefined, readonly RecentNode[]> {
   const tag = query.startsWith('#') ? query.slice(1) : undefined
@@ -31,7 +47,17 @@ export function* searchNodes(document: Document, query: string): Generator<undef
       }
     }
     if (matches)
-      results.push({ id: node.id, text: label(node), path: ancestors.length ? ancestors.map(label).join(' › ') : null })
+      results.push({
+        id: node.id,
+        text: resultText(node),
+        path: ancestors.length ? ancestors.map(label).join(' › ') : null,
+        ...(tag === undefined
+          ? {}
+          : {
+              tagMatches: nodeTags(node).filter((match) => match.name === tag),
+              pathTagMatches: pathTagMatches(ancestors, tag),
+            }),
+      })
     if (node.children.length > 0) {
       ancestors.push(node)
       stack.push({ nodes: node.children, index: 0 })

@@ -635,17 +635,21 @@ Infrastructure should expose narrow interfaces to the application/domain where a
 
 `recent-nodes.ts` owns the bounded recent-node order and ready label/path projection specified in PRODUCT §20.14. The store records successful content changes and explicit visits independently of selection and undo history. Cached ancestor IDs and sibling slots resolve unchanged paths without rebuilding the document index; a displaced path is found directly in the tree. Only bounded history paths are retained. Runtime publication refreshes the projection before UI notification. The Search popup borrows editor focus and dispatches a store navigation command; it does not mutate document content.
 
-`node-search.ts` owns complete-document result enumeration for Search, reusing the domain literal matcher and recognized tag ranges. The store gates short text and unknown tags and provides suggestions from its existing tag catalog. Scheduled batches yield to input; cancellation releases obsolete generators and their snapshots. Only the active result projection is retained, and the popup windows result rows. The input/completion session stays separate from Vim search and document undo. Searching adds no persistence operations; confirming a result uses the existing recent-node visit transition.
+`node-search.ts` owns complete-document result enumeration for Search, reusing the domain literal matcher and recognized tag ranges. The store accepts every nonempty text query, gates unknown tags and provides suggestions from its existing tag catalog. Global suggestions require continuous case-folded name matches; inline completion keeps its separate fuzzy matching. `tag-search.ts` shares Unicode folding and source-offset projection with suggestion highlighting. Scheduled batches yield to input; cancellation releases obsolete generators and their snapshots. Result titles retain the original full text by reference, without normalization or copying. For tag queries, the projection supplies recognized match ranges excluding links, including mapped offsets in bounded, whitespace-normalized ancestor labels. The input/completion session stays separate from Vim search and document undo. Searching adds no persistence operations; confirming a result uses the existing recent-node visit transition.
 
-The popup keeps its result window index and committed scroll origin in one renderer
-state record. A zero-height sticky anchor retains painted results until the native
-scroll handler synchronously replaces rows and their relative offset. The total-height
-container clips overflow, keeping the list's scroll range stable. Query, completion,
-composition, refresh and opening reset the same window record; arrow reveal updates it
-without changing result-session ownership. This reuses Tree/Agenda's retained-paint
-approach. Scroll work stays bounded to 40 rows plus constant state; it adds no document
-writes, syncs, result copies or animation-frame polling. The complete-document Search
-performance scenario and native scroll/frame regressions guard the affected costs.
+The popup windows measured, variable-height rows using the shared list-offset helpers,
+with the selected row pinned when outside the visible range. Unknown heights use an
+estimate; ResizeObserver measures mounted rows and width changes invalidate offscreen
+measurements. Offset changes preserve the current scroll anchor. A zero-height sticky
+anchor retains painted results until the native scroll handler synchronously replaces
+rows and their relative offset. The total-height container clips overflow. Query,
+completion, composition, refresh and opening reset scrolling; selection reveals the row
+or its first match when oversized, without changing result-session ownership. Mounted
+rows remain bounded to 40, while measured heights and offset arrays scale with current
+results. Highlight scanning reuses the yielding literal-decoration hook; tag ranges
+come from the application projection. No document writes, syncs or animation-frame
+polling are added. Search and MRU scale scenarios and native scroll/frame regressions
+guard the affected costs.
 
 `global-search-session.ts` is the pure renderer-local owner of that popup's current
 query, completed results, pending work, selection, tags and composition. One subscribed

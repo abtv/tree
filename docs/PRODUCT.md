@@ -1983,9 +1983,9 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 * The popup is centered horizontally and vertically when opened, using its initial content height. Its top edge, width and input position then remain unchanged during query changes; only the bottom edge adapts to content, up to the available window height. Resizing the application window recenters the popup within the new available space. Lists scroll within the available space.
 * Visible headings distinguish `Recent` nodes, tag suggestions (`Tags`) and matching nodes (`Results`). Tags use compact rows in a separate bordered suggestion list beneath the input. Node results retain their text and parent paths. While tag suggestions are open, only their selected row is highlighted; matching nodes may appear below without a competing selection highlight.
 * The footer explains the active keyboard action: `↑ ↓ select · Enter/Tab apply · Esc close` while tag suggestions are open, otherwise `↑ ↓ select · Enter open · Esc close` when results are ready. Accepting a tag closes suggestions and leaves its full text in the input, so the results and their open action become active.
-* When the node-result list is active and nonempty, the trailing edge of its `Results` or `Recent` heading shows the selected row and total as `3 / 24`. The total covers all matching nodes, including those outside the rendered scroll window. The same indicator describes the displayed recent-node list for empty input. It is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
+* When the node-result list is active and nonempty, the trailing edge of its `Results` heading shows the selected row and total as `3 / 24`. The total covers all matching nodes, including those outside the rendered scroll window. Recent nodes with empty input have no counter. The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
 
-* A leading `#` searches tags. Suggestions use §20.13 case-insensitive matching and ranking; node results match complete case-sensitive tags.
+* A leading `#` searches tags. Global Search suggestions match a continuous, case-insensitive substring of the tag name; unlike inline tag completion (§20.13), they do not match letters separated by gaps. The existing exact-name, prefix, word-prefix and substring ranking remains. Node results match complete case-sensitive tags.
 * When the only matching tag suggestion exactly equals the input, Search omits the redundant suggestion and activates the node results as soon as they are ready. The first result is selected and Enter opens it directly. A nonexact fragment or a query with multiple matching tag suggestions keeps tag completion active, even when one suggestion is an exact match.
 * Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape closes the entire Search popup on the first press, including when tag suggestions are open, and restores the originating editor selection and mode.
 * A manually typed exact existing tag searches immediately, including one-character names; a fragment or unknown tag has no node results. Search matches complete recognized tags, excluding hyperlink ranges, and never creates tags.
@@ -1993,12 +1993,12 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. Memory scales with the current result list and traversal depth, without retaining earlier query snapshots. Query input causes no document/history writes or syncs. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior.
 
-With empty input the popup lists up to eight distinct recent nodes, most recently used first, with each node's text and parent path. Empty nodes use `Empty node`; image-only nodes use `Image`; top-level nodes show the same tree icon as the location bar, with the accessible label `Top level`, instead of a textual root name. Node titles use the same 15 px font size as tree text; paths use 12 px. Labels are single-line previews, bounded to the first 160 characters per node. The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
+With empty input the popup lists up to eight distinct recent nodes, most recently used first, with each node's text and parent path (§20.14.2). The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
 
 Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
 
 * Without tag suggestions, Up/Down wrap result selection; they do not navigate the document.
-* Arrow navigation keeps visible results in place and scrolls only far enough to reveal the next selected row. Crossing the list boundary wraps to the opposite end. Selection changes the highlight, not the text size or row geometry.
+* Arrow navigation keeps visible results in place and scrolls only far enough to reveal the next selected row. If that row exceeds the available list height, reveal its first highlighted match, or its beginning when no match exists. Late-arriving highlights also reveal that match for the active selection. Ordinary manual scrolling does not repeatedly return to the match. Crossing the list boundary wraps to the opposite end. Selection changes the highlight, not the text size or row geometry. Resizing invalidates measured row heights and preserves correct navigation and scrolling.
 * Pointer scrolling and large scrollbar jumps retain the last painted results until replacement rows and their position are ready together. The results list must not flash empty while its rendered window changes. Scrolling preserves the query, result selection and input focus, with at most 40 result rows mounted.
 * A divider and gap separate the Results/Recent heading from its scrollable list. The list softly fades at an edge only while more content exists beyond that edge, so partially visible rows do not appear to overlap the heading or footer. Keyboard reveal leaves the selected row clear of the fades when space permits; a list that fits shows no fade.
 * Enter or clicking a result closes the popup, finishes buffered editing using the existing view-change rules, opens Tree at the result's real parent, selects that node and places the text caret at its start.
@@ -2011,6 +2011,20 @@ Creating or changing a node's content, explicitly entering it, or confirming a r
 History retains at most 100 IDs separately from document content, undo and notes export. Dirty history saves every 30 seconds and during normal persistence flush, including shutdown; an abrupt exit may lose the unsaved history interval. Writes are serialized and desktop replacement is atomic. Missing or unreadable history starts empty. Write failures use the existing operation-error surface; pending history can retry on the next flush. Notes replacement resets the history even when imported IDs coincide. Browser history uses the current profile's local storage and writer-session guards.
 
 Ready result retrieval, including text and paths, and the complete MRU update work must each measure p99 below 1 ms in the maintained scale scenarios. Rendering, initial history loading and disk writes are separate costs. Tests report their measured scale; this is not an unlimited-document or worst-case scheduling guarantee. History memory is bounded; input causes no per-keystroke history writes, and the getter performs no tree traversal or I/O (§22.1).
+
+#### 20.14.2 Result Presentation
+
+* Empty nodes use `Empty node`; image-only nodes use `Image`.
+* Both recent nodes and Search results display the complete node text with preserved line breaks and wrapping, without a character cutoff.
+* Ancestor labels in paths remain single-line previews bounded to their first 160 characters.
+* Nonempty whitespace text is preserved like other node content.
+* Top-level nodes show a small muted tree icon beside the title, with the accessible label `Top level`; they have no path line.
+* Titles align to the top of each row, use the same 15 px font size as tree text, and paths use 12 px with sufficient contrast.
+* Row heights adapt to content.
+* Literal text matches in titles and paths use bold text and a colored foreground/background pair adapted to Light, Dark and Automatic appearance, including the selected row.
+* Tag results highlight only complete, case-sensitive recognized tags, excluding hyperlink ranges.
+* Tag suggestions highlight only the continuous matched fragment, preserving the suggestion's original spelling; a matching prefix includes its leading `#`.
+* Bare `#` does not highlight every suggestion.
 
 ## 21. Unexpected Renderer Errors
 

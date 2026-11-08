@@ -1,17 +1,87 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
+import type { TextMatch } from '../domain/text-search'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
 import { GlobalSearchSession } from './global-search-session'
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
+import { useSearchDecorations } from './search-decorations'
+import { computeListWindow, computeOffsets } from './list-window'
+import { TagSuggestionText } from './TagSuggestionText'
 
 const RESULT_EDGE_INSET = 12
 
 function updateResultEdges(element: HTMLElement): void {
   element.toggleAttribute('data-scroll-before', element.scrollTop > 1)
   element.toggleAttribute('data-scroll-after', element.scrollHeight - element.clientHeight - element.scrollTop > 1)
+}
+
+function revealResult(row: HTMLElement): void {
+  const list = row.closest<HTMLElement>('.node-search-results')
+  if (list === null) return
+  const viewport = list.getBoundingClientRect()
+  const rowBox = row.getBoundingClientRect()
+  const target =
+    rowBox.height > list.clientHeight - RESULT_EDGE_INSET * 2
+      ? (row.querySelector('.node-search-match')?.getBoundingClientRect() ?? rowBox)
+      : rowBox
+  const top = viewport.top + RESULT_EDGE_INSET
+  const bottom = viewport.bottom - RESULT_EDGE_INSET
+  if (target.top < top) list.scrollTop = Math.max(0, list.scrollTop + target.top - top)
+  else if (target.bottom > bottom) {
+    list.scrollTop += target.height > bottom - top ? target.top - top : target.bottom - bottom
+  }
+  updateResultEdges(list)
+}
+
+const NO_MATCHES: readonly TextMatch[] = []
+const NO_HEIGHTS: ReadonlyMap<string, number> = new Map()
+
+function SearchResultText({
+  text,
+  query,
+  active,
+  onReveal,
+  tagMatches = NO_MATCHES,
+}: {
+  text: string
+  query: string
+  active: boolean
+  onReveal(): void
+  tagMatches?: readonly TextMatch[] | undefined
+}): React.JSX.Element {
+  const textMatches = useSearchDecorations(text, query.startsWith('#') ? '' : query)
+  const matches = query.startsWith('#') ? tagMatches : textMatches
+  const firstMatch = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const row = firstMatch.current?.closest<HTMLElement>('.recent-node-row')
+    if (active && row) onReveal()
+  }, [active, matches, onReveal])
+
+  return (
+    <>
+      {matches.map((match, index) => (
+        <Fragment key={match.start}>
+          {text.slice(matches[index - 1]?.end ?? 0, match.start)}
+          <strong ref={index === 0 ? firstMatch : undefined} className="node-search-match">
+            {text.slice(match.start, match.end)}
+          </strong>
+        </Fragment>
+      ))}
+      {text.slice(matches.at(-1)?.end ?? 0)}
+    </>
+  )
 }
 
 export function GlobalSearchPopup({
@@ -42,19 +112,49 @@ export function GlobalSearchPopup({
     session.subscribe,
     session.getSnapshot,
   )
-  const [{ start: windowStart, top: windowTop }, setResultWindow] = useState({ start: 0, top: 0 })
+  const [windowTop, setWindowTop] = useState(0)
+  const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
+  const [measurement, setMeasurement] = useState<{
+    epoch: symbol
+    heights: ReadonlyMap<string, number>
+    viewportHeight: number
+  }>()
+  const heights = measurement?.epoch === measurementEpoch ? measurement.heights : NO_HEIGHTS
+  const viewportHeight = measurement?.epoch === measurementEpoch ? measurement.viewportHeight : 560
+  const layout = useMemo(() => computeOffsets(items?.map((item) => heights.get(item.id) ?? 52) ?? []), [items, heights])
   const input = useRef<HTMLInputElement>(null)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
+  const panelSize = useRef({ width: 0, height: 0 })
+  const scrollAnchor = useRef<{ index: number; inset: number; heights: ReadonlyMap<string, number> } | undefined>(
+    undefined,
+  )
+  const revealPending = useRef(false)
+  const [revealRevision, setRevealRevision] = useState(0)
+  const requestReveal = useCallback(() => {
+    revealPending.current = true
+    setRevealRevision((revision) => revision + 1)
+  }, [])
   const restore = useRef<() => void>(() => undefined)
 
-  const updateResultWindow = (top: number, count: number): void => {
-    const start = Math.max(0, Math.min(Math.floor(top / 52) - 2, count - 40))
-    setResultWindow((previous) => (previous.start === start && previous.top === top ? previous : { start, top }))
-  }
+  const resultWindow = computeListWindow({
+    count: items?.length ?? 0,
+    offsets: layout.offsets,
+    viewportStart: windowTop,
+    viewportEnd: windowTop + viewportHeight,
+    overscan: 2,
+    focusedIndex: selected,
+  })
+  const renderedIndices = Array.from(
+    { length: resultWindow.end - resultWindow.start },
+    (_, offset) => resultWindow.start + offset,
+  )
+  if (resultWindow.pinnedIndex !== undefined) renderedIndices.push(resultWindow.pinnedIndex)
+
   const resetScroll = (): void => {
-    updateResultWindow(0, 0)
+    scrollAnchor.current = undefined
+    setWindowTop(0)
     if (panel.current) panel.current.scrollTop = 0
   }
   const changeQuery = (value: string): void => {
@@ -80,6 +180,14 @@ export function GlobalSearchPopup({
     [session],
   )
 
+  useEffect(
+    () =>
+      session.subscribe(() => {
+        if (session.getSnapshot().items === undefined) setMeasurement(undefined)
+      }),
+    [session],
+  )
+
   useEffect(() => {
     const close = (): void => {
       if (session.close()) restore.current()
@@ -94,7 +202,7 @@ export function GlobalSearchPopup({
       beforeOpen()
       restore.current = captureFocusRestoration()
       session.open()
-      updateResultWindow(0, 0)
+      setWindowTop(0)
     }
     if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
@@ -136,20 +244,6 @@ export function GlobalSearchPopup({
           visit()
         } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
           session.moveResult(event.key === 'ArrowDown' ? 1 : -1)
-          const next = session.getSnapshot().selected
-          if (panel.current) {
-            const top = next * 52
-            const visibleTop = panel.current.scrollTop + RESULT_EDGE_INSET
-            const visibleBottom = panel.current.scrollTop + panel.current.clientHeight - RESULT_EDGE_INSET
-            if (top < visibleTop || top + 52 > visibleBottom) {
-              panel.current.scrollTop =
-                top < visibleTop
-                  ? Math.max(0, top - RESULT_EDGE_INSET)
-                  : top + 52 + RESULT_EDGE_INSET - panel.current.clientHeight
-              updateResultEdges(panel.current)
-              updateResultWindow(panel.current.scrollTop, items.length)
-            }
-          }
         } else if (event.key !== 'Tab') return
         event.preventDefault()
         event.stopImmediatePropagation()
@@ -230,9 +324,87 @@ export function GlobalSearchPopup({
     return () => observer?.disconnect()
   }, [items, suggestions.length])
 
-  useEffect(() => {
-    panel.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [items, selected])
+  useLayoutEffect(() => {
+    revealPending.current = !pending && suggestions.length === 0
+  }, [items, selected, pending, suggestions.length])
+
+  useLayoutEffect(() => {
+    const element = panel.current
+    if (element === null) {
+      scrollAnchor.current = undefined
+      return
+    }
+    const measure = (): void => {
+      const size = { width: element.clientWidth, height: element.clientHeight }
+      const widthChanged = panelSize.current.width !== size.width
+      let changed = widthChanged || panelSize.current.height !== size.height
+      panelSize.current = size
+      const next = new Map(widthChanged ? NO_HEIGHTS : heights)
+      for (const row of element.querySelectorAll<HTMLElement>('.recent-node-row')) {
+        const id = row.dataset.resultId!
+        const height = row.getBoundingClientRect().height
+        if (height > 0 && next.get(id) !== height) {
+          next.set(id, height)
+          changed = true
+        }
+      }
+      if (changed) {
+        const anchor = computeListWindow({
+          count: items?.length ?? 0,
+          offsets: layout.offsets,
+          viewportStart: element.scrollTop,
+          viewportEnd: element.scrollTop,
+          overscan: 0,
+          focusedIndex: undefined,
+        }).start
+        scrollAnchor.current = revealPending.current
+          ? undefined
+          : {
+              index: anchor,
+              inset: element.scrollTop - (layout.offsets[anchor] ?? 0),
+              heights: next,
+            }
+        setMeasurement({ epoch: measurementEpoch, heights: next, viewportHeight: size.height })
+      }
+      updateResultEdges(element)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(element)
+    element.querySelectorAll('.recent-node-row').forEach((row) => observer?.observe(row))
+    return () => observer?.disconnect()
+  }, [
+    items,
+    measurement,
+    measurementEpoch,
+    heights,
+    layout,
+    resultWindow.start,
+    resultWindow.end,
+    resultWindow.pinnedIndex,
+  ])
+
+  useLayoutEffect(() => {
+    const anchor = scrollAnchor.current
+    const element = panel.current
+    if (anchor?.heights !== heights) return
+    scrollAnchor.current = undefined
+    if (anchor !== undefined && element !== null) {
+      element.scrollTop = (layout.offsets[anchor.index] ?? 0) + anchor.inset
+      setWindowTop(element.scrollTop)
+    }
+  }, [layout, heights])
+
+  useLayoutEffect(() => {
+    if (!revealPending.current) return
+    const row = panel.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (row && !pending) {
+      revealResult(row)
+      const top = panel.current!.scrollTop
+      if (top !== windowTop) setWindowTop(top)
+      else revealPending.current = false
+    }
+  }, [items, selected, pending, suggestions.length, windowTop, layout, revealRevision])
 
   useEffect(() => {
     if (!open) return
@@ -291,7 +463,7 @@ export function GlobalSearchPopup({
                   if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
                 }}
               >
-                #{name}
+                <TagSuggestionText name={name} query={query} />
               </div>
             ))}
           </div>
@@ -300,7 +472,7 @@ export function GlobalSearchPopup({
       {(suggestions.length === 0 || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">
           <span>{query === '' ? 'Recent' : 'Results'}</span>
-          {suggestions.length === 0 && items.length > 0 && (
+          {query !== '' && suggestions.length === 0 && items.length > 0 && (
             <output
               className="node-search-position"
               aria-label="Result position"
@@ -320,7 +492,7 @@ export function GlobalSearchPopup({
         onScroll={(event) => {
           updateResultEdges(event.currentTarget)
           // Retained paint and replacement rows must move together in this external scroll event.
-          flushSync(() => updateResultWindow(event.currentTarget.scrollTop, items.length))
+          flushSync(() => setWindowTop(event.currentTarget.scrollTop))
         }}
         data-editor-focus-borrow=""
         aria-activedescendant={items[selected] === undefined ? undefined : `recent-node-${selected}`}
@@ -330,30 +502,39 @@ export function GlobalSearchPopup({
             <div className="recent-node-empty">{displayedQuery === '' ? 'No recent nodes' : 'No results'}</div>
           )
         ) : (
-          <div style={{ height: items.length * 52, position: 'relative', overflow: 'clip' }}>
+          <div style={{ height: layout.total, position: 'relative', overflow: 'clip' }}>
             <div style={{ position: 'sticky', top: 0, height: 0 }}>
-              {items.slice(windowStart, windowStart + 40).map((item, offset) => {
-                const index = windowStart + offset
+              {renderedIndices.map((index) => {
+                const item = items[index]!
                 return (
                   <div
                     key={item.id}
                     id={`recent-node-${index}`}
+                    data-result-id={item.id}
                     role="option"
                     aria-selected={suggestions.length === 0 && index === selected}
                     className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
                     style={{
                       position: 'absolute',
-                      top: index * 52 - windowTop,
-                      height: 52,
+                      top: layout.offsets[index]! - windowTop,
+                      minHeight: 52,
                       width: '100%',
                       boxSizing: 'border-box',
                     }}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => visit(index)}
                   >
-                    <span className="recent-node-text">{item.text}</span>
-                    <span className="recent-node-path">
-                      {item.path === null ? (
+                    <span className="recent-node-title-line">
+                      <span className="recent-node-text">
+                        <SearchResultText
+                          text={item.text}
+                          query={displayedQuery}
+                          tagMatches={item.tagMatches}
+                          active={suggestions.length === 0 && index === selected && !pending}
+                          onReveal={requestReveal}
+                        />
+                      </span>
+                      {item.path === null && (
                         <span
                           className="recent-node-root location-icon"
                           role="img"
@@ -362,10 +543,19 @@ export function GlobalSearchPopup({
                         >
                           <OutlineRootIcon />
                         </span>
-                      ) : (
-                        item.path
                       )}
                     </span>
+                    {item.path !== null && (
+                      <span className="recent-node-path">
+                        <SearchResultText
+                          text={item.path}
+                          query={displayedQuery}
+                          tagMatches={item.pathTagMatches}
+                          active={suggestions.length === 0 && index === selected && !pending}
+                          onReveal={requestReveal}
+                        />
+                      </span>
+                    )}
                   </div>
                 )
               })}

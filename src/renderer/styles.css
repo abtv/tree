@@ -87,6 +87,8 @@
   --color-date-today: #806800;
   --color-date-future: #396d43;
   --color-tag: #76517d;
+  --color-node-search-match: #075a69;
+  --color-node-search-match-background: #dcebef;
   --color-disclosure-background: #efe9da;
   --color-enter-ring-background: #ddd5c2;
   --color-enter-ring-hover-background: #cfc6b0;
@@ -1561,6 +1563,8 @@ body.node-drag-invalid * {
     --color-date-today: #f0dfaf;
     --color-date-future: #7f9f7f;
     --color-tag: #d3afd7;
+    --color-node-search-match: #b9f0ef;
+    --color-node-search-match-background: #28484b;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);
     --color-overlay-button-hover-background: rgba(220, 220, 204, 0.24);
     --color-overlay-button-foreground: #dcdccc;
@@ -1756,25 +1760,54 @@ body.node-drag-invalid * {
   scroll-margin-block: 12px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
   padding: 7px 10px;
   border-radius: 4px;
   cursor: default;
 }
 
+.recent-node-title-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  line-height: 20px;
+}
+
 .recent-node-text,
 .recent-node-path {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.recent-node-text {
+  min-width: 0;
+}
+
+.node-search-match {
+  font-weight: 700;
+  color: var(--color-node-search-match);
+  background: var(--color-node-search-match-background);
+  border-radius: 2px;
 }
 
 .recent-node-path {
   font-size: 12px;
-  opacity: 0.7;
+  line-height: 16px;
+  opacity: 0.85;
 }
 
 .recent-node-root {
   display: inline-flex;
+  width: 14px;
+  height: 18px;
+  opacity: 0.6;
   vertical-align: middle;
   fill: currentColor;
+}
+
+.recent-node-root svg {
+  width: 14px;
+  height: 14px;
 }

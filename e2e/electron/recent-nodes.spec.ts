@@ -100,15 +100,21 @@ describeForEachEditingMode('Recent nodes', (mode) => {
     await window.screenshot({ path: `test-results/search-${mode.mode}-light.png` })
     await input.fill('Alpha')
     await expect(results.getByRole('option')).toHaveCount(1)
+    await expect(results.locator('.node-search-match')).toHaveText(['Alpha'])
     await input.fill('#')
     const tags = window.getByRole('listbox', { name: 'Tags' })
     await expect(tags.getByRole('option')).toHaveText(['#Work', '#w', '#work', '#worker'])
     await input.fill('#wrk')
+    await expect(tags).toHaveCount(0)
+    await expect(window.getByText('No results', { exact: true })).toBeVisible()
+    await input.fill('#wor')
     await expect(tags.getByRole('option')).toHaveText(['#Work', '#work', '#worker'])
+    await expect(tags.locator('.node-search-match')).toHaveText(['#Wor', '#wor', '#wor'])
     await window.keyboard.press('Tab')
     await expect(input).toHaveValue('#Work')
     await expect(tags).toHaveCount(0)
     await expect(results.locator('.recent-node-text')).toHaveText(['alpha #Work'])
+    await expect(results.locator('.node-search-match')).toHaveText(['#Work'])
     await input.fill('#WORK')
     await expect(tags.getByRole('option')).toHaveText(['#Work', '#work', '#worker'])
     await window.keyboard.press('ArrowDown')
@@ -238,6 +244,91 @@ test.describe('Recent-node buffered editing', () => {
 })
 
 test.describe('Recent-node popup geometry (mode-independent)', () => {
+  // @requirement PRODUCT.md §20.14.2
+  test('wraps full results and reveals a distant match across navigation, resize and appearances', async ({
+    userDataDir,
+  }) => {
+    const longText = `${'Introduction without the query\n'.repeat(45)}needle at the end`
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 80 }, (_, index) => ({
+          id: `n${index}`,
+          text: index === 0 ? longText : `needle ${index} ${'wrapped content '.repeat(index % 3 === 0 ? 15 : 0)}`,
+          children: [],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+;')
+    await expect(window.getByLabel('Result position')).toHaveCount(0)
+    const input = window.getByRole('searchbox')
+    await input.fill('needle')
+    const list = window.getByRole('listbox', { name: 'Search results' })
+    const selected = list.locator('[aria-selected="true"]')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 80')
+    await expect(selected.locator('.recent-node-text')).toHaveText(longText)
+
+    const matchVisible = async () => {
+      await expect
+        .poll(async () =>
+          selected.evaluate((element) => {
+            const match = element.querySelector('.node-search-match')?.getBoundingClientRect()
+            const viewport = element.closest('.node-search-results')!.getBoundingClientRect()
+            return match !== undefined && match.top >= viewport.top + 11 && match.bottom <= viewport.bottom - 11
+          }),
+        )
+        .toBe(true)
+      await expect(input).toBeFocused()
+      expect(await list.getByRole('option').count()).toBeLessThanOrEqual(40)
+    }
+    await matchVisible()
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
+      await window.emulateMedia({ colorScheme: appearance })
+      await matchVisible()
+      await window.screenshot({ path: `test-results/search-full-text-${appearance}.png` })
+    }
+
+    await list.hover()
+    await window.mouse.wheel(0, -5000)
+    await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(0)
+    await window.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    )
+    expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
+    await window.keyboard.press('ArrowDown')
+    await expect(window.getByLabel('Result position')).toHaveText('2 / 80')
+    await matchVisible()
+    await window.keyboard.press('ArrowUp')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 80')
+    await matchVisible()
+
+    await window.keyboard.press('ArrowUp')
+    await expect(window.getByLabel('Result position')).toHaveText('80 / 80')
+    await matchVisible()
+    await setMainWindowBounds(app, { width: 520, height: 520 })
+    await matchVisible()
+    await window.keyboard.press('ArrowDown')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 80')
+    await matchVisible()
+    await window.keyboard.press('ArrowDown')
+    await expect(window.getByLabel('Result position')).toHaveText('2 / 80')
+    await matchVisible()
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
+      await window.emulateMedia({ colorScheme: appearance })
+      await window.screenshot({ path: `test-results/search-neighbors-${appearance}.png` })
+    }
+
+    await input.fill('absent')
+    await expect(window.getByText('No results', { exact: true })).toBeVisible()
+    await input.fill('')
+    await expect(window.getByLabel('Result position')).toHaveCount(0)
+    await window.keyboard.press('Escape')
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeFocused()
+  })
+
   // @requirement PRODUCT.md §20.14
   test('keeps the result list in place while an extra character is being searched', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -260,7 +351,8 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.screenshot({ path: 'test-results/search-refinement-pending.png' })
 
     expect(await popup.boundingBox()).toEqual(before)
-    await expect(window.getByRole('option')).toHaveCount(21)
+    expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
+    await expect(window.getByRole('option').first()).toContainText('Result node 0')
     await window.clock.resume()
     await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
     expect(await popup.boundingBox()).toEqual(before)
@@ -494,7 +586,8 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       }
     }
     await input.fill('Alpha')
-    await expect(popup.getByRole('option')).toHaveCount(12)
+    await expect(popup.getByLabel('Result position')).toHaveText('1 / 12')
+    expect(await popup.getByRole('option').count()).toBeLessThanOrEqual(40)
     const manyHeight = (await popup.boundingBox())!.height
     await input.fill('Alpha 11')
     await expect(popup.getByRole('option')).toHaveCount(1)

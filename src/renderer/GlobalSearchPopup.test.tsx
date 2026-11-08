@@ -154,12 +154,15 @@ it('borrows focus, wraps eight results and restores a directional selection with
 it('keeps title and scrollbar interaction inside the popup and reveals arrow-selected rows', () => {
   setup()
   const last = screen.getAllByRole('option')[7]!
-  const reveal = vi.spyOn(last, 'scrollIntoView')
+  const list = screen.getByRole('listbox')
+  vi.spyOn(last, 'getBoundingClientRect').mockImplementation(() => new DOMRect(0, 200 - list.scrollTop, 200, 52))
+  vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 200, 100))
+  Object.defineProperty(list, 'clientHeight', { configurable: true, value: 100 })
   fireEvent.pointerDown(screen.getByRole('dialog'))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
   fireEvent.keyDown(document, { key: 'ArrowUp' })
 
-  expect(reveal).toHaveBeenCalledWith({ block: 'nearest' })
+  expect(list.scrollTop).toBeGreaterThan(0)
 })
 
 it('visits only on confirmation and permits dismissing an empty history', () => {

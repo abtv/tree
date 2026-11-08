@@ -12,6 +12,13 @@ const document = {
 }
 
 describe('recent nodes', () => {
+  it('retains full node text without normalizing or copying it into a preview', () => {
+    const text = `  ${'long title '.repeat(50)}\nfinal match  `
+    const recent = new RecentNodes()
+    recent.load(['long'], { roots: [{ id: 'long', text, children: [] }] })
+
+    expect(recent.getResults()[0]?.text).toBe(text)
+  })
   it('starts empty and normalizes malformed history before retaining valid distinct IDs', () => {
     const recent = new RecentNodes()
 

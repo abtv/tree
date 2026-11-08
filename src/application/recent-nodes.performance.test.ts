@@ -7,7 +7,7 @@ it('prepares and reads recent-node data below one millisecond at p99', () => {
   let document: Document = {
     roots: Array.from({ length: 10_000 }, (_, i) => ({
       id: `n${i}`,
-      text: `Node ${i} ${'long title '.repeat(30)}`,
+      text: i === 0 ? `${' '.repeat(1_000_000)}Node 0` : `Node ${i} ${'long title '.repeat(30)}`,
       children: [],
     })),
   }
@@ -20,6 +20,7 @@ it('prepares and reads recent-node data below one millisecond at p99', () => {
   const reads: number[] = []
   for (let i = 0; i < 1200; i++) {
     const next = { roots: [{ id: `new${i}`, text: 'New node', children: [] }, ...document.roots.slice(0, 9999)] }
+    recent.remember('n0', document)
     const start = performance.now()
     recent.recordChange(document, next, `new${i}`)
     recent.update(next)

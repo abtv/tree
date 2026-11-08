@@ -105,3 +105,53 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
   expect(scroll.maxMs).toBeLessThan(100)
   expect(scroll.mountedMax).toBeLessThanOrEqual(40)
 })
+
+// @requirement PRODUCT.md §20.14
+test('keeps full multiline result navigation and late-match reveal responsive', async ({ userDataDir }) => {
+  const longText = `${'Context before the match\n'.repeat(120)}Needle at the end`
+  seedDocument(userDataDir, {
+    document: {
+      roots: Array.from({ length: 1000 }, (_, index) => ({
+        id: `n${index}`,
+        text: index % 10 === 0 ? longText : `Needle ${index} ${'wrapped text '.repeat(index % 4)}`,
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'n0' },
+  })
+  const { window } = await launchTree(userDataDir)
+  await window.keyboard.press('Meta+;')
+  const input = window.getByRole('searchbox')
+  await expect(input).toBeFocused()
+  const start = performance.now()
+  await input.fill('Needle')
+  const list = window.getByRole('listbox', { name: 'Search results' })
+  await expect(window.getByLabel('Result position')).toHaveText('1 / 1000')
+  await expect
+    .poll(() =>
+      list.evaluate((element) => {
+        const match = element.querySelector('[aria-selected="true"] .node-search-match')?.getBoundingClientRect()
+        const bounds = element.getBoundingClientRect()
+        return match !== undefined && match.top >= bounds.top && match.bottom <= bounds.bottom
+      }),
+    )
+    .toBe(true)
+  const completeMs = performance.now() - start
+  const navigationStart = performance.now()
+  for (let index = 0; index < 24; index++) {
+    await window.keyboard.press('ArrowDown')
+    await expect(window.getByLabel('Result position')).toHaveText(`${index + 2} / 1000`)
+  }
+  const navigationMs = performance.now() - navigationStart
+  await expect(input).toBeFocused()
+  expect(await list.getByRole('option').count()).toBeLessThanOrEqual(40)
+  await expect(window.locator('[data-node-id="n0"] .node-input')).toHaveValue(longText)
+  recordPerfResult({
+    kind: 'node-search',
+    scenario: 'mixed-1000-full-text',
+    samples: 24,
+    metrics: { completeMs, navigationMs },
+  })
+  expect(completeMs).toBeLessThan(2000)
+  expect(navigationMs).toBeLessThan(3000)
+})
