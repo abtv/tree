@@ -121,7 +121,10 @@ export function GlobalSearchPopup({
   }>()
   const heights = measurement?.epoch === measurementEpoch ? measurement.heights : NO_HEIGHTS
   const viewportHeight = measurement?.epoch === measurementEpoch ? measurement.viewportHeight : 560
-  const layout = useMemo(() => computeOffsets(items?.map((item) => heights.get(item.id) ?? 52) ?? []), [items, heights])
+  const layout = useMemo(
+    () => computeOffsets(items?.map((item) => heights.get(item.id) ?? (item.path === null ? 34 : 52)) ?? []),
+    [items, heights],
+  )
   const input = useRef<HTMLInputElement>(null)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
@@ -338,6 +341,7 @@ export function GlobalSearchPopup({
       const size = { width: element.clientWidth, height: element.clientHeight }
       const widthChanged = panelSize.current.width !== size.width
       let changed = widthChanged || panelSize.current.height !== size.height
+      if (widthChanged) revealPending.current = true
       panelSize.current = size
       const next = new Map(widthChanged ? NO_HEIGHTS : heights)
       for (const row of element.querySelectorAll<HTMLElement>('.recent-node-row')) {
@@ -449,7 +453,7 @@ export function GlobalSearchPopup({
       />
       {suggestions.length > 0 && (
         <>
-          <div className="node-search-section-title">Tags</div>
+          <div className="node-search-section-title node-search-tags-heading">Tags</div>
           <div className="node-search-tags" role="listbox" aria-label="Tags">
             {suggestions.map((name, index) => (
               <div
@@ -502,7 +506,7 @@ export function GlobalSearchPopup({
             <div className="recent-node-empty">{displayedQuery === '' ? 'No recent nodes' : 'No results'}</div>
           )
         ) : (
-          <div style={{ height: layout.total, position: 'relative', overflow: 'clip' }}>
+          <div style={{ height: layout.total + RESULT_EDGE_INSET, position: 'relative', overflow: 'clip' }}>
             <div style={{ position: 'sticky', top: 0, height: 0 }}>
               {renderedIndices.map((index) => {
                 const item = items[index]!
@@ -511,13 +515,13 @@ export function GlobalSearchPopup({
                     key={item.id}
                     id={`recent-node-${index}`}
                     data-result-id={item.id}
+                    data-result-divider={index < items.length - 1 ? '' : undefined}
                     role="option"
                     aria-selected={suggestions.length === 0 && index === selected}
                     className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
                     style={{
                       position: 'absolute',
                       top: layout.offsets[index]! - windowTop,
-                      minHeight: 52,
                       width: '100%',
                       boxSizing: 'border-box',
                     }}

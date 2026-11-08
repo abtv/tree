@@ -244,6 +244,73 @@ test.describe('Recent-node buffered editing', () => {
 })
 
 test.describe('Recent-node popup geometry (mode-independent)', () => {
+  for (const appearance of ['light', 'dark'] as const) {
+    // @requirement PRODUCT.md §20.14
+    // @requirement PRODUCT.md §20.14.2
+    test(`presents separated results and aligned tags in ${appearance}`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            {
+              id: 'project',
+              text: 'Example project #alpha #beta #gamma',
+              children: [
+                { id: 'note', text: 'Example note\nAdditional context for the selected result', children: [] },
+              ],
+            },
+            { id: 'task', text: 'Example task', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'project' },
+      })
+      const { app, window } = await launchTree(userDataDir, { appearance })
+      await window.emulateMedia({ colorScheme: appearance })
+      await setMainWindowBounds(app, { width: 700, height: 740 })
+      await window.keyboard.press('Meta+;')
+      const popup = window.getByRole('dialog', { name: 'Search' })
+      const input = popup.getByRole('searchbox')
+      await input.fill('Example')
+      const results = popup.getByRole('listbox', { name: 'Search results' })
+      await expect(results.getByRole('option')).toHaveCount(3)
+      await window.keyboard.press('ArrowDown')
+
+      await expect(results.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+      const rows = await results.getByRole('option').evaluateAll((elements) =>
+        elements.map((element) => {
+          const bounds = element.getBoundingClientRect()
+          return { top: bounds.top, bottom: bounds.bottom, height: bounds.height }
+        }),
+      )
+      expect(rows[1]!.height).toBeGreaterThan(rows[0]!.height)
+      expect(rows[0]!.bottom).toBe(rows[1]!.top)
+      expect(rows[1]!.bottom).toBe(rows[2]!.top)
+      await expect(popup).toHaveCSS('width', '652px')
+      await expect(window).toHaveScreenshot(`search-results-presentation-${appearance}.png`)
+
+      const resultBounds = (await results.boundingBox())!
+      await input.fill('#')
+      const tags = popup.getByRole('listbox', { name: 'Tags' })
+      await expect(tags.getByRole('option')).toHaveCount(3)
+      const tagBounds = (await tags.boundingBox())!
+      expect(tagBounds.x).toBe(resultBounds.x)
+      expect(tagBounds.width).toBe(resultBounds.width)
+      await window.keyboard.press('ArrowDown')
+      await expect(tags.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+      await expect(window).toHaveScreenshot(`search-tags-presentation-${appearance}.png`)
+
+      await setMainWindowBounds(app, { width: 1904, height: 1194 })
+      await expect(popup).toHaveCSS('width', '952px')
+      await window.screenshot({ path: `test-results/search-wide-${appearance}.png` })
+      await window.keyboard.press('Enter')
+      await expect(input).toHaveValue('#beta')
+      await expect(tags).toHaveCount(0)
+      await expect(results.getByRole('option')).toHaveCount(1)
+      await expect(input).toBeFocused()
+      await window.keyboard.press('Escape')
+      await expect(popup).toHaveCount(0)
+    })
+  }
+
   // @requirement PRODUCT.md §20.14.2
   test('wraps full results and reveals a distant match across navigation, resize and appearances', async ({
     userDataDir,
