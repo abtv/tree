@@ -5,6 +5,7 @@ import type { ApplicationMenuActions, ApplicationMenuState } from './application
 import { ipcEvents } from '../../shared/ipc'
 import type { AppUpdates } from './app-updates'
 import type { NotesArchiveControllerDependencies } from './notes-archive-controller'
+import type { WindowBounds } from '../../infrastructure/main/window-state'
 
 const mocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   createFiles: vi.fn(),
   booleanStore: { load: vi.fn(() => false), save: vi.fn() },
   appearanceStore: { load: vi.fn(() => 'system'), save: vi.fn() },
-  boundsStore: { load: vi.fn(() => null), save: vi.fn() },
+  boundsStore: { load: vi.fn<() => WindowBounds | null>(() => null), save: vi.fn() },
   boundsSaver: { save: vi.fn(), flush: vi.fn() },
   history: { load: vi.fn(() => []), save: vi.fn() },
   security: vi.fn(),
@@ -34,6 +35,9 @@ const mocks = vi.hoisted(() => ({
   surface: vi.fn(),
   appearance: vi.fn(),
   report: vi.fn(),
+  resolveRenderer: vi.fn(() => ({ url: 'app://tree/index.html' })),
+  readFile: vi.fn(),
+  themeSourceSet: vi.fn(),
   loadURL: vi.fn(async () => undefined),
 }))
 
@@ -43,6 +47,7 @@ vi.mock('./application-menu', () => ({ applicationMenuTemplate: mocks.menu }))
 vi.mock('./notes-archive-controller', () => ({ createNotesArchiveController: mocks.createArchive }))
 vi.mock('./editor-context-menu', () => ({ showEditorContextMenu: mocks.contextMenu }))
 vi.mock('node:worker_threads', () => ({ Worker: mocks.archiveWorker }))
+vi.mock('node:fs/promises', () => ({ readFile: mocks.readFile }))
 vi.mock('../../infrastructure/main/file-services', () => ({ createFileServices: mocks.createFiles }))
 vi.mock('../../infrastructure/main/command-history', () => ({
   createCommandHistoryStore: (path: string) => {
@@ -83,7 +88,7 @@ vi.mock('./window', () => ({
   createWindowWebPreferences: (preload: string) => ({ preload, sandbox: true }),
   followWindowAppearance: mocks.appearance,
   reportMainProcessError: mocks.report,
-  resolveRendererUrl: () => ({ url: 'app://tree/index.html' }),
+  resolveRendererUrl: mocks.resolveRenderer,
   surfaceWindow: mocks.surface,
   windowBackgroundColor: () => '#fff',
 }))
@@ -93,6 +98,7 @@ vi.mock('electron-updater', async () => {
 })
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
+  let themeSource = 'system'
   class Window extends EventEmitter {
     static fromWebContents = vi.fn((): Window | null => null)
     static windows: Window[] = []
@@ -129,7 +135,16 @@ vi.mock('electron', async () => {
     ipcMain: {},
     Menu: { getApplicationMenu: vi.fn(() => null), buildFromTemplate: vi.fn(), setApplicationMenu: vi.fn() },
     nativeImage: { createMenuSymbol: vi.fn(() => ({})), createFromBuffer: vi.fn() },
-    nativeTheme: { themeSource: 'system', shouldUseDarkColors: false },
+    nativeTheme: {
+      get themeSource() {
+        return themeSource
+      },
+      set themeSource(value: string) {
+        mocks.themeSourceSet(value)
+        themeSource = value
+      },
+      shouldUseDarkColors: false,
+    },
     protocol: {},
     session: { defaultSession: {} },
     shell: { openExternal: vi.fn(async () => undefined), showItemInFolder: vi.fn() },
@@ -178,6 +193,7 @@ beforeEach(async () => {
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 async function packagedSetup() {
@@ -240,6 +256,132 @@ function requestedUpdateId(window: Awaited<ReturnType<typeof setup>>['window']):
 }
 
 describe('packaged desktop update wiring', () => {
+  it('cancels an update save safely after its window has closed', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.lifecycle.setMainWindow(null)
+    vi.mocked(f.window.webContents.send).mockClear()
+
+    f.electron.app.emit('before-quit')
+
+    expect(f.updates.isApplying()).toBe(false)
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+    expect(f.prepare).not.toHaveBeenCalled()
+  })
+
+  it('keeps packaged update checks disabled outside macOS', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'win32' })
+    const f = await setup(true)
+    const { autoUpdater } = await import('electron-updater')
+
+    expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled()
+    expect(f.ipc.appUpdates).toBeUndefined()
+    expect(f.state().updatesSupported).toBe(false)
+  })
+
+  it('publishes download progress and replaces the previous installable package', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    expect(f.ipc.getUpdateCommands!()).toEqual({
+      'check-for-updates': false,
+      'update-app': false,
+      status: 'ready',
+      version: '1.2.4',
+    })
+
+    f.updater.emit('update-available', {
+      version: '1.2.5',
+      files: [],
+      path: '/update.zip',
+      sha512: 'test-digest',
+      releaseDate: '2026-11-05',
+    })
+    const progress = (percent: number) =>
+      f.updater.emit('download-progress', { percent, total: 100, transferred: percent, bytesPerSecond: 10, delta: 1 })
+    vi.mocked(f.window.webContents.send).mockClear()
+    const rebuilds = mocks.menu.mock.calls.length
+    progress(42.9)
+
+    expect(f.updates.isReady()).toBe(false)
+    expect(f.ipc.getUpdateCommands!()).toEqual({
+      'check-for-updates': false,
+      'update-app': false,
+      status: 42,
+    })
+    expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith(
+      ipcEvents.updateCommandsChanged,
+      f.ipc.getUpdateCommands!(),
+    )
+    expect(mocks.menu).toHaveBeenCalledTimes(rebuilds)
+
+    vi.mocked(f.window.isDestroyed).mockReturnValue(true)
+    vi.mocked(f.window.webContents.send).mockClear()
+    progress(43)
+    f.lifecycle.setMainWindow(null)
+    progress(44)
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('waits for the provider download promise before reporting a manual result', async () => {
+    const f = await packagedSetup()
+    let finish!: (paths: string[]) => void
+    const downloadPromise = new Promise<string[]>((resolve) => {
+      finish = resolve
+    })
+    const updateInfo = {
+      version: '1.2.4',
+      files: [{ url: '/update.zip', sha512: 'test-digest', size: 1 }],
+      path: '/update.zip',
+      sha512: 'test-digest',
+      releaseDate: '2026-11-05',
+    }
+    vi.mocked(f.updater.checkForUpdates).mockResolvedValueOnce({
+      isUpdateAvailable: true,
+      updateInfo,
+      versionInfo: updateInfo,
+      downloadPromise,
+    })
+
+    const pending = f.updates.checkManually()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.updates.isChecking()).toBe(true)
+    expect(f.electron.dialog.showMessageBox).not.toHaveBeenCalled()
+    finish(['/update.zip'])
+    await pending
+
+    expect(f.electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+  })
+
+  it('allows retry after native staging fails and restores window creation after rollback', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    vi.mocked(f.electron.autoUpdater.checkForUpdates).mockImplementationOnce(() => {
+      throw new Error('staging unavailable')
+    })
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    expect(f.release).toHaveBeenCalledOnce()
+    vi.mocked(f.window.webContents.send).mockClear()
+
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    const count = f.lifecycle.getWindowCount()
+    f.lifecycle.createMainWindow(vi.fn())
+    expect(f.lifecycle.getWindowCount()).toBe(count)
+    f.electron.autoUpdater.emit('error', new Error('native staging failed'))
+    f.updates.fail(null)
+    f.lifecycle.createMainWindow(vi.fn())
+    expect(f.lifecycle.getWindowCount()).toBe(count + 1)
+    vi.mocked(f.window.webContents.send).mockClear()
+    f.updates.request()
+    const current = f.lifecycle.getMainWindow()!
+    f.updates.confirm(requestedUpdateId(current as typeof f.window), true)
+
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(3)
+    f.updates.fail(null)
+  })
+
   it('does not install after an unsolicited native staging event without a saved update request', async () => {
     const f = await packagedSetup()
 
@@ -247,6 +389,7 @@ describe('packaged desktop update wiring', () => {
 
     expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
     expect(f.prepare).not.toHaveBeenCalled()
+    expect(f.updates.getStatus()).toBeNull()
     f.downloaded()
     f.actions().updateApp!()
     f.ipc.appUpdates!.confirm(requestedUpdateId(f.window), true)
@@ -378,7 +521,7 @@ describe('packaged desktop update wiring', () => {
     f.updates.fail(null)
   })
 
-  it.each(['about', 'data', 'archive', 'export', 'import', 'loading', 'destroyed'] as const)(
+  it.each(['about', 'data', 'archive', 'export', 'import', 'loading', 'destroyed', 'missing'] as const)(
     'does not start update saving while blocked by %s',
     async (reason) => {
       const f = await packagedSetup()
@@ -390,6 +533,7 @@ describe('packaged desktop update wiring', () => {
       if (reason === 'import') f.ipc.setNotesMenuState!({ canExport: true, canImport: false })
       if (reason === 'loading') vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
       if (reason === 'destroyed') vi.mocked(f.window.isDestroyed).mockReturnValue(true)
+      if (reason === 'missing') f.lifecycle.setMainWindow(null)
       vi.mocked(f.window.webContents.send).mockClear()
 
       f.actions().updateApp!()
@@ -454,6 +598,86 @@ describe('packaged desktop update wiring', () => {
 })
 
 describe('desktop entry wiring', () => {
+  it('leaves the native theme source untouched when restoring Automatic appearance', async () => {
+    mocks.themeSourceSet.mockClear()
+
+    await setup()
+
+    expect(mocks.themeSourceSet).not.toHaveBeenCalled()
+  })
+
+  it('permits shutdown before ready services have been registered', async () => {
+    await import('./index')
+    const lifecycle = mocks.bootstrap.mock.lastCall![0] as ApplicationBootstrapDependencies
+
+    expect(lifecycle.getMainWindow()).toBeNull()
+    expect(lifecycle.settleBeforeQuit()).toBeNull()
+    expect(mocks.archive.shutdown).not.toHaveBeenCalled()
+  })
+
+  it('restores saved window geometry and keeps native symbols available across menu rebuilds', async () => {
+    const bounds = { x: 12, y: 34, width: 850, height: 650 }
+    mocks.boundsStore.load.mockReturnValueOnce(bounds)
+    const f = await setup()
+
+    expect((f.window as unknown as { options: unknown }).options).toMatchObject(bounds)
+    expect(f.state().notes).toEqual({ canExport: false, canImport: false })
+    f.ipc.setVimEnabled!(true)
+
+    expect(vi.mocked(f.electron.nativeImage.createMenuSymbol).mock.calls).toEqual([
+      ['point.3.connected.trianglepath.dotted'],
+      ['calendar'],
+      ['square.and.arrow.up'],
+      ['square.and.arrow.down'],
+    ])
+    expect(mocks.menu.mock.lastCall![2]).toEqual({ tree: {}, agenda: {}, export: {}, import: {} })
+  })
+
+  it('forwards packaged renderer resolution and protocol reads without changing bytes or errors', async () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://localhost:5173')
+    const f = await setup()
+    expect(mocks.resolveRenderer).toHaveBeenCalledExactlyOnceWith(
+      false,
+      process.env['ELECTRON_RENDERER_URL'],
+      'app://tree/index.html',
+    )
+    const [protocol, directory, read] = mocks.protocol.mock.lastCall as unknown as [
+      unknown,
+      string,
+      (path: string) => Promise<Uint8Array>,
+    ]
+    expect(protocol).toBe(f.electron.protocol)
+    expect(directory).toMatch(/\/renderer$/)
+    const bytes = new Uint8Array([1, 2, 3])
+    mocks.readFile.mockResolvedValueOnce(bytes)
+
+    await expect(read('/renderer/index.html')).resolves.toBe(bytes)
+    expect(mocks.readFile).toHaveBeenCalledExactlyOnceWith('/renderer/index.html')
+    const failure = new Error('renderer unreadable')
+    mocks.readFile.mockRejectedValueOnce(failure)
+    await expect(read('/renderer/index.html')).rejects.toBe(failure)
+  })
+
+  it('loads and saves line-number preferences through the profile store', async () => {
+    const f = await setup()
+    mocks.booleanStore.load.mockReturnValueOnce(true)
+
+    expect(f.ipc.getLineNumbers!()).toBe(true)
+    f.ipc.setLineNumbers!(true)
+
+    expect(mocks.booleanStore.save).toHaveBeenCalledExactlyOnceWith(true)
+  })
+
+  it('avoids rebuilding native commands for unchanged notes availability', async () => {
+    const f = await setup()
+    mocks.menu.mockClear()
+
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
+
+    expect(mocks.menu).toHaveBeenCalledOnce()
+  })
+
   it('keeps each persisted preference in its established file under the profile data directory', async () => {
     await setup()
 
@@ -595,6 +819,7 @@ describe('desktop entry wiring', () => {
   it('keeps menu commands safe when no main window exists and restores appearance through IPC', async () => {
     const f = await setup()
     const actions = f.actions()
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
     f.lifecycle.setMainWindow(null)
     vi.mocked(f.window.webContents.send).mockClear()
     mocks.menu.mockClear()
@@ -602,12 +827,17 @@ describe('desktop entry wiring', () => {
     actions.findCommand('find')
     actions.viewCommand('tree')
     actions.showAbout()
+    actions.notesCommand('export')
+    actions.notesCommand('import')
+    actions.setVimEnabled(true)
+    actions.setAlwaysOnTop(true)
+    f.ipc.setAlwaysOnTop!(false)
     f.ipc.setAppearance('light')
 
     expect(f.window.webContents.send).not.toHaveBeenCalled()
     expect(mocks.appearanceStore.save).toHaveBeenCalledExactlyOnceWith('light')
     expect(f.electron.nativeTheme.themeSource).toBe('light')
-    expect(mocks.menu).toHaveBeenCalledOnce()
+    expect(mocks.menu).toHaveBeenCalledTimes(2)
   })
 
   it('starts an unpackaged window with secure dimensions and updates unavailable', async () => {
@@ -695,6 +925,9 @@ describe('desktop entry wiring', () => {
     expect(ports.homeDirectory).toBe('/profile/home')
     expect(ports.attachmentsDirectory).toBe('/profile/userData/data/attachments')
     f.lifecycle.setMainWindow(null)
+    vi.mocked(f.window.webContents.send).mockClear()
+    ports.sendProgress({ imagesDone: 3, imageCount: 3 })
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
     await ports.dialogs.showSaveDialog(save)
     await ports.dialogs.showOpenDialog(open)
     expect(f.electron.dialog.showSaveDialog).toHaveBeenLastCalledWith(save)
@@ -853,6 +1086,7 @@ describe('desktop entry wiring', () => {
     ipc.setAboutOpen!(true)
     expect((mocks.menu.mock.lastCall![0] as ApplicationMenuState).modalOpen).toBe(true)
     vi.mocked(window.webContents.send).mockClear()
+    const rebuilds = mocks.menu.mock.calls.length
 
     actions().findCommand('find')
     actions().viewCommand('tree')
@@ -860,6 +1094,7 @@ describe('desktop entry wiring', () => {
     actions().setVimEnabled(true)
     actions().setAlwaysOnTop(true)
 
+    expect(mocks.menu).toHaveBeenCalledTimes(rebuilds + 2)
     expect(mocks.booleanStore.save).not.toHaveBeenCalled()
     expect(
       vi.mocked(window.webContents.send).mock.calls.every(([channel]) => channel === ipcEvents.updateCommandsChanged),
@@ -924,7 +1159,8 @@ describe('desktop entry wiring', () => {
   )
 
   it('saves bounds on move, resize and close and releases the closed window', async () => {
-    const { lifecycle, window } = await setup()
+    const { lifecycle, window, ipc, state } = await setup()
+    ipc.setAboutOpen!(true)
     window.emit('move')
     window.emit('resize')
     window.emit('close')
@@ -936,6 +1172,8 @@ describe('desktop entry wiring', () => {
     expect(lifecycle.getMainWindow()).toBe(window)
     window.emit('closed')
     expect(lifecycle.getMainWindow()).toBeNull()
+    ipc.setVimEnabled!(false)
+    expect(state().modalOpen).toBe(false)
   })
 
   it('waits for archive shutdown and prevents window creation after confirmed quit', async () => {

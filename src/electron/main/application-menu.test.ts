@@ -84,6 +84,47 @@ it('disables main-window commands while About is modal but keeps About, Quit and
 
 describe('application menu template', () => {
   it.each([
+    [false, false, false],
+    [true, true, false],
+    [true, true, true],
+  ])('gates available notes actions during modal display (%s, %s, %s)', (canExport, canImport, modalOpen) => {
+    const template = applicationMenuTemplate(
+      { ...state({ modalOpen }), notes: { canExport, canImport } },
+      createActions(),
+    )
+
+    expect(submenuItems(template, 'File').map((item) => item.enabled)).toEqual([
+      canExport && !modalOpen,
+      canImport && !modalOpen,
+    ])
+  })
+
+  it('supports menu consumers without update actions', () => {
+    const actions: ApplicationMenuActions = {
+      showAbout: vi.fn(),
+      requestQuit: vi.fn(),
+      setVimEnabled: vi.fn(),
+      setAlwaysOnTop: vi.fn(),
+      setAppearance: vi.fn(),
+      notesCommand: vi.fn(),
+      viewCommand: vi.fn(),
+      findCommand: vi.fn(),
+    }
+    const items = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
+
+    expect(() => {
+      clickWithChecked(
+        items.find((item) => item.id === 'check-for-updates')!,
+        false,
+      )
+      clickWithChecked(
+        items.find((item) => item.id === 'update-app')!,
+        false,
+      )
+    }).not.toThrow()
+  })
+
+  it.each([
     [{}, true, true],
     [{ updatesSupported: false }, false, true],
     [{ updateReady: false }, true, false],
@@ -202,6 +243,7 @@ describe('application menu template', () => {
       undefined,
       'Quit Tree',
     ])
+    expect(submenuItems(template, 'Tree')[3]?.type).toBe('separator')
     expect(submenuItems(template, 'Edit').map((item) => item.label)).toEqual([
       'Find…',
       'Find Next',

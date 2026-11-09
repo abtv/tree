@@ -3,7 +3,8 @@ import { capturePasteClipboard } from './paste'
 import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
 
 function data(files: File[] = [], text = '', html = ''): DataTransfer {
-  return { files, getData: (type: string) => (type === 'text/html' ? html : text) } as unknown as DataTransfer
+  const contents: Record<string, string> = { 'text/plain': text, 'text/html': html }
+  return { files, getData: (type: string) => contents[type] ?? '' } as unknown as DataTransfer
 }
 
 describe('browser paste event clipboard', () => {
@@ -45,6 +46,17 @@ describe('browser paste event clipboard', () => {
 
     await expect(capturePasteClipboard(data([file], 'fallback'))()).rejects.toThrow('maximum 25 MiB')
     expect(readBytes).not.toHaveBeenCalled()
+  })
+
+  it('accepts a PNG at the attachment size limit', async () => {
+    const file = new File([], 'limit.png', { type: 'image/png' })
+    Object.defineProperty(file, 'size', { value: MAX_ATTACHMENT_BYTES })
+    vi.spyOn(file, 'arrayBuffer').mockResolvedValue(new Uint8Array([1, 2, 3]).buffer)
+
+    await expect(capturePasteClipboard(data([file]))()).resolves.toEqual({
+      kind: 'image',
+      png: new Uint8Array([1, 2, 3]),
+    })
   })
 
   it('does not reinterpret other file types as PNG attachments', async () => {

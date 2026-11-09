@@ -79,6 +79,95 @@ it('removes active menu event handlers when disposed before the menu closes', as
   expect(document.activeElement).toBe(f.editor)
 })
 
+it('opens and closes without an editor snapshot', async () => {
+  const f = fixture()
+
+  f.open()
+  f.focus.close()
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(f.trigger)
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+})
+
+it('remembers the editor when the menu opens without a trigger press', () => {
+  const f = fixture()
+  f.editor.focus()
+  setSelectionRange(f.editor, 6, 2)
+
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'open' }))
+  f.item.focus()
+  f.focus.close()
+
+  expect(document.activeElement).toBe(f.editor)
+  expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 6, focus: 2 })
+})
+
+it('ignores outside presses while closed and permits departure without an editor snapshot', () => {
+  const f = fixture()
+  const errors: unknown[] = []
+  const onError = (event: ErrorEvent) => {
+    event.preventDefault()
+    errors.push(event.error)
+  }
+  window.addEventListener('error', onError)
+  try {
+    const destination = document.createElement('button')
+    document.body.append(destination)
+
+    destination.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+
+    expect(f.menu.hidePopover).not.toHaveBeenCalled()
+
+    f.open()
+    destination.focus()
+
+    expect(document.activeElement).toBe(destination)
+    expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+    expect(errors).toEqual([])
+  } finally {
+    window.removeEventListener('error', onError)
+  }
+})
+
+it('dismisses an outside press even when there is no editor to restore', () => {
+  const f = fixture()
+  f.open()
+
+  document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+
+  expect(f.menu.hidePopover).toHaveBeenCalledOnce()
+})
+
+it('disposes the menu automatically when the page is hidden', async () => {
+  const f = fixture()
+  f.editor.focus()
+  f.open()
+
+  window.dispatchEvent(new Event('pagehide'))
+  f.item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'closed' }))
+  f.focus.restore()
+  await Promise.resolve()
+
+  expect(document.activeElement).toBe(f.item)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+})
+
+it('keeps disposed handlers inert after new focus and popover events', () => {
+  const f = fixture()
+  f.focus.dispose()
+  f.editor.focus()
+  f.trigger.focus()
+  f.menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'open' }))
+
+  f.focus.close()
+  f.focus.restore()
+
+  expect(document.activeElement).toBe(f.trigger)
+  expect(f.menu.hidePopover).not.toHaveBeenCalled()
+})
+
 it('remembers selection when keyboard focus leaves the editor for the menu trigger', () => {
   const f = fixture()
   f.editor.focus()

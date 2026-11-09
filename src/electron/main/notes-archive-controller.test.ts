@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import * as fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -20,15 +21,17 @@ import { runDesktopExport } from '../../infrastructure/main/notes-archive/deskto
 import { runDesktopImport } from '../../infrastructure/main/notes-archive/desktop-import-job'
 import { ReplacementIncompleteError } from '../../infrastructure/main/notes-replacement'
 import {
-  BUSY_MESSAGE,
-  RESTART_REQUIRED_MESSAGE,
-  WORKER_STOPPED_MESSAGE,
   createNotesArchiveController,
   displayPath,
   type ArchiveWorkerHandle,
   type NotesArchiveControllerDependencies,
 } from './notes-archive-controller'
 import { onePixelPng } from './png-test-utils'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
 
 const NOW = new Date(2026, 9, 23, 14, 5, 9)
 const roots: string[] = []
@@ -185,6 +188,63 @@ const waitForWorker = async (scripted: ScriptedWorker[]) => {
 }
 
 describe('notes archive controller: export', () => {
+  it('uses the current date when no clock is injected', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(NOW)
+      const f = await setup()
+      const dependencies: NotesArchiveControllerDependencies = { ...f.dependencies }
+      Reflect.deleteProperty(dependencies, 'now')
+      const controller = createNotesArchiveController(dependencies)
+
+      await controller.chooseExportDestination()
+
+      expect(f.dialogs.showSaveDialog).toHaveBeenCalledExactlyOnceWith({
+        defaultPath: 'Tree Notes 2026-10-23.zip',
+        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('exports to a long valid destination name without exceeding the temporary filename limit', async () => {
+    const f = await setup()
+    const fileName = 'x'.repeat(240) + '.zip'
+    f.dialogs.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: join(f.destinations, fileName) })
+    await f.controller.chooseExportDestination()
+
+    await expect(f.controller.startExport()).resolves.toMatchObject({ ok: true, fileName })
+
+    expect(await readdir(f.destinations)).toEqual([fileName])
+  })
+
+  it.each([false, true])('closes the exported directory after its flush (flush failure=%s)', async (fails) => {
+    const f = await setup()
+    const sync = vi.fn(async () => {
+      if (fails) throw new Error('Directory flushing unavailable')
+    })
+    const close = vi.fn(async () => undefined)
+    const open = vi.mocked(fs.open)
+    const realOpen = open.getMockImplementation()!
+    open.mockImplementation(async (...args) => {
+      if (args[0] === f.destinations) return { sync, close } as unknown as Awaited<ReturnType<typeof fs.open>>
+      return realOpen(...args)
+    })
+    try {
+      await f.controller.chooseExportDestination()
+
+      await expect(f.controller.startExport()).resolves.toMatchObject({ ok: true })
+
+      expect(open).toHaveBeenCalledWith(f.destinations, 'r')
+      expect(sync).toHaveBeenCalledExactlyOnceWith()
+      expect(close).toHaveBeenCalledExactlyOnceWith()
+    } finally {
+      open.mockImplementation(realOpen)
+      open.mockClear()
+    }
+  })
+
   it('rejects an import-only message from an export worker and releases its snapshot', async () => {
     const { controller, scripted, fileServices, destinations } = await setup({ worker: 'scripted' })
     const release = vi.spyOn(fileServices, 'releaseSnapshot')
@@ -444,7 +504,10 @@ describe('notes archive controller: export', () => {
         'Your notes are too large.',
       ],
       [(worker: ScriptedWorker) => worker.emit('error', new Error('boom')), 'The notes could not be read: boom'],
-      [(worker: ScriptedWorker) => worker.emit('exit', 1), `The notes could not be read: ${WORKER_STOPPED_MESSAGE}`],
+      [
+        (worker: ScriptedWorker) => worker.emit('exit', 1),
+        'The notes could not be read: The notes archive worker stopped unexpectedly.',
+      ],
     ] as const) {
       const { controller, destinations, scripted } = await setup({ worker: 'scripted' })
 
@@ -481,8 +544,8 @@ describe('notes archive controller: export', () => {
     const result = controller.startExport()
     await waitForWorker(scripted)
 
-    await expect(controller.chooseExportDestination()).rejects.toThrow(BUSY_MESSAGE)
-    await expect(controller.chooseImportArchive()).rejects.toThrow(BUSY_MESSAGE)
+    await expect(controller.chooseExportDestination()).rejects.toThrow('Another notes export or import is running.')
+    await expect(controller.chooseImportArchive()).rejects.toThrow('Another notes export or import is running.')
     await expect(controller.commitImport()).rejects.toThrow('No import is prepared.')
 
     await controller.cancel()
@@ -492,6 +555,38 @@ describe('notes archive controller: export', () => {
 })
 
 describe('notes archive controller: import', () => {
+  it('waits for an in-flight snapshot on cancellation without replying to the stopped worker', async () => {
+    const f = await setup({ worker: 'scripted' })
+    let finish!: (snapshot: string) => void
+    const snapshotDocuments = f.fileServices.snapshotDocuments
+    const snapshot = vi.spyOn(f.fileServices, 'snapshotDocuments').mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await f.controller.chooseImportArchive()
+    const preparing = f.controller.prepareImport()
+    const worker = await waitForWorker(f.scripted)
+    worker.send({ type: 'staged' })
+    await vi.waitFor(() => expect(snapshot).toHaveBeenCalledOnce())
+
+    const canceling = f.controller.cancel()
+    const settled = vi.fn()
+    void canceling.then(settled)
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(settled).not.toHaveBeenCalled()
+    const directory = await snapshotDocuments()
+    finish(directory)
+    await canceling
+
+    await expect(preparing).resolves.toEqual({ ok: false, canceled: true })
+    expect(worker.replies).toEqual([])
+    expect(await readdir(join(f.userData, '.notes-export'))).toEqual([])
+    expect(await readdir(join(f.userData, '.notes-import'))).toEqual([])
+    expect(f.controller.isIdle!()).toBe(true)
+  })
+
   it('cancels while staging creation is pending and removes the eventual staging directory', async () => {
     const f = await setup({ worker: 'scripted' })
     const staging = await f.fileServices.createStagingDirectory()
@@ -739,6 +834,8 @@ describe('notes archive controller: import', () => {
 
     expect(await readdir(join(userData, '.notes-import'))).toEqual([])
     await expect(controller.commitImport()).rejects.toThrow('No import is prepared.')
+    expect(controller.isIdle!()).toBe(true)
+    await expect(controller.chooseImportArchive()).resolves.toMatchObject({ ok: true })
   })
 
   it('stops a running preparation, discards staging and ignores later worker messages', async () => {
@@ -799,8 +896,8 @@ describe('notes archive controller: import', () => {
       restartRequired: true,
       message: 'Your notes could not be replaced: interrupted',
     })
-    await expect(controller.chooseExportDestination()).rejects.toThrow(RESTART_REQUIRED_MESSAGE)
-    await expect(controller.chooseImportArchive()).rejects.toThrow(RESTART_REQUIRED_MESSAGE)
+    await expect(controller.chooseExportDestination()).rejects.toThrow('Restart Tree to complete the notes import.')
+    await expect(controller.chooseImportArchive()).rejects.toThrow('Restart Tree to complete the notes import.')
   })
 
   it('reports a replacement that a restart completed, with the archive name its journal kept', async () => {
@@ -920,6 +1017,7 @@ describe('notes archive controller: quitting', () => {
 
     const committed = controller.commitImport()
     const pending = controller.shutdown()
+    expect(pending).not.toBeNull()
     let settled = false
     void pending?.then(() => {
       settled = true

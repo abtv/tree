@@ -18,6 +18,95 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('exposes the bridge object under the renderer API name', async () => {
+    vi.resetModules()
+    mocks.exposeInMainWorld.mockClear()
+    const { treeApi } = await import('./index')
+
+    expect(mocks.exposeInMainWorld).toHaveBeenCalledExactlyOnceWith('treeApi', treeApi)
+  })
+
+  it.each([undefined, null, 'ready', 'failed', 'installing', 0, 100])(
+    'delivers the supported update status %j without requiring a version',
+    async (status) => {
+      const { treeApi } = await import('./index')
+      const listener = vi.fn()
+      const stop = treeApi.onUpdateCommandsChanged!(listener)
+      const handler = mocks.on.mock.lastCall![1]
+      const state = {
+        'check-for-updates': false,
+        'update-app': true,
+        ...(status === undefined ? {} : { status }),
+      }
+
+      handler({}, state)
+
+      expect(listener).toHaveBeenCalledExactlyOnceWith(state)
+      stop()
+    },
+  )
+
+  it.each(['12.34.56', '1.2.3+ci.123', '1.2.3+' + 'x'.repeat(122)])(
+    'delivers the supported update version %s',
+    async (version) => {
+      const { treeApi } = await import('./index')
+      const listener = vi.fn()
+      const stop = treeApi.onUpdateCommandsChanged!(listener)
+      const handler = mocks.on.mock.lastCall![1]
+      const state = { 'check-for-updates': true, 'update-app': false, version }
+
+      handler({}, state)
+
+      expect(listener).toHaveBeenCalledExactlyOnceWith(state)
+      stop()
+    },
+  )
+
+  it('ignores malformed update states without throwing into the renderer', async () => {
+    const { treeApi } = await import('./index')
+    const listener = vi.fn()
+    const stop = treeApi.onUpdateCommandsChanged!(listener)
+    const handler = mocks.on.mock.lastCall![1]
+    const state = { 'check-for-updates': true, 'update-app': false }
+    const invalid = [
+      undefined,
+      true,
+      42,
+      'state',
+      [],
+      { ...state, 'check-for-updates': 'yes' },
+      { ...state, version: 'bad1.2.3' },
+      { ...state, version: '1.2.3+bad?' },
+      { ...state, version: '1.2.3+' + 'x'.repeat(123) },
+    ]
+
+    for (const value of invalid) expect(() => handler({}, value)).not.toThrow()
+
+    expect(listener).not.toHaveBeenCalled()
+    stop()
+  })
+
+  it('forwards context-menu requests, selected commands and native errors', async () => {
+    const { treeApi } = await import('./index')
+    const request = {
+      x: 12,
+      y: 34,
+      selectionText: 'selected',
+      canCut: true,
+      canCopy: true,
+      canPaste: false,
+      canSelectAll: true,
+    }
+    mocks.invoke.mockResolvedValueOnce('copy')
+
+    await expect(treeApi.showEditorContextMenu!(request)).resolves.toBe('copy')
+
+    expect(mocks.invoke).toHaveBeenCalledExactlyOnceWith(ipcChannels.showEditorContextMenu, request)
+    const failure = new Error('Native menu unavailable')
+    mocks.invoke.mockRejectedValueOnce(failure)
+    await expect(treeApi.showEditorContextMenu!(request)).rejects.toBe(failure)
+  })
+
   it('validates update lifecycle notifications and removes both listeners', async () => {
     const { treeApi } = await import('./index')
     const requested = vi.fn()
@@ -82,6 +171,7 @@ describe('preload bridge', () => {
     const handler = mocks.on.mock.calls.findLast(([channel]) => channel === 'tree:about-requested')![1]
 
     handler({})
+    expect(listener).toHaveBeenCalledExactlyOnceWith()
     handler({}, 'extra')
 
     expect(listener).toHaveBeenCalledExactlyOnceWith()
@@ -105,6 +195,8 @@ describe('preload bridge', () => {
 
   beforeEach(() => {
     mocks.invoke.mockClear()
+    mocks.on.mockClear()
+    mocks.removeListener.mockClear()
   })
 
   it('forwards the quit handshake request ID to the main process', async () => {
@@ -230,6 +322,7 @@ describe('preload bridge', () => {
 
     const removeRequested = treeApi.onQuitRequested(requested)
     const removeFailed = treeApi.onQuitFailed(failed)
+    expect(mocks.on.mock.calls.map(([channel]) => channel)).toEqual(['tree:quit-requested', 'tree:quit-failed'])
     const requestedHandler = mocks.on.mock.calls[0]?.[1] as (event: unknown, requestId: string) => void
     const failedHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, message: string) => void
 

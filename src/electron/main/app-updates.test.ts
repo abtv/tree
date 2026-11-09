@@ -26,6 +26,96 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('desktop app updates', () => {
+  it('publishes a replacement download before progress arrives', () => {
+    const { updates, ports } = harness()
+    updates.downloaded('1.2.4')
+    const states: unknown[] = []
+    ports.changed.mockImplementation(() => states.push([updates.isReady(), updates.getVersion(), updates.getStatus()]))
+
+    updates.available()
+
+    expect(states).toEqual([[false, undefined, 0]])
+  })
+
+  it('clears a previous failure as soon as a background check starts', async () => {
+    const { updates, ports } = harness()
+    updates.fail('offline')
+    let finish!: () => void
+    ports.check.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+
+    const pending = updates.check()
+    expect(updates.getStatus()).toBeNull()
+    await Promise.resolve()
+    finish()
+    await pending
+  })
+
+  it('supports consumers without optional progress and result observers', async () => {
+    const { ports } = harness()
+    const updates = new AppUpdates({
+      check: ports.check,
+      install: ports.install,
+      canInstall: ports.canInstall,
+      prepareQuit: ports.prepareQuit,
+      requestSave: ports.requestSave,
+      finished: ports.finished,
+      changed: ports.changed,
+    })
+
+    updates.downloading(42)
+    await updates.checkManually()
+
+    expect(updates.getStatus()).toBeNull()
+    expect(updates.isChecking()).toBe(false)
+    expect(updates.isNotifying()).toBe(false)
+  })
+
+  it('clears prior failures on retry and returns to ready after a failed save', () => {
+    vi.useFakeTimers()
+    const { updates, ports, request } = harness()
+    const first = request()
+    updates.fail('Saving failed.')
+    expect(() => updates.confirm(first, true)).toThrow('Invalid update request.')
+
+    updates.request()
+    const retry = ports.requestSave.mock.lastCall![0] as string
+    updates.confirm(retry, false)
+
+    expect(updates.isApplying()).toBe(false)
+    expect(updates.getStatus()).toBe('ready')
+    expect(ports.finished).toHaveBeenLastCalledWith(null)
+    expect(ports.install).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps neutral cancellation from turning an idle download into a failure', () => {
+    const { updates } = harness()
+    updates.downloading(42)
+
+    updates.fail(null)
+
+    expect(updates.getStatus()).toBeNull()
+  })
+
+  it('ignores direct background checks while saving and staging installation', async () => {
+    vi.useFakeTimers()
+    const { updates, ports, request } = harness()
+    const id = request()
+
+    await updates.check()
+    updates.confirm(id, true)
+    await updates.check()
+
+    expect(ports.check).not.toHaveBeenCalled()
+    expect(updates.isInstalling()).toBe(true)
+    updates.fail(null)
+  })
+
   it('replaces readiness before downloading another package and exposes its version only on completion', () => {
     const { updates, ports } = harness()
     updates.downloaded('1.2.4')

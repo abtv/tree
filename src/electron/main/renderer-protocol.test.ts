@@ -50,6 +50,7 @@ describe('resolveRendererAssetPath', () => {
     'app://tree/assets/archive.zip',
     'app://tree/assets/image.svg',
     'app://other/index.html',
+    'https://tree/index.html',
     'file:///app/out/renderer/index.html',
     'not a url',
   ])('rejects %s', (url) => {

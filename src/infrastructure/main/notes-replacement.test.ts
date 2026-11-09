@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   commitReplacement,
   isDocumentFileName,
@@ -14,10 +14,17 @@ import {
   type ReplacementFileSystem,
 } from './notes-replacement'
 
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
+
 const roots: string[] = []
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+  vi.mocked(open).mockReset()
+  vi.restoreAllMocks()
 })
 
 const NOW = new Date(2026, 9, 23, 14, 5, 9)
@@ -60,6 +67,63 @@ async function sortedEntries(path: string): Promise<string[]> {
 
 // @requirement PRODUCT.md §25.4
 describe('notes replacement', () => {
+  it.each([false, true])('closes the durable journal handle after flushing (failure=%s)', async (fails) => {
+    const layout = await userData()
+    const path = join(layout.userDataDirectory, 'journal.tmp')
+    const handle = await open(path, 'w')
+    const sync = vi.spyOn(handle, 'sync')
+    const close = vi.spyOn(handle, 'close')
+    const failure = new Error('flush failed')
+    if (fails) sync.mockRejectedValueOnce(failure)
+    vi.mocked(open).mockResolvedValueOnce(handle)
+
+    try {
+      const pending = nodeReplacementFileSystem.writeDurableFile(path, 'journal contents')
+      if (fails) await expect(pending).rejects.toBe(failure)
+      else await pending
+
+      expect(sync).toHaveBeenCalledOnce()
+      expect(close).toHaveBeenCalledOnce()
+      expect(close.mock.invocationCallOrder[0]).toBeGreaterThan(sync.mock.invocationCallOrder[0]!)
+      await expect(nodeReplacementFileSystem.readFile(path)).resolves.toBe('journal contents')
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it.each([false, true])('closes a directory handle after flushing (failure=%s)', async (fails) => {
+    const layout = await userData()
+    const handle = await open(layout.userDataDirectory, 'r')
+    const sync = vi.spyOn(handle, 'sync')
+    const close = vi.spyOn(handle, 'close')
+    const failure = new Error('directory flush failed')
+    if (fails) sync.mockRejectedValueOnce(failure)
+    vi.mocked(open).mockResolvedValueOnce(handle)
+
+    try {
+      const pending = nodeReplacementFileSystem.syncDirectory(layout.userDataDirectory)
+      if (fails) await expect(pending).rejects.toBe(failure)
+      else await pending
+
+      expect(sync).toHaveBeenCalledOnce()
+      expect(close).toHaveBeenCalledOnce()
+      expect(close.mock.invocationCallOrder[0]).toBeGreaterThan(sync.mock.invocationCallOrder[0]!)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  it.each([
+    { cause: new Error('disk full'), message: 'disk full' },
+    { cause: 'volume disconnected', message: 'volume disconnected' },
+  ])('preserves the original cause and error identity for $message', ({ cause, message }) => {
+    const error = new ReplacementIncompleteError(cause)
+
+    expect(error.name).toBe('ReplacementIncompleteError')
+    expect(error.message).toBe(message)
+    expect(error.cause).toBe(cause)
+  })
+
   it('recovers single-segment staging and backup names beginning with dots', async () => {
     const layout = await userData()
     await seedOldNotes(layout)
@@ -91,8 +155,9 @@ describe('notes replacement', () => {
         if (operation === 'journal') throw failure
         return nodeReplacementFileSystem.readFile(path)
       },
-      readdir: async () => {
-        throw failure
+      readdir: async (path) => {
+        if (operation === 'directory') throw failure
+        return nodeReplacementFileSystem.readdir(path)
       },
     }
 
@@ -257,6 +322,27 @@ describe('notes replacement', () => {
       archive: 'Tree Notes 2026-10-20.zip',
     })
     expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('new document')
+    expect(await readdir(layout.importDirectory)).toEqual([])
+  })
+
+  it('keeps imported images when recovery resumes a new profile after their move', async () => {
+    const layout = await userData()
+    const staged = await stage(layout)
+    const interrupted: ReplacementFileSystem = {
+      ...nodeReplacementFileSystem,
+      async rename(from, to) {
+        if (from === join(layout.importDirectory, staged, 'document.json')) throw new Error('interrupted')
+        await nodeReplacementFileSystem.rename(from, to)
+      },
+    }
+
+    await expect(commitReplacement(interrupted, layout, staged, NOW)).rejects.toBeInstanceOf(ReplacementIncompleteError)
+
+    const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
+
+    expect(recovery).toEqual({ completed: true, replacedFolder: null })
+    expect(await readFile(join(layout.dataDirectory, 'document.json'), 'utf8')).toBe('new document')
+    expect(await readFile(join(layout.dataDirectory, 'attachments', 'new.png'), 'utf8')).toBe('new image')
     expect(await readdir(layout.importDirectory)).toEqual([])
   })
 

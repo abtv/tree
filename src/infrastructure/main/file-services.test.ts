@@ -819,28 +819,36 @@ describe('file services', () => {
   })
 
   it('keeps successful persistence logs quiet unless debugging is enabled', async () => {
-    const { services } = await servicesForTest()
+    const { directory, services } = await servicesForTest()
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const previousDebug = process.env['TREE_PERSISTENCE_DEBUG']
     delete process.env['TREE_PERSISTENCE_DEBUG']
 
-    await services.save({
-      version: 1,
-      document: { roots: [{ id: 'root', text: '', children: [] }] },
-      location: { currentParentId: null, selectedNodeId: 'root' },
-    })
+    try {
+      await services.save({
+        version: 1,
+        document: { roots: [{ id: 'root', text: '', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'root' },
+      })
 
-    expect(info).not.toHaveBeenCalled()
+      expect(info).not.toHaveBeenCalled()
 
-    process.env['TREE_PERSISTENCE_DEBUG'] = '1'
+      process.env['TREE_PERSISTENCE_DEBUG'] = '1'
 
-    await services.cleanupAttachments([])
+      await services.cleanupAttachments([])
 
-    expect(info).toHaveBeenCalledWith(expect.stringContaining('[persistence] cleanupAttachments start'))
+      expect(info).toHaveBeenCalledWith(expect.stringContaining('[persistence] cleanupAttachments start'))
 
-    if (previousDebug === undefined) delete process.env['TREE_PERSISTENCE_DEBUG']
-    else process.env['TREE_PERSISTENCE_DEBUG'] = previousDebug
-    info.mockRestore()
+      await services.load()
+
+      expect(info).toHaveBeenCalledWith(
+        `[persistence] load start paths=${join(directory, 'document.json')},${join(directory, 'document.json.tmp')},${directory}`,
+      )
+    } finally {
+      if (previousDebug === undefined) delete process.env['TREE_PERSISTENCE_DEBUG']
+      else process.env['TREE_PERSISTENCE_DEBUG'] = previousDebug
+      info.mockRestore()
+    }
   })
 
   it('rejects unsafe attachment IDs on read and write', async () => {
@@ -1477,7 +1485,10 @@ describe('notes export and import support', () => {
 
     const snapshot = await services.snapshotDocuments()
 
-    expect((await stat(join(snapshot, 'document.json.tmp'))).mtimeMs).toBe(modified.getTime())
+    const sourceTimes = await stat(temporary)
+    const snapshotTimes = await stat(join(snapshot, 'document.json.tmp'))
+    expect(snapshotTimes.atimeMs).toBeCloseTo(sourceTimes.atimeMs, 1)
+    expect(snapshotTimes.mtimeMs).toBe(modified.getTime())
     expect(await findNewestValidDocument(snapshot)).toEqual({
       path: join(snapshot, 'document.json'),
       value: stateWithoutImage('Primary'),

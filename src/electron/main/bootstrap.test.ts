@@ -69,6 +69,7 @@ describe('bootstrapApplication', () => {
     const f = createHarness()
     f.dependencies.getMainWindow.mockReturnValue(null)
     await Promise.resolve()
+    await Promise.resolve()
     const event = { preventDefault: vi.fn() }
 
     f.listeners.beforeQuit!(event)
@@ -78,6 +79,38 @@ describe('bootstrapApplication', () => {
     expect(f.window.webContents.send).not.toHaveBeenCalled()
     expect(f.dependencies.setMainWindow).toHaveBeenCalledExactlyOnceWith(null)
     expect(f.dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+    expect(f.dependencies.onStartupError).not.toHaveBeenCalled()
+  })
+
+  it('tolerates the main window disappearing while waiting for a quit acknowledgement', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = createHarness()
+      await Promise.resolve()
+      f.listeners.beforeQuit!({ preventDefault: vi.fn() })
+      f.dependencies.getMainWindow.mockReturnValue(null)
+
+      expect(() => vi.advanceTimersByTime(5_000)).not.toThrow()
+
+      expect(f.app.quit).not.toHaveBeenCalled()
+      expect(f.window.webContents.send).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('attaches close handling to a replacement window created on activation', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.dependencies.getWindowCount.mockReturnValue(0)
+    delete f.windowListeners.close
+
+    f.listeners.activate!()
+    const event = { preventDefault: vi.fn() }
+    f.windowListeners.close!(event)
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(f.app.quit).toHaveBeenCalledOnce()
   })
 
   it('completes the registered renderer save handshake before the final quit cleanup', async () => {
@@ -309,7 +342,7 @@ describe('bootstrapApplication', () => {
 
     await Promise.resolve()
 
-    expect(dependencies.onStartupError).toHaveBeenCalledWith(expect.any(Error))
+    expect(dependencies.onStartupError).toHaveBeenCalledWith(new Error('The accelerator is unavailable.'))
     expect(dependencies.createMainWindow).toHaveBeenCalledOnce()
   })
 

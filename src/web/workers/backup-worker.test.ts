@@ -41,6 +41,17 @@ afterEach(() => {
 })
 
 describe('browser backup worker wiring', () => {
+  it('ignores invalid messages before any backup has started', async () => {
+    const f = await fixture()
+
+    await f.send(null)
+    await f.send({ type: 'unknown' })
+
+    expect(mocks.open).not.toHaveBeenCalled()
+    expect(mocks.start).not.toHaveBeenCalled()
+    expect(f.scope.postMessage).not.toHaveBeenCalled()
+  })
+
   it('starts once, reads the saved head and images, and closes on a storage version change', async () => {
     const f = await fixture()
     const folder = { name: 'backup' }

@@ -5,6 +5,12 @@ import { installDataMenu } from './data-menu'
 import type { ArchiveWorkerMessage } from './workers/archive-protocol'
 import type { BackupActions } from './backup/backup-controller'
 
+// Vitest runs this browser fixture in Node; the renderer tsconfig has no Node types.
+declare const process: {
+  on(event: 'unhandledRejection', listener: (error: unknown) => void): void
+  off(event: 'unhandledRejection', listener: (error: unknown) => void): void
+}
+
 const backup = vi.hoisted(() => ({ supported: false, install: vi.fn() }))
 
 vi.mock('./backup/backup-controller', () => ({
@@ -117,6 +123,95 @@ afterEach(() => {
 })
 
 describe('browser data operations', () => {
+  it('does not suggest folder backup for an unrelated export failure', async () => {
+    backup.supported = true
+    const f = fixture()
+    f.button('data-export').click()
+    await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
+
+    ArchiveWorker.instances[0]!.send({ type: 'error', message: 'The notes could not be read.' })
+
+    expect(f.status()).toBe('Export failed. The notes could not be read.')
+  })
+
+  it('reenables confirmation actions when another import follows a failed replacement save', async () => {
+    const f = fixture()
+    f.choose()
+    await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
+    const prepared = {
+      type: 'prepared' as const,
+      incoming: { nodeCount: 1, imageCount: 0, missingImageCount: 0 },
+      current: { nodeCount: 2, imageCount: 0 },
+    }
+    ArchiveWorker.instances[0]!.send(prepared)
+    f.flushPersistence.mockRejectedValueOnce(new Error('quota'))
+    f.button('import-confirm-replace').click()
+    await vi.waitFor(() => expect(f.isRunning()).toBe(false))
+
+    f.choose()
+    await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(2))
+    ArchiveWorker.instances[1]!.send(prepared)
+
+    expect(f.dialog.open).toBe(true)
+    for (const id of ['import-confirm-export', 'import-confirm-replace', 'import-confirm-cancel']) {
+      expect(f.button(id).disabled).toBe(false)
+    }
+    f.button('import-confirm-cancel').click()
+    expect(f.isRunning()).toBe(false)
+  })
+
+  it.each(['onerror', 'onmessageerror'] as const)(
+    'keeps a restore worker failure through %s until OK',
+    async (kind) => {
+      backup.supported = true
+      vi.stubGlobal(
+        'showDirectoryPicker',
+        vi.fn(async () => ({ kind: 'directory', name: 'Backup' })),
+      )
+      const f = fixture()
+      f.button('data-restore').click()
+      await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
+      const worker = ArchiveWorker.instances[0]!
+
+      if (kind === 'onerror') worker.onerror!(new Event('error', { cancelable: true }))
+      else worker.onmessageerror!()
+
+      expect(f.status()).toBe('Restore failed. The restore stopped unexpectedly.')
+      expect(f.button('data-activity-action').textContent).toBe('OK')
+      expect(f.isRunning()).toBe(false)
+      expect(f.session.discardStagedImages).toHaveBeenCalledOnce()
+      f.button('data-activity-action').click()
+      expect(document.getElementById('data-activity')!.hidden).toBe(true)
+    },
+  )
+
+  it('keeps a restore picker failure visible after an earlier export success timer expires', async () => {
+    vi.useFakeTimers()
+    backup.supported = true
+    mockDownload()
+    const f = fixture()
+    f.button('data-export').click()
+    await vi.advanceTimersByTimeAsync(0)
+    ArchiveWorker.instances[0]!.send({
+      type: 'done',
+      summary: { imageCount: 0, missingImageCount: 0, archiveBytes: 0 },
+    })
+    vi.stubGlobal(
+      'showDirectoryPicker',
+      vi.fn(async () => {
+        throw new Error('permission refused')
+      }),
+    )
+
+    f.button('data-restore').click()
+    await vi.advanceTimersByTimeAsync(6_000)
+
+    expect(f.status()).toBe('Restore failed. The folder could not be opened: permission refused')
+    expect(document.getElementById('data-activity')!.hidden).toBe(false)
+    f.button('data-activity-action').click()
+    expect(document.getElementById('data-activity')!.hidden).toBe(true)
+  })
+
   it('ignores prepared messages queued after an import was canceled', async () => {
     const f = fixture()
     f.choose()
@@ -414,18 +509,28 @@ describe('browser data operations', () => {
       },
     )
 
-    if (operation === 'import') f.choose()
-    else f.button('data-export').click()
-    await vi.waitFor(() => expect(f.isRunning()).toBe(false))
+    const rejections: unknown[] = []
+    const onUnhandledRejection = (error: unknown) => rejections.push(error)
+    process.on('unhandledRejection', onUnhandledRejection)
 
-    expect(f.status()).toBe(
-      operation === 'import'
-        ? 'Import failed. The import stopped unexpectedly.'
-        : 'Export failed. The export stopped unexpectedly.',
-    )
-    expect(f.button('data-import').disabled).toBe(false)
-    expect(f.button('data-export').disabled).toBe(false)
-    expect(f.session.discardStagedImages).toHaveBeenCalledTimes(operation === 'import' ? 1 : 0)
+    try {
+      if (operation === 'import') f.choose()
+      else f.button('data-export').click()
+      await vi.waitFor(() => expect(f.isRunning()).toBe(false))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(rejections).toEqual([])
+      expect(f.status()).toBe(
+        operation === 'import'
+          ? 'Import failed. The import stopped unexpectedly.'
+          : 'Export failed. The export stopped unexpectedly.',
+      )
+      expect(f.button('data-import').disabled).toBe(false)
+      expect(f.button('data-export').disabled).toBe(false)
+      expect(f.session.discardStagedImages).toHaveBeenCalledTimes(operation === 'import' ? 1 : 0)
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection)
+    }
   })
 
   it.each([false, true])(
@@ -457,8 +562,10 @@ describe('browser data operations', () => {
     await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
     const worker = ArchiveWorker.instances[0]!
     expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'restore', folder })
+    expect(f.button('data-activity-action').textContent).toBe('Cancel')
     worker.send({ type: 'progress', imagesDone: 1, imageCount: 3 })
     expect(f.status()).toBe('Restoring Notes… 1 of 3 images')
+    expect(f.button('data-activity-action').textContent).toBe('Cancel')
     worker.send({
       type: 'prepared',
       sourceBytes: 2048,
@@ -503,6 +610,7 @@ describe('browser data operations', () => {
     expect(f.flushPersistence).not.toHaveBeenCalled()
     expect(f.isRunning()).toBe(false)
     if (name !== 'AbortError') {
+      expect(f.button('data-activity-action').textContent).toBe('OK')
       f.button('data-activity-action').focus()
       f.button('data-activity-action').click()
       expect(document.getElementById('data-activity')!.hidden).toBe(true)
@@ -561,10 +669,12 @@ describe('browser data operations', () => {
   })
 
   it('keeps the current notes writable when the final replacement save fails', async () => {
+    const reload = vi.fn()
     const f = fixture()
     f.choose()
     await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
     const worker = ArchiveWorker.instances[0]!
+    vi.stubGlobal('location', { reload })
     worker.send({ type: 'prepared', incoming: { nodeCount: 1, imageCount: 0, missingImageCount: 0 }, current: 'none' })
     f.flushPersistence.mockRejectedValueOnce(new Error('quota'))
 
@@ -575,6 +685,11 @@ describe('browser data operations', () => {
     expect(f.session.suspendWrites).not.toHaveBeenCalled()
     expect(f.session.discardStagedImages).toHaveBeenCalledOnce()
     expect(f.status()).toBe('Import failed. Your latest changes could not be saved: quota')
+    expect(f.button('data-activity-action').textContent).toBe('OK')
+    f.button('data-activity-action').click()
+    expect(document.getElementById('data-activity')!.hidden).toBe(true)
+    worker.onmessageerror!()
+    expect(reload).not.toHaveBeenCalled()
   })
 
   it.each([0, 1])(
@@ -707,6 +822,7 @@ describe('browser data operations', () => {
 
     worker.send({ type: 'progress', imagesDone: 2, imageCount: 4 })
     expect(f.status()).toBe('Exporting Notes… 2 of 4 images')
+    expect(f.button('data-activity-action').textContent).toBe('Cancel')
     f.button('data-activity-action').focus()
     f.button('data-activity-action').click()
     worker.send({ type: 'done', summary: { imageCount: 4, missingImageCount: 0, archiveBytes: 10 } })
@@ -765,10 +881,12 @@ describe('browser data operations', () => {
   )
 
   it('suspends writes only after the replacement save and resumes after a worker rejection', async () => {
+    const reload = vi.fn()
     const f = fixture()
     f.choose()
     await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(1))
     const worker = ArchiveWorker.instances[0]!
+    vi.stubGlobal('location', { reload })
     worker.send({ type: 'prepared', incoming: { nodeCount: 3, imageCount: 2, missingImageCount: 1 }, current: 'none' })
     expect(document.getElementById('import-confirm-missing')!.hidden).toBe(false)
     let finish!: () => void
@@ -797,5 +915,7 @@ describe('browser data operations', () => {
     expect(f.status()).toBe('Import failed. transaction failed')
     expect(f.isRunning()).toBe(false)
     expect(f.session.discardStagedImages).toHaveBeenCalledOnce()
+    worker.onmessageerror!()
+    expect(reload).not.toHaveBeenCalled()
   })
 })

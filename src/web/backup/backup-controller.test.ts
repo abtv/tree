@@ -60,7 +60,7 @@ function useBrowserExceptions() {
   )
 }
 
-async function fixture(stored?: ReturnType<typeof folder>) {
+async function fixture(stored?: ReturnType<typeof folder>, supported = true) {
   document.body.innerHTML = `
     <div id="tree-menu"></div><button id="tree-menu-button"></button><button id="data-backup" hidden></button>
     <span id="backup-status" hidden></span><dialog id="backup-confirm">
@@ -77,7 +77,7 @@ async function fixture(stored?: ReturnType<typeof folder>) {
   })
   const next = folder()
   const picker = vi.fn(async () => next)
-  window.showDirectoryPicker = picker as unknown as NonNullable<Window['showDirectoryPicker']>
+  if (supported) window.showDirectoryPicker = picker as unknown as NonNullable<Window['showDirectoryPicker']>
   storage.read.mockResolvedValueOnce(stored)
   const unsubscribe = vi.fn()
   let saved = () => {}
@@ -119,6 +119,7 @@ async function fixture(stored?: ReturnType<typeof folder>) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  storage.read.mockReset()
   BackupWorker.instances = []
   vi.stubGlobal('Worker', BackupWorker)
   vi.stubGlobal(
@@ -141,6 +142,80 @@ afterEach(() => {
 })
 
 describe('folder backup controller', () => {
+  it('leaves backup unavailable without loading a folder when the picker is unsupported', async () => {
+    const f = await fixture(undefined, false)
+
+    f.refresh()
+    f.button('data-backup').click()
+
+    expect(document.getElementById('backup-status')!.hidden).toBe(true)
+    expect(f.button('data-backup').hidden).toBe(true)
+    expect(storage.read).not.toHaveBeenCalled()
+    expect(f.picker).not.toHaveBeenCalled()
+    expect(BackupWorker.instances).toEqual([])
+  })
+
+  it('refreshes availability when the menu opens', async () => {
+    const f = await fixture()
+    f.actions.available.mockReturnValue(false)
+
+    document.getElementById('tree-menu')!.dispatchEvent(new Event('beforetoggle'))
+
+    expect(f.button('data-backup').disabled).toBe(true)
+
+    f.actions.available.mockReturnValue(true)
+    document.getElementById('tree-menu')!.dispatchEvent(new Event('beforetoggle'))
+
+    expect(f.button('data-backup').disabled).toBe(false)
+  })
+
+  it('does not restart backup after a pending Resume permission completes on a closed page', async () => {
+    const stored = folder()
+    stored.queryPermission.mockResolvedValue('prompt')
+    let grant!: (permission: string) => void
+    stored.requestPermission.mockImplementationOnce(() => new Promise((resolve) => (grant = resolve)))
+    const f = await fixture(stored)
+    f.button('data-backup').click()
+    f.button('backup-confirm-resume').click()
+
+    window.dispatchEvent(new Event('pagehide'))
+    grant('granted')
+    await vi.waitFor(() => expect(f.button('data-backup').disabled).toBe(false))
+
+    expect(BackupWorker.instances).toEqual([])
+    expect(f.unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('terminates a worker whose start message fails and keeps backup available for retry', async () => {
+    vi.stubGlobal(
+      'Worker',
+      class extends BackupWorker {
+        override postMessage = vi.fn(() => {
+          throw new Error('worker port closed')
+        })
+      },
+    )
+    const f = await fixture(folder())
+    const worker = BackupWorker.instances[0]!
+
+    worker.send({ state: 'saved', missingImages: 0 })
+
+    expect(worker.terminate).toHaveBeenCalledOnce()
+    expect(f.status()).toBe('Backup failed. worker port closed')
+    expect(f.button('data-backup').textContent).toBe('Resume Backing Up…')
+    expect(f.button('tree-menu-button').getAttribute('aria-label')).toBe('Tree menu — backup needs attention')
+  })
+
+  it('ignores a saved notification while folder backup is off', async () => {
+    const f = await fixture()
+
+    f.saved()
+
+    expect(f.status()).toBe('Folder backup is off.')
+    expect(f.button('data-backup').textContent).toBe('Back Up to Folder…')
+    expect(BackupWorker.instances).toEqual([])
+  })
+
   it('rechecks data-operation availability at activation even if the button has not refreshed', async () => {
     const f = await fixture()
     expect(f.button('data-backup').disabled).toBe(false)
@@ -180,6 +255,7 @@ describe('folder backup controller', () => {
     await vi.waitFor(() => expect(f.button('data-backup').disabled).toBe(false))
 
     expect(f.status()).toBe(`Backup failed. ${explanation}Storage unavailable`)
+    expect(f.button('tree-menu-button').getAttribute('aria-label')).toBe('Tree menu — backup needs attention')
     expect(storage.put).not.toHaveBeenCalled()
     expect(BackupWorker.instances).toEqual([])
     expect(f.actions.closeMenu).toHaveBeenCalledOnce()
@@ -213,6 +289,7 @@ describe('folder backup controller', () => {
     await vi.waitFor(() => expect(f.button('data-backup').disabled).toBe(false))
 
     expect(f.status()).toBe('Backup paused — permission needed. Choose Resume Backing Up…')
+    expect(f.button('tree-menu-button').getAttribute('aria-label')).toBe('Tree menu — backup needs attention')
     expect(f.dialog.open).toBe(false)
     expect(BackupWorker.instances).toEqual([])
     expect(storage.delete).not.toHaveBeenCalled()
@@ -296,6 +373,22 @@ describe('folder backup controller', () => {
     expect(f.next.getFileHandle).not.toHaveBeenCalled()
     expect(f.actions.flush).not.toHaveBeenCalled()
     expect(storage.put).not.toHaveBeenCalled()
+  })
+
+  it('does not inspect stored-folder permission after pagehide interrupts its loading', async () => {
+    const stored = folder()
+    let loaded!: (value: ReturnType<typeof folder>) => void
+    storage.read.mockImplementationOnce(() => new Promise((resolve) => (loaded = resolve)))
+    const pending = fixture()
+    await vi.waitFor(() => expect(loaded).toBeDefined())
+
+    window.dispatchEvent(new Event('pagehide'))
+    loaded(stored)
+    const f = await pending
+
+    expect(stored.queryPermission).not.toHaveBeenCalled()
+    expect(BackupWorker.instances).toEqual([])
+    expect(f.unsubscribe).toHaveBeenCalledOnce()
   })
 
   it('does not start a worker when pagehide occurs while remembering the selected folder', async () => {
@@ -539,7 +632,9 @@ describe('folder backup controller', () => {
     const f = await fixture(stored)
     expect(BackupWorker.instances).toEqual([])
     expect(stored.requestPermission).not.toHaveBeenCalled()
+    expect(stored.queryPermission).toHaveBeenCalledExactlyOnceWith({ mode: 'readwrite' })
     expect(f.status()).toBe('Backup paused — permission needed. Choose Resume Backing Up…')
+    expect(f.button('tree-menu-button').getAttribute('aria-label')).toBe('Tree menu — backup needs attention')
 
     f.button('data-backup').click()
 
@@ -598,6 +693,7 @@ describe('folder backup controller', () => {
       worker.send({ state: 'saved', missingImages: 0 })
 
       expect(f.status()).toBe('Backup failed. The backup stopped unexpectedly. Choose Resume Backing Up…')
+      expect(f.button('tree-menu-button').getAttribute('aria-label')).toBe('Tree menu — backup needs attention')
       expect(f.button('data-backup').textContent).toBe('Resume Backing Up…')
       expect(worker.terminate).toHaveBeenCalledOnce()
       if (kind === 'error') expect(event.defaultPrevented).toBe(true)

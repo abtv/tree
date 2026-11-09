@@ -52,6 +52,58 @@ function fixture() {
 }
 
 describe('offline package lifecycle', () => {
+  it('keeps active metadata and serves navigation offline after an update download fails', async () => {
+    const f = fixture()
+    f.install('v1')
+    await f.emit('install')
+    await f.emit('activate')
+    const activeFetch = f.handlers.get('fetch')!
+    f.install('v2')
+    f.scope.fetch.mockRejectedValue(new Error('offline'))
+
+    await expect(f.emit('install')).rejects.toThrow('offline')
+
+    const metadata = f.entries.get(`tree-offline-state:${base}`)!.get(`${base}__offline_state__`)!
+    expect(await metadata.clone().json()).toMatchObject({ active: `${prefix}v1`, waiting: `${prefix}v1` })
+    const respondWith = vi.fn()
+    activeFetch({ request: { method: 'GET', url: `${base}?bookmark`, mode: 'navigate' }, respondWith })
+
+    expect(await ((await respondWith.mock.calls[0]![0]) as Response).text()).toBe('file')
+  })
+
+  it('rejects a removed candidate even when the requesting runtime is retained', async () => {
+    const f = fixture()
+    f.install('v1')
+    await f.emit('install')
+    f.install('v2')
+    await f.emit('install')
+    f.entries.delete(`${prefix}v2`)
+    const reply = { postMessage: vi.fn() }
+
+    await f.emit('message', {
+      data: { type: 'tree-activate-update', assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('superseded')
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+  })
+
+  it('continues searching retained packages when an earlier cache lacks the requested asset', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    f.entries.set(`${prefix}older`, new Map())
+    f.entries.set(`${prefix}old`, new Map([[`${base}assets/lazy.js`, new Response('retained')]]))
+    f.scope.fetch.mockRejectedValue(new Error('offline'))
+    const respondWith = vi.fn()
+
+    f.handlers.get('fetch')!({ request: new Request(`${base}assets/lazy.js`), respondWith })
+
+    expect(await ((await respondWith.mock.calls[0]![0]) as Response).text()).toBe('retained')
+  })
+
   it('ignores an empty message body before opening caches or checking clients', async () => {
     const f = fixture()
     f.install()

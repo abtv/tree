@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ipcChannels } from '../../shared/ipc'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import type { NativeClipboard } from '../../infrastructure/main/clipboard'
-import { registerIpcHandlers, type IpcInvokeEvent } from './ipc-handlers'
+import { registerIpcHandlers, type IpcHandlerDependencies, type IpcInvokeEvent } from './ipc-handlers'
 import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 import emojiCatalog from '../../domain/emoji-catalog.json'
@@ -14,7 +14,7 @@ const validState = {
   location: { currentParentId: null, selectedNodeId: 'root' },
 }
 
-function createHarness() {
+function createHarness(configure?: (dependencies: IpcHandlerDependencies) => void) {
   const setAboutOpen = vi.fn()
   const handlers = new Map<string, (event: IpcInvokeEvent, ...args: unknown[]) => unknown>()
   const ipcMain = {
@@ -73,7 +73,7 @@ function createHarness() {
   const getUpdateCommands = vi.fn(() => ({ 'check-for-updates': true, 'update-app': false }))
   const runUpdateCommand = vi.fn()
   const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn(), isApplying: vi.fn(() => false) }
-  registerIpcHandlers({
+  const dependencies: IpcHandlerDependencies = {
     getUpdateCommands,
     runUpdateCommand,
     setAboutOpen,
@@ -103,7 +103,9 @@ function createHarness() {
     setLineNumbers,
     notesArchive,
     setNotesMenuState,
-  })
+  }
+  configure?.(dependencies)
+  registerIpcHandlers(dependencies)
   return {
     getUpdateCommands,
     runUpdateCommand,
@@ -137,6 +139,87 @@ function createHarness() {
 }
 
 describe('main IPC handlers', () => {
+  it('keeps optional platform capabilities unavailable when their ports are absent', async () => {
+    const { handlers, runUpdateCommand, showEditorContextMenu } = createHarness((dependencies) => {
+      delete dependencies.getUpdateCommands
+      delete dependencies.appUpdates
+      delete dependencies.setAboutOpen
+      delete dependencies.setAppUpdateBlocked
+      delete dependencies.getEmojiHistory
+      delete dependencies.setEmojiHistory
+      delete dependencies.getRecentNodes
+      delete dependencies.setRecentNodes
+      delete dependencies.showEditorContextMenu
+    })
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(handlers.get(ipcChannels.getUpdateCommands)!(event)).toEqual({
+      'check-for-updates': false,
+      'update-app': false,
+    })
+    expect(handlers.get(ipcChannels.getEmojiHistory)!(event)).toEqual([])
+    expect(handlers.get(ipcChannels.getRecentNodes)!(event)).toEqual([])
+    expect(handlers.get(ipcChannels.checkAppUpdate)!(event)).toBeUndefined()
+    expect(handlers.get(ipcChannels.confirmAppUpdate)!(event, 'id', true)).toBeUndefined()
+    expect(handlers.get(ipcChannels.setAboutOpen)!(event, true)).toBeUndefined()
+    expect(handlers.get(ipcChannels.setAppUpdateBlocked)!(event, false)).toBeUndefined()
+    expect(handlers.get(ipcChannels.setEmojiHistory)!(event, ['cat'])).toBeUndefined()
+    expect(handlers.get(ipcChannels.setRecentNodes)!(event, ['node'])).toBeUndefined()
+    expect(handlers.get(ipcChannels.runUpdateCommand)!(event, 'check-for-updates')).toBeUndefined()
+    expect(handlers.get(ipcChannels.showEditorContextMenu)!(event)).toBeNull()
+    await expect(handlers.get(ipcChannels.chooseNotesExportDestination)!(event)).resolves.toMatchObject({ ok: true })
+
+    expect(runUpdateCommand).not.toHaveBeenCalled()
+    expect(showEditorContextMenu).not.toHaveBeenCalled()
+  })
+
+  it('allows notes commands when the update adapter has no applying-state observer', async () => {
+    const { handlers, notesArchive } = createHarness((dependencies) => {
+      delete dependencies.appUpdates!.isApplying
+    })
+
+    await handlers.get(ipcChannels.chooseNotesExportDestination)!({ senderFrame: { url: rendererUrl } })
+
+    expect(notesArchive.chooseExportDestination).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  it('ignores an enabled update command when no command runner is installed', () => {
+    const { handlers } = createHarness((dependencies) => {
+      delete dependencies.runUpdateCommand
+    })
+
+    expect(
+      handlers.get(ipcChannels.runUpdateCommand)!({ senderFrame: { url: rendererUrl } }, 'check-for-updates'),
+    ).toBeUndefined()
+  })
+
+  it('does not dispatch a context menu without its sender or native adapter', () => {
+    const withAdapter = createHarness()
+    const withoutAdapter = createHarness((dependencies) => {
+      delete dependencies.showEditorContextMenu
+    })
+    const sender = {} as NonNullable<IpcInvokeEvent['sender']>
+    const event = { senderFrame: { url: rendererUrl }, sender }
+
+    expect(withAdapter.handlers.get(ipcChannels.showEditorContextMenu)!({ senderFrame: event.senderFrame })).toBeNull()
+    expect(withoutAdapter.handlers.get(ipcChannels.showEditorContextMenu)!(event)).toBeNull()
+
+    expect(withAdapter.showEditorContextMenu).not.toHaveBeenCalled()
+    expect(withoutAdapter.showEditorContextMenu).not.toHaveBeenCalled()
+  })
+
+  it('rejects a nonboolean import availability before publishing menu state', () => {
+    const { handlers, setNotesMenuState } = createHarness()
+
+    expect(() =>
+      handlers.get(ipcChannels.setNotesMenuState)!(
+        { senderFrame: { url: rendererUrl } },
+        { canExport: true, canImport: 1 },
+      ),
+    ).toThrow('Invalid notes menu state.')
+    expect(setNotesMenuState).not.toHaveBeenCalled()
+  })
+
   it('validates line number preferences before reading or writing and propagates save failures', () => {
     const { handlers, getLineNumbers, setLineNumbers } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }

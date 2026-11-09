@@ -112,6 +112,39 @@ afterEach(() => {
 })
 
 describe('browser editing service contracts', () => {
+  it('rejects an embedded frame before acquiring writer ownership or opening storage', async () => {
+    const f = fixture()
+    const frame = document.createElement('iframe')
+    document.body.append(frame)
+    vi.stubGlobal('window', frame.contentWindow)
+
+    await expect(installBrowserPrototype()).rejects.toThrow('Open the prototype directly, outside a frame.')
+
+    expect(f.locks.request).not.toHaveBeenCalled()
+    expect(storage.open).not.toHaveBeenCalled()
+  })
+
+  it('handles unload and background flushing before an editor store is connected', async () => {
+    const f = fixture()
+    await installBrowserPrototype()
+    const initialStatus = f.status()
+    const errors: unknown[] = []
+    window.addEventListener('error', (event) => {
+      event.preventDefault()
+      errors.push(event.error)
+    })
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(true)
+    const unload = new Event('beforeunload', { cancelable: true })
+
+    window.dispatchEvent(unload)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
+
+    expect(unload.defaultPrevented).toBe(false)
+    expect(errors).toEqual([])
+    expect(f.status()).toBe(initialStatus)
+  })
+
   it.each(['rejected', 'thrown'] as const)('explains recovery after a %s storage-open failure', async (kind) => {
     const f = fixture()
     const failure = new Error('Storage unavailable')
@@ -530,6 +563,7 @@ describe('browser editing service contracts', () => {
       const initial = f.put.mock.calls[0]![0]
 
       expect(f.put.mock.calls[0]![1]).toBe('head')
+      expect(f.db.transaction).toHaveBeenCalledExactlyOnceWith('document', 'readwrite', { durability: 'strict' })
       expect(initial.document.roots.map((node: { id: string }) => node.id)).toEqual(['welcome', 'project', 'today'])
       expect(initial.document.roots[1].children.map((node: { text: string }) => node.text)).toEqual([
         'First step',
@@ -666,6 +700,31 @@ describe('browser editing service contracts', () => {
     )
   })
 
+  it('preserves a rejected writer-lock request without opening storage', async () => {
+    const f = fixture()
+    const failure = new Error('locks unavailable')
+    f.locks.request.mockRejectedValueOnce(failure)
+
+    await expect(installBrowserPrototype()).rejects.toBe(failure)
+
+    expect(storage.open).not.toHaveBeenCalled()
+  })
+
+  it('provides inert unsubscribe functions for desktop quit subscriptions', async () => {
+    fixture()
+    await installBrowserPrototype()
+    const requested = vi.fn()
+    const failed = vi.fn()
+
+    const stopRequested = window.treeApi.onQuitRequested(requested)
+    const stopFailed = window.treeApi.onQuitFailed(failed)
+    stopRequested()
+    stopFailed()
+
+    expect(requested).not.toHaveBeenCalled()
+    expect(failed).not.toHaveBeenCalled()
+  })
+
   it('rejects browsers without Web Locks before touching storage', async () => {
     fixture()
     vi.stubGlobal('navigator', {})
@@ -683,6 +742,7 @@ describe('browser editing service contracts', () => {
     const stop = data.onSaved(notified)
 
     expect(await services.load()).toEqual(saved)
+    expect(f.status()).toBe('Saved locally in this browser')
     const pending = services.save(saved)
 
     expect(f.status()).toBe('Saving…')
@@ -792,10 +852,13 @@ describe('browser editing service contracts', () => {
     f.clipboard.read.mockResolvedValueOnce([
       {
         types: ['text/plain', 'text/html'],
-        getType: async (type) => ({
-          arrayBuffer: async () => new ArrayBuffer(0),
-          text: async () => (type === 'text/plain' ? 'label' : '<a href="https://example.com">label</a>'),
-        }),
+        getType: async (type) => {
+          if (type !== 'text/plain' && type !== 'text/html') throw new Error('Unavailable clipboard type')
+          return {
+            arrayBuffer: async () => new ArrayBuffer(0),
+            text: async () => (type === 'text/plain' ? 'label' : '<a href="https://example.com">label</a>'),
+          }
+        },
       },
     ])
     expect(await services.readClipboard()).toEqual({
@@ -804,6 +867,20 @@ describe('browser editing service contracts', () => {
       links: [{ start: 0, end: 5, url: 'https://example.com' }],
     })
     expect(await services.readClipboard()).toEqual({ kind: 'text', text: '', links: [] })
+  })
+
+  it('reads plain clipboard text without requiring HTML', async () => {
+    const f = fixture()
+    const { services } = await installBrowserPrototype()
+    const getType = vi.fn(async (type: string) => {
+      if (type !== 'text/plain') throw new Error('Unavailable clipboard type')
+      return { text: async () => 'plain text', arrayBuffer: async () => new ArrayBuffer(0) }
+    })
+    f.clipboard.read.mockResolvedValueOnce([{ types: ['text/plain'], getType }])
+
+    await expect(services.readClipboard()).resolves.toEqual({ kind: 'text', text: 'plain text', links: [] })
+
+    expect(getType).toHaveBeenCalledExactlyOnceWith('text/plain')
   })
 
   it('reflects buffered text in status and protects unsaved edits on unload', async () => {

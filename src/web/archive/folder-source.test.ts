@@ -31,6 +31,7 @@ describe('folder source', () => {
     await source.readImage('a1')
 
     expect(folder.getFileHandle.mock.calls).toEqual([['document.json'], ['a1.png']])
+    expect(folder.getDirectoryHandle).toHaveBeenCalledExactlyOnceWith('attachments')
     expect(source.size).toBe(4)
   })
   it('tolerates missing images and reports document and permission failures as folder errors', async () => {

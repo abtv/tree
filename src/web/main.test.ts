@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   render: vi.fn(),
   createRoot: vi.fn(),
   close: vi.fn(),
+  focus: vi.fn(),
   about: vi.fn(),
   installAbout: vi.fn(),
   updates: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock('../renderer/App', () => ({ App: () => null }))
 vi.mock('../renderer/ErrorBoundary', () => ({ ErrorBoundary: () => null }))
 vi.mock('../application/editor-store', () => ({ EditorStore: mocks.store }))
 vi.mock('./services', () => ({ installBrowserPrototype: mocks.install }))
-vi.mock('./menu-focus', () => ({ installMenuFocus: () => ({ close: mocks.close }) }))
+vi.mock('./menu-focus', () => ({ installMenuFocus: mocks.focus }))
 vi.mock('./data-menu', () => ({ installDataMenu: mocks.menu }))
 vi.mock('./app-updates', () => ({ installAppUpdates: mocks.updates }))
 vi.mock('./device', () => ({ isApplePlatform: mocks.apple }))
@@ -63,6 +64,7 @@ beforeEach(() => {
     return store
   })
   mocks.createRoot.mockReturnValue({ render: mocks.render })
+  mocks.focus.mockReturnValue({ close: mocks.close })
   mocks.installAbout.mockReturnValue({ show: mocks.about })
   mocks.menu.mockReturnValue({ commands, isRunning })
   mocks.apple.mockReturnValue(false)
@@ -110,6 +112,11 @@ describe('browser entry wiring', () => {
     expect(mocks.drop).toHaveBeenCalledExactlyOnceWith(window)
     expect(mocks.connect).toHaveBeenCalledExactlyOnceWith(store)
     expect(mocks.initialize).toHaveBeenCalledOnce()
+    expect(mocks.focus).toHaveBeenCalledExactlyOnceWith(
+      document.getElementById('tree-menu'),
+      document.getElementById('tree-menu-button'),
+    )
+    expect(window).toHaveProperty('prototypeStore', store)
     expect(mocks.store).toHaveBeenCalledWith({}, expect.any(Function), undefined, {
       idleMilliseconds: 300,
       cleanupRetryMilliseconds: 300,

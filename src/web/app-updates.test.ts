@@ -197,10 +197,11 @@ async function controller(
   Object.assign(document.getElementById('tree-menu')!, { showPopover: vi.fn() })
   const resume = vi.fn()
   const suspendWrites = vi.fn(() => resume)
+  const close = vi.fn()
   installAppUpdates(
     { flushPersistence: flush } as EditorStore,
     { suspendWrites, onSaved: () => () => {}, discardStagedImages: async () => {} },
-    { close: vi.fn() },
+    { close },
     () => options.busy ?? false,
   )
   await Promise.resolve()
@@ -208,6 +209,7 @@ async function controller(
     worker,
     resume,
     suspendWrites,
+    close,
     registration,
     container,
     button: document.getElementById('app-update') as HTMLButtonElement,
@@ -215,6 +217,129 @@ async function controller(
 }
 
 describe('update save boundary', () => {
+  it('rechecks that the waiting worker still exists before saving', async () => {
+    const flush = vi.fn(async () => undefined)
+    const f = await controller(flush)
+    f.registration.waiting = null
+
+    f.button.click()
+
+    expect(flush).not.toHaveBeenCalled()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+    expect(f.close).not.toHaveBeenCalled()
+  })
+
+  it('closes the menu and blocks editor input handlers until a failed save restores them', async () => {
+    let fail!: (error: Error) => void
+    const f = await controller(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          fail = reject
+        }),
+    )
+    const root = document.getElementById('root')!
+    const edited = vi.fn()
+    root.addEventListener('keydown', edited)
+
+    f.button.click()
+    const duringSave = new Event('keydown', { bubbles: true, cancelable: true })
+    root.dispatchEvent(duringSave)
+
+    expect(f.close).toHaveBeenCalledOnce()
+    expect(duringSave.defaultPrevented).toBe(true)
+    expect(edited).not.toHaveBeenCalled()
+    expect(document.getElementById('offline-status')!.hidden).toBe(false)
+    fail(new Error('Save failed'))
+    await vi.waitFor(() => expect(f.button.disabled).toBe(false))
+    root.dispatchEvent(new Event('keydown', { bubbles: true, cancelable: true }))
+    expect(edited).toHaveBeenCalledOnce()
+  })
+
+  it('shows a retryable visible error when saving rejects with a non-Error value', async () => {
+    const f = await controller(() => Promise.reject('storage unavailable'))
+
+    f.button.click()
+    await vi.waitFor(() => expect(f.button.disabled).toBe(false))
+
+    const status = document.getElementById('offline-status')!
+    expect(status.hidden).toBe(false)
+    expect(status.textContent).toBe('Update failed. Keep this tab open and try again.')
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+    expect(f.worker.postMessage).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(f.button)
+  })
+
+  it('reassesses offline access after a successful online check', async () => {
+    const active = new Worker()
+    active.state = 'activated'
+    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: true }))
+    const f = await controller(async () => undefined, { active, waiting: null })
+    await vi.waitFor(() => expect(document.getElementById('offline-status')!.textContent).toBe('Ready to work offline'))
+    active.postMessage.mockImplementationOnce((_, ports) => ports[0]!.postMessage({ ready: false }))
+
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() =>
+      expect(document.getElementById('offline-status')!.textContent).toBe('Update App to enable offline access'),
+    )
+
+    expect(active.postMessage).toHaveBeenCalledTimes(2)
+    expect(f.registration.update).toHaveBeenCalledOnce()
+    expect(f.button.hidden).toBe(false)
+  })
+
+  it('keeps offline preparation visible when a successful check has no active worker to assess', async () => {
+    const f = await controller(async () => undefined)
+
+    window.dispatchEvent(new Event('online'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(f.registration.update).toHaveBeenCalledOnce()
+    expect(document.getElementById('offline-status')!.textContent).toBe('Preparing offline access…')
+    expect(f.worker.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('ignores an updatefound event after its installing worker has disappeared', async () => {
+    const installing = new Worker()
+    installing.state = 'installing'
+    const f = await controller(async () => undefined, { installing, waiting: null })
+    f.registration.installing = null
+    const errors: unknown[] = []
+    window.addEventListener('error', (event) => {
+      event.preventDefault()
+      errors.push(event.error)
+    })
+
+    f.registration.dispatchEvent(new Event('updatefound'))
+
+    expect(errors).toEqual([])
+    expect(f.button.hidden).toBe(true)
+    expect(document.getElementById('offline-status')!.textContent).toBe('Preparing offline access…')
+  })
+
+  it('retries an activating worker without requesting a second activation', async () => {
+    vi.useFakeTimers()
+    const f = await controller(async () => undefined)
+    f.worker.state = 'activating'
+    f.registration.waiting = null
+    const active = f.worker
+    f.registration.active = active
+    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.button.hidden).toBe(false)
+    active.postMessage.mockClear()
+
+    f.button.click()
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(active.postMessage).not.toHaveBeenCalled()
+    expect(f.resume).toHaveBeenCalledOnce()
+    expect(document.getElementById('offline-status')!.textContent).toBe(
+      'The new version did not take control. Try Update App again.',
+    )
+    expect(f.button.hidden).toBe(false)
+  })
+
   it('keeps the save status when an outstanding offline assessment times out', async () => {
     vi.useFakeTimers()
     const active = new Worker()
@@ -300,7 +425,7 @@ describe('update save boundary', () => {
 
       f.button.click()
       response.postMessage({ ready })
-      await Promise.resolve()
+      await vi.waitFor(() => expect(response.close).toHaveBeenCalledOnce())
       await Promise.resolve()
 
       expect(document.getElementById('offline-status')!.textContent).toBe('Saving before updating…')

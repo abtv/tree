@@ -180,6 +180,26 @@ describe('browser storage transaction contracts', () => {
     await expect(rejected).rejects.toBe(failure)
   })
 
+  it.each([
+    {
+      operation: 'replacement',
+      run: (db: IDBDatabase) => commitImportedHead(db, { document: 'incoming' }),
+      message: 'Local save failed.',
+    },
+    {
+      operation: 'staged-image cleanup',
+      run: discardStagedImages,
+      message: 'Local storage could not be changed.',
+    },
+  ])('reports an aborted $operation when IndexedDB supplies no native error', async ({ run, message }) => {
+    const f = fixture()
+    const pending = run(f.db)
+
+    f.tx.onabort!()
+
+    await expect(pending).rejects.toThrow(message)
+  })
+
   it('propagates failure to inspect the startup journal', async () => {
     const f = fixture()
     const failure = new Error('read failed')

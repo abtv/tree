@@ -39,6 +39,14 @@ it('shares explicit availability and synchronous actions between buttons and the
   expect(button.hidden).toBe(true)
   expect(source.getSnapshot()).toEqual([])
   expect(action).toHaveBeenCalledTimes(2)
+
+  update('import-notes', true)
+  button.click()
+
+  expect(button.hidden).toBe(false)
+  expect(button.disabled).toBe(false)
+  expect(source.getSnapshot()[0]?.name).toBe('import-notes')
+  expect(action).toHaveBeenCalledTimes(3)
 })
 
 // @requirement PRODUCT.md §24.5

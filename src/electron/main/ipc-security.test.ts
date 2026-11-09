@@ -22,6 +22,26 @@ const state = {
 const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
+  it.each([null, undefined, [], 'selection'])('rejects a non-record context menu request %j', (value) => {
+    expect(() => validateEditorContextMenuRequest(value)).toThrow('Editor context menu request is invalid.')
+  })
+
+  it('counts U+FFFF as a single code point when bounding a context-menu selection', () => {
+    const selectionText = '\uffff'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS)
+
+    const result = validateEditorContextMenuRequest({
+      x: 0,
+      y: 0,
+      selectionText,
+      canCut: false,
+      canCopy: true,
+      canPaste: false,
+      canSelectAll: true,
+    })
+
+    expect(result.selectionText).toBe('\uffff'.repeat(MAX_CONTEXT_MENU_SELECTION_CODE_POINTS - 1) + '…')
+  })
+
   it.each([null, [], { text: 1, html: '<b>x</b>' }, { text: 'x', html: 1 }])(
     'rejects malformed rich clipboard value %j',
     (value) => {
@@ -141,6 +161,12 @@ describe('IPC security validation', () => {
     expect(validateAttachmentIds(['one', 'two'])).toEqual(['one', 'two'])
     expect(() => validateAttachmentId('../document')).toThrow('Attachment IDs')
     expect(() => validateAttachmentIds('one')).toThrow('Attachment IDs')
+  })
+
+  it.each([null, undefined, 42, true, ['safe-image'], {}])('rejects a nonstring attachment ID %j', (value) => {
+    expect(() => validateAttachmentId(value)).toThrow(
+      'Attachment IDs may contain only letters, numbers, underscores, and hyphens.',
+    )
   })
 
   it('accepts genuinely decodable PNGs and supported byte forms', () => {

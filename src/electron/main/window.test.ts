@@ -158,6 +158,10 @@ describe('reportMainProcessError', () => {
 })
 
 describe('surfaceWindow', () => {
+  it('does nothing before a main window exists', () => {
+    expect(() => surfaceWindow(null)).not.toThrow()
+  })
+
   it('focuses a visible inactive window without restoring it', () => {
     const window = {
       isDestroyed: () => false,
@@ -224,6 +228,10 @@ describe('surfaceWindow', () => {
 })
 
 describe('isAllowedExternalUrl', () => {
+  it('rejects a non-web protocol even when it has a valid hostname', () => {
+    expect(isAllowedExternalUrl('ftp://example.com/notes.zip')).toBe(false)
+  })
+
   it('allows HTTP and HTTPS URLs only', () => {
     expect(isAllowedExternalUrl('http://example.com')).toBe(true)
     expect(isAllowedExternalUrl('https://example.com/path')).toBe(true)
