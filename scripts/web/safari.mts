@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { createStaticServer } from './static-server.mts'
 import { browserEditing, happyPath, type SmokeDriver } from '../../e2e/smoke/scenario.mts'
 import { observeSafariErrors, readSafariErrors } from './safari-errors.mts'
+import { SafariDriverError, waitForSafariWindow } from './safari-window.mts'
 import {
   createSafariSession,
   isSafariSessionTimeout,
@@ -110,6 +111,7 @@ async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean
       )
     })
     const { value } = await response.json()
+    if (value?.error) throw new SafariDriverError(value.error, value.message ?? '')
     assert(response.ok && !value?.error, `SafariDriver: ${JSON.stringify(value)}`)
     return value
   }
@@ -208,8 +210,15 @@ async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean
       assert(handles.includes(launcher!), 'Safari lost the smoke launcher window')
       smokeWindow = handles.find((handle) => handle !== launcher)
       assert(smokeWindow, 'Safari did not open the smoke application window')
-      await request(`/session/${session}/window`, { handle: smokeWindow })
-      await waitFor(ready)
+      await waitForSafariWindow(
+        smokeWindow,
+        {
+          select: (handle) => request(`/session/${session}/window`, { handle }),
+          ready: () => evaluate(ready),
+          handles: () => request(`/session/${session}/window/handles`, undefined, 'GET'),
+        },
+        signal,
+      )
       await evaluate(`(${observeSafariErrors.toString()})()`)
     }
     if (smoke) {

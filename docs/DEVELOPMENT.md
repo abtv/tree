@@ -736,6 +736,8 @@ Browser smoke additionally types a URL into a rich editor, switches Vim Insert â
 
 Safari installs error and unhandled-rejection listeners after each application document becomes ready. Errors during the interactions are retained in the isolated origin's local storage across reload and Quit/reopen, and fail the smoke check. This observes interaction errors; it does not claim coverage of errors before the document becomes ready. Playwright smoke retains its page-error and renderer-crash checks.
 
+When opening the Safari smoke application window, the runner selects the same window before each readiness probe. A `no such window` response is recoverable within the 15-second readiness deadline only if that window's handle still exists. A missing handle or any other error fails immediately. This does not reopen a failed application or repeat its interactions; the overall smoke budget remains unchanged.
+
 #### Workflow and job naming policy
 
 Name GitHub Actions workflows by the work they perform, using an imperative verb
