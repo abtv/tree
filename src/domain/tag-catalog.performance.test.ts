@@ -1,5 +1,36 @@
 import { expect, it } from 'vitest'
 import { TagCatalog } from './tag-catalog'
+import { TAG_PREFIXES } from './tags'
+
+// @requirement PRODUCT.md §20.13
+// @requirement PRODUCT.md §22.1
+it('updates three mixed catalogs without rescanning unchanged nodes or keeping removed names', () => {
+  let reads = 0
+  let roots = Array.from({ length: 30_000 }, (_, index) => ({
+    id: String(index),
+    get text() {
+      reads++
+      return `#topic_${index} @person_${index} &event_${index}`
+    },
+    children: [],
+  }))
+  const catalogs = TAG_PREFIXES.map((prefix) => new TagCatalog(prefix))
+  const initial = { roots }
+  for (const catalog of catalogs) catalog.update(initial)
+  reads = 0
+
+  for (let edit = 0; edit < 10; edit++) {
+    roots = [...roots]
+    roots[0] = { id: '0', text: `#changed_${edit} @changed_${edit} &changed_${edit}`, children: [] }
+    const document = { roots }
+    for (const catalog of catalogs) catalog.update(document)
+  }
+
+  expect(reads).toBe(0)
+  for (const [index, prefix] of TAG_PREFIXES.entries()) {
+    expect(catalogs[index]!.suggest('draft', `${prefix}changed`, 8)?.suggestions).toEqual(['changed_9'])
+  }
+})
 
 // @requirement PRODUCT.md §20.14
 it('keeps continuous global Search suggestions within the catalog scale budget', () => {

@@ -104,6 +104,7 @@ import {
 import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
 import { agendaVisualSources } from './agenda-visual-selection'
 import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
+import { TAG_PREFIXES, tagPrefix, type TagPrefix } from '../domain/tags'
 import { RecentNodes } from './recent-nodes'
 import { RecentNodePersistence } from './recent-node-persistence'
 import { EmojiHistory } from './emoji-history'
@@ -118,7 +119,7 @@ export class EditorStore {
   private readonly recentPersistence: RecentNodePersistence
   private readonly recentNodesOwner = new RecentNodes(() => this.recentPersistence.changed())
   public readonly recentNodes: Pick<RecentNodes, 'getIds' | 'getResults'> = this.recentNodesOwner
-  private readonly tags = new TagCatalog()
+  private readonly tags = new Map<TagPrefix, TagCatalog>(TAG_PREFIXES.map((prefix) => [prefix, new TagCatalog(prefix)]))
   private readonly agendaRowsCache = new AgendaRowsCache()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
@@ -134,7 +135,7 @@ export class EditorStore {
     () => this.agendaRowsCache.clear(),
     this.agendaRowsCache,
     (state) => {
-      this.tags.update(state.document)
+      for (const catalog of this.tags.values()) catalog.update(state.document)
       this.searchOwner.update(state)
       this.recentNodesOwner.update(state.document)
     },
@@ -198,12 +199,15 @@ export class EditorStore {
   public subscribe = this.runtime.subscribe
 
   public searchNodeSuggestions(query: string): readonly string[] {
-    const suggestions = this.tags.searchSuggestions(query)
-    return suggestions.length === 1 && query === `#${suggestions[0]}` ? [] : suggestions
+    const prefix = tagPrefix(query)
+    if (prefix === undefined) return []
+    const suggestions = this.tags.get(prefix)!.searchSuggestions(query)
+    return suggestions.length === 1 && query === `${prefix}${suggestions[0]}` ? [] : suggestions
   }
 
   public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
-    if (query === '' || (query.startsWith('#') && !this.tags.has(query.slice(1)))) {
+    const prefix = tagPrefix(query)
+    if (query === '' || (prefix !== undefined && !this.tags.get(prefix)!.has(query.slice(1)))) {
       publish([])
       return () => undefined
     }
@@ -216,7 +220,11 @@ export class EditorStore {
     caret: number,
     links: readonly LinkRange[] = [],
   ): TagMatch | undefined {
-    return this.tags.suggest(nodeId, text, caret, links)
+    for (const catalog of this.tags.values()) {
+      const match = catalog.suggest(nodeId, text, caret, links)
+      if (match !== undefined) return match
+    }
+    return undefined
   }
 
   public openAgenda(cursor?: number): void {

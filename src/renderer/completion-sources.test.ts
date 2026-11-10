@@ -42,10 +42,23 @@ it('offers dates outside tag ranges even when another tag precedes or follows th
 // @requirement PRODUCT.md §20.13
 it('keeps date-like tag names literal when no existing tag matches', () => {
   const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
-  for (const text of ['#today', '#tomorrow', 'Plan #mon']) {
+  for (const text of ['#today', '#tomorrow', 'Plan #mon', '@today', '&tomorrow', 'Plan @mon', 'Plan &fri']) {
     expect(recognizeCompletion(text, text.length, today)).toBeUndefined()
     expect(recognizeCompletion(text, text.length - 1, today)).toBeUndefined()
   }
+})
+
+// @requirement PRODUCT.md §20.13
+it.each(['@', '&'])('preserves the %s prefix and presents its own completion label', (prefix) => {
+  const match = recognizeCompletion(`${prefix}An`, 3, today, {
+    start: 0,
+    end: 3,
+    name: 'An',
+    suggestions: ['Anna_Smith'],
+  })
+
+  expect(match?.listLabel).toBe(prefix === '@' ? 'People suggestions' : 'Events suggestions')
+  expect(match?.suggestions[0]).toMatchObject({ replacement: `${prefix}Anna_Smith`, label: `${prefix}Anna_Smith` })
 })
 
 // @requirement PRODUCT.md §20.9

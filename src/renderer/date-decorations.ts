@@ -2,10 +2,16 @@ import type { TreeNode } from '../domain/document'
 import { dayNumberOf } from '../domain/calendar-date'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { dateLikeDecorations, type TextDecoration } from './editor-dom'
-import { nodeTags } from '../domain/tags'
+import { nodeTags, TAG_PREFIXES } from '../domain/tags'
 
 function tagDecorations(node: TreeNode): TextDecoration[] {
-  return nodeTags(node).map(({ start, end }) => ({ start, end, className: 'tag-text' }))
+  return TAG_PREFIXES.flatMap((prefix) =>
+    nodeTags(node, prefix).map(({ start, end }) => ({
+      start,
+      end,
+      className: prefix === '#' ? 'tag-text' : prefix === '@' ? 'tag-text person-text' : 'tag-text event-text',
+    })),
+  )
 }
 
 /** Local calendar day for presentation; Agenda supplies its captured Today instead. */

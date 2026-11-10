@@ -4,6 +4,28 @@ import type { TreeNode } from './document-types'
 
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
+// @requirement PRODUCT.md §20.13
+it.each(['@', '&'] as const)('keeps the %s catalog independent, current and case-sensitive', (prefix) => {
+  const catalog = new TagCatalog(prefix)
+  const original = { roots: [node('a', '#Other @Anna_Smith &Weekly_review'), node('b', `${prefix}work ${prefix}Work`)] }
+  catalog.update(original)
+
+  expect(catalog.searchSuggestions(`${prefix}WORK`)).toEqual(['Work', 'work'])
+  expect(catalog.has('WORK')).toBe(false)
+  expect(catalog.has('Other')).toBe(false)
+  expect(catalog.has(prefix === '@' ? 'Weekly_review' : 'Anna_Smith')).toBe(false)
+  expect(catalog.suggest('b', prefix, 1)?.suggestions).not.toContain('work')
+  expect(catalog.suggest('b', `${prefix}Fresh ${prefix}fr`, 10)?.suggestions).toEqual(['Fresh'])
+
+  catalog.update({ roots: [] })
+
+  expect(catalog.searchSuggestions(prefix)).toEqual([])
+
+  catalog.update(original)
+
+  expect(catalog.searchSuggestions(`${prefix}WORK`)).toEqual(['Work', 'work'])
+})
+
 it('offers no global tag suggestions in a document without tags or after the last tag is removed', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [node('source', 'No tags')] })

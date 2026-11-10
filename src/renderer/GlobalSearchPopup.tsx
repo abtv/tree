@@ -19,6 +19,7 @@ import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
 import { computeListWindow, computeOffsets } from './list-window'
 import { TagSuggestionText } from './TagSuggestionText'
+import { tagGroupLabel, tagPrefix } from '../domain/tags'
 
 const RESULT_EDGE_INSET = 12
 
@@ -61,8 +62,8 @@ function SearchResultText({
   onReveal(): void
   tagMatches?: readonly TextMatch[] | undefined
 }): React.JSX.Element {
-  const textMatches = useSearchDecorations(text, query.startsWith('#') ? '' : query)
-  const matches = query.startsWith('#') ? tagMatches : textMatches
+  const textMatches = useSearchDecorations(text, tagPrefix(query) !== undefined ? '' : query)
+  const matches = tagPrefix(query) !== undefined ? tagMatches : textMatches
   const firstMatch = useRef<HTMLElement>(null)
   useEffect(() => {
     const row = firstMatch.current?.closest<HTMLElement>('.recent-node-row')
@@ -445,7 +446,7 @@ export function GlobalSearchPopup({
         type="search"
         className="node-search-input"
         aria-label="Search query"
-        placeholder="Search all nodes by text or #tag"
+        placeholder="Search text, #tag, @person or &event"
         value={query}
         data-editor-focus-borrow=""
         onChange={(event) => changeQuery(event.target.value)}
@@ -459,8 +460,8 @@ export function GlobalSearchPopup({
       />
       {suggestions.length > 0 && (
         <>
-          <div className="node-search-section-title node-search-tags-heading">Tags</div>
-          <div className="node-search-tags" role="listbox" aria-label="Tags">
+          <div className="node-search-section-title node-search-tags-heading">{tagGroupLabel(tagPrefix(query)!)}</div>
+          <div className="node-search-tags" role="listbox" aria-label={tagGroupLabel(tagPrefix(query)!)}>
             {suggestions.map((name, index) => (
               <div
                 key={name}

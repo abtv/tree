@@ -1,7 +1,7 @@
 import type { DateTextRange } from './date-recognition'
 import type { Document, TreeNode } from './document-types'
 import { compareCompletionRank, CompletionRankWorkspace, rankCompletionName } from './completion-ranking'
-import { findTags, nodeTags, tagFragment, type TagRange } from './tags'
+import { findTags, nodeTags, tagFragment, type TagPrefix, type TagRange } from './tags'
 import { foldTagName } from './tag-search'
 
 export interface TagMatch extends TagRange {
@@ -18,12 +18,14 @@ export class TagCatalog {
   private readonly characters = new Map<string, Set<string>>()
   private readonly sortedCharacters = new WeakMap<Set<string>, readonly string[]>()
 
+  public constructor(private readonly prefix: TagPrefix = '#') {}
+
   public has(name: string): boolean {
     return this.counts.has(name)
   }
 
   public searchSuggestions(query: string): readonly string[] {
-    const fragment = tagFragment(query, query.length)
+    const fragment = tagFragment(query, query.length, this.prefix)
     if (fragment?.start !== 0) return []
     const needle = foldTagName(fragment.name)
     const groups: string[][] = [[], [], [], []]
@@ -45,7 +47,7 @@ export class TagCatalog {
     const change = (node: TreeNode, delta: -1 | 1): void => {
       if (delta === 1) added.set(node.id, node)
       else removed.add(node.id)
-      for (const { name } of nodeTags(node)) deltas.set(name, (deltas.get(name) ?? 0) + delta)
+      for (const { name } of nodeTags(node, this.prefix)) deltas.set(name, (deltas.get(name) ?? 0) + delta)
     }
     const visit = (before: TreeNode | undefined, after: TreeNode | undefined): void => {
       if (before === after) return
@@ -101,13 +103,14 @@ export class TagCatalog {
     caret: number,
     excluded: readonly DateTextRange[] = [],
   ): TagMatch | undefined {
-    const fragment = tagFragment(text, caret)
+    const fragment = tagFragment(text, caret, this.prefix)
     if (fragment === undefined || excluded.some((range) => range.start < fragment.end && range.end > fragment.start))
       return undefined
     const deltas = new Map<string, number>()
     const old = this.nodes.get(nodeId)
-    for (const { name } of old === undefined ? [] : nodeTags(old)) deltas.set(name, (deltas.get(name) ?? 0) - 1)
-    for (const tag of findTags(text, excluded)) {
+    for (const { name } of old === undefined ? [] : nodeTags(old, this.prefix))
+      deltas.set(name, (deltas.get(name) ?? 0) - 1)
+    for (const tag of findTags(text, excluded, this.prefix)) {
       if (tag.start !== fragment.start) deltas.set(tag.name, (deltas.get(tag.name) ?? 0) + 1)
     }
     let names = this.names

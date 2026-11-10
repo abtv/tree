@@ -107,7 +107,7 @@ export class GlobalSearchSession {
 
   public acceptSuggestion(index = this.snapshot.suggestionIndex): void {
     const tag = this.snapshot.suggestions[index]
-    if (tag !== undefined) this.edit(`#${tag}`, true)
+    if (tag !== undefined) this.edit(`${this.snapshot.query[0]}${tag}`, true)
   }
 
   public moveResult(direction: -1 | 1): void {

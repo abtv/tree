@@ -3,7 +3,7 @@ import type { DateTextRange } from '../domain/date-recognition'
 import { suggestEmoji, type EmojiSuggestion } from '../domain/emoji-completion'
 import { suggestDates } from '../domain/natural-date'
 import type { TagMatch } from '../domain/tag-catalog'
-import { findTags } from '../domain/tags'
+import { findTags, TAG_PREFIXES, tagGroupLabel, tagPrefix } from '../domain/tags'
 
 export interface CompletionSuggestion {
   readonly id: string
@@ -31,20 +31,23 @@ export function recognizeCompletion(
   tags?: TagMatch,
   initialEmoji?: readonly EmojiSuggestion[],
 ): CompletionMatch | undefined {
-  if (tags !== undefined)
+  if (tags !== undefined) {
+    const prefix = tagPrefix(text.slice(tags.start))!
+    const kind = prefix === '#' ? 'tag' : prefix === '@' ? 'person' : 'event'
     return {
       start: tags.start,
       end: tags.end,
-      listLabel: 'Tag suggestions',
+      listLabel: prefix === '#' ? 'Tag suggestions' : `${tagGroupLabel(prefix)} suggestions`,
       retainsSelection: false,
-      preferredSuggestionId: `tag:${tags.suggestions[0]!}`,
+      preferredSuggestionId: `${kind}:${tags.suggestions[0]!}`,
       suggestions: tags.suggestions.map((name) => ({
-        id: `tag:${name}`,
-        replacement: `#${name}`,
-        label: `#${name}`,
+        id: `${kind}:${name}`,
+        replacement: `${prefix}${name}`,
+        label: `${prefix}${name}`,
         description: '',
       })),
     }
+  }
   const emoji = suggestEmoji(text, caret, initialEmoji)
   if (emoji !== undefined)
     return {
@@ -63,7 +66,12 @@ export function recognizeCompletion(
   const dates = suggestDates(text, caret, today)
   if (dates === undefined) return undefined
   // A new literal tag such as #today must not fall through to date acceptance.
-  if (findTags(text).some((tag) => tag.start < dates.end && tag.end > dates.start)) return undefined
+  if (
+    TAG_PREFIXES.some((prefix) =>
+      findTags(text, [], prefix).some((tag) => tag.start < dates.end && tag.end > dates.start),
+    )
+  )
+    return undefined
   return {
     start: dates.start,
     end: dates.end,

@@ -129,15 +129,15 @@ describe('global Search session', () => {
     expect(session.getSnapshot()).toMatchObject({ completedQuery: '#unknown', items: [], pending: false })
   })
 
-  it('owns tag selection, acceptance and composition without activating a result', () => {
+  it.each(['#', '@', '&'])('owns %s selection, acceptance and composition without activating a result', (prefix) => {
     const { session, source } = fixture()
     source.suggestions.mockReturnValue(['work', 'worker'])
-    session.edit('#w')
+    session.edit(`${prefix}w`)
 
     session.moveSuggestion(-1)
     session.acceptSuggestion()
 
-    expect(session.getSnapshot()).toMatchObject({ query: '#worker', suggestions: [], pending: true })
+    expect(session.getSnapshot()).toMatchObject({ query: `${prefix}worker`, suggestions: [], pending: true })
     expect(session.takeResult()).toBeUndefined()
 
     session.edit('#w')

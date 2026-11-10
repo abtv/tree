@@ -90,6 +90,8 @@
   --color-date-today: #806800;
   --color-date-future: #396d43;
   --color-tag: #76517d;
+  --color-person: #306b74;
+  --color-event: #8a522e;
   --color-node-search-match: #075a69;
   --color-node-search-match-background: #dcebef;
   --color-disclosure-background: #efe9da;
@@ -629,9 +631,15 @@ body:not(.node-drag-active) .location-link:hover {
   font-weight: 600;
 }
 .tag-text {
-  color: var(--color-tag);
-  background: color-mix(in srgb, var(--color-tag) 9%, transparent);
+  color: var(--marker-color, var(--color-tag));
+  background: color-mix(in srgb, var(--marker-color, var(--color-tag)) 9%, transparent);
   border-radius: 3px;
+}
+.person-text {
+  --marker-color: var(--color-person);
+}
+.event-text {
+  --marker-color: var(--color-event);
 }
 .date-past {
   color: var(--color-date-past);
@@ -1569,6 +1577,8 @@ body.node-drag-invalid * {
     --color-date-today: #f0dfaf;
     --color-date-future: #7f9f7f;
     --color-tag: #d3afd7;
+    --color-person: #8cd0d3;
+    --color-event: #dfaf8f;
     --color-node-search-match: #b9f0ef;
     --color-node-search-match-background: #28484b;
     --color-overlay-button-background: rgba(220, 220, 204, 0.12);

@@ -12,6 +12,26 @@ const node = (text: string, links?: { start: number; end: number; url: string }[
 })
 
 // @requirement PRODUCT.md §20.13
+it('highlights people and events together in Tree and Agenda without changing literal text or links', () => {
+  const value = node('#topic @Anna_Smith &weekly-review @link', [{ start: 33, end: 38, url: 'https://example.com' }])
+  const day = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const decorations = treeDecorations(value, day)!
+  const element = document.createElement('div')
+  element.innerHTML = richTextHtml(value, decorations)
+
+  expect(agendaDecorations(value, day, day)).toEqual(decorations)
+  expect([...element.querySelectorAll('.tag-text')].map((span) => span.textContent)).toEqual([
+    '#topic',
+    '@Anna_Smith',
+    '&weekly-review',
+  ])
+  expect(element.textContent).toBe(value.text)
+  expect(element.querySelector('a .tag-text')).toBeNull()
+  expect(element.querySelector('.person-text')?.textContent).toBe('@Anna_Smith')
+  expect(element.querySelector('.event-text')?.textContent).toBe('&weekly-review')
+})
+
+// @requirement PRODUCT.md §20.13
 it('decorates literal tags alongside dates and search without decorating hyperlinks', () => {
   const value = node('#Work #2026-10-08 #link', [{ start: 18, end: 23, url: 'https://example.com' }])
   const day = dayNumberOf({ year: 2026, month: 10, day: 8 })

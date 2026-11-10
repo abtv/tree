@@ -506,6 +506,13 @@ Emoji completion shares the `CompletionController` owner, input adapter and popu
 
 `tags.ts` recognizes case-sensitive literal tags and caches direct ranges by weak immutable-node keys. `TagCatalog` is a domain-owned derived index with one application owner in `EditorStore`. The runtime's existing before-publication callback updates it for every document replacement, including history restoration. It retains only the current document, node references, occurrence counts, sorted names and character membership buckets. Reference-equal subtrees are skipped; differing sibling arrays are compared, and changed text is parsed once. Character buckets narrow candidate lookup before the shared `completion-ranking.ts` ranks matches. Numeric alignment workspaces avoid per-character allocation during fuzzy lookup. Queries overlay the edited node's native draft and exclude its active occurrence without mutating the document or copying global counts.
 
+People and event text markers reuse the tag recognizer and `TagCatalog`, parameterized
+by `#`, `@`, or `&`. The store keeps one derived catalog per prefix; immutable node
+recognition caches are weak and prefix-specific. Index updates reuse unchanged
+subtrees. No marker records, persisted indexes, subscriptions, document writes or
+syncs are added. CPU and memory retain the existing tag complexity with three
+namespaces; mixed-catalog scale guards cover the additional work.
+
 The store exposes tag suggestions to the existing completion adapter. Tags reset selection like emoji. When decorations replace a textarea with a rich element, the completion adapter transfers its element reference through the existing input registration path before caret reconciliation. Tag decorations join Tree and Agenda date/search decorations and retain the shared rich-text selection mechanics.
 
 Performance assessment (PRODUCT §22.1): tags add no persistence fields, history records, direct writes or syncs. Initialization and structural replacement scan affected nodes; ordinary edits parse changed node text and compare references along copied ancestor/sibling paths. Catalog membership changes update character buckets and sorted names; count-only changes retain them. Memory is bounded by current nodes, tag occurrences and distinct name characters, plus weak node caches and one maximum-name-sized ranking workspace. Suggestion retrieval is independent of document node count once indexed, but scales with candidate tag count and name length. Automated guards cover 10,000 distinct tags, wide-document edits and real Electron typing; popup rendering is measured separately from the list-retrieval budget owned by the domain performance guard.

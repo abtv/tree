@@ -1,16 +1,16 @@
 import type { Document, TreeNode } from '../domain/document'
-import { nodeTags } from '../domain/tags'
+import { nodeTags, tagPrefix, type TagPrefix } from '../domain/tags'
 import { prepareSearch, searchText } from '../domain/text-search'
 import { label, resultText, type RecentNode } from './recent-nodes'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import type { TextMatch } from '../domain/text-search'
 
-function pathTagMatches(ancestors: readonly TreeNode[], tag: string): readonly TextMatch[] {
+function pathTagMatches(ancestors: readonly TreeNode[], tag: string, prefix: TagPrefix): readonly TextMatch[] {
   const matches: TextMatch[] = []
   let offset = 0
   for (const ancestor of ancestors) {
     const text = ancestor.text.slice(0, 160)
-    for (const match of nodeTags(ancestor)) {
+    for (const match of nodeTags(ancestor, prefix)) {
       if (match.name !== tag || match.end > text.length) continue
       const start = text.slice(0, match.start).replace(/\s+/g, ' ').trimStart().length
       matches.push({ start: offset + start, end: offset + start + tag.length + 1 })
@@ -21,7 +21,8 @@ function pathTagMatches(ancestors: readonly TreeNode[], tag: string): readonly T
 }
 
 export function* searchNodes(document: Document, query: string): Generator<undefined, readonly RecentNode[]> {
-  const tag = query.startsWith('#') ? query.slice(1) : undefined
+  const prefix = tagPrefix(query)
+  const tag = prefix !== undefined ? query.slice(1) : undefined
   const pattern = tag === undefined ? yield* prepareSearch(query) : undefined
   const results: RecentNode[] = []
   const ancestors: TreeNode[] = []
@@ -36,7 +37,7 @@ export function* searchNodes(document: Document, query: string): Generator<undef
     }
     yield undefined
     let matches = false
-    if (tag !== undefined) matches = nodeTags(node).some(({ name }) => name === tag)
+    if (tag !== undefined) matches = nodeTags(node, prefix).some(({ name }) => name === tag)
     else if (pattern !== undefined) {
       for (const match of searchText(node.text, pattern)) {
         yield undefined
@@ -54,8 +55,8 @@ export function* searchNodes(document: Document, query: string): Generator<undef
         ...(tag === undefined
           ? {}
           : {
-              tagMatches: nodeTags(node).filter((match) => match.name === tag),
-              pathTagMatches: pathTagMatches(ancestors, tag),
+              tagMatches: nodeTags(node, prefix).filter((match) => match.name === tag),
+              pathTagMatches: pathTagMatches(ancestors, tag, prefix!),
             }),
       })
     if (node.children.length > 0) {

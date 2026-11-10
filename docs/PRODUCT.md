@@ -1960,6 +1960,31 @@ Escape dismisses suggestions and preserves text, caret, focus and the editing mo
 
 ### 20.13 Tags
 
+People (`@name`) and events (`&name`) follow all tag recognition, highlighting,
+completion, and lifecycle rules below, with independent name catalogs for `#`,
+`@`, and `&`. Names never contain spaces: `@Anna_Smith`, `@anna-smith`, and
+`&weekly-review` are valid. The literal prefix remains visible.
+
+Tags use muted
+violet, people muted teal, and events warm ochre in light appearance and peach in
+dark appearance, with the same subtle rounded background treatment. Light
+foregrounds are `#76517d`, `#306b74`, and `#8a522e`; dark foregrounds are `#d3afd7`,
+`#8cd0d3`, and `#dfaf8f` respectively, coordinated with the existing palette.
+Completion labels are `Tag suggestions`,
+`People suggestions`, and `Events suggestions` respectively.
+
+People and events remain text markers, without separate entity records or calendar
+integration. Their names can identify either a specific event or a recurring activity;
+equal spellings within one prefix identify the same marker across dates. Typing an
+isolated `&` remains ordinary text. Email addresses and embedded prefixes are excluded
+by the same start-of-text or whitespace boundary as tags.
+
+Global Search (§20.14) accepts `@` for people and `&` for events using all the tag
+search rules: continuous case-insensitive suggestions, acceptance, complete
+case-sensitive node matches, hyperlink exclusions, and result highlighting.
+Headings are `People` and `Events`; each prefix searches only its own catalog.
+The input placeholder is `Search text, #tag, @person or &event`.
+
 A word beginning with `#` at the start of text or after whitespace is a tag. Names contain one or more Unicode letters, decimal digits, hyphens or underscores. Other characters end the tag. A bare `#` is not a tag. Tags are case-sensitive: `#Work` and `#work` are distinct. Hyperlink ranges and hashes embedded in other words or URLs are excluded. Tags remain ordinary editable text; typing a new name creates a tag without accepting a suggestion. No separate tag record is persisted.
 
 Tree and Agenda highlight tags with a muted violet foreground and subtle rounded background adapted to light and dark appearance. The literal `#` remains visible. Recognized dates inside tags keep their date foreground. Highlighting does not add padding, change text size, or interfere with selection, caret placement, links or existing date interpretation. Whole-node selection retains its selection colors, and struck-through tags retain the muted completion color.

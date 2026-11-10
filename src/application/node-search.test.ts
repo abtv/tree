@@ -11,6 +11,33 @@ const document: Document = {
   ],
 }
 
+// @requirement PRODUCT.md §20.13
+// @requirement PRODUCT.md §20.14
+it.each(['@', '&'] as const)('searches only complete %s names and maps real matches in paths and text', (prefix) => {
+  const text = `${prefix}Anna ${prefix}Annabelle #Anna ${prefix}Anna`
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'parent',
+          text: `Team ${prefix}Anna`,
+          children: [
+            { id: 'match', text, links: [{ start: 0, end: 5, url: 'https://example.com' }], children: [] },
+            { id: 'other', text: '#Anna @anna &anna email@Anna embedded&Anna', children: [] },
+          ],
+        },
+      ],
+    },
+    `${prefix}Anna`,
+  )
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value.map(({ id }) => id)).toEqual(['parent', 'match'])
+  expect(next.value[1]?.tagMatches?.map(({ start, end }) => text.slice(start, end))).toEqual([`${prefix}Anna`])
+  expect(next.value[1]?.pathTagMatches).toEqual([{ start: 5, end: 10 }])
+})
+
 it('restores ancestor paths after leaving nested branches and separates breadcrumb levels', () => {
   const work = searchNodes(
     {
