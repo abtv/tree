@@ -1577,7 +1577,11 @@ Normal mode also supports:
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
 * Named registers, macros, and marks are not supported.
 
-Tree and Agenda support literal text search in standard editing and Vim. `Cmd+F`
+Tree and Agenda support literal text search in standard editing and Vim.
+Regular expressions and Vim's `?` backward-search command are not supported.
+These are deliberate product limitations; backward navigation through matches remains available.
+
+`Cmd+F`
 opens the local search in either editing mode; `/` also opens it in Vim Normal.
 `Cmd+;` remains the separate global node search (§20.14). A nonmodal Find panel
 opens at the upper right without moving the document layout. It selects the last confirmed query for

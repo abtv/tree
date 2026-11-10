@@ -31,6 +31,8 @@ Agenda horizontal navigation includes contextual text, dates, gaps and the focus
 Tree and Agenda `/`, `n` and `N` follow PRODUCT §20.2.26. **Vim divergence:** the approved
 search is literal, preselects the recalled query, highlights without moving during
 entry, and uses Normal Escape to hide feedback and clean up search-owned folds.
+Regular expressions and the `?` backward-search command are deliberately unsupported
+by Product Owner decision (PRODUCT §20.2.26).
 The shared Find panel retains input focus after Enter; Enter/Shift+Enter repeat
 forward/backward, and Escape returns focus to the last match. This deliberately
 differs from Vim's immediate return to Normal after confirmation. Cmd+F opens the
