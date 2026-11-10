@@ -5,8 +5,17 @@ beforePack: scripts/release-guard.mts
 directories:
   output: dist
 files:
-  - out/**/*
+  - out/main/**/*
+  - out/preload/**/*
+  - out/renderer/**/*
   - package.json
+extraResources:
+  - from: node_modules/react/LICENSE
+    to: licenses/react-LICENSE
+  - from: node_modules/react-dom/LICENSE
+    to: licenses/react-dom-LICENSE
+  - from: node_modules/scheduler/LICENSE
+    to: licenses/scheduler-LICENSE
 asar: true
 electronFuses:
   runAsNode: false
