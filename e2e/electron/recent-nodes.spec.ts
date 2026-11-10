@@ -265,7 +265,26 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       })
       const { app, window } = await launchTree(userDataDir, { appearance })
       await window.emulateMedia({ colorScheme: appearance })
+      // Opening Search before the renderer handles resize can recenter it after
+      // results arrive, making this snapshot depend on native event timing.
+      await window.evaluate(() => {
+        const state = globalThis as typeof globalThis & { searchResizeReady?: Promise<void> }
+        state.searchResizeReady = new Promise<void>((resolve) => {
+          const resized = () => {
+            if (innerWidth !== 700 || innerHeight !== 740) return
+            removeEventListener('resize', resized)
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          }
+          addEventListener('resize', resized)
+          resized()
+        })
+      })
       await setMainWindowBounds(app, { width: 700, height: 740 })
+      await window.evaluate(async () => {
+        const state = globalThis as typeof globalThis & { searchResizeReady?: Promise<void> }
+        await state.searchResizeReady
+        delete state.searchResizeReady
+      })
       await window.keyboard.press('Meta+;')
       const popup = window.getByRole('dialog', { name: 'Search' })
       const input = popup.getByRole('searchbox')
