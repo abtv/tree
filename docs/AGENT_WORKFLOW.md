@@ -279,6 +279,21 @@ End-to-end and performance fixtures must own the Electron processes they launch.
 
 Select functional validation by the highest applicable risk tier in `docs/DEVELOPMENT.md` §9. The matrix defines the required commands. Focused checks remain the preferred development loop.
 
+Run E2E and performance suites without any other test suite running on the same
+machine. This includes unit, coverage, property, browser, Electron, and container
+tests. E2E and performance suites must not overlap each other or another run of
+the same suite. The suite's configured internal workers remain allowed. Wait for
+the active suite to finish before starting the next one; apply this rule to
+delegated validation too.
+
+An `npm audit` result containing only low or moderate vulnerabilities confined to
+development dependencies does not block a commit or require owner approval.
+Verify that the affected dependency paths are development-only, record the audit
+result and affected scope, and report the accepted findings without calling the
+audit a pass. High or critical findings, production-dependency vulnerabilities,
+and audit execution failures are outside this standing exception. Do not suppress
+audits or change dependencies merely to make the command exit successfully.
+
 ### Selecting performance checks
 
 Run timing guards locally, outside CI. Ordinary validation retains functional and bounded-memory regression tests. Select local timing and Electron performance checks separately from the functional risk tier. A High Risk classification, a session ending, or a desire for extra confidence does not by itself justify an Electron performance run.

@@ -503,6 +503,16 @@ It should run:
 
 Timing suites run locally when the affected performance paths require them under procedure §10. A release alone does not require another timing run. They are not part of `npm run check` or CI. Functional and bounded-heap regression tests remain in the unit suite.
 
+Schedule E2E and performance commands sequentially with all other test commands,
+as required by procedure §10. In particular, wait for `npm run check` (including
+coverage) to finish before starting E2E; finish E2E before starting performance
+tests. Preserve each suite's configured internal worker settings.
+
+For the development-only low/moderate audit exception in procedure §10, retain the
+full `npm audit` result and use `npm audit --omit=dev` to check the production
+graph. Inspect the affected paths before applying the exception. A nonzero full
+audit remains a reported finding, even when the exception permits committing.
+
 The documentation governance command accepts `--group links|tests|decisions|structure` for separate CI steps. Without arguments it checks every category: ADR metadata and indexing, relative links, ADR and test references, and documentation structure including restated product quantities outside `docs/PRODUCT.md`.
 
 It also scans Git-tracked and new nonignored Markdown for explicit scratch-file dependencies, including inline paths, Markdown links and reference definitions. Source copies without Git metadata are scanned recursively, excluding generated and scratch directories. Unfinished plans linked from `plans/README.md` and `WORKING_PLAN.md` may retain continuation evidence; a `Status: Completed`, `Closed`, `Done`, or `Retired` in the plan or its index row removes that exception. Directory paths ending in `/`, placeholders, fenced examples, and inline commands starting with a supported command name are allowed. This syntactic check complements the documentation and plan-closure review in `docs/AGENT_WORKFLOW.md` §11; it cannot determine whether prose states every lasting conclusion.
