@@ -103,7 +103,7 @@ These boundaries still trust source maintainers, signing tools and GitHub.
 The desktop updater downloads stable releases from the configured GitHub repository
 in the main process. It sends no notes, accepts no renderer-provided feed URLs, and
 does not expand renderer network permissions. ZIP hashes and macOS code signatures
-are checked before installation. Explicit Update App saves work before native staging;
+are checked before installation. Explicit Restart and Install saves work before native staging;
 ordinary quit does not start it. GitHub release access and the Apple signing identity
 are update trust roots. The browser update mechanism is separate.
 
@@ -311,7 +311,7 @@ The protections differ by tool:
 | Tool and role | Mechanically enforced boundary | Prompt-only boundary |
 | --- | --- | --- |
 | Codex primary | `workspace-write`, approval-on-request, and configured network access; the sandbox limits filesystem scope but does not restrict individual shell commands | repository workflow, command safety, and role behavior |
-| Codex planner/reviewer | read-only sandbox configured in role defaults; actual session permissions may override those defaults | inspection-only shell fallback, no edits, no tests, and no-web policy; see `AGENT_ROLES.md` for observed runtime limits |
+| Codex planner/reviewer | read-only sandbox configured in role defaults; actual session permissions may override those defaults | inspection-only shell fallback, no edits and no tests; web research is allowed for the planner and forbidden for the reviewer; see `AGENT_ROLES.md` for observed runtime limits |
 | Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test/build/lint command list and no-edits rule |
 | Claude Code primary and subagents | configured macOS sandbox for ordinary Bash commands, restricted network domains and selected secret environment variables; explicitly excluded workflows run outside the sandbox under permission rules | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured sandbox and permission patterns |
 | OpenCode primary | per-command allow/deny rules, denied external directories, and denied task types in `opencode.json`; these are consent guardrails, not an OS sandbox | shared role behavior and the trusted-repository assumption |

@@ -28,7 +28,7 @@ The Agenda gathers the dated nodes of the same outline into a timeline of days. 
 
 <img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
 
-Press `Cmd+F` to find text in the current view. While Find has focus, `Enter` / `Shift+Enter` moves between matches; `Escape` closes Find at the last match. `Cmd+G` / `Cmd+Shift+G` and the arrow buttons also navigate matches. `Cmd+;` searches nodes and tags throughout the document. Vim Normal also supports `/`, `n` and `N` for local search.
+Press `Cmd+F` to find text in the current view. While Find has focus, `Enter` / `Shift+Enter` moves between matches; `Escape` closes Find at the last match. `Cmd+G` / `Cmd+Shift+G` and the arrow buttons also navigate matches. `Cmd+;` searches node text, tags (`#`), people (`@`) and events (`&`) throughout the document. Vim Normal also supports `/`, `n` and `N` for local search.
 
 <img src="https://abtv.github.io/tree/tree-commands.png" width="860" alt="Tree command panel in the dark appearance, showing application commands and their keyboard shortcuts.">
 
