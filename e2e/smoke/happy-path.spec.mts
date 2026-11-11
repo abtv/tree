@@ -9,6 +9,15 @@ import { clickApplicationMenuItem, clickApplicationMenuQuit, closeApp } from '..
 import { imageToTextSmoke } from './image-to-text.mts'
 
 test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({ playwright }, testInfo) => {
+  async function phase<T>(name: string, action: () => Promise<T>): Promise<T> {
+    const started = performance.now()
+    console.log(`Smoke: starting ${name}`)
+    try {
+      return await test.step(name, action)
+    } finally {
+      console.log(`Smoke: finished ${name} after ${Math.round(performance.now() - started)}ms`)
+    }
+  }
   const errors: string[] = []
   // Electron injects the Apple shortcut profile even in the Linux smoke container.
   const primaryKey = testInfo.project.name === 'electron' || process.platform === 'darwin' ? 'Meta' : 'Control'
@@ -102,14 +111,15 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
     try {
       await mkdir(join(profile, 'data'))
       await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
-      await happyPath(await launch())
+      const driver = await phase('Electron startup', launch)
+      await phase('Tree and Agenda happy path', () => happyPath(driver))
       if (process.platform === 'darwin' && process.arch === 'arm64') {
-        await imageToTextSmoke(await app!.firstWindow())
+        await phase('Apple Vision OCR and persistence', async () => imageToTextSmoke(await app!.firstWindow()))
       }
 
       expect(errors).toEqual([])
     } finally {
-      await stop()
+      await phase('Electron cleanup', stop)
       // Playwright owns cleanup when launch rejects; otherwise closeApp confirmed process exit.
       await rm(profile, { recursive: true, force: true })
     }

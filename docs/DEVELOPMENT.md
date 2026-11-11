@@ -731,6 +731,10 @@ workflow retains failure artifacts. Neither check observes every presented frame
 
 #### Cross-platform smoke checks
 
+Electron smoke logs the start and elapsed duration of startup, the Tree/Agenda scenario,
+Apple Vision OCR (on Apple Silicon), and cleanup. The last started phase identifies
+where a test timeout occurred; phase completion logs also run on failure and do not imply success.
+
 `Run smoke tests` is reusable and runs inside `Test and build app` after code checks
 and audit pass. Its Linux and macOS jobs run in parallel with each other;
 release browser E2E starts only after both succeed.
