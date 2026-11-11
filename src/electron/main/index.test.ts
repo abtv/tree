@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
     isIdle: vi.fn(() => true),
   },
   createArchive: vi.fn(),
+  createOcr: vi.fn(),
+  ocr: { recognize: vi.fn(), cancel: vi.fn() },
   createFiles: vi.fn(),
   booleanStore: { load: vi.fn(() => false), save: vi.fn() },
   appearanceStore: { load: vi.fn(() => 'system'), save: vi.fn() },
@@ -45,6 +47,7 @@ vi.mock('./bootstrap', () => ({ bootstrapApplication: mocks.bootstrap }))
 vi.mock('./ipc-handlers', () => ({ registerIpcHandlers: mocks.ipc }))
 vi.mock('./application-menu', () => ({ applicationMenuTemplate: mocks.menu }))
 vi.mock('./notes-archive-controller', () => ({ createNotesArchiveController: mocks.createArchive }))
+vi.mock('./image-to-text', () => ({ createImageToText: mocks.createOcr }))
 vi.mock('./editor-context-menu', () => ({ showEditorContextMenu: mocks.contextMenu }))
 vi.mock('node:worker_threads', () => ({ Worker: mocks.archiveWorker }))
 vi.mock('node:fs/promises', () => ({ readFile: mocks.readFile }))
@@ -170,6 +173,7 @@ async function setup(packaged = false) {
 }
 
 beforeEach(async () => {
+  vi.stubGlobal('process', { ...process, resourcesPath: '/Tree.app/Contents/Resources' })
   vi.resetModules()
   vi.clearAllMocks()
   const electron = await import('electron')
@@ -183,6 +187,7 @@ beforeEach(async () => {
   vi.mocked(electron.BrowserWindow.fromWebContents).mockReturnValue(null)
   mocks.createFiles.mockReturnValue(mocks.fileServices)
   mocks.createArchive.mockReturnValue(mocks.archive)
+  mocks.createOcr.mockReturnValue(mocks.ocr)
   mocks.menu.mockReturnValue([])
   mocks.loadURL.mockReset().mockResolvedValue(undefined)
   mocks.booleanStore.load.mockReturnValue(false)
@@ -194,6 +199,35 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+})
+
+it.each([false, true])('wires the correct OCR executable and quit cancellation (packaged=%s)', async (packaged) => {
+  vi.stubGlobal('process', { ...process, platform: 'darwin', arch: 'arm64' })
+
+  const f = await setup(packaged)
+
+  expect(mocks.createOcr).toHaveBeenCalledWith(
+    packaged ? '/Tree.app/Contents/Helpers/tree-image-to-text' : expect.stringContaining('/native/tree-image-to-text'),
+  )
+  expect(f.ipc.imageToText).toBe(mocks.ocr)
+  f.electron.app.emit('will-quit', { preventDefault: vi.fn() })
+  expect(mocks.ocr.cancel).toHaveBeenCalledOnce()
+})
+
+it.each([
+  ['darwin', 'x64'],
+  ['linux', 'arm64'],
+  ['linux', 'x64'],
+  ['win32', 'arm64'],
+])('does not create an OCR worker on %s/%s and still shuts down normally', async (platform, arch) => {
+  vi.stubGlobal('process', { ...process, platform, arch })
+
+  const f = await setup()
+
+  expect(mocks.createOcr).not.toHaveBeenCalled()
+  expect(f.ipc.imageToText).toBeUndefined()
+  expect(() => f.electron.app.emit('will-quit', { preventDefault: vi.fn() })).not.toThrow()
+  expect(mocks.ocr.cancel).not.toHaveBeenCalled()
 })
 
 async function packagedSetup() {

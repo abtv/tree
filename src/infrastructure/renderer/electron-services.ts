@@ -41,6 +41,7 @@ async function notesWrite(write: () => Promise<void>): Promise<void> {
 
 export function createElectronEditorServices(): EditorServices {
   return {
+    ...(window.treeApi.imageToText === undefined ? {} : { imageToText: window.treeApi.imageToText }),
     today: () => {
       const date = new Date()
       return dayNumberOf({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })

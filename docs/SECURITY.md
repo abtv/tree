@@ -43,6 +43,12 @@ a compromised operating system or browser profile.
 ## Desktop runtime
 
 The Electron renderer is treated as untrusted with respect to the main process.
+
+Image recognition uses a fixed bundled Apple Vision helper, with no shell or external
+service. Main validates the attachment ID before reading bytes; the helper accepts
+bytes over stdin, not paths. Input/decode/output limits and a timeout bound each job.
+Renderer loss or reload and application quit terminate native work. The helper is
+signed nested code with existing hardened-runtime policy, not an independent sandbox.
 It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
 validated preload/IPC surface. The structural boundaries are owned by
 `docs/ARCHITECTURE.md` §4, §7, and §15–§17.

@@ -31,6 +31,7 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  imageToText?: { recognize(read: () => Promise<Uint8Array | null>): Promise<string[]>; cancel(): void }
   getUpdateCommands?: () => UpdateCommandsState
   runUpdateCommand?: (command: UpdateCommand) => void
   setAboutOpen?: (open: boolean) => void
@@ -63,6 +64,7 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  imageToText,
   getUpdateCommands,
   runUpdateCommand,
   setAboutOpen,
@@ -96,6 +98,24 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  ipcMain.handle(ipcChannels.imageToText, async (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    const id = validateAttachmentId(value)
+    if (imageToText === undefined) throw new Error('Image recognition is unavailable on this platform.')
+    const cancel = (): void => imageToText.cancel()
+    event.sender?.once('destroyed', cancel)
+    event.sender?.once('render-process-gone', cancel)
+    event.sender?.once('did-start-loading', cancel)
+    try {
+      return await imageToText.recognize(() => fileServices.readAttachment(id))
+    } finally {
+      event.sender?.removeListener('destroyed', cancel)
+      event.sender?.removeListener('render-process-gone', cancel)
+      event.sender?.removeListener('did-start-loading', cancel)
+    }
+  })
 
   ipcMain.handle(ipcChannels.setAboutOpen, (event, open, ...args) => {
     requireTrustedRenderer(event)

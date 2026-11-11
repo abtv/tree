@@ -22,6 +22,8 @@ it('keeps context and ownership mutations outside the consumer interfaces', () =
 
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
+  imageToText: 'Async recognition has dedicated queue, cancellation, Undo and insertion property tests.',
+  imageToTextAvailable: 'Read-only platform capability covered by OCR store and preload tests.',
   disposeSearch: 'Renderer unmount retires search without document changes; editor-search.test.ts covers retirement.',
   visitRecentNode: 'Recent-node navigation is covered by focused store properties and real popup navigation tests.',
   hideSearch:

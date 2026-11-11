@@ -6,6 +6,7 @@ import { registerIpcHandlers, type IpcHandlerDependencies, type IpcInvokeEvent }
 import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 import emojiCatalog from '../../domain/emoji-catalog.json'
+import { EventEmitter } from 'node:events'
 
 const rendererUrl = 'app://tree/index.html'
 const validState = {
@@ -139,6 +140,69 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
 }
 
 describe('main IPC handlers', () => {
+  it('validates image-to-text requests before reading an attachment and forwards native results', async () => {
+    const recognize = vi.fn(async (read: () => Promise<Uint8Array | null>) => {
+      await read()
+      return ['Recognized paragraph']
+    })
+    const { handlers, fileServices } = createHarness((dependencies) => {
+      dependencies.imageToText = { recognize, cancel: vi.fn() }
+    })
+    const invoke = handlers.get(ipcChannels.imageToText)!
+    const event = { senderFrame: { url: rendererUrl } }
+
+    await expect(invoke({ senderFrame: { url: 'https://untrusted.test/' } }, 'image')).rejects.toThrow('Untrusted')
+    await expect(invoke(event, '../escape')).rejects.toThrow()
+    await expect(invoke(event, 'image', 'extra')).rejects.toThrow()
+
+    expect(recognize).not.toHaveBeenCalled()
+    expect(fileServices.readAttachment).not.toHaveBeenCalled()
+
+    await expect(invoke(event, 'image')).resolves.toEqual(['Recognized paragraph'])
+
+    expect(fileServices.readAttachment).toHaveBeenCalledWith('image')
+  })
+  it.each(['destroyed', 'render-process-gone', 'did-start-loading'])(
+    'cancels OCR on %s and retires listeners',
+    async (eventName) => {
+      const sender = new EventEmitter()
+      let finish!: (text: string[]) => void
+      const cancel = vi.fn()
+      const { handlers } = createHarness((dependencies) => {
+        dependencies.imageToText = {
+          cancel,
+          recognize: () =>
+            new Promise((done) => {
+              finish = done
+            }),
+        }
+      })
+      const pending = handlers.get(ipcChannels.imageToText)!(
+        {
+          senderFrame: { url: rendererUrl },
+          sender: sender as unknown as NonNullable<IpcInvokeEvent['sender']>,
+        },
+        'image',
+      )
+
+      sender.emit(eventName)
+      finish(['text'])
+      await pending
+
+      expect(cancel).toHaveBeenCalledOnce()
+      expect(sender.eventNames()).toEqual([])
+    },
+  )
+
+  it('reports unsupported OCR without reading an image', async () => {
+    const { handlers, fileServices } = createHarness()
+
+    await expect(
+      handlers.get(ipcChannels.imageToText)!({ senderFrame: { url: rendererUrl } }, 'image'),
+    ).rejects.toThrow('unavailable')
+    expect(fileServices.readAttachment).not.toHaveBeenCalled()
+  })
+
   it('keeps optional platform capabilities unavailable when their ports are absent', async () => {
     const { handlers, runUpdateCommand, showEditorContextMenu } = createHarness((dependencies) => {
       delete dependencies.getUpdateCommands

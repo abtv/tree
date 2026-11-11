@@ -82,6 +82,7 @@ async function createSeededStore(
   document: unknown,
   location: unknown,
   save: EditorServices['save'] = async () => undefined,
+  extra: Partial<EditorServices> = {},
 ): Promise<EditorStore> {
   const services: EditorServices = {
     load: async () => ({ version: 1, document, location }),
@@ -89,6 +90,7 @@ async function createSeededStore(
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
     cleanupAttachments: async () => undefined,
+    ...extra,
   }
   let id = 0
   const store = new EditorStore(services, () => `created-${id++}`)
@@ -121,6 +123,72 @@ async function createLockedStore(): Promise<EditorStore> {
   }
   return store
 }
+
+it.each(['insert', 'replace'])('preserves %s editing when background OCR completes', async (mode) => {
+  let finish!: (text: string[]) => void
+  const store = await createSeededStore(
+    {
+      roots: [
+        { id: 'image', text: 'Image', attachment: { id: 'png', mimeType: 'image/png' }, children: [] },
+        { id: 'other', text: 'abcd', children: [] },
+      ],
+    },
+    { currentParentId: null, selectedNodeId: 'image' },
+    undefined,
+    {
+      imageToText: () =>
+        new Promise((done) => {
+          finish = done
+        }),
+    },
+  )
+  renderReact(<App store={store} initialVimEnabled />)
+  act(() => {
+    store.imageToText()
+    store.selectNode('other', 0)
+  })
+  const input = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
+  fireEvent.keyDown(input, { key: mode === 'replace' ? 'R' : 'i' })
+  if (mode === 'replace') fireEvent.keyDown(input, { key: 'X' })
+  else {
+    fireEvent.change(input, { target: { value: 'Xabcd' } })
+    input.setSelectionRange(1, 1)
+  }
+
+  await act(async () => {
+    finish(['Recognized'])
+  })
+
+  expect(screen.getByLabelText('Vim mode')).toHaveTextContent(mode.toUpperCase())
+  expect(input).toHaveValue(mode === 'replace' ? 'Xbcd' : 'Xabcd')
+  fireEvent.keyDown(input, { key: 'Escape' })
+  if (mode === 'insert') {
+    fireEvent.keyDown(input, { key: '.' })
+    expect(input).toHaveValue('XXabcd')
+  }
+})
+
+it('keeps update progress visible alongside completed OCR feedback', async () => {
+  const store = await createSeededStore(
+    { roots: [{ id: 'root', text: '', children: [] }] },
+    {
+      currentParentId: null,
+      selectedNodeId: 'root',
+    },
+  )
+  const snapshot = store.getSnapshot()
+  if (snapshot.status !== 'ready') throw new Error('Expected ready state')
+  vi.spyOn(store, 'getSnapshot').mockReturnValue({
+    ...snapshot,
+    imageToTextStatus: 'Image to text: added 1 paragraph.',
+  })
+  window.treeApi.getUpdateCommands = async () => ({ 'check-for-updates': false, 'update-app': false, status: 42 })
+
+  renderReact(<App store={store} initialVimEnabled={true} />)
+
+  expect(await screen.findByText('Downloading update… 42%')).toBeInTheDocument()
+  expect(screen.getByText('Image to text: added 1 paragraph.')).toBeInTheDocument()
+})
 
 function mockAppRowRects(originTop = 0, height = 24): void {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {

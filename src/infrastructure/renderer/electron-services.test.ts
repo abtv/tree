@@ -13,6 +13,21 @@ import { decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 
 describe('renderer Electron services', () => {
+  it('preserves optional OCR availability, results and failures from the bridge', async () => {
+    expect(createElectronEditorServices().imageToText).toBeUndefined()
+    const imageToText = vi.fn<NonNullable<TreeApi['imageToText']>>(async () => ['First', '', 'Second'])
+    window.treeApi = { ...window.treeApi, imageToText }
+    const services = createElectronEditorServices()
+
+    await expect(services.imageToText!('image-1')).resolves.toEqual(['First', '', 'Second'])
+
+    expect(imageToText).toHaveBeenCalledExactlyOnceWith('image-1')
+    const failure = new Error('Recognition unavailable')
+    imageToText.mockRejectedValueOnce(failure)
+
+    await expect(services.imageToText!('image-2')).rejects.toBe(failure)
+  })
+
   it('propagates recent-node save failures from the bridge', async () => {
     const failure = new Error('history storage unavailable')
     window.treeApi = {

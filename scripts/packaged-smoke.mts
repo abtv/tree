@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { packagedSmokeEnvironment } from './packaged-smoke-environment.mts'
+import { imageToTextSmoke } from '../e2e/smoke/image-to-text.mts'
 
 const app = process.argv[2]
 if (!app) throw new Error('Provide a packaged .app path')
@@ -53,6 +54,8 @@ try {
   )
   assert.equal(await page.locator('.save-error, .error-boundary').count(), 0)
   console.log('Packaged renderer editing and reload smoke passed')
+  await imageToTextSmoke(page)
+  console.log('Packaged Apple Vision image-to-text smoke passed')
 } finally {
   try {
     await browser?.close()

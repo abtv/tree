@@ -3,11 +3,13 @@ import { dataMenuCommands } from './menu-commands'
 export type CommandAppearance = 'system' | 'light' | 'dark'
 
 export interface CommandCapabilities {
+  imageToText?: boolean
   alwaysOnTop: boolean
   vim: boolean
 }
 
 export interface CommandServices {
+  imageToText?(): Promise<void>
   showAbout?(): Promise<void>
   find?(): Promise<void>
   findNext?(): Promise<void>
@@ -49,6 +51,16 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  {
+    name: 'image-to-text',
+    aliases: [],
+    description: 'Recognize English text from the selected image',
+    requires: 'imageToText',
+    active: () => false,
+    run: async (services) => {
+      await services.imageToText?.()
+    },
+  },
   {
     name: 'about-tree',
     aliases: [],

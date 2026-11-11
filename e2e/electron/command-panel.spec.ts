@@ -106,7 +106,8 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    await expect(window.locator('.command-count')).toHaveText('18 of 18')
+    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 19 : 18
+    await expect(window.locator('.command-count')).toHaveText(`${commandCount} of ${commandCount}`)
 
     await window.keyboard.press('ArrowUp')
 
@@ -244,6 +245,7 @@ test.describe('Normal command panel', () => {
       'find',
       'find-next',
       'find-previous',
+      ...(process.platform === 'darwin' && process.arch === 'arm64' ? ['image-to-text'] : []),
       'import-notes',
       'quit',
       'search-all-nodes',

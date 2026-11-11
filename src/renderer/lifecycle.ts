@@ -2,7 +2,7 @@ import type { TreeApi } from '../shared/ipc'
 
 export interface RendererLifecycleStore {
   initialize(): Promise<void>
-  flushPersistence(): Promise<void>
+  flushPersistence(options?: { cancelImageRecognition?: boolean }): Promise<void>
   reportError(error: unknown): void
   requestQuitWithoutSavingPrompt(): void
 }
@@ -14,7 +14,7 @@ export function startRendererLifecycle(
   void store.initialize()
   const removeQuitRequested = treeApi.onQuitRequested((requestId) => {
     void store
-      .flushPersistence()
+      .flushPersistence({ cancelImageRecognition: true })
       .then(() => treeApi.quit(requestId))
       .catch((error: unknown) => {
         store.reportError(error)

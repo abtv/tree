@@ -9,6 +9,9 @@ import {
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  ...(process.platform === 'darwin' && process.arch === 'arm64'
+    ? { imageToText: (id: string) => ipcRenderer.invoke(ipcChannels.imageToText, id) }
+    : {}),
   getUpdateCommands: () => ipcRenderer.invoke(ipcChannels.getUpdateCommands),
   runUpdateCommand: (command) => ipcRenderer.invoke(ipcChannels.runUpdateCommand, command),
   onUpdateCommandsChanged: (listener) => {

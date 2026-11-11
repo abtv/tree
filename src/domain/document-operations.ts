@@ -427,6 +427,22 @@ export function createLastChild(document: Document, parentId: NodeId | null, chi
   return next
 }
 
+/** Append plain-text children with one path copy, preserving existing child identities. */
+export function appendTextChildren(
+  document: Document,
+  parentId: NodeId,
+  texts: readonly string[],
+  createId: () => NodeId,
+): Document {
+  if (texts.length === 0) return document
+  const located = requireNode(document, parentId)
+  if (located.ancestors.length + 1 >= MAX_DOCUMENT_DEPTH) throw new Error(MAX_DOCUMENT_DEPTH_ERROR)
+  const children = texts.map((text): TreeNode => ({ id: createId(), text, children: [] }))
+  const next = replaceNode(document, located, { ...located.node, children: [...located.node.children, ...children] })
+  inheritAttachmentIds(document, next)
+  return next
+}
+
 export function splitNode(document: Document, nodeId: NodeId, cursor: number, newNodeId: NodeId): Document {
   const located = requireNode(document, nodeId)
   const position = snapToCodePoint(located.node.text, cursor)

@@ -7,6 +7,7 @@ import type { AgendaState } from './agenda-state'
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
+  imageToText?(attachmentId: AttachmentId): Promise<string[]>
   loadEmojiHistory?(): Promise<unknown>
   saveEmojiHistory?(names: readonly string[]): Promise<void>
   loadRecentNodes?(): Promise<unknown>
@@ -43,6 +44,7 @@ export type EditorSnapshot =
       location: Location
       focus: FocusIntent
       structuralVersion: number
+      imageToTextStatus?: string
       expansion: ExpansionState
       agenda?: AgendaState
       saveError?: string

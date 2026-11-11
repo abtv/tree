@@ -37,6 +37,7 @@ import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
 import { applicationMenuTemplate } from './application-menu'
 import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
+import { createImageToText } from './image-to-text'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
 import { createNotesArchiveController, type NotesArchiveController } from './notes-archive-controller'
@@ -390,6 +391,15 @@ bootstrapApplication({
       userDataDirectory: app.getPath('userData'),
     })
     const decodePng = createPngDecoder(nativeImage)
+    const imageToText =
+      process.platform === 'darwin' && process.arch === 'arm64'
+        ? createImageToText(
+            app.isPackaged
+              ? join(process.resourcesPath, '../Helpers/tree-image-to-text')
+              : join(__dirname, '../native/tree-image-to-text'),
+          )
+        : undefined
+    app.on('will-quit', () => imageToText?.cancel())
     notesArchive = createNotesArchiveController({
       fileServices,
       attachmentsDirectory: join(dataDirectory, 'attachments'),
@@ -416,6 +426,7 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      ...(imageToText === undefined ? {} : { imageToText }),
       getUpdateCommands,
       runUpdateCommand: (command) => {
         const item = Menu.getApplicationMenu()?.getMenuItemById(command)

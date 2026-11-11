@@ -177,7 +177,10 @@ converted by electron-builder. Only compiled `out/main`, `out/preload` and
 `out/renderer` files and production packages are included; the archive worker
 remains included and separate web builds are excluded. React and React DOM are
 build dependencies bundled into the renderer; their licenses and the scheduler
-license are copied into `Resources/licenses`. Application name, sandbox,
+license are copied into `Resources/licenses`. The Apple Vision executable is copied
+from `out/native` to `Contents/Helpers/tree-image-to-text`, signed as nested code,
+and checked explicitly by the verifier. Both DMG and ZIP renderer smoke tests run
+real image recognition through the packaged helper. Application name, sandbox,
 context isolation, CSP and local storage code are unchanged.
 
 Hardened Runtime uses only `com.apple.security.cs.allow-jit`, needed by Electron's

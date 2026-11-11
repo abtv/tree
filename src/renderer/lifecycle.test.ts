@@ -42,6 +42,7 @@ describe('renderer lifecycle', () => {
 
     expect(store.initialize).toHaveBeenCalledOnce()
     expect(store.flushPersistence).toHaveBeenCalledOnce()
+    expect(store.flushPersistence).toHaveBeenCalledWith({ cancelImageRecognition: true })
     expect(treeApi.quit).toHaveBeenCalledWith('request-1')
 
     cleanup()

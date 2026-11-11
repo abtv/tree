@@ -59,13 +59,19 @@ export function useCommandPanel(options: {
   }, [])
   const running = useRef(false)
   const snapshot = store.getSnapshot()
+  const imageToTextAvailable = store.imageToTextAvailable === true
   const view: 'agenda' | 'tree' = snapshot.status === 'ready' && snapshot.agenda !== undefined ? 'agenda' : 'tree'
   const commands = useMemo(
     () =>
-      [...availableCommands({ vim: vimAvailable, alwaysOnTop: alwaysOnTopAvailable }), ...menuEntries].sort((a, b) =>
-        a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
-      ),
-    [vimAvailable, alwaysOnTopAvailable, menuEntries],
+      [
+        ...availableCommands({
+          vim: vimAvailable,
+          alwaysOnTop: alwaysOnTopAvailable,
+          imageToText: imageToTextAvailable,
+        }),
+        ...menuEntries,
+      ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -132,6 +138,7 @@ export function useCommandPanel(options: {
       try {
         await command.run(
           {
+            imageToText: async () => store.imageToText(),
             showAbout: async () => {
               showAbout?.()
             },

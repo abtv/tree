@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { browserEditing, happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, clickApplicationMenuQuit, closeApp } from '../electron/fixtures.ts'
+import { imageToTextSmoke } from './image-to-text.mts'
 
 test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({ playwright }, testInfo) => {
   const errors: string[] = []
@@ -102,6 +103,9 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       await mkdir(join(profile, 'data'))
       await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
       await happyPath(await launch())
+      if (process.platform === 'darwin' && process.arch === 'arm64') {
+        await imageToTextSmoke(await app!.firstWindow())
+      }
 
       expect(errors).toEqual([])
     } finally {

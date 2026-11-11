@@ -28,6 +28,14 @@ The development environment requires:
 
 The Node.js version is pinned in `.nvmrc`. The supported Node.js and npm ranges are also declared in `package.json`.
 
+Apple Silicon Electron development also requires Xcode Command Line Tools (`xcrun
+swiftc --version`). `make dev` and `npm run build` compile the Apple Vision helper
+when its source or build script changes. Swift's module cache stays inside the project
+under `.scratch/image-to-text/swift-cache/` so compilation can run in the workspace
+sandbox. No model download is required. Browser and
+Linux builds skip this native compilation. The macOS Electron smoke includes real
+image recognition; the release verifier repeats it from the signed DMG and ZIP.
+
 Both platform entry points use the shared inline About dialog in
 `src/renderer/about-dialog.ts`, as specified in PRODUCT §1.3–§1.4.
 Its icon and links are bundled with the renderer; no native About-panel resource

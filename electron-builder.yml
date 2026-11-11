@@ -25,6 +25,9 @@ electronFuses:
   onlyLoadAppFromAsar: true
   grantFileProtocolExtraPrivileges: false
 mac:
+  extraFiles:
+    - from: out/native/tree-image-to-text
+      to: Helpers/tree-image-to-text
   target:
     - target: dmg
       arch: arm64

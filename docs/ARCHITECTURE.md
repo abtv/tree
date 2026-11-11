@@ -23,6 +23,7 @@ The application uses:
 * Electron for the desktop application shell and operating-system integration;
 * React for the user interface;
 * TypeScript as the programming language;
+* a Swift helper using Apple Vision for macOS image recognition (ADR 0025);
 * Vite for the frontend development and build tooling.
 
 Do not change the core technology stack without explicit Product Owner approval.
@@ -1027,6 +1028,16 @@ The Vim editing preference uses the same boolean preference store (`createBoolea
 ---
 
 ## 17. Process Boundaries
+
+Image recognition (PRODUCT §15.1) uses a Swift executable launched by Electron main
+through `execFile`, without a shell. The renderer sends only a validated attachment
+ID; main reads its local bytes and pipes them to the helper. Vision decoding and OCR
+run in that process, which returns bounded JSON text entries, including empty spacing
+markers. The application owns queueing, source-identity checks and atomic child
+insertion through the domain. No native API or filesystem dependency enters the domain.
+Main cancels work on renderer loss/reload and quit. The packaged helper lives in
+`Contents/Helpers`; development builds use `out/native`. See
+[ADR 0025](decisions/0025-apple-vision-image-to-text.md).
 
 The application consists conceptually of:
 

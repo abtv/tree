@@ -776,7 +776,14 @@ export function App({
             {statusMessage}
           </span>
         ) : (
-          <UpdateStatus hidden={commandPanel.message !== undefined} />
+          <>
+            {state.imageToTextStatus !== undefined ? (
+              <span className="status-bar-message" role="status" title={state.imageToTextStatus}>
+                {state.imageToTextStatus}
+              </span>
+            ) : null}
+            <UpdateStatus hidden={commandPanel.message !== undefined} />
+          </>
         )}
         {vimEnabled ? (
           <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">

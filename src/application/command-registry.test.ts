@@ -12,6 +12,14 @@ const names = (query: string, history: readonly string[] = []): string[] =>
   matchCommands(query, history).map((command) => command.name)
 
 describe('command registry', () => {
+  it('cannot restore unsupported image recognition from command history', () => {
+    const history = ['image-to-text']
+    const unsupported = availableCommands({ alwaysOnTop: false, vim: true, imageToText: false })
+    const supported = availableCommands({ alwaysOnTop: true, vim: true, imageToText: true })
+
+    expect(matchCommands('image', history, unsupported)).toEqual([])
+    expect(matchCommands('image', history, supported).map((command) => command.name)).toEqual(['image-to-text'])
+  })
   // @requirement PRODUCT.md §20.2.30
   // @requirement PRODUCT.md §20.2.28
   it.each(commandRegistry)('provides a nonempty description for $name in the command panel', (command) => {
@@ -130,6 +138,7 @@ describe('command registry', () => {
       'find',
       'find-next',
       'find-previous',
+      'image-to-text',
       'quit',
       'search-all-nodes',
       'set-theme-auto',
@@ -157,6 +166,7 @@ describe('command registry', () => {
 
   it('delegates all actions to existing services and queries their current state', async () => {
     const services = {
+      imageToText: vi.fn(async () => undefined),
       showAbout: vi.fn(async () => undefined),
       find: vi.fn(async () => undefined),
       findNext: vi.fn(async () => undefined),
@@ -179,6 +189,7 @@ describe('command registry', () => {
         view: 'tree',
       })
 
+    expect(services.imageToText).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
     expect(services.find).toHaveBeenCalledExactlyOnceWith()
@@ -216,7 +227,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(14)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(15)
   })
 
   it('keeps optional actions unchecked and tolerates unavailable services', async () => {
@@ -237,7 +248,7 @@ describe('command registry', () => {
       view: 'tree',
     } as const
 
-    for (const name of ['about-tree', 'find', 'find-next', 'find-previous', 'search-all-nodes']) {
+    for (const name of ['image-to-text', 'about-tree', 'find', 'find-next', 'find-previous', 'search-all-nodes']) {
       const command = commandRegistry.find((candidate) => candidate.name === name)!
 
       expect(command.active(state)).toBe(false)

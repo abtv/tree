@@ -39,6 +39,7 @@ it.each([false, true])('flushes before acknowledging an update and restores inpu
   const cleanup = startAppUpdates(store, api)
 
   request('update-1')
+  expect(store.flushPersistence).toHaveBeenCalledWith({ cancelImageRecognition: true })
   expect(document.getElementById('root')!.inert).toBe(true)
   expect(confirm).not.toHaveBeenCalled()
   resolve()

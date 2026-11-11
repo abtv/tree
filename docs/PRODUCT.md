@@ -1065,6 +1065,39 @@ Images are attachments, not independently draggable objects.
 
 Dragging a node moves its image together with the node.
 
+### 15.1 Image to Text
+
+On Apple Silicon macOS Electron, `image-to-text` in the command panel recognizes
+English text from the selected node's image. It is unavailable in the browser,
+Linux and Intel Electron. Recognition is explicit, never triggered by image paste.
+Apple Vision processes the image locally without model downloads, network calls,
+telemetry or task creation.
+
+The result is appended after the source node's existing last child. Existing image,
+text, children, selection and editing focus remain intact. Paragraphs, headings and
+list items become ordinary nodes without embedded line breaks. Wrapped lines within
+a paragraph are joined with spaces; recognized bullet markers are removed. Large
+vertical gaps produce one empty node between blocks, never leading, trailing or
+consecutive empty nodes. Grouping is a geometric approximation, not a layout replica.
+
+Recognition runs outside the UI thread through a sequential queue. Duplicate pending
+requests for a node are ignored; the queue admits at most 20 requests. The status bar
+reports recognition, queued count, completion, no text and failures. Terminal feedback
+includes both the total added paragraphs and the error when a queue partly succeeds.
+It remains until another request; Find/Agenda feedback takes precedence, while update
+feedback remains visible alongside OCR. A missing image or noneditable selection is
+reported without changing the document. In Agenda only a direct editable occurrence
+can be recognized; days and contextual rows do not target the hidden Tree selection.
+
+Each result is one Undo/Redo operation and uses normal autosave. Deleting or replacing
+the source image discards pending results, even if Undo restores it before completion.
+Saving locks and the maximum depth apply at insertion time. Closing or reloading the
+renderer cancels native work. Preparing to quit or install an update retires pending
+recognition and rejects new requests until the save flush ends. An archive export
+does not cancel recognition. Pending OCR itself is not saved or resumed on restart.
+Each image is limited to 25 MiB and the normal decoded-image dimensions. Native work
+times out after 60 seconds; results are limited to 1 MiB and 1,000 entries.
+
 ---
 
 ## 16. Persistence
@@ -1729,6 +1762,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
 | `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |
+| `image-to-text` | — | Recognize English text in the selected image | — | — | Append recognized children on Apple Silicon macOS Electron (§15.1) |
 | `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.2.26) |
 | `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |
 | `search-all-nodes` | — | Search all nodes | — | `⌘;` | Open document-wide node and tag search (§20.14) |

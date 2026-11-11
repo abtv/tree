@@ -25,7 +25,7 @@ export function startAppUpdates(store: RendererLifecycleStore, api: TreeApi): ()
     root.inert = true
     for (const event of events) window.addEventListener(event, block, true)
     void store
-      .flushPersistence()
+      .flushPersistence({ cancelImageRecognition: true })
       .then(async () => {
         if (request === id) await api.confirmAppUpdate?.(id, true)
       })

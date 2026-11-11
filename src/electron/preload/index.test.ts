@@ -18,6 +18,26 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it.each([
+    ['darwin', 'arm64', true],
+    ['darwin', 'x64', false],
+    ['linux', 'arm64', false],
+  ] as const)('exposes OCR only on supported %s/%s', async (platform, arch, supported) => {
+    vi.resetModules()
+    vi.stubGlobal('process', { ...process, platform, arch })
+    try {
+      const { treeApi } = await import('./index')
+      expect(typeof treeApi.imageToText === 'function').toBe(supported)
+      if (supported) {
+        mocks.invoke.mockResolvedValueOnce(['text'])
+        await expect(treeApi.imageToText!('image')).resolves.toEqual(['text'])
+        expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.imageToText, 'image')
+      }
+    } finally {
+      vi.unstubAllGlobals()
+      vi.resetModules()
+    }
+  })
   it('exposes the bridge object under the renderer API name', async () => {
     vi.resetModules()
     mocks.exposeInMainWorld.mockClear()
@@ -75,6 +95,7 @@ describe('preload bridge', () => {
       'state',
       [],
       { ...state, 'check-for-updates': 'yes' },
+      { ...state, version: ['1.2.3'] },
       { ...state, version: 'bad1.2.3' },
       { ...state, version: '1.2.3+bad?' },
       { ...state, version: '1.2.3+' + 'x'.repeat(123) },

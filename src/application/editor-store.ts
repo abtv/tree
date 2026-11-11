@@ -1,4 +1,5 @@
 import {
+  appendTextChildren,
   collectAttachmentIds,
   createInitialDocument,
   displayedNodes,
@@ -135,12 +136,18 @@ export class EditorStore {
     () => this.agendaRowsCache.clear(),
     this.agendaRowsCache,
     (state) => {
+      for (const job of this.imageToTextJobs) {
+        if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) job.canceled = true
+      }
       for (const catalog of this.tags.values()) catalog.update(state.document)
       this.searchOwner.update(state)
       this.recentNodesOwner.update(state.document)
     },
   )
   private readonly history = new EditorHistory()
+  private readonly imageToTextJobs: Array<{ nodeId: NodeId; attachmentId: AttachmentId; canceled: boolean }> = []
+  private imageToTextRunning = false
+  private imageToTextFlushes = 0
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   private readonly textSession: EditorTextSession
   private readonly saveScheduler: EditorSaveScheduler
@@ -559,18 +566,26 @@ export class EditorStore {
     return () => this.pendingEditFinishers.delete(finish)
   }
 
-  public async flushPersistence(): Promise<void> {
-    let committed: boolean
-    do {
-      this.finishPendingEdits()
-      await Promise.all(this.pendingEdits)
-      // requestImmediateSave returns early without pending changes, so this guard only avoids the call.
-      if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
-      await this.saveScheduler.flush()
-      committed = this.finishPendingEdits()
-    } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
-    await this.recentPersistence.flush()
-    await this.emojiHistory.flush()
+  public async flushPersistence(options: { cancelImageRecognition?: boolean } = {}): Promise<void> {
+    if (options.cancelImageRecognition) {
+      this.imageToTextFlushes++
+      for (const job of this.imageToTextJobs) job.canceled = true
+    }
+    try {
+      let committed: boolean
+      do {
+        this.finishPendingEdits()
+        await Promise.all(this.pendingEdits)
+        // requestImmediateSave returns early without pending changes, so this guard only avoids the call.
+        if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
+        await this.saveScheduler.flush()
+        committed = this.finishPendingEdits()
+      } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
+      await this.recentPersistence.flush()
+      await this.emojiHistory.flush()
+    } finally {
+      if (options.cancelImageRecognition) this.imageToTextFlushes--
+    }
   }
 
   private finishPendingEdits(): boolean {
@@ -584,6 +599,106 @@ export class EditorStore {
     if (this.runtime.snapshot.status !== 'ready') return
     this.runtime.snapshot = { ...this.runtime.snapshot, operationError: messageOf(error) }
     this.runtime.emit()
+  }
+
+  public get imageToTextAvailable(): boolean {
+    return this.services.imageToText !== undefined
+  }
+
+  public imageToText(): void {
+    if (!this.imageToTextAvailable || this.runtime.snapshot.status !== 'ready') return
+    if (this.imageToTextFlushes > 0) {
+      this.setImageToTextStatus('Image to text: saving in progress. Please wait.')
+      return
+    }
+    const state = this.runtime.ready()
+    const nodeId = state.agenda === undefined ? state.location.selectedNodeId : state.agenda.activeOccurrence?.nodeId
+    const attachmentId = nodeId === undefined ? undefined : locateNode(state.document, nodeId)?.node.attachment?.id
+    if (this.isPersistenceLocked() || attachmentId === undefined || nodeId === undefined) {
+      this.setImageToTextStatus('Image to text: select an editable node with an image.')
+      return
+    }
+    if (this.imageToTextJobs.some((job) => !job.canceled && job.nodeId === nodeId)) {
+      this.setImageToTextStatus('Image to text: this image is already queued.')
+      return
+    }
+    if (this.imageToTextJobs.length >= 20) {
+      this.setImageToTextStatus('Image to text: the queue is full. Please wait.')
+      return
+    }
+    this.imageToTextJobs.push({ nodeId, attachmentId, canceled: false })
+    this.setImageToTextStatus(`Recognizing image… ${this.imageToTextJobs.length - 1} queued`)
+    void this.runImageToTextQueue()
+  }
+
+  private setImageToTextStatus(message: string): void {
+    if (this.runtime.snapshot.status !== 'ready') return
+    this.runtime.snapshot = { ...this.runtime.snapshot, imageToTextStatus: message }
+    this.runtime.emit()
+  }
+
+  private async runImageToTextQueue(): Promise<void> {
+    if (this.imageToTextRunning) return
+    this.imageToTextRunning = true
+    let result = 'Image to text: finished.'
+    let failure: string | undefined
+    let addedParagraphs = 0
+    try {
+      while (this.imageToTextJobs.length > 0) {
+        const job = this.imageToTextJobs[0]!
+        try {
+          if (job.canceled) {
+            result = 'Image to text: canceled.'
+            continue
+          }
+          this.setImageToTextStatus(`Recognizing image… ${this.imageToTextJobs.length - 1} queued`)
+          const paragraphs = await this.services.imageToText!(job.attachmentId)
+          if (job.canceled || this.runtime.snapshot.status !== 'ready') {
+            result = 'Image to text: canceled.'
+            continue
+          }
+          if (this.isPersistenceLocked())
+            throw new Error('Saving is unavailable. Please retry after saving is restored.')
+          const normalized = paragraphs.map((text) =>
+            text
+              .split(/\r\n|[\r\n\u2028\u2029]/u)
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .join(' '),
+          )
+          const texts = normalized
+            .slice(normalized.findIndex(Boolean), normalized.findLastIndex(Boolean) + 1)
+            .filter((text, index, all) => text !== '' || all[index - 1] !== '')
+          if (texts.length === 0) {
+            result = 'Image to text: no English text found.'
+            continue
+          }
+          this.endTextSession()
+          const state = this.runtime.ready()
+          const document = appendTextChildren(state.document, job.nodeId, texts, this.createId)
+          this.applyStructural(document, state.location, state.focus)
+          this.noteChange(countPastedWords(texts.join('\n'), undefined), false)
+          this.endTextSession()
+          const paragraphCount = texts.filter(Boolean).length
+          addedParagraphs += paragraphCount
+          result = `Image to text: added ${paragraphCount} ${paragraphCount === 1 ? 'paragraph' : 'paragraphs'}.`
+        } catch (error) {
+          failure = `Image to text failed: ${messageOf(error)}`
+          this.setImageToTextStatus(failure)
+        } finally {
+          this.imageToTextJobs.shift()
+        }
+      }
+    } finally {
+      this.imageToTextRunning = false
+      const summary =
+        addedParagraphs > 0 && failure !== undefined
+          ? `Image to text: added ${addedParagraphs} ${addedParagraphs === 1 ? 'paragraph' : 'paragraphs'}.`
+          : result
+      this.setImageToTextStatus(
+        failure === undefined ? summary : addedParagraphs > 0 ? `${summary} ${failure}` : failure,
+      )
+    }
   }
 
   // The ready checks in the two prompt methods are redundant: only a ready snapshot can carry

@@ -7,6 +7,7 @@ import type { IncomingNotes, NotesCounts } from '../application/notes-archive/im
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
 
 export const ipcChannels = {
+  imageToText: 'tree:image-to-text',
   getUpdateCommands: 'tree:get-update-commands',
   runUpdateCommand: 'tree:run-update-command',
   setAboutOpen: 'tree:set-about-open',
@@ -149,6 +150,7 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  imageToText?: (attachmentId: string) => Promise<string[]>
   getUpdateCommands?: () => Promise<UpdateCommandsState>
   runUpdateCommand?: (command: UpdateCommand) => Promise<void>
   onUpdateCommandsChanged?: (listener: (state: UpdateCommandsState) => void) => () => void

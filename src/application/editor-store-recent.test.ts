@@ -147,6 +147,8 @@ it('omits only a sole exact tag suggestion and restores completion when the quer
   store.editText('a', 'Alpha #p1 #Work #作')
   const before = store.getSnapshot()
 
+  expect(store.searchNodeSuggestions('')).toEqual([])
+  expect(store.searchNodeSuggestions('Work')).toEqual([])
   expect(store.searchNodeSuggestions('#p1')).toEqual([])
   expect(store.searchNodeSuggestions('#Work')).toEqual([])
   expect(store.searchNodeSuggestions('#作')).toEqual([])
