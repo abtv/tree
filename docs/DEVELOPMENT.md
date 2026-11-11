@@ -734,6 +734,8 @@ workflow retains failure artifacts. Neither check observes every presented frame
 Electron smoke logs the start and elapsed duration of startup, the Tree/Agenda scenario,
 Apple Vision OCR (on Apple Silicon), and cleanup. The last started phase identifies
 where a test timeout occurred; phase completion logs also run on failure and do not imply success.
+Electron launch uses the test timeout rather than a shorter startup deadline, so cold
+CI startup can use the available scenario budget without extending the overall smoke limit.
 
 `Run smoke tests` is reusable and runs inside `Test and build app` after code checks
 and audit pass. Its Linux and macOS jobs run in parallel with each other;

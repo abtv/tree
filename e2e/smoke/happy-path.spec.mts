@@ -73,7 +73,8 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
           resolve('e2e/electron/electron-entry.cjs'),
         ],
         env: { ...process.env, TREE_E2E_HIDDEN: '1', TREE_E2E_SHORTCUT_STUB: '1' } as Record<string, string>,
-        timeout: 5000,
+        // Let cold CI startup use the scenario budget; the test/global deadlines still bound the run.
+        timeout: testInfo.timeout,
       })
       // Own the process before waiting for renderer readiness, including failed startup.
       appProcess = app.process()
