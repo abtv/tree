@@ -22,7 +22,7 @@ jobs:
   check:
     name: Check code and documentation
     runs-on: ubuntu-24.04
-    timeout-minutes: 4
+    timeout-minutes: 8
 
     steps:
       - name: Check out repository
