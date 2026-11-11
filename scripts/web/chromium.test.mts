@@ -108,6 +108,7 @@ it('streams smoke launch dependencies without baseline images, host output or cr
       'config/build/electron.vite.config.ts',
       'scripts/rename-dev-app.mts',
       'config/testing/playwright.smoke.config.ts',
+      'config/testing/playwright.smoke-electron.config.ts',
       'e2e/smoke/happy-path.spec.mts',
       'e2e/smoke/scenario.mts',
       'e2e/electron/fixtures.ts',
