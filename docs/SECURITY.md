@@ -43,15 +43,15 @@ a compromised operating system or browser profile.
 ## Desktop runtime
 
 The Electron renderer is treated as untrusted with respect to the main process.
+It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
+validated preload/IPC surface. The structural boundaries are owned by
+`docs/ARCHITECTURE.md` §4, §7, and §15–§17.
 
 Image recognition uses a fixed bundled Apple Vision helper, with no shell or external
 service. Main validates the attachment ID before reading bytes; the helper accepts
 bytes over stdin, not paths. Input/decode/output limits and a timeout bound each job.
 Renderer loss or reload and application quit terminate native work. The helper is
 signed nested code with existing hardened-runtime policy, not an independent sandbox.
-It has no direct Node.js or filesystem access. Its capabilities cross a narrow,
-validated preload/IPC surface. The structural boundaries are owned by
-`docs/ARCHITECTURE.md` §4, §7, and §15–§17.
 
 * **Renderer isolation.** The window runs with context isolation enabled, Node integration disabled, and the sandbox enabled (`src/electron/main/index.ts`).
 * **Restricted navigation.** Packaged builds always load and trust the packaged renderer document; only unpackaged builds may use `ELECTRON_RENDERER_URL`. App-wide web-contents guards restrict main-frame, subframe, and redirected navigation to that resolved document, deny webviews, and route only validated external HTTP(S) URLs to the system browser (`src/electron/main/window.ts`, `src/electron/main/index.ts`).

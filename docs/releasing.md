@@ -173,8 +173,8 @@ including direct builder invocations. Run its negative-path tests with
 through the v26 loader. Local packaging now requires credentials as well.
 
 The stable bundle identifier is `io.github.abtv.tree`. The existing PNG icon is
-converted by electron-builder. Only compiled `out/main`, `out/preload` and
-`out/renderer` files and production packages are included; the archive worker
+converted by electron-builder. The application ASAR includes only compiled `out/main`,
+`out/preload` and `out/renderer` files and production packages; the archive worker
 remains included and separate web builds are excluded. React and React DOM are
 build dependencies bundled into the renderer; their licenses and the scheduler
 license are copied into `Resources/licenses`. The Apple Vision executable is copied

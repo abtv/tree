@@ -33,7 +33,7 @@ swiftc --version`). `make dev` and `npm run build` compile the Apple Vision help
 when its source or build script changes. Swift's module cache stays inside the project
 under `.scratch/image-to-text/swift-cache/` so compilation can run in the workspace
 sandbox. No model download is required. Browser and
-Linux builds skip this native compilation. The macOS Electron smoke includes real
+Linux builds skip this native compilation. The Apple Silicon macOS Electron smoke includes real
 image recognition; the release verifier repeats it from the signed DMG and ZIP.
 
 Both platform entry points use the shared inline About dialog in

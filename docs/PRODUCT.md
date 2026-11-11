@@ -1206,7 +1206,7 @@ A failed attachment cleanup does not lock the editor and does not trigger docume
 
 Image attachments must survive application restart.
 
-A completed image insertion is flushed to local storage before the document that references it is saved, so an attachment that a saved document references is not lost to an abrupt application termination or power loss.
+A completed image insertion is flushed to local storage before the document that references it is saved, so an attachment that a saved document references is not lost to an abrupt application termination. Power-loss durability has the same storage-device cache limitation as document saves (§16.1).
 
 ### 17.1 Inline Presentation and Preview
 
