@@ -310,6 +310,12 @@ The important principle is that product behavior should be represented by explic
 Desktop updates (PRODUCT §26) use `electron-updater` in the main process, with the
 packaged GitHub configuration. `AppUpdates` owns a separate bounded save acknowledgment
 and rollback of the bootstrap quit permission; the ordinary QuitHandshake is unchanged.
+Its independent state models own package readiness, download/failure feedback,
+the shared background-check Promise, manual check/dialog lifetime, and installation.
+Installation is `idle`, `awaiting-save` (request ID and deadline), or
+`preparing-install` (quit-permission rollback and deadline). Public status and
+availability are derived from these states. A failed recheck can coexist with a
+ready package; failure feedback takes precedence without discarding that package.
 The native Tree menu requests a renderer flush through trusted IPC. Renderer input is
 blocked until installation or failure. Automatic installation on quit is disabled.
 The ZIP-download notification enables Restart and Install; only after successful saving does

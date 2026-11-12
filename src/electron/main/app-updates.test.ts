@@ -172,12 +172,15 @@ describe('desktop app updates', () => {
 
   it('reports a failed recheck instead of claiming the existing package is current', async () => {
     const { updates, ports } = harness()
-    updates.downloaded()
+    updates.downloaded('1.2.4')
     ports.check.mockRejectedValueOnce(new Error('offline'))
 
     await updates.checkManually()
 
     expect(ports.notifyCheck).toHaveBeenCalledWith('failed')
+    expect(updates.isReady()).toBe(true)
+    expect(updates.getVersion()).toBe('1.2.4')
+    expect(updates.getStatus()).toBe('failed')
   })
   it('publishes bounded whole percentages and clears failed downloads', async () => {
     const { updates, ports } = harness()
@@ -420,6 +423,9 @@ describe('desktop app updates', () => {
     )
     const pending = updates.check()
     const duplicate = updates.check()
+
+    expect(duplicate).toBe(pending)
+
     await Promise.resolve()
     expect(ports.check).toHaveBeenCalledOnce()
     finish()
