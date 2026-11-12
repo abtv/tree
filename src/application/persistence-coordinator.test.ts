@@ -203,6 +203,45 @@ describe('PersistenceCoordinator', () => {
     expect(cleanupAttachments).toHaveBeenCalledOnce()
   })
 
+  it.each(['save', 'cleanup'] as const)(
+    'merges deferred cleanup with a save requested during a %s failure',
+    async (failingOperation) => {
+      let reject!: (error: Error) => void
+      const pending = new Promise<void>((_, fail) => {
+        reject = fail
+      })
+      const save = vi.fn(async (): Promise<void> => undefined)
+      const cleanupAttachments = vi.fn(async (): Promise<void> => undefined)
+      const failingService = failingOperation === 'save' ? save : cleanupAttachments
+      failingService.mockImplementationOnce(() => pending)
+      const onResult = vi.fn()
+      const coordinator = new PersistenceCoordinator(
+        { save, cleanupAttachments },
+        {
+          currentState: () => state,
+          referencedAttachmentIds: () => ['retained'],
+          hasPendingDocumentChanges: () => false,
+          onSaveCaptured: vi.fn(),
+          onDocumentSaved: vi.fn(),
+          onResult,
+        },
+      )
+      coordinator.requestSave()
+      coordinator.requestAttachmentCleanup()
+      await vi.waitFor(() => expect(failingService).toHaveBeenCalledOnce())
+
+      coordinator.requestSave()
+      const failure = new Error('interrupted operation')
+      reject(failure)
+      await coordinator.flush()
+
+      expect(save).toHaveBeenCalledTimes(2)
+      expect(cleanupAttachments).toHaveBeenCalledTimes(failingOperation === 'save' ? 1 : 2)
+      expect(cleanupAttachments).toHaveBeenLastCalledWith(['retained'])
+      expect(onResult.mock.calls).toEqual([[failure, failingOperation], [undefined]])
+    },
+  )
+
   it('does not acknowledge a document save for cleanup-only work', async () => {
     const save = vi.fn(async () => undefined)
     const cleanupAttachments = vi.fn(async () => undefined)

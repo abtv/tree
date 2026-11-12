@@ -791,6 +791,15 @@ The store counts consecutive failed document saves. The coordinator reports whet
 
 The editor tracks pending asynchronous cut and paste operations. Shutdown flushing waits for those operations, then their queued persistence, and checks for additional pending edits before completing. Operation failures reject the active flush and prevent its quit acknowledgment. The persistence coordinator retains document-save failures separately from cleanup results so cleanup alone cannot authorize quit with unsaved changes.
 
+`PersistenceCoordinator` explicitly separates execution (`idle`, `queued`, `running`,
+`saving`, `cleaning`), pending work (`none`, `save`, `cleanup`, `save-and-cleanup`,
+`deferred-cleanup`), and the latest operation/document-save outcomes. Deferred
+cleanup is retained without immediately scheduling another attempt; a save request
+merges it into the next batch, and an idle flush can wake it. The existing Promise
+queue serializes batches and flush waits for its identity to stabilize, including
+requests received during finalization. State transitions add only bounded metadata;
+capture timing, serialization, write/sync counts and document-scale work are unchanged.
+
 Document saves and attachment filesystem operations are serialized by the file-service operation queue. The application also queues attachment cleanup with persistence work, so cleanup cannot race a save or another cleanup, and cleanup failures follow the same visible error and shutdown-flush path as save failures. File-service failure logs include structured operation names, phases, and filesystem paths. Start and success logs require `TREE_PERSISTENCE_DEBUG=1`.
 
 Document and attachment writes share the same durable-write sequence: the bytes go through a file handle, are flushed with `fsync`, and the handle is closed before the operation reports success. A document save flushes the data directory after the rotation and replacement renames, so the preserved generation and the new primary are durable together before the save reports success; pruning runs after that flush and stays best-effort. An attachment write flushes the attachments directory, because the attachment file is created for the first time and the document reference recorded by a later save must never outlive the attachment data or its directory entry. A failed flush rejects the write instead of reporting success, so the renderer cannot record a reference to an attachment that was not stored.

@@ -26,8 +26,8 @@ Update architecture descriptions with each relevant task; preserve product requi
 | ID | Outcome and expected files | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- |
 | S1 | Desktop update installation, check, manual notification and package state; `src/electron/main/app-updates.ts` and tests | Shared check Promise; one result dialog; readiness retained after failed recheck; replacement revokes readiness; matching save confirmation; 15s/60s deadlines; rollback once. Existing unit, main/IPC contracts and `e2e/electron/app-updates.spec.ts` | High | Done |
-| S2 | Persistence execution phase, pending work and retained outcomes; `src/application/persistence-coordinator.ts` and tests; save scheduler only as necessary | Serialization/coalescing, requests during finalization, cleanup deferral/retry, failed-save retention, flush draining and discard-save without dropping cleanup. Coordinator/scheduler tests, persistence, attachment cleanup and shutdown E2E | High | Ready |
-| S3 | Browser backup lifecycle and separate picker/confirmation state; `src/web/backup/backup-controller.ts`, tests and neighboring pure state module if needed | Click-synchronous picker/permission, no startup prompts, pagehide/stale-worker guards, cancellation, retry, preference/worker failures. Controller tests and `e2e/web/backup.spec.mts` | High | Planned |
+| S2 | Persistence execution phase, pending work and retained outcomes; `src/application/persistence-coordinator.ts` and tests; save scheduler only as necessary | Serialization/coalescing, requests during finalization, cleanup deferral/retry, failed-save retention, flush draining and discard-save without dropping cleanup. Coordinator/scheduler tests, persistence, attachment cleanup and shutdown E2E | High | Done |
+| S3 | Browser backup lifecycle and separate picker/confirmation state; `src/web/backup/backup-controller.ts`, tests and neighboring pure state module if needed | Click-synchronous picker/permission, no startup prompts, pagehide/stale-worker guards, cancellation, retry, preference/worker failures. Controller tests and `e2e/web/backup.spec.mts` | High | Ready |
 | S4 | Complete desktop import/export operation state; `src/application/notes-archive/desktop-data-operations.ts` and tests | Retain prepared import across export from confirmation; cancellation/stale progress/menu/dispose; distinguish pre-commit failure from ambiguous commit requiring restart with writes suspended. Archive contracts and export/import/recovery E2E | High | Planned |
 | S5 | Search hidden/editing/confirmed modes, separate count/navigation jobs; `src/application/search-session.ts` and tests | Recall, empty-draft fallback, cancel restoration, no navigation during drafting, context invalidation and stale response rejection. Session tests and local-search, vim-search, agenda-search E2E | Moderate if confined to session metadata | Planned |
 | S6 | Explicit quit handshake; `src/electron/main/quit-handshake.ts` and tests | Matching confirmation, duplicate suppression, timeout/retry, force, microtask scheduling and terminal idempotence. Unit and real menu/window/shutdown failure coverage | High | Planned |
@@ -71,16 +71,23 @@ No pre-commit manual owner checks are currently identified for internal refactor
 | --- | --- | --- |
 | S1 inspection, focused unit and Electron update E2E | Native file editing, read-only shell fallback, named test workflows | Verified this session; baseline 28 unit and 8 Electron tests passed |
 | Independent planning | Configured Planner | Completed |
-| Independent review | Configured Reviewer | Verified on S1; no meaningful issues |
-| High Risk full checks and audit | Named host workflows | Verified on S1; development-only moderate audit findings fall under the standing exception |
-| S3 browser backup | Chromium container and filesystem support | Unverified; missing preparation may require owner-only `make setup` |
+| Independent review | Configured Reviewer | Verified on S1/S2; no meaningful issues |
+| High Risk full checks and audit | Named host workflows | Full checks/E2E verified on S1/S2; unchanged dependency audit has development-only moderate findings under the standing exception |
+| S3 browser backup | Chromium container and filesystem support | Docker/OrbStack and prepared images verified; exact image compatibility and real browser execution remain unverified. Missing preparation may require owner-only `make setup` |
 | Initiative closure | Owner accepts final delivered commit | Pending final delivery |
 
 ## Exact next task
 
-Implement S2: explicit persistence execution phase, pending work and retained
-outcomes. S1 is implemented, independently reviewed and fully validated.
-The seven-task scope and continuation authorization remain unchanged.
+Implement S3: browser backup lifecycle and separate picker/confirmation state.
+S1 (`4c19bdc`) and S2 are implemented, independently reviewed and fully validated.
+The scheduler, persistence services, serialization and Promise scheduling remain
+unchanged by S2. Its new cases cover a concurrent save inheriting cleanup after
+either a save or cleanup failure. No unresolved findings or validation blockers.
+
+This primary session completes two substantive task commits. Start S3 in a fresh
+session: its Worker, permission, IndexedDB and dialog lifetimes require a new
+bounded transition inventory. The seven-task scope and continuation authorization
+remain unchanged; no renewed implementation approval is needed.
 
 ## Resume prompt
 
