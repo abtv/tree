@@ -61,6 +61,44 @@ function fixture() {
 }
 
 describe('viewport reveal lifecycle', () => {
+  it.each(['layout', 'resize', 'observer', 'scroll'])(
+    'relinquishes an end jump before a %s correction even when content has grown',
+    (signal) => {
+      const { viewport, row, reveal } = fixture()
+      reveal.beginRegion(
+        row,
+        () => new DOMRect(0, 700, 400, 200),
+        () => true,
+      )
+      Object.defineProperty(viewport, 'scrollHeight', { value: 10100 })
+      viewport.scrollTop = 9500
+
+      if (signal === 'layout') notifyViewportLayout()
+      else if (signal === 'resize') window.dispatchEvent(new Event('resize'))
+      else if (signal === 'observer') notify()
+      else viewport.dispatchEvent(new Event('scroll'))
+      notifyViewportLayout()
+
+      expect(centerRectInViewport).toHaveBeenCalledOnce()
+      expect(observed.size).toBe(0)
+    },
+  )
+
+  it.each([
+    { extent: 10100, top: 1040 },
+    { extent: 9900, top: 960 },
+  ])('retains native anchoring within the content change: %j', ({ extent, top }) => {
+    const { viewport, row, reveal } = fixture()
+    reveal.begin(row, true, () => true)
+    Object.defineProperty(viewport, 'scrollHeight', { value: extent })
+    viewport.scrollTop = top
+
+    notifyViewportLayout()
+
+    expect(revealInViewport).toHaveBeenCalledTimes(2)
+    expect(observed.size).toBe(3)
+  })
+
   it('remeasures an opening region while layout settles and releases it on the next command', () => {
     const { row, reveal } = fixture()
     let region: DOMRect | undefined

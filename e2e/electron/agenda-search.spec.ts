@@ -220,7 +220,7 @@ test('uses the day origin for search and cancels a pending jump on a newer day s
   await expect(window.locator(`${row(later, 'child')} .node-input`)).toBeFocused()
 
   await window.clock.install()
-  await window.clock.pauseAt(new Date())
+  await window.clock.pauseAt(Date.now() + 1000)
   await window.keyboard.press('n')
   await window.locator(header(day)).click()
   await window.clock.runFor(1000)

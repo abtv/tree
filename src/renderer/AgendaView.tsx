@@ -263,11 +263,18 @@ export function AgendaView({
   const updateViewport = useCallback(() => {
     const element = listRef.current
     if (element === null) return
+    // Capture an explicit end jump before mounting wrapped rows increases the estimated extent.
+    const scroller = viewportScroller()
+    viewportState.followEnd(
+      scroller !== undefined &&
+        scroller.scrollTop > 0 &&
+        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+    )
     const top = element.getBoundingClientRect().top
     const start = Math.max(0, viewportBounds().top - top)
     const end = Math.max(0, viewportBounds().bottom - top)
     setViewport((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
-  }, [])
+  }, [viewportState])
   useLayoutEffect(() => {
     if (windowed) {
       // Newly measured path labels can grow the list after a jump to its estimated end.
@@ -289,12 +296,6 @@ export function AgendaView({
     // Replace the anchored window in this event; it retains its previous paint until delivery.
     // Flush only this external event; layout-effect updates keep their existing commit ordering.
     const unsubscribe = onViewportScroll(() => {
-      const scroller = viewportScroller()
-      viewportState.followEnd(
-        scroller !== undefined &&
-          scroller.scrollTop > 0 &&
-          scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
-      )
       flushSync(updateViewport)
     })
     globalThis.addEventListener('resize', updateViewport)

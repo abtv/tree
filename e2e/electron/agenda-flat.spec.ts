@@ -243,9 +243,14 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const viewport = window.locator('.scroll-viewport')
+    await expect(window.getByRole('textbox', { name: 'Agenda node item-0' })).toBeInViewport()
     expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
 
-    await viewport.evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+    await viewport.evaluate((element) => {
+      element.scrollTo({ top: element.scrollHeight })
+      // A pending geometry notification must not restore the opening Today position before scroll delivery.
+      globalThis.dispatchEvent(new Event('resize'))
+    })
     const last = window.getByRole('textbox', { name: 'Agenda node item-179' })
     await expect(last).toBeInViewport()
     await last.click()

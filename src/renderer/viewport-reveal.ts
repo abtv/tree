@@ -38,9 +38,23 @@ export function createViewportReveal() {
     observer?.disconnect()
     observedElement = undefined
   }
+  const rememberScroll = (): void => {
+    const { top, max } = metrics()
+    expectedScroll = top
+    expectedMax = max
+  }
+  const scrollIsCurrent = (): boolean => {
+    const { top, max } = metrics()
+    if (top === expectedScroll) return true
+    const delta = top - expectedScroll
+    const growth = max - expectedMax
+    // Native anchoring can move within the changed extent. A larger or opposite jump takes over.
+    return growth !== 0 && delta >= Math.min(0, growth) - 1 && delta <= Math.max(0, growth) + 1
+  }
   const correct = (): void => {
     if (intent === undefined) return
-    if (!intent.isCurrent()) return cancel()
+    // Resize/layout can arrive before the scroll event that relinquishes an older reveal.
+    if (!intent.isCurrent() || !scrollIsCurrent()) return cancel()
     const element = intent.element()
     // A counted motion can end outside the mounted window. Retain its intent until React mounts it.
     if (element === undefined) return
@@ -51,9 +65,7 @@ export function createViewportReveal() {
       centerRectInViewport(rect)
     } else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
     else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext, element)
-    const { top, max } = metrics()
-    expectedScroll = top
-    expectedMax = max
+    rememberScroll()
     if (typeof ResizeObserver === 'undefined' || observedElement === element) return
     observer ??= new ResizeObserver(correct)
     observer.disconnect()
@@ -66,16 +78,19 @@ export function createViewportReveal() {
   const begin = (element: Element, keepContext: boolean, isCurrent: () => boolean): void => {
     cancel()
     intent = { element: () => element, keepContext, isCurrent }
+    rememberScroll()
     correct()
   }
   const beginLine = (element: () => HTMLElement | undefined, cursor: number, isCurrent: () => boolean): void => {
     cancel()
     intent = { element, cursor, keepContext: true, isCurrent }
+    rememberScroll()
     correct()
   }
   const beginRegion = (element: Element, region: () => DOMRect | undefined, isCurrent: () => boolean): void => {
     cancel()
     intent = { element: () => element, region, keepContext: false, isCurrent }
+    rememberScroll()
     correct()
   }
   const hasLine = (): boolean => intent?.cursor !== undefined && intent.isCurrent()
@@ -83,12 +98,7 @@ export function createViewportReveal() {
     refreshViewportContext()
     const onScroll = (): void => {
       if (intent === undefined) return
-      const { top, max } = metrics()
-      if (top === expectedScroll) return
-      // Native anchoring during content growth is part of geometry settlement. Other offset
-      // changes (including scrollbar dragging and drag auto-scroll) relinquish navigation control.
-      if (max !== expectedMax) correct()
-      else cancel()
+      if (metrics().top !== expectedScroll) correct()
     }
     const onKey = (event: KeyboardEvent): void => {
       if (intent?.region !== undefined || ['PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) cancel()
