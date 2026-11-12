@@ -315,6 +315,10 @@ heading and Agenda day headings are not numbered. Agenda counts each visible
 direct-match node occurrence, including repeated occurrences on different
 days. Changing view, scope or folds recomputes the numbers for that view.
 
+Numbering stays independent of wrapping. In Vim Normal, `j`/`k` still follow
+visual text lines (§20.2.9, §23.4), so the caret can move while the node's number
+stays the same.
+
 Numbers occupy a separate, muted, right-aligned column to the left of the outline,
 aligned with each node's first text line. They do not replace bullets or fold
 controls, enter copied text, or change selection, caret, editing mode or pending
