@@ -35,7 +35,7 @@ it('preserves counted find meaning and consumes each sequence once across both s
         state.lastChange = remembered
 
         for (const digit of String(count)) appendVimCount(state, digit, surface)
-        state.pending = { ...state.pending!, operator: 'd' }
+        state.pending = { count: state.pending!.count, motionCount: '', operator: 'd' }
         for (const digit of String(motionCount)) appendVimCount(state, digit, surface)
         beginVimCharacter(state, command, 'normal')
         const completed = takeVimCharacter(state, character)
@@ -134,8 +134,48 @@ type WriteOp =
   | { slot: 'clearVisualRange' }
   | { slot: 'clearCommandAssembly' }
 
-const pendingArbitrary = fc.option(
-  fc.record({ count: fc.string({ maxLength: 3 }), motionCount: fc.string({ maxLength: 3 }) }),
+const commandCounts = { count: fc.string({ maxLength: 3 }), motionCount: fc.string({ maxLength: 3 }) }
+const operator = fc.constantFrom(
+  'd' as const,
+  'y' as const,
+  'c' as const,
+  's' as const,
+  'u' as const,
+  'U' as const,
+  '~' as const,
+)
+const pendingArbitrary: fc.Arbitrary<VimPendingCommand | undefined> = fc.option(
+  fc.oneof(
+    fc.record(commandCounts),
+    fc.record({ ...commandCounts, operator }),
+    fc.record({ ...commandCounts, prefix: fc.constantFrom('g' as const, 'i' as const, 'a' as const, 'z' as const) }),
+    fc.record({ ...commandCounts, operator, prefix: fc.constantFrom('g' as const, 'i' as const, 'a' as const) }),
+    fc.record({
+      ...commandCounts,
+      awaiting: fc.constantFrom('f' as const, 'F' as const, 't' as const, 'T' as const, 'r' as const),
+    }),
+    fc.record({
+      ...commandCounts,
+      operator,
+      awaiting: fc.constantFrom('f' as const, 'F' as const, 't' as const, 'T' as const),
+    }),
+    fc.record({
+      ...commandCounts,
+      surround: fc.oneof(
+        fc.record({ stage: fc.constant('delimiter' as const), start: fc.nat(10), end: fc.nat(20) }),
+        fc.record({
+          stage: fc.constant('target' as const),
+          operation: fc.constantFrom('delete' as const, 'change' as const),
+          count: fc.integer({ min: 1, max: 9 }),
+        }),
+        fc.record({
+          stage: fc.constant('replacement' as const),
+          target: characterKey,
+          count: fc.integer({ min: 1, max: 9 }),
+        }),
+      ),
+    }),
+  ),
   { nil: undefined },
 )
 const repeatChangeArbitrary: fc.Arbitrary<VimRepeatChange> = fc.oneof(

@@ -65,6 +65,21 @@ describe('createVimCommandState', () => {
 })
 
 describe('pending command input', () => {
+  it.each<VimPendingCommand>([
+    { count: '2', motionCount: '', prefix: 'g' },
+    { count: '', motionCount: '', surround: { stage: 'replacement', target: '(', count: 1 } },
+  ])('keeps an unresolved prefix or surround available to its adapter (%j)', (pending) => {
+    const state = populatedState()
+    state.pending = pending
+
+    const accepted = beginVimCharacter(state, 'f', 'normal')
+
+    expect(accepted).toBe(false)
+    expect(state.pending).toBe(pending)
+    expect(takeVimCharacter(state, 'x')).toBeUndefined()
+    expect(state.lastFind).toBe(find)
+  })
+
   it.each(['0', 'g', 'ArrowLeft'])('leaves a non-count key available to the command adapter (%s)', (key) => {
     const state = createVimCommandState()
 
@@ -82,7 +97,7 @@ describe('pending command input', () => {
 
       appendVimCount(state, '2', surface)
       appendVimCount(state, '0', surface)
-      state.pending = { ...state.pending!, operator: 'd' }
+      state.pending = { count: state.pending!.count, motionCount: '', operator: 'd' }
       appendVimCount(state, '3', surface)
       appendVimCount(state, '0', surface)
       beginVimCharacter(state, 'f', 'normal')

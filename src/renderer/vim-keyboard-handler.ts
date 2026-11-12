@@ -534,8 +534,7 @@ export function handleVimKey(
     // `s` after a case operator is not a surround; it falls through and cancels the command.
     if (event.key === 's' && (pending.operator === 'd' || pending.operator === 'y' || pending.operator === 'c')) {
       if (pending.operator === 'y') {
-        pending.operator = 's'
-        commandState.pending = pending
+        commandState.pending = { ...pending, operator: 's' }
       } else
         commandState.pending = {
           count: '',
@@ -559,13 +558,21 @@ export function handleVimKey(
     }
     if (beginVimCharacter(commandState, event.key, 'operator')) return handled()
     if (event.key === 'g') {
-      pending.prefix = 'g'
-      commandState.pending = pending
+      commandState.pending = {
+        count: pending.count,
+        motionCount: pending.motionCount,
+        operator: pending.operator,
+        prefix: 'g',
+      }
       return handled()
     }
     if (event.key === 'i' || event.key === 'a') {
-      pending.prefix = event.key
-      commandState.pending = pending
+      commandState.pending = {
+        count: pending.count,
+        motionCount: pending.motionCount,
+        operator: pending.operator,
+        prefix: event.key,
+      }
       return handled()
     }
     if (event.key === ';' || event.key === ',') {
@@ -600,13 +607,11 @@ export function handleVimKey(
     return handled()
   }
   if (!visual && (event.key === 'd' || event.key === 'y' || event.key === 'c')) {
-    pending.operator = event.key
-    commandState.pending = pending
+    commandState.pending = { count: pending.count, motionCount: pending.motionCount, operator: event.key }
     return handled()
   }
   if (visual && (event.key === 'i' || event.key === 'a')) {
-    pending.prefix = event.key
-    commandState.pending = pending
+    commandState.pending = { count: pending.count, motionCount: pending.motionCount, prefix: event.key }
     return handled()
   }
   clearPending(commandState)

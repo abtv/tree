@@ -1242,6 +1242,14 @@ Standard (non-Vim) editing is the Vim layer switched off, not a second editor. `
 
 `vim-command-state.ts` owns shared count accumulation and character-command assembly for editable text and Agenda rows. It consumes an awaited character before command classification, records character finds, retains operator counts, and leaves execution to each adapter. The two count policies preserve Agenda's different zero/prefix handling. Prefix dispatch, row-count limits, readonly replacement, structural commands and surround stages remain with their specialized adapters; this is not a shared Vim executor.
 
+`VimPendingCommand` is a local union of count, operator, prefix, awaited-character
+and surround variants. Existing required payload fields discriminate the variants;
+an absent pending command is idle. Prefix and character variants can carry an
+operator, while surround stages exclude operators, prefixes and awaited characters.
+Handlers construct complete variants instead of mutating an optional field into
+another variant. Character assembly refuses an unresolved prefix or surround stage;
+the adapters already dispatch those stages before character assembly.
+
 These coordination transitions add no document traversal, subscriptions, disk writes or syncs. They retain only the existing pending command and session. Count input remains proportional to its digit string, and character completion parses the same counts as before; no history of commands is retained.
 
 Each caret transition performs constant-time arithmetic and retains only a cursor and optional return position. Counted navigation invokes one transition per motion step as before. It adds no disk writes or syncs, no work that scales with document size or edit count, and no growing history. The bounded property tests exercise counted motion and return-position invariants across varied text lengths and node layouts, and a bounded mixed-sequence guard compares the production Vim keyboard handler and `EditorStore` with an independent expected-state model over generated interaction sequences.

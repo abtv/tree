@@ -90,15 +90,52 @@ export type VimSurroundStage =
   | { stage: 'target'; operation: 'delete' | 'change'; count: number }
   | { stage: 'replacement'; target: string; count: number }
 
-export interface VimPendingCommand {
+interface VimCommandCounts {
   count: string
-  /** `u`, `U`, and `~` are the case operators `gu`, `gU`, and `g~`; `s` is the `ys` surround. */
-  operator?: 'd' | 'y' | 'c' | 's' | 'u' | 'U' | '~'
   motionCount: string
-  awaiting?: 'f' | 'F' | 't' | 'T' | 'r'
-  prefix?: 'g' | 'i' | 'a' | 'z'
-  surround?: VimSurroundStage
 }
+
+/** `u`, `U`, and `~` are the case operators `gu`, `gU`, and `g~`; `s` is the `ys` surround. */
+type VimPendingOperator = 'd' | 'y' | 'c' | 's' | 'u' | 'U' | '~'
+
+type VimCountPending = {
+  operator?: never
+  prefix?: never
+  awaiting?: never
+  surround?: never
+}
+
+type VimOperatorPending = {
+  operator: VimPendingOperator
+  prefix?: never
+  awaiting?: never
+  surround?: never
+}
+
+type VimPrefixPending = {
+  prefix: 'g' | 'i' | 'a' | 'z'
+  operator?: VimPendingOperator
+  awaiting?: never
+  surround?: never
+}
+
+type VimCharacterPending = {
+  awaiting: 'f' | 'F' | 't' | 'T' | 'r'
+  operator?: VimPendingOperator
+  prefix?: never
+  surround?: never
+}
+
+type VimSurroundPending = {
+  surround: VimSurroundStage
+  operator?: never
+  prefix?: never
+  awaiting?: never
+}
+
+/** Existing payload fields discriminate local assembly variants; undefined pending means idle. */
+export type VimPendingCommand = VimCommandCounts &
+  (VimCountPending | VimOperatorPending | VimPrefixPending | VimCharacterPending | VimSurroundPending)
 
 /**
  * The fold transitions the `z` keys request (`docs/PRODUCT.md` §20.2.15). The per-node commands act

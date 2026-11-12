@@ -86,8 +86,10 @@ export function beginVimCharacter(
   context: 'normal' | 'visual' | 'operator',
 ): boolean {
   if (!(['f', 'F', 't', 'T'].includes(key) || (key === 'r' && context === 'normal'))) return false
+  const pending = state.pending ?? { count: '', motionCount: '' }
+  if (pending.prefix !== undefined || pending.surround !== undefined) return false
   state.pending = {
-    ...(state.pending ?? { count: '', motionCount: '' }),
+    ...pending,
     awaiting: key as NonNullable<VimPendingCommand['awaiting']>,
   }
   return true

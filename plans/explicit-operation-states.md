@@ -9,7 +9,7 @@ This is internal refactoring: preserve behavior, public contracts, persistence
 formats, ownership boundaries, and existing dependencies. Use separate local
 state models; do not introduce a common FSM framework.
 
-Status: In progress. Coding tool: Codex. Source: the seven-item recommendation
+Status: Awaiting owner acceptance. Coding tool: Codex. Source: the seven-item recommendation
 in the conversation, independently assessed by the configured Planner.
 
 Authoritative context: [workflow](../AGENTS.md), [architecture](../docs/ARCHITECTURE.md),
@@ -31,7 +31,7 @@ Update architecture descriptions with each relevant task; preserve product requi
 | S4 | Complete desktop import/export operation state; `src/application/notes-archive/desktop-data-operations.ts` and tests | Retain prepared import across export from confirmation; cancellation/stale progress/menu/dispose; distinguish pre-commit failure from ambiguous commit requiring restart with writes suspended. Archive contracts and export/import/recovery E2E | High | Done |
 | S5 | Search hidden/editing/confirmed modes, separate count/navigation jobs; `src/application/search-session.ts` and tests | Recall, empty-draft fallback, cancel restoration, no navigation during drafting, context invalidation and stale response rejection. Session tests and local-search, vim-search, agenda-search E2E | Moderate; confined to session metadata | Done |
 | S6 | Explicit quit handshake; `src/electron/main/quit-handshake.ts` and tests | Matching confirmation, duplicate suppression, timeout/retry, force, microtask scheduling and terminal idempotence. Unit and real menu/window/shutdown failure coverage | High | Done |
-| S7 | Explicit Vim pending-command variants; `src/renderer/vim-keyboard-types.ts`, `vim-command-state.ts`, affected handlers and tests | Inventory producers/consumers first; retain editor/Agenda zero/count rules, operator motions, awaited characters, prefixes, surround, Escape/reset and mode/surface transitions. Existing unit/property and representative Vim E2E | High for expected shared-handler scope | Ready |
+| S7 | Explicit Vim pending-command variants; `src/renderer/vim-keyboard-types.ts`, `vim-command-state.ts`, affected handlers and tests | Inventory producers/consumers first; retain editor/Agenda zero/count rules, operator motions, awaited characters, prefixes, surround, Escape/reset and mode/surface transitions. Existing unit/property and representative Vim E2E | High | Done |
 
 High Risk requires `npm run check`, full `npm run test:e2e`, `npm run audit`
 and independent review before each commit. The full unit coverage stage subsumes
@@ -71,20 +71,28 @@ No pre-commit manual owner checks are currently identified for internal refactor
 | --- | --- | --- |
 | S1 inspection, focused unit and Electron update E2E | Native file editing, read-only shell fallback, named test workflows | Verified this session; baseline 28 unit and 8 Electron tests passed |
 | Independent planning | Configured Planner | Completed |
-| Independent review | Configured Reviewer | Verified on S1-S4; no meaningful issues |
-| High Risk full checks and audit | Named host workflows | Full checks/E2E verified on S1-S4; unchanged dependency audit has development-only moderate findings under the standing exception |
+| Independent review | Configured Reviewer | Completed separately on S1-S7; no meaningful issues |
+| High Risk full checks and audit | Named host workflows | Full checks/E2E verified on S1-S4, S6 and S7; S5 passed its Moderate tier. Dependency audit has 17 development-only moderate findings under the standing exception; production-only audit found zero vulnerabilities |
 | S3 browser backup | Chromium container and filesystem support | Verified through the full maintained built-browser workflow, including real folder/Worker backup cases |
 | Initiative closure | Owner accepts final delivered commit | Pending final delivery |
 
 ## Exact next task
 
-Implement S7: explicit Vim pending-command variants. S1 (`4c19bdc`), S2 (`9452437`),
-S3 (`78538ef`), S4 (`8c15b64`), S5 (`f5f7196`) and S6 are implemented, independently reviewed
-and validated. S5 stayed within session metadata (Moderate Risk): full check and
+All seven implementation tasks are complete, independently reviewed and validated.
+S1 (`4c19bdc`), S2 (`9452437`), S3 (`78538ef`), S4 (`8c15b64`),
+S5 (`f5f7196`) and S6 (`7157fcb`) precede the S7 commit containing this update.
+S5 stayed within session metadata (Moderate Risk): full check and
 27 focused search Electron cases passed; no meaningful review findings. S6 passed
 the full check (6136 tests) and all 965 local Electron cases. Its independent
 review found no meaningful issues. Dependency audit retains 17 moderate
 development-only findings; production-only audit reports zero vulnerabilities.
+
+S7 uses local count/operator/prefix/character/surround variants discriminated by
+their existing payload fields. It preserves adapter dispatch order and separate
+editor/Agenda count policies. Its full check passed 6138 tests and its full local
+Electron run passed all 965 cases. Independent review traced the producers,
+consumers and reset paths and found no meaningful issues. No product changes,
+new persistence fields, dependencies or unresolved findings remain.
 The scheduler, persistence services, serialization and Promise scheduling remain
 unchanged by S2. Its new cases cover a concurrent save inheriting cleanup after
 either a save or cleanup failure. No unresolved findings or validation blockers.
@@ -95,13 +103,13 @@ cached projection, and its shared replacement attempt records whether commit beg
 The existing cancellation/disposal order is preserved, including preparation reset
 after awaited cleanup. No product changes or unresolved review findings.
 
-The fresh primary session resumes after the earlier four-task limit. Continue
-S7 without renewed scope approval. This session has completed two tasks.
+The fresh primary session completed S5-S7 in three separate task commits.
+No implementation tasks remain. The exact next action is final owner acceptance
+of the delivered result. Keep this plan and index awaiting that acceptance;
+after acceptance, retire the plan and index entry in a documentation-only commit.
 
 ## Resume prompt
 
-Continue the authorized Explicit Operation States initiative. Read this plan,
-Git status/history and any WORKING_PLAN.md, then resume the exact next task.
-The owner authorized all seven sequential refactors and one commit per task.
-Preserve behavior and keep independent machines. Retain final owner acceptance
-and the four-task-commits-per-primary-session limit.
+All seven authorized refactors are delivered. Recover final acceptance status
+from this plan and the conversation before retiring the plan. Do not invent
+additional implementation tasks or treat continuation as owner acceptance.
