@@ -40,6 +40,7 @@ export interface VimTextCommandState {
   finishInsert?: VimKeyboardState['finishInsert']
   getCaretState?: VimKeyboardState['getCaretState']
   applyCaretState?: VimKeyboardState['applyCaretState']
+  revealVerticalCaret?: VimKeyboardState['revealVerticalCaret']
   register?: VimKeyboardState['register']
   nodeVisual?: Pick<VimKeyboardState['nodeVisual'], 'exit'>
   setMode: VimKeyboardState['setMode']

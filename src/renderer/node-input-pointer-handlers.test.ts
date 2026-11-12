@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
-
-import type { MouseEvent } from 'react'
+import {
+  replaceClickMoved,
+  continueReplaceClickAfterBlur,
+  beginReplaceClick,
+  beginReplaceSession,
+  createVimEditSessionState,
+} from './vim-edit-session'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import { getCaret, setCaret } from './editor-dom'
@@ -8,7 +13,8 @@ import { createPointerHandlers, preventReadOnlyLinkFocus } from './node-input-po
 import { createRealStoreHarness } from './test/real-store-harness'
 import { beginStructuralOpen, createVimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
-import { beginReplaceClick, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
+
+import type { MouseEvent } from 'react'
 import { OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
 import type { VimTextCommandState } from './vim-session-finish'
@@ -265,7 +271,7 @@ describe('blur', () => {
 
     expect(f.deps.finishVimReplace).toHaveBeenCalledOnce()
     expect(f.deps.changeVimMode).not.toHaveBeenCalled()
-    expect(f.session.replaceClickMoved).toBe(true)
+    expect(replaceClickMoved(f.session)).toBe(true)
   })
 
   it('ends Replace when the window lost focus during the press', async () => {
@@ -335,7 +341,7 @@ describe('mouse down', () => {
     f.handlers().onMouseDown(mouse(textarea('hello')))
 
     expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
-    expect(f.session.replaceClick).toBe(true)
+    expect(f.session.replaceGesture.kind).toBe('pressed')
   })
 
   it.each([
@@ -349,7 +355,7 @@ describe('mouse down', () => {
 
     f.handlers().onMouseDown(mouse(textarea('hello'), extra))
 
-    expect(f.session.replaceClick === true).toBe(marked)
+    expect(f.session.replaceGesture.kind !== 'idle').toBe(marked)
   })
 
   // @requirement PRODUCT.md §1.5
@@ -362,7 +368,7 @@ describe('mouse down', () => {
 
     f.handlers(OTHER_SHORTCUTS).onMouseDown(mouse(textarea('hello'), extra))
 
-    expect(f.session.replaceClick === true).toBe(marked)
+    expect(f.session.replaceGesture.kind !== 'idle').toBe(marked)
   })
 
   it('interrupts a structural session even when there is no blur', async () => {
@@ -398,7 +404,7 @@ describe('mouse up', () => {
     const f = await fixture({ mode: 'replace' })
 
     beginReplaceClick(f.session)
-    f.session.replaceClickMoved = moved
+    if (moved) continueReplaceClickAfterBlur(f.session, true)
     const input = textarea('hello word tail')
     input.focus()
     input.setSelectionRange(6, 10)
@@ -438,7 +444,7 @@ describe('mouse up', () => {
     f.handlers().onMouseUp(mouse(input))
 
     expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 2, typed: '' })
-    expect(f.session.replaceClick).toBeUndefined()
+    expect(f.session.replaceGesture.kind).toBe('idle')
     expect(f.deps.applyCaretState).toHaveBeenCalledExactlyOnceWith(
       'node',
       expect.objectContaining({ cursor: 2 }),
@@ -472,7 +478,7 @@ describe('mouse up', () => {
     f.handlers().onMouseUp(mouse(input))
 
     expect(f.session.replace).toBeUndefined()
-    expect(f.session.replaceClick).toBeUndefined()
+    expect(f.session.replaceGesture.kind).toBe('idle')
     expect(f.deps.changeVimMode).not.toHaveBeenCalled()
   })
 
@@ -480,7 +486,7 @@ describe('mouse up', () => {
     const f = await fixture({ mode: 'replace' })
 
     beginReplaceClick(f.session)
-    f.session.replaceClickMoved = true
+    continueReplaceClickAfterBlur(f.session, true)
     const input = textarea('hello')
     input.focus()
     input.setSelectionRange(1, 3)
@@ -498,7 +504,7 @@ describe('mouse up', () => {
     f.handlers().onMouseUp(mouse(textarea('hello', 2)))
 
     expect(f.session.replace).toBeUndefined()
-    expect(f.session.replaceClick).toBeUndefined()
+    expect(f.session.replaceGesture.kind).toBe('idle')
   })
 
   it('publishes the pointer caret in Normal mode', async () => {

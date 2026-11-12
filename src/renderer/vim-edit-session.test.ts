@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import type { NodeForest } from '../application/editor-store'
-import type { TreeNode } from '../domain/document'
 import {
+  replaceClickAgendaKey,
+  replaceClickMoved,
+  continueReplaceClickAfterBlur,
+  settleReplaceClick,
   applyReplaceKey,
   beginInsertSession,
   beginReplaceSession,
@@ -18,6 +19,9 @@ import {
   visualCommandRegister,
   type VimReplaceSession,
 } from './vim-edit-session'
+import { describe, expect, it } from 'vitest'
+import type { NodeForest } from '../application/editor-store'
+import type { TreeNode } from '../domain/document'
 import type { VimRegister } from './vim-keyboard-types'
 
 describe('diffTypedText', () => {
@@ -105,21 +109,47 @@ describe('resolveReplaceCommit', () => {
 })
 
 describe('VimEditSessionState', () => {
+  it('settles only the released press and rejects a timer belonging to an earlier click', () => {
+    const state = createVimEditSessionState()
+
+    expect(settleReplaceClick(state)).toBeUndefined()
+    expect(continueReplaceClickAfterBlur(state, true)).toBe(false)
+
+    beginReplaceClick(state, 'node:1:a')
+    expect(continueReplaceClickAfterBlur(state, false)).toBe(false)
+    const old = settleReplaceClick(state)!
+
+    expect(state.replaceGesture.kind).toBe('settling')
+    expect(settleReplaceClick(state)).toBeUndefined()
+    expect(continueReplaceClickAfterBlur(state, true)).toBe(true)
+
+    beginReplaceClick(state, 'node:2:a')
+
+    expect(replaceClickMoved(state)).toBe(false)
+    expect(takeReplaceClick(state, old)).toBe(false)
+    expect(replaceClickAgendaKey(state)).toBe('node:2:a')
+
+    const current = settleReplaceClick(state)!
+
+    expect(takeReplaceClick(state, current)).toBe(true)
+    expect(takeReplaceClick(state, current)).toBe(false)
+    expect(state.replaceGesture.kind).toBe('idle')
+  })
   it('consumes an Agenda row click once and clears its destination and blur state', () => {
     const state = createVimEditSessionState()
 
     beginReplaceClick(state, 'day:1')
-    state.replaceClickMoved = true
+    continueReplaceClickAfterBlur(state, true)
 
-    expect(state.replaceClickAgendaKey).toBe('day:1')
+    expect(replaceClickAgendaKey(state)).toBe('day:1')
     expect(takeReplaceClick(state)).toBe(true)
-    expect(state.replaceClickAgendaKey).toBeUndefined()
-    expect(state.replaceClickMoved).toBeUndefined()
+    expect(replaceClickAgendaKey(state)).toBeUndefined()
+    expect(replaceClickMoved(state)).toBe(false)
     expect(takeReplaceClick(state)).toBe(false)
 
     beginReplaceClick(state)
 
-    expect(state.replaceClickAgendaKey).toBeUndefined()
+    expect(replaceClickAgendaKey(state)).toBeUndefined()
   })
 
   it('starts with an empty register and no pending session', () => {

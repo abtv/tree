@@ -35,6 +35,7 @@ export const AgendaRow = memo(function AgendaRow({
   pinnedOffset = 0,
   mirror = false,
   marks = NO_MARKS,
+  caretAtStart = false,
   rowRef,
   onSelect,
   onToggle,
@@ -57,6 +58,7 @@ export const AgendaRow = memo(function AgendaRow({
   mirror?: boolean
   /** The caret and selection marks of the selected row when it has no editor. */
   marks?: readonly CaretMark[] | undefined
+  caretAtStart?: boolean
   rowRef: (key: string, element: HTMLDivElement | null) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
@@ -81,6 +83,7 @@ export const AgendaRow = memo(function AgendaRow({
       <div
         className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${mirror ? ' agenda-mirror' : ''}`}
         data-agenda-key={row.key}
+        data-caret-end={caretAtStart ? 'start' : 'end'}
         data-depth={depth}
         data-node-id={row.kind === 'node' ? row.nodeId : undefined}
         data-has-attachment={row.kind === 'node' && node?.attachment !== undefined}

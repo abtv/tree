@@ -1,6 +1,6 @@
+import { activeAgendaOccurrence, openAgendaState } from './agenda-state'
 import { expect, it, vi } from 'vitest'
 import * as agendaModule from './agenda-reconcile'
-import { openAgendaState } from './agenda-state'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 import { isValidLocation, type Document } from '../domain/document'
@@ -85,7 +85,7 @@ it.each(['deleted', 'moved'] as const)(
     const agenda = {
       ...openAgendaState(location, 4, 100),
       selectedKey: 'node:100:a',
-      activeOccurrence: { nodeId: 'a', day: 100 },
+      activity: { kind: 'dated' as const, occurrence: { nodeId: 'a', day: 100 } },
     }
     const state: ReadySnapshot = {
       status: 'ready',
@@ -107,7 +107,7 @@ it.each(['deleted', 'moved'] as const)(
     expect(runtime.ready().location).toEqual({ currentParentId: 'scope', selectedNodeId: 'scope' })
     expect(runtime.ready().focus).toMatchObject({ nodeId: 'scope', cursor: 0 })
     expect(runtime.ready().agenda!.selectedKey).toBe('day:100')
-    expect(runtime.ready().agenda!.activeOccurrence).toBeUndefined()
+    expect(activeAgendaOccurrence(runtime.ready().agenda!)).toBeUndefined()
     expect(isValidLocation(changed, runtime.ready().location)).toBe(true)
   },
 )
@@ -129,7 +129,7 @@ it('calls the cache-release callback only when Agenda closes and reconciles an a
   const agenda = {
     ...openAgendaState(state.location, 4, 100),
     selectedKey: 'node:100:a',
-    activeOccurrence: { nodeId: 'a', day: 100 },
+    activity: { kind: 'dated' as const, occurrence: { nodeId: 'a', day: 100 } },
   }
 
   runtime.replaceReady({ ...state, agenda })
@@ -160,8 +160,7 @@ it('does not reconcile unchanged pinned content when only its focus intent chang
   const agenda = {
     ...openAgendaState(location, 0, 100),
     selectedKey: 'node:100:a',
-    activeOccurrence: occurrence,
-    pinnedOccurrence: occurrence,
+    activity: { kind: 'pinned-until-leave' as const, occurrence: occurrence },
   }
   const state: ReadySnapshot = {
     status: 'ready',

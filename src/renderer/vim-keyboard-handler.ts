@@ -1,3 +1,4 @@
+import { activeAgendaOccurrence } from '../application/agenda-state'
 import type { KeyboardEvent } from 'react'
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
 import {
@@ -611,23 +612,21 @@ export function handleVimKey(
   clearPending(commandState)
 
   if (!visual && event.key === '/' && store.getSnapshot().status === 'ready') {
+    const occurrence = snapshot.status === 'ready' ? activeAgendaOccurrence(snapshot.agenda) : undefined
     store.search.begin({
       nodeId: node.id,
       offset: cursor,
-      ...(snapshot.status === 'ready' && snapshot.agenda?.activeOccurrence !== undefined
-        ? { day: snapshot.agenda.activeOccurrence.day }
-        : {}),
+      ...(occurrence === undefined ? {} : { day: occurrence.day }),
     })
     return handled()
   }
   if (!visual && (event.key === 'n' || event.key === 'N')) {
+    const occurrence = snapshot.status === 'ready' ? activeAgendaOccurrence(snapshot.agenda) : undefined
     store.search.navigate(
       {
         nodeId: node.id,
         offset: cursor,
-        ...(snapshot.status === 'ready' && snapshot.agenda?.activeOccurrence !== undefined
-          ? { day: snapshot.agenda.activeOccurrence.day }
-          : {}),
+        ...(occurrence === undefined ? {} : { day: occurrence.day }),
       },
       event.key === 'n' ? 1 : -1,
       count,

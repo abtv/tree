@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { computeOffsets, ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
+import { ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
 import type { VisibleRow } from '../application/visible-rows'
 
 export interface ListLayout {
@@ -43,14 +43,45 @@ export function collectWindowIndices(windowRange: ListWindow): number[] {
 
 type KeyedRow = VisibleRow | { readonly key: string }
 
+// Row arrays are immutable projections. Weak keys release indexes with the retired projection;
+// only identities and uniform estimates are cached, never DOM measurements or document content.
+const estimatedLayouts = new WeakMap<readonly KeyedRow[], { layout: ListLayout; indices: Map<string, number> }>()
+
 function rowKey(row: KeyedRow): string {
   return 'key' in row ? row.key : row.node.id
 }
 
 export function buildLayout(rows: readonly KeyedRow[], heights: ReadonlyMap<string, number>): ListLayout {
-  const rowHeights = rows.map((row) => heights.get(rowKey(row)) ?? ROW_HEIGHT_ESTIMATE)
-  const { offsets, total } = computeOffsets(rowHeights)
-  return { offsets, total, count: rows.length }
+  let estimated = estimatedLayouts.get(rows)
+  if (estimated === undefined) {
+    const offsets = new Float64Array(rows.length + 1)
+    const indices = new Map<string, number>()
+    for (let index = 0; index < rows.length; index++) {
+      indices.set(rowKey(rows[index]!), index)
+      offsets[index + 1] = (index + 1) * ROW_HEIGHT_ESTIMATE
+    }
+    estimated = { layout: { offsets, total: rows.length * ROW_HEIGHT_ESTIMATE, count: rows.length }, indices }
+    estimatedLayouts.set(rows, estimated)
+  }
+
+  const changes: { index: number; delta: number }[] = []
+  for (const [key, height] of heights) {
+    const index = estimated.indices.get(key)
+    if (index !== undefined && height !== ROW_HEIGHT_ESTIMATE)
+      changes.push({ index, delta: height - ROW_HEIGHT_ESTIMATE })
+  }
+  if (changes.length === 0) return estimated.layout
+  changes.sort((left, right) => left.index - right.index)
+
+  const offsets = estimated.layout.offsets.slice()
+  let delta = 0
+  for (let index = 0; index < changes.length; index++) {
+    const change = changes[index]!
+    delta += change.delta
+    const end = changes[index + 1]?.index ?? rows.length
+    for (let offset = change.index + 1; offset <= end; offset++) offsets[offset]! += delta
+  }
+  return { offsets, total: estimated.layout.total + delta, count: rows.length }
 }
 
 export function pruneHeights(heights: Map<string, number>, rows: readonly KeyedRow[]): void {

@@ -84,7 +84,7 @@ import {
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
-import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
+import { focusedAgendaDay, applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
 import { dayNumberOf } from '../domain/calendar-date'
 import {
   agendaHistorySelection,
@@ -121,18 +121,16 @@ export class EditorStore {
     EditorSearch,
     'subscribe' | 'getResult' | 'begin' | 'edit' | 'cancelDraft' | 'confirm' | 'interruptNavigation' | 'navigate'
   > & { readonly session: Pick<EditorSearch['session'], 'getSnapshot'> } = this.searchOwner
-  private readonly runtime = new EditorRuntimeState(
-    () => this.agendaRowsCache.clear(),
-    this.agendaRowsCache,
-    (state) => {
-      for (const job of this.imageToTextJobs) {
-        if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) job.canceled = true
-      }
-      for (const catalog of this.tags.values()) catalog.update(state.document)
-      this.searchOwner.update(state)
-      this.recentNodesOwner.update(state.document)
-    },
-  )
+  private readonly runtime = new EditorRuntimeState(undefined, this.agendaRowsCache, (state) => {
+    if (state.agenda === undefined) this.agendaRowsCache.releaseIfStale(state.document)
+
+    for (const job of this.imageToTextJobs) {
+      if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) job.canceled = true
+    }
+    for (const catalog of this.tags.values()) catalog.update(state.document)
+    this.searchOwner.update(state)
+    this.recentNodesOwner.update(state.document)
+  })
   private readonly history = new EditorHistory()
   private readonly imageToTextJobs: Array<{ nodeId: NodeId; attachmentId: AttachmentId; canceled: boolean }> = []
   private imageToTextRunning = false
@@ -282,7 +280,7 @@ export class EditorStore {
     if (
       agenda.selectedKey !== state.agenda.selectedKey ||
       realSelection ||
-      agenda.focusedDay !== state.agenda.focusedDay
+      focusedAgendaDay(agenda) !== focusedAgendaDay(state.agenda)
     )
       this.endTextSession()
     this.runtime.replaceReady({
@@ -291,7 +289,10 @@ export class EditorStore {
       ...(realSelection
         ? {
             location: { ...state.location, selectedNodeId: selected.nodeId },
-            focus: this.runtime.newFocus(selected.nodeId, command.kind === 'select' ? (command.cursor ?? 0) : 0),
+            focus: {
+              ...this.runtime.newFocus(selected.nodeId, command.kind === 'select' ? (command.cursor ?? 0) : 0),
+              ...(command.kind === 'select' && command.revealLine ? { revealLine: true } : {}),
+            },
           }
         : {}),
     })

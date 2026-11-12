@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, screen } from '@testing-library/react'
+import { pinnedAgendaOccurrence, focusedAgendaDay } from '../application/agenda-state'
+import { act, fireEvent, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
 import { createAppHarness, settleApp } from './test/app-harness'
@@ -123,13 +124,47 @@ it.each([false, true])(
     await f.input(input, '')
     await f.press(input, 'Backspace')
     expect(f.node('a').text).toBe('')
-    expect(f.snapshot().agenda?.pinnedOccurrence?.nodeId).toBe('a')
+    expect(pinnedAgendaOccurrence(f.snapshot().agenda)?.nodeId).toBe('a')
     expect(f.store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'a')).toBe(true)
 
     act(() => f.store.applyAgenda({ kind: 'select', key: dayKey }))
     await settleApp()
     expect(f.node('a').text).toBe('')
     expect(f.store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'a')).toBe(false)
+  },
+)
+
+it.each([false, true].flatMap((vimEnabled) => [false, true].map((returned) => ({ vimEnabled, returned }))))(
+  'repeats Find from the native Agenda caret while the prompt retains focus (Vim $vimEnabled, returned $returned)',
+  async ({ vimEnabled, returned }) => {
+    const f = await createAppHarness({
+      vimEnabled,
+      document: { roots: [{ id: 'dated', text: 'apple apple apple 2026-10-08', children: [] }] },
+    })
+    act(() => {
+      f.store.openAgenda()
+      f.store.applyAgenda({ kind: 'select', key: `node:${today}:dated` })
+      if (returned) {
+        f.store.applyAgenda({ kind: 'focus-day', key: dayKey, scrollTop: 0 })
+        f.store.applyAgenda({ kind: 'return-timeline', key: dayKey })
+      }
+    })
+    await settleApp()
+    const editor = screen.getByRole('textbox', { name: 'Agenda node dated' })
+    await f.focus(editor, 0)
+    expect(f.snapshot().agenda?.activity.kind).toBe(returned ? 'inactive' : 'dated')
+    await f.press(editor, 'f', { metaKey: true })
+    const prompt = screen.getByRole('textbox', { name: 'Search' })
+    fireEvent.change(prompt, { target: { value: 'apple' } })
+    await settleApp()
+
+    for (const expected of ['2 / 3', '3 / 3']) {
+      await f.press(prompt, 'Enter')
+
+      expect(screen.getByText(expected)).toBeInTheDocument()
+      expect(prompt).toHaveFocus()
+      expect(f.snapshot().agenda?.activity.kind).toBe(returned ? 'inactive' : 'dated')
+    }
   },
 )
 
@@ -158,7 +193,7 @@ it('searches node text across folded days, excludes path labels and preserves fo
     f.store.applyAgenda({ kind: 'focus-day', key: dayKey, scrollTop: 0 })
   })
   await settleApp()
-  expect(f.snapshot().agenda?.focusedDay).toBe(today)
+  expect(focusedAgendaDay(f.snapshot().agenda)).toBe(today)
   expect(f.container.querySelectorAll('.agenda-path-label')).toHaveLength(3)
   expect(f.container.querySelectorAll('.agenda-focused-heading')).toHaveLength(1)
 })
@@ -203,7 +238,7 @@ it('retains the last dated day while editing and shows an empty state after leav
   })
   await settleApp()
 
-  expect(f.snapshot().agenda?.pinnedOccurrence).toEqual({ nodeId: 'only', day: date })
+  expect(pinnedAgendaOccurrence(f.snapshot().agenda)).toEqual({ nodeId: 'only', day: date })
   expect(f.container.querySelector(`[data-agenda-key="day:${date}"]`)).not.toBeNull()
 
   act(() => f.store.applyAgenda({ kind: 'select', key: dayKey }))

@@ -1,3 +1,4 @@
+import { pinnedAgendaOccurrence, activeAgendaOccurrence } from '../application/agenda-state'
 import type { AgendaRow } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
 import { calendarDateOf, weekdayOf, type DayNumber } from '../domain/calendar-date'
@@ -14,16 +15,16 @@ export function agendaDateLabel(day: DayNumber, today: DayNumber, weekday = fals
 export const AGENDA_INVALID_ITEM_HINT = 'Add a date to keep this item in Agenda'
 
 /** The invalid-item hint is runtime-only and does not alter row heights. */
-export function agendaStatusMessage(agenda: Pick<AgendaState, 'pinnedOccurrence'> | undefined): string | undefined {
-  return agenda?.pinnedOccurrence === undefined ? undefined : AGENDA_INVALID_ITEM_HINT
+export function agendaStatusMessage(agenda: Pick<AgendaState, 'activity'> | undefined): string | undefined {
+  return pinnedAgendaOccurrence(agenda) === undefined ? undefined : AGENDA_INVALID_ITEM_HINT
 }
 
 /** A live mirror is another day's occurrence of the node whose occurrence is active. */
 export function isAgendaMirror(
-  agenda: Pick<AgendaState, 'activeOccurrence'>,
+  agenda: Pick<AgendaState, 'activity'>,
   row: { readonly nodeId: string; readonly day: DayNumber; readonly role: 'match' | 'context' },
 ): boolean {
-  const active = agenda.activeOccurrence
+  const active = activeAgendaOccurrence(agenda)
   return row.role === 'match' && active !== undefined && active.nodeId === row.nodeId && active.day !== row.day
 }
 

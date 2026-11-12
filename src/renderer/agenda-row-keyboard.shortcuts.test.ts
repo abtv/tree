@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { focusedAgendaDay } from '../application/agenda-state'
 // @requirement PRODUCT.md §1.5
 
 import type { KeyboardEvent } from 'react'
@@ -131,7 +132,7 @@ describe('Agenda keyboard primary commands on each profile', () => {
       const state = f.snapshot()
       outcomes.push({
         agenda: state.agenda !== undefined,
-        focusedDay: state.agenda?.focusedDay,
+        focusedDay: focusedAgendaDay(state.agenda),
         selectedKey: state.agenda?.selectedKey,
         parent: state.location.currentParentId,
       })
@@ -152,7 +153,7 @@ describe('Agenda keyboard primary commands on each profile', () => {
     focused.selectRow(isDay)
     focused.press('.', { ctrl: true })
 
-    expect(focused.snapshot().agenda?.focusedDay).toBeDefined()
+    expect(focusedAgendaDay(focused.snapshot().agenda)).toBeDefined()
   })
 
   it('gives Ctrl no command on the Apple profile and Meta none on the other profile', async () => {
@@ -194,11 +195,11 @@ describe('Agenda keyboard Ctrl commands in Vim Normal on a non-Apple profile', (
     f.selectRow(isDay)
     f.press('.', { ctrl: true })
 
-    expect(f.snapshot().agenda?.focusedDay).toBeDefined()
+    expect(focusedAgendaDay(f.snapshot().agenda)).toBeDefined()
 
     f.press('o', { ctrl: true })
 
-    expect(f.snapshot().agenda?.focusedDay).toBeUndefined()
+    expect(focusedAgendaDay(f.snapshot().agenda)).toBeUndefined()
   })
 
   it('keeps Ctrl+R redoing', async () => {

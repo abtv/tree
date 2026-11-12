@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
-import { applyAgendaCommand, dayKey, openAgendaState } from './agenda-state'
+import {
+  activeAgendaOccurrence,
+  applyAgendaCommand,
+  dayKey,
+  openAgendaState,
+  focusedAgendaDay,
+  agendaTimelineReturn,
+  focusAgendaState,
+} from './agenda-state'
 import { AgendaRowsCache, buildAgendaRows, type AgendaRow } from './agenda-rows'
 import { reconcileAgenda } from './agenda-reconcile'
 
@@ -13,19 +21,19 @@ const header: AgendaRow = { kind: 'day', key: dayKey(day), day, content: true, i
 describe('focused Agenda day', () => {
   it('follows a live edit to its remaining date while history preserves the presentation', () => {
     const state = {
-      ...openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 4, today),
-      focusedDay: day,
+      ...focusAgendaState(openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 4, today), day, 0),
       selectedKey: `node:${day}:match`,
-      activeOccurrence: { nodeId: 'match', day },
+      activity: { kind: 'dated' as const, occurrence: { nodeId: 'match', day } },
     }
     const document = { roots: [{ id: 'match', text: 'Prepare 2026-10-20', children: [] }] }
 
     const edited = reconcileAgenda(document, state)!
 
-    expect(edited.focusedDay).toBe(otherDay)
+    expect(focusedAgendaDay(edited)).toBe(otherDay)
     expect(edited.selectedKey).toBe(`node:${otherDay}:match`)
-    expect(edited.activeOccurrence).toEqual({ nodeId: 'match', day: otherDay })
-    expect(reconcileAgenda(document, state, true)?.focusedDay).toBe(day)
+    expect(activeAgendaOccurrence(edited)).toEqual({ nodeId: 'match', day: otherDay })
+    expect(agendaTimelineReturn(edited)).toBe(agendaTimelineReturn(state))
+    expect(focusedAgendaDay(reconcileAgenda(document, state, true))).toBe(day)
   })
 
   it('reuses cached focused rows during selection changes on a large projection', () => {
@@ -63,8 +71,9 @@ describe('focused Agenda day', () => {
 
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 360 }, [header])
 
-    expect(focused.focusedDay).toBe(day)
-    expect(focused.timelineReturn?.scrollTop).toBe(360)
+    expect(focusedAgendaDay(focused)).toBe(day)
+    expect(focused.activity).toEqual({ kind: 'inactive' })
+    expect(agendaTimelineReturn(focused)?.scrollTop).toBe(360)
 
     const folded = applyAgendaCommand(focused, { kind: 'toggle-fold', key: header.key }, [header])
 
@@ -72,14 +81,19 @@ describe('focused Agenda day', () => {
 
     const returned = applyAgendaCommand(folded, { kind: 'return-timeline', key: header.key }, [header])
 
-    expect(returned.focusedDay).toBeUndefined()
-    expect(returned.timelineReturn).toBeUndefined()
+    expect(focusedAgendaDay(returned)).toBeUndefined()
+    expect(agendaTimelineReturn(returned)).toBeUndefined()
+    expect(agendaTimelineReturn(undefined)).toBeUndefined()
     expect(returned.selectedKey).toBe(timeline.selectedKey)
     expect(returned.collapsed).toBe(timeline.collapsed)
   })
 
   it('includes only the focused heading and its matches with their passive parent paths, including an empty focused day', () => {
-    const state = { ...openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today), focusedDay: day }
+    const state = focusAgendaState(
+      openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today),
+      day,
+      0,
+    )
 
     const rows = buildAgendaRows(
       [
@@ -107,5 +121,22 @@ describe('focused Agenda day', () => {
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 0 }, [header])
 
     expect(applyAgendaCommand(focused, { kind: 'focus-day', key: header.key, scrollTop: 50 }, [header])).toBe(focused)
+  })
+
+  it('restores a selected node without activating it and retains a zero return position', () => {
+    const timeline = {
+      ...openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today),
+      selectedKey: `node:${day}:match`,
+      activity: { kind: 'dated' as const, occurrence: { nodeId: 'match', day } },
+    }
+
+    const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 0 }, [header])
+    const returned = applyAgendaCommand(focused, { kind: 'return-timeline', key: header.key }, [header])
+
+    expect(agendaTimelineReturn(focused)?.scrollTop).toBe(0)
+    expect(returned.selectedKey).toBe(timeline.selectedKey)
+    expect(returned.activity).toEqual({ kind: 'inactive' })
+    expect(returned.presentation).toEqual({ kind: 'timeline' })
+    expect(returned.collapsed).toBe(timeline.collapsed)
   })
 })

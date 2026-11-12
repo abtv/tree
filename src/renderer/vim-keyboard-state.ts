@@ -1,3 +1,11 @@
+import {
+  replaceClickAgendaKey,
+  applyReplaceKey,
+  beginInsertSession,
+  beginReplaceSession,
+  takeReplaceClick,
+  type VimEditSessionState,
+} from './vim-edit-session'
 import type { EditorStore } from '../application/editor-store'
 import { moveSelectionBoundaryTransition } from '../application/editor-command-transitions'
 import { requireNode, type TreeNode } from '../domain/document'
@@ -10,13 +18,6 @@ import {
   swapNodeVisual,
   type VimCommandState,
 } from './vim-command-state'
-import {
-  applyReplaceKey,
-  beginInsertSession,
-  beginReplaceSession,
-  takeReplaceClick,
-  type VimEditSessionState,
-} from './vim-edit-session'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { rememberNodeRange } from './vim-visual-memory'
 import { firstNonWhitespace } from './vim-editing'
@@ -97,9 +98,9 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       // synchronously so the first typed character is never lost while waiting for that timer.
       if (
         session.replace === undefined &&
-        session.replaceClickAgendaKey !== undefined &&
+        replaceClickAgendaKey(session) !== undefined &&
         input.ownerDocument.activeElement === input &&
-        input.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey === session.replaceClickAgendaKey
+        input.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey === replaceClickAgendaKey(session)
       ) {
         takeReplaceClick(session)
         const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text

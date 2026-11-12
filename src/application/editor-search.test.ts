@@ -3,7 +3,7 @@ import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { EditorSearch } from './editor-search'
 import { AgendaRowsCache } from './agenda-rows'
-import { openAgendaState } from './agenda-state'
+import { focusAgendaState, openAgendaState } from './agenda-state'
 
 afterEach(() => vi.useRealTimers())
 
@@ -103,7 +103,7 @@ it('hides confirmed feedback and recounts when moving between two focused Agenda
     },
   }
   const agenda = openAgendaState(base.location, 0, 100)
-  search.update({ ...base, agenda: { ...agenda, focusedDay: 100, selectedKey: 'day:100' } })
+  search.update({ ...base, agenda: focusAgendaState(agenda, 100, 0) })
   search.begin({ beforeDay: 100, offset: 0 })
   search.edit('apple')
   search.confirm()
@@ -111,7 +111,7 @@ it('hides confirmed feedback and recounts when moving between two focused Agenda
 
   expect(search.session.getSnapshot().count?.total).toBe(1)
 
-  search.update({ ...base, agenda: { ...agenda, focusedDay: 101, selectedKey: 'day:101' } })
+  search.update({ ...base, agenda: focusAgendaState(agenda, 101, 0) })
 
   expect(search.session.getSnapshot()).toMatchObject({ visible: false, confirmed: 'apple' })
 

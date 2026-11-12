@@ -1,6 +1,10 @@
-import type { ClipboardEvent, FocusEvent, MouseEvent, SyntheticEvent } from 'react'
-import type { EditorStore } from '../application/editor-store'
-import type { TreeNode } from '../domain/document'
+import {
+  replaceClickAgendaKey,
+  replaceClickMoved,
+  beginReplaceSession,
+  takeReplaceClick,
+  type VimEditSessionState,
+} from './vim-edit-session'
 import { getCaret, getSelectionRange, isCollapsedSelection, readEditableContent, setNormalCaret } from './editor-dom'
 import { executeEditorContextMenuCommand } from './editor-input-handlers'
 import {
@@ -12,10 +16,13 @@ import {
 import type { NodeInputBindings } from './NodeInput'
 import type { VimCommandState } from './vim-command-state'
 import { pointerCaretTransition, type VimCaretState } from './vim-caret-transition'
-import { beginReplaceSession, takeReplaceClick, type VimEditSessionState } from './vim-edit-session'
+import type { ClipboardEvent, FocusEvent, MouseEvent, SyntheticEvent } from 'react'
+import type { EditorStore } from '../application/editor-store'
+import type { TreeNode } from '../domain/document'
 import type { VimMode } from './vim-editing'
 import type { EditorServices } from '../application/editor-store-types'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { isAgendaVerticalArrival } from './agenda-caret-state'
 
 /** Keep a readonly occurrence mounted until its link click has been dispatched. */
 export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
@@ -88,11 +95,18 @@ export function createPointerHandlers(
       const snapshot = store.getSnapshot()
       const verticalArrival =
         event?.relatedTarget instanceof Element &&
-        event.relatedTarget.matches('.node-input') &&
+        event.relatedTarget.matches('.node-input,.agenda-row') &&
         goal !== undefined &&
-        goal.nodeId !== node.id &&
         snapshot.status === 'ready' &&
-        snapshot.location.selectedNodeId === goal.nodeId &&
+        (snapshot.agenda === undefined
+          ? goal.nodeId !== node.id && snapshot.location.selectedNodeId === goal.nodeId
+          : isAgendaVerticalArrival(
+              event.currentTarget.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey,
+              event.relatedTarget.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey,
+              snapshot.agenda.selectedKey,
+              snapshot.focus.token,
+              goal,
+            )) &&
         snapshot.focus.token === goal.focusToken
       finishVimBlur(deps, node.id, input, { verticalArrival, windowFocused: document.hasFocus() })
       store.endTextSession()
@@ -172,11 +186,11 @@ export function createPointerHandlers(
       if (getMode() === 'replace') {
         // An Agenda row press can mount this editor before release. Its row-click adapter waits
         // until selection and focus have settled before starting the destination session.
-        if (session.replaceClickAgendaKey !== undefined) return
+        if (replaceClickAgendaKey(session) !== undefined) return
         // The release completes an ordinary text click: the replacement continues at the clicked
         // caret or double-clicked word as a new session. A dragged selection keeps its existing
         // interruption rule; a word selection stays visible until the first replacement key.
-        const moved = session.replaceClickMoved === true
+        const moved = replaceClickMoved(session)
         if (!takeReplaceClick(session)) return
         const input = event.currentTarget
         const selection = getSelectionRange(input)

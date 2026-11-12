@@ -1,7 +1,13 @@
-import type { DayNumber } from '../domain/calendar-date'
+import {
+  pinnedAgendaOccurrence,
+  focusedAgendaDay,
+  dayKey,
+  type AgendaState,
+  type AgendaOccurrence,
+} from './agenda-state'
 import { locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
 import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
-import { dayKey, type AgendaState, type AgendaOccurrence } from './agenda-state'
+import type { DayNumber } from '../domain/calendar-date'
 
 /** The projected ancestor path, excluding the destination itself. */
 export function agendaAncestorKeys(
@@ -40,7 +46,7 @@ export function agendaProjection(
   previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
 ): readonly AgendaProjectionDay[] {
   const projection = projectAgenda(document, state.scopeParentId, previous)
-  const pin = state.pinnedOccurrence
+  const pin = pinnedAgendaOccurrence(state)
   if (pin === undefined) return projection
   const located = locateNode(document, pin.nodeId)
   if (located === undefined) return projection
@@ -69,7 +75,6 @@ export function agendaProjection(
 
 interface DayRows {
   projected: readonly AgendaProjectionRow[]
-  collapsed: ReadonlySet<string>
   rows: readonly AgendaRow[]
 }
 
@@ -80,9 +85,9 @@ export function buildAgendaRows(
 ): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
   const timelineDays =
-    state.focusedDay === undefined
+    state.presentation.kind === 'timeline'
       ? [...new Set([...days.keys(), state.today])].sort((left, right) => left - right)
-      : [state.focusedDay]
+      : [state.presentation.day]
   const rows: AgendaRow[] = []
   for (const day of timelineDays) {
     const entry = { kind: 'day' as const, day, content: days.has(day), isToday: day === state.today }
@@ -91,7 +96,7 @@ export function buildAgendaRows(
     if (state.collapsed.has(key)) continue
     const projected = days.get(entry.day) ?? []
     const cached = cache?.get(entry.day)
-    if (cached?.projected === projected && cached.collapsed === state.collapsed) {
+    if (cached?.projected === projected) {
       for (const row of cached.rows) rows.push(row)
       continue
     }
@@ -118,7 +123,7 @@ export function buildAgendaRows(
       })
       previousParent = parent
     }
-    cache?.set(entry.day, { projected, collapsed: state.collapsed, rows: dayRows })
+    cache?.set(entry.day, { projected, rows: dayRows })
     for (const row of dayRows) rows.push(row)
   }
   if (cache !== undefined) {
@@ -137,6 +142,10 @@ function sameDay(left: AgendaProjectionDay, right: AgendaProjectionDay): boolean
       return row.nodeId === other.nodeId && row.depth === other.depth && row.role === other.role
     })
   )
+}
+
+function sameFolds(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left === right || (left.size === right.size && [...left].every((key) => right.has(key)))
 }
 
 /** One bounded cache per store; rows contain identities, never retained document snapshots. */
@@ -160,14 +169,14 @@ export class AgendaRowsCache {
       document !== this.document ||
       state.scopeParentId !== this.scope ||
       // The document/scope guards run first; an equal cached document always has cached state.
-      state.pinnedOccurrence !== this.state?.pinnedOccurrence
+      pinnedAgendaOccurrence(state) !== pinnedAgendaOccurrence(this.state)
     ) {
       const previous = new Map(this.projection.map((day) => [day.day, day]))
       const reusable =
         this.document !== undefined &&
         state.scopeParentId === this.scope &&
-        state.pinnedOccurrence === undefined &&
-        this.state?.pinnedOccurrence === undefined
+        pinnedAgendaOccurrence(state) === undefined &&
+        pinnedAgendaOccurrence(this.state) === undefined
           ? { document: this.document, projection: this.projection }
           : undefined
       const projection = agendaProjection(document, state, reusable).map((day) => {
@@ -191,8 +200,8 @@ export class AgendaRowsCache {
     if (
       changed ||
       this.state?.today !== state.today ||
-      this.state.focusedDay !== state.focusedDay ||
-      this.state.collapsed !== state.collapsed
+      focusedAgendaDay(this.state) !== focusedAgendaDay(state) ||
+      !sameFolds(this.state.collapsed, state.collapsed)
     ) {
       this.rows = buildAgendaRows(this.projection, state, this.dayRows)
     }
@@ -210,5 +219,10 @@ export class AgendaRowsCache {
     this.state = undefined
     this.rows = []
     this.dayRows.clear()
+  }
+
+  /** Tree can reuse one warm projection, but must never retain a replaced document through it. */
+  public releaseIfStale(document: Document): void {
+    if (this.document !== undefined && this.document !== document) this.clear()
   }
 }

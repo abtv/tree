@@ -87,37 +87,59 @@ export interface VimEditSessionState {
   register: VimRegister
   insert?: VimInsertSession | undefined
   replace?: VimReplaceSession | undefined
-  /** True from an ordinary primary press in Replace mode until its release (PRODUCT §20.2.6). */
-  replaceClick?: boolean | undefined
-  /** True once the press moved focus away from another node, so Replace must end if no click follows. */
-  replaceClickMoved?: boolean | undefined
-  /** The row surface that began an Agenda click, whose editor may mount before release. */
-  replaceClickAgendaKey?: string | undefined
+  replaceGesture: VimReplaceGesture
 }
 
+export type VimReplaceGesture =
+  | { readonly kind: 'idle' }
+  | {
+      readonly kind: 'pressed' | 'settling'
+      readonly identity: object
+      readonly moved: boolean
+      readonly agendaKey?: string
+    }
+
 export function createVimEditSessionState(): VimEditSessionState {
-  return { register: { kind: 'empty' } }
+  return { register: { kind: 'empty' }, replaceGesture: { kind: 'idle' } }
 }
 
 export function beginReplaceClick(state: VimEditSessionState, agendaKey?: string): void {
-  state.replaceClick = true
-  state.replaceClickAgendaKey = agendaKey
+  state.replaceGesture = {
+    kind: 'pressed',
+    identity: {},
+    moved: false,
+    ...(agendaKey === undefined ? {} : { agendaKey }),
+  }
+}
+
+export function replaceClickAgendaKey(state: VimEditSessionState): string | undefined {
+  return state.replaceGesture.kind === 'idle' ? undefined : state.replaceGesture.agendaKey
+}
+
+export function replaceClickMoved(state: VimEditSessionState): boolean {
+  return state.replaceGesture.kind !== 'idle' && state.replaceGesture.moved
+}
+
+/** Release waits for the native mouseup/click before consuming this particular press. */
+export function settleReplaceClick(state: VimEditSessionState): object | undefined {
+  if (state.replaceGesture.kind !== 'pressed') return undefined
+  state.replaceGesture = { ...state.replaceGesture, kind: 'settling' }
+  return state.replaceGesture.identity
 }
 
 /** A press can carry Replace across input blur only while the window still has focus. */
 export function continueReplaceClickAfterBlur(state: VimEditSessionState, windowFocused: boolean): boolean {
-  if (state.replaceClick !== true || !windowFocused) return false
-  state.replaceClickMoved = true
+  if (state.replaceGesture.kind === 'idle' || !windowFocused) return false
+  state.replaceGesture = { ...state.replaceGesture, moved: true }
   return true
 }
 
 /** End the press intent, reporting whether one was pending. */
-export function takeReplaceClick(state: VimEditSessionState): boolean {
-  const pending = state.replaceClick === true
-  state.replaceClick = undefined
-  state.replaceClickMoved = undefined
-  state.replaceClickAgendaKey = undefined
-  return pending
+export function takeReplaceClick(state: VimEditSessionState, identity?: object): boolean {
+  if (state.replaceGesture.kind === 'idle' || (identity !== undefined && identity !== state.replaceGesture.identity))
+    return false
+  state.replaceGesture = { kind: 'idle' }
+  return true
 }
 
 export function beginInsertSession(state: VimEditSessionState, session: VimInsertSession): void {

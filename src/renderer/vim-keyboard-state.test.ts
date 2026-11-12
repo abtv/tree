@@ -227,7 +227,7 @@ describe('session and command ports', () => {
 
       expect(f.vim.handleReplaceKey(element, 'X')).toBe(true)
       expect(f.session.replace).toEqual({ nodeId: 'node', baseline: 'hello', position: 1, typed: 'X' })
-      expect(f.session.replaceClickAgendaKey).toBeUndefined()
+      expect(f.session.replaceGesture.kind).toBe('idle')
       expect(f.vim.handleReplaceKey(element, 'Y')).toBe(true)
       expect(f.session.replace?.typed).toBe('XY')
     },

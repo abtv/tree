@@ -1,3 +1,4 @@
+import { pinnedAgendaOccurrence } from './agenda-state'
 import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
@@ -152,7 +153,7 @@ it('recounts after leaving a pinned occurrence and does not publish its obsolete
   store.applyAgenda({ kind: 'select', key: key(second, 'c') })
   store.editText('c', 'apple')
 
-  expect(state().agenda!.pinnedOccurrence?.nodeId).toBe('c')
+  expect(pinnedAgendaOccurrence(state().agenda!)?.nodeId).toBe('c')
 
   begin()
   await vi.runAllTimersAsync()
@@ -162,7 +163,7 @@ it('recounts after leaving a pinned occurrence and does not publish its obsolete
   store.search.confirm()
   await vi.runAllTimersAsync()
 
-  expect(state().agenda!.pinnedOccurrence).toBeUndefined()
+  expect(pinnedAgendaOccurrence(state().agenda!)).toBeUndefined()
   expect(store.search.getResult()).toBeUndefined()
   expect(store.search.session.getSnapshot().count?.total).toBe(4)
 })

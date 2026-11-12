@@ -1,6 +1,12 @@
+import {
+  activeAgendaOccurrence,
+  pinnedAgendaOccurrence,
+  applyAgendaCommand,
+  openAgendaState,
+  type AgendaCommand,
+} from './agenda-state'
 import { expect, it } from 'vitest'
 import { buildAgendaRows } from './agenda-rows'
-import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
 
 const opened = () => openAgendaState({ currentParentId: 'scope', selectedNodeId: 'origin' }, 7, 100)
 const projection = [110, 120].map((day) => ({
@@ -18,6 +24,7 @@ it('captures the origin and retains identity for invalid or inapplicable command
   const rows = buildAgendaRows(projection, state)
 
   expect(state).toMatchObject({
+    activity: { kind: 'inactive' },
     scopeParentId: 'scope',
     selectedKey: 'day:100',
     today: 100,
@@ -39,14 +46,18 @@ it('captures the origin and retains identity for invalid or inapplicable command
 it.each(['close', 'close-recursive', 'toggle'] as const)(
   'folds a populated day with %s and selects its hidden entry',
   (operation) => {
-    const state = { ...opened(), selectedKey: 'node:110:b', activeOccurrence: { nodeId: 'b', day: 110 } }
+    const state = {
+      ...opened(),
+      selectedKey: 'node:110:b',
+      activity: { kind: 'dated' as const, occurrence: { nodeId: 'b', day: 110 } },
+    }
     const rows = buildAgendaRows(projection, state)
 
     const next = applyAgendaCommand(state, { kind: 'fold', key: 'day:110', operation }, rows)
 
     expect([...next.collapsed]).toEqual(['day:110'])
     expect(next.selectedKey).toBe('day:110')
-    expect(next.activeOccurrence).toBeUndefined()
+    expect(activeAgendaOccurrence(next)).toBeUndefined()
     expect(next.origin).toBe(state.origin)
     expect(
       buildAgendaRows(projection, next)
@@ -114,8 +125,7 @@ it('retains a pin on reselection and drops it with the old cursor when another r
   const state = {
     ...opened(),
     selectedKey: 'node:110:a',
-    activeOccurrence: { nodeId: 'a', day: 110 },
-    pinnedOccurrence: { nodeId: 'a', day: 110 },
+    activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'a', day: 110 } },
     selectionCursor: 9,
   }
   const rows = buildAgendaRows(projection, state)
@@ -124,12 +134,13 @@ it('retains a pin on reselection and drops it with the old cursor when another r
 
   const selected = applyAgendaCommand(state, { kind: 'select', key: 'node:120:b', cursor: 3 }, rows)
 
-  expect(selected.activeOccurrence).toEqual({ nodeId: 'b', day: 120 })
-  expect(selected.pinnedOccurrence).toBeUndefined()
+  expect(activeAgendaOccurrence(selected)).toEqual({ nodeId: 'b', day: 120 })
+  expect(pinnedAgendaOccurrence(selected)).toBeUndefined()
   expect(selected.selectionCursor).toBe(3)
 
   const header = applyAgendaCommand(selected, { kind: 'select', key: 'day:100' }, rows)
 
-  expect(header.activeOccurrence).toBeUndefined()
+  expect(activeAgendaOccurrence(header)).toBeUndefined()
+  expect(header.activity).toEqual({ kind: 'inactive' })
   expect(header.selectionCursor).toBeUndefined()
 })

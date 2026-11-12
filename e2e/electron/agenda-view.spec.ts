@@ -177,6 +177,14 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       })
       .toBeLessThan(1)
 
+    if (mode === 'vim') {
+      await window.keyboard.press('ArrowDown')
+
+      await expectFocused(selected)
+      await expect(selected).toHaveAttribute('data-node-id', 'dated-0')
+
+      await window.keyboard.press('$')
+    }
     await window.keyboard.press('ArrowDown')
 
     await expectFocused(neighbor)

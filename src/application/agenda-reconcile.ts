@@ -2,7 +2,13 @@ import { nextActiveDay } from '../domain/agenda-date-edits'
 import { findCanonicalDates } from '../domain/date-recognition'
 import { isValidLocation, locateNode, type Document, type NodeId, type Location } from '../domain/document'
 import { agendaProjection, buildAgendaRows, type AgendaRow, type AgendaRowsCache } from './agenda-rows'
-import { dayKey, selectAgendaRow, type AgendaState } from './agenda-state'
+import {
+  activeAgendaOccurrence,
+  pinnedAgendaOccurrence,
+  dayKey,
+  selectAgendaRow,
+  type AgendaState,
+} from './agenda-state'
 
 /** Scope membership excludes the scope node itself, just like the domain projection. */
 export function isInAgendaScope(document: Document, state: AgendaState, nodeId: NodeId): boolean {
@@ -26,7 +32,7 @@ export function reconcileAgenda(
         ...state,
         origin: { location: agendaOriginLocation(document, state), cursor: 0 },
       }
-  const active = state.activeOccurrence
+  const active = activeAgendaOccurrence(state)
   if (active !== undefined) {
     const located = locateNode(document, active.nodeId)
     // The located guard duplicates scope membership's missing-node check; it narrows the node type.
@@ -36,22 +42,21 @@ export function reconcileAgenda(
         active.day,
       )
       if (day === undefined) {
-        if (state.pinnedOccurrence === undefined) next = { ...next, pinnedOccurrence: active }
+        if (state.activity.kind !== 'pinned-until-leave')
+          next = { ...next, activity: { kind: 'pinned-until-leave', occurrence: active } }
       } else {
-        const valid = { ...next }
-        delete valid.pinnedOccurrence
         next =
-          state.pinnedOccurrence === undefined && day === active.day
+          state.activity.kind === 'dated' && day === active.day
             ? next
             : {
-                ...valid,
-                activeOccurrence: { nodeId: active.nodeId, day },
+                ...next,
+                activity: { kind: 'dated', occurrence: { nodeId: active.nodeId, day } },
                 selectedKey: `node:${day}:${active.nodeId}`,
               }
         // A live edit continues in the nearest remaining occurrence. History never unfolds it.
         // If the day is unchanged, the active path is already visible; deleting its absent folds is equivalent.
         if (day !== active.day && !preservePresentation) {
-          if (next.focusedDay !== undefined) next = { ...next, focusedDay: day }
+          if (next.presentation.kind === 'focused-day') next = { ...next, presentation: { ...next.presentation, day } }
           const collapsed = new Set(next.collapsed)
           collapsed.delete(dayKey(day))
           if (collapsed.size !== next.collapsed.size) next = { ...next, collapsed }
@@ -127,7 +132,7 @@ export function agendaHistorySelection(
   if (row === undefined) return state
   const next = selectAgendaRow(state, row)
   // Rechecking visible selection when no pin changed is equivalent; avoid that extra projection work.
-  return next.pinnedOccurrence === state.pinnedOccurrence
+  return pinnedAgendaOccurrence(next) === pinnedAgendaOccurrence(state)
     ? next
     : reconcileAgendaSelection(
         next,

@@ -1,10 +1,12 @@
 import type { KeyboardEvent } from 'react'
+import { focusedAgendaDay } from '../application/agenda-state'
 import type { EditorStore } from '../application/editor-store'
 import { appendVimCount, clearCommandAssembly, clearPending } from './vim-command-state'
 import type { VimTextCommandState } from './vim-session-finish'
 import { viewportBounds, viewportScrollEdges, viewportScroller } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
-import { getCaret } from './editor-dom'
+import { getCaret, visualLineCursor } from './editor-dom'
+import { measureAgendaRow, type AgendaTextGeometry } from './agenda-text-geometry'
 import type { AgendaRow } from '../application/agenda-rows'
 import { handleRowTextKey, rowCaretMode } from './agenda-row-text-keys'
 import { arrivalCaret, clampCaret, type RowCaret } from './agenda-row-caret'
@@ -22,7 +24,7 @@ export interface AgendaRowText {
   /** A row with an editor keeps its text commands in the editor; focus on its padding stays inert. */
   hasEditor: (row: AgendaRow) => boolean
   caret: () => RowCaret
-  setCaret: (caret: RowCaret) => void
+  setCaret: (caret: RowCaret, revealLine?: boolean) => void
   copy: (text: string) => void
 }
 
@@ -33,6 +35,7 @@ interface Dependencies {
   rowText?: AgendaRowText | undefined
   /** The platform's primary-modifier profile; Apple conventions when absent. */
   shortcuts?: ShortcutProfile | undefined
+  measureRow?: typeof measureAgendaRow
 }
 
 /** Navigation over occurrence keys; Tree text and structural handlers never see these keys. */
@@ -42,6 +45,7 @@ export function createAgendaKeyDownHandler({
   beforeSelect,
   rowText,
   shortcuts = APPLE_SHORTCUTS,
+  measureRow = measureAgendaRow,
 }: Dependencies): (event: KeyboardEvent<HTMLElement>) => void {
   return (event) => {
     if (event.nativeEvent?.isComposing || ['Shift', 'Control', 'Meta', 'Alt'].includes(event.key)) return
@@ -54,6 +58,8 @@ export function createAgendaKeyDownHandler({
     const row = rows[index]
     if (row === undefined) return
     const countDigit = /^[1-9]$/u.test(event.key) || (event.key === '0' && !!vim?.commandState.pending?.count)
+    const verticalKey = ['j', 'k', 'J', 'K', 'ArrowDown', 'ArrowUp'].includes(event.key)
+    if (vim !== undefined && !verticalKey && !countDigit) vim.commandState.verticalGoal = undefined
     if (!countDigit && event.key !== 'n' && event.key !== 'N') store.search.interruptNavigation()
     const finishClickReplace = (): void => {
       if (vim?.mode === 'replace') vim.setMode('normal')
@@ -64,7 +70,7 @@ export function createAgendaKeyDownHandler({
         : agendaRowLabel(
             candidate,
             state.agenda!.today,
-            candidate.kind === 'day' && state.agenda!.focusedDay !== undefined,
+            candidate.kind === 'day' && focusedAgendaDay(state.agenda) !== undefined,
           )
     const hasImage = (candidate: AgendaRow): boolean =>
       candidate.kind === 'node' &&
@@ -114,38 +120,116 @@ export function createAgendaKeyDownHandler({
               event.currentTarget?.classList.contains('node-input-image-caret') ?? false,
             )
           : { cursor: navigationCursor, imageActive: false }
-      for (let stepIndex = 0; stepIndex < count; stepIndex += 1) {
-        const nextIndex = Math.max(0, Math.min(rows.length - 1, position + (direction === 'down' ? 1 : -1)))
-        const step = verticalCaretTransition(
-          caret,
-          direction,
-          textOf(current).length,
-          stepIndex === 0 && hasImage(current),
-          nextIndex !== position,
-        )
-        if (!step.crossNode) {
-          if (step.caret === caret) break
-          caret = step.caret
-          navigationCursor = caret.cursor
-          if (current.kind === 'node' && current.role === 'match') vim.applyCaretState?.(current.nodeId, caret)
-          continue
+      let measuredKey: string | undefined
+      let measuredRow: AgendaTextGeometry | undefined
+      const geometry = (candidate: AgendaRow): AgendaTextGeometry | undefined => {
+        if (measuredKey !== candidate.key) {
+          // Counted motion visits rows in one direction; old DOM mirrors must not accumulate.
+          measuredRow?.dispose()
+          measuredRow = undefined
+          measuredKey = candidate.key
+          measuredRow = measureRow(
+            candidate,
+            textOf(candidate),
+            focusedAgendaDay(state.agenda) !== undefined,
+            candidate.kind === 'node' ? requireNode(state.document, candidate.nodeId).node : undefined,
+            state.agenda!.today,
+          )
         }
-        const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
-        if (stepIndex === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
-        current = rows[nextIndex]!
-        position = nextIndex
-        caret = focusCaretTransition(
-          caret,
-          cursor,
-          textOf(current).length,
-          hasImage(current),
-          true,
-          direction === 'up' && hasImage(current),
-        )
-        beforeSelect?.(false)
-        store.applyAgenda({ kind: 'select', key: current.key, cursor: caret.cursor })
-        if (current.kind === 'node' && current.role === 'match') vim.applyCaretState?.(current.nodeId, caret, true)
+        return measuredRow
       }
+      const viewportWidth = document.documentElement.clientWidth
+      const previousGoal = vim.commandState.verticalGoal
+      let preferredLeft =
+        previousGoal?.agendaKey === row.key &&
+        previousGoal.cursor === caret.cursor &&
+        previousGoal.text === textOf(row) &&
+        previousGoal.viewportWidth === viewportWidth &&
+        previousGoal.focusToken === state.focus.token
+          ? previousGoal.left
+          : (geometry(row)?.position(caret.cursor).left ?? 0)
+      const publishCaret = (candidate: AgendaRow, next: VimCaretState, fromFocus = false): void => {
+        if (candidate.kind === 'node' && candidate.role === 'match' && (rowText?.hasEditor(candidate) ?? true))
+          vim.applyCaretState?.(candidate.nodeId, next, fromFocus)
+        else rowText?.setCaret({ key: candidate.key, anchor: next.cursor, focus: next.cursor }, true)
+        const snapshot = store.getSnapshot()
+        if (snapshot.status !== 'ready') return
+        vim.commandState.verticalGoal = {
+          nodeId: candidate.kind === 'node' ? candidate.nodeId : snapshot.location.selectedNodeId,
+          agendaKey: candidate.key,
+          cursor: next.cursor,
+          left: preferredLeft,
+          viewportWidth,
+          text: textOf(candidate),
+          focusToken: snapshot.focus.token,
+        }
+      }
+      try {
+        for (let stepIndex = 0; stepIndex < count; stepIndex += 1) {
+          if (!caret.imageActive) {
+            const measured = geometry(current)
+            const lineCursor =
+              measured === undefined
+                ? undefined
+                : visualLineCursor(textOf(current), measured.position, caret.cursor, direction, preferredLeft)
+            if (lineCursor !== undefined) {
+              caret = { cursor: lineCursor, imageActive: false }
+              navigationCursor = lineCursor
+              publishCaret(current, caret)
+              continue
+            }
+          }
+          const nextIndex = Math.max(0, Math.min(rows.length - 1, position + (direction === 'down' ? 1 : -1)))
+          const step = verticalCaretTransition(
+            caret,
+            direction,
+            textOf(current).length,
+            current.key === row.key && hasImage(current),
+            nextIndex !== position,
+          )
+          if (!step.crossNode) {
+            if (step.caret === caret) break
+            caret = step.caret
+            navigationCursor = caret.cursor
+            publishCaret(current, caret)
+            continue
+          }
+          const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
+          const leftImage = caret.imageActive
+          if (stepIndex === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
+          current = rows[nextIndex]!
+          position = nextIndex
+          caret = focusCaretTransition(
+            caret,
+            cursor,
+            textOf(current).length,
+            hasImage(current),
+            true,
+            direction === 'up' && hasImage(current),
+          )
+          if (textOf(current).length > 0 && !(leftImage && stepIndex > 0 && direction === 'down')) {
+            if (direction === 'down' && leftImage) preferredLeft = 0
+            const measured = geometry(current)
+            const entering =
+              measured === undefined
+                ? undefined
+                : visualLineCursor(textOf(current), measured.position, caret.cursor, direction, preferredLeft, true)
+            if (entering !== undefined)
+              caret = caret.imageActive
+                ? { ...caret, imageTextReturnCursor: entering }
+                : { cursor: entering, imageActive: false }
+          }
+          if (leftImage && !caret.imageActive)
+            preferredLeft = geometry(current)?.position(caret.cursor).left ?? preferredLeft
+          beforeSelect?.(false)
+          store.applyAgenda({ kind: 'select', key: current.key, cursor: caret.cursor, revealLine: true })
+          publishCaret(current, caret, true)
+        }
+      } finally {
+        measuredRow?.dispose()
+      }
+      if (current.kind === 'node' && current.role === 'match' && (rowText?.hasEditor(current) ?? true))
+        vim.revealVerticalCaret?.()
     }
     const horizontal = (direction: 'left' | 'right', count: number): void => {
       let position = index
@@ -267,7 +351,7 @@ export function createAgendaKeyDownHandler({
       } else if (event.key === ',') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
-        if (state.agenda.focusedDay !== undefined) finishClickReplace()
+        if (focusedAgendaDay(state.agenda) !== undefined) finishClickReplace()
         beforeSelect?.(true)
         rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })
@@ -312,7 +396,10 @@ export function createAgendaKeyDownHandler({
       return
     }
     const pending = vim?.commandState.pending
-    const count = Math.min(rows.length, Math.max(1, Number(pending?.count || '1')))
+    const count =
+      verticalKey && vim?.mode === 'normal'
+        ? parseCount(pending?.count ?? '')
+        : Math.min(rows.length, Math.max(1, Number(pending?.count || '1')))
     const normal = vim?.mode === 'normal'
     // Counts and the `g` prefix also serve the text motions of a Visual selection over a row's text.
     const textMode = normal || vim?.mode === 'visual'

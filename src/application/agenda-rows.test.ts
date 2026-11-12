@@ -5,7 +5,7 @@ import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
 import { agendaAncestorKeys, agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
-import { openAgendaState } from './agenda-state'
+import { openAgendaState, focusAgendaState } from './agenda-state'
 import { reconcileAgenda } from './agenda-reconcile'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
@@ -26,6 +26,72 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  it('does not enumerate unchanged folds during repeated caret publications', () => {
+    const cache = new AgendaRowsCache()
+    const collapsed = new Set(Array.from({ length: 10000 }, (_, index) => `day:${today + index}`))
+    const state = { ...openAgendaState(location, 0, today), collapsed }
+    const rows = cache.get(document, state)
+    const iterator = vi.spyOn(collapsed, Symbol.iterator)
+
+    for (let index = 0; index < 30; index++) {
+      expect(cache.get(document, { ...state, selectionCursor: index })).toBe(rows)
+    }
+
+    expect(iterator).not.toHaveBeenCalled()
+  })
+
+  it('reuses unaffected day fragments after reopening and adding another date', () => {
+    const initial: Document = {
+      roots: [
+        { id: 'a', text: '2026-10-14 A', children: [] },
+        { id: 'b', text: '2026-10-20 B', children: [] },
+      ],
+    }
+    const cache = new AgendaRowsCache()
+    const before = cache.get(initial, openAgendaState(location, 0, today))
+    const unchanged = before.find((row) => row.kind === 'node' && row.nodeId === 'b')
+    const reopened = openAgendaState(location, 0, today)
+    cache.get(initial, reopened)
+
+    const edited = editNodeText(initial, 'a', '2026-10-14 A 2026-10-15')
+    const after = cache.get(edited, reopened)
+
+    expect(after.find((row) => row.kind === 'node' && row.nodeId === 'b')).toBe(unchanged)
+    expect(after).toEqual(buildAgendaRows(projectAgenda(edited, null), reopened))
+  })
+
+  it('releases only a populated cache for a replaced document', () => {
+    const cache = new AgendaRowsCache()
+    const clear = vi.spyOn(cache, 'clear')
+    const state = openAgendaState(location, 0, today)
+    cache.releaseIfStale(document)
+    const before = cache.get(document, state)
+
+    cache.releaseIfStale(document)
+
+    expect(clear).not.toHaveBeenCalled()
+    expect(cache.get(document, state)).toBe(before)
+
+    cache.releaseIfStale({ roots: [] })
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(cache.get(document, state)).not.toBe(before)
+  })
+
+  it('reuses equal folded-day membership and invalidates different folds with the same size', () => {
+    const cache = new AgendaRowsCache()
+    const state = { ...openAgendaState(location, 0, today), collapsed: new Set([`day:${today + 6}`]) }
+    const before = cache.get(document, state)
+
+    const equal = cache.get(document, { ...state, collapsed: new Set(state.collapsed) })
+    const different = cache.get(document, { ...state, collapsed: new Set([`day:${today}`]) })
+
+    expect(equal).toBe(before)
+    expect(different).not.toBe(before)
+    expect(different.some((row) => row.kind === 'node' && row.nodeId === 'a')).toBe(true)
+    expect(before.some((row) => row.kind === 'node' && row.nodeId === 'a')).toBe(false)
+  })
+
   it('releases the search corpus when cleared before reopening an undated scope', () => {
     const cache = new AgendaRowsCache()
     const state = openAgendaState(location, 0, today)
@@ -80,7 +146,7 @@ describe('Agenda rows', () => {
       })),
     )
 
-    const focused = cache.get(document, { ...state, focusedDay: today + 6 })
+    const focused = cache.get(document, focusAgendaState(state, today + 6, 0))
 
     expect(focused.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual([today + 6])
     expect(cache.get(document, state).filter((row) => row.kind === 'day').length).toBeGreaterThan(1)
@@ -113,11 +179,11 @@ describe('Agenda rows', () => {
     const state = openAgendaState(location, 0, today)
     const projection = projectAgenda(document, null)
 
-    expect(buildAgendaRows(projection, { ...state, focusedDay: today })[0]).toMatchObject({
+    expect(buildAgendaRows(projection, focusAgendaState(state, today, 0))[0]).toMatchObject({
       day: today,
       isToday: true,
     })
-    expect(buildAgendaRows(projection, { ...state, focusedDay: today + 6 })[0]).toMatchObject({
+    expect(buildAgendaRows(projection, focusAgendaState(state, today + 6, 0))[0]).toMatchObject({
       day: today + 6,
       isToday: false,
     })
@@ -186,7 +252,10 @@ describe('Agenda rows', () => {
   })
   it('merges a root-scope pin in chronological order, preserves matched ancestors, and ignores stale pins', () => {
     const unpinnedState = openAgendaState(location, 0, today)
-    const state = { ...unpinnedState, pinnedOccurrence: { nodeId: 'a', day: today + 6 } }
+    const state = {
+      ...unpinnedState,
+      activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'a', day: today + 6 } },
+    }
     const invalid = editNodeText(document, 'a', 'Undated')
     const cache = new AgendaRowsCache()
     const unpinned = cache.get(invalid, unpinnedState)
@@ -202,7 +271,10 @@ describe('Agenda rows', () => {
         { id: 'later', text: '2026-10-28 Later', children: [] },
       ],
     }
-    const early = { ...state, pinnedOccurrence: { nodeId: 'early', day: today + 6 } }
+    const early = {
+      ...state,
+      activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'early', day: today + 6 } },
+    }
 
     expect(agendaProjection(solo, early).map((day) => day.day)).toEqual([today + 6, today + 20])
     expect(agendaProjection(solo, early)[0]!.rows).toEqual([{ nodeId: 'early', depth: 0, role: 'match' }])
@@ -210,11 +282,18 @@ describe('Agenda rows', () => {
     const matchedParent = editNodeText(invalid, 'parent', '2026-10-14 Parent')
 
     expect(agendaProjection(matchedParent, state)[0]!.rows[0]!.role).toBe('match')
-    expect(agendaProjection(invalid, { ...state, pinnedOccurrence: { nodeId: 'missing', day: today } })).toEqual(
-      projectAgenda(invalid, null),
-    )
+    expect(
+      agendaProjection(invalid, {
+        ...state,
+        activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'missing', day: today } },
+      }),
+    ).toEqual(projectAgenda(invalid, null))
 
-    const scoped = { ...state, scopeParentId: 'a', pinnedOccurrence: { nodeId: 'c', day: today } }
+    const scoped = {
+      ...state,
+      scopeParentId: 'a',
+      activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'c', day: today } },
+    }
 
     expect(agendaProjection(invalid, scoped)).toEqual(projectAgenda(invalid, 'a'))
   })
@@ -230,7 +309,7 @@ describe('Agenda rows', () => {
     const agenda = {
       ...openAgendaState({ currentParentId: null, selectedNodeId: '0' }, 0, today),
       selectedKey: `node:${today + 6}:0`,
-      activeOccurrence: { nodeId: '0', day: today + 6 },
+      activity: { kind: 'dated' as const, occurrence: { nodeId: '0', day: today + 6 } },
     }
     const snapshot: ReadySnapshot = {
       status: 'ready',
@@ -251,7 +330,7 @@ describe('Agenda rows', () => {
         const next = {
           ...agenda,
           selectedKey: `node:${today + 6}:${index}`,
-          activeOccurrence: { nodeId: String(index), day: today + 6 },
+          activity: { kind: 'dated' as const, occurrence: { nodeId: String(index), day: today + 6 } },
         }
 
         runtime.replaceReady({ ...snapshot, agenda: next })

@@ -1,3 +1,12 @@
+import {
+  replaceClickAgendaKey,
+  replaceClickMoved,
+  settleReplaceClick,
+  beginReplaceClick,
+  beginReplaceSession,
+  createVimEditSessionState,
+  takeReplaceClick,
+} from './vim-edit-session'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { requireNode, type LinkRange, type TreeNode } from '../domain/document'
@@ -34,7 +43,6 @@ import * as sessionFinish from './vim-session-finish'
 import { currentPendingCaretInput, normalCaretIsDrawn } from './caret-projection-rules'
 import { CaretProjectionState } from './caret-projection-state'
 import { SearchFocusController } from './search-focus-controller'
-import { beginReplaceClick, beginReplaceSession, createVimEditSessionState, takeReplaceClick } from './vim-edit-session'
 import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
@@ -520,6 +528,7 @@ export function useNodeInputBindings({
           ? { ...caretProjection.current.authority.caret, cursor }
           : { cursor, imageActive },
       applyCaretState,
+      revealVerticalCaret,
       setMode: changeVimMode,
     }),
     [
@@ -529,6 +538,7 @@ export function useNodeInputBindings({
       vimCommandState,
       registerHandle,
       applyCaretState,
+      revealVerticalCaret,
       setNodeVisualSelection,
     ],
   )
@@ -724,10 +734,12 @@ export function useNodeInputBindings({
     // press is handled. Re-observing an input after a render reports it again, and redrawing the
     // block mid-press would replace the selection being extended, so the block is drawn again only
     // when the press ends.
-    let pressed = false
+    let pointerPhase: 'held' | 'released' = 'released'
+    const gestureSession = vimSession.current
+    let settlementTimer: ReturnType<typeof globalThis.setTimeout> | undefined
     const onPress = (event: PointerEvent): void => {
       if (event.button !== 0) return
-      pressed = true
+      pointerPhase = 'held'
       const target = event.target instanceof Element ? event.target : undefined
       const row = target?.closest<HTMLElement>('.agenda-row')
       // A read-only row has no input blur handler. Leaving its row surface must still end
@@ -772,29 +784,34 @@ export function useNodeInputBindings({
         changeVimMode('normal')
       }
       const target = event.target instanceof Element ? event.target : undefined
-      const agendaPressedKey = vimSession.current.replaceClickAgendaKey
+      const agendaPressedKey = replaceClickAgendaKey(vimSession.current)
       const agendaClick =
         event.type === 'pointerup' &&
         agendaPressedKey !== undefined &&
         target?.closest<HTMLElement>('.agenda-row')?.dataset.agendaKey === agendaPressedKey
       // The input's mouseup follows this event in the same task; a release it never receives
       // (outside any input, a cancelled pointer, a lost window) must not leave the click pending.
-      globalThis.setTimeout(() => {
-        const moved = vimSession.current.replaceClickMoved === true
-        if (!takeReplaceClick(vimSession.current) || caretProjection.current.mode !== 'replace') return
-        if (!agendaClick) {
-          if (moved) changeVimMode('normal')
-          return
-        }
-        const input = document.activeElement
-        const entry = [...inputs.current.entries()].find(([, candidate]) => candidate === input)
-        if (entry === undefined) return // A read-only row retains the mode without an edit session.
-        const [nodeId, editor] = entry
-        const baseline = editor instanceof HTMLTextAreaElement ? editor.value : readEditableContent(editor).text
-        beginReplaceSession(vimSession.current, { nodeId, baseline, position: getCaret(editor) })
-      })
-      if (!pressed) return
-      pressed = false
+      const identity = settleReplaceClick(vimSession.current)
+      if (identity !== undefined) {
+        globalThis.clearTimeout(settlementTimer)
+        settlementTimer = globalThis.setTimeout(() => {
+          settlementTimer = undefined
+          const moved = replaceClickMoved(vimSession.current)
+          if (!takeReplaceClick(vimSession.current, identity) || caretProjection.current.mode !== 'replace') return
+          if (!agendaClick) {
+            if (moved) changeVimMode('normal')
+            return
+          }
+          const input = document.activeElement
+          const entry = [...inputs.current.entries()].find(([, candidate]) => candidate === input)
+          if (entry === undefined) return // A read-only row retains the mode without an edit session.
+          const [nodeId, editor] = entry
+          const baseline = editor instanceof HTMLTextAreaElement ? editor.value : readEditableContent(editor).text
+          beginReplaceSession(vimSession.current, { nodeId, baseline, position: getCaret(editor) })
+        })
+      }
+      if (pointerPhase !== 'held') return
+      pointerPhase = 'released'
       const input = document.activeElement
       if (input instanceof HTMLElement && [...inputs.current.values()].includes(input)) redraw(input)
     }
@@ -807,12 +824,14 @@ export function useNodeInputBindings({
       typeof ResizeObserver === 'undefined'
         ? undefined
         : new ResizeObserver((entries) => {
-            if (pressed) return
+            if (pointerPhase === 'held') return
             for (const entry of entries) redraw(entry.target as HTMLElement)
           })
     normalCaretResizeObserver.current = observer
     for (const input of inputs.current.values()) observer?.observe(input)
     return () => {
+      globalThis.clearTimeout(settlementTimer)
+      takeReplaceClick(gestureSession)
       observer?.disconnect()
       document.removeEventListener('pointerdown', onPress, true)
       globalThis.removeEventListener('pointerup', onRelease, true)

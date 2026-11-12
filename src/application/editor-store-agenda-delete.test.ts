@@ -1,3 +1,4 @@
+import { pinnedAgendaOccurrence } from './agenda-state'
 import { expect, it } from 'vitest'
 import { EditorStore } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
@@ -47,7 +48,7 @@ it.each(['sibling', 'context', 'day'] as const)(
     store.editText('target', '')
     const before = ready().document
 
-    expect(ready().agenda?.pinnedOccurrence?.nodeId).toBe('target')
+    expect(pinnedAgendaOccurrence(ready().agenda)?.nodeId).toBe('target')
 
     store.deleteEmptySelected()
 

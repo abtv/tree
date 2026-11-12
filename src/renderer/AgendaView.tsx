@@ -1,8 +1,14 @@
+import {
+  activeAgendaOccurrence,
+  type AgendaOccurrence,
+  focusedAgendaDay,
+  dayKey,
+  type AgendaState,
+} from '../application/agenda-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
-import { dayKey, type AgendaState } from '../application/agenda-state'
 import { label } from '../application/recent-nodes'
 import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
@@ -11,7 +17,7 @@ import { findCanonicalDates } from '../domain/date-recognition'
 import type { VimTextCommandState } from './vim-session-finish'
 import { clearCommandAssembly } from './vim-command-state'
 import { createAgendaKeyDownHandler, type AgendaRowText } from './agenda-row-keyboard'
-import { arrivalCaret, caretMarks, clampCaret, type CaretMark, type RowCaret } from './agenda-row-caret'
+import { arrivalCaret, caretMarks, clampCaret, type CaretMark } from './agenda-row-caret'
 import { rowCaretMode } from './agenda-row-text-keys'
 import { AgendaRow } from './AgendaRow'
 import { markedNodes } from './marked-nodes'
@@ -28,12 +34,16 @@ import {
   viewportScroller,
 } from './scroll-viewport'
 import type { ShortcutProfile } from './shortcut-profile'
+import { createAgendaFocusHandlers } from './agenda-row-focus'
+import { AgendaViewportState } from './agenda-viewport-state'
+import { selectedAgendaDay } from '../application/agenda-reconcile'
+import { agendaCaret, arriveAgendaCaret, moveAgendaCaret } from './agenda-caret-state'
 
 /** A direct match owns an editor when it is the active occurrence or has at most one date. */
 function isEditableOccurrence(
-  row: Extract<AgendaRowModel, { kind: 'node' }>,
+  row: Pick<Extract<AgendaRowModel, { kind: 'node' }>, 'role' | 'nodeId' | 'day'>,
   node: TreeNode,
-  active: AgendaState['activeOccurrence'],
+  active: AgendaOccurrence | undefined,
 ): boolean {
   return (
     row.role === 'match' &&
@@ -53,9 +63,11 @@ export function AgendaView({
   renderText,
   shortcuts,
   searchCaretRef,
+  refreshActiveLine,
 }: {
   lineNumbers?: boolean
-  searchCaretRef?: { current: (() => number) | undefined }
+  searchCaretRef?: { current: (() => number | undefined) | undefined }
+  refreshActiveLine?: () => void
   shortcuts?: ShortcutProfile
   store: EditorStore
   agenda: AgendaState
@@ -75,26 +87,43 @@ export function AgendaView({
   const elements = useRef(new Map<string, HTMLDivElement>())
   // The caret of a row without an editor is renderer state: it changes on every motion key, so it
   // stays out of the store and the document. Navigation supplies the arrival offset.
-  const arrival = { key: agenda.selectedKey, anchor: agenda.selectionCursor ?? 0, focus: agenda.selectionCursor ?? 0 }
-  const [caretState, setCaretState] = useState<RowCaret>(() => arrival)
   const snapshot = store.getSnapshot()
   const focus = snapshot.status === 'ready' ? snapshot.focus : undefined
-  const [lastFocus, setLastFocus] = useState(focus)
-  const arrived = caretState.key !== agenda.selectedKey || lastFocus !== focus
-  if (arrived) {
-    setLastFocus(focus)
-    setCaretState(arrival)
+  const focusedDay = focusedAgendaDay(agenda)
+  const selectedDay = selectedAgendaDay(agenda.selectedKey)
+  const selectedNode =
+    focus !== undefined && agenda.selectedKey === `node:${selectedDay}:${focus.nodeId}`
+      ? requireNode(document, focus.nodeId).node
+      : undefined
+  const arrival = {
+    key: agenda.selectedKey,
+    focusToken: focus?.token,
+    cursor: agenda.selectionCursor ?? 0,
+    surface:
+      selectedNode !== undefined &&
+      selectedDay !== undefined &&
+      isEditableOccurrence(
+        { role: 'match', nodeId: selectedNode.id, day: selectedDay },
+        selectedNode,
+        activeAgendaOccurrence(agenda),
+      )
+        ? ('native' as const)
+        : ('synthetic' as const),
   }
-  const caret = arrived ? arrival : caretState
+  const [caretState, setCaretState] = useState(() => arriveAgendaCaret(undefined, arrival))
+  const currentCaret = arriveAgendaCaret(caretState, arrival)
+  if (currentCaret !== caretState) setCaretState(currentCaret)
+  const caret = agendaCaret(currentCaret)
   // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
   const caretRef = useRef(caret)
+  const [viewportState] = useState(() => new AgendaViewportState<Document, readonly AgendaRowModel[]>())
   useLayoutEffect(() => {
     if (searchCaretRef === undefined) return
-    searchCaretRef.current = () => caretRef.current.focus
+    searchCaretRef.current = currentCaret.kind === 'native' ? () => undefined : () => caretRef.current.focus
     return () => {
       searchCaretRef.current = undefined
     }
-  }, [searchCaretRef])
+  }, [searchCaretRef, currentCaret.kind])
   useLayoutEffect(() => {
     caretRef.current = caret
   })
@@ -103,7 +132,7 @@ export function AgendaView({
       const state = store.getSnapshot()
       if (state.status !== 'ready' || state.agenda === undefined) return ''
       if (row.kind === 'node') return requireNode(state.document, row.nodeId).node.text
-      return agendaRowLabel(row, state.agenda.today, row.kind === 'day' && state.agenda.focusedDay !== undefined)
+      return agendaRowLabel(row, state.agenda.today, row.kind === 'day' && focusedAgendaDay(state.agenda) !== undefined)
     },
     [store],
   )
@@ -116,7 +145,7 @@ export function AgendaView({
           state.status === 'ready' &&
           state.agenda !== undefined &&
           row.kind === 'node' &&
-          isEditableOccurrence(row, requireNode(state.document, row.nodeId).node, state.agenda.activeOccurrence)
+          isEditableOccurrence(row, requireNode(state.document, row.nodeId).node, activeAgendaOccurrence(state.agenda))
         )
       },
       caret: () => {
@@ -124,15 +153,16 @@ export function AgendaView({
         const key = state.status === 'ready' ? (state.agenda?.selectedKey ?? '') : ''
         return caretRef.current.key === key ? caretRef.current : arrivalCaret(key)
       },
-      setCaret: (next) => {
+      setCaret: (next, revealLine = false) => {
         caretRef.current = next
-        setCaretState(next)
+        if (revealLine) viewportState.revealLine(next)
+        setCaretState((current) => moveAgendaCaret(current, next))
       },
       copy: (text) => {
         void store.copyVimContent({ kind: 'text', text }).catch((error: unknown) => store.reportError(error))
       },
     }),
-    [store, textOfRow],
+    [store, textOfRow, viewportState],
   )
   const marksFor = (row: AgendaRowModel): readonly CaretMark[] | undefined => {
     if (row.key !== agenda.selectedKey) return undefined
@@ -146,33 +176,21 @@ export function AgendaView({
   const width = useRef(globalThis.innerWidth)
   const [revision, setRevision] = useState(0)
   const [viewport, setViewport] = useState({ start: 0, end: 0 })
-  const followEnd = useRef(false)
-  const reveal = useRef<'keyboard' | 'pointer' | 'none'>('keyboard')
   const viewportReveal = useMemo(() => createViewportReveal(), [])
-  const openingReveal = useRef(true)
   useLayoutEffect(() => {
     // Development StrictMode replays mount effects; restore the opening intent after its cleanup.
-    openingReveal.current = true
+    viewportState.mount()
     return viewportReveal.mount()
-  }, [viewportReveal])
+  }, [viewportReveal, viewportState])
   const rows = store.getAgendaRows()
   const numbers = useMemo(() => (lineNumbers ? agendaLineNumbers(rows) : undefined), [lineNumbers, rows])
   const lineNumberCount = useMemo(() => rows.reduce((count, row) => count + Number(row.kind === 'node'), 0), [rows])
   const lineNumberDigits = Math.max(2, String(lineNumberCount).length)
-  const lastPresentation = useRef(agenda)
-  const restoreScroll = useRef<number | undefined>(undefined)
   useLayoutEffect(() => {
-    const last = lastPresentation.current
-    if (last.focusedDay !== undefined && agenda.focusedDay === undefined) {
-      restoreScroll.current = last.timelineReturn?.scrollTop
-      reveal.current = 'none'
-      viewportReveal.cancel()
-    } else if (last.focusedDay !== agenda.focusedDay && last.focusedDay === undefined) {
-      viewportScroller()?.scrollTo({ top: 0 })
-      reveal.current = 'keyboard'
-    }
-    lastPresentation.current = agenda
-  }, [agenda, viewportReveal])
+    const change = viewportState.presentationChanged(agenda.presentation)
+    if (change === 'restore') viewportReveal.cancel()
+    else if (change === 'start') viewportScroller()?.scrollTo({ top: 0 })
+  }, [agenda.presentation, viewportReveal, viewportState])
   const windowed = shouldWindow(rows.length)
   const [layoutState, setLayoutState] = useState(() => ({
     rows,
@@ -255,27 +273,28 @@ export function AgendaView({
       // Newly measured path labels can grow the list after a jump to its estimated end.
       // Keep that explicit end position while the visible range settles.
       const scroller = viewportScroller()
-      if (followEnd.current && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight
+      if (viewportState.followsEnd && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight
       updateViewport()
     }
     notifyViewportLayout()
-  }, [layoutState, updateViewport, windowed])
+  }, [layoutState, updateViewport, windowed, viewportState])
   useLayoutEffect(() => {
-    if (restoreScroll.current === undefined || layoutState.rows !== rows || layoutState.revision !== revision) return
-    viewportScroller()?.scrollTo({ top: restoreScroll.current })
-    restoreScroll.current = undefined
+    const top = viewportState.takeRestoration(layoutState.rows === rows && layoutState.revision === revision)
+    if (top === undefined) return
+    viewportScroller()?.scrollTo({ top })
     updateViewport()
-  }, [layoutState, rows, revision, updateViewport])
+  }, [layoutState, rows, revision, updateViewport, viewportState])
   useEffect(() => {
     if (!windowed) return undefined
     // Replace the anchored window in this event; it retains its previous paint until delivery.
     // Flush only this external event; layout-effect updates keep their existing commit ordering.
     const unsubscribe = onViewportScroll(() => {
       const scroller = viewportScroller()
-      followEnd.current =
+      viewportState.followEnd(
         scroller !== undefined &&
-        scroller.scrollTop > 0 &&
-        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1
+          scroller.scrollTop > 0 &&
+          scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      )
       flushSync(updateViewport)
     })
     globalThis.addEventListener('resize', updateViewport)
@@ -283,70 +302,60 @@ export function AgendaView({
       unsubscribe()
       globalThis.removeEventListener('resize', updateViewport)
     }
-  }, [updateViewport, windowed])
+  }, [updateViewport, windowed, viewportState])
   // Rows a document change re-derives keep the selected occurrence at its viewport position, so a
   // mirror or day change around it never scrolls it away (docs/PRODUCT.md §23.7).
-  const previous = useRef<
-    { key: string; nodeId: string | undefined; document: Document; rows: typeof rows } | undefined
-  >(undefined)
-  const anchorTop = useRef<number | undefined>(undefined)
-  const skipReveal = useRef(false)
-  const activeNodeId = agenda.activeOccurrence?.nodeId
+  const activeNodeId = activeAgendaOccurrence(agenda)?.nodeId
   // The store publishes before React renders, so the row is still where the user last saw it. A
   // keystroke that keeps the same rows measures nothing.
   useEffect(
     () =>
       store.subscribe(() => {
         const state = store.getSnapshot()
-        const last = previous.current
-        if (
-          state.status !== 'ready' ||
-          state.agenda === undefined ||
-          last === undefined ||
-          last.nodeId === undefined ||
-          last.nodeId !== state.agenda.activeOccurrence?.nodeId ||
-          last.document === state.document ||
-          last.rows === store.getAgendaRows()
-        )
-          return
-        anchorTop.current ??= elements.current.get(last.key)?.getBoundingClientRect().top
+        if (state.status !== 'ready' || state.agenda === undefined) return
+        const key = viewportState.anchorSource({
+          nodeId: activeAgendaOccurrence(state.agenda)?.nodeId,
+          document: state.document,
+          rows: store.getAgendaRows(),
+        })
+        if (key !== undefined) viewportState.captureAnchor(elements.current.get(key)?.getBoundingClientRect().top)
       }),
-    [store],
+    [store, viewportState],
   )
   useLayoutEffect(() => {
-    const anchored = anchorTop.current
-    skipReveal.current = anchored !== undefined
+    const anchored = viewportState.commit(
+      { key: agenda.selectedKey, nodeId: activeNodeId, document, rows },
+      layoutState.rows === rows && layoutState.revision === revision,
+    )
     // A commit rendered with estimated heights is transient: the measured layout follows at once and
     // moves the rows above, so the correction waits for it.
-    if (anchored !== undefined && layoutState.rows === rows && layoutState.revision === revision) {
-      anchorTop.current = undefined
+    if (anchored !== undefined) {
       const element = elements.current.get(agenda.selectedKey)
       if (element !== undefined) {
         const delta = element.getBoundingClientRect().top - anchored
         if (Math.abs(delta) >= 1) scrollViewportBy(delta)
       }
     }
-    previous.current = { key: agenda.selectedKey, nodeId: activeNodeId, document, rows }
   })
   const select = useCallback(
     (key: string): void => {
-      reveal.current = 'pointer'
+      viewportState.navigate('pointer')
       store.search.cancelDraft()
       store.search.interruptNavigation()
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
       store.applyAgenda({ kind: 'select', key })
     },
-    [store, vim],
+    [store, vim, viewportState],
   )
   const toggle = useCallback(
     (key: string): void => {
       const row = store.getAgendaRows().find((candidate) => candidate.key === key)
       if (row === undefined) return
-      reveal.current = 'pointer'
+      viewportState.navigate('pointer')
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
       store.applyAgenda({ kind: 'toggle-fold', key })
     },
-    [store, vim],
+    [store, vim, viewportState],
   )
   useLayoutEffect(() => {
     if (store.search.session.getSnapshot().draft !== undefined) return
@@ -360,9 +369,16 @@ export function AgendaView({
       // The editor that lost focus keeps its native selection, which would paint a second caret.
       globalThis.getSelection()?.removeAllRanges()
     }
-    const opening = openingReveal.current
-    openingReveal.current = false
-    if (opening && agenda.focusedDay === undefined && agenda.selectedKey === dayKey(agenda.today)) {
+    const caretElement = element.querySelector('.agenda-caret')
+    const intent = viewportState.takeReveal(
+      focusedDay === undefined && agenda.selectedKey === dayKey(agenda.today),
+      focus?.revealLine && element.dataset.nodeId === focus.nodeId
+        ? caretElement === null
+          ? 'native'
+          : 'synthetic'
+        : 'none',
+    )
+    if (intent === 'today') {
       viewportReveal.beginRegion(
         element,
         () => {
@@ -382,13 +398,12 @@ export function AgendaView({
           return (
             state.status === 'ready' &&
             state.agenda !== undefined &&
-            state.agenda.focusedDay === undefined &&
+            focusedAgendaDay(state.agenda) === undefined &&
             state.agenda.selectedKey === dayKey(state.agenda.today)
           )
         },
       )
-    } else if (focus?.revealLine && element.dataset.nodeId === focus.nodeId) {
-      const caretElement = element.querySelector('.agenda-caret')
+    } else if (intent === 'native-line' || intent === 'synthetic-line') {
       // Editable rows use the input owner's existing line-reveal intent.
       if (caretElement === null) viewportReveal.cancel()
       else
@@ -396,26 +411,49 @@ export function AgendaView({
           const state = store.getSnapshot()
           return state.status === 'ready' && state.focus === focus
         })
-    } else if (skipReveal.current) viewportReveal.cancel()
-    else if (reveal.current !== 'none')
-      viewportReveal.begin(element, reveal.current === 'keyboard', () => {
+    } else if (intent === 'keyboard-row' || intent === 'pointer-row')
+      viewportReveal.begin(element, intent === 'keyboard-row', () => {
         const state = store.getSnapshot()
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
       })
     else viewportReveal.cancel()
-  }, [agenda.selectedKey, agenda.focusedDay, agenda.today, focus, store, viewportReveal])
+  }, [agenda.selectedKey, focusedDay, agenda.today, focus, store, viewportReveal, viewportState])
+  useLayoutEffect(() => {
+    const intent = viewportState.takeLine()
+    if (intent === undefined) return
+    const row = elements.current.get(intent.key)
+    if (row === undefined || row.querySelector('.node-input') !== null) return
+    const text = row.querySelector<HTMLElement>('.agenda-text,.agenda-label') ?? row
+    viewportReveal.beginLine(
+      () => text,
+      intent.focus,
+      () => {
+        const state = store.getSnapshot()
+        return (
+          state.status === 'ready' &&
+          vim?.mode === 'normal' &&
+          globalThis.document.activeElement?.closest('.agenda-row') === row &&
+          state.agenda?.selectedKey === intent.key &&
+          caretRef.current.key === intent.key &&
+          caretRef.current.focus === intent.focus
+        )
+      },
+    )
+  }, [caret, store, viewportReveal, vim, viewportState])
   // A changed row array needs compatible offsets immediately, before the measuring effect commits.
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
   const windowOffset = range === undefined ? 0 : (layout.offsets[range.start] ?? 0)
+  useLayoutEffect(() => refreshActiveLine?.())
   const renderRow = (index: number, pinned = false): React.JSX.Element => {
     const row = rows[index]!
-    if (row.kind === 'day' && agenda.focusedDay !== undefined) {
+    if (row.kind === 'day' && focusedDay !== undefined) {
       const heading = (
         <div
           key={row.key}
           className={`current-parent agenda-row agenda-focused-heading${pinned ? ' agenda-row-pinned' : ''}`}
           style={pinned ? { top: (layout.offsets[index] ?? 0) - windowOffset } : undefined}
           data-agenda-key={row.key}
+          data-caret-end={caret.focus < caret.anchor ? 'start' : 'end'}
           role="row"
           aria-selected={row.key === agenda.selectedKey}
           tabIndex={row.key === agenda.selectedKey ? 0 : -1}
@@ -441,7 +479,7 @@ export function AgendaView({
       )
     }
     const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
-    const editable = row.kind === 'node' && isEditableOccurrence(row, node!, agenda.activeOccurrence)
+    const editable = row.kind === 'node' && isEditableOccurrence(row, node!, activeAgendaOccurrence(agenda))
     return (
       <AgendaRow
         lineNumber={numbers?.get(row.key)}
@@ -465,6 +503,7 @@ export function AgendaView({
         pinned={pinned}
         pinnedOffset={(layout.offsets[index] ?? 0) - windowOffset}
         marks={editable ? undefined : marksFor(row)}
+        caretAtStart={row.key === caret.key && caret.focus < caret.anchor}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
         rowRef={rowRef}
         onSelect={select}
@@ -490,7 +529,8 @@ export function AgendaView({
       }
       ref={listRef}
       role="grid"
-      aria-label={agenda.focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}
+      aria-label={focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}
+      {...createAgendaFocusHandlers(store, vim)}
       onKeyDown={(event) =>
         !event.defaultPrevented &&
         !(event.target instanceof Element && event.target.closest('.node-input')) &&
@@ -500,7 +540,7 @@ export function AgendaView({
           rowText,
           shortcuts,
           beforeSelect: (preserve) => {
-            reveal.current = preserve ? 'none' : 'keyboard'
+            viewportState.navigate(preserve ? 'none' : 'keyboard')
           },
         })(event)
       }

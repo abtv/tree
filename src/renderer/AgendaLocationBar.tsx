@@ -10,10 +10,10 @@ export function AgendaLocationBar({ agenda }: { agenda: AgendaState }): React.JS
           <path d="M8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 3h2" />
         </svg>
       </span>
-      {agenda.focusedDay !== undefined && (
+      {agenda.presentation.kind === 'focused-day' && (
         <>
           <span className="location-separator">›</span>
-          <span className="location-current">{agendaDateLabel(agenda.focusedDay, agenda.today)}</span>
+          <span className="location-current">{agendaDateLabel(agenda.presentation.day, agenda.today)}</span>
         </>
       )}
     </header>

@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from 'react'
+import { focusedAgendaDay } from '../application/agenda-state'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
@@ -171,7 +172,7 @@ export function createEditorKeyDownHandler({
       }
       if (primary && event.key === ',') {
         event.preventDefault()
-        if (agenda.focusedDay !== undefined) {
+        if (focusedAgendaDay(agenda) !== undefined) {
           prepareVimCommand(vim, 'navigation', event.currentTarget)
           store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
         }
@@ -201,7 +202,8 @@ export function createEditorKeyDownHandler({
         (((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !primary) ||
           (vim?.mode === 'normal' && event.ctrlKey && (event.key === 'd' || event.key === 'u')))
       ) {
-        prepareVimCommand(vim, 'navigation', event.currentTarget)
+        if (vim?.mode !== 'normal' || !['ArrowUp', 'ArrowDown'].includes(event.key))
+          prepareVimCommand(vim, 'navigation', event.currentTarget)
         createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
         return
       }

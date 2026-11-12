@@ -30,6 +30,129 @@ const caretOffset = (field: Locator): Promise<number> =>
   })
 
 // @requirement PRODUCT.md §23.4
+test('walks wrapped visual lines with j and k before crossing Agenda nodes', async ({ userDataDir }, testInfo) => {
+  const text = `2026-10-15 ${'Wrapped navigation words. '.repeat(150)}`
+  seedDocument(userDataDir, {
+    document: { roots: [node('wrapped', text), node('next', '2026-10-15 Next')] },
+    location: { currentParentId: null, selectedNodeId: 'wrapped' },
+  })
+  const { window } = await launchTree(userDataDir)
+
+  await openAndSelect(window, nodeKey(10, 15, 'wrapped'))
+  const input = window.getByRole('textbox', { name: 'Agenda node wrapped', exact: true })
+  await window.keyboard.press('0')
+  await window.keyboard.press('j')
+
+  await expect(input).toBeFocused()
+  const secondLine = await caretOffset(input)
+  expect(secondLine).toBeGreaterThan(0)
+
+  await window.keyboard.press('k')
+
+  await expect(input).toBeFocused()
+  await expect.poll(() => caretOffset(input)).toBe(0)
+
+  await window.keyboard.press('ArrowDown')
+
+  await expect.poll(() => caretOffset(input)).toBe(secondLine)
+
+  await window.keyboard.press('ArrowUp')
+
+  await expect.poll(() => caretOffset(input)).toBe(0)
+
+  await window.keyboard.type('10j')
+  const counted = await caretOffset(window.locator('.node-input:focus'))
+  await input.click()
+  await window.keyboard.press('0')
+  for (let index = 0; index < 10; index++) await window.keyboard.press('j')
+
+  await expect.poll(() => caretOffset(window.locator('.node-input:focus'))).toBe(counted)
+
+  await input.click()
+
+  await window.keyboard.press('$')
+  await window.keyboard.press('j')
+  const next = window.getByRole('textbox', { name: 'Agenda node next', exact: true })
+
+  await expect(next).toBeFocused()
+
+  await window.keyboard.press('0')
+  await window.keyboard.press('k')
+
+  await expect(input).toBeFocused()
+  expect(await caretOffset(input)).toBeGreaterThan(secondLine)
+  const visible = await input.evaluate((element) => {
+    const caret = document.getSelection()!.getRangeAt(0).getBoundingClientRect()
+    const viewport = element.closest('.scroll-viewport')!.getBoundingClientRect()
+    return caret.top >= viewport.top && caret.bottom <= viewport.bottom
+  })
+
+  expect(visible).toBe(true)
+  await window.screenshot({ path: testInfo.outputPath('agenda-wrapped-vertical-arrival.png') })
+  await window.emulateMedia({ colorScheme: 'dark' })
+  await window.screenshot({ path: testInfo.outputPath('agenda-wrapped-vertical-arrival-dark.png') })
+})
+
+// @requirement PRODUCT.md §23.4
+test('counted wrapped motion measures windowed Agenda destinations like repeated motion', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: Array.from({ length: 150 }, (_, index) =>
+        node(`row-${index}`, `2026-10-15 Row ${index} ${'Windowed wrapped text. '.repeat(24)}`),
+      ),
+    },
+    location: { currentParentId: null, selectedNodeId: 'row-0' },
+  })
+  const { window } = await launchTree(userDataDir)
+
+  await openAndSelect(window, nodeKey(10, 15, 'row-0'))
+  await window.keyboard.press('0')
+  await window.keyboard.type('100j')
+  const countedKey = await window.locator('.agenda-row[aria-selected="true"]').getAttribute('data-agenda-key')
+  const countedCursor = await caretOffset(window.locator('.node-input:focus'))
+
+  await window.keyboard.type('gg')
+  await row(window, nodeKey(10, 15, 'row-0')).click()
+  await window.keyboard.press('0')
+  for (let index = 0; index < 100; index++) await window.keyboard.press('j')
+
+  await expect(window.locator('.agenda-row[aria-selected="true"]')).toHaveAttribute('data-agenda-key', countedKey!)
+  await expect.poll(() => caretOffset(window.locator('.node-input:focus'))).toBe(countedCursor)
+  await expect(window.locator('.agenda-row[aria-hidden="true"]')).toHaveCount(0)
+})
+
+for (const interruption of ['pointer', 'focus'] as const) {
+  // @requirement PRODUCT.md §23.4
+  test(`resets the desired column after ${interruption} interrupts a selected day`, async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [node('before', `2026-10-14 ${'a'.repeat(50)}`), node('after', `2026-10-15 ${'b'.repeat(70)}`)],
+      },
+      location: { currentParentId: null, selectedNodeId: 'before' },
+    })
+    const { window } = await launchTree(userDataDir)
+
+    await openAndSelect(window, nodeKey(10, 14, 'before'))
+    await window.keyboard.press('$')
+    await window.keyboard.press('j')
+    const day = row(window, dayKey(10, 15))
+
+    await expect(day).toHaveAttribute('aria-selected', 'true')
+
+    if (interruption === 'pointer') await day.click()
+    else {
+      await window.getByRole('button', { name: 'Pin window on top' }).focus()
+      await day.focus()
+    }
+    await window.keyboard.press('j')
+    const after = window.getByRole('textbox', { name: 'Agenda node after', exact: true })
+
+    await expect(after).toBeFocused()
+    expect(await caretOffset(after)).toBeLessThan(20)
+  })
+}
+
+// @requirement PRODUCT.md §23.4
 test('keeps horizontal image carets separate across repeated Agenda occurrences and a focused-day heading', async ({
   userDataDir,
 }, testInfo) => {
@@ -459,6 +582,20 @@ test.describe('Agenda Vim commands', () => {
     )
     const { window } = await launchTree(userDataDir)
 
+    const treeInput = window.locator('.node-row[data-node-id="image"] .node-input')
+    await treeInput.click()
+    await window.keyboard.press('Escape')
+    await window.keyboard.type('05l')
+    await window.keyboard.press('j')
+    await window.keyboard.press('k')
+    await window.keyboard.type('2j')
+    await window.keyboard.press('k')
+    await window.keyboard.press('k')
+
+    const returnedColumn = await caretOffset(treeInput)
+
+    expect(returnedColumn).toBe('2026-10-14 Image'.length - 1)
+
     await openAndSelect(window, nodeKey(10, 14, 'image'))
     const imageRow = row(window, nodeKey(10, 14, 'image'))
     const input = imageRow.locator('.node-input')
@@ -498,7 +635,7 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('k')
 
     await expect(image).not.toHaveClass(/attachment-image-caret/)
-    expect(await offset()).toBe('2026-10-14 Image'.length - 1)
+    expect(await offset()).toBe(returnedColumn)
 
     await window.keyboard.press('G')
 

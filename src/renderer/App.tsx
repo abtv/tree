@@ -1,3 +1,4 @@
+import { activeAgendaOccurrence, focusedAgendaDay } from '../application/agenda-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CommandServices } from '../application/command-registry'
 import { EditorStore } from '../application/editor-store'
@@ -43,6 +44,7 @@ import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 import { useLineNumbers } from './use-line-numbers'
 import { UpdateStatus } from './UpdateStatus'
+import { useActiveLineHighlight } from './use-active-line-highlight'
 
 interface AppProps {
   showAbout?: () => void
@@ -123,7 +125,7 @@ export function App({
   const statusMessage = agendaStatusMessage(agenda)
   const focus =
     state.status === 'ready' &&
-    (agenda === undefined || agenda.activeOccurrence?.nodeId === state.location.selectedNodeId)
+    (agenda === undefined || activeAgendaOccurrence(agenda)?.nodeId === state.location.selectedNodeId)
       ? state.focus
       : undefined
   const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
@@ -224,9 +226,19 @@ export function App({
     },
     beforeViewChange,
   })
-  const searchCaret = useRef<(() => number) | undefined>(undefined)
+  const searchCaret = useRef<(() => number | undefined) | undefined>(undefined)
+  const activeLineRoot = useRef<HTMLElement | null>(null)
+  const refreshActiveLine = useActiveLineHighlight(activeLineRoot)
   const openGlobalSearch = useRef<(() => void) | undefined>(undefined)
-  const readAgendaCaret = useCallback(() => searchCaret.current?.() ?? 0, [])
+  const readAgendaCaret = useCallback(() => {
+    const synthetic = searchCaret.current?.()
+    if (synthetic !== undefined) return synthetic
+    const current = store.getSnapshot()
+    // An inactive editor has not consumed this arrival; Find uses the published target.
+    return current.status === 'ready' && current.agenda?.activity.kind === 'inactive'
+      ? current.focus.cursor
+      : readSearchCaret()
+  }, [store, readSearchCaret])
   const localSearch = useLocalSearch({
     vimEnabled,
     store,
@@ -527,6 +539,7 @@ export function App({
 
   return (
     <main
+      ref={activeLineRoot}
       className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}
       onKeyDown={(event) => {
         const target = event.target
@@ -589,7 +602,7 @@ export function App({
           }}
           className={
             agenda !== undefined
-              ? `editor-shell agenda-shell${agenda.focusedDay === undefined ? '' : ' agenda-shell-focused'}`
+              ? `editor-shell agenda-shell${focusedAgendaDay(agenda) === undefined ? '' : ' agenda-shell-focused'}`
               : topLevel
                 ? 'editor-shell editor-shell-top-level'
                 : 'editor-shell'
@@ -599,6 +612,7 @@ export function App({
             <AgendaView
               lineNumbers={lineNumbers}
               searchCaretRef={searchCaret}
+              refreshActiveLine={refreshActiveLine}
               store={store}
               agenda={agenda}
               document={state.document}

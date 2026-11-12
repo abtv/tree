@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { focusedAgendaDay } from '../application/agenda-state'
 import type { KeyboardEvent } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
@@ -235,7 +236,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
 
       f.press('.', { metaKey: true })
 
-      if (element === 'day') expect(f.snapshot().agenda?.focusedDay).toBe(day(15))
+      if (element === 'day') expect(focusedAgendaDay(f.snapshot().agenda)).toBe(day(15))
       else {
         expect(f.snapshot().agenda).toBeUndefined()
         expect(f.snapshot().location.currentParentId).toBe(element)
@@ -249,7 +250,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
 
       f.press(',', { metaKey: true })
 
-      expect(f.snapshot().agenda?.focusedDay).toBeUndefined()
+      expect(focusedAgendaDay(f.snapshot().agenda)).toBeUndefined()
       expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
     })
 

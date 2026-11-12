@@ -1,3 +1,4 @@
+import { pinnedAgendaOccurrence, activeAgendaOccurrence } from './agenda-state'
 import { afterEach, expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
 import type { Location, TreeNode } from '../domain/document'
@@ -41,6 +42,47 @@ export function ready(store: EditorStore): ReadySnapshot {
 }
 
 afterEach(() => vi.useRealTimers())
+
+// @requirement PRODUCT.md §22.2
+it('reuses the unchanged Agenda projection and rows across repeated view switches', async () => {
+  const { store, save } = await agendaHarness()
+  store.openAgenda()
+  const rows = store.getAgendaRows()
+
+  for (let index = 0; index < 20; index++) {
+    store.closeAgenda()
+    store.openAgenda()
+
+    expect(store.getAgendaRows()).toBe(rows)
+    expect(ready(store).agenda!.selectedKey).toBe(`day:${today}`)
+  }
+
+  await store.flushPersistence()
+
+  expect(save).not.toHaveBeenCalled()
+})
+
+// @requirement PRODUCT.md §22.1
+it('releases a retained Agenda projection when its document changes in Tree', async () => {
+  vi.useFakeTimers()
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.closeAgenda()
+  const clear = vi.spyOn(AgendaRowsCache.prototype, 'clear')
+  try {
+    store.editText('outside', '2026-10-09 Changed in Tree')
+
+    expect(clear).toHaveBeenCalledOnce()
+
+    store.openAgenda()
+
+    expect(
+      store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'outside' && row.day === today + 1),
+    ).toBe(true)
+  } finally {
+    clear.mockRestore()
+  }
+})
 
 // @requirement PRODUCT.md §23.9
 it('attaches the first clipboard image in Agenda and rejects a second before writing or creating a sibling', async () => {
@@ -303,23 +345,26 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
 
   store.editText('match', 'Undated')
 
-  expect(ready(store).agenda).toMatchObject({ selectedKey: key, pinnedOccurrence: { nodeId: 'match', day: today + 6 } })
+  expect(ready(store).agenda).toMatchObject({
+    selectedKey: key,
+    activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'match', day: today + 6 } },
+  })
   expect(ready(store).focus).toBe(original.focus)
   expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
 
   store.undo()
 
   expect(ready(store).document).toBe(original.document)
-  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeUndefined()
   expect(ready(store).agenda!.selectedKey).toBe(key)
 
   store.redo()
 
-  expect(ready(store).agenda!.pinnedOccurrence).toBeDefined()
+  expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeDefined()
 
   store.applyAgenda({ kind: 'select', key: `day:${today}` })
 
-  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeUndefined()
   expect(store.getAgendaRows().some((row) => row.key === key)).toBe(false)
 
   store.undo()
@@ -379,7 +424,7 @@ it('clears a pin when its day is selected, maintaining a valid visible selection
   store.editText('match', 'No date')
   store.applyAgenda({ kind: 'select', key: `day:${today + 6}` })
 
-  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeUndefined()
   expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda!.selectedKey)).toBe(true)
 
   store.closeAgenda()
@@ -440,7 +485,7 @@ it('rejects edits and history while persistence is locked, but allows leaving a 
 
   store.applyAgenda({ kind: 'select', key: `day:${today}` })
 
-  expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
+  expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeUndefined()
   expect(ready(store).document).toBe(before.document)
 })
 
@@ -494,7 +539,7 @@ it('uses the selected day for history proximity and retains focus for path-only 
   store.undo()
 
   expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 20}:other`)
-  expect(ready(store).agenda!.activeOccurrence).toEqual({ nodeId: 'other', day: today + 20 })
+  expect(activeAgendaOccurrence(ready(store).agenda!)).toEqual({ nodeId: 'other', day: today + 20 })
   expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'other' })
   expect(ready(store).focus).toBe(before)
 
@@ -547,7 +592,7 @@ it('ends text grouping at open, close, day selection, and real-row reselection',
   }
 })
 
-it('releases the derived cache when closing and does not republish focus on an unrelated fold', async () => {
+it('keeps the derived cache warm when closing and does not republish focus on an unrelated fold', async () => {
   const { store } = await agendaHarness()
   const clear = vi.spyOn(AgendaRowsCache.prototype, 'clear')
   try {
@@ -572,7 +617,7 @@ it('releases the derived cache when closing and does not republish focus on an u
 
     store.closeAgenda()
 
-    expect(clear).toHaveBeenCalledOnce()
+    expect(clear).not.toHaveBeenCalled()
   } finally {
     clear.mockRestore()
   }
@@ -661,11 +706,16 @@ it('publishes real-row selection and focus atomically, including reselection, an
     location: { selectedNodeId: 'match' },
     focus: { nodeId: 'match', cursor: 8 },
   })
+  expect(seen[0]!.focus).not.toHaveProperty('revealLine')
 
   store.applyAgenda({ kind: 'select', key })
 
   expect(seen).toHaveLength(2)
   expect(ready(store).focus.cursor).toBe(0)
+
+  store.applyAgenda({ kind: 'select', key, cursor: 3, revealLine: true })
+
+  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 3, revealLine: true })
 
   const focus = ready(store).focus
 

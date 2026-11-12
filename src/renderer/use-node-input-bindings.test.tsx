@@ -647,6 +647,41 @@ describe('useNodeInputBindings', () => {
     },
   )
 
+  it('keeps a newer Agenda press cancellable after the previous release timer runs', async () => {
+    const f = await fixture({ mode: 'replace' })
+    const source = f.input()
+    const rows = ['first', 'second'].map((key) => {
+      const row = document.createElement('div')
+      row.className = 'agenda-row'
+      row.dataset.agendaKey = key
+      row.tabIndex = 0
+      document.body.append(row)
+      return row
+    })
+
+    act(() => {
+      source.focus()
+      rows[0]!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      rows[0]!.focus()
+      f.bindings('node').onBlur()
+      rows[0]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+      source.focus()
+      rows[1]!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      rows[1]!.focus()
+      f.bindings('node').onBlur()
+      vi.advanceTimersByTime(1)
+    })
+
+    expect(f.result.current.vimMode).toBe('replace')
+
+    act(() => {
+      globalThis.dispatchEvent(new MouseEvent('pointercancel'))
+      vi.advanceTimersByTime(1)
+    })
+
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
   it.each(['pointercancel', 'blur', 'outside', 'drag'])(
     'ends Replace when an Agenda row press becomes %s',
     async (release) => {

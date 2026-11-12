@@ -1,3 +1,4 @@
+import { pinnedAgendaOccurrence, activeAgendaOccurrence } from './agenda-state'
 import { isValidLocation, normalizeVisibleLocation, releaseNodeIndex, type NodeId } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
 import { agendaOriginLocation, reconcileAgenda } from './agenda-reconcile'
@@ -48,7 +49,7 @@ export class EditorRuntimeState {
       (previous.status !== 'ready' ||
         previous.document !== state.document ||
         previous.agenda === undefined ||
-        (previous.agenda?.pinnedOccurrence !== undefined && state.agenda.pinnedOccurrence === undefined))
+        (pinnedAgendaOccurrence(previous.agenda) !== undefined && pinnedAgendaOccurrence(state.agenda) === undefined))
     ) {
       const agenda = reconcileAgenda(state.document, state.agenda, false, this.agendaRowsCache)
       if (agenda === undefined) {
@@ -65,7 +66,7 @@ export class EditorRuntimeState {
         next.focus = this.newFocus(next.location.selectedNodeId, 0)
       } else {
         next.agenda = agenda
-        const active = agenda.activeOccurrence
+        const active = activeAgendaOccurrence(agenda)
         // Publication enforces Agenda's active node even when the command already selected that same ID.
         if (active !== undefined)
           next.location = { currentParentId: agenda.scopeParentId, selectedNodeId: active.nodeId }

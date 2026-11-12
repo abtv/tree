@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { activeAgendaOccurrence } from '../application/agenda-state'
 import type { KeyboardEvent } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -129,7 +130,7 @@ describe('Agenda editing command boundaries', () => {
         '2026-10-14 Review',
       ])
       expect(f.snapshot().focus).toMatchObject({ nodeId: 'first', cursor: 13 })
-      expect(f.snapshot().agenda?.activeOccurrence?.nodeId).toBe('first')
+      expect(activeAgendaOccurrence(f.snapshot().agenda)?.nodeId).toBe('first')
 
       f.store.undo()
 

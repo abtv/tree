@@ -17,18 +17,20 @@ describe('Agenda labels', () => {
     const occurrence = { nodeId: 'a', day: 1 }
 
     expect(agendaStatusMessage(undefined)).toBeUndefined()
-    expect(agendaStatusMessage({})).toBeUndefined()
-    expect(agendaStatusMessage({ pinnedOccurrence: occurrence })).toBe('Add a date to keep this item in Agenda')
+    expect(agendaStatusMessage({ activity: { kind: 'inactive' } })).toBeUndefined()
+    expect(agendaStatusMessage({ activity: { kind: 'pinned-until-leave' as const, occurrence: occurrence } })).toBe(
+      'Add a date to keep this item in Agenda',
+    )
   })
 
   // @requirement PRODUCT.md §23.7
   it('treats only other-day direct matches of the active node as mirrors', () => {
-    const agenda = { activeOccurrence: { nodeId: 'a', day: 1 } }
+    const agenda = { activity: { kind: 'dated' as const, occurrence: { nodeId: 'a', day: 1 } } }
 
     expect(isAgendaMirror(agenda, { nodeId: 'a', day: 2, role: 'match' })).toBe(true)
     expect(isAgendaMirror(agenda, { nodeId: 'a', day: 1, role: 'match' })).toBe(false)
     expect(isAgendaMirror(agenda, { nodeId: 'b', day: 2, role: 'match' })).toBe(false)
     expect(isAgendaMirror(agenda, { nodeId: 'a', day: 2, role: 'context' })).toBe(false)
-    expect(isAgendaMirror({}, { nodeId: 'a', day: 2, role: 'match' })).toBe(false)
+    expect(isAgendaMirror({ activity: { kind: 'inactive' } }, { nodeId: 'a', day: 2, role: 'match' })).toBe(false)
   })
 })

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { focusedAgendaDay } from '../application/agenda-state'
 import type { KeyboardEvent } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -418,11 +419,11 @@ describe('read-only Agenda keyboard', () => {
     f.press('.', { metaKey: true })
 
     expect(f.snapshot().agenda).toBeDefined()
-    expect(f.snapshot().agenda?.focusedDay).toBeDefined()
+    expect(focusedAgendaDay(f.snapshot().agenda)).toBeDefined()
 
     f.press(',', { metaKey: true })
 
-    expect(f.snapshot().agenda?.focusedDay).toBeUndefined()
+    expect(focusedAgendaDay(f.snapshot().agenda)).toBeUndefined()
 
     f.press('G')
     f.press('.', { metaKey: true })

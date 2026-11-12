@@ -4,7 +4,7 @@ import type { ReadySnapshot } from './editor-runtime-state'
 import { SearchSession } from './search-session'
 import type { SearchDestination, SearchPosition, SearchResult } from './search-executor'
 import { agendaAncestorKeys, AgendaRowsCache } from './agenda-rows'
-import { applyAgendaCommand, type AgendaCommand, type AgendaState } from './agenda-state'
+import { focusedAgendaDay, applyAgendaCommand, type AgendaCommand, type AgendaState } from './agenda-state'
 import { expandNode, isNodeExpanded, type ExpansionState } from './expansion-state'
 import type { FocusIntent } from './editor-store-types'
 
@@ -50,7 +50,7 @@ export class EditorSearch {
     const key =
       agenda === undefined
         ? `tree:${state.location.currentParentId ?? ''}`
-        : `agenda:${agenda.scopeParentId ?? ''}:${agenda.focusedDay ?? 'timeline'}`
+        : `agenda:${agenda.scopeParentId ?? ''}:${focusedAgendaDay(agenda) ?? 'timeline'}`
     const projection = agenda === undefined ? undefined : this.agendaRows.getProjection(state.document, agenda)
     const changedProjection = this.scope.kind === 'agenda' && this.scope.projection !== projection
     const changedScope = key !== this.scopeKey
@@ -74,7 +74,7 @@ export class EditorSearch {
         : {
             kind: 'agenda',
             projection: projection!,
-            ...(agenda.focusedDay === undefined ? {} : { focusedDay: agenda.focusedDay }),
+            ...(agenda.presentation.kind === 'timeline' ? {} : { focusedDay: agenda.presentation.day }),
           }
     this.session.replaceContext({ document: state.document, revision: this.revision, scopeKey: key, scope: this.scope })
   }
