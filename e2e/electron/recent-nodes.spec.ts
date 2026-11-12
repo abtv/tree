@@ -536,6 +536,10 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { window } = await launchTree(userDataDir)
+    const rendererErrors: string[] = []
+    window.on('console', (message) => {
+      if (message.type() === 'error') rendererErrors.push(message.text())
+    })
     await window.keyboard.press('Meta+;')
     await window.getByRole('searchbox').fill('node')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 100')
@@ -554,13 +558,21 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         const state = { active: true, count: 0, failures: [] as string[] }
         Object.assign(window, { searchFrameProbe: state })
         const sample = (): void => {
-          const list = document.querySelector('.node-search-results')!
-          const rows = list.querySelectorAll('[aria-selected="true"]')
-          const viewport = list.getBoundingClientRect()
-          const row = rows[0]?.getBoundingClientRect()
+          const list = document.querySelector('.node-search-results')
+          const rows = list?.querySelectorAll('[aria-selected="true"]')
+          const viewport = list?.getBoundingClientRect()
+          const row = rows?.[0]?.getBoundingClientRect()
           state.count++
-          if (rows.length !== 1 || !row || row.top < viewport.top - 1 || row.bottom > viewport.bottom + 1) {
-            state.failures.push(`frame ${state.count}: selected=${rows.length}, top=${row?.top}, bottom=${row?.bottom}`)
+          if (
+            rows?.length !== 1 ||
+            !row ||
+            !viewport ||
+            row.top < viewport.top - 1 ||
+            row.bottom > viewport.bottom + 1
+          ) {
+            state.failures.push(
+              `frame ${state.count}: selected=${rows?.length}, top=${row?.top}, bottom=${row?.bottom}`,
+            )
           }
           if (state.active) requestAnimationFrame(sample)
         }
@@ -587,6 +599,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         writeFileSync(test.info().outputPath(`arrows-${appearance}-${index}.png`), Buffer.from(data, 'base64'))
       })
 
+      expect(rendererErrors).toEqual([])
       expect(probe.count).toBeGreaterThan(100)
       expect(probe.failures).toEqual([])
       expect(frames.length).toBeGreaterThan(20)

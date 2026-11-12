@@ -65,7 +65,12 @@ function SearchResultText({
   const textMatches = useSearchDecorations(text, tagPrefix(query) !== undefined ? '' : query)
   const matches = tagPrefix(query) !== undefined ? tagMatches : textMatches
   const firstMatch = useRef<HTMLElement>(null)
+  const previousMatches = useRef(matches)
   useEffect(() => {
+    const changed = previousMatches.current !== matches
+    previousMatches.current = matches
+    // Selection already reveals ready matches; only newly computed highlights need another pass.
+    if (!changed) return
     const row = firstMatch.current?.closest<HTMLElement>('.recent-node-row')
     if (active && row) onReveal()
   }, [active, matches, onReveal])

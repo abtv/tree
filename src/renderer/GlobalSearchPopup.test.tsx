@@ -9,6 +9,7 @@ import { RecentNodes, type RecentNode } from '../application/recent-nodes'
 
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
   vi.useRealTimers()
 })
 
@@ -196,6 +197,50 @@ it('keeps title and scrollbar interaction inside the popup and reveals arrow-sel
   fireEvent.keyDown(document, { key: 'ArrowUp' })
 
   expect(list.scrollTop).toBeGreaterThan(0)
+})
+
+it('reveals an already highlighted selection without scheduling a second layout update', () => {
+  const { store } = setup()
+  vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+    publish(Array.from({ length: 8 }, (_, i) => ({ id: String(i), text: `Node ${i}`, path: null })))
+    return vi.fn()
+  })
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Node' } })
+  const next = screen.getAllByRole('option')[1]!
+  const geometry = vi.spyOn(next, 'getBoundingClientRect')
+
+  fireEvent.keyDown(document, { key: 'ArrowDown' })
+
+  expect(next).toHaveAttribute('aria-selected', 'true')
+  expect(geometry).toHaveBeenCalledTimes(1)
+})
+
+it('reveals a distant match when its highlights finish after the initial selection', () => {
+  vi.useFakeTimers()
+  const { store } = setup()
+  const list = screen.getByRole('listbox')
+  Object.defineProperty(list, 'clientHeight', { configurable: true, value: 100 })
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this === list) return new DOMRect(0, 0, 200, 100)
+    if (this.classList.contains('recent-node-row')) return new DOMRect(0, -list.scrollTop, 200, 1000)
+    if (this.classList.contains('node-search-match')) return new DOMRect(0, 900 - list.scrollTop, 200, 20)
+    return new DOMRect()
+  })
+  vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+    publish([{ id: 'long', text: `${'context '.repeat(5000)}Needle`, path: null }])
+    return vi.fn()
+  })
+
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Needle' } })
+
+  expect(list.querySelector('.node-search-match')).toBeNull()
+  expect(list.scrollTop).toBe(0)
+
+  act(() => vi.runAllTimers())
+
+  expect(list.querySelector('.node-search-match')).toHaveTextContent('Needle')
+  expect(list.scrollTop).toBeGreaterThan(800)
+  expect(screen.getByRole('searchbox')).toHaveFocus()
 })
 
 it('visits only on confirmation and permits dismissing an empty history', () => {
