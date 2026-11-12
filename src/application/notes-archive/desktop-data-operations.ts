@@ -45,45 +45,78 @@ export type DataActivity =
     }
   | { readonly phase: 'confirming' | 'replacing' | 'restart'; readonly text: string }
 
+type PreparedImport = Extract<NotesImportPreparation, { ok: true }>
+type PreparationState = { phase: 'none' } | { phase: 'prepared'; value: PreparedImport }
+
+interface ReplacementAttempt {
+  stage: 'flushing' | 'committing'
+}
+
+type OperationState =
+  | { phase: 'idle' | 'canceling' }
+  | { phase: 'choosing'; direction: 'import' | 'export' }
+  | {
+      phase: 'running'
+      direction: 'import' | 'export'
+      stage: 'flushing' | 'transferring'
+      text: string
+    }
+  | { phase: 'confirming' | 'restart'; text: string }
+  | { phase: 'replacing'; attempt: ReplacementAttempt }
+  | { phase: 'done' | 'failed'; text: string; showFolder?: boolean; focusAction?: boolean }
+
+function activityOf(operation: OperationState): DataActivity {
+  switch (operation.phase) {
+    case 'choosing':
+      return { phase: 'choosing' }
+    case 'running':
+      return { phase: 'running', text: operation.text }
+    case 'replacing':
+      return { phase: 'replacing', text: 'Replacing Notes…' }
+    default:
+      return operation
+  }
+}
+
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** Coordinates the desktop archive commands without DOM, React or platform dependencies. */
 export class DesktopDataOperations {
   readonly menuCommands = new MenuCommands()
-  private state: DataActivity = { phase: 'idle' }
+  private operation: OperationState = { phase: 'idle' }
+  private activity: DataActivity = activityOf(this.operation)
   private listeners = new Set<() => void>()
   private stops: (() => void)[] = []
   private timer: ReturnType<typeof setTimeout> | undefined
   private epoch = 0
-  private started = false
-  private disposed = false
+  private lifecycle: 'created' | 'started' | 'disposed' = 'created'
   private lastMenu: NotesMenuState | undefined
-  private importing = false
-  private confirmation: Extract<NotesImportPreparation, { ok: true }> | undefined
+  private preparation: PreparationState = { phase: 'none' }
   private noticeTaken = false
 
-  getConfirmation = (): Extract<NotesImportPreparation, { ok: true }> | undefined => this.confirmation
+  getConfirmation = (): PreparedImport | undefined =>
+    this.preparation.phase === 'prepared' ? this.preparation.value : undefined
 
   constructor(
     private readonly api: DesktopNotesApi,
     private readonly store: NotesStore,
   ) {}
 
-  getSnapshot = (): DataActivity => this.state
+  getSnapshot = (): DataActivity => this.activity
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
 
   start(): void {
-    if (this.started || this.disposed) return
-    this.started = true
+    if (this.lifecycle !== 'created') return
+    this.lifecycle = 'started'
     this.stops = [
       this.store.subscribe(() => this.updateMenu()),
       this.api.onNotesProgress((progress) => {
-        if (this.state.phase === 'running') {
-          const text = this.importing ? importProgressText : exportProgressText
-          this.publish({ phase: 'running', text: text(progress.imagesDone, progress.imageCount) })
+        if (this.operation.phase === 'running') {
+          const text = this.operation.direction === 'import' ? importProgressText : exportProgressText
+          this.publish({ ...this.operation, text: text(progress.imagesDone, progress.imageCount) })
         }
       }),
       this.api.onNotesMenuCommand((command) => {
@@ -96,13 +129,13 @@ export class DesktopDataOperations {
 
   private busy(): boolean {
     return (
-      this.confirmation !== undefined ||
-      ['choosing', 'running', 'canceling', 'replacing', 'restart'].includes(this.state.phase)
+      this.preparation.phase === 'prepared' ||
+      ['choosing', 'running', 'canceling', 'replacing', 'restart'].includes(this.operation.phase)
     )
   }
 
   private updateMenu(): void {
-    if (this.disposed) return
+    if (this.lifecycle === 'disposed') return
     const state = this.store.getSnapshot()
     const available = !state.persistenceLocked && !this.busy()
     const next = {
@@ -134,10 +167,15 @@ export class DesktopDataOperations {
     void this.api.setNotesMenuState(next).catch((error: unknown) => this.store.reportError(error))
   }
 
-  private publish(state: DataActivity): void {
-    this.state = state
+  private publish(operation: OperationState): void {
+    this.operation = operation
+    this.activity = activityOf(operation)
     this.updateMenu()
     for (const listener of this.listeners) listener()
+  }
+
+  private beginTransfer(): void {
+    if (this.operation.phase === 'running') this.operation = { ...this.operation, stage: 'transferring' }
   }
 
   private clearTimer(): void {
@@ -148,17 +186,16 @@ export class DesktopDataOperations {
   async exportNotes(fromConfirmation = false): Promise<void> {
     const state = this.store.getSnapshot()
     if (
-      this.disposed ||
-      (this.busy() && !(fromConfirmation && this.state.phase === 'confirming')) ||
+      this.lifecycle === 'disposed' ||
+      (this.busy() && !(fromConfirmation && this.operation.phase === 'confirming')) ||
       state.status !== 'ready' ||
       state.persistenceLocked
     )
       return
-    this.importing = false
     this.clearTimer()
     const epoch = ++this.epoch
-    const current = () => !this.disposed && this.epoch === epoch
-    this.publish({ phase: 'choosing' })
+    const current = () => this.lifecycle !== 'disposed' && this.epoch === epoch
+    this.publish({ phase: 'choosing', direction: 'export' })
     let failure = 'The export stopped unexpectedly.'
     try {
       const choice = await this.api.chooseNotesExportDestination()
@@ -167,10 +204,10 @@ export class DesktopDataOperations {
         return
       }
       if (!choice.ok) {
-        this.publish(this.confirmation === undefined ? { phase: 'idle' } : { phase: 'confirming', text: '' })
+        this.publish(this.preparation.phase === 'none' ? { phase: 'idle' } : { phase: 'confirming', text: '' })
         return
       }
-      this.publish({ phase: 'running', text: exportProgressText(0, 0) })
+      this.publish({ phase: 'running', direction: 'export', stage: 'flushing', text: exportProgressText(0, 0) })
       try {
         await this.store.flushPersistence()
       } catch (error) {
@@ -178,10 +215,11 @@ export class DesktopDataOperations {
         throw error
       }
       if (!current()) return
+      this.beginTransfer()
       const result = await this.api.startNotesExport()
       if (!current()) return
       if (!result.ok) {
-        if (this.confirmation !== undefined) {
+        if (this.preparation.phase === 'prepared') {
           this.publish({ phase: 'confirming', text: result.canceled ? '' : `Export failed. ${result.message}` })
           return
         }
@@ -190,7 +228,7 @@ export class DesktopDataOperations {
         )
         return
       }
-      if (this.confirmation !== undefined) {
+      if (this.preparation.phase === 'prepared') {
         this.publish({ phase: 'confirming', text: exportResultText(result.fileName, result.summary) })
         return
       }
@@ -207,19 +245,24 @@ export class DesktopDataOperations {
       } catch (error) {
         this.store.reportError(error)
       }
-      this.confirmation = undefined
+      this.preparation = { phase: 'none' }
       if (current()) this.publish({ phase: 'failed', text: `Export failed. ${failure}` })
     }
   }
 
   async importNotes(): Promise<void> {
     const state = this.store.getSnapshot()
-    if (this.disposed || this.busy() || !['ready', 'error'].includes(state.status) || state.persistenceLocked) return
+    if (
+      this.lifecycle === 'disposed' ||
+      this.busy() ||
+      !['ready', 'error'].includes(state.status) ||
+      state.persistenceLocked
+    )
+      return
     this.clearTimer()
-    this.importing = true
     const epoch = ++this.epoch
-    const current = () => !this.disposed && epoch === this.epoch
-    this.publish({ phase: 'choosing' })
+    const current = () => this.lifecycle !== 'disposed' && epoch === this.epoch
+    this.publish({ phase: 'choosing', direction: 'import' })
     try {
       const choice = await this.api.chooseNotesImportArchive()
       if (!current()) return
@@ -227,7 +270,7 @@ export class DesktopDataOperations {
         this.publish({ phase: 'idle' })
         return
       }
-      this.publish({ phase: 'running', text: importProgressText(0, 0) })
+      this.publish({ phase: 'running', direction: 'import', stage: 'flushing', text: importProgressText(0, 0) })
       if (state.status === 'ready') {
         try {
           await this.store.flushPersistence()
@@ -236,6 +279,7 @@ export class DesktopDataOperations {
         }
       }
       if (!current()) return
+      this.beginTransfer()
       const result = await this.api.prepareNotesImport()
       if (!current()) return
       if (!result.ok) {
@@ -244,7 +288,7 @@ export class DesktopDataOperations {
         )
         return
       }
-      this.confirmation = result
+      this.preparation = { phase: 'prepared', value: result }
       this.publish({ phase: 'confirming', text: '' })
     } catch (error) {
       if (!current()) return
@@ -255,20 +299,18 @@ export class DesktopDataOperations {
 
   replaceNotes = async (): Promise<void> => {
     if (
-      this.state.phase !== 'confirming' ||
-      this.confirmation === undefined ||
+      this.operation.phase !== 'confirming' ||
+      this.preparation.phase !== 'prepared' ||
       this.store.getSnapshot().persistenceLocked
     )
       return
-    this.publish({ phase: 'replacing', text: 'Replacing Notes…' })
-    let suspended = false
-    let committing = false
+    const attempt: ReplacementAttempt = { stage: 'flushing' }
+    this.publish({ phase: 'replacing', attempt })
     try {
       if (this.store.getSnapshot().status === 'ready') await this.store.flushPersistence()
-      if (this.disposed) return
+      if (this.lifecycle === 'disposed') return
       this.api.suspendWrites()
-      suspended = true
-      committing = true
+      attempt.stage = 'committing'
       const result = await this.api.commitNotesImport()
       if (result.ok) {
         this.api.reload()
@@ -281,19 +323,18 @@ export class DesktopDataOperations {
         })
         return
       }
-      this.confirmation = undefined
+      this.preparation = { phase: 'none' }
       this.api.resumeWrites()
       this.publish(result.canceled ? { phase: 'idle' } : { phase: 'failed', text: `Import failed. ${result.message}` })
     } catch (error) {
       // An IPC failure during commit cannot prove that the journal was not written.
-      if (committing) {
+      if (attempt.stage === 'committing') {
         this.publish({
           phase: 'restart',
           text: `Import failed. ${messageOf(error)} Restart Tree to complete the import.`,
         })
       } else {
-        this.confirmation = undefined
-        if (suspended) this.api.resumeWrites()
+        this.preparation = { phase: 'none' }
         await this.api.cancelNotesOperation().catch((cause: unknown) => this.store.reportError(cause))
         this.publish({
           phase: 'failed',
@@ -306,7 +347,7 @@ export class DesktopDataOperations {
   private async showImportNotice(): Promise<void> {
     try {
       const notice = await this.api.takeNotesImportNotice()
-      if (this.disposed || notice === null || this.busy()) return
+      if (this.lifecycle === 'disposed' || notice === null || this.busy()) return
       const text = notice.fileName === undefined ? 'Imported notes.' : `Imported “${notice.fileName}”.`
       this.publish({
         phase: 'done',
@@ -331,7 +372,7 @@ export class DesktopDataOperations {
   }
 
   cancel = async (): Promise<void> => {
-    if (!['running', 'confirming'].includes(this.state.phase)) return
+    if (!['running', 'confirming'].includes(this.operation.phase)) return
     ++this.epoch
     this.publish({ phase: 'canceling' })
     try {
@@ -339,12 +380,12 @@ export class DesktopDataOperations {
     } catch (error) {
       this.store.reportError(error)
     }
-    this.confirmation = undefined
-    if (!this.disposed) this.publish({ phase: 'idle' })
+    this.preparation = { phase: 'none' }
+    if (this.lifecycle !== 'disposed') this.publish({ phase: 'idle' })
   }
 
   dispose(): void {
-    this.disposed = true
+    this.lifecycle = 'disposed'
     ++this.epoch
     this.clearTimer()
     for (const stop of this.stops.splice(0)) stop()

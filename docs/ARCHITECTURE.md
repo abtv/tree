@@ -846,6 +846,16 @@ Menu availability crosses a validated boolean-only IPC channel; the coordinator 
 
 The coordinator also owns import preparation, confirmation, replacement and the one-shot result after loading. `ImportConfirmationDialog` presents its counts and messages, traps focus with the native HTML modal mechanism, and restores focus on dismissal. Export Current Notes First runs inside that modal: main retains the prepared import while its export worker runs, restores it after success or a cancelled save panel, and discards both operations on cancellation, navigation or quit. Replace flushes pending edits before suspending renderer writes, then reloads on success. A pre-journal failure resumes writes; a post-journal failure or an uncertain commit IPC outcome keeps the modal blocked and writes suspended until restart. The result panel displays the main-provided folder text and invokes argument-free Show in Finder. Import presentation retains only counts and short text, with no document-scale CPU work or additional persistence beyond the existing flush, staging and replacement operations.
 
+Its lifecycle, current operation and prepared-import state are independent regions.
+Choosing and running operations own their import/export direction; running also
+distinguishes flushing from transfer. `DataActivity` is a cached UI projection,
+so internal stage changes do not add notifications or replace an unchanged public
+snapshot. A replacement owns one attempt record, retained locally across awaits,
+whose `flushing` or `committing` stage determines whether failure is ambiguous.
+Preparation survives exports from confirmation and follows the existing cleanup
+lifetime independently of progress or disposal. These records remain bounded and
+add no writes, syncs or document-scale work.
+
 Performance assessment (`docs/PRODUCT.md` §22.1): starting an operation adds a worker start, at most the generation cap plus three hard links and one directory listing per snapshot. The main thread does constant work per worker message, except one platform PNG decode per imported image. Export writes the archive once with one flush and one rename; import writes each referenced image and the document once with one flush each, then commits as above. The worker holds the document, one image and the archive's central directory; the main process and the renderer hold no document or image bytes beyond the image being decoded. Editing adds one flag check per save, image write and cleanup.
 
 `perf/electron/notes-archive.spec.ts` compares visible typing at idle, during export and during import preparation on a large synthetic profile with referenced PNGs, including images near the attachment byte limit. It records key-to-frame latency, operation duration, main event-loop delay and sampled main JavaScript heap growth, and checks that cancelling active preparation closes the worker's archive file and removes staging. The local measurement kept per-image main-thread work within the guard, so the native decoder remains in the main process under ADR 0024. The heap measurement excludes native image memory and worker heaps; timer samples can miss short heap peaks.

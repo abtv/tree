@@ -671,8 +671,9 @@ describe('desktop notes operations', () => {
     store.flushPersistence.mockReturnValueOnce(flush.promise)
 
     const replace = operations.replaceNotes()
+    const replacing = operations.getSnapshot()
 
-    expect(operations.getSnapshot().phase).toBe('replacing')
+    expect(replacing.phase).toBe('replacing')
     expect(api.suspendWrites).not.toHaveBeenCalled()
 
     flush.resolve()
@@ -682,6 +683,7 @@ describe('desktop notes operations', () => {
     expect(api.commitNotesImport).toHaveBeenCalledOnce()
     expect(api.reload).toHaveBeenCalledOnce()
     expect(api.resumeWrites).not.toHaveBeenCalled()
+    expect(operations.getSnapshot()).toBe(replacing)
 
     operations.dispose()
   })
@@ -748,6 +750,30 @@ describe('desktop notes operations', () => {
 
     operations.dispose()
   })
+
+  it.each(['suspend', 'resume', 'reload'] as const)(
+    'preserves replacement failure recovery when %s throws',
+    async (stage) => {
+      const { operations, api } = harness()
+      await operations.importNotes()
+      if (stage === 'resume')
+        api.commitNotesImport.mockResolvedValueOnce({ ok: false, restartRequired: false, message: 'Disk full' })
+      const failingPort = stage === 'suspend' ? api.suspendWrites : stage === 'resume' ? api.resumeWrites : api.reload
+      failingPort.mockImplementationOnce(() => {
+        throw new Error(`${stage} failed`)
+      })
+
+      await operations.replaceNotes()
+
+      expect(operations.getSnapshot().phase).toBe(stage === 'suspend' ? 'failed' : 'restart')
+      expect(api.commitNotesImport).toHaveBeenCalledTimes(stage === 'suspend' ? 0 : 1)
+      expect(api.cancelNotesOperation).toHaveBeenCalledTimes(stage === 'suspend' ? 1 : 0)
+      expect(api.resumeWrites).toHaveBeenCalledTimes(stage === 'resume' ? 1 : 0)
+      expect(operations.getConfirmation() !== undefined).toBe(stage === 'reload')
+
+      operations.dispose()
+    },
+  )
 
   it('does not commit after the final flush fails and clears prepared staging', async () => {
     const { operations, api, store } = harness()
