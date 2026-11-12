@@ -57,10 +57,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 14],
-    [false, true, 13],
-    [false, false, 12],
-    [true, false, 13],
+    [true, true, 15],
+    [false, true, 14],
+    [false, false, 13],
+    [true, false, 14],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -86,6 +86,7 @@ describe('command registry', () => {
       'set-theme-light',
       'show-agenda',
       'show-tree',
+      'summarize',
       'toggle-line-numbers',
     ])
     expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
@@ -144,6 +145,7 @@ describe('command registry', () => {
       'set-theme-auto',
       'show-agenda',
       'show-tree',
+      'summarize',
       'toggle-always-on-top',
       'toggle-line-numbers',
       'toggle-vim-mode',
@@ -166,6 +168,7 @@ describe('command registry', () => {
 
   it('delegates all actions to existing services and queries their current state', async () => {
     const services = {
+      summarize: vi.fn(async () => undefined),
       imageToText: vi.fn(async () => undefined),
       showAbout: vi.fn(async () => undefined),
       find: vi.fn(async () => undefined),
@@ -227,7 +230,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(15)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(16)
   })
 
   it('keeps optional actions unchecked and tolerates unavailable services', async () => {

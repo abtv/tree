@@ -9,6 +9,7 @@ export interface CommandCapabilities {
 }
 
 export interface CommandServices {
+  summarize?(): Promise<void>
   imageToText?(): Promise<void>
   showAbout?(): Promise<void>
   find?(): Promise<void>
@@ -51,6 +52,16 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  {
+    name: 'summarize',
+    aliases: [],
+    description: 'Summarize selected nodes and copy the summary',
+    enabled: false,
+    active: () => false,
+    run: async (services) => {
+      await services.summarize?.()
+    },
+  },
   {
     name: 'image-to-text',
     aliases: [],

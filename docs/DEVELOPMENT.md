@@ -977,6 +977,17 @@ File-service diagnostics identify `load`, `save`, `writeAttachment`, `readAttach
 
 ## 10. Development Workflow
 
+### On-device summarization
+
+Apple Silicon builds also compile `src/electron/native/summarize.swift` through
+`scripts/build-summarize.mts`, called by the existing native build entry. An SDK with
+Foundation Models is required. The helper preserves macOS 13 compatibility but
+reports unavailable below macOS 26 or when Apple Intelligence is not ready.
+`e2e/electron/summarize.spec.ts` exercises real model inference and the native
+clipboard on synthetic English notes; its real-model case requires a ready local
+model and does not treat an unavailable model as successful inference validation.
+Do not substitute deterministic IPC doubles for this native boundary check.
+
 ### Shared agent instructions
 
 `AGENTS.md` is the compact workflow core and policy owner. Its action table requires relevant sections of [Agent Workflow Procedures](AGENT_WORKFLOW.md) before those actions; a link does not load a section automatically. The supplement retains the matching section numbers. This guide owns validation mechanics, while `docs/AGENT_ROLES.md` owns role contracts. Keep shared behavior in these sources rather than copying it into three tool adapters. `npm run check:docs` checks the core size (at most 24 KiB), routing links, and the supplement as a live document. These checks establish document structure, not model compliance or actual client loading.

@@ -124,6 +124,47 @@ async function createLockedStore(): Promise<EditorStore> {
   return store
 }
 
+// @requirement PRODUCT.md §15.2
+// @requirement PRODUCT.md §20.2.7
+it('keeps operation failures visible beside summary progress and preserves editor focus on cancel', async () => {
+  let finish!: (text: string) => void
+  const port = {
+    available: async () => true,
+    begin: async () => undefined,
+    reduce: () =>
+      new Promise<string>((resolve) => {
+        finish = resolve
+      }),
+    finish: vi.fn(async () => undefined),
+    cancel: vi.fn(async () => undefined),
+  }
+  const store = await createSeededStore(
+    { roots: [{ id: 'a', text: 'English project notes', children: [] }] },
+    { currentParentId: null, selectedNodeId: 'a' },
+    undefined,
+    { summarization: port },
+  )
+  renderReact(<App store={store} initialVimEnabled={true} />)
+  const editor = screen.getByRole('textbox', { name: 'Node 1' })
+  editor.focus()
+
+  await act(async () => {
+    await store.summarization.refresh()
+    store.summarize()
+    store.reportError(new Error('Synthetic operation failure'))
+  })
+
+  expect(screen.getByText(/Synthetic operation failure/).closest('.status-bar')).not.toBeNull()
+  expect(screen.getByRole('button', { name: 'Cancel summarization' }).closest('.status-bar')).not.toBeNull()
+  fireEvent.mouseDown(screen.getByRole('button', { name: 'Cancel summarization' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel summarization' }))
+  await act(async () => finish('Late result'))
+
+  expect(port.finish).not.toHaveBeenCalled()
+  expect(editor).toBe(document.activeElement)
+  expect(screen.getByText(/Synthetic operation failure/)).toBeTruthy()
+})
+
 it.each(['insert', 'replace'])('preserves %s editing when background OCR completes', async (mode) => {
   let finish!: (text: string[]) => void
   const store = await createSeededStore(
@@ -2104,7 +2145,7 @@ describe('App', () => {
     expect(toggle.closest('footer.status-bar')).not.toBeNull()
     expect(toggle.closest('.location-bar')).toBeNull()
     expect(screen.getByLabelText('Vim mode').nextElementSibling).toBe(toggle.parentElement)
-    expect(toggle.closest('footer.status-bar')?.lastElementChild).toBe(toggle.parentElement)
+    expect(toggle.closest('.status-controls')?.lastElementChild).toBe(toggle.parentElement)
 
     fireEvent.click(toggle)
 

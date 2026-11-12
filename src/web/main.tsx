@@ -15,6 +15,7 @@ import './styles.css'
 import { installAboutDialog } from '../renderer/about-dialog'
 import { blockExternalDrops } from '../renderer/external-drop'
 import { installAppUpdates } from './app-updates'
+import { BrowserStatus } from './BrowserStatus'
 
 blockExternalDrops(window)
 
@@ -69,6 +70,7 @@ try {
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <App
+        platformStatus={<BrowserStatus />}
         showAbout={showAbout}
         registerViewCommands={registerViewCommands}
         registerSearchCommands={registerSearchCommands}

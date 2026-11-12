@@ -103,7 +103,7 @@ will be replaced. Import also replaces stored notes that can no longer be opened
 
 In Chromium-based browsers, **Back Up to Folder…** copies saved notes and images
 to a chosen folder in the desktop data-directory layout. It runs in a worker;
-the menu footer reports success, permission needs or failure. **Stop Backing Up**
+the bottom status bar reports success, permission needs or failure. **Stop Backing Up**
 forgets the folder choice and leaves its files intact. An existing `document.json`
 requires an explicit choice to replace the backup, restore its notes through the
 import confirmation, or choose another folder. Restore does not enable backup.

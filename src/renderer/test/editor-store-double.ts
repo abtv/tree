@@ -7,6 +7,7 @@ import { buildVisibleRows } from '../../application/visible-rows'
 import { EditorSearch } from '../../application/editor-search'
 import { AgendaRowsCache } from '../../application/agenda-rows'
 import { EmojiHistory } from '../../application/emoji-history'
+import { Summarization } from '../../application/summarization'
 
 /** The public surface of `EditorStore`, without the class's private branding. */
 export type EditorStorePublic = { [K in keyof EditorStore]: EditorStore[K] }
@@ -67,6 +68,9 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
   )
 
   const double: EditorStorePublic = {
+    summarization: new Summarization(),
+    canSummarize: false,
+    summarize: vi.fn(),
     imageToTextAvailable: false,
     imageToText: vi.fn(),
     emojiHistory: new EmojiHistory(undefined, () => undefined),

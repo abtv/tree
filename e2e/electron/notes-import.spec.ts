@@ -130,7 +130,9 @@ test.describe('desktop Import Notes', () => {
         await panel.evaluate((element) => {
           const panel = element.getBoundingClientRect()
           const footer = document.querySelector('.status-bar')!.getBoundingClientRect()
-          return panel.left >= 0 && panel.right <= innerWidth && panel.bottom < footer.top
+          return (
+            panel.left >= 0 && panel.right <= innerWidth && panel.top >= footer.top && panel.bottom <= footer.bottom
+          )
         }),
       ).toBe(true)
       await expect(panel).toHaveScreenshot(`import-result-${appearance}.png`)

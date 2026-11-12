@@ -870,7 +870,7 @@ Performance assessment (`docs/PRODUCT.md` §22.1): starting an operation adds a 
 
 ### Browser installation and storage protection
 
-PRODUCT §24.1 adds no notes storage layer. Vite copies the manifest and icons from `src/web/public/` to the package root, and the release policy accepts them only by exact name. `src/web/storage-persistence.ts` reads `navigator.storage.persisted()` after the editor starts and calls `persist()` at most once per page load when storage is not yet persistent; `main.tsx` shows the result in the menu footer. `src/web/appearance.ts` switches the two `theme-color` meta tags together with the CSS appearance rules. Performance assessment (§22.1): one storage-state read and at most one request per page load; no IndexedDB writes, no interactive CPU and no memory growth.
+PRODUCT §24.1 adds no notes storage layer. Vite copies the manifest and icons from `src/web/public/` to the package root, and the release policy accepts them only by exact name. `src/web/storage-persistence.ts` reads `navigator.storage.persisted()` after the editor starts and calls `persist()` at most once per page load when storage is not yet persistent; `main.tsx` shows the result in the bottom status bar. `src/web/appearance.ts` switches the two `theme-color` meta tags together with the CSS appearance rules. Performance assessment (§22.1): one storage-state read and at most one request per page load; no IndexedDB writes, no interactive CPU and no memory growth.
 
 ### Browser offline package and updates
 
@@ -1081,6 +1081,20 @@ The Vim editing preference uses the same boolean preference store (`createBoolea
 ---
 
 ## 17. Process Boundaries
+
+Summarization (PRODUCT §15.2, ADR 0026) uses a separate bounded Swift helper with
+Foundation Models `SystemLanguageModel`. The application owns immutable source
+selection and sequential branch reduction; Electron main owns trusted IPC, native
+cancellation and the final guarded plain-text clipboard write. Fresh sessions avoid
+context growth across requests. No model or job state enters persistence.
+
+Performance assessment (§22.1): summarization adds no document writes or syncs.
+Source processing yields between bounded batches; one native request runs at a time.
+An explicit stack retains bounded branch buffers and references to the immutable
+selected forest until completion/cancel. Node, byte, request and lifetime limits
+bound retention. System model memory and hardware scheduling remain Apple-owned.
+The shared bottom status bar renders operation messages independently of document
+changes; browser controllers retain their existing status owners and DOM nodes.
 
 Image recognition (PRODUCT §15.1) uses a Swift executable launched by Electron main
 through `execFile`, without a shell. The renderer sends only a validated attachment

@@ -42,6 +42,7 @@ async function notesWrite(write: () => Promise<void>): Promise<void> {
 
 export function createElectronEditorServices(): EditorServices {
   return {
+    ...(window.treeApi.summarization === undefined ? {} : { summarization: window.treeApi.summarization }),
     ...(window.treeApi.imageToText === undefined ? {} : { imageToText: window.treeApi.imageToText }),
     today: () => {
       const date = new Date()

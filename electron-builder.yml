@@ -28,6 +28,8 @@ mac:
   extraFiles:
     - from: out/native/tree-image-to-text
       to: Helpers/tree-image-to-text
+    - from: out/native/tree-summarize
+      to: Helpers/tree-summarize
   target:
     - target: dmg
       arch: arm64

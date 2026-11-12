@@ -135,6 +135,8 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
   await chooseMenuItem(page, 'Stop Backing Up')
 
   await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
+  await expect(page.locator('.status-bar #backup-status')).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('backup-status-bottom.png') })
   expect(await readStored(page, 'preferences', 'backup-folder')).toBeUndefined()
   expect(await readBackup(page)).toEqual(files)
 })

@@ -9,6 +9,13 @@ import {
 } from '../../shared/ipc'
 
 export const treeApi: TreeApi = {
+  summarization: {
+    available: () => ipcRenderer.invoke(ipcChannels.summaryAvailable),
+    begin: (id) => ipcRenderer.invoke(ipcChannels.summaryBegin, id),
+    reduce: (id, text, final) => ipcRenderer.invoke(ipcChannels.summaryReduce, id, text, final),
+    finish: (id, text) => ipcRenderer.invoke(ipcChannels.summaryFinish, id, text),
+    cancel: (id) => ipcRenderer.invoke(ipcChannels.summaryCancel, id),
+  },
   ...(process.platform === 'darwin' && process.arch === 'arm64'
     ? { imageToText: (id: string) => ipcRenderer.invoke(ipcChannels.imageToText, id) }
     : {}),

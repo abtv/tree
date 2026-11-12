@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, rm, access } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { packagedSmokeEnvironment } from './packaged-smoke-environment.mts'
 import { imageToTextSmoke } from '../e2e/smoke/image-to-text.mts'
+import { summarizeSmoke } from '../e2e/smoke/summarize.mts'
 
 const app = process.argv[2]
 if (!app) throw new Error('Provide a packaged .app path')
+await access(resolve(app, 'Contents/Helpers/tree-summarize'), constants.X_OK)
 const profile = await mkdtemp(join(tmpdir(), 'tree-packaged-smoke-'))
 await mkdir(join(profile, 'data'))
 await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
@@ -56,6 +59,8 @@ try {
   console.log('Packaged renderer editing and reload smoke passed')
   await imageToTextSmoke(page)
   console.log('Packaged Apple Vision image-to-text smoke passed')
+  await summarizeSmoke(page)
+  console.log('Packaged summarization capability smoke passed')
 } finally {
   try {
     await browser?.close()

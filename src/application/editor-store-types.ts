@@ -3,10 +3,12 @@ import type { ClipboardContent, ClipboardPayload, ClipboardWritePayload } from '
 import type { ExpansionState } from './expansion-state'
 import type { DayNumber } from '../domain/calendar-date'
 import type { AgendaState } from './agenda-state'
+import type { SummarizationPort } from '../shared/summarize'
 
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
+  summarization?: SummarizationPort
   imageToText?(attachmentId: AttachmentId): Promise<string[]>
   loadEmojiHistory?(): Promise<unknown>
   saveEmojiHistory?(names: readonly string[]): Promise<void>

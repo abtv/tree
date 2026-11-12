@@ -38,6 +38,7 @@ import { applicationMenuTemplate } from './application-menu'
 import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
 import { createImageToText } from './image-to-text'
+import { createSummarization } from './summarize'
 import { showEditorContextMenu } from './editor-context-menu'
 import { bootstrapApplication } from './bootstrap'
 import { createNotesArchiveController, type NotesArchiveController } from './notes-archive-controller'
@@ -400,6 +401,15 @@ bootstrapApplication({
           )
         : undefined
     app.on('will-quit', () => imageToText?.cancel())
+    const summarization =
+      process.platform === 'darwin' && process.arch === 'arm64'
+        ? createSummarization(
+            app.isPackaged
+              ? join(process.resourcesPath, '../Helpers/tree-summarize')
+              : join(__dirname, '../native/tree-summarize'),
+          )
+        : undefined
+    app.on('will-quit', () => summarization?.cancelAll())
     notesArchive = createNotesArchiveController({
       fileServices,
       attachmentsDirectory: join(dataDirectory, 'attachments'),
@@ -426,6 +436,7 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
     registerIpcHandlers({
+      ...(summarization === undefined ? {} : { summarization }),
       ...(imageToText === undefined ? {} : { imageToText }),
       getUpdateCommands,
       runUpdateCommand: (command) => {

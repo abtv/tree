@@ -178,6 +178,27 @@ body:has(.image-preview-overlay) #tree-menu-button {
 #data-activity[hidden] {
   display: none;
 }
+
+#browser-status:not([hidden]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+#browser-status > span {
+  padding: 2px 0;
+  font: inherit;
+}
+.status-notifications #data-activity {
+  position: static;
+  inset: auto;
+  padding: 2px 0;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font: inherit;
+}
 /* The problem banner occupies the same lower edge; keep both messages visible. */
 body:has(#prototype-problem:not([hidden])) #data-activity {
   inset: 34px 10px auto auto;
@@ -282,4 +303,16 @@ body:has(#prototype-problem:not([hidden])) #data-activity {
   font:
     13px/1.5 system-ui,
     sans-serif;
+}
+
+.status-notifications #prototype-problem {
+  position: static;
+  inset: auto;
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-save-error);
+  font: inherit;
 }

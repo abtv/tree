@@ -139,6 +139,13 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
     // Native title-bar height varies between macOS versions; compare a fixed content area.
     await page.setViewportSize({ width: 800, height: 618 })
     await page.evaluate(() => {
+      const root = document.getElementById('root')!
+      root.className = 'tree-app'
+      root.innerHTML =
+        '<div class="scroll-viewport"></div><footer class="status-bar"><div class="status-notifications"></div><div class="status-controls"></div></footer>'
+      const statuses = document.getElementById('browser-status')!
+      statuses.hidden = false
+      root.querySelector('.status-notifications')!.append(statuses)
       document.getElementById('prototype-save-status')!.textContent = 'Saved locally in this browser'
       document.getElementById('app-version')!.textContent = 'Version 0.1.2 · Oct 29, 2026'
       ;(document.getElementById('data-export') as HTMLButtonElement).disabled = true
@@ -162,7 +169,8 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
       await showUpdate(true)
       const action = (await page.locator('#app-update').boundingBox())!
       const status = (await page.locator('#offline-status').boundingBox())!
-      expect(action.y).toBeGreaterThanOrEqual(status.y + status.height)
+      expect(action.y + action.height).toBeLessThanOrEqual(status.y)
+      expect(await page.locator('.status-bar #offline-status').count()).toBe(1)
       await expect(page).toHaveScreenshot(`browser-update-${appearance}.png`)
       await showUpdate(false)
     }
@@ -173,7 +181,9 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
 
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
-    await expect(menu).toHaveScreenshot('browser-menu-narrow.png')
+    expect(bounds!.width).toBeGreaterThan(200)
+    expect(bounds!.height).toBeGreaterThan(300)
+    await expect(page).toHaveScreenshot('browser-menu-narrow.png')
     await showUpdate(true)
     await expect(page).toHaveScreenshot('browser-update-narrow.png')
   } finally {

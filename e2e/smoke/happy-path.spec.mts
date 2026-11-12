@@ -7,6 +7,7 @@ import { browserEditing, happyPath, type SmokeDriver } from './scenario.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, clickApplicationMenuQuit, closeApp } from '../electron/fixtures.ts'
 import { imageToTextSmoke } from './image-to-text.mts'
+import { summarizeSmoke } from './summarize.mts'
 
 test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({ playwright }, testInfo) => {
   async function phase<T>(name: string, action: () => Promise<T>): Promise<T> {
@@ -116,6 +117,7 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       await phase('Tree and Agenda happy path', () => happyPath(driver))
       if (process.platform === 'darwin' && process.arch === 'arm64') {
         await phase('Apple Vision OCR and persistence', async () => imageToTextSmoke(await app!.firstWindow()))
+        await phase('On-device summarization capability', async () => summarizeSmoke(await app!.firstWindow()))
       }
 
       expect(errors).toEqual([])

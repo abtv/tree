@@ -45,8 +45,10 @@ import { usePopupNavigation } from './use-popup-navigation'
 import { useLineNumbers } from './use-line-numbers'
 import { UpdateStatus } from './UpdateStatus'
 import { useActiveLineHighlight } from './use-active-line-highlight'
+import { StatusBar } from './StatusBar'
 
 interface AppProps {
+  platformStatus?: React.ReactNode
   showAbout?: () => void
   registerSearchCommands?: (run: (command: import('../shared/ipc').FindMenuCommand) => void) => () => void
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
@@ -70,6 +72,7 @@ interface AppProps {
 }
 
 export function App({
+  platformStatus,
   showAbout,
   registerSearchCommands,
   store,
@@ -88,6 +91,7 @@ export function App({
   const shortcuts = shortcutProfile(shortcutPlatform)
   const { lineNumbers, applyLineNumbers } = useLineNumbers(initialLineNumbers, store)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const summary = useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
   const agendaToday = state.status === 'ready' ? state.agenda?.today : undefined
   const treeToday = localToday()
   const search = useSyncExternalStore(store.search.subscribe, store.search.session.getSnapshot)
@@ -200,6 +204,7 @@ export function App({
   }, [vimTextCommandState])
   const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+    summarySelection: vimMode === 'visual-node' ? nodeVisualSelection : undefined,
     showAbout,
     searchCommand: (command) => {
       window.setTimeout(() => searchAction.current(command), 0)
@@ -515,16 +520,21 @@ export function App({
           <p>{state.message}</p>
           <p>The existing data was left unchanged.</p>
         </main>
-        {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
         {commandList}
-        <footer className="status-bar">
-          {commandPanel.open ? commandInput : commandPanel.message}
-          {commandPanel.open ? (
-            <span className="command-count">
-              {commandPanel.matches.length} of {commandPanel.total}
-            </span>
-          ) : null}
-        </footer>
+        <StatusBar>
+          <div className="status-notifications">
+            {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
+            {platformStatus}
+          </div>
+          <div className="status-controls">
+            {commandPanel.open ? commandInput : commandPanel.message}
+            {commandPanel.open ? (
+              <span className="command-count">
+                {commandPanel.matches.length} of {commandPanel.total}
+              </span>
+            ) : null}
+          </div>
+        </StatusBar>
       </div>
     )
   }
@@ -686,24 +696,8 @@ export function App({
               />
             </>
           )}
-          {state.saveError === undefined ? null : (
-            <p className="save-error" role="status">
-              {SAVE_ERROR_PREFIX} {state.saveError}
-            </p>
-          )}
-          {state.operationError === undefined ? null : (
-            <p className="save-error" role="alert">
-              {OPERATION_ERROR_PREFIX} {state.operationError}
-            </p>
-          )}
-          {persistenceLocked ? (
-            <p className="save-error persistence-locked" role="alert">
-              {SAVE_LOCKED_MESSAGE}
-            </p>
-          ) : null}
         </section>
       </div>
-      {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
       {commandList}
       {search.visible && !commandPanel.open ? (
@@ -766,39 +760,68 @@ export function App({
           </div>
         </section>
       ) : null}
-      <footer className="status-bar">
-        {commandPanel.open ? (
-          commandInput
-        ) : commandPanel.message !== undefined ? (
-          <span className="command-error" role="status">
-            {commandPanel.message}
-          </span>
-        ) : null}
-        {commandPanel.open ? (
-          <span className="command-count">
-            {commandPanel.matches.length} of {commandPanel.total}
-          </span>
-        ) : statusMessage !== undefined ? (
-          <span className={`status-bar-message${search.visible ? ' search-status-message' : ''}`} role="status">
-            {statusMessage}
-          </span>
-        ) : (
-          <>
-            {state.imageToTextStatus !== undefined ? (
-              <span className="status-bar-message" role="status" title={state.imageToTextStatus}>
-                {state.imageToTextStatus}
-              </span>
-            ) : null}
+      <StatusBar>
+        <div className="status-notifications">
+          {state.saveError === undefined ? null : (
+            <span className="save-error" role="status">
+              {SAVE_ERROR_PREFIX} {state.saveError}
+            </span>
+          )}
+          {state.operationError === undefined ? null : (
+            <span className="save-error" role="alert">
+              {OPERATION_ERROR_PREFIX} {state.operationError}
+            </span>
+          )}
+          {persistenceLocked ? (
+            <span className="save-error persistence-locked" role="alert">
+              {SAVE_LOCKED_MESSAGE}
+            </span>
+          ) : null}
+          {summary.message === undefined ? null : (
+            <span className="summary-status" role="status">
+              {summary.message}
+            </span>
+          )}
+          {summary.running ? (
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={store.summarization.cancel}>
+              Cancel summarization
+            </button>
+          ) : null}
+          {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
+          {platformStatus}
+          {state.imageToTextStatus !== undefined ? (
+            <span role="status" title={state.imageToTextStatus}>
+              {state.imageToTextStatus}
+            </span>
+          ) : null}
+        </div>
+        <div className="status-controls">
+          {commandPanel.open ? (
+            commandInput
+          ) : commandPanel.message !== undefined ? (
+            <span className="command-error" role="status">
+              {commandPanel.message}
+            </span>
+          ) : null}
+          {commandPanel.open ? (
+            <span className="command-count">
+              {commandPanel.matches.length} of {commandPanel.total}
+            </span>
+          ) : statusMessage !== undefined ? (
+            <span className={`status-bar-message${search.visible ? ' search-status-message' : ''}`} role="status">
+              {statusMessage}
+            </span>
+          ) : (
             <UpdateStatus hidden={commandPanel.message !== undefined} />
-          </>
-        )}
-        {vimEnabled ? (
-          <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
-            {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
-          </div>
-        ) : null}
-        <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
-      </footer>
+          )}
+          {vimEnabled ? (
+            <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
+              {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
+            </div>
+          ) : null}
+          <AlwaysOnTopToggle alwaysOnTop={alwaysOnTop} onToggle={toggleAlwaysOnTop} />
+        </div>
+      </StatusBar>
       {state.quitWithoutSavingPrompt === true ? (
         <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
       ) : null}

@@ -60,7 +60,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
 
   await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)
 
-  const storageText = await storage.textContent()
+  await expect(page.locator('.status-bar #storage-status')).toBeVisible()
 
   expect(
     await menu.evaluate((element) =>
@@ -83,9 +83,6 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Import Notes…',
     'Back Up to Folder…',
     'Restore from Folder…',
-    'Saved locally in this browser',
-    storageText,
-    'Folder backup is off.',
     'About Tree',
   ])
 
@@ -119,8 +116,9 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   const panelBox = (await activity(page).boundingBox())!
   const statusBarBox = (await page.locator('.status-bar').boundingBox())!
 
-  expect(panelBox.y + panelBox.height, 'The panel must not cover the status bar').toBeLessThanOrEqual(statusBarBox.y)
-  expect(panelBox.x + panelBox.width).toBeCloseTo(1100 - 16, 0)
+  expect(panelBox.y, 'The activity belongs inside the bottom status bar').toBeGreaterThanOrEqual(statusBarBox.y)
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(statusBarBox.y + statusBarBox.height)
+  expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(statusBarBox.x + statusBarBox.width)
 
   await capture(page, 'data-export-result.png')
 

@@ -1095,8 +1095,8 @@ Recognition runs outside the UI thread through a sequential queue. Duplicate pen
 requests for a node are ignored; the queue admits at most 20 requests. The status bar
 reports recognition, queued count, completion, no text and failures. Terminal feedback
 includes both the total added paragraphs and the error when a queue partly succeeds.
-It remains until another request; Find/Agenda feedback takes precedence, while update
-feedback remains visible alongside OCR. A missing image or noneditable selection is
+It remains until another request; Find/Agenda feedback remains in the controls row,
+while recognition and update feedback stay visible alongside it. A missing image or noneditable selection is
 reported without changing the document. Image-to-text does nothing throughout Agenda (§23.9), because recognition creates nodes.
 
 Each result is one Undo/Redo operation and uses normal autosave. Deleting or replacing
@@ -1109,6 +1109,48 @@ Each image is limited to 25 MiB and the normal decoded-image dimensions. Native 
 times out after 60 seconds; results are limited to 1 MiB and 1,000 entries.
 
 ---
+
+### 15.2 Summarize
+
+`summarize` is visible in the command panel on every platform. It is disabled
+unless on-device Apple Intelligence is ready on Apple Silicon macOS Electron
+(macOS 26 or later), and while a summarization runs. Tree uses only the system
+on-device model, never Private Cloud Compute, a network model or its own downloader.
+macOS manages model installation and availability.
+
+The command summarizes the current node, or all whole-node selected siblings,
+including every descendant even when collapsed. Input follows tree order and each
+node is included once. In Agenda it uses the current node and its descendants.
+Only node text is included; images are not recognized and links are not fetched.
+Agenda day headings have no current node, so the command is disabled there.
+
+Each invocation captures the current immutable text after buffered edits finish.
+Editing and navigation remain available and do not change that snapshot. Large
+branches are reduced sequentially from children toward parents in fresh bounded
+sessions; long node text and wide forests are split and combined without silent
+truncation. Intermediate summaries remain temporary and can lose source detail.
+
+The final English result is a concise paragraph with key bullet points when useful,
+proportional to the input. Completion copies it to the system clipboard once and
+shows `Summary copied.` in the bottom status bar. This replaces the clipboard even
+if its contents changed while processing. No nodes, history entries or document saves are
+created. Source selection and editing focus remain unchanged.
+
+The bottom status bar shows progress and **Cancel summarization** without taking
+editor focus. Waiting for the final clipboard queue shows `Copying summary…` and
+remains cancellable. Once the clipboard commit begins, cancellation cannot undo
+the write and normal completion is reported. Cancel, failure,
+renderer loss/reload, note replacement, and preparing to quit or install an update
+retire work before the commit point and prevent a late result from being copied.
+No pending job is saved or resumed. Failure and cancellation preserve the clipboard.
+Empty input reports that the selection contains no text.
+
+Processing admits at most 100,000 nodes, 16 MiB of source UTF-8 text, 1,000 model
+requests, and 15 minutes per invocation. Each native request times out after
+60 seconds, accepts at most 2,400 UTF-8 input bytes and returns at most 8,000 bytes.
+Intermediate summaries must fit 800 bytes; an oversized result fails explicitly.
+The byte budget reserves context for instructions and output. Apple controls compute
+resources; Tree does not promise GPU execution or zero impact on responsiveness.
 
 ## 16. Persistence
 
@@ -1377,6 +1419,7 @@ At or below 100 visible rows, the list renders every row, including inline desce
 * The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
+* Operation status messages, including save failures, image recognition, summarization, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap, increasing the bar height; the content and popups remain above it. Confirmation dialogs retain their existing behavior. App update feedback retains its priority rules (§26).
 
 #### 20.2.8 Drops and Whole-Node Visual Mode
 
@@ -1769,6 +1812,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | --- | --- | --- | --- | --- | --- |
 | `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |
 | `image-to-text` | — | Recognize English text in the selected image | — | — | Append recognized children on Apple Silicon macOS Electron (§15.1) |
+| `summarize` | — | Summarize selected nodes and copy the summary | — | — | On-device English summary to clipboard; disabled when unavailable or busy (§15.2) |
 | `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.2.26) |
 | `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |
 | `search-all-nodes` | — | Search all nodes | — | `⌘;` | Open document-wide node and tag search (§20.14) |
@@ -2299,7 +2343,7 @@ The browser's window color follows the Appearance choice (§20.5): the light or 
 
 After the editor opens, Tree asks the browser once per page load to keep its storage when space runs low, unless the browser already reports persistent storage. The request never delays startup and shows no prompt of Tree's own. A refusal or an error changes nothing else. Persistent storage does not protect against clearing site data or deleting the profile, so export and folder backup remain the independent copies.
 
-The menu footer shows the result below the save status: `Storage is protected from automatic clearing.` or `Storage is not protected from automatic clearing.` Browsers without the storage API show no line.
+The bottom status bar shows the result alongside the save status: `Storage is protected from automatic clearing.` or `Storage is not protected from automatic clearing.` Browsers without the storage API show no line.
 
 ### 24.2 Notes Archive
 
@@ -2321,7 +2365,7 @@ Choosing it closes the menu and first saves pending edits, as Quit does. It then
 
 Export runs in the background, and editing remains available. Changes made after the export started are not part of the archive.
 
-While it runs, a panel at the lower right of the window, above the status bar, shows `Exporting Notes…`, then `Exporting Notes… 3 of 120 images`, with a **Cancel** button. Cancel stops the export immediately, closes the panel and produces no file.
+While it runs, an activity in the bottom status bar shows `Exporting Notes…`, then `Exporting Notes… 3 of 120 images`, with a **Cancel** button. Cancel stops the export immediately, closes the activity and produces no file.
 
 On success the browser downloads the archive as `Tree Notes YYYY-MM-DD.zip`, named with the local date, to its usual download location. The panel shows `Exported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with **OK**.
 
@@ -2336,7 +2380,7 @@ Export produces no file and leaves the notes unchanged when:
 * browser storage cannot be read: `Export failed. The notes could not be read: <reason>`;
 * the background export cannot start or stops for another reason: `Export failed. The export stopped unexpectedly.`
 
-A failure panel stays until **OK**. While the save-failure message of §16.2 is shown at the lower edge, the panel appears at the upper right below the menu button instead, so both stay visible.
+A failure activity stays until **OK**. It remains visible alongside the save-failure message of §16.2 in the bottom status bar.
 
 In a browser that supports folder backup (§24.5), an archive-limit refusal adds `Use Back Up to Folder… instead.`
 
@@ -2394,7 +2438,7 @@ The folder uses the desktop data-directory layout (§24.2), without ZIP compress
 
 An empty image file left by a failed write is not a completed image; the next startup retries it. An image name that differs only in letter case from an existing file rejects the run before overwriting it, with a message to choose a different folder. This protects case-insensitive destination filesystems.
 
-The menu footer shows muted backup status: `Folder backup is off.`, `Backing up to “Tree Backup”…`, or `Backed up to “Tree Backup”.` Missing images add their count and say they were not included. Failures say `Backup failed. <reason>`, distinguishing a missing folder or full destination. They retry at the same interval and on later saved versions. Failures affect backup only; browser editing and saving remain available.
+The bottom status bar shows muted backup status: `Folder backup is off.`, `Backing up to “Tree Backup”…`, or `Backed up to “Tree Backup”.` Missing images add their count and say they were not included. Failures say `Backup failed. <reason>`, distinguishing a missing folder or full destination. They retry at the same interval and on later saved versions. Failures affect backup only; browser editing and saving remain available.
 
 Startup checks permission without prompting. If access is not granted, the footer says `Backup paused — permission needed. Choose Resume Backing Up…`, and the command becomes **Resume Backing Up…**. Its dialog offers **Resume Backing Up**, **Stop Backing Up**, **Choose Another Folder**, and default **Cancel**. Only the Resume click requests write permission. Worker startup failures also offer Resume. A small dot and accessible attention label on the ellipsis button appear only for failure or permission-needed states and clear after success or stopping.
 
@@ -2417,7 +2461,7 @@ Cancel and every failure keep the current notes unchanged and remove the images 
 ### 24.7 Offline Access and App Updates
 
 The hosted browser version downloads its complete application package on the first online
-visit. The menu footer says **Ready to work offline** only after installation succeeds.
+visit. The bottom status bar says **Ready to work offline** only after installation succeeds.
 After that, Tree can open after a browser restart without Internet, edit and save local notes,
 display stored images, and run its local archive operations. External links still require
 their destination to be reachable. The first visit and restoring a removed application cache
@@ -2461,9 +2505,9 @@ Both native items show the corresponding export/import symbols (§9.3), includin
 
 Export Notes… opens a save panel named `Tree Notes YYYY-MM-DD.zip` with the local date. Cancelling the panel changes nothing. After a location is chosen, Tree saves pending edits, as Quit does, and exports the newest stored version that opens (§16.1) with every referenced image. Export never changes the stored notes.
 
-Export otherwise follows §24.3: it runs in the background while editing remains available, shows its progress, Cancel and result in a panel at the lower right above the status bar, leaves out and counts missing or unusable images, and produces no file in the listed failure cases. The archive takes its name only when it is complete: Cancel, a failure or quitting leaves no archive and leaves an existing file of that name unchanged. A file that cannot be written gives `Export failed. The archive could not be saved: <reason>`.
+Export otherwise follows §24.3: it runs in the background while editing remains available, shows its progress, Cancel and result in the bottom status bar, leaves out and counts missing or unusable images, and produces no file in the listed failure cases. The archive takes its name only when it is complete: Cancel, a failure or quitting leaves no archive and leaves an existing file of that name unchanged. A file that cannot be written gives `Export failed. The archive could not be saved: <reason>`.
 
-The desktop panel moves to the upper right below the location bar while a save or operation error is shown, so both messages remain visible. Dismissing a focused panel returns focus to the previously focused editor or control. An archive-limit refusal has no folder-backup suffix because desktop folder backup is not available.
+The desktop activity remains visible alongside save or operation errors in the bottom status bar. Dismissing a focused activity returns focus to the previously focused editor or control. An archive-limit refusal has no folder-backup suffix because desktop folder backup is not available.
 
 ### 25.3 Import
 

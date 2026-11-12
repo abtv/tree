@@ -72,8 +72,12 @@ async function inspectGeometry(page: Page, error = false): Promise<void> {
     const footer = document.querySelector('.status-bar')!.getBoundingClientRect()
     const errors = [...document.querySelectorAll('.save-error')].map((element) => element.getBoundingClientRect())
     return {
-      visible: panel.left >= 0 && panel.right <= innerWidth && panel.top >= toolbar.bottom && panel.bottom < footer.top,
-      nearTop: panel.top < toolbar.bottom + 20,
+      visible:
+        panel.left >= 0 &&
+        panel.right <= innerWidth &&
+        panel.top >= Math.max(toolbar.bottom, footer.top) &&
+        panel.bottom <= footer.bottom,
+      errorCount: errors.length,
       separate: errors.every(
         (box) =>
           panel.right <= box.left || panel.left >= box.right || panel.bottom <= box.top || panel.top >= box.bottom,
@@ -83,7 +87,7 @@ async function inspectGeometry(page: Page, error = false): Promise<void> {
 
   expect(geometry.visible).toBe(true)
   expect(geometry.separate).toBe(true)
-  expect(geometry.nearTop).toBe(error)
+  if (error) expect(geometry.errorCount).toBeGreaterThan(0)
 }
 
 test.describe('desktop Export Notes', () => {

@@ -140,6 +140,113 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
 }
 
 describe('main IPC handlers', () => {
+  // @requirement PRODUCT.md §15.2
+  it('cancels a final summary queued behind image Copy before it reaches the clipboard commit', async () => {
+    const summarization = {
+      available: vi.fn(async () => true),
+      begin: vi.fn(async () => undefined),
+      reduce: vi.fn(async () => 'Summary'),
+      finish: vi.fn(async () => undefined),
+      cancel: vi.fn(async () => undefined),
+    }
+    const harness = createHarness((dependencies) => {
+      dependencies.summarization = summarization
+    })
+    const event = { senderFrame: { url: rendererUrl } }
+    const invoke = (channel: string, ...args: unknown[]) => harness.handlers.get(channel)!(event, ...args)
+    let read!: (png: Uint8Array) => void
+    vi.mocked(harness.fileServices.readAttachment).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          read = resolve
+        }),
+    )
+    const imageCopy = invoke(ipcChannels.writeClipboardContent, { kind: 'image', attachmentId: 'image' })
+    await vi.waitFor(() => expect(harness.fileServices.readAttachment).toHaveBeenCalledOnce())
+    await invoke(ipcChannels.summaryBegin, 'job')
+    const queued = invoke(ipcChannels.summaryFinish, 'job', 'Summary')
+    const rejected = expect(queued).rejects.toThrow('canceled')
+
+    await expect(invoke(ipcChannels.summaryCancel, 'job')).resolves.toBe(true)
+    read(onePixelPng)
+    await imageCopy
+    await rejected
+
+    expect(summarization.finish).not.toHaveBeenCalled()
+    expect(harness.nativeClipboard.writePlainText).not.toHaveBeenCalled()
+    expect(harness.nativeClipboard.writeImage).toHaveBeenCalledOnce()
+    await expect(invoke(ipcChannels.summaryCancel, 'job')).resolves.toBe(false)
+  })
+  // @requirement PRODUCT.md §15.2
+  it('rejects unavailable, invalid, concurrent and canceled summary sessions before clipboard access', async () => {
+    const unsupported = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    await expect(unsupported.handlers.get(ipcChannels.summaryBegin)!(event, 'job')).rejects.toThrow('unavailable')
+    expect(unsupported.handlers.get(ipcChannels.summaryAvailable)!(event)).toBe(false)
+    await expect(unsupported.handlers.get(ipcChannels.summaryBegin)!(event, {})).rejects.toThrow(
+      'Invalid summarization ID',
+    )
+
+    const summarization = {
+      available: vi.fn(async () => true),
+      begin: vi.fn(async () => undefined),
+      reduce: vi.fn(async () => 'Summary'),
+      finish: vi.fn(async () => undefined),
+      cancel: vi.fn(async () => undefined),
+    }
+    const harness = createHarness((dependencies) => {
+      dependencies.summarization = summarization
+    })
+    const invoke = (channel: string, ...args: unknown[]) => harness.handlers.get(channel)!(event, ...args)
+    await invoke(ipcChannels.summaryBegin, 'job')
+    await expect(invoke(ipcChannels.summaryBegin, 'another')).rejects.toThrow('already running')
+    await invoke(ipcChannels.summaryCancel, 'job')
+    await invoke(ipcChannels.summaryCancel, 'job')
+    expect(() => invoke(ipcChannels.summaryFinish, 'job', 'Late')).toThrow('canceled')
+    expect(harness.nativeClipboard.writePlainText).not.toHaveBeenCalled()
+
+    summarization.begin.mockRejectedValueOnce(new Error('Start failed'))
+    await expect(invoke(ipcChannels.summaryBegin, 'failed')).rejects.toThrow('Start failed')
+    await invoke(ipcChannels.summaryBegin, 'replacement')
+    await invoke(ipcChannels.commitNotesImport)
+    expect(summarization.cancel).toHaveBeenCalledWith('replacement')
+    expect(() => invoke(ipcChannels.summaryFinish, 'replacement', 'Old notes')).toThrow('canceled')
+  })
+  // @requirement PRODUCT.md §15.2
+  it('validates summaries, copies only a final active result, and cancels on reload', async () => {
+    const summarization = {
+      available: vi.fn(async () => true),
+      begin: vi.fn(async () => undefined),
+      reduce: vi.fn(async () => 'Summary'),
+      finish: vi.fn(async () => undefined),
+      cancel: vi.fn(async () => undefined),
+    }
+    const harness = createHarness((dependencies) => {
+      dependencies.summarization = summarization
+    })
+    const sender = new EventEmitter() as unknown as NonNullable<IpcInvokeEvent['sender']>
+    const event = { senderFrame: { url: rendererUrl }, sender }
+    const invoke = (channel: string, ...args: unknown[]) => harness.handlers.get(channel)!(event, ...args)
+
+    await expect(invoke(ipcChannels.summaryAvailable)).resolves.toBe(true)
+    await invoke(ipcChannels.summaryBegin, 'job')
+    expect(() => invoke(ipcChannels.summaryReduce, 'job', 'x'.repeat(2401), true)).toThrow('Invalid summary text')
+    expect(() => invoke(ipcChannels.summaryReduce, 'job', 'Notes', 'yes')).toThrow('Invalid summary phase')
+    await expect(invoke(ipcChannels.summaryReduce, 'job', 'Notes', true)).resolves.toBe('Summary')
+    await invoke(ipcChannels.summaryFinish, 'job', 'Summary')
+
+    expect(harness.nativeClipboard.writePlainText).toHaveBeenCalledExactlyOnceWith('Summary')
+    expect(sender.listenerCount('did-start-loading')).toBe(0)
+    await invoke(ipcChannels.summaryBegin, 'second')
+    sender.emit('did-start-loading')
+
+    expect(summarization.cancel).toHaveBeenCalledWith('second')
+    expect(() => invoke(ipcChannels.summaryFinish, 'second', 'Stale')).toThrow('canceled')
+    expect(harness.nativeClipboard.writePlainText).toHaveBeenCalledOnce()
+    expect(() =>
+      harness.handlers.get(ipcChannels.summaryAvailable)!({ senderFrame: { url: 'https://evil.example/' } }),
+    ).toThrow('Untrusted')
+  })
   it('validates image-to-text requests before reading an attachment and forwards native results', async () => {
     const recognize = vi.fn(async (read: () => Promise<Uint8Array | null>) => {
       await read()

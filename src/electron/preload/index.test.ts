@@ -18,6 +18,25 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  // @requirement PRODUCT.md §15.2
+  it('forwards the complete summarization contract and preserves native failures', async () => {
+    const { treeApi } = await import('./index')
+    const port = treeApi.summarization!
+    mocks.invoke.mockResolvedValueOnce(true)
+    await expect(port.available()).resolves.toBe(true)
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.summaryAvailable)
+    await port.begin('job')
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.summaryBegin, 'job')
+    mocks.invoke.mockResolvedValueOnce('Result')
+    await expect(port.reduce('job', 'Notes', true)).resolves.toBe('Result')
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.summaryReduce, 'job', 'Notes', true)
+    await port.finish('job', 'Result')
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.summaryFinish, 'job', 'Result')
+    await port.cancel('job')
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.summaryCancel, 'job')
+    mocks.invoke.mockRejectedValueOnce(new Error('Native unavailable'))
+    await expect(port.reduce('job', 'Notes', false)).rejects.toThrow('Native unavailable')
+  })
   it('forwards encoded saves unchanged and retains IPC rejection', async () => {
     const { treeApi } = await import('./index')
     const encoded = '{"version":4}'

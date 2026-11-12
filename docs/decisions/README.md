@@ -29,5 +29,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0023](0023-browser-folder-backup.md) | Browser Folder Backup | Accepted | 2026-10-20 |
 | [0024](0024-desktop-notes-archive.md) | Desktop Notes Archive: Worker Thread, Shared Archive Code and Crash-Safe Replacement | Accepted | 2026-10-23 |
 | [0025](0025-apple-vision-image-to-text.md) | Apple Vision Image to Text | Accepted | 2026-11-11 |
+| [0026](0026-on-device-summarization.md) | On-Device Summarization | Accepted | 2026-11-12 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

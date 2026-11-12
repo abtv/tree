@@ -1076,10 +1076,55 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
-  height: var(--status-bar-height);
+  min-height: 27px;
+  flex-wrap: wrap;
   padding: 0 12px;
   border-top: 1px solid var(--color-location-border);
   background: var(--color-background);
+}
+
+.status-notifications {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--color-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.status-notifications:empty {
+  display: none;
+}
+.status-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 26px;
+}
+.status-notifications .save-error {
+  position: static;
+  margin: 2px 0;
+}
+.status-notifications button {
+  font: inherit;
+  color: inherit;
+  background: var(--color-background);
+  border: 1px solid var(--color-location-border);
+  border-radius: 4px;
+}
+.status-notifications .data-activity {
+  position: static;
+  inset: auto;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  max-width: 100%;
+  font: inherit;
 }
 
 /* Left-side messages leave room for the mode indicator and pin on the right. */

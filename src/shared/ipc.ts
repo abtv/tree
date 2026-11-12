@@ -7,6 +7,11 @@ import type { IncomingNotes, NotesCounts } from '../application/notes-archive/im
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
 
 export const ipcChannels = {
+  summaryAvailable: 'tree:summary-available',
+  summaryBegin: 'tree:summary-begin',
+  summaryReduce: 'tree:summary-reduce',
+  summaryFinish: 'tree:summary-finish',
+  summaryCancel: 'tree:summary-cancel',
   imageToText: 'tree:image-to-text',
   getUpdateCommands: 'tree:get-update-commands',
   runUpdateCommand: 'tree:run-update-command',
@@ -150,6 +155,7 @@ export interface EditorContextMenuRequest {
 export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | null
 
 export interface TreeApi {
+  summarization?: import('./summarize').SummarizationPort
   imageToText?: (attachmentId: string) => Promise<string[]>
   getUpdateCommands?: () => Promise<UpdateCommandsState>
   runUpdateCommand?: (command: UpdateCommand) => Promise<void>

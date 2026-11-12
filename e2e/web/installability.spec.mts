@@ -62,7 +62,7 @@ test('serves an installable manifest with icons', async ({ newContext, baseURL }
   expect(manifestErrors).toEqual([])
 })
 
-test('asks once for persistent storage and shows the result in the menu', async ({ newContext, baseURL }) => {
+test('asks once for persistent storage and shows the result in the status bar', async ({ newContext, baseURL }) => {
   const context = await newContext()
 
   await stubPersistence(context, { persisted: false, persist: true })

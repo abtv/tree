@@ -20,6 +20,7 @@ import type { EditorContextMenuCommand, EditorContextMenuRequest } from '../../s
 import type { WebContents } from 'electron'
 import { RECENT_NODE_LIMIT } from '../../application/recent-nodes'
 import { EMOJI_HISTORY_LIMIT, normalizeEmojiHistory } from '../../domain/emoji-completion'
+import { SUMMARY_INPUT_BYTES, SUMMARY_OUTPUT_BYTES, type SummarizationPort } from '../../shared/summarize'
 
 export interface IpcInvokeEvent {
   senderFrame?: { url?: string } | null
@@ -31,6 +32,7 @@ export interface IpcMain {
 }
 
 export interface IpcHandlerDependencies {
+  summarization?: SummarizationPort
   imageToText?: { recognize(read: () => Promise<Uint8Array | null>): Promise<string[]>; cancel(): void }
   getUpdateCommands?: () => UpdateCommandsState
   runUpdateCommand?: (command: UpdateCommand) => void
@@ -64,6 +66,7 @@ export interface IpcHandlerDependencies {
 }
 
 export function registerIpcHandlers({
+  summarization,
   imageToText,
   getUpdateCommands,
   runUpdateCommand,
@@ -98,6 +101,90 @@ export function registerIpcHandlers({
   const requireTrustedRenderer = (event: IpcInvokeEvent): void => {
     if (!isTrustedRendererUrl(event.senderFrame?.url, rendererUrl)) throw new Error('Untrusted renderer IPC call.')
   }
+
+  let summarySession: { id: string; sender: WebContents | undefined; cleanup(): void } | undefined
+  const summaryId = (value: unknown): string => {
+    if (typeof value !== 'string' || !/^[\w-]{1,100}$/.test(value)) throw new Error('Invalid summarization ID.')
+    return value
+  }
+  const summaryText = (value: unknown, limit: number): string => {
+    if (typeof value !== 'string' || !value.trim() || Buffer.byteLength(value) > limit)
+      throw new Error('Invalid summary text.')
+    return value
+  }
+  const requireSummarySession = (event: IpcInvokeEvent, id: string): void => {
+    if (summarySession?.id !== id || summarySession.sender !== event.sender)
+      throw new Error('Summarization was canceled.')
+  }
+  ipcMain.handle(ipcChannels.summaryAvailable, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return summarization?.available() ?? false
+  })
+  ipcMain.handle(ipcChannels.summaryBegin, async (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    const id = summaryId(value)
+    if (!summarization) throw new Error('Apple Intelligence is unavailable.')
+    if (summarySession) throw new Error('Summarization is already running.')
+    const cancel = (): void => {
+      if (summarySession?.id === id) summarySession = undefined
+      cleanup()
+      void summarization.cancel(id)
+    }
+    const cleanup = (): void => {
+      event.sender?.removeListener('destroyed', cancel)
+      event.sender?.removeListener('render-process-gone', cancel)
+      event.sender?.removeListener('did-start-loading', cancel)
+    }
+    summarySession = { id, sender: event.sender, cleanup }
+    event.sender?.once('destroyed', cancel)
+    event.sender?.once('render-process-gone', cancel)
+    event.sender?.once('did-start-loading', cancel)
+    try {
+      await summarization.begin(id)
+    } catch (error) {
+      cancel()
+      throw error
+    }
+  })
+  ipcMain.handle(ipcChannels.summaryReduce, (event, value, text, final, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    const id = summaryId(value)
+    requireSummarySession(event, id)
+    if (typeof final !== 'boolean') throw new Error('Invalid summary phase.')
+    return summarization!.reduce(id, summaryText(text, SUMMARY_INPUT_BYTES), final)
+  })
+  ipcMain.handle(ipcChannels.summaryCancel, async (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    const id = summaryId(value)
+    if (summarySession?.id !== id) return false
+    requireSummarySession(event, id)
+    summarySession.cleanup()
+    summarySession = undefined
+    await summarization?.cancel(id)
+    return true
+  })
+  ipcMain.handle(ipcChannels.summaryFinish, (event, value, text, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    const id = summaryId(value)
+    const result = summaryText(text, SUMMARY_OUTPUT_BYTES)
+    requireSummarySession(event, id)
+    return queueClipboardWrite(async () => {
+      requireSummarySession(event, id)
+      if (!nativeClipboard.writePlainText) throw new Error('Clipboard text copying is unavailable.')
+      await summarization!.finish(id, result)
+      requireSummarySession(event, id)
+      const session = summarySession!
+      session.cleanup()
+      summarySession = undefined
+      // This is the clipboard commit point. A new job cannot retire this write's session.
+      await nativeClipboard.writePlainText(result)
+    })
+  })
 
   ipcMain.handle(ipcChannels.imageToText, async (event, value, ...args) => {
     requireTrustedRenderer(event)
@@ -347,6 +434,12 @@ export function registerIpcHandlers({
       requireNoArguments(args)
       if (appUpdates?.isApplying?.() && channel !== ipcChannels.cancelNotesOperation)
         throw new Error('Wait for the app update to finish.')
+      if (channel === ipcChannels.commitNotesImport && summarySession !== undefined) {
+        const id = summarySession.id
+        summarySession.cleanup()
+        summarySession = undefined
+        void summarization?.cancel(id)
+      }
       return request()
     })
   }
