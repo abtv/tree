@@ -19,14 +19,16 @@ export function dependencyImage(packageBytes: Uint8Array, lockBytes: Uint8Array,
       'packageManager',
     ].map((key) => [key, manifest[key]]),
   )
+  const lock = JSON.parse(Buffer.from(lockBytes).toString()) as {
+    version?: string
+    packages?: Record<string, { version?: string }>
+  }
+  // Release bumps change these metadata fields without changing installed dependencies.
+  delete lock.version
+  if (lock.packages?.['']) delete lock.packages[''].version
+
   const digest = createHash('sha256')
-    .update(
-      JSON.stringify([
-        installation,
-        Buffer.from(lockBytes).toString(),
-        ...recipeBytes.map((bytes) => Buffer.from(bytes).toString()),
-      ]),
-    )
+    .update(JSON.stringify([installation, lock, ...recipeBytes.map((bytes) => Buffer.from(bytes).toString())]))
     .digest('hex')
   return `tree-chromium-tests:${digest}`
 }

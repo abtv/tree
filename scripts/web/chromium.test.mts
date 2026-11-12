@@ -163,16 +163,16 @@ it('runs only a local immutable image with the fixed isolation settings', () => 
 it('reuses dependencies for script edits but invalidates changed install inputs', () => {
   const bytes = (value: string) => Buffer.from(value)
   const manifest = { dependencies: { react: '19.3.0' }, scripts: { test: 'old' } }
-  const name = (value: unknown, lock = 'lock', recipe = 'recipe', ignore = 'ignore', buildRecipe = 'buildRecipe') =>
+  const name = (value: unknown, lock = '{}', recipe = 'recipe', ignore = 'ignore', buildRecipe = 'buildRecipe') =>
     dependencyImage(bytes(JSON.stringify(value)), bytes(lock), bytes(recipe), bytes(ignore), bytes(buildRecipe))
   const image = name(manifest)
 
   expect(name({ ...manifest, scripts: { test: 'new' }, description: 'new' })).toBe(image)
   expect(name({ ...manifest, dependencies: { react: '20.0.0' } })).not.toBe(image)
-  expect(name(manifest, 'changed')).not.toBe(image)
-  expect(name(manifest, 'lock', 'changed')).not.toBe(image)
-  expect(name(manifest, 'lock', 'recipe', 'changed')).not.toBe(image)
-  expect(name(manifest, 'lock', 'recipe', 'ignore', 'changed')).not.toBe(image)
+  expect(name(manifest, '{"lockfileVersion":3}')).not.toBe(image)
+  expect(name(manifest, '{}', 'changed')).not.toBe(image)
+  expect(name(manifest, '{}', 'recipe', 'changed')).not.toBe(image)
+  expect(name(manifest, '{}', 'recipe', 'ignore', 'changed')).not.toBe(image)
 })
 
 it('stops at a missing image without building, pulling, archiving, or running anything', () => {
