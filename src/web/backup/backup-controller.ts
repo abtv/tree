@@ -11,6 +11,16 @@ import {
 
 const FOLDER_KEY = 'backup-folder'
 
+type BackupCommand = 'back-up-to-folder' | 'resume-backing-up' | 'stop-backing-up'
+
+type BackupLifecycle =
+  | { phase: 'loading' | 'off' }
+  | { phase: 'starting' | 'paused'; folder: FileSystemDirectoryHandle }
+  | { phase: 'active'; folder: FileSystemDirectoryHandle; worker: Worker }
+  | { phase: 'disposed'; command: BackupCommand; folder: FileSystemDirectoryHandle | undefined }
+
+type BackupConfirmation = { phase: 'closed' } | { phase: 'occupied' | 'resume'; folder: FileSystemDirectoryHandle }
+
 async function storedFolder(): Promise<FileSystemDirectoryHandle | undefined> {
   const db = await openDatabase()
   try {
@@ -73,33 +83,39 @@ export function installFolderBackup(
   const cancel = document.getElementById('backup-confirm-cancel') as HTMLButtonElement
   if (!supportsFolderBackup()) return () => undefined
   status.hidden = false
-  let folder: FileSystemDirectoryHandle | undefined
-  let worker: Worker | undefined
-  let paused = false
-  let busy = true
-  let disposed = false
+  let lifecycle: BackupLifecycle = { phase: 'loading' }
+  let operation: 'idle' | 'running' = 'running'
+  let confirmation: BackupConfirmation = { phase: 'closed' }
+  const configuredFolder = () => ('folder' in lifecycle ? lifecycle.folder : undefined)
+  const disposed = () => lifecycle.phase === 'disposed'
+  const command = (): BackupCommand => {
+    if (lifecycle.phase === 'disposed') return lifecycle.command
+    if (!configuredFolder()) return 'back-up-to-folder'
+    return lifecycle.phase === 'paused' ? 'resume-backing-up' : 'stop-backing-up'
+  }
   const update = (message: string, attention = false) => {
     status.textContent = message
     menuButton.classList.toggle('backup-attention', attention)
     menuButton.setAttribute('aria-label', attention ? 'Tree menu — backup needs attention' : 'Tree menu')
   }
   const refresh = () => {
-    const name = !folder ? 'back-up-to-folder' : paused ? 'resume-backing-up' : 'stop-backing-up'
+    const name = command()
     const label = dataMenuCommands[name]
     if (button.textContent !== label) button.textContent = label
-    updateCommand(name, !busy && actions.available())
+    updateCommand(name, operation === 'idle' && actions.available())
   }
   const stopWorker = () => {
-    worker?.terminate()
-    worker = undefined
+    if (lifecycle.phase === 'active') {
+      lifecycle.worker.terminate()
+      lifecycle = { phase: 'paused', folder: lifecycle.folder }
+    } else if (lifecycle.phase === 'starting') lifecycle = { phase: 'paused', folder: lifecycle.folder }
   }
   const fail = (error: unknown) => {
     const failure = backupFailure(error)
     if (failure.kind === 'permission') {
       stopWorker()
-      paused = true
       update(
-        folder
+        configuredFolder()
           ? 'Backup paused — permission needed. Choose Resume Backing Up…'
           : 'Backup failed. Write permission was not granted. Choose Back Up to Folder…',
         true,
@@ -113,20 +129,22 @@ export function installFolderBackup(
     refresh()
   }
   const startWorker = () => {
-    if (disposed || !folder) return
+    const folder = configuredFolder()
+    if (disposed() || !folder) return
     stopWorker()
-    paused = false
+    lifecycle = { phase: 'starting', folder }
     update(`Backing up to “${folder.name}”…`)
     try {
       const current = new Worker(new URL('../workers/backup.worker.ts', import.meta.url), { type: 'module' })
-      worker = current
+      lifecycle = { phase: 'active', folder, worker: current }
+      const currentWorker = () => lifecycle.phase === 'active' && lifecycle.worker === current
       current.onmessage = ({ data }: MessageEvent<BackupWorkerMessage>) => {
-        if (worker !== current || disposed) return
-        if (data.state === 'writing') update(`Backing up to “${folder!.name}”…`)
+        if (!currentWorker()) return
+        if (data.state === 'writing') update(`Backing up to “${folder.name}”…`)
         else if (data.state === 'saved') {
           const missing = data.missingImages
           update(
-            `Backed up to “${folder!.name}”.${missing ? ` ${missing.toLocaleString('en-US')} ${missing === 1 ? 'image could' : 'images could'} not be found and ${missing === 1 ? 'was' : 'were'} not included.` : ''}`,
+            `Backed up to “${folder.name}”.${missing ? ` ${missing.toLocaleString('en-US')} ${missing === 1 ? 'image could' : 'images could'} not be found and ${missing === 1 ? 'was' : 'were'} not included.` : ''}`,
           )
         } else if (data.state === 'stopped') {
           stopped()
@@ -140,9 +158,8 @@ export function installFolderBackup(
         }
       }
       const stopped = () => {
-        if (worker !== current || disposed) return
+        if (!currentWorker()) return
         stopWorker()
-        paused = true
         update('Backup failed. The backup stopped unexpectedly. Choose Resume Backing Up…', true)
         refresh()
       }
@@ -154,92 +171,99 @@ export function installFolderBackup(
       current.postMessage({ type: 'start', folder } satisfies BackupWorkerRequest)
     } catch (error) {
       stopWorker()
-      paused = true
       fail(error)
     }
     refresh()
   }
   const remove = async () => {
     await rememberFolder(undefined)
-    if (disposed) return
+    if (disposed()) return
     stopWorker()
-    folder = undefined
-    paused = false
+    lifecycle = { phase: 'off' }
     update('Folder backup is off.')
   }
   const activate = async (next: FileSystemDirectoryHandle) => {
     await actions.flush()
-    if (disposed) return
+    if (disposed()) return
     // queryPermission never prompts. Only picker/Resume clicks may request access.
     if ((await next.queryPermission({ mode: 'readwrite' })) !== 'granted') {
       throw new DOMException('Write permission was not granted.', 'NotAllowedError')
     }
     await rememberFolder(next)
-    if (disposed) return
-    folder = next
+    if (disposed()) return
+    stopWorker()
+    lifecycle = { phase: 'starting', folder: next }
     startWorker()
   }
   const run = async (action: () => Promise<void>) => {
-    busy = true
+    operation = 'running'
     refresh()
     try {
       await action()
     } catch (error) {
       if (!(error instanceof Error && error.name === 'AbortError')) fail(error)
     } finally {
-      busy = false
+      operation = 'idle'
       refresh()
     }
   }
   const closeDialog = () => {
-    if (!dialog.open) return
+    if (confirmation.phase === 'closed') return
     const focused = dialog.contains(document.activeElement)
     dialog.close()
+    confirmation = { phase: 'closed' }
     if (focused) actions.restoreFocus()
   }
-  const showDialog = (next?: FileSystemDirectoryHandle) => {
-    const occupied = next !== undefined
+  const showDialog = (next: Exclude<BackupConfirmation, { phase: 'closed' }>) => {
+    confirmation = next
+    const occupied = next.phase === 'occupied'
     title.textContent = occupied ? 'This Folder Already Contains Notes' : 'Resume Folder Backup?'
     text.textContent = occupied
-      ? `“${next.name}” contains document.json. Restore its notes, explicitly replace its backup with your current saved notes, or choose another folder. Replacing the backup cannot be undone. Existing image files are kept.`
-      : `Tree needs write permission to resume backing up to “${folder!.name}”. You can also stop or choose another folder. Files already in the folder are kept.`
+      ? `“${next.folder.name}” contains document.json. Restore its notes, explicitly replace its backup with your current saved notes, or choose another folder. Replacing the backup cannot be undone. Existing image files are kept.`
+      : `Tree needs write permission to resume backing up to “${next.folder.name}”. You can also stop or choose another folder. Files already in the folder are kept.`
     restore.hidden = replace.hidden = !occupied
     resume.hidden = stop.hidden = occupied
-    restore.onclick = () => {
-      closeDialog()
-      void actions.restore(next!)
-    }
-    replace.onclick = () => {
-      closeDialog()
-      void run(() => activate(next!))
-    }
-    resume.onclick = () => {
-      // Start requestPermission synchronously in the click handler, preserving user activation.
-      const request = folder!.requestPermission({ mode: 'readwrite' })
-      closeDialog()
-      void run(async () => {
-        if ((await request) !== 'granted')
-          throw new DOMException('Write permission was not granted.', 'NotAllowedError')
-        startWorker()
-      })
-    }
-    stop.onclick = () => {
-      closeDialog()
-      void run(remove)
-    }
-    choose.onclick = () => {
-      closeDialog()
-      const picking = window.showDirectoryPicker!({ mode: 'readwrite', id: 'tree-backup' })
-      void run(async () => {
-        const selected = await picking
-        await select(selected)
-      })
-    }
     dialog.showModal()
     cancel.focus()
   }
+  restore.onclick = () => {
+    if (confirmation.phase !== 'occupied') return
+    const folder = confirmation.folder
+    closeDialog()
+    void actions.restore(folder)
+  }
+  replace.onclick = () => {
+    if (confirmation.phase !== 'occupied') return
+    const folder = confirmation.folder
+    closeDialog()
+    void run(() => activate(folder))
+  }
+  resume.onclick = () => {
+    if (confirmation.phase !== 'resume') return
+    // Start requestPermission synchronously in the click handler, preserving user activation.
+    const request = confirmation.folder.requestPermission({ mode: 'readwrite' })
+    closeDialog()
+    void run(async () => {
+      if ((await request) !== 'granted') throw new DOMException('Write permission was not granted.', 'NotAllowedError')
+      startWorker()
+    })
+  }
+  stop.onclick = () => {
+    if (confirmation.phase !== 'resume') return
+    closeDialog()
+    void run(remove)
+  }
+  choose.onclick = () => {
+    if (confirmation.phase === 'closed') return
+    closeDialog()
+    const picking = window.showDirectoryPicker!({ mode: 'readwrite', id: 'tree-backup' })
+    void run(async () => {
+      const selected = await picking
+      await select(selected)
+    })
+  }
   const select = async (next: FileSystemDirectoryHandle) => {
-    if (disposed) return
+    if (disposed()) return
     try {
       await next.getFileHandle('document.json')
     } catch (error) {
@@ -249,7 +273,7 @@ export function installFolderBackup(
       }
       throw error
     }
-    showDialog(next)
+    showDialog({ phase: 'occupied', folder: next })
   }
   cancel.onclick = closeDialog
   dialog.oncancel = (event) => {
@@ -258,13 +282,13 @@ export function installFolderBackup(
   }
   menu.addEventListener('beforetoggle', refresh)
   const updateCommand = commands.bind(button, () => {
-    if (busy || !actions.available()) return
+    if (operation === 'running' || !actions.available()) return
     actions.closeMenu()
-    if (folder && paused) {
-      showDialog()
+    if (lifecycle.phase === 'paused') {
+      showDialog({ phase: 'resume', folder: lifecycle.folder })
       return
     }
-    if (folder) {
+    if (configuredFolder()) {
       void run(remove)
       return
     }
@@ -273,9 +297,8 @@ export function installFolderBackup(
   })
   const unsubscribe = session.onSaved(() => {
     try {
-      worker?.postMessage(backupSavedMessage())
+      if (lifecycle.phase === 'active') lifecycle.worker.postMessage(backupSavedMessage())
     } catch (error) {
-      paused = true
       stopWorker()
       fail(error)
     }
@@ -283,22 +306,26 @@ export function installFolderBackup(
   window.addEventListener(
     'pagehide',
     () => {
-      disposed = true
+      const lastCommand = command()
+      const folder = configuredFolder()
       stopWorker()
+      lifecycle = { phase: 'disposed', command: lastCommand, folder }
       unsubscribe()
     },
     { once: true },
   )
   void run(async () => {
-    folder = await storedFolder()
-    if (disposed) return
+    const folder = await storedFolder()
+    if (disposed()) return
     if (!folder) {
+      lifecycle = { phase: 'off' }
       update('Folder backup is off.')
       return
     }
+    lifecycle = { phase: 'starting', folder }
     if ((await folder.queryPermission({ mode: 'readwrite' })) === 'granted') startWorker()
     else {
-      paused = true
+      if (!disposed()) lifecycle = { phase: 'paused', folder }
       update('Backup paused — permission needed. Choose Resume Backing Up…', true)
     }
   })
