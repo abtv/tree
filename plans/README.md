@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Explicit Operation States](explicit-operation-states.md) | In progress | S6: quit handshake |
+| [Explicit Operation States](explicit-operation-states.md) | In progress | S7: Vim pending-command variants |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

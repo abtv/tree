@@ -8,10 +8,11 @@ const systemClock: QuitHandshakeClock = {
   clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
 }
 
+type QuitState =
+  { kind: 'idle' } | { kind: 'waiting'; requestId: string; timeoutHandle: unknown } | { kind: 'quitting' }
+
 export class QuitHandshake {
-  private pendingRequestId: string | undefined
-  private timeoutHandle: unknown
-  private quitting = false
+  private state: QuitState = { kind: 'idle' }
 
   public constructor(
     private readonly sendRequest: (requestId: string) => void,
@@ -23,40 +24,38 @@ export class QuitHandshake {
   ) {}
 
   public request(): void {
-    if (this.quitting || this.pendingRequestId !== undefined) return
+    if (this.state.kind !== 'idle') return
     const requestId = this.createRequestId()
-    this.pendingRequestId = requestId
-    this.timeoutHandle = this.clock.setTimeout(() => {
-      this.pendingRequestId = undefined
-      this.timeoutHandle = undefined
+    this.state = { kind: 'waiting', requestId, timeoutHandle: undefined }
+    this.state.timeoutHandle = this.clock.setTimeout(() => {
+      this.state = { kind: 'idle' }
       this.onTimeout()
     }, this.timeoutMilliseconds)
     this.sendRequest(requestId)
   }
 
   public confirm(requestId: string): boolean {
-    if (this.quitting || this.pendingRequestId !== requestId) return false
+    if (this.state.kind !== 'waiting' || this.state.requestId !== requestId) return false
     this.clearTimeout()
-    this.pendingRequestId = undefined
-    this.quitting = true
+    this.state = { kind: 'quitting' }
     queueMicrotask(this.quit)
     return true
   }
 
   public force(): void {
-    if (this.quitting) return
+    if (this.state.kind === 'quitting') return
     this.clearTimeout()
-    this.pendingRequestId = undefined
-    this.quitting = true
+    this.state = { kind: 'quitting' }
     queueMicrotask(this.quit)
   }
 
   public isQuitting(): boolean {
-    return this.quitting
+    return this.state.kind === 'quitting'
   }
 
   private clearTimeout(): void {
-    if (this.timeoutHandle !== undefined) this.clock.clearTimeout(this.timeoutHandle)
-    this.timeoutHandle = undefined
+    if (this.state.kind === 'waiting' && this.state.timeoutHandle !== undefined)
+      this.clock.clearTimeout(this.state.timeoutHandle)
+    if (this.state.kind === 'waiting') this.state.timeoutHandle = undefined
   }
 }

@@ -14,6 +14,27 @@ function createClock() {
 }
 
 describe('QuitHandshake', () => {
+  it('enters terminal state before the quit microtask and forces from idle only once', async () => {
+    const send = vi.fn()
+    const quit = vi.fn()
+    const { clock } = createClock()
+    const handshake = new QuitHandshake(send, vi.fn(), quit, () => 'idle', clock)
+
+    expect(handshake.confirm('idle')).toBe(false)
+    handshake.force()
+    handshake.force()
+    handshake.request()
+
+    expect(handshake.isQuitting()).toBe(true)
+    expect(quit).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
+    expect(clock.clearTimeout).not.toHaveBeenCalled()
+
+    await Promise.resolve()
+
+    expect(quit).toHaveBeenCalledOnce()
+  })
+
   it('cancels the timeout after confirmation and keeps later requests inert', async () => {
     vi.useFakeTimers()
     try {

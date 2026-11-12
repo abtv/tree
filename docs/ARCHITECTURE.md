@@ -393,6 +393,11 @@ Before application shutdown is allowed to complete, the main process asks the re
 
 The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
 
+`quit-handshake.ts` owns a local idle/waiting/quitting union. Only waiting carries
+the request ID and timeout handle; confirmation or force enters the terminal
+quitting state before queuing the quit microtask. Timeout restores idle for retry.
+This changes no IPC contracts, timers, persistence operations or runtime growth.
+
 The application layer must not contain React components or JSX.
 
 The Agenda store uses `agenda-state.ts` for pure runtime transitions and `agenda-rows.ts` to derive populated days plus Today and flatten direct matches with scope-relative parent identity paths. `EditorStore` owns one row cache and publishes Agenda selection with real-node location and focus atomically. Rows carry node IDs rather than captured node content, so unchanged date membership can reuse their identities while the document supplies current text. Presentation is an explicit `timeline` or `focused-day` union; the latter requires its day and captured timeline selection, day-fold references and scroll anchor. Focused folds use a separate set. Activity is independently `inactive`, `dated`, or `pinned-until-leave`, with one occurrence descriptor for either active state. Selection can name a node without activating its editor after timeline return. `agenda-reconcile.ts` resolves date loss, restoration and migration through this activity state. Live date migration updates the focused day while retaining captured return data; history preserves presentation. Cache selectors return the original pinned descriptor to preserve identity-based reuse. See [ADR 0020](decisions/0020-agenda-derived-projection-and-runtime-view-state.md).
