@@ -2,6 +2,7 @@ import type { EditorServices } from '../../application/editor-store'
 import { createAttachmentImageCache, decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
+import { encodeJson } from './encode-json'
 
 export const ATTACHMENT_IMAGE_CACHE_LIMIT = 512 * 1024 * 1024
 
@@ -51,7 +52,11 @@ export function createElectronEditorServices(): EditorServices {
     saveEmojiHistory: (names) => window.treeApi.setEmojiHistory?.(names) ?? Promise.resolve(),
     loadRecentNodes: () => window.treeApi.getRecentNodes?.() ?? Promise.resolve([]),
     saveRecentNodes: (ids) => notesWrite(() => window.treeApi.setRecentNodes?.(ids) ?? Promise.resolve()),
-    save: (state) => notesWrite(() => window.treeApi.save(state)),
+    save: async (state) => {
+      if (notesWritesSuspended) return
+      const encoded = await encodeJson(state)
+      await notesWrite(() => window.treeApi.save(encoded))
+    },
     readClipboard: () => window.treeApi.readClipboard(),
     writeClipboard: (payload) => window.treeApi.writeClipboard?.(payload) ?? Promise.resolve(),
     writeClipboardContent: (payload) => window.treeApi.writeClipboardContent?.(payload) ?? Promise.resolve(),

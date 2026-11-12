@@ -726,6 +726,34 @@ describe('main IPC handlers', () => {
     expect(fileServices.save).toHaveBeenCalledOnce()
   })
 
+  it('validates encoded saves before filesystem persistence and preserves failures', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const state = {
+      version: 4,
+      document: { roots: [{ id: 'root', text: 'saved 🐱', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+      view: { expandedIds: [] },
+    }
+
+    await handlers.get(ipcChannels.save)!(event, JSON.stringify(state))
+
+    expect(fileServices.save).toHaveBeenCalledExactlyOnceWith(state)
+
+    await expect(Promise.resolve().then(() => handlers.get(ipcChannels.save)!(event, '{'))).rejects.toThrow()
+    await expect(
+      Promise.resolve().then(() =>
+        handlers.get(ipcChannels.save)!(event, JSON.stringify({ ...state, document: { roots: [] } })),
+      ),
+    ).rejects.toThrow()
+
+    expect(fileServices.save).toHaveBeenCalledOnce()
+    const failure = new Error('save failed')
+    vi.mocked(fileServices.save).mockRejectedValueOnce(failure)
+
+    await expect(handlers.get(ipcChannels.save)!(event, JSON.stringify(state))).rejects.toBe(failure)
+  })
+
   it('validates the maximum persisted depth before filesystem persistence', async () => {
     const { handlers, fileServices } = createHarness()
     const root = { id: 'n0', text: '', children: [] as { id: string; text: string; children: never[] }[] }

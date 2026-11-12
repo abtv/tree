@@ -18,6 +18,19 @@ vi.mock('electron', () => ({
 }))
 
 describe('preload bridge', () => {
+  it('forwards encoded saves unchanged and retains IPC rejection', async () => {
+    const { treeApi } = await import('./index')
+    const encoded = '{"version":4}'
+
+    await treeApi.save(encoded)
+
+    expect(mocks.invoke).toHaveBeenLastCalledWith(ipcChannels.save, encoded)
+    const failure = new Error('disk unavailable')
+    mocks.invoke.mockRejectedValueOnce(failure)
+
+    await expect(treeApi.save(encoded)).rejects.toBe(failure)
+  })
+
   it.each([
     ['darwin', 'arm64', true],
     ['darwin', 'x64', false],

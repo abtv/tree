@@ -29,7 +29,7 @@ export function isTrustedRendererUrl(value: string | undefined, expected: string
 }
 
 export function validatePersistedEditorState(value: unknown): PersistedEditorState {
-  return validatePersistedState(value)
+  return validatePersistedState(typeof value === 'string' ? JSON.parse(value) : value)
 }
 
 export function validateClipboardWritePayload(value: unknown): ClipboardWritePayload {

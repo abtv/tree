@@ -175,7 +175,8 @@ export interface TreeApi {
   onQuitRequested(listener: (requestId: string) => void): () => void
   onQuitFailed(listener: (message: string) => void): () => void
   load(): Promise<unknown | null>
-  save(state: PersistedEditorState): Promise<void>
+  /** Electron services send encoded JSON to avoid copying a large object graph through contextBridge. */
+  save(state: PersistedEditorState | string): Promise<void>
   readClipboard(): Promise<ClipboardPayload>
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeClipboardContent?: (payload: ClipboardContent) => Promise<void>

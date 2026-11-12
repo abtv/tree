@@ -22,6 +22,17 @@ const state = {
 const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
+  it('validates an encoded save using the same document rules as an object payload', () => {
+    expect(validatePersistedEditorState(JSON.stringify(state))).toEqual(state)
+    expect(() => validatePersistedEditorState(JSON.stringify({ ...state, document: { roots: [] } }))).toThrow(
+      'at least one root node',
+    )
+  })
+
+  it.each(['{', 'null', '[]', '"text"'])('rejects an invalid encoded save %s', (value) => {
+    expect(() => validatePersistedEditorState(value)).toThrow()
+  })
+
   it.each([null, undefined, [], 'selection'])('rejects a non-record context menu request %j', (value) => {
     expect(() => validateEditorContextMenuRequest(value)).toThrow('Editor context menu request is invalid.')
   })

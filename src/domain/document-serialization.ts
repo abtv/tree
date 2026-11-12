@@ -16,6 +16,10 @@ import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 import { deriveCompletion } from './node-completion'
+import { buildNodeIndex } from './document-index'
+
+// Documents are immutable. Remember validation, without retaining an ID set for every history snapshot.
+const validatedDocuments = new WeakSet<Document>()
 
 /** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
 export interface ViewState {
@@ -33,12 +37,15 @@ export function serializeState(
   location: Location,
   view: ViewState = EMPTY_PERSISTED_VIEW,
 ): PersistedEditorState {
-  const nodeIds = assertDocumentIds(document)
+  if (!validatedDocuments.has(document)) {
+    assertDocumentIds(document)
+    validatedDocuments.add(document)
+  }
   if (!isValidLocation(document, location)) {
     throw new Error('The selected node is not valid for the persisted location.')
   }
   const expandedIds: NodeId[] = []
-  for (const id of view.expandedIds) if (nodeIds.has(id)) expandedIds.push(id)
+  for (const id of view.expandedIds) if (buildNodeIndex(document).has(id)) expandedIds.push(id)
   return {
     version: 4,
     document,
@@ -169,6 +176,7 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
   if (!isValidLocation(document, location)) {
     throw new Error('The saved document location does not match its tree.')
   }
+  validatedDocuments.add(document)
   return { version: 4, document, location, view: parseView(value, nodeIds) }
 }
 

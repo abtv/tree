@@ -494,7 +494,9 @@ test.describe('persistence reliability regressions', () => {
         control.releaseSave = resolve
       })
       globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
-        const state = args[1] as { document?: { roots?: { attachment?: { id?: string } }[] } }
+        const state = (typeof args[1] === 'string' ? JSON.parse(args[1]) : args[1]) as {
+          document?: { roots?: { attachment?: { id?: string } }[] }
+        }
         const attachmentId = state.document?.roots?.[0]?.attachment?.id
         if (attachmentId !== undefined) control.savedAttachmentId = attachmentId
         control.saveStarted = true

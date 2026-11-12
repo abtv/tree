@@ -11,8 +11,37 @@ import {
 } from './electron-services'
 import { decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
+import * as jsonEncoding from './encode-json'
 
 describe('renderer Electron services', () => {
+  it('does not send a snapshot whose encoding overlaps notes replacement', async () => {
+    let release!: (text: string) => void
+    const gate = new Promise<string>((resolve) => {
+      release = resolve
+    })
+    const encode = vi.spyOn(jsonEncoding, 'encodeJson').mockReturnValueOnce(gate)
+    const save = vi.fn(async () => undefined)
+    window.treeApi = { ...window.treeApi, save }
+    const state = {
+      version: 4 as const,
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+      view: { expandedIds: [] },
+    }
+    const saving = createElectronEditorServices().save(state)
+
+    suspendNotesWrites()
+    release(JSON.stringify(state))
+    try {
+      await saving
+
+      expect(save).not.toHaveBeenCalled()
+    } finally {
+      resumeNotesWrites()
+      encode.mockRestore()
+    }
+  })
+
   it('preserves optional OCR availability, results and failures from the bridge', async () => {
     expect(createElectronEditorServices().imageToText).toBeUndefined()
     const imageToText = vi.fn<NonNullable<TreeApi['imageToText']>>(async () => ['First', '', 'Second'])
@@ -159,7 +188,7 @@ describe('renderer Electron services', () => {
     await expect(readAttachment('attachment-1')).resolves.toEqual(bytes)
 
     expect(api.load).toHaveBeenCalledWith()
-    expect(api.save).toHaveBeenCalledWith(state)
+    expect(api.save).toHaveBeenCalledWith(JSON.stringify(state))
     expect(api.readClipboard).toHaveBeenCalledWith()
     expect(api.writeClipboard).toHaveBeenCalledWith(payload)
     expect(api.writeClipboardContent).toHaveBeenCalledWith({ kind: 'text', text: 'plain' })
@@ -218,7 +247,7 @@ describe('renderer Electron services', () => {
 
     await services.save(state)
 
-    expect(api.save).toHaveBeenCalledExactlyOnceWith(state)
+    expect(api.save).toHaveBeenCalledExactlyOnceWith(JSON.stringify(state))
   })
 
   it('suspends writes when the main process reports that the notes were replaced', async () => {

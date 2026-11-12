@@ -49,7 +49,8 @@ async function installPersistenceProbes(app: Awaited<ReturnType<typeof launchTre
     globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
       const result = await original(...args)
       control.__saveProbe!.saves += 1
-      control.__saveProbe!.bytesWritten += Buffer.byteLength(JSON.stringify(args[1], null, 2))
+      const state: unknown = typeof args[1] === 'string' ? JSON.parse(args[1]) : args[1]
+      control.__saveProbe!.bytesWritten += Buffer.byteLength(JSON.stringify(state, null, 2))
       return result
     })
 
