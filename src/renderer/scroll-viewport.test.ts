@@ -6,6 +6,7 @@ import {
   refreshViewportContext,
   onViewportScroll,
   revealInViewport,
+  centerRectInViewport,
   viewportScrollEdges,
   scrollViewportBy,
   SCROLL_VIEWPORT_CLASS,
@@ -30,6 +31,19 @@ afterEach(() => {
 })
 
 describe('scroll viewport', () => {
+  it.each([
+    { top: 700, height: 200, delta: 470 },
+    { top: 100, height: 200, delta: -130 },
+    { top: 700, height: 800, delta: 645 },
+  ])('centers a complete region or reveals its oversized beginning ($top, $height)', ({ top, height, delta }) => {
+    const viewport = mountScroller({ top: 30, bottom: 630 })
+    viewport.scrollBy = vi.fn()
+
+    centerRectInViewport(new DOMRect(0, top, 400, height))
+
+    expect(viewport.scrollBy).toHaveBeenCalledWith(0, delta)
+  })
+
   it('measures the content area below the toolbar, and falls back to the window without one', () => {
     expect(viewportBounds()).toEqual({ top: 0, bottom: globalThis.innerHeight })
 

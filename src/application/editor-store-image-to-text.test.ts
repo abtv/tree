@@ -143,23 +143,23 @@ it('keeps unsupported platforms and image-less selections inert', async () => {
   expect(ready(store).imageToTextStatus).toContain('select an editable node')
 })
 
-it('rejects Agenda day selection instead of recognizing the hidden Tree selection', async () => {
+it('does not create recognized nodes from a day or an editable Agenda occurrence', async () => {
   const today = dayNumberOf({ year: 2026, month: 11, day: 11 })
   const recognize = vi.fn(async () => ['Recognized'])
   const store = await setup(recognize, { today: () => today })
   store.editText('image', '2026-11-11 Image')
   store.openAgenda()
+  const before = ready(store).document
   store.applyAgenda({ kind: 'select', key: `day:${today}`, cursor: 0 })
 
   store.imageToText()
 
   expect(recognize).not.toHaveBeenCalled()
-  expect(ready(store).imageToTextStatus).toContain('select an editable node')
-
   store.applyAgenda({ kind: 'select', key: `node:${today}:image`, cursor: 0 })
   store.imageToText()
-  await vi.waitFor(() => expect(ready(store).imageToTextStatus).toContain('added 1'))
-  expect(recognize).toHaveBeenCalledExactlyOnceWith('png')
+
+  expect(recognize).not.toHaveBeenCalled()
+  expect(ready(store).document).toBe(before)
 })
 
 it('discards a canceled queued source without calling recognition for it', async () => {

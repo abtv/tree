@@ -109,7 +109,7 @@ test('drags from empty row space while preserving touch editing and controls', a
 
 // @requirement PRODUCT.md §11
 // @requirement PRODUCT.md §23.12
-test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({ newContext, baseURL }) => {
+test('keeps a windowed Agenda occurrence unchanged after a touch hold on an iPad', async ({ newContext, baseURL }) => {
   const context = await newContext({
     hasTouch: true,
     viewport: { width: 820, height: 760 },
@@ -154,17 +154,18 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
   const point = { x: sourceBox.x + sourceBox.width + 12, y: sourceBox.y + sourceBox.height / 2, id: 1 }
 
   await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] })
+  await page.clock.runFor(300)
 
-  await expect(source).toHaveClass(/agenda-row-dragging/)
+  await expect(page.locator('body')).not.toHaveClass(/node-drag-active/)
+  await expect(source).not.toHaveClass(/agenda-row-dragging/)
 
   await session.send('Input.dispatchTouchEvent', {
     type: 'touchMove',
     touchPoints: [{ ...point, y: targetBox.y + targetBox.height / 2 }],
   })
 
-  await expect(page.locator('.agenda-row-drop-on')).toHaveCount(1)
+  await expect(page.locator('.agenda-row-drop-on')).toHaveCount(0)
 
-  await capture(page, 'ipad-agenda-touch-drag.png')
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
 
   await expect
@@ -176,6 +177,6 @@ test('moves a windowed Agenda occurrence with a touch hold on an iPad', async ({
           )!.children[0]!.text,
       ),
     )
-    .toBe('First #2026-10-19')
+    .toBe('First #2026-10-18')
   await expect(page.locator('body')).not.toHaveClass(/node-drag-active/)
 })

@@ -41,7 +41,10 @@ describeForEachEditingMode('Browser search', (vimEnabled) => {
   })
 })
 
-test('searches Agenda context and mirrors through native editing mode transitions', async ({ newContext, baseURL }) => {
+test('searches Agenda entries and mirrors while excluding passive paths through editing mode transitions', async ({
+  newContext,
+  baseURL,
+}) => {
   const context = await newContext()
   const page = await context.newPage()
 
@@ -68,18 +71,19 @@ test('searches Agenda context and mirrors through native editing mode transition
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 
   await page.keyboard.press(`${primaryKey}+p`)
-  await page.locator('.agenda-role-context').first().click()
+  await page.locator('.agenda-row-day').first().click()
   await page.keyboard.press('/')
   const prompt = page.getByRole('textbox', { name: 'Search', exact: true })
 
   await prompt.fill('apple')
 
-  await expect(page.locator('.search-count')).toHaveText('4')
+  await expect(page.locator('.search-count')).toHaveText('2')
+  await expect(page.locator('.agenda-path-label .search-match')).toHaveCount(0)
 
   await page.keyboard.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Agenda node child', exact: true })
 
-  await expect(page.locator('.search-count')).toHaveText('2 / 4')
+  await expect(page.locator('.search-count')).toHaveText('1 / 2')
   await expect(prompt).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(editor).toBeFocused()
@@ -87,12 +91,8 @@ test('searches Agenda context and mirrors through native editing mode transition
 
   await page.keyboard.press('n')
 
-  await expect(page.locator('.agenda-role-context').last()).toBeFocused()
-
-  await page.keyboard.press('n')
-
   await expect(editor).toBeFocused()
-  await expect(page.locator('.search-count')).toHaveText('4 / 4')
+  await expect(page.locator('.search-count')).toHaveText('2 / 2')
 
   await page.keyboard.press('i')
 

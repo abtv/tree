@@ -54,40 +54,31 @@ describe('focused Agenda day', () => {
     expect(cache.get(document, returned)).toBe(returnedRows)
   })
 
-  it('restores the timeline selection, folds, revealed days and scroll anchor after focused folds change', () => {
+  it('restores the timeline selection, folds and scroll anchor after focused folds change', () => {
     const timeline = {
       ...openAgendaState({ currentParentId: null, selectedNodeId: 'source' }, 0, today),
       selectedKey: header.key,
-      collapsed: new Set([`node:${day}:context`]),
-      revealed: new Set([otherDay]),
-      pendingMove: [{ nodeId: 'source', day }],
+      collapsed: new Set([dayKey(otherDay)]),
     }
 
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: header.key, scrollTop: 360 }, [header])
 
     expect(focused.focusedDay).toBe(day)
-    expect(focused.pendingMove).toBeUndefined()
     expect(focused.timelineReturn?.scrollTop).toBe(360)
 
     const folded = applyAgendaCommand(focused, { kind: 'toggle-fold', key: header.key }, [header])
 
     expect(folded.collapsed.has(header.key)).toBe(true)
 
-    const returned = applyAgendaCommand(
-      { ...folded, pendingMove: [{ nodeId: 'source', day }] },
-      { kind: 'return-timeline', key: header.key },
-      [header],
-    )
+    const returned = applyAgendaCommand(folded, { kind: 'return-timeline', key: header.key }, [header])
 
-    expect(returned.pendingMove).toBeUndefined()
     expect(returned.focusedDay).toBeUndefined()
     expect(returned.timelineReturn).toBeUndefined()
     expect(returned.selectedKey).toBe(timeline.selectedKey)
     expect(returned.collapsed).toBe(timeline.collapsed)
-    expect(returned.revealed).toBe(timeline.revealed)
   })
 
-  it('includes only the focused heading and its hierarchy, including an empty focused day', () => {
+  it('includes only the focused heading and its matches with their passive parent paths, including an empty focused day', () => {
     const state = { ...openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today), focusedDay: day }
 
     const rows = buildAgendaRows(
@@ -104,7 +95,7 @@ describe('focused Agenda day', () => {
       state,
     )
 
-    expect(rows.map((row) => row.key)).toEqual([dayKey(day), `node:${day}:context`, `node:${day}:match`])
+    expect(rows.map((row) => row.key)).toEqual([dayKey(day), `node:${day}:match`])
     expect(buildAgendaRows([], state)).toEqual([{ ...header, content: false }])
   })
 

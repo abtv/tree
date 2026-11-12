@@ -5195,18 +5195,16 @@ describe('editor keyboard handler', () => {
 })
 
 // @requirement PRODUCT.md §23.11
-describe('Agenda split and sibling keys', () => {
+describe('Agenda single-node editing keys', () => {
   const key = 'node:100:node'
-  function agendaStore(role: 'match' | 'context' = 'match') {
+  function agendaStore() {
     return createEditorStoreDouble({
       snapshot: {
         status: 'ready',
         location: { currentParentId: null, selectedNodeId: 'node' },
         agenda: { selectedKey: key },
       } as never,
-      getAgendaRows: vi.fn(() => [{ kind: 'node', key, day: 100, nodeId: 'node', depth: 0, role }]) as never,
-      splitAgendaNode: vi.fn(() => true),
-      createAgendaSibling: vi.fn(() => true),
+      getAgendaRows: vi.fn(() => [{ kind: 'node', key, day: 100, nodeId: 'node', depth: 0, role: 'match' }]) as never,
       createSibling: vi.fn(() => true),
       createSiblingOrFirstChild: vi.fn(),
     })
@@ -5219,23 +5217,23 @@ describe('Agenda split and sibling keys', () => {
     return element
   }
 
-  it('splits a direct match at the caret in standard editing without running the Tree split', () => {
+  it('inserts a newline in the direct match without running the Tree split', () => {
     const store = agendaStore()
     const event = keyEvent(input(), 'Enter')
 
     handler(store, node).handle(event)
 
     expect(event.preventDefault).toHaveBeenCalledOnce()
-    expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, '\n')
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
   })
 
-  it('splits in Vim Insert and keeps Enter inert in Replace and Visual modes', () => {
+  it('inserts a newline in Vim Insert and keeps Enter inert in Replace and Visual modes', () => {
     const store = agendaStore()
 
     vimHandler(store, node, 'insert').handle(keyEvent(input(), 'Enter'))
 
-    expect(store.splitAgendaNode).toHaveBeenCalledWith(2)
+    expect(store.replaceTextRange).toHaveBeenCalledWith('node', 2, 2, '\n')
 
     for (const mode of ['replace', 'visual', 'visual-node'] as const) {
       const inert = agendaStore()
@@ -5244,7 +5242,7 @@ describe('Agenda split and sibling keys', () => {
       vimHandler(inert, node, mode).handle(event)
 
       expect(event.preventDefault).toHaveBeenCalled()
-      expect(inert.splitAgendaNode).not.toHaveBeenCalled()
+      expect(inert.replaceTextRange).not.toHaveBeenCalled()
       expect(inert.createSiblingOrFirstChild).not.toHaveBeenCalled()
     }
   })
@@ -5263,7 +5261,6 @@ describe('Agenda split and sibling keys', () => {
       keyboard.handle(keyEvent(element, 'Enter'))
 
       expect(open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
-      expect(store.splitAgendaNode).not.toHaveBeenCalled()
       expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
       expect(element.selectionStart).toBe(2)
       expect(keyboard.vim.mode).toBe('normal')
@@ -5287,181 +5284,46 @@ describe('Agenda split and sibling keys', () => {
     keyboard.handle(keyEvent(element, 'Enter'))
 
     expect(keyboard.onPreviewAttachment).toHaveBeenCalledWith('image')
-    expect(store.splitAgendaNode).not.toHaveBeenCalled()
     expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
     expect(keyboard.vim.mode).toBe('normal')
   })
 
-  it('does nothing on a contextual ancestor', () => {
-    const store = agendaStore('context')
-    const event = keyEvent(input(), 'Enter')
-
-    handler(store, node).handle(event)
-
-    expect(event.preventDefault).toHaveBeenCalledOnce()
-    expect(store.splitAgendaNode).not.toHaveBeenCalled()
-    expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    ['o', 'after'],
-    ['O', 'before'],
-  ] as const)('%s opens a dated sibling and enters Insert without the Tree commands', (pressed, position) => {
-    const store = agendaStore()
-    const { handle, vim } = vimHandler(store, node, 'normal')
-
-    handle(keyEvent(input(), pressed))
-
-    expect(store.createAgendaSibling).toHaveBeenCalledWith(position)
-    expect(store.createSibling).not.toHaveBeenCalled()
-    expect(vim.mode).toBe('insert')
-  })
-
-  // @requirement PRODUCT.md §23.13
-  describe('pending move keys', () => {
-    function pendingStore(pending: boolean) {
-      return createEditorStoreDouble({
-        snapshot: {
-          status: 'ready',
-          location: { currentParentId: null, selectedNodeId: 'node' },
-          agenda: { selectedKey: key, ...(pending ? { pendingMove: [{ nodeId: 'node', day: 100 }] } : {}) },
-        } as never,
-        getAgendaRows: vi.fn(() => [{ kind: 'node', key, day: 100, nodeId: 'node', depth: 0, role: 'match' }]) as never,
-        startAgendaMove: vi.fn(() => true),
-        putAgendaMove: vi.fn(() => true),
-        cancelAgendaMove: vi.fn(),
-        deleteSiblingRange: vi.fn(() => undefined),
-        pasteSubtree: vi.fn(() => true),
-        pasteNodeForest: vi.fn(() => true),
-        replaceTextRange: vi.fn(() => true),
-      })
-    }
-    const press = (keys: readonly string[]) => {
-      const store = pendingStore(true)
+  it.each(['o', 'O', '2o', '2O', 'dd', '3dd', '2d3d', 'gp', 'gP'])(
+    '%s cannot reach Tree structure commands',
+    (keys) => {
+      const store = agendaStore()
       const keyboard = vimHandler(store, node, 'normal')
+      const register = keyboard.vim.register.current
       const element = input()
+
       for (const pressed of keys) keyboard.handle(keyEvent(element, pressed))
-      return { store, ...keyboard }
-    }
 
-    it('marks the occurrence with dd instead of deleting it, and leaves the register alone', () => {
-      const register = { kind: 'text' as const, value: 'kept' }
-      const store = pendingStore(false)
-      const keyboard = vimHandler(store, node, 'normal')
-      keyboard.vim.register.current = register
-      const element = input()
-
-      keyboard.handle(keyEvent(element, 'd'))
-      keyboard.handle(keyEvent(element, 'd'))
-
-      expect(store.startAgendaMove).toHaveBeenCalledWith(1)
+      expect(store.createSibling).not.toHaveBeenCalled()
+      expect(store.createSiblingOrFirstChild).not.toHaveBeenCalled()
       expect(store.deleteSiblingRange).not.toHaveBeenCalled()
+      expect(store.pasteSubtree).not.toHaveBeenCalled()
+      expect(store.pasteNodeForest).not.toHaveBeenCalled()
+      expect(keyboard.vim.mode).toBe('normal')
       expect(keyboard.vim.register.current).toBe(register)
       expect(keyboard.commandState.pending).toBeUndefined()
-    })
+    },
+  )
 
-    it('passes the whole count of dd and of d with a motion count', () => {
-      const counted = pendingStore(false)
-      const first = vimHandler(counted, node, 'normal')
-      first.commandState.pending = { count: '3', motionCount: '', operator: 'd' }
-
-      first.handle(keyEvent(input(), 'd'))
-
-      expect(counted.startAgendaMove).toHaveBeenCalledWith(3)
-
-      const motion = pendingStore(false)
-      const second = vimHandler(motion, node, 'normal')
-      second.commandState.pending = { count: '2', motionCount: '3', operator: 'd' }
-
-      second.handle(keyEvent(input(), 'd'))
-
-      expect(motion.startAgendaMove).toHaveBeenCalledWith(6)
-    })
-
-    it.each(['p', 'P'])('%s puts a pending move and does not run the node put', (pressed) => {
-      const store = pendingStore(true)
-      const keyboard = vimHandler(store, node, 'normal')
-      keyboard.vim.register.current = { kind: 'node', value: node, sourceIds: ['node'] }
-
-      keyboard.handle(keyEvent(input(), pressed))
-
-      expect(store.putAgendaMove).toHaveBeenCalledOnce()
-      expect(store.pasteSubtree).not.toHaveBeenCalled()
-      expect(store.pasteNodeForest).not.toHaveBeenCalled()
-      expect(keyboard.vim.register.current).toEqual({ kind: 'node', value: node, sourceIds: ['node'] })
-    })
-
-    it.each(['p', 'P'])('%s with a node register and no pending move does nothing', (pressed) => {
-      for (const register of [
-        { kind: 'node' as const, value: node, sourceIds: ['node'] },
-        { kind: 'nodes' as const, value: { nodes: [node], sourceIds: ['node'] } },
-      ]) {
-        const store = pendingStore(false)
-        const keyboard = vimHandler(store, node, 'normal')
-        keyboard.vim.register.current = register
-        const event = keyEvent(input(), pressed)
-
-        keyboard.handle(event)
-
-        expect(event.preventDefault).toHaveBeenCalled()
-        expect(store.putAgendaMove).not.toHaveBeenCalled()
-        expect(store.pasteSubtree).not.toHaveBeenCalled()
-        expect(store.pasteNodeForest).not.toHaveBeenCalled()
-      }
-    })
-
-    it('keeps a text-register put as ordinary text editing without a pending move', () => {
-      const store = pendingStore(false)
-      const keyboard = vimHandler(store, node, 'normal')
-      keyboard.vim.register.current = { kind: 'text', value: 'abc' }
-
-      keyboard.handle(keyEvent(input(), 'p'))
-
-      expect(store.putAgendaMove).not.toHaveBeenCalled()
-      expect(store.pasteSubtree).not.toHaveBeenCalled()
-      expect(store.replaceTextRange).toHaveBeenCalled()
-    })
-
-    it('cancels a pending move with Escape', () => {
-      const { store } = press(['Escape'])
-
-      expect(store.cancelAgendaMove).toHaveBeenCalledOnce()
-    })
-
-    it.each(['insert', 'replace'] as const)('cancels a pending move with the Escape that leaves %s', (mode) => {
-      const store = pendingStore(true)
-      const keyboard = vimHandler(store, node, mode)
-
-      keyboard.handle(keyEvent(input(), 'Escape'))
-
-      expect(store.cancelAgendaMove).toHaveBeenCalledOnce()
-    })
-
-    it('leaves gp and gP structural puts inert', () => {
-      const { store } = press(['g', 'p'])
-
-      expect(store.putAgendaMove).not.toHaveBeenCalled()
-      expect(store.pasteNodeForest).not.toHaveBeenCalled()
-    })
-  })
-
-  it('stays in Normal when no sibling is created and ignores a counted o', () => {
+  it.each(['p', 'P'])('%s rejects node registers and retains ordinary text-register editing', (pressed) => {
     const store = agendaStore()
-    vi.mocked(store.createAgendaSibling).mockReturnValue(false)
-    const failed = vimHandler(store, node, 'normal')
+    const keyboard = vimHandler(store, node, 'normal')
+    const element = input()
+    keyboard.vim.register.current = { kind: 'node', value: node, sourceIds: ['node'] }
 
-    failed.handle(keyEvent(input(), 'o'))
+    keyboard.handle(keyEvent(element, pressed))
 
-    expect(failed.vim.mode).toBe('normal')
+    expect(store.pasteSubtree).not.toHaveBeenCalled()
+    expect(store.pasteNodeForest).not.toHaveBeenCalled()
+    expect(store.replaceTextRange).not.toHaveBeenCalled()
 
-    const counted = agendaStore()
-    const { handle, vim, commandState } = vimHandler(counted, node, 'normal')
-    commandState.pending = { count: '2', motionCount: '' }
+    keyboard.vim.register.current = { kind: 'text', value: 'abc' }
+    keyboard.handle(keyEvent(element, pressed))
 
-    handle(keyEvent(input(), 'o'))
-
-    expect(counted.createAgendaSibling).not.toHaveBeenCalled()
-    expect(vim.mode).toBe('normal')
-    expect(commandState.pending).toBeUndefined()
+    expect(store.replaceTextRange).toHaveBeenCalled()
   })
 })

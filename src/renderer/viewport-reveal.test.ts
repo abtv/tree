@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createViewportReveal } from './viewport-reveal'
-import { notifyViewportLayout, revealInViewport, revealRectInViewport } from './scroll-viewport'
+import { centerRectInViewport, notifyViewportLayout, revealInViewport, revealRectInViewport } from './scroll-viewport'
 import { caretLineRect } from './editor-dom'
 
 vi.mock('./editor-dom', () => ({ caretLineRect: vi.fn(() => new DOMRect(0, 700, 400, 20)) }))
@@ -10,6 +10,7 @@ vi.mock('./scroll-viewport', async (original) => ({
   ...(await original<typeof import('./scroll-viewport')>()),
   revealInViewport: vi.fn(),
   revealRectInViewport: vi.fn(),
+  centerRectInViewport: vi.fn(),
 }))
 
 let notify: () => void
@@ -60,6 +61,36 @@ function fixture() {
 }
 
 describe('viewport reveal lifecycle', () => {
+  it('remeasures an opening region while layout settles and releases it on the next command', () => {
+    const { row, reveal } = fixture()
+    let region: DOMRect | undefined
+    reveal.beginRegion(
+      row,
+      () => region,
+      () => true,
+    )
+
+    expect(centerRectInViewport).not.toHaveBeenCalled()
+
+    region = new DOMRect(0, 700, 400, 200)
+    notifyViewportLayout()
+
+    expect(centerRectInViewport).toHaveBeenLastCalledWith(region)
+    expect(observed.size).toBe(3)
+
+    region = new DOMRect(0, 700, 400, 300)
+    notify()
+
+    expect(centerRectInViewport).toHaveBeenLastCalledWith(region)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' }))
+    notifyViewportLayout()
+
+    expect(centerRectInViewport).toHaveBeenCalledTimes(2)
+    expect(observed.size).toBe(0)
+    expect(revealInViewport).not.toHaveBeenCalled()
+  })
+
   it('retains a line destination until its input mounts, then remeasures it on layout', () => {
     const { row, reveal } = fixture()
     const input: { current?: HTMLElement } = {}

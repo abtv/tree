@@ -51,58 +51,26 @@ describe('whole-node Visual restoration and movement', () => {
     })
   })
   // @requirement PRODUCT.md §23.14
-  it('routes Agenda selection motions and d through pending moves and blocks other range commands', async () => {
+  it('rejects whole-node Visual motions and commands in Agenda', async () => {
     const deps = await setup([
       node('a'),
       { ...node('b'), text: '2026-10-14 B' },
       { ...node('c'), text: '2026-10-14 C' },
     ])
-
     deps.store.openAgenda()
-    moveNodeVisual(deps, 'down')
-    commandNodeVisual(deps, 'd')
+    const before = deps.snapshot()
 
-    expect(deps.setNodeVisualSelection).not.toHaveBeenCalled()
-
-    const key = deps.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'c')!.key
-
-    deps.store.applyAgenda({ kind: 'select', key })
-    moveNodeVisual(deps, 'up')
-
-    expect(deps.setNodeVisualSelection).toHaveBeenCalledWith({ anchorId: 'b', focusId: 'b' })
-    expect(deps.snapshot().focus).toMatchObject({ nodeId: 'b', cursor: 0 })
-
-    deps.setNodeVisualSelection.mockClear()
-
-    moveNodeVisual({ ...deps, nodeVisualSelection: { anchorId: 'b', focusId: 'b' } }, 'up')
-
-    expect(deps.setNodeVisualSelection).not.toHaveBeenCalled()
-
-    moveNodeVisual({ ...deps, nodeVisualSelection: { anchorId: 'missing', focusId: 'b' } }, 'down')
-
-    expect(deps.setNodeVisualSelection).not.toHaveBeenCalled()
-
-    const before = deps.snapshot().document
-
-    commandNodeVisual(deps, 'c')
+    for (const direction of ['up', 'down', 'first', 'last'] as const) moveNodeVisual(deps, direction)
+    for (const command of ['d', 'c', 'y', 'p', 'P'] as const) commandNodeVisual(deps, command)
     shiftNodeVisual(deps, 'in', 1)
     joinNodeVisual(deps, true)
-    rememberNodeRange(deps.commandState, deps.snapshot().document, 'b', 'c')
+    rememberNodeRange(deps.commandState, before.document, 'b', 'c')
     restoreVisual(deps)
 
-    expect(deps.snapshot().document).toBe(before)
+    expect(deps.snapshot()).toBe(before)
+    expect(deps.setNodeVisualSelection).not.toHaveBeenCalled()
     expect(deps.changeVimMode).not.toHaveBeenCalled()
-
-    commandNodeVisual({ ...deps, nodeVisualSelection: { anchorId: 'missing', focusId: 'b' } }, 'd')
-
-    expect(deps.changeVimMode).not.toHaveBeenCalled()
-
-    commandNodeVisual(deps, 'd')
-
-    expect(deps.snapshot().agenda!.pendingMove!.map((source) => source.nodeId)).toEqual(['b', 'c'])
-    expect(deps.changeVimMode).toHaveBeenCalledWith('normal')
-    expect(deps.setNodeVisualSelection).toHaveBeenCalledWith(undefined)
-    expect(deps.snapshot().document).toBe(before)
+    expect(deps.syncImageCaretToFocus).not.toHaveBeenCalled()
   })
   it('ignores restoration without saved Visual memory', async () => {
     const deps = await setup()

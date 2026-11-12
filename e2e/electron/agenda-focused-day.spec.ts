@@ -144,7 +144,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
   })
 
   // @requirement PRODUCT.md §23.15
-  test('follows a live date edit and creates from the focused heading', async ({ userDataDir }) => {
+  test('follows a live date edit and rejects creation from the focused heading', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'item', text: '2026-10-14 Prepare 2026-10-20', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'item' },
@@ -168,7 +168,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     await expect(window.locator('.agenda-focused-heading')).toHaveCount(0)
     await expect(window.locator('[data-agenda-key][aria-selected="true"]')).toHaveAttribute(
       'data-agenda-key',
-      `day:${day - 3}`,
+      `day:${dayNumberOf({ year: 2026, month: 10, day: 8 })}`,
     )
 
     await window.locator(`[data-agenda-key="day:${later}"]`).click()
@@ -178,8 +178,11 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       await window.keyboard.press('o')
     } else await window.keyboard.press('Enter')
 
-    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveText('2026-10-20 ')
-    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toBeFocused()
+    await expect(window.locator('.agenda-focused-heading')).toHaveText('Tue Oct 20')
+    await expect(window.locator('.agenda-focused-heading')).toBeFocused()
+    await expect(window.getByRole('textbox', { name: 'Agenda node item', exact: true })).toHaveText(
+      'Prepare 2026-10-20',
+    )
   })
 
   // @requirement PRODUCT.md §23.15
@@ -280,15 +283,15 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
 
       await window.keyboard.press('O')
 
-      await expect(window.locator('.agenda-focused-heading')).toHaveText('Tue Oct 13')
-      await expect(window.locator('.node-input')).toHaveText('2026-10-13 ')
+      await expect(window.locator('.agenda-focused-heading')).toHaveText('Wed Oct 14')
+      await expect(window.locator('.agenda-focused-heading')).toBeFocused()
 
-      await window.keyboard.press('Escape')
+      await window.keyboard.press('j')
       await window.keyboard.press('g')
       await window.keyboard.press('d')
 
       await expect(window.locator('.agenda-list')).toHaveCount(0)
-      await expect(window.locator('.current-parent .node-input')).toHaveText('2026-10-13 ')
+      await expect(window.locator('.current-parent .node-input')).toContainText('2026-10-14 Prepare')
     }
   })
 })

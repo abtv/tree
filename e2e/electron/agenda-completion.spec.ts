@@ -581,10 +581,12 @@ describeForEachEditingMode('Date completion', ({ mode, screenshotName }) => {
         const canvas = document.createElement('canvas')
         const context = canvas.getContext('2d')!
         context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+        const dateWidth = element.querySelector('.date-today')!.getBoundingClientRect().width
         const expectedLeft =
           element.getBoundingClientRect().left +
           parseFloat(style.paddingLeft) +
-          context.measureText('2026-10-08 Plan ').width
+          dateWidth +
+          context.measureText(' Plan ').width
         return { popupTop: popup.top, rowBottom: row.bottom, popupLeft: popup.left, expectedLeft }
       })
 

@@ -63,7 +63,7 @@ async function fixture(mode?: VimMode) {
 
 // @requirement PRODUCT.md §23.10
 describe('Agenda editing command boundaries', () => {
-  it('keeps the selected occurrence and real selection consistent after multiline paste creates an undated focus target', async () => {
+  it('keeps the selected occurrence and real selection consistent after multiline paste stays in one node', async () => {
     const f = await fixture('insert')
     f.clipboard.current = { kind: 'text', text: 'one\ntwo' }
 
@@ -71,40 +71,6 @@ describe('Agenda editing command boundaries', () => {
     const selected = f.store.getAgendaRows().find((row) => row.key === f.snapshot().agenda?.selectedKey)
 
     expect(selected).toMatchObject({ kind: 'node', nodeId: f.snapshot().location.selectedNodeId })
-  })
-  it('deletes an empty root without dereferencing a missing parent and preserves the sole root', async () => {
-    vi.useFakeTimers()
-    const f = await createRealStoreHarness({
-      services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
-      document: {
-        roots: [
-          { id: 'root', text: '2026-10-14 Root', children: [] },
-          { id: 'other', text: 'Other', children: [] },
-        ],
-      },
-    })
-
-    f.store.openAgenda()
-    const row = f.store.getAgendaRows().find((candidate) => candidate.kind === 'node')!
-
-    f.store.applyAgenda({ kind: 'select', key: row.key })
-    f.store.editText('root', '')
-    f.store.deleteEmptySelected()
-
-    expect(f.snapshot().document.roots.map((node) => node.id)).toEqual(['other'])
-    expect(f.snapshot().agenda?.selectedKey).toBe(`day:${dayNumberOf({ year: 2026, month: 10, day: 11 })}`)
-
-    f.store.editText('other', '2026-10-08 Other')
-    const other = f.store.getAgendaRows().find((candidate) => candidate.kind === 'node')!
-
-    f.store.applyAgenda({ kind: 'select', key: other.key })
-    f.store.editText('other', '')
-    const empty = f.snapshot().document
-
-    f.store.deleteEmptySelected()
-
-    expect(f.snapshot().document).toBe(empty)
-    expect(f.snapshot().document.roots).toHaveLength(1)
   })
   it('protects children and synthetic selections from empty-node deletion at the store boundary', async () => {
     const f = await fixture('insert')
@@ -128,54 +94,6 @@ describe('Agenda editing command boundaries', () => {
     expect(f.snapshot().document).toBe(empty)
   })
 
-  it('selects a previous sibling on the deleted occurrence day rather than its later mirror', async () => {
-    const f = await fixture('insert')
-
-    f.store.editText('first', '2026-10-14 Prepare 2026-10-20')
-    f.store.applyAgenda({ kind: 'select', key: f.key.replace(':first', ':second') })
-    f.store.editText('second', '')
-    f.store.deleteEmptySelected()
-
-    expect(f.snapshot().agenda?.selectedKey).toBe(f.key)
-  })
-  it.each(['previous', 'parent', 'day'] as const)(
-    'selects the %s row after childless empty deletion and keeps document history',
-    async (destination) => {
-      const f = await fixture('insert')
-      if (destination === 'previous') {
-        const key = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'second')!.key
-        f.store.applyAgenda({ kind: 'select', key })
-        f.store.editText('second', '')
-      } else if (destination === 'day') {
-        f.store.editText('second', '')
-        f.store.deleteEmptySelected()
-        // Both contextual ancestors disappear once their last dated descendant is removed.
-        f.store.editText('first', '')
-      } else f.store.editText('first', '')
-
-      f.store.deleteEmptySelected()
-      const key = f.snapshot().agenda!.selectedKey
-
-      expect(key).toBe(
-        destination === 'previous'
-          ? f.key
-          : destination === 'parent'
-            ? f.key.replace(':first', ':context')
-            : f.store
-                .getAgendaRows()
-                .filter((row) => row.kind === 'day')
-                .sort((left, right) => {
-                  const day = Number(f.key.split(':')[1])
-                  return Math.abs(left.day - day) - Math.abs(right.day - day) || left.day - right.day
-                })[0]!.key,
-      )
-      expect(f.snapshot().location.currentParentId).toBe(null)
-
-      f.store.undo()
-
-      expect(f.snapshot().document.roots[0]!.children.length).toBe(2)
-    },
-  )
   it.each([undefined, 'normal', 'insert', 'replace', 'visual'] as const)(
     'retains document, caret and mode for structural shortcuts in %s',
     async (mode) => {
@@ -200,19 +118,18 @@ describe('Agenda editing command boundaries', () => {
 
   // @requirement PRODUCT.md §23.11
   it.each([undefined, 'insert'] as const)(
-    'splits at the caret with the displayed date on Enter in %s',
+    'inserts one newline at the caret without adding a node on Enter in %s',
     async (mode) => {
       const f = await fixture(mode)
       const before = f.snapshot().document
 
       expect(f.press('Enter').preventDefault).toHaveBeenCalled()
       expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
-        '2026-10-14 P',
-        '2026-10-14 repare',
+        '2026-10-14 P\nrepare',
         '2026-10-14 Review',
       ])
-      expect(f.snapshot().focus).toMatchObject({ nodeId: 'generated-0', cursor: 11 })
-      expect(f.snapshot().agenda?.activeOccurrence?.nodeId).toBe('generated-0')
+      expect(f.snapshot().focus).toMatchObject({ nodeId: 'first', cursor: 13 })
+      expect(f.snapshot().agenda?.activeOccurrence?.nodeId).toBe('first')
 
       f.store.undo()
 
@@ -232,19 +149,16 @@ describe('Agenda editing command boundaries', () => {
   })
 
   // @requirement PRODUCT.md §23.11
-  it('opens a dated sibling with o, enters Insert, and leaves repeat memory and the register alone', async () => {
+  it('rejects o without changing mode, repeat memory or the register', async () => {
     const f = await fixture('normal')
+    const before = f.snapshot().document
     const last = f.commandState.lastChange
     const register = f.vim.register.current
 
     f.press('o')
 
-    expect(f.snapshot().document.roots[0]!.children.map((node) => node.text)).toEqual([
-      '2026-10-14 Prepare',
-      '2026-10-14 ',
-      '2026-10-14 Review',
-    ])
-    expect(f.vim.mode).toBe('insert')
+    expect(f.snapshot().document).toBe(before)
+    expect(f.vim.mode).toBe('normal')
     expect(f.vim.beginStructuralOpen).not.toHaveBeenCalled()
     expect(f.commandState.lastChange).toBe(last)
     expect(f.vim.register.current).toBe(register)

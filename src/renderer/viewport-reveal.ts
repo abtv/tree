@@ -4,6 +4,7 @@ import {
   refreshViewportContext,
   revealInViewport,
   revealRectInViewport,
+  centerRectInViewport,
   viewportContent,
   viewportScroller,
 } from './scroll-viewport'
@@ -14,6 +15,7 @@ interface RevealIntent {
   keepContext: boolean
   isCurrent: () => boolean
   cursor?: number
+  region?: () => DOMRect | undefined
 }
 
 /** One navigation's geometry projection; it never writes focus, caret, selection or document state. */
@@ -43,7 +45,11 @@ export function createViewportReveal() {
     // A counted motion can end outside the mounted window. Retain its intent until React mounts it.
     if (element === undefined) return
     if (!element.isConnected) return cancel()
-    if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
+    if (intent.region !== undefined) {
+      const rect = intent.region()
+      if (rect === undefined) return
+      centerRectInViewport(rect)
+    } else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
     else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext, element)
     const { top, max } = metrics()
     expectedScroll = top
@@ -67,6 +73,11 @@ export function createViewportReveal() {
     intent = { element, cursor, keepContext: true, isCurrent }
     correct()
   }
+  const beginRegion = (element: Element, region: () => DOMRect | undefined, isCurrent: () => boolean): void => {
+    cancel()
+    intent = { element: () => element, region, keepContext: false, isCurrent }
+    correct()
+  }
   const hasLine = (): boolean => intent?.cursor !== undefined && intent.isCurrent()
   const mount = (): (() => void) => {
     refreshViewportContext()
@@ -80,7 +91,7 @@ export function createViewportReveal() {
       else cancel()
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (['PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) cancel()
+      if (intent?.region !== undefined || ['PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) cancel()
     }
     const onResize = (): void => {
       refreshViewportContext()
@@ -101,5 +112,5 @@ export function createViewportReveal() {
       globalThis.removeEventListener('resize', onResize)
     }
   }
-  return { begin, beginLine, hasLine, correct, cancel, mount }
+  return { begin, beginLine, beginRegion, hasLine, correct, cancel, mount }
 }

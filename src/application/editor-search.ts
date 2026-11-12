@@ -3,7 +3,7 @@ import type { SearchScope } from '../domain/search-scope'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { SearchSession } from './search-session'
 import type { SearchDestination, SearchPosition, SearchResult } from './search-executor'
-import { agendaAncestorKeys, AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { agendaAncestorKeys, AgendaRowsCache } from './agenda-rows'
 import { applyAgendaCommand, type AgendaCommand, type AgendaState } from './agenda-state'
 import { expandNode, isNodeExpanded, type ExpansionState } from './expansion-state'
 import type { FocusIntent } from './editor-store-types'
@@ -112,9 +112,7 @@ export class EditorSearch {
     if (state.agenda !== undefined) {
       const row = this.agendaRows.get(state.document, state.agenda).find((row) => row.key === state.agenda!.selectedKey)
       if (row !== undefined) {
-        return row.kind === 'node'
-          ? { nodeId: row.nodeId, day: row.day, offset }
-          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
+        return row.kind === 'node' ? { nodeId: row.nodeId, day: row.day, offset } : { beforeDay: row.day, offset: 0 }
       }
     }
     return { nodeId: state.location.selectedNodeId, offset }
@@ -230,28 +228,10 @@ export class EditorSearch {
     return close
   }
 
-  public manualAgendaFold(
-    command: Extract<AgendaCommand, { kind: 'fold' | 'toggle-fold' }>,
-    rows: readonly AgendaRow[],
-  ): void {
+  public manualAgendaFold(command: Extract<AgendaCommand, { kind: 'fold' | 'toggle-fold' }>): void {
     const all = command.kind === 'fold' && command.operation.endsWith('all')
-    const recursive = command.kind === 'fold' && command.operation.endsWith('recursive')
     if (all) this.opened.clear()
-    else {
-      this.opened.delete(command.key)
-      if (recursive && this.opened.size > 0) {
-        const index = rows.findIndex((row) => row.key === command.key)
-        const parent = rows[index]
-        if (parent !== undefined && parent.kind !== 'gap') {
-          for (let cursor = index + 1; cursor < rows.length; cursor++) {
-            const row = rows[cursor]!
-            if (row.kind !== 'node' || row.day !== parent.day || (parent.kind === 'node' && row.depth <= parent.depth))
-              break
-            this.opened.delete(row.key)
-          }
-        }
-      }
-    }
+    else this.opened.delete(command.key)
   }
 
   /** Explicit manual choices transfer fold ownership away from search. */

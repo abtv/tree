@@ -363,7 +363,7 @@ describe('session and command ports', () => {
 
 describe('whole-node Visual and structural owners', () => {
   // @requirement PRODUCT.md §23.14
-  it('enters only a valid active Agenda occurrence and swaps Agenda focus without Tree visual memory', async () => {
+  it('rejects whole-node Visual entry and swaps on every Agenda occurrence', async () => {
     const f = await fixture({ anchorId: 'node', focusId: 'node' }, '2026-10-14 hello')
 
     f.store.openAgenda()
@@ -378,12 +378,12 @@ describe('whole-node Visual and structural owners', () => {
 
     f.store.applyAgenda({ kind: 'select', key })
 
-    expect(f.vim.nodeVisual.enter('node')).toBe(true)
+    expect(f.vim.nodeVisual.enter('node')).toBe(false)
     expect(f.commandState.lastVisual).toBeUndefined()
 
     f.vim.nodeVisual.swap()
 
-    expect(f.deps.syncImageCaretToFocus).toHaveBeenCalledOnce()
+    expect(f.deps.syncImageCaretToFocus).not.toHaveBeenCalled()
 
     f.store.editText('node', 'no date')
 

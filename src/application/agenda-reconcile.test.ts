@@ -7,7 +7,6 @@ import {
   reconcileAgenda,
   reconcileAgendaSelection,
   selectedAgendaDay,
-  withoutPendingMove,
 } from './agenda-reconcile'
 import { agendaProjection, buildAgendaRows } from './agenda-rows'
 import { openAgendaState, applyAgendaCommand, type AgendaState } from './agenda-state'
@@ -71,26 +70,6 @@ it('reuses focused-day state when the active date and visible path are unchanged
   expect(result).toBe(state)
 })
 
-// @requirement PRODUCT.md §23.13
-it('drops a pending move on every reconciliation but keeps everything else', () => {
-  const state = { ...selected(), pendingMove: [{ nodeId: 'match', day: 100 }] }
-
-  const settled = reconcileAgenda(document, state)!
-
-  expect(settled.pendingMove).toBeUndefined()
-  expect('pendingMove' in settled).toBe(false)
-  expect(settled).toEqual(selected())
-  expect(withoutPendingMove(state)).toEqual(selected())
-
-  const plain = selected()
-
-  expect(withoutPendingMove(plain)).toBe(plain)
-
-  const edited = editNodeText(document, 'other', '1970-04-11 Other!')
-
-  expect(reconcileAgenda(edited, state)!.pendingMove).toBeUndefined()
-})
-
 // @requirement PRODUCT.md §23.7
 it('pins the last-date item and its ancestors in tree order, without including the scope or unrelated ancestors', () => {
   const state = selected()
@@ -116,7 +95,7 @@ it('pins the last-date item and its ancestors in tree order, without including t
 
   expect(applyAgendaCommand(next, { kind: 'select', key: next.selectedKey }, rows)).toBe(next)
 
-  const left = applyAgendaCommand(next, { kind: 'select', key: 'node:100:context' }, rows)
+  const left = applyAgendaCommand(next, { kind: 'select', key: 'day:100' }, rows)
 
   expect(left.pinnedOccurrence).toBeUndefined()
   expect(reconcileAgenda(invalid, left)!.selectedKey).toBe('day:100')
@@ -128,11 +107,11 @@ it('pins the last-date item and its ancestors in tree order, without including t
 // @requirement PRODUCT.md §23.8
 it('history chooses the nearest visible occurrence and leaves out-of-scope or fully folded changes alone', () => {
   const state = selected('node:100:other')
-  const folded = { ...state, collapsed: new Set(['node:100:context']) }
+  const folded = { ...state, collapsed: new Set(['day:100']) }
 
   expect(agendaHistorySelection(document, folded, 'match')).toMatchObject({ selectedKey: 'node:98:match' })
 
-  const hidden = { ...folded, collapsed: new Set(['node:98:context', 'node:100:context', 'node:102:context']) }
+  const hidden = { ...folded, collapsed: new Set(['day:98', 'day:100', 'day:102']) }
 
   expect(agendaHistorySelection(document, hidden, 'match')).toBe(hidden)
   expect(agendaHistorySelection(document, state, 'outside')).toBe(state)
@@ -159,7 +138,7 @@ it('closes a removed scope, removes a deleted/moved active item, and falls back 
 })
 
 it('continues a live edit in a folded remaining day but history preserves presentation', () => {
-  const state = { ...selected(), collapsed: new Set(['day:98', 'node:98:context']) }
+  const state = { ...selected(), collapsed: new Set(['day:98']) }
 
   const changed = editNodeText(document, 'match', '1970-04-09')
   const live = reconcileAgenda(changed, state)!
@@ -253,10 +232,10 @@ it('history measures nearest occurrences from the outgoing day rather than a mig
 
   const withPin = reconcileAgenda(editNodeText(document, 'match', 'Undated'), selected())!
   const invalid = editNodeText(document, 'match', 'Undated')
-  const left = agendaHistorySelection(invalid, withPin, 'context')
+  const left = agendaHistorySelection(invalid, withPin, 'other')
 
   expect(left.pinnedOccurrence).toBeUndefined()
-  expect(left.selectedKey).toBe('day:100')
+  expect(left.selectedKey).toBe('node:100:other')
 })
 
 it.each([
@@ -270,10 +249,10 @@ it.each([
   expect(selectedAgendaDay(key)).toBe(expected)
 })
 
-it('falls back to an empty displayed day rather than the nearest content occurrence', () => {
+it('falls back to the nearest displayed day, earlier on a tie', () => {
   const state = { ...selected(), selectedKey: 'node:99:removed' }
 
   const rows = buildAgendaRows(agendaProjection(document, state), state)
 
-  expect(reconcileAgendaSelection(state, rows).selectedKey).toBe('day:99')
+  expect(reconcileAgendaSelection(state, rows).selectedKey).toBe('day:98')
 })

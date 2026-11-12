@@ -13,21 +13,12 @@ export function isInAgendaScope(document: Document, state: AgendaState, nodeId: 
   )
 }
 
-/** A pending move survives navigation only; every document change cancels it without an Undo entry (D4). */
-export function withoutPendingMove(state: AgendaState): AgendaState {
-  if (state.pendingMove === undefined) return state
-  const rest = { ...state }
-  delete rest.pendingMove
-  return rest
-}
-
 export function reconcileAgenda(
   document: Document,
-  changed: AgendaState,
+  state: AgendaState,
   preservePresentation = false,
   cache?: AgendaRowsCache,
 ): AgendaState | undefined {
-  const state = withoutPendingMove(changed)
   if (state.scopeParentId !== null && locateNode(document, state.scopeParentId) === undefined) return undefined
   let next = isValidLocation(document, state.origin.location)
     ? state
@@ -63,7 +54,6 @@ export function reconcileAgenda(
           if (next.focusedDay !== undefined) next = { ...next, focusedDay: day }
           const collapsed = new Set(next.collapsed)
           collapsed.delete(dayKey(day))
-          for (const ancestor of located.ancestors) collapsed.delete(`node:${day}:${ancestor.id}`)
           if (collapsed.size !== next.collapsed.size) next = { ...next, collapsed }
         }
       }
@@ -75,11 +65,11 @@ export function reconcileAgenda(
   )
 }
 
-/** Prefer the old day before Today when a deleted row or gap no longer exists. */
+/** Prefer the old day before Today when a selected row no longer exists. */
 export function reconcileAgendaSelection(state: AgendaState, rows: readonly AgendaRow[]): AgendaState {
   if (rows.some((row) => row.key === state.selectedKey)) return state
   const previousDay = selectedAgendaDay(state.selectedKey) ?? state.today
-  // Stryker disable next-line MethodExpression: Node days duplicate headers; gaps have no day, so dropping this filter gives the same nearest day.
+  // Stryker disable next-line MethodExpression: Node days duplicate headers, so dropping this filter gives the same nearest day.
   const headers = rows.filter((row) => row.kind === 'day')
   const day = nextActiveDay(
     headers.map((row) => row.day),
@@ -114,7 +104,7 @@ export function agendaOriginLocation(document: Document, state: AgendaState, pre
   return { currentParentId: null, selectedNodeId: document.roots[0]!.id }
 }
 
-/** History chooses only visible occurrences; it does not change folds or revealed days. */
+/** History chooses only visible occurrences; it does not change folds. */
 export function agendaHistorySelection(
   document: Document,
   state: AgendaState,
@@ -126,7 +116,7 @@ export function agendaHistorySelection(
   // The projection is scoped too, so removing the preceding scope guard cannot find an outside occurrence.
   const rows = cache?.get(document, state) ?? buildAgendaRows(agendaProjection(document, state), state)
   const occurrences = rows.filter(
-    // The ID test alone excludes day/gap rows, which have no nodeId; the kind guard narrows the union.
+    // The ID test alone excludes day rows, which have no nodeId; the kind guard narrows the union.
     (row): row is Extract<AgendaRow, { kind: 'node' }> => row.kind === 'node' && row.nodeId === nodeId,
   )
   const day = nextActiveDay(

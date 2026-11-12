@@ -37,13 +37,21 @@ function seed(directory: string): void {
   })
 }
 
+const caretOffset = async (input: import('@playwright/test').Locator): Promise<number> =>
+  input.evaluate((element) => {
+    const selection = document.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    range.setEnd(selection.anchorNode!, selection.anchorOffset)
+    return range.toString().length
+  })
+
 // @requirement PRODUCT.md §20.2.26
-test('searches folded occurrences and moves the contextual caret within the same row', async ({
+test('searches folded direct matches and skips passive paths during same-node and cross-day jumps', async ({
   userDataDir,
 }, testInfo) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
   await setMainWindowContentSize(app, screenshotContentSize)
   await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
@@ -52,67 +60,48 @@ test('searches folded occurrences and moves the contextual caret within the same
   await window.keyboard.press('/')
   const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
 
-  await expect(prompt).toBeFocused()
-
   await prompt.pressSequentially('apple')
 
-  await expect(window.locator('.search-count')).toHaveText('9')
+  await expect(window.locator('.search-count')).toHaveText('5')
   await expect(window.locator(row(day, 'child'))).toHaveCount(0)
+  await expect(window.locator('.agenda-path-label .search-match')).toHaveCount(0)
 
   await window.keyboard.press('Enter')
-  const context = window.locator(row(day, 'parent'))
 
   await expect(prompt).toBeFocused()
-  await expect(window.locator('.search-count')).toHaveText('1 / 9')
+  await expect(window.locator('.search-count')).toHaveText('1 / 5')
 
-  await context.focus()
-  await window.keyboard.press('0')
-  await expect(context).toBeFocused()
+  const input = window.locator(`${row(day, 'child')} .node-input`)
+  await input.focus()
+
+  await expect(input).toBeFocused()
   await window.keyboard.press('n')
 
-  await expect(window.locator('.search-count')).toHaveText('2 / 9')
-  await expect
-    .poll(() =>
-      context.evaluate((element) => {
-        const caret = element.querySelector('.agenda-caret')!
-        const range = document.createRange()
-        range.selectNodeContents(element.querySelector('.agenda-text')!)
-        range.setEndBefore(caret)
-        return range.toString().length
-      }),
-    )
-    .toBe(6)
+  await expect(window.locator('.search-count')).toHaveText('2 / 5')
+  await expect.poll(() => caretOffset(input)).toBe(48)
+
+  await window.keyboard.type('2n')
+
+  await expect(window.locator(`${row(later, 'child')} .node-input`)).toBeFocused()
+  await expect(window.locator('.search-count')).toHaveText('4 / 5')
 
   for (const appearance of ['light', 'dark'] as const) {
     await window.emulateMedia({ colorScheme: appearance })
-    await window.screenshot({ path: testInfo.outputPath(`agenda-search-context-${appearance}.png`) })
+    await window.screenshot({ path: testInfo.outputPath(`agenda-search-match-${appearance}.png`) })
   }
-
-  await window.keyboard.press('n')
-
-  await expect(window.locator(`${row(day, 'child')} .node-input`)).toBeFocused()
-
-  await window.keyboard.press('3')
-  await window.keyboard.press('n')
-
-  await expect(window.locator(row(later, 'parent'))).toBeFocused()
-  await expect(window.locator('.search-count')).toHaveText('6 / 9')
-
   await window.keyboard.press('Escape')
 
-  await expect(window.locator(row(day, 'parent'))).toHaveCount(0)
-
+  await expect(window.locator(row(day, 'child'))).toHaveCount(0)
   await window.keyboard.press('Meta+p')
-
   await expect(window.locator('[data-node-id="child"]')).toHaveCount(0)
 })
 
-test('keeps the draft through folding and scroll, restores row focus, and recalls across focused days', async ({
+// @requirement PRODUCT.md §20.2.26
+test('keeps draft origin through folding and scroll and recalls the query across focused days', async ({
   userDataDir,
 }) => {
   seed(userDataDir)
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
   await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
   await window.locator(row(day, 'child')).click()
@@ -121,100 +110,55 @@ test('keeps the draft through folding and scroll, restores row focus, and recall
 
   await prompt.fill('apple')
   await window.locator(`${header(day)} .node-disclosure-triangle`).click()
-
-  await expect(prompt).toBeFocused()
-
   await window.evaluate(() => {
     document.querySelector('.scroll-viewport')!.scrollTop = 300
   })
 
   await expect(prompt).toBeFocused()
-  await expect(window.locator('.search-count')).toHaveText('9')
+  await expect(window.locator('.search-count')).toHaveText('5')
 
   await window.keyboard.press('Escape')
-
   await expect(window.locator(header(day))).toBeFocused()
-
   await window.keyboard.press('/')
   await prompt.fill('apple')
   await window.keyboard.press('Enter')
-  await expect(window.locator('.search-count')).toHaveText('1 / 9')
-  await window.locator(row(day, 'parent')).click()
-
-  await expect(window.locator(row(day, 'parent'))).toBeFocused()
-
+  await window.locator(row(day, 'child')).click()
   await window.keyboard.press('/')
   await prompt.fill('discarded')
-  await window.locator(`${row(later, 'parent')} .agenda-text`).click()
+  await window.locator(row(later, 'other')).click()
 
   await expect(prompt).toHaveCount(0)
 
   await window.locator(header(later)).click()
   await window.keyboard.press('Meta+.')
-
-  await expect(window.locator('.search-count')).toHaveCount(0)
-
   await window.keyboard.press('/')
 
   await expect(prompt).toHaveValue('apple')
-  await expect(window.locator('.search-count')).toHaveText('5')
-
+  await expect(window.locator('.search-count')).toHaveText('3')
   await window.keyboard.press('Enter')
-  await expect(window.locator('.search-count')).toHaveText('1 / 5')
+  await expect(window.locator('.search-count')).toHaveText('1 / 3')
   await window.keyboard.press('Escape')
-
-  await expect(window.locator(row(later, 'parent'))).toBeFocused()
-
+  await expect(window.locator(`${row(later, 'child')} .node-input`)).toBeFocused()
   await window.keyboard.press('/')
   await window.keyboard.press('Meta+p')
-
   await expect(window.locator('.agenda-list')).toHaveCount(0)
-
   await window.keyboard.press('/')
-
   await expect(prompt).toHaveValue('apple')
 })
 
-test('keeps move and date-removal messages beside search and updates mirrors after editing', async ({
+// @requirement PRODUCT.md §20.2.26
+// @requirement PRODUCT.md §23.7
+test('keeps the invalid-date hint beside search and updates matches across mirrors and history', async ({
   userDataDir,
 }, testInfo) => {
   seed(userDataDir)
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
   await setMainWindowContentSize(app, screenshotContentSize)
   await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
   await window.locator(row(day, 'child')).click()
-  await window.keyboard.press('d')
-  await window.keyboard.press('d')
   await window.keyboard.press('/')
   const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
-
-  await prompt.fill('apple')
-
-  await expect(window.locator('.search-status-message')).toContainText('Moving 1 item')
-
-  const positions = await window.evaluate(() =>
-    ['.search-input-line', '.search-status-message', '.search-count'].map((selector) => {
-      const rect = document.querySelector(selector)!.getBoundingClientRect()
-      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
-    }),
-  )
-
-  expect(positions[0]!.right).toBeLessThanOrEqual(positions[2]!.left)
-  expect(positions[0]!.bottom).toBeLessThan(positions[1]!.top)
-
-  await window.screenshot({ path: testInfo.outputPath('agenda-search-moving.png') })
-  await window.keyboard.press('Enter')
-
-  await expect(window.locator('.search-status-message')).toContainText('Moving 1 item')
-
-  await window.keyboard.press('Escape')
-
-  await expect(window.locator('.status-bar')).not.toContainText('Moving')
-
-  await window.locator(row(day, 'child')).click()
-  await window.keyboard.press('/')
   await prompt.fill('apple')
   await window.keyboard.press('Enter')
   await window.locator(`${row(day, 'child')} .node-input`).focus()
@@ -223,56 +167,57 @@ test('keeps move and date-removal messages beside search and updates mirrors aft
   await window.keyboard.type('apple ')
 
   await expect(window.locator(`${row(later, 'child')} .agenda-text`)).toContainText('apple apple')
-  await expect(window.locator('.search-count')).toHaveText('11')
+  await expect(window.locator('.search-count')).toHaveText('7')
 
   await window.keyboard.press('Escape')
   await window.locator(`${row(later, 'other')} .node-input`).click()
-  await window.keyboard.press('0')
-  await window.keyboard.press('w')
-  await window.keyboard.press('D')
+  await window.keyboard.type('0wD')
 
   await expect(window.locator('.status-bar')).toContainText('Add a date to keep this item in Agenda')
-
   await window.keyboard.press('/')
+  await expect(window.locator('.search-status-message')).toContainText('Add a date')
+
+  const positions = await window.evaluate(() =>
+    ['.search-input-line', '.search-status-message', '.search-count'].map((selector) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect()
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+    }),
+  )
+  expect(positions[0]!.right).toBeLessThanOrEqual(positions[2]!.left)
+  expect(positions[0]!.bottom).toBeLessThan(positions[1]!.top)
+
   for (const appearance of ['light', 'dark'] as const) {
     await window.emulateMedia({ colorScheme: appearance })
     await window.screenshot({ path: testInfo.outputPath(`agenda-search-pinned-${appearance}.png`) })
   }
-
   await window.keyboard.press('Enter')
 
   await expect(window.locator(row(later, 'other'))).toHaveCount(0)
-  await expect(window.locator('.search-count')).toHaveText('10')
+  await expect(window.locator('.search-count')).toHaveText('6')
 
-  await window.locator(row(day, 'parent')).focus()
+  await window.locator(header(day)).focus()
   await window.keyboard.press('u')
-
   await expect(window.locator(row(later, 'other'))).toHaveCount(1)
-  await expect(window.locator('.search-count')).toHaveText('11')
-
+  await expect(window.locator('.search-count')).toHaveText('7')
   await window.keyboard.press('Control+r')
-  await window.locator(row(day, 'parent')).focus()
-
+  await window.locator(header(day)).click()
   await expect(window.locator(row(later, 'other'))).toHaveCount(0)
-  await expect(window.locator('.search-count')).toHaveText('10')
+  await expect(window.locator('.search-count')).toHaveText('6')
 })
 
-test('uses gap position for search and cancels a pending jump on a newer synthetic selection', async ({
-  userDataDir,
-}) => {
+// @requirement PRODUCT.md §20.2.26
+test('uses the day origin for search and cancels a pending jump on a newer day selection', async ({ userDataDir }) => {
   seed(userDataDir)
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
   await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
-  await window.locator('.agenda-row-gap').first().click()
+  await window.locator(header(later)).click()
   await window.keyboard.press('/')
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
   await window.keyboard.press('Enter')
-  await expect(window.locator('.search-count')).toHaveText('5 / 9')
+  await expect(window.locator('.search-count')).toHaveText('3 / 5')
   await window.keyboard.press('Escape')
-
-  await expect(window.locator(row(later, 'parent'))).toBeFocused()
+  await expect(window.locator(`${row(later, 'child')} .node-input`)).toBeFocused()
 
   await window.clock.install()
   await window.clock.pauseAt(new Date())
@@ -283,7 +228,8 @@ test('uses gap position for search and cancels a pending jump on a newer synthet
   await expect(window.locator(header(day))).toBeFocused()
 })
 
-test('reveals the matching line of a long contextual row after returning from a focused day', async ({
+// @requirement PRODUCT.md §20.2.26
+test('reveals the matching line of a long direct match after returning from a focused day', async ({
   userDataDir,
 }, testInfo) => {
   seedDocument(userDataDir, {
@@ -291,15 +237,14 @@ test('reveals the matching line of a long contextual row after returning from a 
       roots: [
         {
           id: 'context',
-          text: `${'context '.repeat(500)}needle`,
-          children: [{ id: 'child', text: '2026-10-14 child', children: [] }],
+          text: 'needle path context',
+          children: [{ id: 'child', text: `2026-10-14 ${'content '.repeat(500)}needle`, children: [] }],
         },
       ],
     },
     location: { currentParentId: null, selectedNodeId: 'context' },
   })
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
-
   await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
   await window.locator(header(day)).click()
@@ -308,18 +253,17 @@ test('reveals the matching line of a long contextual row after returning from a 
   await window.keyboard.press('/')
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
   await window.keyboard.press('Enter')
-  const context = window.locator(row(day, 'context'))
 
   await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
+  await expect(window.locator('.search-count')).toHaveText('1 / 1')
   await expect
     .poll(() =>
-      context.locator('.agenda-caret').evaluate((element) => {
+      window.locator(`${row(day, 'child')} .search-match`).evaluate((element) => {
         const rect = element.getBoundingClientRect()
         const viewport = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
         return rect.top >= viewport.top && rect.bottom <= viewport.bottom
       }),
     )
     .toBe(true)
-
-  await window.screenshot({ path: testInfo.outputPath('agenda-search-wrapped-context.png') })
+  await window.screenshot({ path: testInfo.outputPath('agenda-search-wrapped-match.png') })
 })

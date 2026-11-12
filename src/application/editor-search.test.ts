@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { EditorSearch } from './editor-search'
-import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { AgendaRowsCache } from './agenda-rows'
 import { openAgendaState } from './agenda-state'
 
 afterEach(() => vi.useRealTimers())
@@ -24,104 +24,29 @@ it('publishes a zero-result search without applying an absent destination', asyn
   expect(search.getResult()?.destination).toBeUndefined()
 })
 
-it('transfers every node of a recursively folded final Agenda day', () => {
-  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
-  const rows: AgendaRow[] = [
-    { kind: 'day', key: 'day:100', day: 100, content: true, isToday: true },
-    ...['a', 'b'].map((id) => ({
-      kind: 'node' as const,
-      key: id,
-      nodeId: id,
-      depth: 0,
-      day: 100,
-      role: 'match' as const,
-      hasProjectedChildren: false,
-    })),
-  ]
-  for (const row of rows) search.recordOpenedFold(row.key)
-
-  search.manualAgendaFold({ kind: 'fold', key: 'day:100', operation: 'close-recursive' }, rows)
-
-  expect(search.takeFoldsToClose(new Set())).toEqual([])
-})
-
-it('keeps search ownership in later days when manually folding an entire Agenda day', () => {
-  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
-  const rows: AgendaRow[] = [100, 101].flatMap((day): AgendaRow[] => [
-    { kind: 'day', key: `day:${day}`, day, content: true, isToday: day === 100 },
-    {
-      kind: 'node',
-      key: `node:${day}`,
-      nodeId: `node-${day}`,
-      depth: 0,
-      day,
-      role: 'match',
-      hasProjectedChildren: false,
-    },
-  ])
-  for (const row of rows) search.recordOpenedFold(row.key)
-
-  search.manualAgendaFold({ kind: 'fold', key: 'day:100', operation: 'close-recursive' }, rows)
-
-  expect(search.takeFoldsToClose(new Set())).toEqual(['day:101', 'node:101'])
-})
-
-it.each(['close-recursive', 'open-recursive'] as const)(
-  'transfers only a node subtree when Agenda folding is %s',
+// @requirement PRODUCT.md §20.2.26
+it.each(['toggle', 'close', 'open', 'close-recursive', 'open-recursive'] as const)(
+  'transfers only the manually chosen Agenda day for %s',
   (operation) => {
     const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
-    const rows: AgendaRow[] = [
-      { kind: 'day', key: 'day:100', day: 100, content: true, isToday: true },
-      ...(
-        [
-          ['before', 0],
-          ['parent', 0],
-          ['child', 1],
-          ['deep', 2],
-          ['sibling', 0],
-        ] as const
-      ).map(([id, depth]) => ({
-        kind: 'node' as const,
-        key: id,
-        nodeId: id,
-        depth,
-        day: 100,
-        role: 'match' as const,
-        hasProjectedChildren: true,
-      })),
-      { kind: 'day', key: 'day:101', day: 101, content: true, isToday: false },
-    ]
-    for (const row of rows) search.recordOpenedFold(row.key)
+    search.recordOpenedFold('day:100')
+    search.recordOpenedFold('day:101')
 
-    search.manualAgendaFold({ kind: 'fold', key: 'parent', operation }, rows)
+    search.manualAgendaFold(
+      operation === 'toggle' ? { kind: 'toggle-fold', key: 'day:100' } : { kind: 'fold', key: 'day:100', operation },
+    )
 
-    expect(search.takeFoldsToClose(new Set())).toEqual(['day:100', 'before', 'sibling', 'day:101'])
+    expect(search.takeFoldsToClose(new Set())).toEqual(['day:101'])
     expect(search.takeFoldsToClose(new Set())).toEqual([])
   },
 )
 
-it.each(['toggle', 'close', 'open'] as const)('transfers only the chosen Agenda fold for %s', (operation) => {
+it.each(['close-all', 'open-all'] as const)('transfers every Agenda day on a manual %s', (operation) => {
   const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
-  const rows: AgendaRow[] = ['parent', 'child'].map((id, depth) => ({
-    kind: 'node',
-    key: id,
-    nodeId: id,
-    depth,
-    day: 100,
-    role: 'match',
-    hasProjectedChildren: true,
-  }))
-  for (const row of rows) search.recordOpenedFold(row.key)
+  search.recordOpenedFold('day:100')
+  search.recordOpenedFold('day:101')
 
-  search.manualAgendaFold(
-    operation === 'toggle' ? { kind: 'toggle-fold', key: 'parent' } : { kind: 'fold', key: 'parent', operation },
-    rows,
-  )
-
-  expect(search.takeFoldsToClose(new Set())).toEqual(['child'])
-
-  for (const row of rows) search.recordOpenedFold(row.key)
-  search.manualAgendaFold({ kind: 'fold', key: 'parent', operation: 'close-all' }, rows)
+  search.manualAgendaFold({ kind: 'fold', key: 'node:100:a', operation })
 
   expect(search.takeFoldsToClose(new Set())).toEqual([])
 })

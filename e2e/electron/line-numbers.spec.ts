@@ -71,8 +71,8 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
     await editor.focus()
     await window.keyboard.press('Meta+p')
 
-    await expect(window.locator('.agenda-list .line-number')).toHaveText(['1', '2', '3'])
-    await expect(window.locator('.agenda-row-day .line-number, .agenda-row-gap .line-number')).toHaveCount(0)
+    await expect(window.locator('.agenda-list .line-number')).toHaveText(['1', '2'])
+    await expect(window.locator('.agenda-row-day .line-number, .agenda-path-label .line-number')).toHaveCount(0)
     await expectCompactNumbering(window.locator('.agenda-row-node'))
     await expect(window.locator('.agenda-list')).toHaveScreenshot(screenshotName('line-numbers-agenda-dark.png'))
     const agendaGeometry = await outlineGeometry(window.locator('.agenda-row'))
@@ -178,7 +178,10 @@ async function expectCompactNumbering(rows: Locator): Promise<void> {
         numberTop: number.top,
         textTop: text.top,
         textLeft,
-        outlineGap: textLeft - number.right - Number(row.getAttribute('data-depth')) * 20,
+        outlineGap:
+          textLeft -
+          number.right -
+          (Number.parseFloat(getComputedStyle(row).getPropertyValue('--row-depth')) || 0) * 20,
         bulletLeft: bullet.left,
         bulletRight: bullet.right,
         disclosureLeft: disclosure?.left,

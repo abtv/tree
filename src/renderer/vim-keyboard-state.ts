@@ -182,30 +182,21 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       enter: (nodeId) => {
         const state = store.getSnapshot()
         if (state.status !== 'ready' || state.location.currentParentId === nodeId) return false
-        if (
-          state.agenda !== undefined &&
-          (state.agenda.pinnedOccurrence !== undefined || state.agenda.activeOccurrence?.nodeId !== nodeId)
-        )
-          return false
+        if (state.agenda !== undefined) return false
         setNodeVisualSelection({ anchorId: nodeId, focusId: nodeId })
-        if (state.agenda === undefined) rememberNodeRange(commandState, state.document, nodeId, nodeId)
+        rememberNodeRange(commandState, state.document, nodeId, nodeId)
         return true
       },
       move: moveNodeVisual,
       swap: () => {
+        const state = store.getSnapshot()
+        if (state.status !== 'ready' || state.agenda !== undefined) return
         if (nodeVisualSelection !== undefined) {
           setNodeVisualSelection({
             anchorId: nodeVisualSelection.focusId,
             focusId: nodeVisualSelection.anchorId,
           })
-          const state = store.getSnapshot()
-          if (state.status === 'ready' && state.agenda !== undefined) {
-            const day = state.agenda.activeOccurrence?.day
-            if (day !== undefined) {
-              store.applyAgenda({ kind: 'select', key: `node:${day}:${nodeVisualSelection.anchorId}` })
-              syncImageCaretToFocus()
-            }
-          } else swapNodeVisual(commandState)
+          swapNodeVisual(commandState)
         }
       },
       exit: () => setNodeVisualSelection(undefined),

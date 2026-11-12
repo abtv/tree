@@ -206,7 +206,11 @@ export function NodeInput({
         onContentInput(event)
       }}
       suppressContentEditableWarning
-      dangerouslySetInnerHTML={{ __html: compositionHtml ?? richTextHtml(node, decorations) }}
+      dangerouslySetInnerHTML={{
+        __html:
+          compositionHtml ??
+          richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
+      }}
     />
   )
 }

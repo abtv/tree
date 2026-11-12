@@ -531,6 +531,45 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-list {
   position: relative;
   --row-indent: 20px;
+  --agenda-text-inset: calc(var(--row-gutter, 28px) + 24px);
+  --agenda-context-gap: 4px;
+  --agenda-heading-gap: 8px;
+  --agenda-group-gap: 16px;
+  --agenda-day-gap: 24px;
+}
+.agenda-entry {
+  position: relative;
+  display: flow-root;
+}
+.agenda-entry-day {
+  padding-top: var(--agenda-day-gap);
+  padding-bottom: var(--agenda-heading-gap);
+}
+.agenda-entry-day:not(.agenda-entry-separated) {
+  padding-top: 0;
+}
+.agenda-entry-group-start {
+  padding-top: var(--agenda-group-gap);
+}
+.agenda-entry-first-in-day {
+  padding-top: 0;
+}
+.agenda-day-separator {
+  position: absolute;
+  top: calc(var(--agenda-day-gap) / 2);
+  right: 0;
+  left: var(--agenda-text-inset);
+  border-top: 1px solid var(--color-location-border);
+  pointer-events: none;
+}
+.agenda-path-label {
+  margin: 0 0 var(--agenda-context-gap) var(--agenda-text-inset);
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 /* Retain the painted window while native scrolling waits for its range update. The inner offset
    and rows change together; the compositor never scrolls the old window into an empty spacer. */
@@ -551,12 +590,18 @@ body:not(.node-drag-active) .location-link:hover {
   top: 0;
   height: 0;
 }
-.agenda-row-day,
-.agenda-row-gap {
+.agenda-row-day {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   height: var(--node-row-min-height);
+}
+.agenda-row-day,
+.agenda-row-node {
+  min-height: 24px;
+}
+.agenda-row-day {
+  height: 24px;
 }
 .agenda-label {
   line-height: 20px;
@@ -571,24 +616,45 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-label-empty {
   font-weight: 400;
 }
-.agenda-rule {
-  flex: 1;
-  margin-top: 10px;
-  border-top: 1px solid var(--color-location-border);
-}
-.agenda-row-gap .agenda-label {
-  font-weight: 400;
-  letter-spacing: normal;
+.agenda-row-day .agenda-label {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 24px;
+  letter-spacing: -0.02em;
   text-transform: none;
 }
-.agenda-row-gap .agenda-rule {
-  border-top-style: dashed;
+.agenda-row-day .agenda-label-empty {
+  color: var(--color-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: normal;
 }
-.agenda-today .agenda-label {
-  color: var(--color-drop-marker);
+.agenda-row-day .node-disclosure-triangle {
+  top: 3.5px;
 }
-.agenda-today .agenda-rule {
-  border-color: var(--color-drop-marker);
+.agenda-row-day .node-focus-marker {
+  top: 8.5px;
+}
+.agenda-today-badge {
+  align-self: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--color-secondary);
+  background: color-mix(in srgb, var(--color-text) 7%, var(--color-background));
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+}
+.agenda-today .agenda-label-empty {
+  color: var(--color-secondary);
+  font-size: 13px;
+}
+.agenda-empty-message {
+  margin: var(--agenda-heading-gap) 0 0 var(--agenda-text-inset);
+  color: var(--color-secondary);
+  font-size: 13px;
+  line-height: 20px;
 }
 .agenda-text {
   display: block;
@@ -599,9 +665,9 @@ body:not(.node-drag-active) .location-link:hover {
   overflow-wrap: anywhere;
   line-height: 20px;
 }
-/* A selected row without an editor (day, gap, contextual ancestor, mirror) has no native caret, so the
+/* A selected row without an editor (day or mirror) has no native caret, so the
    renderer draws one as marks in its text (docs/PRODUCT.md §23.4), like the Tree caret: a block in Vim
-   Normal and a thin line in Insert and standard editing. Whole-node Visual draws no mark. */
+   Normal and a thin line in Insert and standard editing. */
 .vim-state-normal .agenda-caret {
   color: var(--color-white);
   background: var(--color-ink);
@@ -623,9 +689,6 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-text-struck {
   text-decoration: line-through;
   color: var(--color-struck-text);
-}
-.agenda-role-context {
-  color: var(--color-secondary);
 }
 .agenda-date-active {
   font-weight: 600;
@@ -649,6 +712,22 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .date-future {
   color: var(--color-date-future);
+}
+.agenda-row-node :is(.agenda-date-active, .agenda-date-secondary) {
+  font-size: 14px;
+  font-weight: 400;
+}
+.agenda-row-node .agenda-date-active {
+  font-weight: 500;
+}
+.agenda-row-node .date-past {
+  color: color-mix(in srgb, var(--color-date-past) 50%, var(--color-secondary));
+}
+.agenda-row-node .date-today {
+  color: color-mix(in srgb, var(--color-date-today) 50%, var(--color-secondary));
+}
+.agenda-row-node .date-future {
+  color: color-mix(in srgb, var(--color-date-future) 50%, var(--color-secondary));
 }
 .node-input-struck .tag-text,
 .agenda-text-struck .tag-text {
@@ -687,13 +766,7 @@ body:not(.node-drag-active) .location-link:hover {
 .node-row-visual-selected,
 .node-row-visual-selected .node-input,
 .node-row-visual-selected .agenda-date-active,
-.node-row-visual-selected .tag-text,
-.agenda-row-visual-selected,
-.agenda-row-visual-selected .node-input,
-.agenda-row-visual-selected .agenda-text,
-.agenda-row-visual-selected .agenda-date-active,
-.agenda-row-visual-selected .agenda-date-secondary,
-.agenda-row-visual-selected .tag-text {
+.node-row-visual-selected .tag-text {
   color: var(--highlight-foreground);
   background: var(--highlight-background);
 }
@@ -905,8 +978,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 }
 
 /* Inside the whole-node Visual highlight the struck text takes the highlight pair, keeping its line. */
-.node-row-visual-selected .node-input.node-input-struck,
-.agenda-row-visual-selected .node-input.node-input-struck {
+.node-row-visual-selected .node-input.node-input-struck {
   color: var(--highlight-foreground);
 }
 
@@ -1227,33 +1299,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .node-row.node-row-dragging {
   background: var(--color-drag-highlight);
-}
-
-/* Dragging an Agenda occurrence onto another day (docs/PRODUCT.md §23.12). */
-.agenda-row.agenda-row-dragging .node-input:focus {
-  background: transparent;
-}
-
-.agenda-row.agenda-row-dragging .node-input,
-.agenda-row.agenda-row-dragging .agenda-text {
-  user-select: none;
-}
-
-.agenda-row.agenda-row-dragging {
-  background: var(--color-drag-highlight);
-}
-
-.agenda-row-drop-on {
-  outline: 2px solid var(--color-drop-marker);
-  outline-offset: -2px;
-}
-
-/* A pending Vim move keeps the source visible but dimmed; the selection marker stays (docs/PRODUCT.md §23.13). */
-.agenda-row-pending .node-input,
-.agenda-row-pending .agenda-text,
-.agenda-row-pending .node-enter-control,
-.agenda-row-pending .node-disclosure-triangle {
-  opacity: 0.38;
 }
 
 .node-row-drop-before::before,

@@ -23,7 +23,7 @@ async function setup() {
             {
               id: 'a',
               text: 'apple apple',
-              children: [{ id: 'b', text: 'apple 2026-10-22 2026-10-23', children: [] }],
+              children: [{ id: 'b', text: 'apple apple 2026-10-22 2026-10-23', children: [] }],
             },
             { id: 'c', text: 'apple 2026-10-23', children: [] },
           ],
@@ -49,19 +49,13 @@ async function setup() {
 
 it('captures occurrence and synthetic origins using the current renderer caret', async () => {
   const { store } = await setup()
-  store.applyAgenda({ kind: 'select', key: key(first, 'a') })
+  store.applyAgenda({ kind: 'select', key: key(first, 'b') })
 
-  expect(store.searchOrigin(6)).toEqual({ nodeId: 'a', day: first, offset: 6 })
+  expect(store.searchOrigin(6)).toEqual({ nodeId: 'b', day: first, offset: 6 })
 
   store.applyAgenda({ kind: 'select', key: `day:${first}` })
 
   expect(store.searchOrigin(8)).toEqual({ beforeDay: first, offset: 0 })
-
-  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
-  expect(gap.kind).toBe('gap')
-  store.applyAgenda({ kind: 'select', key: gap.key })
-
-  if (gap.kind === 'gap') expect(store.searchOrigin(8)).toEqual({ beforeDay: gap.startDay, offset: 0 })
 
   store.closeAgenda()
   const getAgendaRows = vi.spyOn(store, 'getAgendaRows')
@@ -79,25 +73,25 @@ it('falls back to the Tree selection while the selected Agenda row is unavailabl
   expect(search.origin(state(), 4)).toEqual({ nodeId: 'a', offset: 4 })
 })
 
-it('counts folded contextual occurrences and serializes same-node and cross-day jumps without saving', async () => {
+it('counts only folded direct matches and serializes same-node and cross-day jumps without saving', async () => {
   const { store, state, save, begin } = await setup()
 
   store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
-  store.applyAgenda({ kind: 'toggle-fold', key: key(second, 'a') })
   begin()
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(7)
-  expect(state().agenda!.collapsed).toEqual(new Set([`day:${first}`, key(second, 'a')]))
+  expect(store.search.session.getSnapshot().count?.total).toBe(5)
+  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'a')).toBe(false)
+  expect(state().agenda!.collapsed).toEqual(new Set([`day:${first}`]))
 
   store.search.confirm()
   store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
   await vi.runAllTimersAsync()
 
-  expect(state().agenda!.selectedKey).toBe(key(first, 'a'))
+  expect(state().agenda!.selectedKey).toBe(key(first, 'b'))
   expect(state().focus?.cursor).toBe(6)
 
-  store.search.navigate({ nodeId: 'a', day: first, offset: 6 }, 1, 4)
+  store.search.navigate({ nodeId: 'b', day: first, offset: 6 }, 1, 1)
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
@@ -122,9 +116,9 @@ it('retains manual folds and draft origin, closes feedback on focused-day change
   store.search.confirm()
   await vi.runAllTimersAsync()
 
-  expect(state().agenda!.selectedKey).toBe(key(second, 'a'))
+  expect(state().agenda!.selectedKey).toBe(key(first, 'b'))
 
-  store.search.navigate({ nodeId: 'a', day: second, offset: 0 }, -1, 1)
+  store.search.navigate({ nodeId: 'b', day: first, offset: 6 }, 1, 1)
   await vi.runAllTimersAsync()
 
   store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
@@ -144,7 +138,7 @@ it('retains manual folds and draft origin, closes feedback on focused-day change
   store.search.begin({ beforeDay: second, offset: 0 })
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(4)
+  expect(store.search.session.getSnapshot().count?.total).toBe(3)
 
   store.closeAgenda()
   store.search.begin({ nodeId: 'a', offset: 0 })
@@ -163,14 +157,14 @@ it('recounts after leaving a pinned occurrence and does not publish its obsolete
   begin()
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(7)
+  expect(store.search.session.getSnapshot().count?.total).toBe(5)
 
   store.search.confirm()
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.pinnedOccurrence).toBeUndefined()
   expect(store.search.getResult()).toBeUndefined()
-  expect(store.search.session.getSnapshot().count?.total).toBe(6)
+  expect(store.search.session.getSnapshot().count?.total).toBe(4)
 })
 
 it('transfers recursive fold ownership only within the chosen day', async () => {
@@ -180,13 +174,13 @@ it('transfers recursive fold ownership only within the chosen day', async () => 
   store.applyAgenda({ kind: 'fold', key: `day:${second}`, operation: 'close-recursive' })
   begin()
   store.search.confirm()
-  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 2)
+  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.selectedKey).toBe(key(first, 'b'))
 
   store.applyAgenda({ kind: 'fold', key: `day:${first}`, operation: 'open-recursive' })
-  store.search.navigate({ nodeId: 'b', day: first, offset: 0 }, 1, 3)
+  store.search.navigate({ nodeId: 'b', day: first, offset: 0 }, 1, 2)
   await vi.runAllTimersAsync()
 
   store.hideSearch()
@@ -196,29 +190,26 @@ it('transfers recursive fold ownership only within the chosen day', async () => 
   expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
 })
 
-it('invalidates pending jumps on synthetic selection and document edits while retaining a pending move', async () => {
+it('invalidates pending jumps on synthetic selection and document edits without changing the newer selection', async () => {
   const { store, state, begin } = await setup()
 
   store.applyAgenda({ kind: 'select', key: key(first, 'b') })
-  store.startAgendaMove(1)
   begin()
   store.search.confirm()
   await vi.runAllTimersAsync()
 
-  expect(state().agenda!.pendingMove).toHaveLength(1)
-
-  store.search.navigate({ nodeId: 'a', day: first, offset: 0 }, 1, 1)
+  store.search.navigate({ nodeId: 'b', day: first, offset: 0 }, 1, 1)
   store.applyAgenda({ kind: 'select', key: `day:${second}` })
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.selectedKey).toBe(`day:${second}`)
 
   store.search.navigate({ beforeDay: second, offset: 0 }, 1, 1)
-  store.editText('a', 'pear')
+  store.editText('b', 'pear 2026-10-22 2026-10-23')
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.selectedKey).toBe(`day:${second}`)
-  expect(store.search.session.getSnapshot().count?.total).toBe(3)
+  expect(store.search.session.getSnapshot().count?.total).toBe(1)
 })
 
 it('replaces dated occurrences during pending search and restores them through history', async () => {
@@ -226,12 +217,12 @@ it('replaces dated occurrences during pending search and restores them through h
 
   begin()
   store.search.confirm()
-  store.editText('b', 'apple 2026-10-23')
+  store.editText('b', 'apple apple 2026-10-23')
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(4)
+  expect(store.search.session.getSnapshot().count?.total).toBe(3)
 
-  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 3)
+  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
   await vi.runAllTimersAsync()
 
   expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
@@ -239,16 +230,16 @@ it('replaces dated occurrences during pending search and restores them through h
   store.undo()
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(7)
+  expect(store.search.session.getSnapshot().count?.total).toBe(5)
 
   store.redo()
   await vi.runAllTimersAsync()
 
-  expect(store.search.session.getSnapshot().count?.total).toBe(4)
+  expect(store.search.session.getSnapshot().count?.total).toBe(3)
 
-  store.search.navigate({ nodeId: 'b', day: second, offset: 0 }, -1, 1)
+  store.search.navigate({ nodeId: 'b', day: second, offset: 0 }, 1, 1)
   await vi.runAllTimersAsync()
 
-  expect(state().agenda!.selectedKey).toBe(key(second, 'a'))
+  expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
   expect(state().focus?.cursor).toBe(6)
 })

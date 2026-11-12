@@ -304,8 +304,8 @@ Each visible node receives one number, starting at 1 in the current view and
 following its displayed order, including expanded descendants. Wrapped text and
 image-only nodes each receive one number. Collapsed descendants are excluded;
 scrolling and list virtualization do not restart numbering. The Tree parent
-heading and Agenda day/gap headings are not numbered. Agenda counts each visible
-node occurrence, including context ancestors and repeated occurrences on different
+heading and Agenda day headings are not numbered. Agenda counts each visible
+direct-match node occurrence, including repeated occurrences on different
 days. Changing view, scope or folds recomputes the numbers for that view.
 
 Numbers occupy a separate, muted, right-aligned column to the left of the outline,
@@ -859,7 +859,7 @@ External drops are not accepted anywhere in the desktop window or browser page, 
 
 Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto the middle of a node row makes the dragged node its last child. Dropping onto an ancestor breadcrumb segment or the root glyph appends to that destination and follows it, as specified in §2.2.
 
-On touch devices, holding the empty gutter beside a node or its trailing row margin starts the same drag after 200 ms. Holding text retains native text selection and its magnifier. The node dot and fold arrow keep their existing actions. Touch dragging uses the same destinations and cancellation rules in Tree and Agenda; Agenda still permits only its existing draggable occurrences. Moving more than 4 pixels before activation or releasing early cancels the hold. Browser scrolling, text selection and callouts are disabled only on the empty drag surfaces, preserving native gestures over text and elsewhere.
+On touch devices, holding the empty gutter beside a node or its trailing row margin starts the same drag after 200 ms. Holding text retains native text selection and its magnifier. The node dot and fold arrow keep their existing actions. Touch dragging uses Tree's destinations and cancellation rules. Agenda does not support node dragging (§23.12). Moving more than 4 pixels before activation or releasing early cancels the hold. Browser scrolling, text selection and callouts are disabled only on the empty drag surfaces, preserving native gestures over text and elsewhere.
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
 
@@ -1086,8 +1086,7 @@ reports recognition, queued count, completion, no text and failures. Terminal fe
 includes both the total added paragraphs and the error when a queue partly succeeds.
 It remains until another request; Find/Agenda feedback takes precedence, while update
 feedback remains visible alongside OCR. A missing image or noneditable selection is
-reported without changing the document. In Agenda only a direct editable occurrence
-can be recognized; days and contextual rows do not target the hidden Tree selection.
+reported without changing the document. Image-to-text does nothing throughout Agenda (§23.9), because recognition creates nodes.
 
 Each result is one Undo/Redo operation and uses normal autosave. Deleting or replacing
 the source image discards pending results, even if Undo restores it before completion.
@@ -1624,12 +1623,11 @@ Displayed link text participates, including phrases crossing a link boundary.
 
 Tree scope includes the current-parent heading before all descendants, regardless of folds.
 
-Agenda searches its complete current projection, including contextual ancestors and
-collapsed days/branches. Focused-day search includes only that day. Each occurrence
-of a node on a different day counts separately. Synthetic day and gap labels are
+Agenda searches all direct-match occurrences, including collapsed days. Parent-path labels are excluded. Focused-day search includes only that day. Each occurrence
+of a node on a different day counts separately. Synthetic day labels are
 excluded. Order is chronological by day, then depth-first through projected rows.
 From a day header, forward search starts before that day's contents and reverse
-search starts before the header; a gap origin lies between its surrounding days.
+search starts before the header.
 The caret offset within a synthetic label does not affect search order.
 
 Counting stops at the 101st match and reports `100+` without an ordinal. Navigation
@@ -1678,9 +1676,7 @@ editing or Vim Normal hides
 feedback and closes search-opened branches except the current path, preserving
 pre-existing expansion and explicit manual fold choices. Repeat commands restore feedback.
 
-Agenda reveals only the selected occurrence's day and projected ancestor path;
-its folds remain independent of other days and Tree expansion. Search destinations
-on contextual rows place the read-only caret; direct matches become the active occurrence.
+Agenda reveals only the selected occurrence's day; its folds remain independent of other days and Tree expansion. A search destination becomes the active occurrence.
 
 A newer manual selection, non-search command or command-panel opening cancels
 pending search jumps and queued repeats. A delayed result must not replace the
@@ -1700,7 +1696,6 @@ entry and hides search feedback. Both retain the last confirmed query for recall
 Entering or leaving a focused Agenda day also closes search. Query recall is shared
 between Tree and Agenda. Agenda edits update all mounted mirrors; leaving a temporarily
 pinned item removes it from the search corpus and refreshes the count.
-Search navigation preserves a pending Agenda move; Escape also cancels that move.
 While search is visible, Agenda's existing status message remains visible in the
 bottom status bar, independently of the Find panel and without changing document geometry.
 
@@ -2135,7 +2130,9 @@ Performance guards must exercise representative sequences in the running applica
 
 ### 23.1 Opening and Closing
 
-`Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected and revealed. `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
+* `Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected.
+* Opening makes a best effort to center the complete Today block, including its path labels and entries, within the content viewport. A block taller than the viewport starts at its heading with the ordinary context margin. Natural scroll limits apply; no blank padding is added just to center it. Alignment follows measured layout changes until explicit user scrolling or a subsequent command takes over.
+* `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
 
 This deliberately assigns Apple's standard Print shortcut to Agenda, as approved by the Product Owner: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no global shortcut. View > Agenda opens Agenda through the same named command as the command panel; View > Tree returns to Tree (§9.3).
 
@@ -2145,17 +2142,19 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 
 * Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end.
 * Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
-* A node appears under every distinct date it contains. Its proper ancestors below the scope appear as contextual rows in Tree order, preserving the hierarchy.
+* A node appears under every distinct date it contains. Only direct matches are node rows, ordered by Tree preorder within each day.
+* Proper ancestors below the scope form a passive parent-path label above the node. Consecutive matches with the same real parent share one label. Paths are relative to the Agenda scope; immediate children have no label. Labels are secondary context as in Search: they cannot be selected, edited, folded, opened or matched by local search.
 * Full text is shown and wraps as in Tree.
-* Every recognized date uses the temporal color of §20.11, independent of the displayed day: red in the past, yellow today and green in the future. The displayed day's date is semibold; other dates retain ordinary weight. Date colors yield to struck-through text color (§2.5).
-* Contextual ancestors use secondary text, ordinary size, and ordinary row height; direct matches retain Tree colors, including depth colors in dark appearance.
-* An outer bullet ring reflects real children; a chevron reflects projected children.
+* Every recognized date uses a quieter variant of the temporal color of §20.11, independent of the displayed day. Dates are slightly smaller than node text; the displayed day's date has medium weight. Date colors yield to struck-through text color (§2.5). Direct matches retain Tree text colors, including depth colors in dark appearance.
+* An outer bullet ring reflects real children. Node rows have no disclosure chevron.
 
 ### 23.3 Timeline
 
-Days are ordered chronologically. The three calendar days before Today and the three after it are always shown, including empty days. Other runs of one or two empty days have individual day headers; longer runs have a collapsed gap labeled `N empty days · Sep 30 – Oct 6`. Labels append the year only when it differs from Today's year.
+Days are ordered chronologically. Show only days containing projected entries, plus Today as the opening anchor. Empty days and gap placeholders are omitted, even when neighboring days are folded. When Today has no entries, show a nonfoldable `No entries for today` row. A temporary last-date pin retains its day until the item leaves Agenda (§23.7).
 
-A day is a compact header with small uppercase text, slight letter spacing, and a thin rule to the content's right edge, all in secondary colors. Empty days have a lighter label and no chevron. Today uses the accent color for label and rule, with ` · TODAY` appended. A gap has small secondary text, a chevron, and a dashed rule. Day and gap rows have the ordinary row height. Their chevrons, selected focus dot, and label align to the Tree chevron, bullet, and text columns; nodes start one outline level deeper. Headers scroll with the content; none is sticky. Transitions between Agenda and Tree have no animation or contrasting background flash.
+Day headings are more prominent than node text and retain ordinary case. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. A thin neutral separator sits between days, with none before the first day. Parent paths use smaller secondary text. Day headings, path labels and node text share one left alignment axis; disclosure and bullet markers occupy the gutter. Leave 8px from the heading to its first group, 4px between a path and its first node, 16px between parent groups, and 24px between days. Context and its nodes read as one block.
+
+Headers scroll with the content; none is sticky. Transitions between Agenda and Tree have no animation or contrasting background flash. Labels append the year only when it differs from Today's year.
 
 ### 23.4 Navigation
 
@@ -2163,18 +2162,18 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 * Up and Down move over visible Agenda rows and clamp at either edge.
 * In Vim Normal, counted `j`/`k`, `J`/`K`, `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` navigate Agenda rows with the same count, caret and viewport rules as Tree.
-* In Vim Normal, `h` and `l` continue through all visible rows, including direct matches, contextual ancestors, day containers, gaps and the focused-day heading. `l` crosses from the final character to the next row's first character; `h` crosses from the first character to the previous row's final character. Counts include character and crossing steps as in Tree (§4.3), and stop at the outer boundaries.
-* A direct match's image is its final character; contextual rows expose text only. Occurrences of the same node on different days remain distinct destinations. Visual and operator motions stay within the current row. This deliberate Vim divergence makes horizontal navigation continuous in both views.
-* Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers, gaps and contextual ancestors.
+* In Vim Normal, `h` and `l` continue through all visible rows, including direct matches, day containers and the focused-day heading. `l` crosses from the final character to the next row's first character; `h` crosses from the first character to the previous row's final character. Counts include character and crossing steps as in Tree (§4.3), and stop at the outer boundaries.
+* A direct match's image is its final character; day rows expose text only. Occurrences of the same node on different days remain distinct destinations. Visual and operator motions stay within the current row. This deliberate Vim divergence makes horizontal navigation continuous in both views.
+* Vertical movement preserves the horizontal text offset, clamped to the destination text, including when crossing day containers.
 * Normal `j`/`k` treat a direct match's attached image as Tree does: moving down from text enters the image and records the text caret, moving up from that image restores it, and arriving from below activates the image with the originating text position remembered. A counted motion applies the originating node's image transition first, then follows Tree's counted row and column rules for the remaining steps.
 * `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` land on the destination's first non-whitespace text character, using a direct match's image only when it has no text, as in §20.2.9.
 * A vertical motion that clamps at the current row preserves its caret and image return position.
 * Clicking a row selects and focuses it with the same focus dot.
-* An ordinary primary-button row click keeps Replace mode and completes any pending replacement as one edit before changing rows. A row without an editor retains Replace without accepting text edits; clicking an editable occurrence then resumes overwrite at its focused caret. Text typed after changing rows is a separate edit for Undo. This includes day containers, gaps, contextual ancestors, inactive occurrences and the focused-day heading; it does not extend Replace to navigation controls or other focus losses.
+* An ordinary primary-button row click keeps Replace mode and completes any pending replacement as one edit before changing rows. A row without an editor retains Replace without accepting text edits; clicking an editable occurrence then resumes overwrite at its focused caret. Text typed after changing rows is a separate edit for Undo. This includes day containers, inactive occurrences and the focused-day heading; it does not extend Replace to navigation controls or other focus losses.
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda, except when it dismisses an open completion popup in Insert (§20.2.4).
-* Contextual ancestors, day containers and gaps accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
+* Day containers accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 * The caret never disappears while selection moves.
-* A selected row without an editor (a day container, a gap, a contextual ancestor, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert and standard editing, and the shared selection highlight for a selection. Whole-node Visual shows its row highlight instead.
+* A selected row without an editor (a day container, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert and standard editing, and the shared selection highlight for a selection. Whole-node Visual selection is unavailable in Agenda.
 * Explicit pointer selection of a different row without an editor places its caret at offset zero; keyboard navigation carries its offset as above.
 * An empty text shows the caret at its end.
 
@@ -2192,21 +2191,17 @@ A day is a compact header with small uppercase text, slight letter spacing, and 
 
 #### Opening Tree and Scoped Agenda
 
-`Cmd+.` on a direct match or contextual ancestor closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today.
+`Cmd+.` on a direct match closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today.
 
-### 23.5 Folding and Gaps
+### 23.5 Folding Days
 
-Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles the selected day or node's projected children. Day folds hide all that day's nodes; node folds hide their projected descendants on that day. A day stays non-empty even when its only matches lie in folded branches. Empty days and projected leaves do not fold. Fold choices are keyed by occurrence, independent across days and independent of Tree expansion. If collapsing an ancestor hides the selected row, the ancestor becomes selected and focused; an unrelated collapse keeps selection and focus. Mode and document content are unchanged.
+Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles a populated day. Folding hides all its entries and labels; a folded day stays non-empty. Empty Today does not fold. Node and path rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Mode and document content are unchanged.
 
-* On a gap, the same controls reveal up to seven days from the start. Its original header stays visible with a down chevron, followed by the revealed empty day headers and a smaller collapsed gap when at least three unrevealed days remain. A remaining one or two days use day headers.
-* Toggling the original expanded gap collapses its revealed region again; toggling the smaller gap reveals its next chunk.
-* Because the smaller gap is replaced by the revealed days and a new smaller gap, revealing from it moves the selection to the original expanded header.
-* Reveal choices remain calendar-day choices as the timeline restructures.
-* All folds and revealed gaps are runtime state, never saved to the Tree view or Undo history.
+Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected populated day; recursive forms have the same effect because entries are flat. `zM`/`zR` close or open all populated days from any row. Folds are runtime state, independent of Tree expansion and never saved or added to Undo history.
 
 ### 23.6 Large Timelines
 
-Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers and gaps. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Folding, gap reveal and window resizing update the layout without losing selection or focus; windowing adds no document saves.
+Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers. The selected occurrence stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Day folding and window resizing update the layout without losing selection or focus; windowing adds no document saves.
 
 Scrolling must populate the newly visible range before the next rendered frame, including large scrollbar jumps and rapid direction changes. The viewport must not flash empty while its rows are replaced. Scrolling preserves the selected occurrence, active editor, caret, text selection and editing mode.
 
@@ -2214,7 +2209,7 @@ Scrolling must populate the newly visible range before the next rendered frame, 
 
 Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded so editing can continue; unrelated folds remain unchanged.
 
-Removing the last recognized date keeps the item and its contextual ancestors on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
+Removing the last recognized date keeps the item and its parent-path label on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
 
 If the scope root no longer exists, Agenda closes and returns to the nearest surviving Tree ancestor, or Root. A removed originating selection falls back to its surviving scope heading, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
 
@@ -2226,7 +2221,7 @@ While the last date is removed, the status bar shows `Add a date to keep this it
 
 ### 23.8 Agenda History Focus
 
-Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the Tree current parent, Agenda folds, revealed days, or Tree expansion while the scope exists.
+Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the Tree current parent, Agenda folds or Tree expansion while the scope exists.
 
 After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, or the change is outside the Agenda scope, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
 
@@ -2234,89 +2229,44 @@ After Undo or Redo, select the nearest visible occurrence of the change-site nod
 
 ### 23.9 Editing in Agenda
 
-Direct matches edit the same real nodes in standard editing and text-oriented Vim modes. Text commands, links, images, strikethrough (`Cmd+Enter`), and ordinary Cut/Paste follow Tree behavior. Contextual ancestors show text only, with no editing or strikethrough command. Day containers and gaps are synthetic and never editable.
+Direct matches edit the same real nodes in standard editing and text-oriented Vim modes. Text commands, links, images, strikethrough (`Cmd+Enter`), and ordinary Cut/Paste follow Tree behavior. Path labels are passive context. Day containers are synthetic and never editable.
 
-Canonical dates are recognized immediately after typing or pasting. Date emphasis preserves every character, caret offset and text-selection operation; dates remain editable text. A single-date node has one editor; a node appearing on several days has an editor only at its active occurrence. Other direct-match occurrences display the current text, hyperlinks and attached image. Native context-menu commands follow keyboard editing rules. Ordinary multiline paste may create nodes, and image paste retains Tree behavior; pasted new nodes receive no additional date.
+* Canonical dates are recognized immediately after typing or pasting. Date emphasis preserves every character, caret offset and text-selection operation; dates remain editable text.
+* A single-date node has one editor; a node appearing on several days has an editor only at its active occurrence. Other direct-match occurrences display the current text, hyperlinks and attached image.
+* Native context-menu commands follow keyboard editing rules. Enter in standard editing or Vim Insert inserts a newline in the existing node rather than splitting it. Multiline paste inserts at the text cursor in that node and preserves hyperlinks, following §13. Normalize CRLF and CR line endings to LF, keeping the caret and hyperlink ranges aligned. Completion acceptance takes precedence.
+* Image paste can attach an image to a node without one; a paste that would create a sibling for a second image does nothing. Overlapping image pastes obey the same restriction. Image-to-text does nothing in Agenda because it creates nodes.
 
 ### 23.10 Structural Restrictions
 
-Agenda does not reorder existing siblings, change their real parents, delete subtrees, or transfer contextual ancestors between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,`, Vim `>`/`<`, `gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, whole-node Visual structural edits, and structural dot repeats do nothing and retain focus, caret, mode, and text. Awaited text characters and surround delimiters still work. Whole-node Visual navigation and deferred moves follow §23.14.
+Agenda never creates or deletes nodes, reorders siblings, changes real parents, or moves occurrences between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,` on a node, Vim `>`/`<`, `gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, and structural dot repeats do nothing and retain focus, caret, mode and text. Awaited text characters and surround delimiters still work. These restrictions do not override completion acceptance (§20.9, §20.12).
 
-These structural restrictions do not override completion acceptance (§20.9, §20.12).
+`Backspace` on an empty direct match retains the node, including when it has no children. Removing text or dates never deletes a node automatically.
 
-`Backspace` on an empty childless direct match deletes it under the ordinary empty-node deletion rules. Selection moves to the previous sibling occurrence on that day, otherwise its contextual parent, otherwise the day container. If the day itself disappears, selection falls back to the nearest displayed day, earlier on a tie, preserving the compressed timeline. An empty node with children is retained. Removing text or dates never deletes a node automatically.
+Vim Normal `Enter` on a direct match follows Tree: it opens the hyperlink under the caret or previews its image when the image is the active character; elsewhere it does nothing. A counted `Enter` does nothing. On a day container it does nothing.
 
-Vim fold commands `zc`/`zo`, `za`, `zC`/`zO`, and `zM`/`zR` act on Agenda folds using the corresponding Tree fold rules. Recursive commands cover projected descendants; all-fold commands cover Agenda, independently of Tree expansion.
+### 23.11 Node Creation
 
-Vim Normal `Enter` on a direct match follows Tree: it opens the hyperlink under the caret or previews the attached image when the image is the active character; elsewhere it does nothing. It never creates or splits a node. A counted `Enter` does nothing, as in Tree. On day containers, gaps and contextual ancestors it does nothing. Creation from a day container, splitting, and sibling creation on direct matches are defined in §23.11; `o`/`O` do nothing on contextual ancestors. `dd` and `p`/`P` move occurrences instead of deleting or putting nodes, as §23.13 defines.
+Creation is unavailable throughout Agenda. Standard `Enter` on a day and Vim Normal `o`/`O` on any row do nothing. Enter in an editable node follows §23.9; it adds no date and no sibling.
 
-### 23.11 Creating Nodes
+### 23.12 Occurrence Movement
 
-On a day container, standard `Enter` and Vim Normal `o` create a node for that day, and Vim Normal `O` creates one for the preceding calendar day. If that day lies inside a gap, it is revealed. Vim Normal `Enter`, a counted or prefixed `o`/`O`, and every creation key on a gap or contextual ancestor do nothing; direct matches follow the two subsections below.
+Agenda has no node drag or occurrence move command. Holding or moving the pointer never changes dates or structure. Ordinary click, text selection and scrolling remain available. Edit a node's dates directly to change its day membership (§23.7).
 
-The new node is the last child of the Agenda scope, which is a final root when Agenda was opened from Root. Its text is the day's canonical date followed by one space, with the caret after the space. It becomes the active occurrence under that day, unfolding the day if it was collapsed, and Vim enters Insert. Creation is one undoable change that adds only the node, and it saves as any structural change does. If the scope is at the maximum document depth, the ordinary depth error is shown and nothing changes. Creation is rejected while persistence is locked.
+### 23.13 Vim Node Commands
 
-Undo removes the node and applies the history focus rule of §23.8.
-
-#### Splitting a Dated Node
-
-* In standard editing and Vim Insert, `Enter` in a direct match splits it as in Tree (§5.1): the caret splits the text, and a caret at the start of non-empty text inserts a new node before instead. An open completion popup takes precedence and accepts its selected suggestion (§20.9, §20.12).
-* The new part receives the displayed day's date, so the node stays on that day. The date is inserted at the start of the new part and replaces its leading whitespace with the single space after the date, so `2026-10-14 Prepare| release` becomes `2026-10-14 Prepare` and `2026-10-14 release`.
-* Nothing is inserted when the new part already contains that day's date as a recognized date; a date inside a hyperlink does not count.
-* Only the displayed day's date is inherited, and hyperlinks in the new part keep their text.
-* The caret is placed after the inserted date, or at the start when nothing was inserted, and the new node becomes the active occurrence under that day.
-* The split and the inserted date are one undoable change.
-
-Vim Normal `Enter` follows the link/image behavior in §23.10 without creating a node. Replace and Visual `Enter` do nothing.
-
-#### Creating a Sibling of a Dated Node
-
-Vim Normal `o` creates a real sibling immediately after the selected direct match and after its subtree, and `O` immediately before it, in the Tree. The new node's text is the displayed day's date followed by one space, the caret follows the space, it becomes the active occurrence and Vim enters Insert. It never becomes a child, even when the node has children. A count before `o`/`O` cancels the command. Creation is one undoable change, is rejected while persistence is locked, and is not repeated by `.`.
-
-### 23.12 Moving Occurrences
-
-#### Mouse Drag
-
-* A direct match is moved to another day by pressing and holding it with the primary mouse button, using the hold time and movement tolerance of §11, and dropping it on any row of the target day: the day header or any node row beneath it.
-* Contextual ancestors, day headers, and gaps cannot be dragged, nor can the disclosure chevron or the node bullet start a drag.
-* The dragged row takes the Tree drag highlight, and the pointer shows the grabbing cursor.
-* The target day's header is outlined with the inset drop outline of §11; the source's own day shows no outline and a drop there changes nothing.
-* A gap is not a day: over it the pointer shows the not-allowed cursor and a drop changes nothing.
-* `Esc`, a lost pointer, and window blur cancel the drag.
-* Dragging near the top or bottom of the viewport scrolls it as in Tree.
-* Dragging is unavailable while persistence is locked, and a quick click that does not hold selects and places the caret as before.
-
-A move replaces the source day's date in the node's text and changes nothing else: the parent, the children, and the position among siblings are unchanged, and other dates in the text stay. If the text already contains the target date, no second copy is added and the source date is removed with one adjacent space, so `2026-10-14 Plan 2026-10-15` dropped on Oct 15 becomes `2026-10-15 Plan`. Links keep their text. Descendants are never changed.
-
-The moved node becomes the selected, active occurrence under the target day, which is unfolded together with the moved node's ancestors there. The caret offset is kept when the node owned the focus, and its editor receives the focus again after the drop. The move is one undoable change that saves as any document edit does. Undo restores the previous dates and applies the history focus rule of §23.8.
-
-### 23.13 Pending Vim Move
-
-In Vim Normal, `dd` on a direct match marks that occurrence for a move and never deletes the node. A count marks the occurrence and the following direct matches of the same day at the same nesting level, skipping rows between them that do not qualify, such as contextual ancestors and nodes at other levels, and stops at the end of the day; fewer rows than the count mark the rows that exist. `dd` on a contextual ancestor, a day container, or a gap does nothing. Marking changes no document text, no Vim register, and not the system clipboard, and it is unavailable while persistence is locked.
-
-While a move is pending, each marked occurrence stays visible with its text, bullet, and disclosure chevron dimmed, and the status bar shows `Moving 1 item · p to put · Esc to cancel`, or `Moving N items · …` for several, at the left edge, including during search entry (§20.2.26). The mode indicator remains beside the pin on the right. The text of the marked nodes does not change until the move is put. A pending move and the invalid-item hint of §23.7 never coexist, because any text edit cancels the move.
-
-Navigation keeps the pending move: `j`/`k`, arrow keys, `gg`, `G`, `H`/`M`/`L`, `Ctrl+d`/`Ctrl+u`, mouse selection, scrolling, folding and unfolding, and expanding or collapsing gaps. `Esc` in any Vim mode (including the `Esc` that leaves Insert or Replace), any change of the document (a text edit or another move), Undo and Redo even when they change nothing, turning Vim off, and leaving the Agenda presentation (`Cmd+P`, `Cmd+.`) cancel it without an edit or an Undo entry. `dd` on a temporarily invalid item (§23.7) does nothing.
-
-`p` or `P` on any row of a day (its day container, a direct match, or a contextual ancestor) moves the marked occurrences to that day by replacing each source day's date as §23.12 defines, and the dimming disappears. The moved nodes keep their parents and positions; the first moved node becomes the selected, active occurrence under the target day. The put is one undoable change. When the target is the marked occurrences' own day nothing changes, no history entry is created, and the pending state ends. `p`/`P` on a gap does nothing and the move stays pending; a gap inside the timeline is reached by expanding it with `Cmd+E` and putting on the revealed day.
-
-Without a pending move, a node-register `p`/`P` does nothing in Agenda and a text-register `p`/`P` on a direct match is ordinary text editing (§23.9). `yy` copies as in Tree.
+Vim `dd`, including counted forms, does nothing in Agenda: it neither deletes nor starts a pending move, changes registers, writes the clipboard or creates history. Node-register `p`/`P` does nothing. Text-register `p`/`P` on a direct match remains ordinary text editing (§23.9). `yy` copies as in Tree.
 
 ### 23.14 Vim Whole-Node Selection
 
-`V` in Vim Normal on a valid direct match enters whole-node Visual mode. The range includes only visible direct matches of that day at the anchor's nesting level, even across different real parents. Contextual ancestors and nodes at other levels between them are skipped and keep their ordinary appearance. Qualifying rows use the shared selection highlight foreground and background, including their dates. Day containers, gaps, contextual ancestors, and temporarily invalid items cannot start a range.
-
-`j`/`k` and counts extend through qualifying rows; `J`/`K` extend by ten times that count, as in Tree. `gg`/`G` reach the first/last qualifying row of that day, stopping at its edges. Moving focus to another node places its text caret at offset zero; a clamped motion keeps the caret. `o` swaps the endpoints as in Tree. `Esc` or `V` ends the range in Normal; `Esc` also cancels a pending move. Pointer navigation or folding that hides an endpoint ends an obsolete range, as does leaving Agenda or changing the document through history or text shortcuts.
-
-Whole-node Visual `d` marks exactly the selected occurrences for the pending move of §23.13 and returns to Normal without changing text, history, registers, or clipboard. Putting the group replaces only the source dates in those nodes in one Undo step, leaving parents, order, descendants, and other dates unchanged. Other whole-node Visual mutation commands do nothing in Agenda. This deliberately differs from Vim's line deletion and structural range editing: Agenda edits a temporal projection of the same nodes.
+`V` does nothing throughout Agenda. There is no group selection or group mutation. Character Visual `v`, text selection, copy and text editing remain available under §23.4 and §23.9.
 
 ### 23.15 Focused Days
 
-`Cmd+.` on a day container opens that day's hierarchy. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Oct 14`; a non-editable heading such as `Wed Oct 14` occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports the existing day-container creation and folding commands, including `O` to create on the preceding day.
+`Cmd+.` on a day container opens that day's flat entries. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Oct 14`; a non-editable heading such as `Wed Oct 14` occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports day folding but no creation. If the focused day becomes empty, retain its heading and show the passive message `No entries for this day`.
 
-`Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position, folds, and revealed days instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes cancel pending moves and obsolete whole-node selections. `Cmd+.` or `gd` on a real node still opens Tree at that node.
+`Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position and folds instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes retain the ordinary text-session completion rules. `Cmd+.` or `gd` on a real node still opens Tree at that node.
 
-When a live edit removes the active occurrence's date but another date remains, the focused view follows the chronologically nearest remaining date under §23.7, preserving editing continuity. Creating on the preceding day likewise focuses the new node's day. Returning still restores the original timeline state. History does not change the focused presentation or its folds. Focused-day state is runtime only and creates no additional persistence writes.
+When a live edit removes the active occurrence's date but another date remains, the focused view follows the chronologically nearest remaining date under §23.7, preserving editing continuity. Returning still restores the original timeline state. History does not change the focused presentation or its folds. Focused-day state is runtime only and creates no additional persistence writes.
 
 ## 24. Browser Data Safety
 

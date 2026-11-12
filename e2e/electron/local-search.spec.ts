@@ -4,6 +4,7 @@ import {
   expect,
   launchTree,
   seedDocument,
+  setCursor,
   describeForEachEditingMode,
   clickApplicationMenuItem,
 } from './fixtures'
@@ -160,18 +161,26 @@ describeForEachEditingMode('Local search', () => {
     await expect(editor).toHaveText('Zle apple')
   })
 
-  test('searches Agenda contextual rows without leaving the presentation', async ({ userDataDir }) => {
+  test('searches Agenda entries while excluding passive paths without leaving the presentation', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
-          { id: 'parent', text: 'apple apple', children: [{ id: 'dated', text: 'apple 2026-10-14', children: [] }] },
+          {
+            id: 'parent',
+            text: 'apple apple',
+            children: [{ id: 'dated', text: 'apple apple apple 2026-10-14', children: [] }],
+          },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'parent' },
     })
     const { window } = await launchTree(userDataDir)
     await window.keyboard.press('Meta+p')
-    await window.locator('.agenda-row').filter({ hasText: 'apple apple' }).click()
+    const entry = window.getByRole('textbox', { name: 'Agenda node dated', exact: true })
+    await entry.click()
+    await setCursor(entry, 0)
 
     await window.keyboard.press('Meta+f')
     const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
@@ -181,6 +190,7 @@ describeForEachEditingMode('Local search', () => {
     await window.keyboard.press('Enter')
 
     await expect(window.locator('.search-count')).toHaveText('2 / 3')
+    await expect(window.locator('.agenda-path-label .search-match')).toHaveCount(0)
     await window.keyboard.press('Enter')
     await expect(window.locator('.search-count')).toHaveText('3 / 3')
     await expect(prompt).toBeFocused()
@@ -201,7 +211,7 @@ describeForEachEditingMode('Local search', () => {
     await window.keyboard.press('Escape')
     await window.keyboard.press('Meta+f')
     await expect(prompt).toHaveValue('apple')
-    await window.locator('.agenda-row .agenda-text').filter({ hasText: 'apple apple' }).click()
+    await window.locator('.agenda-row-day').first().click()
     await expect(window.locator('.local-search-panel')).toHaveCount(0)
     await expect(window.locator('.search-match')).toHaveCount(0)
   })

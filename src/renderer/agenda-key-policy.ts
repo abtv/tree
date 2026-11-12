@@ -1,4 +1,4 @@
-export type AgendaElement = 'day' | 'gap' | 'match' | 'context'
+export type AgendaElement = 'day' | 'match'
 export type AgendaAction =
   | 'navigate'
   | 'fold'
@@ -18,24 +18,23 @@ export type AgendaAction =
 
 /** Agenda policy: which synthetic or real row accepts each command family. */
 const POLICY: Readonly<Record<AgendaAction, readonly AgendaElement[]>> = {
-  navigate: ['day', 'gap', 'match', 'context'],
-  fold: ['day', 'gap', 'match', 'context'],
+  navigate: ['day', 'match'],
+  fold: ['day'],
   text: ['match'],
   clipboard: ['match'],
   strikethrough: ['match'],
-  history: ['day', 'gap', 'match', 'context'],
-  'empty-delete': ['match'],
+  history: ['day', 'match'],
+  'empty-delete': [],
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.
   structure: [],
-  create: ['day'],
-  split: ['match'],
-  'open-sibling': ['match'],
+  create: [],
+  split: [],
+  'open-sibling': [],
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.
   'node-put': [],
-  // `dd` starts a pending move only from a direct match; `p`/`P` drops it on any row of a day, never on a gap (D4).
-  'start-move': ['match'],
-  'put-move': ['day', 'match', 'context'],
-  'whole-node-visual': ['match'],
+  'start-move': [],
+  'put-move': [],
+  'whole-node-visual': [],
 }
 
 export function agendaAllows(element: AgendaElement, action: AgendaAction): boolean {

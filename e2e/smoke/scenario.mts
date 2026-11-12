@@ -225,11 +225,11 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.press(commandInput, 'Enter')
   await restored.waitFor(`return !document.querySelector('.command-panel') &&
     !document.querySelector(${JSON.stringify(commandInput)})`)
-  // Today's dated child must appear in the real projection, with its undated parent as context.
+  // Today's dated child must appear in the real projection, with its undated parent as a passive path.
   await restored.waitFor(`return !!document.querySelector('.agenda-list') &&
     document.activeElement?.closest('.agenda-today')?.getAttribute('aria-selected') === 'true' &&
     Array.from(document.querySelectorAll('.agenda-role-match')).some(row => row.querySelector('.node-input, .agenda-text')?.textContent === ${JSON.stringify('Vim ' + childText)}) &&
-    Array.from(document.querySelectorAll('.agenda-role-context')).some(row => row.querySelector('.agenda-text')?.textContent === ${JSON.stringify(parentText)})`)
+    Array.from(document.querySelectorAll('.agenda-path-label')).some(label => label.textContent === ${JSON.stringify(parentText)})`)
   // Search from the day header, so a no-op confirmation cannot pass as a successful jump.
   await search(restored, 'Smoke child')
   await restored.waitFor(`return document.activeElement?.closest('.agenda-role-match')?.getAttribute('aria-selected') === 'true' &&

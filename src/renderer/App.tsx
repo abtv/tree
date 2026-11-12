@@ -275,14 +275,10 @@ export function App({
   }, [localSearch])
   useEffect(() => window.treeApi.onFindMenuCommand?.((command) => searchAction.current(command)), [])
   useEffect(() => registerSearchCommands?.((command) => searchAction.current(command)), [registerSearchCommands])
-  // `p` and `Esc` of a pending Agenda move are Vim commands, so standard editing cannot keep one.
   useLayoutEffect(
     () => registerViewCommands?.(commandPanel.menuViewCommands),
     [registerViewCommands, commandPanel.menuViewCommands],
   )
-  useEffect(() => {
-    if (!vimEnabled) store.cancelAgendaMove()
-  }, [vimEnabled, store])
   // The application menu owns its own check marks and persists the value; the renderer only follows it.
   useEffect(() => {
     const stopAlwaysOnTop = window.treeApi.onAlwaysOnTopChanged?.(setAlwaysOnTop)
@@ -606,11 +602,8 @@ export function App({
               store={store}
               agenda={agenda}
               document={state.document}
-              dragFreeze={dragFreeze}
-              locked={persistenceLocked}
               vim={vimEnabled ? vimTextCommandState : undefined}
               shortcuts={shortcuts}
-              visualNodeSelection={vimMode === 'visual-node' ? nodeVisualSelection : undefined}
               renderInput={renderAgendaInput}
               renderAttachment={renderAgendaAttachment}
               renderText={renderAgendaText}

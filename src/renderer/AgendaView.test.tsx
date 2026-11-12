@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from '@testing-library/react'
-import { useSyncExternalStore } from 'react'
+import { StrictMode, useSyncExternalStore } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import './test/setup'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -8,8 +8,40 @@ import { AgendaView } from './AgendaView'
 import type { EditorStore } from '../application/editor-store'
 import { dayNumberOf } from '../domain/calendar-date'
 import { AgendaSearchText } from './AgendaSearchText'
+import * as revealModule from './viewport-reveal'
 
 afterEach(cleanup)
+
+// @requirement PRODUCT.md §23.1
+it('restores the complete-day opening intent after StrictMode mount-effect cleanup', async () => {
+  const harness = await createRealStoreHarness({
+    document: { roots: [{ id: 'today', text: '2026-10-08 Today task', children: [] }] },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const createReveal = revealModule.createViewportReveal
+  const regions: ReturnType<typeof vi.fn>[] = []
+  const factory = vi.spyOn(revealModule, 'createViewportReveal').mockImplementation(() => {
+    const reveal = createReveal()
+    regions.push(vi.spyOn(reveal, 'beginRegion'))
+    return reveal
+  })
+  try {
+    const view = render(
+      <StrictMode>
+        <View store={harness.store} />
+      </StrictMode>,
+    )
+
+    // StrictMode allocates the memo twice, then replays effects for the retained owner.
+    expect(regions.map((begin) => begin.mock.calls.length).filter(Boolean)).toEqual([2])
+    expect(view.container.querySelector('.agenda-today')).toHaveFocus()
+
+    view.unmount()
+  } finally {
+    factory.mockRestore()
+  }
+})
 
 // @requirement PRODUCT.md §23.9
 it('renders attachments on inactive direct matches and excludes contextual ancestors', async () => {
@@ -39,7 +71,6 @@ it('renders attachments on inactive direct matches and excludes contextual ances
       store={harness.store}
       agenda={state.agenda!}
       document={state.document}
-      dragFreeze={{ begin: vi.fn(), end: vi.fn() }}
       renderInput={() => <span className="test-editor" />}
       renderText={(node, day, marks, context) => (
         <AgendaSearchText
@@ -66,14 +97,7 @@ it('renders attachments on inactive direct matches and excludes contextual ances
 function View({ store }: { store: EditorStore }): React.JSX.Element {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   if (state.status !== 'ready' || state.agenda === undefined) return <div />
-  return (
-    <AgendaView
-      store={store}
-      agenda={state.agenda}
-      document={state.document}
-      dragFreeze={{ begin: vi.fn(), end: vi.fn() }}
-    />
-  )
+  return <AgendaView store={store} agenda={state.agenda} document={state.document} />
 }
 
 // @requirement PRODUCT.md §23.6
@@ -101,7 +125,7 @@ it('bounds mounted rows, pins distant selection and preserves its DOM across a f
   const element = container.querySelector(`[data-agenda-key="${distant.key}"]`)!
 
   expect(element).toBe(document.activeElement)
-  expect(element.classList.contains('agenda-row-pinned')).toBe(true)
+  expect(element.closest('.agenda-entry')!.classList.contains('agenda-row-pinned')).toBe(true)
 
   const day = rows.find((row) => row.kind === 'day' && row.content)!
 
@@ -151,42 +175,6 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:single` }))
 
   expect(container.querySelectorAll('.agenda-mirror')).toHaveLength(0)
-})
-
-// @requirement PRODUCT.md §23.13
-it('dims only the marked occurrence of a pending move, not its mirror or other nodes', async () => {
-  const harness = await createRealStoreHarness({
-    document: {
-      roots: [
-        { id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] },
-        { id: 'single', text: '2026-10-14 Single', children: [] },
-      ],
-    },
-    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
-  })
-
-  harness.store.openAgenda()
-  const { container } = render(<View store={harness.store} />)
-  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
-  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
-  const pendingKeys = (): string[] =>
-    [...container.querySelectorAll('.agenda-row-pending')].map((row) => row.getAttribute('data-agenda-key')!)
-
-  expect(pendingKeys()).toEqual([])
-
-  act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
-  act(() => {
-    harness.store.startAgendaMove()
-  })
-
-  expect(pendingKeys()).toEqual([`node:${day14}:multi`])
-  expect(container.querySelector(`[data-agenda-key="node:${day20}:multi"]`)!.classList.contains('agenda-mirror')).toBe(
-    true,
-  )
-
-  act(() => harness.store.cancelAgendaMove())
-
-  expect(pendingKeys()).toEqual([])
 })
 
 // @requirement PRODUCT.md §23.7

@@ -36,7 +36,7 @@ async function blockCaretAt(input: Locator, offset: number): Promise<boolean> {
 describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.11
   // @requirement PRODUCT.md §23.2
-  test('colors past, today and future dates consistently across Tree and Agenda', async ({ userDataDir }) => {
+  test('uses temporal date colors in Tree and quieter variants in Agenda', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'dates', text: 'Dates 2026-10-07 2026-10-08 2026-10-09', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'dates' },
@@ -65,14 +65,19 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
             await expect(date).toHaveText(text)
             await expect(date).toHaveCSS(
               'color',
-              await date.evaluate((el, name) => {
-                const probe = document.createElement('span')
-                probe.style.color = getComputedStyle(el).getPropertyValue(`--color-date-${name}`)
-                el.append(probe)
-                const color = getComputedStyle(probe).color
-                probe.remove()
-                return color
-              }, kind),
+              await date.evaluate(
+                (el, { kind, quiet }) => {
+                  const probe = document.createElement('span')
+                  probe.style.color = quiet
+                    ? `color-mix(in srgb, var(--color-date-${kind}) 50%, var(--color-secondary))`
+                    : `var(--color-date-${kind})`
+                  el.append(probe)
+                  const color = getComputedStyle(probe).color
+                  probe.remove()
+                  return color
+                },
+                { kind, quiet: view === 'agenda' },
+              ),
             )
           }
         }

@@ -2,6 +2,7 @@
 import type { TreeNode } from '../../src/domain/document'
 import {
   describeForEachEditingMode,
+  closeApp,
   expect,
   fireIdleSave,
   idleSavePoll,
@@ -37,6 +38,62 @@ function seed(userDataDir: string): void {
   })
 }
 
+test.describe('Agenda concurrent clipboard writes', () => {
+  test.use({ editingMode: 'standard' })
+
+  // @requirement PRODUCT.md §23.9
+  // @requirement PRODUCT.md §16.1
+  test('finishes two pending image pastes on quit without creating an Agenda sibling', async ({ userDataDir }) => {
+    seed(userDataDir)
+    const original = readPersisted(userDataDir).document
+    const { app, window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="first"]').first().click()
+    const input = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & { agendaImageWrites: (() => void)[] }
+      control.agendaImageWrites = []
+      globalThis.__treeIpc.wrap('tree:write-attachment', async (original, ...args) => {
+        await original(...args)
+        await new Promise<void>((resolve) => control.agendaImageWrites.push(resolve))
+      })
+    })
+    await writeClipboardImageSized(app, 80, 80)
+
+    await firePaste(input)
+    await firePaste(input)
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () => (globalThis as typeof globalThis & { agendaImageWrites: unknown[] }).agendaImageWrites.length,
+        ),
+      )
+      .toBe(2)
+    unlockSystemClipboard()
+    await app.evaluate(() => {
+      ;(globalThis as typeof globalThis & { agendaImageWrites: (() => void)[] }).agendaImageWrites[0]!()
+    })
+    await expect(window.locator('.agenda-row[data-node-id="first"] img')).toHaveCount(2)
+    await app.evaluate(() => {
+      ;(globalThis as typeof globalThis & { agendaImageWrites: (() => void)[] }).agendaImageWrites[1]!()
+    })
+    await closeApp(app)
+
+    const persisted = readPersisted(userDataDir).document
+    const attachment = persisted.roots[0]!.children[0]!.attachment
+    expect(attachment).toBeDefined()
+    expect(persisted).toEqual({
+      roots: [
+        {
+          ...original.roots[0],
+          children: [{ ...original.roots[0]!.children[0], attachment }, original.roots[0]!.children[1]],
+        },
+      ],
+    })
+  })
+})
+
 describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.4
   // @requirement PRODUCT.md §23.9
@@ -51,9 +108,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     const original = readPersisted(userDataDir).document
     if (mode === 'vim') await window.keyboard.press('Escape')
     const day = window.locator(`.agenda-row[data-agenda-key="${dayKey(10, 14)}"]`)
-    const gap = window.locator('.agenda-row-gap').first()
-    const context = window.locator('.agenda-role-context').first()
-    for (const target of [day, gap, context]) {
+    for (const target of [day]) {
       await target.click()
       // App.agenda-policy.test.tsx owns the full command matrix with the real App/store.
       // Retain native Tab focus suppression and a prohibited editing key for every row role.
@@ -177,10 +232,10 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
     const input = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
 
     await setCursor(input, await input.evaluate((element) => element.textContent!.length))
-    await writeClipboardText(app, ' alpha\nbeta')
+    await writeClipboardText(app, ' alpha\r\nbeta')
     await firePaste(input)
 
-    await expect(input).toHaveText('2026-10-14 Prepare 2026-10-20 alpha')
+    await expect(input).toHaveText('2026-10-14 Prepare 2026-10-20 alpha\nbeta')
 
     unlockSystemClipboard()
 
@@ -190,7 +245,7 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
 
     await expect
       .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((child) => child.text), idleSavePoll)
-      .toEqual(['2026-10-14 Prepare 2026-10-20 alpha', 'beta', '2026-10-14 Review'])
+      .toEqual(['2026-10-14 Prepare 2026-10-20 alpha\nbeta', '2026-10-14 Review'])
 
     await writeClipboardImageSized(app, 80, 80)
     await firePaste(input)
@@ -207,6 +262,18 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
         timeout: 20000,
       })
       .toBeDefined()
+
+    const withImage = readPersisted(userDataDir).document
+    await writeClipboardImageSized(app, 40, 40)
+    await firePaste(input)
+    unlockSystemClipboard()
+    await fireIdleSave(window)
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+
+    expect(readPersisted(userDataDir).document).toEqual(withImage)
+    await expect(window.locator('.agenda-row[data-node-id="first"] img')).toHaveCount(2)
 
     await app.close()
     const restarted = await launchTree(userDataDir)
@@ -341,22 +408,20 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   })
 
   // @requirement PRODUCT.md §23.10
-  test('blocks structural commands and contextual editing while retaining direct text editing', async ({
-    userDataDir,
-  }) => {
+  test('blocks structural commands and day editing while retaining direct text editing', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window } = await launchTree(userDataDir)
 
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
-    const context = window.locator('.agenda-row[data-node-id="context"]').first()
+    const context = window.locator(`.agenda-row[data-agenda-key="${dayKey(10, 14)}"]`)
 
     await context.click()
     for (const key of ['Tab', 'Shift+Tab', 'Meta+Backspace', 'Meta+Enter', 'Enter', 'Backspace', 'i', 'o', 'R'])
       await window.keyboard.press(key)
 
     await expect(context).toBeFocused()
-    await expect(context).toHaveText('Context')
+    await expect(context).toContainText('Wed Oct 14')
     await expect(context.locator('.node-input')).toHaveCount(0)
 
     await window.locator('.agenda-row[data-node-id="first"]').first().click()
@@ -440,223 +505,12 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
   })
 
   // @requirement PRODUCT.md §23.11
-  test('creates a dated last root from a day container in Insert and persists it', async ({ userDataDir }) => {
-    seed(userDataDir)
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-
-    await expect(window.locator(`[data-agenda-key="${dayKey(10, 8)}"]`)).toBeFocused()
-
-    if (mode === 'vim') await window.keyboard.press('Escape')
-
-    await window.keyboard.press(mode === 'vim' ? 'o' : 'Enter')
-    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
-
-    await expect(created).toBeFocused()
-    await expect(created).toHaveText('2026-10-08 ')
-    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
-
-    await window.keyboard.type('Plan')
-
-    await expect(created).toHaveText('2026-10-08 Plan')
-    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 8)}:"]`)).toHaveCount(1)
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['Context', '2026-10-08 Plan'])
-    expect(readPersisted(userDataDir).document.roots[0]!.children.map((entry) => entry.id)).toEqual(['first', 'second'])
-  })
 
   // @requirement PRODUCT.md §23.11
-  test('creates for the preceding day from a gap, one Undo removes it, and gaps ignore creation keys', async ({
-    userDataDir,
-  }) => {
-    seed(userDataDir)
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-    await window.locator(`[data-agenda-key="${dayKey(10, 20)}"]`).click()
-
-    await expect(window.locator(`[data-agenda-key="${dayKey(10, 19)}"]`)).toHaveCount(0)
-
-    if (mode === 'vim') await window.keyboard.press('Escape')
-    const day = mode === 'vim' ? 19 : 20
-    const rowsBefore = await window.locator(`[data-agenda-key^="node:${dayNumber(10, day)}:"]`).count()
-
-    await window.keyboard.press(mode === 'vim' ? 'O' : 'Enter')
-    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
-
-    await expect(created).toBeFocused()
-    await expect(created).toHaveText(`2026-10-${day} `)
-    await expect(window.locator(`[data-agenda-key="${dayKey(10, day)}"]`)).toHaveCount(1)
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['Context', `2026-10-${day} `])
-
-    await window.keyboard.press('Meta+z')
-
-    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, day)}:"]`)).toHaveCount(rowsBefore)
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['Context'])
-
-    const gap = window.locator('[data-agenda-key^="gap:"]').first()
-
-    await gap.click()
-    for (const key of mode === 'vim' ? ['Enter', 'o', 'O'] : ['Enter']) await window.keyboard.press(key)
-
-    await expect(gap).toBeFocused()
-    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveCount(0)
-    expect(readPersisted(userDataDir).document.roots.map((entry) => entry.text)).toEqual(['Context'])
-  })
 
   // @requirement PRODUCT.md §23.11
-  test('splits a dated node at the caret with the displayed date and one Undo restores it', async ({ userDataDir }) => {
-    seedDocument(userDataDir, {
-      document: { roots: [node('context', 'Context', [node('plan', '2026-10-14 Prepare release')])] },
-      location: { currentParentId: null, selectedNodeId: 'context' },
-    })
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-    await window.locator('.agenda-row[data-node-id="plan"]').first().click()
-    const plan = window.getByRole('textbox', { name: 'Agenda node plan', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
-
-    await setCursor(plan, '2026-10-14 Prepare'.length)
-    await window.keyboard.press('Enter')
-    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
-
-    await expect(created).toBeFocused()
-    await expect(created).toHaveText('2026-10-14 release')
-    if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
-    // The contextual `Context` row plus the two dated nodes.
-    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(3)
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['2026-10-14 Prepare', '2026-10-14 release'])
-
-    await window.keyboard.press('Meta+z')
-
-    await expect(window.locator(`[data-agenda-key^="node:${dayNumber(10, 14)}:"]`)).toHaveCount(2)
-    await expect(window.getByRole('textbox', { name: 'Agenda node plan', exact: true })).toHaveText(
-      '2026-10-14 Prepare release',
-    )
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['2026-10-14 Prepare release'])
-  })
 
   // @requirement PRODUCT.md §23.11
-  test('places the caret after the inherited date and ignores Enter on a contextual ancestor', async ({
-    userDataDir,
-  }) => {
-    seedDocument(userDataDir, {
-      document: { roots: [node('context', 'Context', [node('plan', '2026-10-14 Prepare release')])] },
-      location: { currentParentId: null, selectedNodeId: 'context' },
-    })
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-    await window.locator('.agenda-row[data-node-id="plan"]').first().click()
-    const plan = window.getByRole('textbox', { name: 'Agenda node plan', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
-
-    await setCursor(plan, '2026-10-14 Prepare'.length)
-    await window.keyboard.press('Enter')
-    const created = window.locator('.agenda-row[aria-selected="true"] .node-input')
-
-    await expect(created).toBeFocused()
-
-    await window.keyboard.type('X')
-
-    await expect(created).toHaveText('2026-10-14 Xrelease')
-
-    await fireIdleSave(window)
-
-    await expect
-      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children.map((entry) => entry.text), idleSavePoll)
-      .toEqual(['2026-10-14 Prepare', '2026-10-14 Xrelease'])
-
-    const context = window.locator('.agenda-row[data-node-id="context"]').first()
-
-    await context.click()
-    await window.keyboard.press('Enter')
-
-    await expect(context).toBeFocused()
-    await expect(window.locator('.agenda-row[aria-selected="true"] .node-input')).toHaveCount(0)
-    expect(readPersisted(userDataDir).document.roots[0]!.children).toHaveLength(2)
-  })
 
   // @requirement PRODUCT.md §23.10
-  test('deletes an empty childless match but preserves an empty match with children', async ({ userDataDir }) => {
-    seed(userDataDir)
-    const { window } = await launchTree(userDataDir)
-
-    await setAgendaToday(window)
-    await window.keyboard.press('Meta+p')
-    await window.locator('.agenda-row[data-node-id="second"]').first().click()
-    const second = window.getByRole('textbox', { name: 'Agenda node second', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
-
-    await window.keyboard.press('Meta+a')
-    await window.keyboard.press('Backspace')
-
-    await expect(second).toHaveText('')
-
-    await window.keyboard.press('Backspace')
-
-    await expect(second).toBeFocused()
-
-    await window.keyboard.press('Meta+z')
-    await window.locator('.agenda-row[data-node-id="first"]').first().click()
-    const first = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
-    if (mode === 'vim') {
-      await window.keyboard.press('Escape')
-      await window.keyboard.press('i')
-    }
-
-    await window.keyboard.press('Meta+a')
-    await window.keyboard.press('Backspace')
-
-    await expect(first).toHaveText('')
-
-    await window.keyboard.press('Backspace')
-
-    await expect(window.locator('.agenda-row[data-node-id="first"]')).toHaveCount(0)
-    await expect(window.locator('.agenda-row[data-node-id="context"]').first()).toBeFocused()
-
-    await window.keyboard.press('Meta+z')
-    await window.keyboard.press('Meta+z')
-
-    await expect(window.locator('.agenda-row[data-node-id="first"]')).toHaveCount(2)
-  })
 })

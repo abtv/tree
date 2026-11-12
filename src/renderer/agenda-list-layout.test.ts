@@ -10,7 +10,6 @@ const rows: AgendaRow[] = Array.from({ length: 1000 }, (_, day) => ({
   day,
   depth: 0,
   role: 'match',
-  hasProjectedChildren: false,
 }))
 
 describe('Agenda occurrence layout', () => {

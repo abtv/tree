@@ -13,6 +13,7 @@ import { OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import type { VimMode } from './vim-editing'
 import { getCaret, setCaret } from './editor-dom'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
+import * as revealModule from './viewport-reveal'
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }))
 
@@ -26,6 +27,44 @@ afterEach(() => {
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const image = (text = 'ab'): TreeNode => ({ ...node('node', text), attachment: { id: 'image', mimeType: 'image/png' } })
+
+// @requirement PRODUCT.md §20.2.26
+it('reveals the matching Agenda text line while Search retains focus', async () => {
+  const createReveal = revealModule.createViewportReveal
+  const beginLine = vi.fn()
+  vi.spyOn(revealModule, 'createViewportReveal').mockImplementation(() => {
+    const reveal = createReveal()
+    const begin = reveal.beginLine
+    reveal.beginLine = (...args) => {
+      beginLine(...args)
+      begin(...args)
+    }
+    return reveal
+  })
+  const f = await fixture({
+    document: { roots: [node('node', '2026-10-14 Head needle')] },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  f.input()
+  act(() => f.store.openAgenda())
+  const line = document.createElement('div')
+  line.className = 'search-input-line'
+  const prompt = document.createElement('input')
+  line.append(prompt)
+  document.body.append(line)
+  prompt.focus()
+
+  act(() => {
+    f.store.search.begin(f.store.searchOrigin(0))
+    f.store.search.edit('needle')
+    f.store.search.confirm()
+  })
+  await act(async () => vi.advanceTimersByTimeAsync(100))
+
+  expect(f.snapshot().focus).toMatchObject({ nodeId: 'node', cursor: 16, revealLine: true })
+  expect(document.activeElement).toBe(prompt)
+  expect(beginLine).toHaveBeenCalledWith(expect.any(Function), 16, expect.any(Function))
+})
 
 async function fixture(
   options: RealStoreOptions & { mode?: VimMode; vimEnabled?: boolean; shortcuts?: ShortcutProfile } = {},
@@ -249,7 +288,7 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().document.roots.map((item) => item.text)).toEqual(['Alpha', 'Bravo', 'Charlie'])
   })
 
-  it('restores search focus to the selected Agenda header, context or editor instead of a stale Tree input', async () => {
+  it('restores search focus to the selected Agenda header or editor instead of a stale Tree input', async () => {
     // jsdom omits CSS.escape; these fixture keys contain only selector-safe characters.
     vi.stubGlobal('CSS', { escape: (value: string) => value })
     const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
@@ -276,7 +315,7 @@ describe('useNodeInputBindings', () => {
     mounted.get(childKey)!.append(editor)
     const prompt = document.createElement('input')
     document.body.append(prompt)
-    for (const key of [`day:${day}`, `node:${day}:parent`, childKey]) {
+    for (const key of [`day:${day}`, childKey]) {
       act(() => f.store.applyAgenda({ kind: 'select', key, cursor: 2 }))
       prompt.focus()
 

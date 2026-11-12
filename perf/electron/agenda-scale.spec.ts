@@ -47,8 +47,8 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
   for (const dense of [false, true]) {
     const scenario = `agenda-${shape}-100000-${dense ? 'dense' : 'sparse'}`
     // @requirement PRODUCT.md §22.1
-    // @requirement PRODUCT.md §23.13
-    test(`${scenario}: open, navigate, edit dates, move and undo`, async ({ userDataDir }, testInfo) => {
+    // @requirement PRODUCT.md §23.7
+    test(`${scenario}: open, navigate, edit dates and undo`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, scaleSeed(shape, dense))
       const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const profiler = process.env.AGENDA_CPU_PROFILE === '1' ? await window.context().newCDPSession(window) : undefined
@@ -73,7 +73,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
           'keydown',
           (event) => {
             const key = event.metaKey && event.key === 'p' ? 'open' : event.key
-            if (!['open', 'j', 'k', 'a', '5', 'p', 'u'].includes(key)) return
+            if (!['open', 'j', 'k', 'a', '5', 'u'].includes(key)) return
             requestAnimationFrame(() =>
               requestAnimationFrame(() => (samples[key] ??= []).push(performance.now() - event.timeStamp)),
             )
@@ -119,7 +119,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
 
       expect(navigationSaves).toBe(0)
 
-      // The first dated node is visible even with nineteen contextual ancestors.
+      // Passive labels keep the first dated node directly reachable at any scope depth.
       const targetId = dense ? 'scale-0' : 'scale-19'
 
       await window.locator(`.agenda-row[data-node-id="${targetId}"]`).first().click()
@@ -140,20 +140,16 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       await expect(input).toBeFocused()
 
       await window.keyboard.press('Escape')
-      await window.keyboard.type('100dd')
-
-      await expect(window.locator('.agenda-row-pending').first()).toBeVisible()
-
-      await window.keyboard.press('G')
-      await window.keyboard.press('p')
-
-      await expect(window.locator('.agenda-row-pending')).toHaveCount(0)
-
+      const beforeDate = await input.textContent()
+      await window.keyboard.press('A')
+      await window.keyboard.type(' 2099-01-05')
+      await expect(input).toContainText('2099-01-05')
       await window.keyboard.press('Escape')
       await window.keyboard.press('u')
       await window.waitForFunction(
         () => (window as unknown as { scaleSamples: Record<string, number[]> }).scaleSamples.u?.length === 1,
       )
+      await expect(input).toHaveText(beforeDate!)
       const samples = await window.evaluate(
         () => (window as unknown as { scaleSamples: Record<string, number[]> }).scaleSamples,
       )
@@ -179,7 +175,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       }
       const motion = [...samples.j!, ...samples.k!].toSorted((a, b) => a - b)
       const typing = samples.a!.toSorted((a, b) => a - b)
-      const dates = samples['5']!.toSorted((a, b) => a - b)
+      const dates = samples['5']!.slice(0, 15).toSorted((a, b) => a - b)
 
       expect(motion).toHaveLength(40)
       expect(typing).toHaveLength(30)
@@ -193,12 +189,12 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
         typingP95Ms: round(typing[28]!),
         typingMaxMs: round(typing[29]!),
         dateEditP95Ms: round(dates[13]!),
-        moveMs: round(samples.p![0]!),
+        dateAddMs: round(samples['5']!.at(-1)!),
         undoMs: round(samples.u![0]!),
         navigationSaves,
       }
 
-      recordPerfResult({ kind: 'state', scenario, samples: 85, metrics })
+      recordPerfResult({ kind: 'state', scenario, samples: 86, metrics })
 
       // Opening materializes every projected row (about 200,000 in these shapes, far fewer in the sparse wide
       // and mixed ones), so it keeps its own ceiling; the Product Owner accepted this extreme case.
@@ -212,7 +208,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       expect.soft(metrics.typingP95Ms).toBeLessThan(editP95LimitMs)
       expect.soft(metrics.typingMaxMs).toBeLessThan(100)
       expect.soft(metrics.dateEditP95Ms).toBeLessThan(editP95LimitMs)
-      expect.soft(metrics.moveMs).toBeLessThan(500)
+      expect.soft(metrics.dateAddMs).toBeLessThan(500)
       expect.soft(metrics.undoMs).toBeLessThan(100)
       expect(await window.locator('.agenda-row').count()).toBeLessThan(100)
     })

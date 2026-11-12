@@ -125,9 +125,15 @@ export function createEditorKeyDownHandler({
       }
       if (event.key === 'Enter' && !primary && !event.metaKey && !(vim?.mode === 'normal' && element === 'match')) {
         event.preventDefault()
-        // Normal direct matches use Tree's link/image command below; splitting is standard/Insert only.
-        if ((vim === undefined || vim.mode === 'insert') && agendaAllows(element, 'split'))
-          store.splitAgendaNode(getCaret(event.currentTarget))
+        if ((vim === undefined || vim.mode === 'insert') && element === 'match') {
+          const selection = getSelectionRange(event.currentTarget)
+          prepareVimCommand(vim, 'text-edit', event.currentTarget)
+          if (store.replaceTextRange(node.id, selection.start, selection.end, '\n')) {
+            const next = store.getSnapshot()
+            if (next.status === 'ready' && next.agenda !== undefined)
+              store.applyAgenda({ kind: 'select', key: next.agenda.selectedKey, cursor: selection.start + 1 })
+          }
+        }
         return
       }
       if (primary && event.key === 'Enter') {
@@ -146,7 +152,6 @@ export function createEditorKeyDownHandler({
         nodeTextLength(event.currentTarget) === 0
       ) {
         event.preventDefault()
-        if (node.children.length === 0) store.deleteEmptySelected()
         return
       }
       if (primary && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'p') {
@@ -265,7 +270,6 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       if (event.key === 'Escape') {
         const committed = vim.finishReplace(event.currentTarget, true)
-        store.cancelAgendaMove()
         vim.setMode('normal')
         if (!committed) {
           const prior = vim.getCaretState(node.id, cursor, node.attachment !== undefined && cursor === node.text.length)
@@ -351,7 +355,6 @@ export function createEditorKeyDownHandler({
         // finish path below consumes it without recording (PRODUCT §20.2.19).
         vim.finishInsert(event.currentTarget, true)
         clearCommandAssembly(vim.commandState)
-        store.cancelAgendaMove()
         vim.setMode('normal')
         const input = event.currentTarget
         const prior = vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret'))

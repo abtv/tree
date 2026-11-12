@@ -22,9 +22,9 @@ Keep projects, notes, and ideas in one outline. Expand the branches you are work
 
 The same outline, focused on “Plan the first meetup”: the node text and expanded branches are unchanged. The breadcrumb path keeps its place in the larger project visible. Here, the dark appearance and Vim Normal mode are enabled.
 
-<img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing the same outline's dated nodes grouped under days from Monday October 5 to Thursday October 15, with Thursday October 8 marked as today.">
+<img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing dated nodes grouped by day with passive parent paths and an empty Today anchor.">
 
-The Agenda gathers the dated nodes of the same outline into a timeline of days. Each occurrence keeps its place in the outline through its ancestors, and Today is marked.
+The Agenda gathers the dated nodes of the same outline into a timeline of days. Passive parent paths show each entry's context, and Today is marked. Days fold; entries remain a flat list.
 
 <img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
 

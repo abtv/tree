@@ -13,19 +13,9 @@ export function agendaDateLabel(day: DayNumber, today: DayNumber, weekday = fals
 
 export const AGENDA_INVALID_ITEM_HINT = 'Add a date to keep this item in Agenda'
 
-export function agendaPendingMoveMessage(count: number): string {
-  return `Moving ${count} ${count === 1 ? 'item' : 'items'} · p to put · Esc to cancel`
-}
-
-/**
- * The transient status-bar message; at most one exists at a time. A pending move and an invalid item cannot
- * coexist, because any text edit cancels the move and only a text edit makes an item invalid.
- */
-export function agendaStatusMessage(
-  agenda: Pick<AgendaState, 'pinnedOccurrence' | 'pendingMove'> | undefined,
-): string | undefined {
-  if (agenda?.pinnedOccurrence !== undefined) return AGENDA_INVALID_ITEM_HINT
-  return agenda?.pendingMove === undefined ? undefined : agendaPendingMoveMessage(agenda.pendingMove.length)
+/** The invalid-item hint is runtime-only and does not alter row heights. */
+export function agendaStatusMessage(agenda: Pick<AgendaState, 'pinnedOccurrence'> | undefined): string | undefined {
+  return agenda?.pinnedOccurrence === undefined ? undefined : AGENDA_INVALID_ITEM_HINT
 }
 
 /** A live mirror is another day's occurrence of the node whose occurrence is active. */
@@ -37,19 +27,11 @@ export function isAgendaMirror(
   return row.role === 'match' && active !== undefined && active.nodeId === row.nodeId && active.day !== row.day
 }
 
-export function agendaGapLabel(start: DayNumber, end: DayNumber, today: DayNumber): string {
-  return `${end - start + 1} empty days · ${agendaDateLabel(start, today)} – ${agendaDateLabel(end, today)}`
-}
-
 /**
- * The source text of a day or gap row as drawn: CSS only changes its case, so these offsets are the
- * caret offsets of the row (`docs/PRODUCT.md` §23.4). The focused-day heading has no `· TODAY` suffix.
+ * The source text of a day row as drawn; these offsets are the
+ * caret offsets of the row (`docs/PRODUCT.md` §23.4). The Today badge is separate presentation.
  */
-export function agendaRowLabel(
-  row: AgendaRow & { readonly kind: 'day' | 'gap' },
-  today: DayNumber,
-  heading = false,
-): string {
-  if (row.kind === 'gap') return agendaGapLabel(row.startDay, row.endDay, today)
-  return `${agendaDateLabel(row.day, today, true)}${row.isToday && !heading ? ' · TODAY' : ''}`
+export function agendaRowLabel(row: AgendaRow & { readonly kind: 'day' }, today: DayNumber, heading = false): string {
+  if (!heading && !row.content) return row.isToday ? 'No entries for today' : 'No entries for this day'
+  return agendaDateLabel(row.day, today, true)
 }

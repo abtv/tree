@@ -78,7 +78,6 @@ export function SearchPrompt({
             else store.openAgenda(active instanceof HTMLElement ? getCaret(active) : undefined)
           } else if (event.key === 'Escape') {
             event.preventDefault()
-            store.cancelAgendaMove()
             store.hideSearch()
             restoreEditor()
           } else if (event.key === 'Enter') {

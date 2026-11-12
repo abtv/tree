@@ -5,7 +5,6 @@ import type { VimTextCommandState } from './vim-session-finish'
 import { viewportBounds, viewportScrollEdges, viewportScroller } from './scroll-viewport'
 import { contextViewport, viewportMotionTarget } from './vim-viewport-motion'
 import { getCaret } from './editor-dom'
-import { agendaAllows } from './agenda-key-policy'
 import type { AgendaRow } from '../application/agenda-rows'
 import { handleRowTextKey, rowCaretMode } from './agenda-row-text-keys'
 import { arrivalCaret, clampCaret, type RowCaret } from './agenda-row-caret'
@@ -276,7 +275,7 @@ export function createAgendaKeyDownHandler({
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         beforeSelect?.(false)
-        store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key: row.key })
+        store.applyAgenda({ kind: 'toggle-fold', key: row.key })
       } else if (event.key.toLowerCase() === 'z') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
@@ -300,7 +299,6 @@ export function createAgendaKeyDownHandler({
     }
     event.preventDefault()
     if (event.key === 'Escape') {
-      store.cancelAgendaMove()
       if (vim?.mode === 'normal' && store.search.session.getSnapshot().visible) store.hideSearch()
       if (rowText !== undefined && vim?.mode === 'visual') {
         // Leaving Visual keeps its active endpoint, as in Tree.
@@ -331,7 +329,7 @@ export function createAgendaKeyDownHandler({
       const origin =
         row.kind === 'node'
           ? { nodeId: row.nodeId, day: row.day, offset: sourceCursor() }
-          : { beforeDay: row.kind === 'day' ? row.day : row.startDay, offset: 0 }
+          : { beforeDay: row.day, offset: 0 }
       clearCommandAssembly(vim.commandState)
       if (event.key === '/') store.search.begin(origin)
       else store.search.navigate(origin, event.key === 'n' ? 1 : -1, Math.max(1, Number(pending?.count || '1')))
@@ -347,11 +345,9 @@ export function createAgendaKeyDownHandler({
       return
     }
     if (normal && !event.ctrlKey && !event.altKey && pending?.prefix === undefined) {
-      const element = row.kind === 'node' ? row.role : row.kind
       if (event.key === 'd') {
         if (pending?.operator === 'd') {
           clearPending(vim.commandState)
-          if (agendaAllows(element, 'start-move')) store.startAgendaMove(count)
         } else vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', operator: 'd' }
         return
       }
@@ -364,27 +360,11 @@ export function createAgendaKeyDownHandler({
         vim.commandState.pending = { count: pending?.count ?? '', motionCount: '', operator: event.key }
         return
       }
-      // A gap has no day, so `p` there is not allowed and the move stays pending (D4).
+      // Read-only row text never accepts a put.
       if ((event.key === 'p' || event.key === 'P') && pending?.operator === undefined) {
         clearPending(vim.commandState)
-        if (agendaAllows(element, 'put-move')) store.putAgendaMove()
         return
       }
-    }
-    // Creation is a command key, so a count or pending prefix never reaches it.
-    const vimCreate =
-      normal && (event.key === 'o' || event.key === 'O') && !event.ctrlKey && !event.altKey && !pending?.count
-    if (
-      row.kind === 'day' &&
-      agendaAllows('day', 'create') &&
-      pending?.prefix === undefined &&
-      ((vim === undefined && event.key === 'Enter' && !event.ctrlKey && !event.altKey) || vimCreate)
-    ) {
-      if (vim !== undefined) clearPending(vim.commandState)
-      beforeSelect?.(false)
-      if (store.createAgendaDayNode(event.key === 'O' ? 'preceding' : 'selected') && vim !== undefined)
-        vim.setMode('insert')
-      return
     }
     if (
       normal &&
@@ -415,16 +395,7 @@ export function createAgendaKeyDownHandler({
         R: 'open-all',
       } as const
       const operation = operations[event.key as keyof typeof operations]
-      if (operation !== undefined) {
-        if (row.kind === 'gap' && operation !== 'close-all' && operation !== 'open-all') {
-          if (
-            operation === 'toggle' ||
-            (operation === 'open' && !row.expanded) ||
-            (operation === 'close' && row.expanded)
-          )
-            store.applyAgenda({ kind: 'toggle-gap', key: row.key })
-        } else store.applyAgenda({ kind: 'fold', key: row.key, operation })
-      }
+      if (operation !== undefined) store.applyAgenda({ kind: 'fold', key: row.key, operation })
       return
     }
     if (event.ctrlKey) {

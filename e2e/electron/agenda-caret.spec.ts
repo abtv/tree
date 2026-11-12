@@ -29,7 +29,7 @@ function seed(userDataDir: string): void {
   })
 }
 
-const TODAY_LABEL = 'Thu Oct 8 · TODAY'
+const TODAY_LABEL = 'No entries for today'
 
 interface Mark {
   text: string
@@ -63,7 +63,9 @@ const selectionText = (row: Locator): Promise<string | undefined> =>
 
 describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.4
-  test('carries the caret through a day and contextual ancestor into another editor', async ({ userDataDir }) => {
+  test('carries the caret through a day into another editor while skipping its passive path', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -109,11 +111,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.emulateMedia({ colorScheme: 'light' })
     await window.keyboard.press(down)
 
-    await expect(selected).toHaveAttribute('data-node-id', 'parent')
-    expect((await caretMark(selected))!.before).toBe(5)
-
-    await window.keyboard.press(down)
-
+    await expect(window.locator('.agenda-path-label')).toContainText(['Context ancestor'])
     await expect(selected).toHaveAttribute('data-node-id', 'second')
     expect(
       await selected.locator('.node-input').evaluate((input) => {
@@ -128,7 +126,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   })
 
   // @requirement PRODUCT.md §23.4
-  test('shows the caret on days, gaps and contextual ancestors but not on unselected rows', async ({ userDataDir }) => {
+  test('shows the caret only on the selected day and skips path labels', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
 
@@ -156,29 +154,21 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       }
     }
 
-    await expectCaret(today, 'T')
+    await expectCaret(today, 'N')
 
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
 
-    await expect(selected).toContainText('Fri Oct 9')
-    await expectCaret(selected, 'F')
+    await expect(selected).toContainText('Wed Oct 14')
+    await expectCaret(selected, 'W')
     expect(await caretMark(today)).toBeUndefined()
 
-    const gap = window.locator('.agenda-row-gap').first()
+    await window.keyboard.press('ArrowDown')
 
-    await gap.click()
-
-    await expect(gap).toHaveAttribute('aria-selected', 'true')
-    await expectCaret(gap, '1')
-
-    const work = window.locator('.agenda-row[data-node-id="work"]').first()
-
-    await work.click()
-
-    await expect(work).toHaveAttribute('aria-selected', 'true')
-    await expectCaret(work, 'W')
-    expect(await caretMark(gap)).toBeUndefined()
+    await expect(selected).toHaveAttribute('data-node-id', 'prepare')
+    await expect(window.locator('.agenda-path-label')).toHaveText(['Work › Team A', 'Work › Team A'])
+    expect(await caretMark(today)).toBeUndefined()
+    await expect(window.locator('.agenda-path-label .agenda-caret')).toHaveCount(0)
   })
 
   // @requirement PRODUCT.md §23.4
@@ -237,7 +227,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
       await window.keyboard.press('$')
 
-      expect((await caretMark(today))!).toMatchObject({ before: TODAY_LABEL.length - 1, text: 'Y' })
+      expect((await caretMark(today))!).toMatchObject({ before: TODAY_LABEL.length - 1, text: 'y' })
 
       await window.keyboard.press('l')
 
@@ -252,18 +242,18 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
       expect((await caretMark(today))!.before).toBe(0)
 
-      await window.keyboard.type('fO')
+      await window.keyboard.type('fe')
 
-      expect((await caretMark(today))!.before).toBe(4)
+      expect((await caretMark(today))!.before).toBe(3)
 
       await window.keyboard.type('w')
 
-      expect((await caretMark(today))!.before).toBe(8)
+      expect((await caretMark(today))!.before).toBe(11)
 
       await window.keyboard.type('0vee')
 
       await expect(window.locator('.vim-mode-indicator, [aria-label="Vim mode"]').first()).toHaveText('VISUAL')
-      expect(await selectionText(today)).toBe('Thu Oct')
+      expect(await selectionText(today)).toBe('No entries')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
 
       await window.emulateMedia({ colorScheme: 'dark' })
@@ -274,14 +264,14 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await lockSystemClipboard()
       await window.keyboard.press('y')
 
-      await expect.poll(clipboard).toBe('Thu Oct')
+      await expect.poll(clipboard).toBe('No entries')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       expect((await caretMark(today))!.before).toBe(0)
 
       await window.keyboard.press('l')
       await window.keyboard.press('Meta+c')
 
-      await expect.poll(clipboard).toBe('h')
+      await expect.poll(clipboard).toBe('o')
 
       for (const exitKey of ['Escape', 'v']) {
         for (const [keys, endpoint] of [
@@ -311,7 +301,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.keyboard.press('Shift+ArrowRight')
       await window.keyboard.press('Shift+ArrowRight')
 
-      expect(await selectionText(today)).toBe('u O')
+      expect(await selectionText(today)).toBe(' en')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
 
       await window.emulateMedia({ colorScheme: 'dark' })
@@ -322,7 +312,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await lockSystemClipboard()
       await window.keyboard.press('Meta+c')
 
-      await expect.poll(clipboard).toBe('u O')
+      await expect.poll(clipboard).toBe(' en')
 
       await window.keyboard.press('ArrowLeft')
 

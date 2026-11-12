@@ -163,7 +163,6 @@ export function handleVimKey(
       return true
     }
     if (event.key === 'Escape' || event.key === 'V') {
-      if (event.key === 'Escape') store.cancelAgendaMove()
       vim.nodeVisual.exit()
       // Whole-node Visual mode can hold only the pending `g` prefix; a prefix that survived the
       // exit would be read as a Normal-mode continuation (`d` would run `gd`).
@@ -268,7 +267,6 @@ export function handleVimKey(
     if (!visual && store.search.session.getSnapshot().visible) store.hideSearch()
     const exitCursor = visual ? motionCursor : selection.start
     clearCommandAssembly(commandState)
-    store.cancelAgendaMove()
     vim.setMode('normal')
     syncImageCaretAtCursor(vim, node, input, exitCursor)
     return handled()
@@ -340,18 +338,12 @@ export function handleVimKey(
   if (snapshot.status === 'ready' && snapshot.agenda !== undefined) {
     // Awaited characters and surround delimiters above are text, even when they look like commands.
     const plainPut = !visual && ['p', 'P'].includes(event.key) && !pending.operator && !pending.prefix
-    // `dd` never deletes in Agenda: it marks the node for a move, and a counted form marks the following rows too.
+    // Consume dd before Tree's node-deletion dispatch.
     if (!visual && pending.operator === 'd' && event.key === 'd' && pending.prefix === undefined) {
       clearPending(commandState)
-      if (agendaAllows('match', 'start-move')) store.startAgendaMove(totalCount)
       return handled()
     }
-    if (plainPut && snapshot.agenda.pendingMove !== undefined) {
-      clearPending(commandState)
-      if (agendaAllows('match', 'put-move')) store.putAgendaMove()
-      return handled()
-    }
-    // Without a pending move a text register puts as ordinary editing; a node register has nothing to put (D1).
+    // Only a text register can put inside an existing Agenda node.
     const textPut = plainPut && vim.register.current.kind === 'text'
     if (!visual && pending.operator === undefined && pending.prefix === 'g' && event.key === 'd') {
       createAgendaKeyDownHandler({ store, vim, shortcuts })(event)
@@ -365,21 +357,6 @@ export function handleVimKey(
       (['d', 'y', 'c'].includes(pending.operator ?? '') && ['j', 'k'].includes(event.key)) ||
       (!visual && ['p', 'P'].includes(event.key) && !textPut) ||
       (!visual && event.key === '.' && commandState.lastChange?.kind.startsWith('structural-'))
-    if (
-      !visual &&
-      (event.key === 'o' || event.key === 'O') &&
-      pending.operator === undefined &&
-      pending.prefix === undefined
-    ) {
-      // A count never reaches creation; the dated sibling starts Insert like the Tree command, without a structural repeat record.
-      const created =
-        pending.count === '' &&
-        agendaAllows('match', 'open-sibling') &&
-        store.createAgendaSibling(event.key === 'o' ? 'after' : 'before')
-      clearPending(commandState)
-      if (created) vim.setMode('insert')
-      return handled()
-    }
     if (structural && !agendaAllows('match', 'structure')) {
       clearPending(commandState)
       return handled()

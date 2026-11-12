@@ -42,6 +42,106 @@ export function ready(store: EditorStore): ReadySnapshot {
 
 afterEach(() => vi.useRealTimers())
 
+// @requirement PRODUCT.md §23.9
+it('attaches the first clipboard image in Agenda and rejects a second before writing or creating a sibling', async () => {
+  vi.useFakeTimers()
+  const { store, services } = await agendaHarness()
+  services.readClipboard = async () => ({ kind: 'image', png: new Uint8Array([1, 2]) })
+  const write = vi.spyOn(services, 'writeAttachment')
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:outside` })
+
+  await store.paste('outside', '2026-10-08 Outside'.length)
+  await store.flushPersistence()
+  const before = ready(store)
+
+  expect(before.document.roots[1]!.attachment).toEqual({ id: 'unused', mimeType: 'image/png' })
+  expect(write).toHaveBeenCalledExactlyOnceWith('unused', new Uint8Array([1, 2]))
+
+  await store.paste('outside', '2026-10-08 Outside'.length)
+  await store.flushPersistence()
+
+  expect(write).toHaveBeenCalledTimes(1)
+  expect(ready(store).document).toBe(before.document)
+  expect(ready(store).focus).toBe(before.focus)
+
+  store.undo()
+
+  expect(ready(store).document).toEqual({ roots })
+})
+
+// @requirement PRODUCT.md §23.9
+it('keeps concurrent image pastes in Agenda from creating a sibling after an attachment write completes', async () => {
+  vi.useFakeTimers()
+  const writes: (() => void)[] = []
+  let id = 0
+  const document = { roots: [{ id: 'image', text: '2026-10-08 Image', children: [] }] }
+  const store = new EditorStore(
+    {
+      today: () => today,
+      load: async () => ({
+        version: 1,
+        document,
+        location: { currentParentId: null, selectedNodeId: 'image' },
+      }),
+      save: async () => undefined,
+      readClipboard: async () => ({ kind: 'image', png: new Uint8Array([1, 2]) }),
+      writeAttachment: () => new Promise<void>((resolve) => writes.push(resolve)),
+      cleanupAttachments: async () => undefined,
+    },
+    () => `attachment-${++id}`,
+  )
+  await store.initialize()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:image` })
+
+  const first = store.paste('image', 0)
+  const second = store.paste('image', 0)
+  await vi.waitFor(() => expect(writes).toHaveLength(2))
+  writes[0]!()
+  await first
+  writes[1]!()
+  await second
+  await store.flushPersistence()
+
+  expect(ready(store).document.roots).toEqual([
+    { ...document.roots[0], attachment: { id: 'attachment-1', mimeType: 'image/png' } },
+  ])
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today}:image`)
+
+  store.undo()
+
+  expect(ready(store).document).toEqual(document)
+})
+
+// @requirement PRODUCT.md §20.2.26
+it.each(['toggle-fold', 'fold'] as const)(
+  'preserves a manual %s choice after leaving a search-opened day',
+  async (kind) => {
+    vi.useFakeTimers()
+    const { store } = await agendaHarness()
+    const key = `day:${today + 6}`
+    store.openAgenda()
+    store.applyAgenda({ kind: 'fold', key, operation: 'close' })
+    store.search.begin(store.searchOrigin(0))
+    store.search.edit('Match')
+    store.search.confirm()
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(ready(store).agenda!.collapsed.has(key)).toBe(false)
+
+    if (kind === 'fold') store.applyAgenda({ kind, key, operation: 'open' })
+    else {
+      store.applyAgenda({ kind, key })
+      store.applyAgenda({ kind, key })
+    }
+    store.applyAgenda({ kind: 'select', key: `node:${today}:outside` })
+    store.hideSearch()
+
+    expect(ready(store).agenda!.collapsed.has(key)).toBe(false)
+  },
+)
+
 it.each(['node', 'day'] as const)('preserves Agenda %s focus after undoing net-zero typing', async (kind) => {
   const { store } = await agendaHarness()
   store.editText('outside', '2026-10-08 Changed')
@@ -59,40 +159,11 @@ it.each(['node', 'day'] as const)('preserves Agenda %s focus after undoing net-z
   await store.flushPersistence()
 })
 
-it('resets the moved occurrence cursor when the move is put from another focused node', async () => {
-  const { store } = await agendaHarness()
-  store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 13 })
-  expect(store.startAgendaMove()).toBe(true)
-  store.applyAgenda({ kind: 'select', key: `node:${today + 20}:other`, cursor: 4 })
-
-  expect(store.putAgendaMove()).toBe(true)
-
-  expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 0 })
-  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 20}:match`)
-  await store.flushPersistence()
-})
-
-it('separates typing after moving the active Agenda occurrence', async () => {
-  const { store } = await agendaHarness()
-  store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 13 })
-  store.editText('match', '2026-10-14 First')
-
-  expect(store.moveAgendaOccurrences([{ nodeId: 'match', day: today + 6 }], today + 20)).toBe(true)
-  const moved = ready(store).document
-  store.editText('match', '2026-10-28 Second')
-  store.undo()
-
-  expect(ready(store).document).toEqual(moved)
-  await store.flushPersistence()
-})
-
-it('keeps search ownership when an opened Agenda context is selected without folding it', async () => {
+it('keeps search ownership when an opened Agenda day is selected without folding it', async () => {
   vi.useFakeTimers()
   const { store } = await agendaHarness()
   store.openAgenda()
-  const contextKey = `node:${today + 6}:context`
+  const contextKey = `day:${today + 6}`
   store.applyAgenda({ kind: 'fold', key: contextKey, operation: 'close' })
   store.search.begin(store.searchOrigin(0))
   store.search.edit('Match')
@@ -177,19 +248,19 @@ it('keeps a restored date folded when undo changes the active occurrence day', a
   await store.flushPersistence()
 })
 
-it('closes hidden descendants too when recursively folding an Agenda day', async () => {
+it('recursive day folds hide the flat entries and opening the day restores them', async () => {
   const { store } = await agendaHarness()
   store.openAgenda()
   store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 6}:scope` })
 
   store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'close-recursive' })
 
-  expect(ready(store).agenda?.collapsed.has(`node:${today + 6}:context`)).toBe(true)
+  expect([...ready(store).agenda!.collapsed]).toEqual([`day:${today + 6}`])
 
   store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'open' })
   store.applyAgenda({ kind: 'fold', key: `node:${today + 6}:scope`, operation: 'open' })
 
-  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'match')).toBe(false)
+  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'match')).toBe(true)
 })
 
 it('restores the real selection from another day when returning to the timeline', async () => {
@@ -215,7 +286,7 @@ it('returns to a visible day when the timeline selection was an expired pin', as
 
   store.applyAgenda({ kind: 'return-timeline', key: `day:${today}` })
 
-  expect(ready(store).agenda?.selectedKey).toBe(`day:${today + 3}`)
+  expect(ready(store).agenda?.selectedKey).toBe(`day:${today}`)
   expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda?.selectedKey)).toBe(true)
 })
 
@@ -264,7 +335,7 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
 })
 
 // @requirement PRODUCT.md §23.8
-it('history preserves Agenda folds/reveals and focus for hidden or out-of-scope changes', async () => {
+it('history preserves Agenda day folds and focus for hidden or out-of-scope changes', async () => {
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.editText('outside', '2026-10-08 Changed outside')
@@ -286,16 +357,12 @@ it('history preserves Agenda folds/reveals and focus for hidden or out-of-scope 
   expect(ready(store).focus).toBe(before.focus)
 
   store.editText('match', '2026-10-14 Changed')
-  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 6}:context` })
-  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
-
-  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
   const folded = ready(store)
 
   store.undo()
 
   expect(ready(store).agenda!.collapsed).toBe(folded.agenda!.collapsed)
-  expect(ready(store).agenda!.revealed).toBe(folded.agenda!.revealed)
   expect(ready(store).agenda!.selectedKey).toBe(folded.agenda!.selectedKey)
   expect(ready(store).focus).toBe(folded.focus)
   expect(ready(store).location.currentParentId).toBe('scope')
@@ -304,13 +371,13 @@ it('history preserves Agenda folds/reveals and focus for hidden or out-of-scope 
 })
 
 // @requirement PRODUCT.md §23.7
-it('clears a pin when its contextual ancestor is selected, maintaining a valid visible selection', async () => {
+it('clears a pin when its day is selected, maintaining a valid visible selection', async () => {
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.openAgenda()
   store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
   store.editText('match', 'No date')
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:context` })
+  store.applyAgenda({ kind: 'select', key: `day:${today + 6}` })
 
   expect(ready(store).agenda!.pinnedOccurrence).toBeUndefined()
   expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda!.selectedKey)).toBe(true)
@@ -342,8 +409,10 @@ it('closes Agenda when its scope disappears and normalizes a deleted origin on c
 
   const origin = await agendaHarness()
 
-  origin.store.openAgenda()
   origin.store.deleteSelected()
+  origin.store.undo()
+  origin.store.openAgenda()
+  origin.store.redo()
   origin.store.closeAgenda()
 
   expect(ready(origin.store).location.selectedNodeId).toBe('outside')
@@ -402,17 +471,14 @@ it('publishes the change-site cursor and real-node selection when history switch
 })
 
 // @requirement PRODUCT.md §23.8
-it('uses the selected day for history proximity and focuses contextual change sites', async () => {
+it('uses the selected day for history proximity and retains focus for path-only change sites', async () => {
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.editText('match', '2026-10-14 Match 2026-10-20')
   store.endTextSession()
   store.editText('match', '2026-10-14 Changed 2026-10-20')
   store.openAgenda()
-  const gap = store.getAgendaRows().find((row) => row.kind === 'gap' && row.startDay === today + 7)!
-
-  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
-  store.applyAgenda({ kind: 'select', key: `day:${today + 10}` })
+  store.applyAgenda({ kind: 'select', key: `day:${today + 12}` })
   store.undo()
 
   expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 12}:match`)
@@ -427,11 +493,10 @@ it('uses the selected day for history proximity and focuses contextual change si
 
   store.undo()
 
-  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 12}:context`)
-  expect(ready(store).agenda!.activeOccurrence).toBeUndefined()
-  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
-  expect(ready(store).focus).toMatchObject({ nodeId: 'context', cursor: 0 })
-  expect(ready(store).focus.token).toBeGreaterThan(before.token)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 20}:other`)
+  expect(ready(store).agenda!.activeOccurrence).toEqual({ nodeId: 'other', day: today + 20 })
+  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'other' })
+  expect(ready(store).focus).toBe(before)
 
   await store.flushPersistence()
 })
@@ -440,10 +505,10 @@ it('history keeps a valid Root location when deleting the selected last projecte
   const { store } = await agendaHarness()
 
   store.editText('outside', 'Undated outside')
-  store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
   store.deleteSelected()
   store.undo()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
 
   expect(ready(store).location.selectedNodeId).toBe('scope')
 
@@ -466,7 +531,7 @@ it('ends text grouping at open, close, day selection, and real-row reselection',
     store.editText('scope', '2026-10-08 First')
     if (transition === 'open') store.openAgenda()
     else if (transition === 'close') store.closeAgenda()
-    else store.applyAgenda({ kind: 'select', key: transition === 'day' ? `day:${today + 1}` : key })
+    else store.applyAgenda({ kind: 'select', key: transition === 'day' ? `day:${today + 6}` : key })
 
     store.editText('scope', '2026-10-08 Second')
     store.closeAgenda()
@@ -615,45 +680,27 @@ it('publishes real-row selection and focus atomically, including reselection, an
   expect(ready(store)).toBe(snapshot)
 })
 
-it('keeps folds and gap reveals runtime-only and returns hidden selection to its folding row', async () => {
+it('keeps day folds runtime-only and returns hidden selection to its day', async () => {
   const { store, save } = await agendaHarness()
-
   store.openAgenda()
   const original = ready(store)
-  const nodes = store.getAgendaRows().filter((row) => row.kind === 'node')
-  const match = nodes.find((row) => row.nodeId === 'match')!
-  const context = nodes.find((row) => row.nodeId === 'context')!
+  const key = `node:${today + 6}:match`
 
-  store.applyAgenda({ kind: 'select', key: match.key })
-  store.applyAgenda({ kind: 'toggle-fold', key: context.key })
+  store.applyAgenda({ kind: 'select', key })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
 
-  expect(ready(store)).toMatchObject({
-    agenda: { selectedKey: context.key },
-    location: { selectedNodeId: 'context' },
-    focus: { nodeId: 'context', cursor: 0 },
-  })
-  expect(store.getAgendaRows().some((row) => row.key === match.key)).toBe(false)
+  expect(ready(store).agenda!.selectedKey).toBe(`day:${today + 6}`)
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(false)
 
-  store.applyAgenda({ kind: 'toggle-fold', key: context.key })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
 
-  expect(store.getAgendaRows().some((row) => row.key === match.key)).toBe(true)
-
-  const gap = store.getAgendaRows().find((row) => row.kind === 'gap')!
-
-  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
-
-  expect(ready(store).agenda!.revealed.size).toBe(7)
-
-  store.applyAgenda({ kind: 'toggle-gap', key: gap.key })
-
-  expect(ready(store).agenda!.revealed.size).toBe(0)
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
   expect(ready(store).expansion).toBe(original.expansion)
   expect(ready(store).document).toBe(original.document)
 
   await store.flushPersistence()
 
   expect(save).not.toHaveBeenCalled()
-
   store.closeAgenda()
 })
 

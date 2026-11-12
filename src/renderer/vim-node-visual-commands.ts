@@ -1,5 +1,4 @@
 import type { EditorStore, NodeVisualCommand } from '../application/editor-store'
-import { agendaVisualTarget } from '../application/agenda-visual-selection'
 import { locateNode, requireNode } from '../domain/document'
 import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 import { isNodeExpanded } from '../application/expansion-state'
@@ -72,20 +71,7 @@ export function moveNodeVisual(deps: MoveNodeVisualDeps, direction: 'up' | 'down
   const { store, commandState, nodeVisualSelection, setNodeVisualSelection, syncImageCaretToFocus } = deps
   const state = store.getSnapshot()
   if (state.status !== 'ready' || nodeVisualSelection === undefined) return
-  if (state.agenda !== undefined) {
-    const target = agendaVisualTarget(
-      store.getAgendaRows(),
-      state.agenda.activeOccurrence?.day ?? NaN,
-      nodeVisualSelection,
-      direction,
-      count,
-    )
-    if (target === undefined || target.nodeId === nodeVisualSelection.focusId) return
-    setNodeVisualSelection({ ...nodeVisualSelection, focusId: target.nodeId })
-    store.applyAgenda({ kind: 'select', key: target.key })
-    syncImageCaretToFocus()
-    return
-  }
+  if (state.agenda !== undefined) return
   // Whole-node Visual extension stays within the focused node's actual sibling array, whatever
   // depth it is displayed at through inline expansion.
   const located = locateNode(state.document, nodeVisualSelection.focusId)
@@ -130,14 +116,7 @@ export function commandNodeVisual(deps: CommandNodeVisualDeps, command: NodeVisu
   if (nodeVisualSelection === undefined) return
   const state = store.getSnapshot()
   if (state.status !== 'ready') return
-  if (state.agenda !== undefined) {
-    if (command !== 'd' || !store.startAgendaMove(1, nodeVisualSelection)) return
-    clearCommandAssembly(commandState)
-    setNodeVisualSelection(undefined)
-    changeVimMode('normal')
-    syncImageCaretToFocus()
-    return
-  }
+  if (state.agenda !== undefined) return
   // The anchor and focus of a whole-node Visual range always share a real parent (see
   // `moveNodeVisual`), so the anchor's actual siblings resolve the span.
   const anchorLocated = locateNode(state.document, nodeVisualSelection.anchorId)

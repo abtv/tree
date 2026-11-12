@@ -32,7 +32,6 @@ const config = {
     'src/renderer/node-drag.ts',
     'src/renderer/list-window.ts',
     'src/renderer/agenda-key-policy.ts',
-    'src/renderer/agenda-drop-targets.ts',
     'src/renderer/completion-controller.ts',
     'src/renderer/completion-sources.ts',
     'src/renderer/shortcut-profile.ts',

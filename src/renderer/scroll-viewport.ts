@@ -91,6 +91,17 @@ export function revealRectInViewport(rect: DOMRect, keepContext = false, element
   else scrollRevealBy(Math.min(rect.bottom - (bottom - margin), rect.top - top), margin)
 }
 
+/** Opening a grouped view centers its complete destination, or shows the start of an oversized block. */
+export function centerRectInViewport(rect: DOMRect): void {
+  if (rect.width === 0 && rect.height === 0) return
+  const { top, bottom } = viewportBounds()
+  const height = bottom - top
+  const margin = contextMargin(rect.height, height)
+  const target = rect.height > height - margin * 2 ? top + margin : top + (height - rect.height) / 2
+  const delta = rect.top - target
+  if (Math.abs(delta) >= 1) scrollViewportBy(delta)
+}
+
 /**
  * Scrolls by the distance, except that a scroll position closer to the start or end of the content
  * than two margins goes all the way there, so every way of reaching the document edge — walking,

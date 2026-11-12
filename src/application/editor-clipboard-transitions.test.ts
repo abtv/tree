@@ -3,6 +3,65 @@ import type { Document } from '../domain/document'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 
 describe('editor clipboard transitions', () => {
+  // @requirement PRODUCT.md §23.9
+  it.each(['\r\n', '\r'])('normalizes plain multiline Agenda text with %j line endings', (lineBreak) => {
+    const result = textPasteTransition(
+      { roots: [{ id: 'root', text: 'abc', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+      'root',
+      2,
+      { kind: 'text', text: `one${lineBreak}two` },
+      () => [],
+      true,
+    )
+
+    expect(result.document.roots).toEqual([{ id: 'root', text: 'abone\ntwoc', children: [] }])
+    expect(result.focus).toEqual({ nodeId: 'root', cursor: 9 })
+  })
+
+  // @requirement PRODUCT.md §23.9
+  it('normalizes line endings and link offsets while keeping a multiline Agenda paste in its existing node', () => {
+    const document: Document = {
+      roots: [{ id: 'root', text: 'abcdef', attachment: { id: 'image', mimeType: 'image/png' }, children: [] }],
+    }
+    const createIds = () => {
+      throw new Error('Agenda paste cannot create nodes')
+    }
+
+    const result = textPasteTransition(
+      document,
+      { currentParentId: null, selectedNodeId: 'root' },
+      'root',
+      3,
+      {
+        kind: 'text',
+        text: 'Xhttps://a.test\r\nYhttps://b.test\rZhttps://c.test\r\n',
+        links: [
+          { start: 1, end: 15, url: 'https://a.test' },
+          { start: 18, end: 32, url: 'https://b.test' },
+          { start: 34, end: 48, url: 'https://c.test' },
+        ],
+      },
+      createIds,
+      true,
+    )
+
+    expect(result.document.roots).toEqual([
+      {
+        id: 'root',
+        text: 'abcXhttps://a.test\nYhttps://b.test\nZhttps://c.test\ndef',
+        links: [
+          { start: 4, end: 18, url: 'https://a.test' },
+          { start: 20, end: 34, url: 'https://b.test' },
+          { start: 36, end: 50, url: 'https://c.test' },
+        ],
+        attachment: { id: 'image', mimeType: 'image/png' },
+        children: [],
+      },
+    ])
+    expect(result.focus).toEqual({ nodeId: 'root', cursor: 51 })
+  })
+
   it('normalizes a copied selection, keeps complete links, and produces escaped rich HTML', () => {
     const document: Document = {
       roots: [

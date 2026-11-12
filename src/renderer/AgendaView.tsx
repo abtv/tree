@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
-import type { AgendaState } from '../application/agenda-state'
+import { dayKey, type AgendaState } from '../application/agenda-state'
+import { label } from '../application/recent-nodes'
 import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
@@ -19,8 +20,6 @@ import { agendaListWindow } from './agenda-list-layout'
 import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
 import { shouldWindow } from './list-window'
 import { agendaRowLabel, isAgendaMirror } from './agenda-labels'
-import { isPendingMoveSource } from '../application/agenda-pending-move'
-import { agendaVisualSources, type AgendaVisualEndpoints } from '../application/agenda-visual-selection'
 import {
   notifyViewportLayout,
   onViewportScroll,
@@ -28,8 +27,6 @@ import {
   viewportBounds,
   viewportScroller,
 } from './scroll-viewport'
-import type { NodeDragCaretFreeze } from './drag-caret-freeze'
-import { useAgendaDrag } from './use-agenda-drag'
 import type { ShortcutProfile } from './shortcut-profile'
 
 /** A direct match owns an editor when it is the active occurrence or has at most one date. */
@@ -54,9 +51,6 @@ export function AgendaView({
   renderInput,
   renderAttachment,
   renderText,
-  dragFreeze,
-  locked = false,
-  visualNodeSelection,
   shortcuts,
   searchCaretRef,
 }: {
@@ -66,9 +60,6 @@ export function AgendaView({
   store: EditorStore
   agenda: AgendaState
   document: Document
-  dragFreeze: NodeDragCaretFreeze
-  locked?: boolean
-  visualNodeSelection?: AgendaVisualEndpoints | undefined
   vim?: VimTextCommandState | undefined
   renderInput?: ((node: import('../domain/document').TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: import('../domain/document').TreeNode, editable: boolean) => ReactNode) | undefined
@@ -155,9 +146,15 @@ export function AgendaView({
   const width = useRef(globalThis.innerWidth)
   const [revision, setRevision] = useState(0)
   const [viewport, setViewport] = useState({ start: 0, end: 0 })
+  const followEnd = useRef(false)
   const reveal = useRef<'keyboard' | 'pointer' | 'none'>('keyboard')
   const viewportReveal = useMemo(() => createViewportReveal(), [])
-  useEffect(() => viewportReveal.mount(), [viewportReveal])
+  const openingReveal = useRef(true)
+  useLayoutEffect(() => {
+    // Development StrictMode replays mount effects; restore the opening intent after its cleanup.
+    openingReveal.current = true
+    return viewportReveal.mount()
+  }, [viewportReveal])
   const rows = store.getAgendaRows()
   const numbers = useMemo(() => (lineNumbers ? agendaLineNumbers(rows) : undefined), [lineNumbers, rows])
   const lineNumberCount = useMemo(() => rows.reduce((count, row) => count + Number(row.kind === 'node'), 0), [rows])
@@ -176,38 +173,33 @@ export function AgendaView({
     }
     lastPresentation.current = agenda
   }, [agenda, viewportReveal])
-  const visualDocument = useRef(document)
-  useEffect(() => {
-    const changed = visualDocument.current !== document
-    visualDocument.current = document
-    if (visualNodeSelection === undefined || vim === undefined) return
-    const sources = agendaVisualSources(rows, agenda.activeOccurrence?.day ?? NaN, visualNodeSelection)
-    if (changed || agenda.activeOccurrence?.nodeId !== visualNodeSelection.focusId || sources.length === 0) {
-      clearCommandAssembly(vim.commandState)
-      vim.setMode('normal')
-    }
-  }, [rows, agenda.activeOccurrence, visualNodeSelection, vim, document])
-  const visualKeys = new Set(
-    visualNodeSelection === undefined
-      ? []
-      : agendaVisualSources(rows, agenda.activeOccurrence?.day ?? NaN, visualNodeSelection).map(
-          (source) => `node:${source.day}:${source.nodeId}`,
-        ),
-  )
   const windowed = shouldWindow(rows.length)
   const [layoutState, setLayoutState] = useState(() => ({
     rows,
     revision: -1,
     layout: buildLayout(rows, EMPTY_HEIGHTS),
   }))
+  // Opening uses the complete day extent, including context labels and rows outside the mounted window.
+  const layout = layoutState.rows === rows ? layoutState.layout : buildLayout(rows, EMPTY_HEIGHTS)
+  const todayRange = useMemo(() => {
+    const start = rows.findIndex((row) => row.kind === 'day' && row.day === agenda.today)
+    let end = start + 1
+    while (start >= 0 && rows[end]?.kind === 'node') end++
+    return { start, end }
+  }, [rows, agenda.today])
+  const openingGeometry = useRef({ layout, range: todayRange })
+  useLayoutEffect(() => {
+    openingGeometry.current = { layout, range: todayRange }
+  }, [layout, todayRange])
   const rowRef = useCallback((key: string, element: HTMLDivElement | null): void => {
     const previous = elements.current.get(key)
-    if (previous !== undefined) observer.current?.unobserve(previous)
+    if (previous !== undefined) observer.current?.unobserve(previous.closest('.agenda-entry') ?? previous)
     if (element === null) elements.current.delete(key)
     else {
       elements.current.set(key, element)
-      observer.current?.observe(element)
-      measureElement(key, element, heights.current, setRevision)
+      const measured = element.closest<HTMLElement>('.agenda-entry') ?? element
+      observer.current?.observe(measured)
+      measureElement(key, measured, heights.current, setRevision)
     }
   }, [])
   useEffect(() => {
@@ -216,7 +208,7 @@ export function AgendaView({
       let changed = false
       for (const entry of entries) {
         const element = entry.target as HTMLElement
-        const key = element.dataset.agendaKey
+        const key = element.dataset.agendaMeasureKey ?? element.dataset.agendaKey
         const height = element.getBoundingClientRect().height
         if (key !== undefined && height > 0 && heights.current.get(key) !== height) {
           heights.current.set(key, height)
@@ -226,7 +218,7 @@ export function AgendaView({
       if (changed) setRevision((value) => value + 1)
     })
     observer.current = resizeObserver
-    elements.current.forEach((element) => resizeObserver.observe(element))
+    elements.current.forEach((element) => resizeObserver.observe(element.closest('.agenda-entry') ?? element))
     return () => {
       resizeObserver.disconnect()
       observer.current = undefined
@@ -237,7 +229,9 @@ export function AgendaView({
       if (width.current === globalThis.innerWidth) return
       width.current = globalThis.innerWidth
       heights.current.clear()
-      elements.current.forEach((element, key) => measureElement(key, element, heights.current, setRevision))
+      elements.current.forEach((element, key) =>
+        measureElement(key, element.closest<HTMLElement>('.agenda-entry') ?? element, heights.current, setRevision),
+      )
       setRevision((value) => value + 1)
     }
     globalThis.addEventListener('resize', resize)
@@ -257,7 +251,13 @@ export function AgendaView({
     setViewport((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
   }, [])
   useLayoutEffect(() => {
-    if (windowed) updateViewport()
+    if (windowed) {
+      // Newly measured path labels can grow the list after a jump to its estimated end.
+      // Keep that explicit end position while the visible range settles.
+      const scroller = viewportScroller()
+      if (followEnd.current && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight
+      updateViewport()
+    }
     notifyViewportLayout()
   }, [layoutState, updateViewport, windowed])
   useLayoutEffect(() => {
@@ -270,7 +270,14 @@ export function AgendaView({
     if (!windowed) return undefined
     // Replace the anchored window in this event; it retains its previous paint until delivery.
     // Flush only this external event; layout-effect updates keep their existing commit ordering.
-    const unsubscribe = onViewportScroll(() => flushSync(updateViewport))
+    const unsubscribe = onViewportScroll(() => {
+      const scroller = viewportScroller()
+      followEnd.current =
+        scroller !== undefined &&
+        scroller.scrollTop > 0 &&
+        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1
+      flushSync(updateViewport)
+    })
     globalThis.addEventListener('resize', updateViewport)
     return () => {
       unsubscribe()
@@ -283,7 +290,6 @@ export function AgendaView({
     { key: string; nodeId: string | undefined; document: Document; rows: typeof rows } | undefined
   >(undefined)
   const anchorTop = useRef<number | undefined>(undefined)
-  const dropping = useRef(false)
   const skipReveal = useRef(false)
   const activeNodeId = agenda.activeOccurrence?.nodeId
   // The store publishes before React renders, so the row is still where the user last saw it. A
@@ -294,7 +300,6 @@ export function AgendaView({
         const state = store.getSnapshot()
         const last = previous.current
         if (
-          dropping.current ||
           state.status !== 'ready' ||
           state.agenda === undefined ||
           last === undefined ||
@@ -339,7 +344,7 @@ export function AgendaView({
       if (row === undefined) return
       reveal.current = 'pointer'
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
-      store.applyAgenda({ kind: row.kind === 'gap' ? 'toggle-gap' : 'toggle-fold', key })
+      store.applyAgenda({ kind: 'toggle-fold', key })
     },
     [store, vim],
   )
@@ -355,7 +360,34 @@ export function AgendaView({
       // The editor that lost focus keeps its native selection, which would paint a second caret.
       globalThis.getSelection()?.removeAllRanges()
     }
-    if (focus?.revealLine && element.dataset.nodeId === focus.nodeId) {
+    const opening = openingReveal.current
+    openingReveal.current = false
+    if (opening && agenda.focusedDay === undefined && agenda.selectedKey === dayKey(agenda.today)) {
+      viewportReveal.beginRegion(
+        element,
+        () => {
+          const list = listRef.current
+          const geometry = openingGeometry.current
+          if (list === null || geometry.range.start < 0) return undefined
+          const bounds = list.getBoundingClientRect()
+          if (bounds.width <= 0) return undefined
+          const wrapper = element.closest('.agenda-entry')
+          const inset = wrapper === null ? 0 : element.getBoundingClientRect().top - wrapper.getBoundingClientRect().top
+          const start = geometry.layout.offsets[geometry.range.start]! + inset
+          const end = geometry.layout.offsets[geometry.range.end]!
+          return new DOMRect(bounds.left, bounds.top + start, bounds.width, Math.max(0, end - start))
+        },
+        () => {
+          const state = store.getSnapshot()
+          return (
+            state.status === 'ready' &&
+            state.agenda !== undefined &&
+            state.agenda.focusedDay === undefined &&
+            state.agenda.selectedKey === dayKey(state.agenda.today)
+          )
+        },
+      )
+    } else if (focus?.revealLine && element.dataset.nodeId === focus.nodeId) {
       const caretElement = element.querySelector('.agenda-caret')
       // Editable rows use the input owner's existing line-reveal intent.
       if (caretElement === null) viewportReveal.cancel()
@@ -371,33 +403,14 @@ export function AgendaView({
         return state.status === 'ready' && state.agenda?.selectedKey === agenda.selectedKey
       })
     else viewportReveal.cancel()
-  }, [agenda.selectedKey, agenda.focusedDay, focus, store, viewportReveal])
-  const drag = useAgendaDrag({
-    rows,
-    locked,
-    listRef,
-    elementsRef: elements,
-    dragFreeze,
-    onDrop: (source, targetDay) => {
-      reveal.current = 'pointer'
-      // The source row may be far off-screen after a long drag; anchoring to it would scroll the moved
-      // row away from the drop, so the pointer reveal places it instead.
-      dropping.current = true
-      try {
-        store.moveAgendaOccurrences([{ nodeId: source.nodeId, day: source.day }], targetDay)
-      } finally {
-        dropping.current = false
-      }
-    },
-  })
+  }, [agenda.selectedKey, agenda.focusedDay, agenda.today, focus, store, viewportReveal])
   // A changed row array needs compatible offsets immediately, before the measuring effect commits.
-  const layout = layoutState.rows === rows ? layoutState.layout : buildLayout(rows, EMPTY_HEIGHTS)
   const range = agendaListWindow(rows, layout, viewport, agenda.selectedKey)
   const windowOffset = range === undefined ? 0 : (layout.offsets[range.start] ?? 0)
   const renderRow = (index: number, pinned = false): React.JSX.Element => {
     const row = rows[index]!
     if (row.kind === 'day' && agenda.focusedDay !== undefined) {
-      return (
+      const heading = (
         <div
           key={row.key}
           className={`current-parent agenda-row agenda-focused-heading${pinned ? ' agenda-row-pinned' : ''}`}
@@ -418,6 +431,14 @@ export function AgendaView({
           })()}
         </div>
       )
+      return row.content ? (
+        heading
+      ) : (
+        <div key={row.key} className="agenda-entry">
+          {heading}
+          <p className="agenda-empty-message">No entries for this day</p>
+        </div>
+      )
     }
     const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
     const editable = row.kind === 'node' && isEditableOccurrence(row, node!, agenda.activeOccurrence)
@@ -426,21 +447,25 @@ export function AgendaView({
         lineNumber={numbers?.get(row.key)}
         key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
         row={row}
+        startsGroup={row.kind === 'node' && row.startsPathGroup === true}
+        startsDay={row.kind === 'node' && rows[index - 1]?.kind === 'day'}
+        separatesDay={row.kind === 'day' && index > 0}
+        pathLabel={
+          row.kind === 'node' && row.startsPathGroup && (row.parentPath?.length ?? 0) > 0
+            ? row.parentPath?.map((id) => label(requireNode(document, id).node)).join(' › ')
+            : undefined
+        }
         node={node}
         renderInput={editable ? renderInput : undefined}
         renderAttachment={renderAttachment}
         renderText={renderText}
         today={agenda.today}
         selected={row.key === agenda.selectedKey}
-        visualSelected={visualKeys.has(row.key)}
-        expanded={row.kind === 'gap' ? row.expanded : !agenda.collapsed.has(row.key)}
+        expanded={!agenda.collapsed.has(row.key)}
         pinned={pinned}
-        dragging={drag.sourceKey === row.key}
-        dropTarget={drag.dropHeaderKey === row.key}
         pinnedOffset={(layout.offsets[index] ?? 0) - windowOffset}
         marks={editable ? undefined : marksFor(row)}
         mirror={row.kind === 'node' && isAgendaMirror(agenda, row)}
-        pendingSource={row.kind === 'node' && isPendingMoveSource(agenda, row.nodeId, row.day)}
         rowRef={rowRef}
         onSelect={select}
         onToggle={toggle}
@@ -466,13 +491,6 @@ export function AgendaView({
       ref={listRef}
       role="grid"
       aria-label={agenda.focusedDay === undefined ? 'Agenda timeline' : 'Focused Agenda day'}
-      onClickCapture={drag.onListClick}
-      onLostPointerCapture={drag.onLostPointerCapture}
-      onPointerCancel={drag.onListPointerCancel}
-      onPointerDown={drag.onListPointerDown}
-      onPointerLeave={drag.onListPointerLeave}
-      onPointerMove={drag.onListPointerMove}
-      onPointerUp={drag.onListPointerUp}
       onKeyDown={(event) =>
         !event.defaultPrevented &&
         !(event.target instanceof Element && event.target.closest('.node-input')) &&

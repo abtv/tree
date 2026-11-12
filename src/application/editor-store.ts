@@ -84,15 +84,7 @@ import {
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
-import { applyAgendaCommand, openAgendaState, type AgendaCommand, type AgendaState } from './agenda-state'
-import {
-  createDayNodeTransition,
-  moveOccurrencesTransition,
-  openDatedSiblingTransition,
-  splitDatedNodeTransition,
-  type AgendaCreateTransition,
-  type AgendaOccurrenceMove,
-} from './editor-agenda-transitions'
+import { applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
 import { dayNumberOf } from '../domain/calendar-date'
 import {
   agendaHistorySelection,
@@ -100,10 +92,7 @@ import {
   reconcileAgenda,
   reconcileAgendaSelection,
   selectedAgendaDay,
-  withoutPendingMove,
 } from './agenda-reconcile'
-import { pendingMoveSources, pendingMoveTargetDay } from './agenda-pending-move'
-import { agendaVisualSources } from './agenda-visual-selection'
 import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
 import { TAG_PREFIXES, tagPrefix, type TagPrefix } from '../domain/tags'
 import { RecentNodes } from './recent-nodes'
@@ -278,13 +267,10 @@ export class EditorStore {
   public applyAgenda(command: AgendaCommand): void {
     const state = this.runtime.ready()
     if (state.agenda === undefined) return
-    const rows =
-      command.kind === 'fold'
-        ? this.agendaRowsCache.get(state.document, { ...state.agenda, collapsed: new Set() })
-        : this.getAgendaRows()
+    const rows = this.getAgendaRows()
     if (command.kind === 'select') this.search.cancelDraft()
     if (command.kind === 'toggle-fold' || command.kind === 'fold') {
-      this.searchOwner.manualAgendaFold(command, rows)
+      this.searchOwner.manualAgendaFold(command)
     }
     const changed = applyAgendaCommand(state.agenda, command, rows)
     const nextRows = command.kind === 'return-timeline' ? this.agendaRowsCache.get(state.document, changed) : rows
@@ -309,132 +295,6 @@ export class EditorStore {
           }
         : {}),
     })
-  }
-
-  /**
-   * Create a dated node from the selected Agenda day: for that day, or for the day before it. The
-   * new node is the last child of the scope and becomes the active occurrence (`docs/PRODUCT.md` §23.11).
-   */
-  public createAgendaDayNode(day: 'selected' | 'preceding'): boolean {
-    const state = this.runtime.ready()
-    if (state.agenda === undefined || this.isPersistenceLocked()) return false
-    const rows = this.getAgendaRows()
-    const selected = rows.find((row) => row.key === state.agenda!.selectedKey)
-    if (selected?.kind !== 'day') return false
-    const transition = createDayNodeTransition(
-      state.document,
-      state.agenda,
-      rows,
-      day === 'selected' ? selected.day : selected.day - 1,
-      this.createId,
-    )
-    if (transition === undefined) return false
-    if (transition.kind === 'rejected') {
-      this.reportError(new Error(transition.message))
-      return false
-    }
-    this.applyAgendaCreation(state.expansion, transition)
-    return true
-  }
-
-  /** `Enter` in the selected dated Agenda node: split it and date the new part (`docs/PRODUCT.md` §23.11). */
-  public splitAgendaNode(cursor: number): boolean {
-    const state = this.runtime.ready()
-    const row = this.selectedAgendaMatch()
-    if (row === undefined || this.isPersistenceLocked()) return false
-    this.applyAgendaCreation(
-      state.expansion,
-      splitDatedNodeTransition(state.document, state.location, state.agenda!, row.day, cursor, this.createId),
-    )
-    return true
-  }
-
-  /** Vim `o`/`O` on the selected dated Agenda node: a dated real sibling after or before it. */
-  public createAgendaSibling(position: SiblingInsertionPosition): boolean {
-    const state = this.runtime.ready()
-    const row = this.selectedAgendaMatch()
-    if (row === undefined || this.isPersistenceLocked()) return false
-    this.applyAgendaCreation(
-      state.expansion,
-      openDatedSiblingTransition(state.document, state.location, state.agenda!, row.day, position, this.createId),
-    )
-    return true
-  }
-
-  /**
-   * Move dated occurrences to `targetDay` by replacing their source days' dates (`docs/PRODUCT.md` §23.12).
-   * It is one undoable change that selects the first moved node on the target day, and returns whether
-   * any text changed.
-   */
-  public moveAgendaOccurrences(moves: readonly AgendaOccurrenceMove[], targetDay: number): boolean {
-    const state = this.runtime.ready()
-    if (state.agenda === undefined || this.isPersistenceLocked()) return false
-    const first = moves[0]
-    const cursor = first !== undefined && state.focus.nodeId === first.nodeId ? state.focus.cursor : 0
-    const transition = moveOccurrencesTransition(state.document, state.location, state.agenda, moves, targetDay, cursor)
-    if (transition === undefined) return false
-    this.applyAgendaCreation(state.expansion, transition)
-    return true
-  }
-
-  /**
-   * Vim `dd` in Agenda: mark the selected direct match and the next `count − 1` qualifying rows, or the
-   * provided whole-node Visual range for Visual `d`, for a later
-   * `p`/`P` (`docs/PRODUCT.md` §23.13). It changes no document, Vim register, or clipboard, and returns whether
-   * anything was marked.
-   */
-  public startAgendaMove(count = 1, visual?: import('./agenda-visual-selection').AgendaVisualEndpoints): boolean {
-    const state = this.runtime.ready()
-    // A temporarily invalid item leaves Agenda when the selection moves, so it cannot be a pending source.
-    if (state.agenda === undefined || state.agenda.pinnedOccurrence !== undefined || this.isPersistenceLocked())
-      return false
-    const pendingMove =
-      visual === undefined
-        ? pendingMoveSources(this.getAgendaRows(), state.agenda.selectedKey, count)
-        : agendaVisualSources(this.getAgendaRows(), state.agenda.activeOccurrence?.day ?? NaN, visual)
-    if (pendingMove.length === 0) return false
-    this.runtime.replaceReady({ ...state, agenda: { ...state.agenda, pendingMove } })
-    return true
-  }
-
-  /** Drop a pending move without an edit or history entry (D4). */
-  public cancelAgendaMove(): void {
-    const state = this.runtime.snapshot
-    if (state.status !== 'ready' || state.agenda?.pendingMove === undefined) return
-    this.runtime.replaceReady({ ...state, agenda: withoutPendingMove(state.agenda) })
-  }
-
-  /**
-   * `p`/`P` with a pending move: move the marked occurrences to the selected row's day as one undoable change.
-   * A gap has no day, so it leaves the move pending; dropping on the source's own day edits nothing and only
-   * ends the pending state. Returns whether a pending move was consumed.
-   */
-  public putAgendaMove(): boolean {
-    const state = this.runtime.ready()
-    const pending = state.agenda?.pendingMove
-    if (state.agenda === undefined || pending === undefined || this.isPersistenceLocked()) return false
-    const day = pendingMoveTargetDay(this.getAgendaRows().find((row) => row.key === state.agenda!.selectedKey))
-    if (day === undefined) return false
-    if (!this.moveAgendaOccurrences(pending, day)) this.cancelAgendaMove()
-    return true
-  }
-
-  private selectedAgendaMatch(): Extract<AgendaRow, { kind: 'node' }> | undefined {
-    const agenda = this.runtime.ready().agenda
-    if (agenda === undefined) return undefined
-    const row = this.getAgendaRows().find((candidate) => candidate.key === agenda.selectedKey)
-    return row?.kind === 'node' && row.role === 'match' ? row : undefined
-  }
-
-  private applyAgendaCreation(expansion: ExpansionState, transition: AgendaCreateTransition): void {
-    this.endTextSession()
-    this.applyStructural(
-      transition.document,
-      transition.location,
-      this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
-      expansion,
-      transition.agenda,
-    )
   }
 
   public getVisibleRows(): readonly VisibleRow[] {
@@ -607,14 +467,15 @@ export class EditorStore {
 
   public imageToText(): void {
     if (!this.imageToTextAvailable || this.runtime.snapshot.status !== 'ready') return
+    if (this.runtime.snapshot.agenda !== undefined) return
     if (this.imageToTextFlushes > 0) {
       this.setImageToTextStatus('Image to text: saving in progress. Please wait.')
       return
     }
     const state = this.runtime.ready()
-    const nodeId = state.agenda === undefined ? state.location.selectedNodeId : state.agenda.activeOccurrence?.nodeId
-    const attachmentId = nodeId === undefined ? undefined : locateNode(state.document, nodeId)?.node.attachment?.id
-    if (this.isPersistenceLocked() || attachmentId === undefined || nodeId === undefined) {
+    const nodeId = state.location.selectedNodeId
+    const attachmentId = locateNode(state.document, nodeId)?.node.attachment?.id
+    if (this.isPersistenceLocked() || attachmentId === undefined) {
       this.setImageToTextStatus('Image to text: select an editable node with an image.')
       return
     }
@@ -1471,25 +1332,9 @@ export class EditorStore {
 
   public deleteEmptySelected(): void {
     const state = this.runtime.ready()
-    if (this.isPersistenceLocked()) return
-    const selected = requireNode(state.document, state.location.selectedNodeId)
-    if (state.agenda !== undefined && selected.node.children.length > 0) return
-    const agendaRow =
-      state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda!.selectedKey)
-    if (state.agenda !== undefined && (agendaRow?.kind !== 'node' || agendaRow.role !== 'match')) return
-    const dayRows =
-      agendaRow?.kind === 'node'
-        ? this.getAgendaRows().filter((row) => row.kind !== 'gap' && row.day === agendaRow.day)
-        : []
-    const previousIds = new Set(selected.siblings.slice(0, selected.index).map((node) => node.id))
-    const destination =
-      dayRows.findLast((row) => row.kind === 'node' && previousIds.has(row.nodeId)) ??
-      dayRows.find((row) => row.kind === 'node' && row.nodeId === selected.parent?.id) ??
-      dayRows.find((row) => row.kind === 'day')
-    const transition = deleteEmptySelectedTransition(
-      state.document,
-      state.location,
-      (id) => state.agenda === undefined && state.expansion.expandedIds.has(id),
+    if (this.isPersistenceLocked() || state.agenda !== undefined) return
+    const transition = deleteEmptySelectedTransition(state.document, state.location, (id) =>
+      state.expansion.expandedIds.has(id),
     )
     if (transition === undefined) return
     this.endTextSession()
@@ -1499,7 +1344,6 @@ export class EditorStore {
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
     this.queueAttachmentCleanup()
-    if (destination !== undefined) this.applyAgenda({ kind: 'select', key: destination.key })
   }
 
   public moveSelectedTo(insertionIndex: number): void {
@@ -1582,6 +1426,7 @@ export class EditorStore {
     }
     const current = this.runtime.ready()
     if (clipboard.kind === 'image') {
+      if (current.agenda !== undefined && requireNode(current.document, nodeId).node.attachment !== undefined) return
       const attachment: AttachmentReference = { id: this.createId(), mimeType: 'image/png' }
       this.pendingAttachmentIds.add(attachment.id)
       try {
@@ -1589,13 +1434,10 @@ export class EditorStore {
         if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
           return
         }
-        const transition = imagePasteTransition(
-          this.runtime.snapshot.document,
-          this.runtime.snapshot.location,
-          nodeId,
-          attachment,
-          this.createId,
-        )
+        const latest = this.runtime.ready()
+        // Another paste can attach an image while this write is pending.
+        if (latest.agenda !== undefined && requireNode(latest.document, nodeId).node.attachment !== undefined) return
+        const transition = imagePasteTransition(latest.document, latest.location, nodeId, attachment, this.createId)
         this.applyStructural(
           transition.document,
           transition.location,
@@ -1614,8 +1456,14 @@ export class EditorStore {
     if (clipboard.text === '' && (clipboard.links === undefined || clipboard.links.length === 0)) {
       return
     }
-    const transition = textPasteTransition(current.document, current.location, nodeId, cursor, clipboard, (count) =>
-      Array.from({ length: count }, () => this.createId()),
+    const transition = textPasteTransition(
+      current.document,
+      current.location,
+      nodeId,
+      cursor,
+      clipboard,
+      (count) => Array.from({ length: count }, () => this.createId()),
+      current.agenda !== undefined,
     )
     const node = requireNode(current.document, nodeId).node
     const position = Math.max(0, Math.min(cursor, node.text.length))
@@ -1631,8 +1479,6 @@ export class EditorStore {
 
   public undo(): void {
     this.endTextSession()
-    // Undo cancels a pending Agenda move even when there is nothing to undo (D4).
-    this.cancelAgendaMove()
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const previous = this.history.undo(state.document, state.location)
@@ -1647,7 +1493,6 @@ export class EditorStore {
     // restart one first begins a history entry that discards the redo branch. The session is
     // therefore already closed here; the call states the boundary and removing it changes nothing.
     this.endTextSession()
-    this.cancelAgendaMove()
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     const next = this.history.redo(state.document, state.location)
@@ -1720,16 +1565,12 @@ export class EditorStore {
     location: Location,
     focus: FocusIntent,
     expansion: ExpansionState = this.runtime.ready().expansion,
-    agenda: AgendaState | undefined = undefined,
   ): void {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return
     this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.runtime.replaceReady(
-      { ...state, document, location, focus, expansion, ...(agenda === undefined ? {} : { agenda }) },
-      true,
-    )
+    this.runtime.replaceReady({ ...state, document, location, focus, expansion }, true)
     this.markPersistedChange()
   }
 

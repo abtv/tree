@@ -30,7 +30,7 @@ async function setup(roots: TreeNode[], cursor = 0) {
 }
 
 it.each(['sibling', 'context', 'day'] as const)(
-  'selects the %s fallback after deleting an empty pinned Agenda item',
+  'retains an empty pinned item with %s context without creating deletion history',
   async (kind) => {
     const roots: TreeNode[] =
       kind === 'day'
@@ -51,16 +51,13 @@ it.each(['sibling', 'context', 'day'] as const)(
 
     store.deleteEmptySelected()
 
-    const expected = kind === 'sibling' ? 'node:100:before' : kind === 'context' ? 'node:100:parent' : 'day:100'
-    expect(ready().agenda?.selectedKey).toBe(expected)
-    expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'target')).toBe(false)
-    expect(ready().document).not.toBe(before)
-    if (kind !== 'day')
-      expect(ready().focus).toMatchObject({ nodeId: kind === 'sibling' ? 'before' : 'parent', cursor: 0 })
+    expect(ready().agenda?.selectedKey).toBe('node:100:target')
+    expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'target')).toBe(true)
+    expect(ready().document).toBe(before)
 
     store.undo()
 
-    expect(ready().document).toEqual(before)
+    expect(ready().document).toEqual({ roots })
   },
 )
 
@@ -100,7 +97,7 @@ it('rejects Agenda Backspace even when Tree has an empty preceding sibling', asy
   expect(ready().document).toBe(before)
 })
 
-it('selects the immediate context rather than its outer ancestor after deleting a pinned item', async () => {
+it('retains the pinned item and its context after a rejected deletion', async () => {
   const { store, ready } = await setup([
     {
       id: 'outer',
@@ -113,11 +110,13 @@ it('selects the immediate context rather than its outer ancestor after deleting 
 
   store.deleteEmptySelected()
 
-  expect(ready().agenda?.selectedKey).toBe('node:100:parent')
-  expect(ready().focus).toMatchObject({ nodeId: 'parent', cursor: 0 })
+  expect(ready().agenda?.selectedKey).toBe('node:100:target')
+  expect(store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'target')).toMatchObject({
+    parentPath: ['outer', 'parent'],
+  })
 })
 
-it('resets the cursor when closing Agenda after the origin node was deleted', async () => {
+it('preserves the origin cursor after a rejected empty-node deletion', async () => {
   const { store, ready } = await setup([dated('target'), dated('after')], 7)
   store.applyAgenda({ kind: 'select', key: 'node:100:target' })
   store.editText('target', '')
@@ -125,6 +124,6 @@ it('resets the cursor when closing Agenda after the origin node was deleted', as
 
   store.closeAgenda()
 
-  expect(ready().location).toEqual({ currentParentId: null, selectedNodeId: 'after' })
-  expect(ready().focus).toMatchObject({ nodeId: 'after', cursor: 0 })
+  expect(ready().location).toEqual({ currentParentId: null, selectedNodeId: 'target' })
+  expect(ready().focus).toMatchObject({ nodeId: 'target', cursor: 7 })
 })

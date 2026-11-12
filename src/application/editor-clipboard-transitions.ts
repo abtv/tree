@@ -43,12 +43,14 @@ export function textPasteTransition(
   cursor: number,
   clipboard: Extract<ClipboardPayload, { kind: 'text' }>,
   createIds: (count: number) => NodeId[],
+  singleNode = false,
 ): StructuralTransition {
-  if (!clipboard.text.includes('\n') && !clipboard.text.includes('\r')) {
+  if (singleNode || (!clipboard.text.includes('\n') && !clipboard.text.includes('\r'))) {
+    const pasted = singleNode ? normalizePasteLines(clipboard) : clipboard
     return {
-      document: pasteText(document, nodeId, cursor, clipboard.text, clipboard.links),
+      document: pasteText(document, nodeId, cursor, pasted.text, pasted.links),
       location,
-      focus: { nodeId, cursor: cursor + clipboard.text.length },
+      focus: { nodeId, cursor: cursor + pasted.text.length },
     }
   }
   const lines = clipboard.text.replace(/\r\n?/g, '\n').split('\n')
@@ -59,6 +61,31 @@ export function textPasteTransition(
     location: locationForSiblingOf(document, nodeId, finalNodeId, location),
     // `split` always returns at least one line, so the empty fallback only satisfies the type.
     focus: { nodeId: finalNodeId, cursor: (lines.at(-1) ?? '').length },
+  }
+}
+
+/** Normalize native line endings without moving hyperlink endpoints onto neighboring characters. */
+function normalizePasteLines(
+  clipboard: Extract<ClipboardPayload, { kind: 'text' }>,
+): Extract<ClipboardPayload, { kind: 'text' }> {
+  if (!clipboard.text.includes('\r')) return clipboard
+  const removed = [...clipboard.text.matchAll(/\r\n/g)].map((match) => match.index)
+  const offset = (position: number): number => {
+    let low = 0
+    let high = removed.length
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2)
+      if (removed[middle]! < position) low = middle + 1
+      else high = middle
+    }
+    return position - low
+  }
+  return {
+    ...clipboard,
+    text: clipboard.text.replace(/\r\n?/g, '\n'),
+    ...(clipboard.links === undefined
+      ? {}
+      : { links: clipboard.links.map((link) => ({ ...link, start: offset(link.start), end: offset(link.end) })) }),
   }
 }
 

@@ -1,11 +1,66 @@
 // @editing-modes: vim
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { test, expect, launchTree, closeApp, seedDocument, fireIdleSave, readPersisted } from './fixtures'
+import {
+  test,
+  expect,
+  launchTree,
+  closeApp,
+  seedDocument,
+  fireIdleSave,
+  readPersisted,
+  setAgendaToday,
+} from './fixtures'
 import { ipcEvents } from '../../src/shared/ipc'
 import { onePixelPng } from '../../src/shared/png-test-utils'
 
 test.use({ editingMode: 'vim' })
+
+// @requirement PRODUCT.md §15.1
+// @requirement PRODUCT.md §23.9
+test('does not start native recognition or create nodes from Agenda', async ({ userDataDir }) => {
+  test.skip(process.platform !== 'darwin' || process.arch !== 'arm64', 'Apple Silicon only')
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'source', text: '2026-10-08 Image', attachment: { id: 'png', mimeType: 'image/png' }, children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'source' },
+  })
+  mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+  writeFileSync(join(userDataDir, 'data', 'attachments', 'png.png'), onePixelPng)
+  const original = readPersisted(userDataDir).document
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.clock.install()
+  await setAgendaToday(window)
+  await app.evaluate(() => {
+    const control = globalThis as typeof globalThis & { agendaOcrCalls: number }
+    control.agendaOcrCalls = 0
+    globalThis.__treeIpc.wrap('tree:image-to-text', async (original, ...args) => {
+      control.agendaOcrCalls += 1
+      return original(...args)
+    })
+  })
+  await window.keyboard.press('Meta+p')
+
+  for (const selector of ['.agenda-today', '.agenda-row[data-node-id="source"]']) {
+    await window.locator(selector).click()
+    await window.keyboard.press(':')
+    await window.getByRole('combobox', { name: 'Command' }).fill('image-to-text')
+    await expect(window.getByRole('option', { selected: true })).toContainText('image-to-text')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.command-panel')).toHaveCount(0)
+  }
+  await fireIdleSave(window)
+  await window.evaluate(() => globalThis.window.treeApi.load())
+
+  expect(await app.evaluate(() => (globalThis as typeof globalThis & { agendaOcrCalls: number }).agendaOcrCalls)).toBe(
+    0,
+  )
+  expect(readPersisted(userDataDir).document).toEqual(original)
+  await expect(window.getByRole('textbox', { name: 'Agenda node source', exact: true })).toBeFocused()
+})
 
 // @requirement PRODUCT.md §15.1
 

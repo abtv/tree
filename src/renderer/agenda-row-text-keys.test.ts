@@ -35,13 +35,14 @@ async function fixture(vimEnabled: boolean, mode: VimTextCommandState['mode'] = 
   let caret: RowCaret = arrivalCaret('')
   const copied: string[] = []
   const editor = { value: false }
+  let customLabel: string | undefined
   const rowText: AgendaRowText = {
     textOf: (row) => {
       const state = harness.store.getSnapshot()
       if (state.status !== 'ready' || state.agenda === undefined) return ''
       return row.kind === 'node'
         ? requireNode(state.document, row.nodeId).node.text
-        : agendaRowLabel(row, state.agenda.today)
+        : (customLabel ?? agendaRowLabel(row, state.agenda.today))
     },
     hasEditor: () => editor.value,
     caret: () => {
@@ -62,12 +63,10 @@ async function fixture(vimEnabled: boolean, mode: VimTextCommandState['mode'] = 
     handler(event)
     return event
   }
-  const selectKind = (kind: 'day' | 'gap' | 'context'): void => {
-    const row = harness.store
-      .getAgendaRows()
-      .find((candidate) =>
-        kind === 'context' ? candidate.kind === 'node' && candidate.role === 'context' : candidate.kind === kind,
-      )!
+  const selectKind = (kind: 'day' | 'label'): void => {
+    // Arbitrary day text isolates row-text commands from calendar formatting.
+    customLabel = kind === 'label' ? 'Work' : undefined
+    const row = harness.store.getAgendaRows().find((candidate) => candidate.kind === 'day')!
     harness.store.applyAgenda({ kind: 'select', key: row.key })
   }
   const selectedText = (): string => {
@@ -149,7 +148,7 @@ describe('Agenda row text keys', () => {
   it('selects both Visual endpoints, yanks at the start, and exits at the active endpoint', async () => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.press('l')
     f.press('v')
 
@@ -191,7 +190,7 @@ describe('Agenda row text keys', () => {
   it.each(['Escape', 'v'])('leaves character Visual at its active endpoint with %s', async (exitKey) => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     for (const motions of [
       ['l', 'l'],
       ['l', 'l', 'o'],
@@ -216,7 +215,7 @@ describe('Agenda row text keys', () => {
   it('moves, extends and collapses the standard-editing caret, and copies and selects all', async () => {
     const f = await fixture(false)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.press('ArrowRight')
     f.press('ArrowRight')
 
@@ -272,7 +271,7 @@ describe('Agenda row text keys', () => {
   it('copies the block character with Cmd+C in Normal and selects everything with Cmd+A', async () => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.press('l')
     f.press('c', { metaKey: true })
 
@@ -291,7 +290,7 @@ describe('Agenda row text keys', () => {
   it('leaves arrows and Cmd+arrows inert in Vim Normal and Visual', async () => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     for (const key of ['ArrowRight', 'End']) f.press(key)
 
     f.press('ArrowRight', { metaKey: true })
@@ -305,7 +304,7 @@ describe('Agenda row text keys', () => {
   })
 
   // @requirement PRODUCT.md §23.4
-  it('never edits the document or saves through arbitrary keys on days, gaps and contextual ancestors', async () => {
+  it('never edits the document or saves through arbitrary keys on day labels', async () => {
     const keys = [
       'i',
       'a',
@@ -345,7 +344,7 @@ describe('Agenda row text keys', () => {
       'g',
     ]
     for (const vimEnabled of [true, false]) {
-      for (const kind of ['day', 'gap', 'context'] as const) {
+      for (const kind of ['day', 'label'] as const) {
         const f = await fixture(vimEnabled)
         f.selectKind(kind)
         const before = f.snapshot().document
@@ -366,7 +365,7 @@ describe('Agenda row text keys', () => {
   it('leaves a row that owns an editor to that editor, even when its padding has the focus', async () => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.editor.value = true
     for (const key of ['l', 'v', 'y', '$']) f.press(key)
 
@@ -382,7 +381,7 @@ describe('Agenda row text keys', () => {
   it('walks backward and by find motions: ge, F, t, T and the reversed repeat', async () => {
     const f = await fixture(true)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.press('$')
 
     expect(f.caret().focus).toBe(3)
@@ -453,7 +452,7 @@ describe('Agenda row text keys', () => {
   it('collapses a range that outlives Visual when Normal draws the caret again', async () => {
     const f = await fixture(false)
 
-    f.selectKind('context')
+    f.selectKind('label')
     f.press('ArrowRight', { shiftKey: true })
     f.press('ArrowRight', { shiftKey: true })
 

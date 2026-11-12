@@ -1,7 +1,6 @@
 import type { DayNumber } from '../domain/calendar-date'
 import { locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
 import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
-import { buildTimeline, type TimelineDay, type TimelineGap } from '../domain/agenda-timeline'
 import { dayKey, type AgendaState, type AgendaOccurrence } from './agenda-state'
 
 /** The projected ancestor path, excluding the destination itself. */
@@ -10,31 +9,28 @@ export function agendaAncestorKeys(
   occurrence: AgendaOccurrence,
 ): readonly string[] | undefined {
   const rows = projection.find((entry) => entry.day === occurrence.day)?.rows
-  const index = rows?.findIndex((row) => row.nodeId === occurrence.nodeId) ?? -1
+  const index = rows?.findIndex((row) => row.nodeId === occurrence.nodeId && row.role === 'match') ?? -1
   if (rows === undefined || index < 0) return undefined
-  const path = [dayKey(occurrence.day)]
-  let depth = rows[index]!.depth
-  for (let cursor = index - 1; cursor >= 0 && depth > 0; cursor--) {
-    const row = rows[cursor]!
-    if (row.depth < depth) {
-      path.push(`node:${occurrence.day}:${row.nodeId}`)
-      depth = row.depth
-    }
-  }
-  return path
+  return [dayKey(occurrence.day)]
 }
 
 export type AgendaRow =
-  | (TimelineDay & { readonly key: string })
-  | (TimelineGap & { readonly key: string })
+  | {
+      readonly kind: 'day'
+      readonly key: string
+      readonly day: DayNumber
+      readonly content: boolean
+      readonly isToday: boolean
+    }
   | {
       readonly kind: 'node'
       readonly key: string
       readonly day: DayNumber
       readonly nodeId: NodeId
       readonly depth: number
-      readonly role: 'match' | 'context'
-      readonly hasProjectedChildren: boolean
+      readonly role: 'match'
+      readonly parentPath?: readonly NodeId[]
+      readonly startsPathGroup?: boolean
     }
 
 /** Add the one temporarily invalid item and its ancestors without copying document nodes. */
@@ -83,24 +79,13 @@ export function buildAgendaRows(
   cache?: Map<DayNumber, DayRows>,
 ): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
-  const timeline =
+  const timelineDays =
     state.focusedDay === undefined
-      ? buildTimeline({ contentDays: new Set(days.keys()), today: state.today, revealed: state.revealed })
-      : [
-          {
-            kind: 'day' as const,
-            day: state.focusedDay,
-            content: days.has(state.focusedDay),
-            isToday: state.focusedDay === state.today,
-          },
-        ]
+      ? [...new Set([...days.keys(), state.today])].sort((left, right) => left - right)
+      : [state.focusedDay]
   const rows: AgendaRow[] = []
-  const anyCollapsed = state.collapsed.size > 0
-  for (const entry of timeline) {
-    if (entry.kind === 'gap') {
-      rows.push({ ...entry, key: `gap:${entry.startDay}:${entry.endDay}` })
-      continue
-    }
+  for (const day of timelineDays) {
+    const entry = { kind: 'day' as const, day, content: days.has(day), isToday: day === state.today }
     const key = dayKey(entry.day)
     rows.push({ ...entry, key })
     if (state.collapsed.has(key)) continue
@@ -111,24 +96,27 @@ export function buildAgendaRows(
       continue
     }
     const dayRows: AgendaRow[] = []
-    let hiddenBelow: number | undefined
+    const ancestors: NodeId[] = []
+    let previousParent: NodeId | undefined
     for (let index = 0; index < projected.length; index++) {
       const node = projected[index]!
-      // The explicit undefined guard is equivalent to comparing with undefined (which is false).
-      if (hiddenBelow !== undefined && node.depth > hiddenBelow) continue
-      hiddenBelow = undefined
+      ancestors.length = node.depth
+      const parentPath = [...ancestors]
+      ancestors.push(node.nodeId)
+      if (node.role !== 'match') continue
+      const parent = parentPath.at(-1)
       const nodeKey = `node:${entry.day}:${node.nodeId}`
       dayRows.push({
         kind: 'node',
         key: nodeKey,
         day: entry.day,
         nodeId: node.nodeId,
-        depth: node.depth,
-        role: node.role,
-        hasProjectedChildren: (projected[index + 1]?.depth ?? -1) > node.depth,
+        depth: 0,
+        role: 'match',
+        parentPath,
+        startsPathGroup: dayRows.length === 0 || parent !== previousParent,
       })
-      // Hashing each freshly built key is measurable at 100,000 rows, and most Agendas have no folds.
-      if (anyCollapsed && state.collapsed.has(nodeKey)) hiddenBelow = node.depth
+      previousParent = parent
     }
     cache?.set(entry.day, { projected, collapsed: state.collapsed, rows: dayRows })
     for (const row of dayRows) rows.push(row)
@@ -156,13 +144,14 @@ export class AgendaRowsCache {
   private document: Document | undefined
   private scope: NodeId | null | undefined
   private projection: readonly AgendaProjectionDay[] = []
+  private searchProjection: readonly AgendaProjectionDay[] = []
   private state: AgendaState | undefined
   private rows: readonly AgendaRow[] = []
   private readonly dayRows = new Map<DayNumber, DayRows>()
 
   public getProjection(document: Document, state: AgendaState): readonly AgendaProjectionDay[] {
     this.get(document, state)
-    return this.projection
+    return this.searchProjection
   }
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
@@ -188,6 +177,14 @@ export class AgendaRowsCache {
       changed =
         projection.length !== this.projection.length || projection.some((day, index) => day !== this.projection[index])
       this.projection = projection
+      if (changed) {
+        const searchable = new Map(this.searchProjection.map((day) => [day.day, day]))
+        this.searchProjection = projection.map((day) =>
+          previous.get(day.day) === day
+            ? searchable.get(day.day)!
+            : { ...day, rows: day.rows.filter((row) => row.role === 'match') },
+        )
+      }
       this.document = document
       this.scope = state.scopeParentId
     }
@@ -195,8 +192,7 @@ export class AgendaRowsCache {
       changed ||
       this.state?.today !== state.today ||
       this.state.focusedDay !== state.focusedDay ||
-      this.state.collapsed !== state.collapsed ||
-      this.state.revealed !== state.revealed
+      this.state.collapsed !== state.collapsed
     ) {
       this.rows = buildAgendaRows(this.projection, state, this.dayRows)
     }
@@ -210,6 +206,7 @@ export class AgendaRowsCache {
     this.document = undefined
     this.scope = undefined
     this.projection = []
+    this.searchProjection = []
     this.state = undefined
     this.rows = []
     this.dayRows.clear()

@@ -2,7 +2,6 @@
 import type { KeyboardEvent } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
-import { requireNode } from '../domain/document'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -11,12 +10,12 @@ import type { AgendaElement } from './agenda-key-policy'
 import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 
 const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
-const elements: AgendaElement[] = ['day', 'gap', 'match', 'context']
+const elements: AgendaElement[] = ['day', 'match']
 const platforms: ShortcutPlatform[] = ['apple', 'other']
 /** The profile under test; the matrix sends Cmd on Apple and Ctrl on the other profile (PRODUCT §1.5). */
 let platform: ShortcutPlatform = 'apple'
 
-async function fixture(element: AgendaElement, standard = false) {
+async function fixture(element: AgendaElement, standard = false, children = true) {
   const f = await createRealStoreHarness({
     services: { today: () => day(8) },
     document: {
@@ -28,7 +27,7 @@ async function fixture(element: AgendaElement, standard = false) {
             {
               id: 'match',
               text: '2026-10-15 Work',
-              children: [{ id: 'child', text: '2026-10-15 Child', children: [] }],
+              children: children ? [{ id: 'child', text: '2026-10-15 Child', children: [] }] : [],
             },
           ],
         },
@@ -39,11 +38,7 @@ async function fixture(element: AgendaElement, standard = false) {
   f.store.openAgenda()
   const rows = f.store.getAgendaRows()
   const selected = rows.find((row) =>
-    element === 'gap'
-      ? row.kind === 'gap' && row.count > 7
-      : element === 'day'
-        ? row.kind === 'day' && row.day === day(15)
-        : row.kind === 'node' && row.nodeId === element,
+    element === 'day' ? row.kind === 'day' && row.day === day(15) : row.kind === 'node' && row.nodeId === 'match',
   )!
   f.store.applyAgenda({ kind: 'select', key: selected.key })
   const shortcuts = shortcutProfile(platform)
@@ -108,33 +103,30 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       expect(f.snapshot().agenda?.selectedKey).toBe(rows[index + (['ArrowDown', 'j'].includes(key) ? 1 : -1)]!.key)
     })
 
-    it('Cmd+E toggles the occurrence fold or reveals at most seven gap days, then reverses it', async () => {
+    it('Cmd+E folds only a day and then reverses it', async () => {
       const f = await fixture(element)
       const before = f.snapshot()
 
       f.press('e', { metaKey: true })
 
-      if (element === 'gap') expect(f.snapshot().agenda?.revealed.size).toBe(7)
-      else expect(f.snapshot().agenda?.collapsed.has(f.selected.key)).toBe(true)
+      expect(f.snapshot().agenda?.collapsed.has(f.selected.key)).toBe(element === 'day')
 
       f.press('e', { metaKey: true })
 
       expect(f.snapshot().agenda?.collapsed.size).toBe(0)
-      expect(f.snapshot().agenda?.revealed.size).toBe(0)
       expect(f.snapshot().document).toBe(before.document)
       expect(f.snapshot().expansion).toBe(before.expansion)
     })
 
-    it('standard Enter creates on a day, splits a match and is inert elsewhere', async () => {
+    it('standard Enter inserts a newline in a match and leaves a day unchanged', async () => {
       const f = await fixture(element, true)
       const before = f.snapshot().document
 
       f.press('Enter')
 
-      if (element === 'day') expect(f.snapshot().document.roots.at(-1)!.text).toBe('2026-10-15 ')
-      else if (element === 'match') {
-        expect(f.node('match').text).toBe('2026-10-15 W')
-        expect(f.node().text).toBe('2026-10-15 ork')
+      if (element === 'match') {
+        expect(f.node('match').text).toBe('2026-10-15 W\nork')
+        expect(f.snapshot().document.roots).toHaveLength(before.roots.length)
       } else expect(f.snapshot().document).toBe(before)
     })
 
@@ -150,21 +142,15 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       expect(f.input.selectionStart).toBe(Math.min(12, f.input.value.length))
     })
 
-    it.each(['o', 'O'])('%s creates only on days and matches and enters Insert', async (key) => {
+    it.each(['o', 'O', 'V'])('%s preserves the node, caret and Normal mode', async (key) => {
       const f = await fixture(element)
       const before = f.snapshot().document
+
       f.press(key)
-      if (element === 'day' || element === 'match') {
-        expect(f.node().text).toBe(`2026-10-${element === 'day' && key === 'O' ? '14' : '15'} `)
-        expect(f.vim.mode).toBe('insert')
 
-        f.store.undo()
-
-        expect(f.snapshot().document).toBe(before)
-      } else {
-        expect(f.snapshot().document).toBe(before)
-        expect(f.vim.mode).toBe('normal')
-      }
+      expect(f.snapshot().document).toBe(before)
+      expect(f.vim.mode).toBe('normal')
+      expect(f.input.selectionStart).toBe(Math.min(12, f.input.value.length))
     })
 
     it.each([
@@ -210,7 +196,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       },
     )
 
-    it('dd marks only a direct match and never deletes or changes registers', async () => {
+    it('dd never deletes, starts a move or changes registers', async () => {
       const f = await fixture(element)
       const before = f.snapshot().document
       const register = f.vim.register.current
@@ -218,35 +204,11 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       f.press('d')
       f.press('d')
 
-      expect(f.snapshot().agenda?.pendingMove).toEqual(
-        element === 'match' ? [{ nodeId: 'match', day: day(15) }] : undefined,
-      )
       expect(f.snapshot().document).toBe(before)
       expect(f.vim.register.current).toBe(register)
     })
 
-    it.each(['p', 'P'])('%s puts pending items on any day row but leaves a gap pending', async (key) => {
-      const f = await fixture(element)
-      f.store.applyAgenda({ kind: 'select', key: `node:${day(30)}:source` })
-      f.store.startAgendaMove(1)
-      f.store.applyAgenda({ kind: 'select', key: f.selected.key })
-      const before = f.snapshot().document
-      const pending = f.snapshot().agenda?.pendingMove
-      f.press(key)
-      if (element === 'gap') {
-        expect(f.snapshot().document).toBe(before)
-        expect(f.snapshot().agenda?.pendingMove).toBe(pending)
-      } else {
-        expect(f.node('source').text).toBe('2026-10-15 Source')
-        expect(f.snapshot().agenda?.pendingMove).toBeUndefined()
-
-        f.store.undo()
-
-        expect(f.snapshot().document).toBe(before)
-      }
-    })
-
-    it.each(['p', 'P'])('%s with a node register and no pending move is inert', async (key) => {
+    it.each(['p', 'P'])('%s with a node register is inert', async (key) => {
       const f = await fixture(element)
       f.vim.register.current = { kind: 'node', value: f.node('source'), sourceIds: ['source'] }
       const before = f.snapshot().document
@@ -268,25 +230,22 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       else expect(f.snapshot().document).toBe(before)
     })
 
-    it('Cmd+. focuses a day, opens Tree for real rows and leaves a gap unchanged', async () => {
+    it('Cmd+. focuses a day and opens Tree for a match', async () => {
       const f = await fixture(element)
 
       f.press('.', { metaKey: true })
 
       if (element === 'day') expect(f.snapshot().agenda?.focusedDay).toBe(day(15))
-      else if (element === 'gap') expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
       else {
         expect(f.snapshot().agenda).toBeUndefined()
         expect(f.snapshot().location.currentParentId).toBe(element)
       }
     })
 
-    it('Cmd+, restores the saved timeline from focused-day rows and is inert on a timeline gap', async () => {
+    it('Cmd+, restores the saved timeline from focused-day rows', async () => {
       const f = await fixture(element)
-      if (element !== 'gap') {
-        f.store.applyAgenda({ kind: 'focus-day', key: `day:${day(15)}`, scrollTop: 123 })
-        f.store.applyAgenda({ kind: 'select', key: f.selected.key })
-      }
+      f.store.applyAgenda({ kind: 'focus-day', key: `day:${day(15)}`, scrollTop: 123 })
+      f.store.applyAgenda({ kind: 'select', key: f.selected.key })
 
       f.press(',', { metaKey: true })
 
@@ -314,7 +273,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
         expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
       })
       it.each(['i', 'a', 'R', 'x', 'Backspace'])(
-        'synthetic/context row never edits with %s or enters Insert/Replace',
+        'day row never edits with %s or enters Insert/Replace',
         async (key) => {
           const f = await fixture(element)
           const before = f.snapshot()
@@ -331,14 +290,10 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
 )
 
 // @requirement PRODUCT.md §23.10
-it.each([false, true])('empty direct match deletion respects children=%s', async (children) => {
-  const f = await fixture('match', true)
+it.each([false, true])('empty direct match is retained with children=%s', async (children) => {
+  const f = await fixture('match', true, children)
 
   f.store.replaceTextRange('match', 0, f.node('match').text.length, '')
-  if (!children) {
-    f.store.selectNode('child', 0)
-    f.store.deleteSelected()
-  }
 
   f.store.applyAgenda({ kind: 'select', key: `node:${day(15)}:match` })
   const input = document.createElement('textarea')
@@ -354,6 +309,5 @@ it.each([false, true])('empty direct match deletion respects children=%s', async
 
   keyboard({ key: 'Backspace', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
 
-  if (children) expect(f.snapshot().document).toBe(before)
-  else expect(() => requireNode(f.snapshot().document, 'match')).toThrow()
+  expect(f.snapshot().document).toBe(before)
 })
