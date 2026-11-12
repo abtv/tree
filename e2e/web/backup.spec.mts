@@ -79,6 +79,7 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
 
   await page.goto('/')
   await ready(page)
+  const footerHeight = (await page.locator('.status-bar').boundingBox())!.height
   const png = await noisePng(page, 16)
   await seedImageNodes(page, [{ id: 'backup-image', bytes: png }, { id: 'missing-image' }])
 
@@ -136,6 +137,7 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
 
   await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
   await expect(page.locator('.status-bar #backup-status')).toBeVisible()
+  expect((await page.locator('.status-bar').boundingBox())!.height).toBe(footerHeight)
   await page.screenshot({ path: test.info().outputPath('backup-status-bottom.png') })
   expect(await readStored(page, 'preferences', 'backup-folder')).toBeUndefined()
   expect(await readBackup(page)).toEqual(files)

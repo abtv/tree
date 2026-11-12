@@ -1077,7 +1077,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   align-items: center;
   justify-content: flex-end;
   min-height: 27px;
-  flex-wrap: wrap;
+  column-gap: 12px;
   padding: 0 12px;
   border-top: 1px solid var(--color-location-border);
   background: var(--color-background);
@@ -1085,7 +1085,8 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .status-notifications {
   display: flex;
-  flex: 1 1 100%;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
@@ -1101,7 +1102,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 26px;
 }

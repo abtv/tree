@@ -88,6 +88,18 @@ test('keeps inference in the background, shows disabled commands, and cancels wi
   await expect(window.getByRole('option', { selected: true })).not.toHaveAttribute('aria-disabled', 'true')
   await window.keyboard.press('Enter')
   await expect(window.getByRole('button', { name: 'Cancel summarization' })).toBeVisible()
+
+  const footer = await window.locator('.status-bar').boundingBox()
+
+  expect(footer!.height).toBe(27)
+
+  const message = await window.locator('.summary-status').boundingBox()
+  const pin = await window.getByRole('button', { name: 'Pin window on top' }).boundingBox()
+
+  expect(message!.y + message!.height / 2).toBeCloseTo(pin!.y + pin!.height / 2, 0)
+  await expect(window.locator('.status-bar')).toHaveScreenshot('summary-status.png')
+  await window.screenshot({ path: '.scratch/status-bar-height/running.png' })
+
   await window.getByRole('textbox', { name: 'Node 2', exact: true }).click()
   await window.keyboard.press('A')
   await window.keyboard.type(' while summarizing')
