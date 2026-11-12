@@ -29,8 +29,8 @@ Update architecture descriptions with each relevant task; preserve product requi
 | S2 | Persistence execution phase, pending work and retained outcomes; `src/application/persistence-coordinator.ts` and tests; save scheduler only as necessary | Serialization/coalescing, requests during finalization, cleanup deferral/retry, failed-save retention, flush draining and discard-save without dropping cleanup. Coordinator/scheduler tests, persistence, attachment cleanup and shutdown E2E | High | Done |
 | S3 | Browser backup lifecycle and separate picker/confirmation state; `src/web/backup/backup-controller.ts`, tests and neighboring pure state module if needed | Click-synchronous picker/permission, no startup prompts, pagehide/stale-worker guards, cancellation, retry, preference/worker failures. Controller tests and `e2e/web/backup.spec.mts` | High | Done |
 | S4 | Complete desktop import/export operation state; `src/application/notes-archive/desktop-data-operations.ts` and tests | Retain prepared import across export from confirmation; cancellation/stale progress/menu/dispose; distinguish pre-commit failure from ambiguous commit requiring restart with writes suspended. Archive contracts and export/import/recovery E2E | High | Done |
-| S5 | Search hidden/editing/confirmed modes, separate count/navigation jobs; `src/application/search-session.ts` and tests | Recall, empty-draft fallback, cancel restoration, no navigation during drafting, context invalidation and stale response rejection. Session tests and local-search, vim-search, agenda-search E2E | Moderate if confined to session metadata | Ready |
-| S6 | Explicit quit handshake; `src/electron/main/quit-handshake.ts` and tests | Matching confirmation, duplicate suppression, timeout/retry, force, microtask scheduling and terminal idempotence. Unit and real menu/window/shutdown failure coverage | High | Planned |
+| S5 | Search hidden/editing/confirmed modes, separate count/navigation jobs; `src/application/search-session.ts` and tests | Recall, empty-draft fallback, cancel restoration, no navigation during drafting, context invalidation and stale response rejection. Session tests and local-search, vim-search, agenda-search E2E | Moderate; confined to session metadata | Done |
+| S6 | Explicit quit handshake; `src/electron/main/quit-handshake.ts` and tests | Matching confirmation, duplicate suppression, timeout/retry, force, microtask scheduling and terminal idempotence. Unit and real menu/window/shutdown failure coverage | High | Ready |
 | S7 | Explicit Vim pending-command variants; `src/renderer/vim-keyboard-types.ts`, `vim-command-state.ts`, affected handlers and tests | Inventory producers/consumers first; retain editor/Agenda zero/count rules, operator motions, awaited characters, prefixes, surround, Escape/reset and mode/surface transitions. Existing unit/property and representative Vim E2E | High for expected shared-handler scope | Planned |
 
 High Risk requires `npm run check`, full `npm run test:e2e`, `npm run audit`
@@ -78,9 +78,10 @@ No pre-commit manual owner checks are currently identified for internal refactor
 
 ## Exact next task
 
-Implement S5: explicit local-search session modes with independent count/navigation
-jobs. S1 (`4c19bdc`), S2 (`9452437`), S3 (`78538ef`) and S4 are implemented,
-independently reviewed and fully validated.
+Implement S6: explicit quit handshake. S1 (`4c19bdc`), S2 (`9452437`),
+S3 (`78538ef`), S4 (`8c15b64`) and S5 are implemented, independently reviewed
+and validated. S5 stayed within session metadata (Moderate Risk): full check and
+27 focused search Electron cases passed; no meaningful review findings.
 The scheduler, persistence services, serialization and Promise scheduling remain
 unchanged by S2. Its new cases cover a concurrent save inheriting cleanup after
 either a save or cleanup failure. No unresolved findings or validation blockers.
@@ -91,14 +92,8 @@ cached projection, and its shared replacement attempt records whether commit beg
 The existing cancellation/disposal order is preserved, including preparation reset
 after awaited cleanup. No product changes or unresolved review findings.
 
-The owner requested continued execution after an unnecessary two-task handoff.
-This primary session has now completed four substantive task commits and reached
-the binding limit in AGENT_WORKFLOW §12. An asynchronous question asks whether
-the owner permits exceeding that limit for the remaining three tasks; no answer
-has been received. Do not infer an exception from silence. S5 can proceed directly
-in a fresh primary session, or here after an explicit exception. The seven-task
-scope and continuation authorization remain unchanged; no renewed approval of the
-implementation itself is needed.
+The fresh primary session resumes after the earlier four-task limit. Continue
+S6 and S7 without renewed scope approval. This session has completed one task.
 
 ## Resume prompt
 

@@ -15,17 +15,23 @@ export interface SearchSessionSnapshot {
   readonly count?: Extract<SearchResult, { kind: 'count' }>
 }
 
+type SearchMode =
+  | { kind: 'hidden'; confirmed: string }
+  | { kind: 'confirmed'; confirmed: string }
+  | { kind: 'editing'; confirmed: string; draft: string; origin: SearchPosition; previousVisible: boolean }
+
+type SearchJob = { kind: 'idle' } | { kind: 'running'; cancel: () => void }
+
 /** Memory-only foundation. The editor must replace context before publishing a changed document. */
 export class SearchSession {
   private context: SearchContext | undefined
   private snapshot: SearchSessionSnapshot = { confirmed: '', visible: false, pending: false }
-  private origin: SearchPosition | undefined
-  private previousVisible = false
+  private mode: SearchMode = { kind: 'hidden', confirmed: '' }
   private generation = 0
   private countId = 0
   private navigationId = 0
-  private cancelCount: (() => void) | undefined
-  private cancelNavigation: (() => void) | undefined
+  private countJob: SearchJob = { kind: 'idle' }
+  private navigationJob: SearchJob = { kind: 'idle' }
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly executor: SearchExecutor = createSearchExecutor()) {}
@@ -49,47 +55,50 @@ export class SearchSession {
     this.invalidate()
     this.context = context
     if (previous?.scopeKey !== context.scopeKey) {
-      this.origin = undefined
-      this.set({ confirmed: this.snapshot.confirmed, visible: false, pending: false })
+      this.set({ kind: 'hidden', confirmed: this.mode.confirmed }, false)
     } else {
-      const { confirmed, draft, visible } = this.snapshot
-      if (!visible && draft === undefined) return
-      this.set({ confirmed, ...(draft === undefined ? {} : { draft }), visible, pending: visible })
-      if (visible) this.recount()
+      if (this.mode.kind === 'hidden') return
+      this.set(this.mode, true)
+      this.recount()
     }
   }
 
   public begin(origin: SearchPosition): void {
     this.invalidate()
-    this.previousVisible = this.snapshot.visible
-    this.origin = origin
-    this.set({ confirmed: this.snapshot.confirmed, draft: this.snapshot.confirmed, visible: true, pending: true })
+    this.set(
+      {
+        kind: 'editing',
+        confirmed: this.mode.confirmed,
+        draft: this.mode.confirmed,
+        origin,
+        previousVisible: this.mode.kind !== 'hidden',
+      },
+      true,
+    )
     this.recount()
   }
 
   public edit(query: string): void {
-    if (this.snapshot.draft === undefined) return
+    if (this.mode.kind !== 'editing') return
     this.invalidate()
-    this.set({ confirmed: this.snapshot.confirmed, draft: query, visible: true, pending: true })
+    this.set({ ...this.mode, draft: query }, true)
     this.recount()
   }
 
   public cancelDraft(): void {
-    if (this.snapshot.draft === undefined) return
+    if (this.mode.kind !== 'editing') return
     this.invalidate()
-    this.origin = undefined
-    const visible = this.previousVisible
-    this.set({ confirmed: this.snapshot.confirmed, visible, pending: visible })
+    const visible = this.mode.previousVisible
+    this.set({ kind: visible ? 'confirmed' : 'hidden', confirmed: this.mode.confirmed }, visible)
     if (visible) this.recount()
   }
 
   /** Caller applies a current destination through the editor's existing focus/reveal owner. */
   public confirm(publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void, direction: -1 | 1 = 1): void {
-    const origin = this.origin
-    const query = this.snapshot.draft || this.snapshot.confirmed
+    const origin = this.mode.kind === 'editing' ? this.mode.origin : undefined
+    const query = (this.mode.kind === 'editing' ? this.mode.draft : '') || this.mode.confirmed
     this.invalidate()
-    this.origin = undefined
-    this.set({ confirmed: query, visible: query.length > 0, pending: query.length > 0 })
+    this.set({ kind: query.length > 0 ? 'confirmed' : 'hidden', confirmed: query }, query.length > 0)
     if (query.length === 0) return
     this.recount()
     if (origin !== undefined) this.navigate(origin, direction, 1, publish)
@@ -97,14 +106,13 @@ export class SearchSession {
 
   public hide(): void {
     this.invalidate()
-    this.origin = undefined
-    this.set({ confirmed: this.snapshot.confirmed, visible: false, pending: false })
+    this.set({ kind: 'hidden', confirmed: this.mode.confirmed }, false)
   }
 
   public interruptNavigation(): void {
     this.navigationId++
-    this.cancelNavigation?.()
-    this.cancelNavigation = undefined
+    if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
+    this.navigationJob = { kind: 'idle' }
   }
 
   /** One pending jump. Repeated UI intents must await application of the preceding destination. */
@@ -114,12 +122,12 @@ export class SearchSession {
     count: number,
     publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void,
   ): void {
-    if (this.context === undefined || this.snapshot.confirmed.length === 0 || this.snapshot.draft !== undefined) return
-    if (!this.snapshot.visible) {
-      this.set({ confirmed: this.snapshot.confirmed, visible: true, pending: true })
+    if (this.context === undefined || this.mode.confirmed.length === 0 || this.mode.kind === 'editing') return
+    if (this.mode.kind === 'hidden') {
+      this.set({ kind: 'confirmed', confirmed: this.mode.confirmed }, true)
       this.recount()
     }
-    this.cancelNavigation?.()
+    if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
     const id = ++this.navigationId
     const generation = this.generation
     const context = this.context
@@ -129,17 +137,18 @@ export class SearchSession {
       query: this.snapshot.confirmed,
       operation: { kind: 'navigate', origin, direction, count },
     }
-    this.cancelNavigation = this.executor.execute(request, (result) => {
+    const cancel = this.executor.execute(request, (result) => {
       if (generation !== this.generation || id !== this.navigationId || context !== this.context) return
-      this.cancelNavigation = undefined
+      this.navigationJob = { kind: 'idle' }
       if (result.kind === 'navigate') publish(result)
     })
+    this.navigationJob = { kind: 'running', cancel }
   }
 
   public dispose(): void {
     this.invalidate()
     this.context = undefined
-    this.origin = undefined
+    this.mode = { kind: 'hidden', confirmed: '' }
     this.listeners.clear()
     this.snapshot = { confirmed: '', visible: false, pending: false }
   }
@@ -147,29 +156,37 @@ export class SearchSession {
   private recount(): void {
     const context = this.context
     if (context === undefined) return
-    this.cancelCount?.()
+    if (this.countJob.kind === 'running') this.countJob.cancel()
     const id = ++this.countId
     const generation = this.generation
-    this.cancelCount = this.executor.execute(
+    const cancel = this.executor.execute(
       { ...context, id, query: this.snapshot.draft ?? this.snapshot.confirmed, operation: { kind: 'count' } },
       (result) => {
         if (generation !== this.generation || id !== this.countId || context !== this.context) return
-        this.cancelCount = undefined
-        if (result.kind === 'count') this.set({ ...this.snapshot, count: result, pending: false })
+        this.countJob = { kind: 'idle' }
+        if (result.kind === 'count') this.set(this.mode, false, result)
       },
     )
+    this.countJob = { kind: 'running', cancel }
   }
 
   private invalidate(): void {
     this.generation++
-    this.cancelCount?.()
-    this.cancelNavigation?.()
-    this.cancelCount = undefined
-    this.cancelNavigation = undefined
+    if (this.countJob.kind === 'running') this.countJob.cancel()
+    if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
+    this.countJob = { kind: 'idle' }
+    this.navigationJob = { kind: 'idle' }
   }
 
-  private set(snapshot: SearchSessionSnapshot): void {
-    this.snapshot = snapshot
+  private set(mode: SearchMode, pending: boolean, count?: Extract<SearchResult, { kind: 'count' }>): void {
+    this.mode = mode
+    this.snapshot = {
+      confirmed: mode.confirmed,
+      ...(mode.kind === 'editing' ? { draft: mode.draft } : {}),
+      visible: mode.kind !== 'hidden',
+      pending,
+      ...(count === undefined ? {} : { count }),
+    }
     this.listeners.forEach((listener) => listener())
   }
 }

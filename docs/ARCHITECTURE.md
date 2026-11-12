@@ -169,7 +169,10 @@ from paint latency. Its timer probe includes all zero-delay callbacks in the mea
 so it supports cost attribution without claiming every callback belongs to search.
 
 `search-session.ts` owns memory-only query recall, draft entry, feedback and request validity.
-Count and navigation have separate request IDs and share context invalidation. The caller
+Its local mode is hidden, editing (with the captured origin and cancellation visibility),
+or confirmed. The public snapshot is a cached projection of that mode and count feedback.
+Count and navigation have independent idle/running jobs and separate request IDs, and
+share context invalidation. These bounded runtime records add no traversal or disk work. The caller
 must replace context before publishing a new document revision or presentation scope.
 Late callbacks are rejected even if an executor ignores cancellation. A pending navigation
 can be superseded; the input owner must serialize repeated user intents after applying

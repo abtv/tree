@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Explicit Operation States](explicit-operation-states.md) | In progress | S5: local-search session; new primary session or explicit four-task-limit exception |
+| [Explicit Operation States](explicit-operation-states.md) | In progress | S6: quit handshake |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
