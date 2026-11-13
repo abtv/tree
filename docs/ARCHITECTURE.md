@@ -422,6 +422,8 @@ The existing `vim-edit-session.ts` owner represents Replace pointer continuation
 
 `node-list-layout.ts` caches uniform estimated offsets and row-key indices with weak keys for immutable Tree and Agenda row arrays. Reopening a view reuses those identities without scanning off-screen rows again. Each layout applies the current measured heights to a fresh numeric offset array; measured geometry is never cached across mounts, document edits, width changes or line-number changes. Cached storage scales with live row projections and is collectible with them. The numeric offset adjustment remains linear in row count, while sparse measured-key lookup avoids repeating document-scale string-map reads. This adds no disk writes, syncs or persisted fields.
 
+Tree row refs register pending measurements; `NodeList` reads their geometry together in its layout effect after sibling editor refs have projected their content. This avoids alternating rich-content DOM writes and forced layout during view switching. The pending set is bounded by attached rows and cleared each commit. ResizeObserver retains ownership of later geometry changes. This changes no document state, writes, syncs or caret authority; measurement CPU remains proportional to attached rows.
+
 `use-line-numbers.ts` owns the shared Tree/Agenda line-number preference and its
 literal Control shortcut. The command panel uses the same setter. Both platform
 entries read it before mounting the editor; Electron uses the existing boolean

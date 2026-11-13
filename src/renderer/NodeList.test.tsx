@@ -49,6 +49,32 @@ function mockRowRects(originTop = 0, height = ROW_HEIGHT_ESTIMATE): void {
   })
 }
 
+// @requirement PRODUCT.md §23.1
+it('measures mounted rows after every editor has attached its content', () => {
+  const attached = new Set<string>()
+  const incomplete: string[] = []
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.classList.contains('node-row') && attached.size !== nodes.length) incomplete.push(this.dataset.nodeId!)
+    return rect(0)
+  })
+
+  renderRows({
+    renderInput: (node, label) => (
+      <textarea
+        aria-label={label}
+        readOnly
+        value={node.text}
+        ref={(element) => {
+          if (element !== null) attached.add(node.id)
+          else attached.delete(node.id)
+        }}
+      />
+    ),
+  })
+
+  expect(incomplete).toEqual([])
+})
+
 class TestResizeObserver {
   static instances: TestResizeObserver[] = []
 

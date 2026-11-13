@@ -64,6 +64,7 @@ export function NodeList({
   const listRef = useRef<HTMLElement | null>(null)
   const heightsRef = useRef(new Map<string, number>())
   const observedElementsRef = useRef(new Map<string, HTMLElement>())
+  const pendingMeasurementsRef = useRef(new Set<string>())
   const observerRef = useRef<ResizeObserver | undefined>(undefined)
   const widthRef = useRef(typeof globalThis.innerWidth === 'number' ? globalThis.innerWidth : 0)
   const [measureRevision, setMeasureRevision] = useState(0)
@@ -85,14 +86,27 @@ export function NodeList({
       const observed = observedElementsRef.current.get(nodeId)
       if (observed !== undefined) {
         observedElementsRef.current.delete(nodeId)
+        pendingMeasurementsRef.current.delete(nodeId)
         observerRef.current?.unobserve(observed)
       }
       return
     }
     observedElementsRef.current.set(nodeId, element)
+    pendingMeasurementsRef.current.add(nodeId)
     observerRef.current?.observe(element)
-    measureElement(nodeId, element, heightsRef.current, setMeasureRevision)
   }, [])
+
+  // Editor refs project rich content while React attaches siblings. Read geometry only after
+  // that stage, so each subsequent editor does not invalidate the previous row's layout read.
+  // Run after every commit: draining pending refs cannot enqueue another measurement itself.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    for (const nodeId of pendingMeasurementsRef.current) {
+      const element = observedElementsRef.current.get(nodeId)
+      if (element !== undefined) measureElement(nodeId, element, heightsRef.current, setMeasureRevision)
+    }
+    pendingMeasurementsRef.current.clear()
+  })
 
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return undefined
