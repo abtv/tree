@@ -1158,8 +1158,8 @@ tested case), Vim divergence (empty, or the marker with what Vim does differentl
 and the reason), and evidence (cited test paths and names, verified by
 `npm run check:docs`). A row cites PRODUCT instead of restating a rule. A clause
 that no PRODUCT sentence states stays in the Case cell tagged `matrix-only (Mn)`
-and is listed under "Open matrix-only rules" until the Product Owner decides or a
-named test asserts it; moving it into PRODUCT.md follows `AGENTS.md` §5.
+and is listed under "Open matrix-only rules" until the Product Owner decides;
+a named test alone does not authorize the rule. Moving it into PRODUCT.md follows `AGENTS.md` §5.
 
 A refactoring that preserves behavior should not require unnecessary test changes.
 

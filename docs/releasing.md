@@ -190,8 +190,12 @@ remains included and separate web builds are excluded. React and React DOM are
 build dependencies bundled into the renderer; their licenses and the scheduler
 license are copied into `Resources/licenses`. The Apple Vision executable is copied
 from `out/native` to `Contents/Helpers/tree-image-to-text`, signed as nested code,
-and checked explicitly by the verifier. Both DMG and ZIP renderer smoke tests run
-real image recognition through the packaged helper. Application name, sandbox,
+and checked explicitly by the verifier. The Foundation Models executable is copied
+from `out/native/tree-summarize` to `Contents/Helpers/tree-summarize` under the same
+nested-code signing policy (ADR 0026). Both DMG and ZIP renderer smoke tests run
+real image recognition through the packaged Apple Vision helper. The summarization
+smoke checks real inference when the system model is available; otherwise it checks
+the disabled command and reports inference as unverified. Application name, sandbox,
 context isolation, CSP and local storage code are unchanged.
 
 Hardened Runtime uses only `com.apple.security.cs.allow-jit`, needed by Electron's
