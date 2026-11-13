@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := help
+BUMP ?= patch
 
 include scripts/web/chromium-image.mk
 
@@ -17,7 +18,7 @@ help:
 	@echo "make test-perf      Run domain, Electron, web, and Safari comparison benchmarks"
 	@echo "make test-property  Run property tests with increased repetitions"
 	@echo "make test-mutation  Check whether tests detect deliberately introduced bugs"
-	@echo "make release        Bump the patch version and create a local commit"
+	@echo "make release        Bump the version and commit locally (BUMP=patch|minor|major; default: patch)"
 
 dev:
 	npm run dev
@@ -58,4 +59,4 @@ test-mutation:
 	npm run test:mutation
 
 release:
-	npm run release
+	npm run release -- "$(BUMP)"

@@ -19,6 +19,14 @@ commit. It runs no tests, makes no network requests and creates no tag.
 Optional `-- minor` and `-- major` select those increments. Push or merge the
 commit into `main` using the normal development workflow.
 
+The Make shortcut accepts the same increments:
+
+```bash
+make release             # patch by default
+make release BUMP=minor
+make release BUMP=major
+```
+
 The `Test and build app` main workflow runs code checks, audit, browser and Linux/macOS Electron E2E, Linux Electron memory measurements, and
 Linux/macOS smoke once. After success it dispatches the versioned release, whose
 Web and macOS branches run independently. The macOS branch calls
