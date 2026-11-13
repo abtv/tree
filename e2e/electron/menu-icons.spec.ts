@@ -119,9 +119,15 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
 
   expect(remainingScripts).toBe(0)
 
+  // A data URL cannot resolve the stylesheet's relative font URL. Embed the bundled font so
+  // status text uses the production typeface instead of a machine-dependent fallback.
+  const rendererStyles = readFileSync('src/renderer/styles.css', 'utf8').replace(
+    './assets/fonts/JetBrainsMono[wght].ttf',
+    `data:font/ttf;base64,${readFileSync('src/renderer/assets/fonts/JetBrainsMono[wght].ttf').toString('base64')}`,
+  )
   const html = (await withoutScripts(readFileSync('src/web/index.html', 'utf8'))).replace(
     '</head>',
-    `<style>${readFileSync('src/renderer/styles.css', 'utf8')}\n${readFileSync('src/web/styles.css', 'utf8')}</style></head>`,
+    `<style>${rendererStyles}\n${readFileSync('src/web/styles.css', 'utf8')}</style></head>`,
   )
   const opened = app.waitForEvent('window')
   const id = await app.evaluate(async ({ BrowserWindow }, html) => {
@@ -138,6 +144,13 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
   try {
     // Native title-bar height varies between macOS versions; compare a fixed content area.
     await page.setViewportSize({ width: 800, height: 618 })
+    const loadedFonts = await page.evaluate(async () => {
+      const fonts = await document.fonts.load('12px "JetBrains Mono"')
+      return fonts.map((font) => font.status)
+    })
+
+    expect(loadedFonts).toEqual(['loaded'])
+
     await page.evaluate(() => {
       const root = document.getElementById('root')!
       root.className = 'tree-app'
