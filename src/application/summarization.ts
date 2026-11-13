@@ -47,15 +47,22 @@ export async function summarizeForest(
     signal.throwIfAborted()
   }
   const compress = async (text: string, final = false): Promise<string> => {
-    check()
-    if (++requests > SUMMARY_MAX_REQUESTS)
-      throw new Error('The selected notes require too many summarization steps. Select a smaller branch.')
-    const result = (await reduce(text, final)).trim()
-    check()
-    if (!result || (!final && bytes(result) > SUMMARY_INTERMEDIATE_BYTES))
-      throw new Error('The model could not produce a compact summary. Please try a smaller branch.')
-    progress(requests)
-    return result
+    let input = text
+    for (let attempt = 0; attempt < 3; attempt++) {
+      check()
+      if (++requests > SUMMARY_MAX_REQUESTS)
+        throw new Error('The selected notes require too many summarization steps. Select a smaller branch.')
+      const result = (await reduce(input, final)).trim()
+      check()
+      if (!result) break
+      progress(requests)
+      if (final || bytes(result) <= SUMMARY_INTERMEDIATE_BYTES) return result
+      if (bytes(result) > SUMMARY_INPUT_BYTES) break
+      // The model's length instruction is advisory. Recompress the complete result,
+      // still charging every attempt to the invocation's existing request limit.
+      input = result
+    }
+    throw new Error('The model could not produce a compact summary. Please try a smaller branch.')
   }
   interface Frame {
     nodes: readonly TreeNode[]

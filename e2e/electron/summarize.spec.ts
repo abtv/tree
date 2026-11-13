@@ -65,6 +65,65 @@ test('summarizes with the actual local model and copies once without editing not
 })
 
 // @requirement PRODUCT.md §15.2
+test('recovers from oversized intermediate output using the actual local model', async ({ userDataDir }) => {
+  test.skip(process.platform !== 'darwin' || process.arch !== 'arm64', 'Apple Silicon model required')
+  test.setTimeout(120_000)
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        {
+          id: 'project',
+          text: 'Reading club project',
+          children: Array.from({ length: 36 }, (_, index) => ({
+            id: `task-${index}`,
+            text: `Task ${index}: Alice brings the books on Friday. Bob reserves room ${index + 1}. The budget is ${50 + index * 5} dollars. Carol prepares ${index + 3} handouts. Do not confirm this task before the room reservation.`,
+            children: [],
+          })),
+        },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'project' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const available = await window.evaluate(() => globalThis.window.treeApi.summarization!.available())
+  test.skip(!available, 'Local model unavailable; no real recovery inference evidence')
+  await lockSystemClipboard()
+  await app.evaluate(() => {
+    const runtime = globalThis as typeof globalThis & {
+      oversizedSummary?: string
+      recoveryUsedModel?: boolean
+    }
+    globalThis.__treeIpc.wrap('tree:summary-reduce', async (original, event, id, text, final) => {
+      // Deterministically reproduce an overlong reply once, then use the real native model.
+      if (!final && runtime.oversizedSummary === undefined) {
+        runtime.oversizedSummary = text as string
+        return text
+      }
+      const result = await original(event, id, text, final)
+      if (!final && text === runtime.oversizedSummary) runtime.recoveryUsedModel = true
+      return result
+    })
+  })
+
+  await window.keyboard.press(':')
+  await window.getByRole('combobox', { name: 'Command' }).fill('summarize')
+  await window.keyboard.press('Enter')
+  await expect(window.locator('.summary-status')).toHaveText(/^(Summary copied\.|Summarization failed\.)/, {
+    timeout: 90_000,
+  })
+
+  await expect(window.locator('.summary-status')).toHaveText('Summary copied.')
+  expect(
+    await app.evaluate(() => (globalThis as typeof globalThis & { recoveryUsedModel?: boolean }).recoveryUsedModel),
+  ).toBe(true)
+  const text = await app.evaluate(({ clipboard }) => clipboard.readText())
+  expect(text).toMatch(/Alice/i)
+  expect(text).toMatch(/Bob/i)
+  expect(text).toMatch(/Friday/i)
+  await closeApp(app)
+})
+
+// @requirement PRODUCT.md §15.2
 // @requirement PRODUCT.md §20.2.7
 test('keeps inference in the background, shows disabled commands, and cancels without late clipboard writes', async ({
   userDataDir,

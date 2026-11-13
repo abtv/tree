@@ -1148,7 +1148,11 @@ Empty input reports that the selection contains no text.
 Processing admits at most 100,000 nodes, 16 MiB of source UTF-8 text, 1,000 model
 requests, and 15 minutes per invocation. Each native request times out after
 60 seconds, accepts at most 2,400 UTF-8 input bytes and returns at most 8,000 bytes.
-Intermediate summaries must fit 800 bytes; an oversized result fails explicitly.
+
+Intermediate summaries must fit 800 bytes. If the model exceeds that limit, Tree
+recompresses the complete intermediate result up to twice more, within the same
+request and time limits. It never truncates the result. Output too large for another
+request, empty output or failure to fit after these attempts fails explicitly.
 The byte budget reserves context for instructions and output. Apple controls compute
 resources; Tree does not promise GPU execution or zero impact on responsiveness.
 

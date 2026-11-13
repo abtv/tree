@@ -62,7 +62,30 @@ it('reduces long Unicode text and a wide forest sequentially within the byte bud
 })
 
 // @requirement PRODUCT.md §15.2
-it('rejects empty notes and a model that does not compress without copying partial output', async () => {
+it.each([
+  { label: 'English', text: 'Alice brings the books on Friday. Bob reserves the room. '.repeat(16).trim() },
+  { label: 'Unicode', text: '😀'.repeat(201) },
+])('recompresses oversized $label intermediate output without truncating it', async ({ text: oversized }) => {
+  const reduce = vi.fn(async (_text: string, final: boolean): Promise<string> =>
+    final ? 'Final summary' : 'Compact summary',
+  )
+  reduce.mockResolvedValueOnce(oversized)
+  const progress = vi.fn()
+
+  const result = await summarizeForest(
+    [node('long', 'Detailed notes. '.repeat(300))],
+    reduce,
+    new AbortController().signal,
+    progress,
+  )
+
+  expect(result).toBe('Final summary')
+  expect(reduce).toHaveBeenNthCalledWith(2, oversized, false)
+  expect(progress.mock.calls.at(-1)).toEqual([reduce.mock.calls.length])
+})
+
+// @requirement PRODUCT.md §15.2
+it('rejects empty notes without asking the model', async () => {
   const abort = new AbortController()
 
   await expect(
@@ -73,14 +96,45 @@ it('rejects empty notes and a model that does not compress without copying parti
       () => undefined,
     ),
   ).rejects.toThrow('no text')
+})
+
+// @requirement PRODUCT.md §15.2
+it.each([
+  { output: '', attempts: 1 },
+  { output: 'x'.repeat(2401), attempts: 1 },
+  { output: 'x'.repeat(801), attempts: 3 },
+])('bounds recovery for unusable intermediate results (%#)', async ({ output, attempts }) => {
+  const reduce = vi.fn(async () => output)
+
   await expect(
-    summarizeForest(
-      [node('long', 'x'.repeat(5000))],
-      async () => 'x'.repeat(801),
-      abort.signal,
-      () => undefined,
-    ),
+    summarizeForest([node('long', 'x'.repeat(5000))], reduce, new AbortController().signal, () => undefined),
   ).rejects.toThrow('compact summary')
+
+  expect(reduce).toHaveBeenCalledTimes(attempts)
+})
+
+// @requirement PRODUCT.md §15.2
+it('checks cancellation before recompressing an oversized result', async () => {
+  const abort = new AbortController()
+  const reduce = vi.fn(async () => 'x'.repeat(801))
+
+  await expect(
+    summarizeForest([node('long', 'x'.repeat(5000))], reduce, abort.signal, () => abort.abort(new Error('Canceled'))),
+  ).rejects.toThrow('Canceled')
+
+  expect(reduce).toHaveBeenCalledOnce()
+})
+
+// @requirement PRODUCT.md §15.2
+it('charges recompression requests to the invocation limit', async () => {
+  let calls = 0
+  const reduce = vi.fn(async () => (++calls % 2 === 1 ? 'x'.repeat(801) : 'Compact summary'))
+
+  await expect(
+    summarizeForest([node('long', 'x'.repeat(900_000))], reduce, new AbortController().signal, () => undefined),
+  ).rejects.toThrow('too many summarization steps')
+
+  expect(reduce).toHaveBeenCalledTimes(1000)
 })
 
 // @requirement PRODUCT.md §15.2
