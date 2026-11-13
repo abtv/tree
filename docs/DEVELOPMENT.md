@@ -101,7 +101,7 @@ less frequent checks.
 | `make test-perf` | Domain, Electron, web, and Safari comparison benchmarks | `npm run test:performance`, `npm run test:perf`, `npm run test:perf:safari` |
 | `make test-property` | Property tests with increased repetitions | `npm run test:property` |
 | `make test-mutation` | Check whether tests detect deliberately introduced bugs | `npm run test:mutation` |
-| `make release` | Bump the version and commit locally; `BUMP=patch` (default), `minor` or `major` | `npm run release -- <bump>` |
+| `make release [patch\|minor\|major]` | Bump the version and commit locally; patch by default | `npm run release -- <bump>` |
 
 Combined targets run their listed workflows sequentially and stop at the first
 failure. They include the required builds: `test:safari` builds the web package
@@ -1235,7 +1235,7 @@ Commit the intended application changes, then run this command from the reposito
 npm run release
 ```
 
-The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. `make release` runs the same default patch bump. For minor or major use `make release BUMP=minor` or `make release BUMP=major`, equivalent to `npm run release -- minor` or `npm run release -- major`.
+The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. `make release` runs the same default patch bump. For minor or major use `make release minor` or `make release major`, equivalent to `npm run release -- minor` or `npm run release -- major`. The earlier `BUMP=minor` and `BUMP=major` forms remain supported.
 
 It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `npm run release -- --help` or `make release BUMP=--help` for usage without side effects.
 

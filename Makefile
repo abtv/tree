@@ -1,9 +1,16 @@
 .DEFAULT_GOAL := help
 BUMP ?= patch
+RELEASE_BUMP = $(or $(filter-out release,$(MAKECMDGOALS)),$(BUMP))
 
 include scripts/web/chromium-image.mk
 
 .PHONY: help dev dev-web build test-unit test-smoke test-e2e test-memory test-perf test-property test-mutation release
+
+ifneq ($(filter release,$(MAKECMDGOALS)),)
+.PHONY: patch minor major
+patch minor major:
+	@:
+endif
 
 help:
 	@echo "make                Show available commands"
@@ -18,7 +25,7 @@ help:
 	@echo "make test-perf      Run domain, Electron, web, and Safari comparison benchmarks"
 	@echo "make test-property  Run property tests with increased repetitions"
 	@echo "make test-mutation  Check whether tests detect deliberately introduced bugs"
-	@echo "make release        Bump the version and commit locally (BUMP=patch|minor|major; default: patch)"
+	@echo "make release        Bump patch and commit locally; use make release minor or make release major"
 
 dev:
 	npm run dev
@@ -59,4 +66,4 @@ test-mutation:
 	npm run test:mutation
 
 release:
-	npm run release -- "$(BUMP)"
+	npm run release -- "$(RELEASE_BUMP)"

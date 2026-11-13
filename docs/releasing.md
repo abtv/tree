@@ -23,9 +23,12 @@ The Make shortcut accepts the same increments:
 
 ```bash
 make release             # patch by default
-make release BUMP=minor
-make release BUMP=major
+make release minor
+make release major
 ```
+
+`make release patch` selects patch explicitly. The earlier `BUMP=minor` and
+`BUMP=major` forms remain supported.
 
 The `Test and build app` main workflow runs code checks, audit, browser and Linux/macOS Electron E2E, Linux Electron memory measurements, and
 Linux/macOS smoke once. After success it dispatches the versioned release, whose
