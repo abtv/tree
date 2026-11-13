@@ -371,6 +371,11 @@ export function richTextHtml(
   return parts.join('')
 }
 
+/** Preserve native edits and their live text nodes when the projection already matches. */
+export function syncRichTextHtml(element: HTMLElement, html: string): void {
+  if (element.innerHTML !== html) element.innerHTML = html
+}
+
 export function readEditableContent(element: HTMLElement): { text: string; links: LinkRange[] } {
   const links: LinkRange[] = []
   let text = ''

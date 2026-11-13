@@ -2164,6 +2164,8 @@ Changes that were queued in memory but not yet persisted may be lost when the us
 
 The application must stay responsive and must not accumulate unbounded memory or perform unnecessary disk operations as the document and edit history grow.
 
+Typing in long decorated rows must keep the caret and viewport stable without pauses caused by redundant replacement of unchanged formatted content. Actual formatting changes, undo/redo and composition must retain their existing behavior.
+
 Preparing and dispatching a large save must leave ongoing typing and navigation responsive, including when a save scheduled in Tree becomes due after opening Agenda. This must preserve the existing save timing, ordering, failure handling and durable acknowledgment.
 
 Any change to editor state or persistence must include an explicit assessment of its performance implications, covering:

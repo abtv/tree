@@ -10,7 +10,13 @@ import type {
 } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { TreeNode } from '../domain/document'
-import { getSelectionEndpoints, richTextHtml, setSelectionRange, type TextDecoration } from './editor-dom'
+import {
+  getSelectionEndpoints,
+  richTextHtml,
+  setSelectionRange,
+  syncRichTextHtml,
+  type TextDecoration,
+} from './editor-dom'
 import { useSearchDecorations } from './search-decorations'
 
 export interface NodeInputBindings {
@@ -88,7 +94,7 @@ export function NodeInput({
           ),
         ]
   const hasLinks = (node.links?.length ?? 0) > 0
-  const [compositionHtml, setCompositionHtml] = useState<string>()
+  const [composing, setComposing] = useState(false)
   const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
     nodeId: node.id,
     enabled: hasLinks,
@@ -127,6 +133,13 @@ export function NodeInput({
       retainedSelection.current = getSelectionEndpoints(previous)
     }
     element.current = input
+    // Commit the projection before registration/row measurement. Native input often already made
+    // exactly this edit; replacing its DOM would discard selection and disturb scroll anchoring.
+    if (input !== null && !plain && !composing)
+      syncRichTextHtml(
+        input,
+        richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
+      )
     inputRef(input)
   }
   const className = [
@@ -149,12 +162,12 @@ export function NodeInput({
     },
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {
       onCompositionEnd(event)
-      setCompositionHtml(undefined)
+      setComposing(false)
     },
     onCompositionStart: (event: CompositionEvent<HTMLElement>) => {
       // Any rich element freezes its markup for the composition, including a Tree row that kept the
       // rich element after its last date-like token was removed.
-      if (!plain) setCompositionHtml(richTextHtml(node, decorations))
+      if (!plain) setComposing(true)
       onCompositionStart(event)
     },
     onContextMenu,
@@ -206,11 +219,6 @@ export function NodeInput({
         onContentInput(event)
       }}
       suppressContentEditableWarning
-      dangerouslySetInnerHTML={{
-        __html:
-          compositionHtml ??
-          richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
-      }}
     />
   )
 }

@@ -34,6 +34,27 @@ const bindings: NodeInputBindings = {
 const node = (text: string) => ({ id: 'n', text, children: [] })
 
 describe('native rich editing', () => {
+  it('preserves native text nodes when the edited DOM already matches the next projection', () => {
+    const { rerender } = render(view('due 2026-10-14 note'))
+    const input = screen.getByLabelText('Node 1')
+    input.focus()
+    const date = input.querySelector('span')!
+    const tail = input.lastChild!
+    tail.textContent += 'x'
+    setSelectionRange(input, 20, 20)
+
+    rerender(view('due 2026-10-14 notex'))
+
+    expect(input.querySelector('span')).toBe(date)
+    expect(input.lastChild).toBe(tail)
+    expect(input.textContent).toBe('due 2026-10-14 notex')
+
+    rerender(view('due 2026-10-14 note'))
+
+    expect(input.textContent).toBe('due 2026-10-14 note')
+    expect(document.activeElement).toBe(input)
+  })
+
   it('retains native editing by default and locks either rich editing policy', () => {
     const value = node('2026-10-18 Review')
     const field = (disabled: boolean, richEditingEnabled?: boolean) => (
