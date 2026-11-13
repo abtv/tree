@@ -46,6 +46,11 @@ describe('apple shortcut profile', () => {
     expect(APPLE_SHORTCUTS.format({ key: 'Q' })).toBe('⌘Q')
     expect(APPLE_SHORTCUTS.format({ key: 'p', shift: true })).toBe('⇧⌘P')
   })
+
+  // @requirement PRODUCT.md §20.2.30
+  it('labels the line-number shortcut with Control', () => {
+    expect(APPLE_SHORTCUTS.format({ key: 'l', control: true })).toBe('⌃L')
+  })
 })
 
 describe('other shortcut profile', () => {

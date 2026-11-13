@@ -20,6 +20,7 @@ describe('QuitHandshake', () => {
     const { clock } = createClock()
     const handshake = new QuitHandshake(send, vi.fn(), quit, () => 'idle', clock)
 
+    expect(handshake.isQuitting()).toBe(false)
     expect(handshake.confirm('idle')).toBe(false)
     handshake.force()
     handshake.force()
@@ -100,6 +101,7 @@ describe('QuitHandshake', () => {
     handshake.request()
     fire()
 
+    expect(handshake.isQuitting()).toBe(false)
     expect(onTimeout).toHaveBeenCalledOnce()
 
     handshake.request()

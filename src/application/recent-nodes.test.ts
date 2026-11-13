@@ -12,6 +12,27 @@ const document = {
 }
 
 describe('recent nodes', () => {
+  // @requirement PRODUCT.md §20.14.1
+  it('reuses retained paths without traversing unrelated roots on a new document snapshot', () => {
+    let childrenReads = 0
+    const roots = Array.from({ length: 1000 }, (_, index) => ({
+      id: `root-${index}`,
+      text: 'Node',
+      get children(): TreeNode[] {
+        childrenReads += 1
+        return []
+      },
+    }))
+    const recent = new RecentNodes()
+    recent.load(['root-999'], { roots })
+    childrenReads = 0
+
+    recent.update({ roots: [...roots] })
+
+    expect(recent.getResults()).toEqual([{ id: 'root-999', text: 'Node', path: null }])
+    expect(childrenReads).toBeLessThanOrEqual(2)
+  })
+
   it('retains full node text without normalizing or copying it into a preview', () => {
     const text = `  ${'long title '.repeat(50)}\nfinal match  `
     const recent = new RecentNodes()

@@ -302,7 +302,10 @@ it('does not restore a stale snapshot after a close immediately followed by reop
 })
 
 it('removes document listeners and makes pending restoration inert after disposal', async () => {
+  const add = vi.spyOn(document, 'addEventListener')
+  const remove = vi.spyOn(document, 'removeEventListener')
   const f = fixture()
+  const focusout = add.mock.calls.find(([type]) => type === 'focusout')![1]
   f.editor.focus()
   f.open()
   f.menu.hidePopover()
@@ -317,6 +320,7 @@ it('removes document listeners and makes pending restoration inert after disposa
 
   expect(document.activeElement).toBe(f.item)
   expect(f.menu.hidePopover).not.toHaveBeenCalled()
+  expect(remove).toHaveBeenCalledWith('focusout', focusout, true)
 })
 
 // @requirement PRODUCT.md §1.4

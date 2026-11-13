@@ -5,6 +5,27 @@ import { expect, it } from 'vitest'
 import { createRecentNodesStore } from './recent-nodes'
 import { createFileServices } from './file-services'
 
+it('loads empty history after a failed write and permits a later atomic replacement', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'tree-recent-retry-'))
+  try {
+    const blocked = join(directory, 'data')
+    await writeFile(blocked, 'A file blocks the history directory')
+    const path = join(blocked, 'recent-nodes.json')
+    const history = createRecentNodesStore(path)
+
+    await expect(history.save(['failed'])).rejects.toThrow()
+    await expect(history.load()).resolves.toEqual([])
+    await rm(blocked)
+    await history.save(['latest', 'latest', 'previous'])
+
+    await expect(history.load()).resolves.toEqual(['latest', 'previous'])
+    expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(['latest', 'previous'])
+    await expect(readFile(`${path}.tmp`)).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 it('loads empty history on missing/corrupt data and serializes atomic replacements', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'tree-recent-'))
   try {

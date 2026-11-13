@@ -5,6 +5,37 @@ import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
 import { isValidLocation, type Document } from '../domain/document'
 
+// @requirement PRODUCT.md §23.7
+it('publishes the active Agenda node while preserving the recorded Tree origin', () => {
+  const runtime = new EditorRuntimeState()
+  const document: Document = {
+    roots: [
+      { id: 'origin', text: 'Origin', children: [] },
+      { id: 'active', text: '1970-04-11', children: [] },
+    ],
+  }
+  const location = { currentParentId: null, selectedNodeId: 'origin' }
+  const agenda = {
+    ...openAgendaState(location, 4, 100),
+    selectedKey: 'node:100:active',
+    activity: { kind: 'dated' as const, occurrence: { nodeId: 'active', day: 100 } },
+  }
+
+  runtime.replaceReady({
+    status: 'ready',
+    document,
+    location,
+    agenda,
+    focus: runtime.newFocus('active', 0),
+    structuralVersion: 0,
+    expansion: COLLAPSED_EXPANSION_STATE,
+  })
+
+  expect(runtime.ready().location).toEqual({ currentParentId: null, selectedNodeId: 'active' })
+  expect(runtime.ready().agenda!.origin).toEqual({ location, cursor: 4 })
+  expect(activeAgendaOccurrence(runtime.ready().agenda)).toEqual({ nodeId: 'active', day: 100 })
+})
+
 it('returns to the nearest surviving origin ancestor when the Agenda scope is deleted', () => {
   const closed = vi.fn()
   const runtime = new EditorRuntimeState(closed)

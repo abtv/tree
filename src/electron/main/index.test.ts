@@ -20,6 +20,15 @@ const mocks = vi.hoisted(() => ({
   createArchive: vi.fn(),
   createOcr: vi.fn(),
   ocr: { recognize: vi.fn(), cancel: vi.fn() },
+  createSummary: vi.fn(),
+  summary: {
+    available: vi.fn(),
+    begin: vi.fn(),
+    reduce: vi.fn(),
+    finish: vi.fn(),
+    cancel: vi.fn(),
+    cancelAll: vi.fn(),
+  },
   createFiles: vi.fn(),
   booleanStore: { load: vi.fn(() => false), save: vi.fn() },
   appearanceStore: { load: vi.fn(() => 'system'), save: vi.fn() },
@@ -48,6 +57,7 @@ vi.mock('./ipc-handlers', () => ({ registerIpcHandlers: mocks.ipc }))
 vi.mock('./application-menu', () => ({ applicationMenuTemplate: mocks.menu }))
 vi.mock('./notes-archive-controller', () => ({ createNotesArchiveController: mocks.createArchive }))
 vi.mock('./image-to-text', () => ({ createImageToText: mocks.createOcr }))
+vi.mock('./summarize', () => ({ createSummarization: mocks.createSummary }))
 vi.mock('./editor-context-menu', () => ({ showEditorContextMenu: mocks.contextMenu }))
 vi.mock('node:worker_threads', () => ({ Worker: mocks.archiveWorker }))
 vi.mock('node:fs/promises', () => ({ readFile: mocks.readFile }))
@@ -188,6 +198,7 @@ beforeEach(async () => {
   mocks.createFiles.mockReturnValue(mocks.fileServices)
   mocks.createArchive.mockReturnValue(mocks.archive)
   mocks.createOcr.mockReturnValue(mocks.ocr)
+  mocks.createSummary.mockReturnValue(mocks.summary)
   mocks.menu.mockReturnValue([])
   mocks.loadURL.mockReset().mockResolvedValue(undefined)
   mocks.booleanStore.load.mockReturnValue(false)
@@ -228,6 +239,37 @@ it.each([
   expect(f.ipc.imageToText).toBeUndefined()
   expect(() => f.electron.app.emit('will-quit', { preventDefault: vi.fn() })).not.toThrow()
   expect(mocks.ocr.cancel).not.toHaveBeenCalled()
+})
+
+it.each([false, true])('wires the Summary executable and quit cancellation (packaged=%s)', async (packaged) => {
+  vi.stubGlobal('process', { ...process, platform: 'darwin', arch: 'arm64' })
+
+  const f = await setup(packaged)
+
+  expect(mocks.createSummary).toHaveBeenCalledWith(
+    packaged ? '/Tree.app/Contents/Helpers/tree-summarize' : expect.stringContaining('/native/tree-summarize'),
+  )
+  expect(f.ipc.summarization).toBe(mocks.summary)
+
+  f.electron.app.emit('will-quit', { preventDefault: vi.fn() })
+
+  expect(mocks.summary.cancelAll).toHaveBeenCalledOnce()
+})
+
+it.each([
+  ['darwin', 'x64'],
+  ['linux', 'arm64'],
+  ['linux', 'x64'],
+  ['win32', 'arm64'],
+])('leaves Summary unavailable on %s/%s and still permits shutdown', async (platform, arch) => {
+  vi.stubGlobal('process', { ...process, platform, arch })
+
+  const f = await setup()
+
+  expect(mocks.createSummary).not.toHaveBeenCalled()
+  expect(f.ipc.summarization).toBeUndefined()
+  expect(() => f.electron.app.emit('will-quit', { preventDefault: vi.fn() })).not.toThrow()
+  expect(mocks.summary.cancelAll).not.toHaveBeenCalled()
 })
 
 async function packagedSetup() {

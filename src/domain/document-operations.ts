@@ -745,6 +745,14 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
     addAttachmentId(document, next, attachment.id)
   } else if (located.node.attachment.id === attachment.id) {
     inheritAttachmentIds(document, next)
+  } else {
+    const counts = new Map(attachmentSummary(document))
+    const oldId = located.node.attachment.id
+    const remaining = (counts.get(oldId) ?? 0) - 1
+    if (remaining > 0) counts.set(oldId, remaining)
+    else counts.delete(oldId)
+    counts.set(attachment.id, (counts.get(attachment.id) ?? 0) + 1)
+    setAttachmentSummary(next, counts)
   }
   return next
 }

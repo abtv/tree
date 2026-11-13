@@ -3,6 +3,31 @@ import { MenuCommands, dataMenuCommands } from './menu-commands'
 import { normalizeCommandHistory } from './command-registry'
 
 describe('menu commands', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it('replaces actions with equal descriptions and publishes later description changes', async () => {
+    const source = new MenuCommands()
+    const listener = vi.fn()
+    source.subscribe(listener)
+    const exportNotes = vi.fn()
+    const backUp = vi.fn()
+    source.update([{ name: 'export-notes', description: 'Save a backup', enabled: true, run: exportNotes }])
+    const before = source.getSnapshot()
+
+    source.update([{ name: 'back-up-to-folder', description: 'Save a backup', enabled: true, run: backUp }])
+    await source.getSnapshot()[0]!.run({} as never, {} as never)
+
+    expect(source.getSnapshot()[0]!.name).toBe('back-up-to-folder')
+    expect(backUp).toHaveBeenCalledOnce()
+    expect(exportNotes).not.toHaveBeenCalled()
+    expect(before[0]!.name).toBe('export-notes')
+    expect(listener).toHaveBeenCalledTimes(2)
+
+    source.update([{ name: 'back-up-to-folder', description: 'Back up to Work Notes', enabled: true, run: backUp }])
+
+    expect(source.getSnapshot()[0]!.description).toBe('Back up to Work Notes')
+    expect(listener).toHaveBeenCalledTimes(3)
+  })
+
   it('publishes a changed action even when another action remains unchanged', () => {
     const source = new MenuCommands()
     const listener = vi.fn()

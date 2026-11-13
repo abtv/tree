@@ -64,9 +64,9 @@ function isTagNameBoundary(value: string | undefined): boolean {
   return value === undefined || value === '>' || value === '/' || isHtmlWhitespace(value)
 }
 
-function findTagEnd(html: string, from: number): number {
+function findTagEnd(html: string, from: number, to = html.length): number {
   let quote: string | undefined
-  for (let index = from; index < html.length; index += 1) {
+  for (let index = from; index < to; index += 1) {
     const character = html[index]!
     if (quote !== undefined) {
       if (character === quote) quote = undefined
@@ -135,7 +135,7 @@ function decodeHtmlSegment(html: string, from: number, to: number): string {
       break
     }
     label += html.slice(cursor, tagStart)
-    const tagEnd = html.indexOf('>', tagStart + 1)
+    const tagEnd = findTagEnd(html, tagStart + 1, to)
     if (tagEnd < 0 || tagEnd >= to) {
       label += html.slice(tagStart, to)
       break

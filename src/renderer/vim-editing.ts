@@ -212,6 +212,7 @@ export function findCharacter(
 ): number | undefined {
   let position = cursor
   for (let index = 0; index < count; index += 1) {
+    if (direction === 'backward' && position <= 0) return undefined
     position =
       direction === 'forward' ? text.indexOf(character, position + 1) : text.lastIndexOf(character, position - 1)
     if (position < 0) return undefined

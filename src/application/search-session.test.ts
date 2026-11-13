@@ -97,6 +97,31 @@ it('keeps interrupted navigation obsolete even after another jump starts', () =>
   expect(jump).toHaveBeenCalledExactlyOnceWith({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
 })
 
+// @requirement PRODUCT.md §20.2.26
+it('cancels the previous navigation when a newer jump replaces it', () => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(jump)
+  const previous = jobs.at(-1)!
+
+  session.navigate(origin, -1, 2, jump)
+  const current = jobs.at(-1)!
+
+  expect(previous.cancel).toHaveBeenCalledOnce()
+  expect(current.cancel).not.toHaveBeenCalled()
+
+  previous.publish({ kind: 'navigate', total: 99, wrapped: true, missingOrigin: false })
+
+  expect(jump).not.toHaveBeenCalled()
+
+  current.publish({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
+
+  expect(jump).toHaveBeenCalledExactlyOnceWith({ kind: 'navigate', total: 2, wrapped: false, missingOrigin: false })
+})
+
 it('does not start a hidden count when canceling a draft opened from inactive search', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)

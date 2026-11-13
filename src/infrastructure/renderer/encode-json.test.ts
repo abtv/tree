@@ -1,6 +1,34 @@
 import { expect, it, vi } from 'vitest'
 import { encodeJson } from './encode-json'
 
+it.each([true, false])('yields through the default scheduler (scheduler available=%s)', async (available) => {
+  vi.useFakeTimers()
+  let tick = 0
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => (tick += 3))
+  const scheduled = vi.fn(async () => undefined)
+  vi.stubGlobal('scheduler', available ? { yield: scheduled } : undefined)
+  const state = Array.from({ length: 128 }, () => 'Notes')
+  try {
+    let settled = false
+    const pending = encodeJson(state).then((value) => {
+      settled = true
+      return value
+    })
+
+    expect(settled).toBe(false)
+    if (available) expect(scheduled).toHaveBeenCalled()
+    else expect(vi.getTimerCount()).toBeGreaterThan(0)
+    await vi.runAllTimersAsync()
+
+    await expect(pending).resolves.toBe(JSON.stringify(state))
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    clock.mockRestore()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  }
+})
+
 it('preserves persisted JSON values, escaping, optional fields and repeated references', async () => {
   const child = { id: 'child', text: 'quote " slash \\ newline\n emoji 🐱 \ud800', children: [], links: undefined }
   const state = {

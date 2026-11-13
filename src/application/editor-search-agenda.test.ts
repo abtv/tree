@@ -74,6 +74,28 @@ it('falls back to the Tree selection while the selected Agenda row is unavailabl
   expect(search.origin(state(), 4)).toEqual({ nodeId: 'a', offset: 4 })
 })
 
+// @requirement PRODUCT.md §20.2.26
+it.each([
+  { nodeId: 'missing', day: first, start: 0, end: 5, caret: 0 },
+  { nodeId: 'b', day: second + 1, start: 0, end: 5, caret: 0 },
+  { nodeId: 'b', start: 0, end: 5, caret: 0 },
+])('ignores an unavailable Agenda search destination %j without opening folds', async (destination) => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+  const before = state()
+  const apply = vi.fn()
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  search.update(before)
+
+  const revealed = search.revealView(before, destination)
+
+  expect(revealed).toBeUndefined()
+  expect(search.takeFoldsToClose(new Set())).toEqual([])
+  expect(state()).toBe(before)
+  expect(before.agenda!.collapsed).toEqual(new Set([`day:${first}`]))
+  expect(apply).not.toHaveBeenCalled()
+})
+
 it('counts only folded direct matches and serializes same-node and cross-day jumps without saving', async () => {
   const { store, state, save, begin } = await setup()
 

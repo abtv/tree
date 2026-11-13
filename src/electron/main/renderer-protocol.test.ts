@@ -44,6 +44,7 @@ describe('resolveRendererAssetPath', () => {
     'app://tree/',
     'app://tree/assets',
     'app://tree/assets/..%2F..%2F..%2Fdata%2Fdocument.json',
+    'app://tree/assets/..%2Findex.js',
     'app://tree/assets/..%5C..%5Csecret.js',
     'app://tree/assets/name%00.js',
     'app://tree/%E0%A4%A.js',

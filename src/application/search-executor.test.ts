@@ -133,6 +133,25 @@ describe('incremental executor', () => {
     ).toEqual({ kind: 'navigate', total: 3, wrapped: false, missingOrigin: true })
   })
 
+  // @requirement PRODUCT.md §20.2.26
+  it('refuses a removed node origin in Agenda without choosing another occurrence', () => {
+    const result = searchHarness().run({
+      ...base,
+      scope: {
+        kind: 'agenda',
+        projection: [{ day: 1 as DayNumber, rows: [{ nodeId: 'a', depth: 0, role: 'match' }] }],
+      },
+      operation: {
+        kind: 'navigate',
+        origin: { nodeId: 'removed', day: 1 as DayNumber, offset: 0 },
+        direction: 1,
+        count: 1,
+      },
+    })
+
+    expect(result).toEqual({ kind: 'navigate', total: 3, wrapped: false, missingOrigin: true })
+  })
+
   it.each(['', 'absent'])('finishes navigation without a destination for query %j', (query) => {
     expect(
       searchHarness().run({

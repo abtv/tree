@@ -113,6 +113,40 @@ it('discards a late result even if a deleted source is restored by Undo', async 
   expect(ready(store).document.roots[0]!.children.map((child) => child.text)).toEqual(['Existing child'])
 })
 
+// @requirement PRODUCT.md §15.1
+it('discards recognition when Undo removes only the source attachment and Redo restores it', async () => {
+  let finish!: (text: string[]) => void
+  const store = await setup(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    {
+      load: async () => ({
+        version: 1,
+        document: { roots: [{ id: 'image', text: 'Screenshot', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'image' },
+      }),
+      readClipboard: async () => ({ kind: 'image', png: new Uint8Array([1]) }),
+    },
+  )
+  await store.paste('image', 0)
+  store.imageToText()
+
+  store.undo()
+
+  expect(ready(store).document.roots[0]!.attachment).toBeUndefined()
+
+  store.redo()
+  const restored = ready(store).document
+  finish(['Stale result'])
+  await vi.waitFor(() => expect(ready(store).imageToTextStatus).toContain('canceled'))
+
+  expect(restored.roots[0]!.attachment).toBeDefined()
+  expect(ready(store).document).toBe(restored)
+  expect(ready(store).document.roots[0]!.children).toEqual([])
+})
+
 it('shows errors in the status bar and allows a later retry', async () => {
   const recognize = vi
     .fn<NonNullable<EditorServices['imageToText']>>()

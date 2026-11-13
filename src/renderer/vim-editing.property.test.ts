@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
+  findCharacter,
   moveWORDBackward,
   moveWORDEnd,
   moveWORDForward,
@@ -12,6 +13,33 @@ import {
 } from './vim-editing'
 import { imageTextReturnCursor, moveCharacterCursor } from './vim-editing'
 import { calculateTextChange, normalEditCursor } from './vim-text-commands'
+import { propertyRuns } from '../test/property-runs'
+
+describe('Vim character-find invariants', () => {
+  // @requirement PRODUCT.md §20.2.9
+  it('finds distinct occurrences strictly beyond the starting cursor without wrapping', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('a', 'b', 'c'), { maxLength: 80 }),
+        fc.nat(80),
+        fc.constantFrom('a', 'b', 'c'),
+        fc.constantFrom('forward', 'backward'),
+        fc.integer({ min: 1, max: 10 }),
+        (characters, rawCursor, character, direction, count) => {
+          const text = characters.join('')
+          const cursor = Math.min(rawCursor, text.length)
+          const matches = characters.flatMap((value, index) =>
+            value === character && (direction === 'forward' ? index > cursor : index < cursor) ? [index] : [],
+          )
+          if (direction === 'backward') matches.reverse()
+
+          expect(findCharacter(text, cursor, character, direction, count)).toBe(matches[count - 1])
+        },
+      ),
+      { numRuns: propertyRuns(300) },
+    )
+  })
+})
 
 describe('Vim character-cursor invariants with attachments', () => {
   it('never records a text return position for an image-only node', () => {

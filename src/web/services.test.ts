@@ -271,6 +271,26 @@ describe('browser editing service contracts', () => {
     expect(store.flush).toHaveBeenCalledOnce()
   })
 
+  // @requirement PRODUCT.md §1.4
+  it('cancels native unload with a string returnValue while an edit remains buffered', async () => {
+    fixture()
+    const installed = await installBrowserPrototype()
+    const store = connectStore(installed)
+    const input = document.createElement('textarea')
+    input.className = 'node-input'
+    input.value = 'buffered before native close'
+    document.body.append(input)
+    input.focus()
+    const unload = new Event('beforeunload', { cancelable: true })
+    // BeforeUnloadEvent has a string returnValue; Event's boolean setter would cancel on assignment.
+    Object.defineProperty(unload, 'returnValue', { value: '', writable: true })
+
+    window.dispatchEvent(unload)
+
+    expect(unload.defaultPrevented).toBe(true)
+    expect(store.flush).toHaveBeenCalledOnce()
+  })
+
   it('does not request another save from an inactive dirty page', async () => {
     fixture()
     const installed = await installBrowserPrototype()

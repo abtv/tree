@@ -14,6 +14,49 @@ import { dayNumberOf } from '../../domain/calendar-date'
 import * as jsonEncoding from './encode-json'
 
 describe('renderer Electron services', () => {
+  it('forwards document writes immediately in a fresh renderer session', async () => {
+    vi.resetModules()
+    const fresh = await import('./electron-services')
+    const save = vi.fn(async () => undefined)
+    window.treeApi = { ...window.treeApi, save }
+    const state = {
+      version: 2 as const,
+      document: { roots: [{ id: 'root', text: 'Notes', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    }
+
+    await fresh.createElectronEditorServices().save(state)
+
+    expect(save).toHaveBeenCalledExactlyOnceWith(JSON.stringify(state))
+  })
+
+  it('preserves the optional Summary bridge and its results and failures', async () => {
+    expect(createElectronEditorServices().summarization).toBeUndefined()
+    const summarization = {
+      available: vi.fn(async () => true),
+      begin: vi.fn(async () => undefined),
+      reduce: vi.fn(async () => 'Summary'),
+      finish: vi.fn(async () => undefined),
+      cancel: vi.fn(async () => true),
+    }
+    window.treeApi = { ...window.treeApi, summarization }
+    const service = createElectronEditorServices().summarization!
+
+    await expect(service.available()).resolves.toBe(true)
+    await service.begin('job')
+    await expect(service.reduce('job', 'Notes', true)).resolves.toBe('Summary')
+    await service.finish('job', 'Summary')
+    await expect(service.cancel('job')).resolves.toBe(true)
+
+    expect(summarization.begin).toHaveBeenCalledExactlyOnceWith('job')
+    expect(summarization.reduce).toHaveBeenCalledExactlyOnceWith('job', 'Notes', true)
+    expect(summarization.finish).toHaveBeenCalledExactlyOnceWith('job', 'Summary')
+    expect(summarization.cancel).toHaveBeenCalledExactlyOnceWith('job')
+    const failure = new Error('Native Summary unavailable')
+    summarization.reduce.mockRejectedValueOnce(failure)
+    await expect(service.reduce('next', 'Notes', false)).rejects.toBe(failure)
+  })
+
   it('does not send a snapshot whose encoding overlaps notes replacement', async () => {
     let release!: (text: string) => void
     const gate = new Promise<string>((resolve) => {
@@ -228,6 +271,7 @@ describe('renderer Electron services', () => {
       location: { currentParentId: null, selectedNodeId: 'root' },
     }
 
+    const encode = vi.spyOn(jsonEncoding, 'encodeJson')
     suspendNotesWrites()
     try {
       await expect(services.save(state)).resolves.toBeUndefined()
@@ -238,11 +282,13 @@ describe('renderer Electron services', () => {
       await services.load()
 
       expect(api.save).not.toHaveBeenCalled()
+      expect(encode).not.toHaveBeenCalled()
       expect(api.writeAttachment).not.toHaveBeenCalled()
       expect(api.cleanupAttachments).not.toHaveBeenCalled()
       expect(api.load).toHaveBeenCalledOnce()
     } finally {
       resumeNotesWrites()
+      encode.mockRestore()
     }
 
     await services.save(state)

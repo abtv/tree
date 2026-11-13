@@ -188,6 +188,30 @@ const waitForWorker = async (scripted: ScriptedWorker[]) => {
 }
 
 describe('notes archive controller: export', () => {
+  it('keeps a pending native panel exclusive after cancellation until the panel closes', async () => {
+    const { controller, dialogs, destinations } = await setup()
+    let close!: (value: { canceled: boolean; filePath: string }) => void
+    dialogs.showSaveDialog.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          close = resolve
+        }),
+    )
+    const choosing = controller.chooseExportDestination()
+
+    await controller.cancel()
+
+    expect(controller.isIdle!()).toBe(false)
+    await expect(controller.chooseImportArchive()).rejects.toThrow('Another notes export or import is running.')
+    expect(dialogs.showOpenDialog).not.toHaveBeenCalled()
+
+    close({ canceled: false, filePath: join(destinations, 'selected.zip') })
+
+    await expect(choosing).resolves.toEqual({ ok: true, fileName: 'selected.zip' })
+    await controller.cancel()
+    expect(controller.isIdle!()).toBe(true)
+  })
+
   it('uses the current date when no clock is injected', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     try {

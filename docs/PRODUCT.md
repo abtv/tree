@@ -1777,6 +1777,7 @@ outside this version.
 `Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-mode` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
 
 * The status bar's left side becomes an input line starting with `:` and the typed text.
+* At narrow widths, status messages wrap above the command controls as needed to keep the input visible and editable alongside the count and mode indicator.
 * Its right end shows `<matching> of <total>`, then the persistent mode indicator and pin toggle.
 * Command feedback also occupies the left side without hiding the mode indicator.
 * Long feedback truncates to leave the mode and toggles visible.

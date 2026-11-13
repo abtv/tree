@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { extractClipboardLinks } from './clipboard-links'
 
 describe('clipboard link extraction', () => {
+  // @requirement PRODUCT.md §13.1
+  it.each(['"', "'"])('preserves link labels with a greater-than sign in a %s-quoted inline attribute', (quote) => {
+    const html = `<a href="https://example.com"><span title=${quote}a>b${quote}>label</span></a>`
+
+    expect(extractClipboardLinks(html, 'label')).toEqual([{ start: 0, end: 5, url: 'https://example.com' }])
+  })
+
+  // @requirement PRODUCT.md §13.1
+  it('keeps a quoted tag delimiter before a duplicate link label out of its text offset', () => {
+    const html = '<span title="a>b">label </span><a href="https://example.com">label</a>'
+
+    expect(extractClipboardLinks(html, 'label label')).toEqual([{ start: 6, end: 11, url: 'https://example.com' }])
+  })
+
   it('does not extract a link from an unterminated opening attribute matching literal clipboard text', () => {
     expect(extractClipboardLinks('<a href="url>label</a>', '<a href="url>label')).toEqual([])
   })

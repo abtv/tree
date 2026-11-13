@@ -186,7 +186,16 @@ for (const [profile, modifier, otherModifier, label] of [
 
     await expect(panel.locator('.command-name')).toHaveCount(18)
 
-    await page.getByRole('combobox', { name: 'Command', exact: true }).fill('toggle-always-on-top')
+    const commandInput = page.getByRole('combobox', { name: 'Command', exact: true })
+    await expect(commandInput).toBeVisible()
+    await expect(commandInput).toBeFocused()
+    await expect(page.locator('#storage-status')).toBeVisible()
+    await expect(page.getByLabel('Vim mode')).toBeInViewport()
+
+    await commandInput.fill('toggle-always-on-top')
+
+    await expect(commandInput).toHaveValue('toggle-always-on-top')
+    await capture(page, `${profile}-narrow-command-input.png`)
 
     await expect(panel.getByRole('option')).toHaveCount(0)
     await expect(page.locator('.command-count')).toHaveText('0 of 18')

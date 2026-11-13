@@ -139,9 +139,13 @@ describe('VimEditSessionState', () => {
     const state = createVimEditSessionState()
 
     beginReplaceClick(state, 'day:1')
+
+    expect(replaceClickMoved(state)).toBe(false)
+
     continueReplaceClickAfterBlur(state, true)
 
     expect(replaceClickAgendaKey(state)).toBe('day:1')
+    expect(replaceClickMoved(state)).toBe(true)
     expect(takeReplaceClick(state)).toBe(true)
     expect(replaceClickAgendaKey(state)).toBeUndefined()
     expect(replaceClickMoved(state)).toBe(false)

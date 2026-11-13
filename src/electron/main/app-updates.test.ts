@@ -207,8 +207,57 @@ describe('desktop app updates', () => {
   it('starts with no manual check or result notification in progress', () => {
     const { updates } = harness()
 
+    expect(updates.isReady()).toBe(false)
+    expect(updates.getVersion()).toBeUndefined()
+    expect(updates.getStatus()).toBeNull()
     expect(updates.isChecking()).toBe(false)
     expect(updates.isNotifying()).toBe(false)
+  })
+
+  it('publishes the first whole percentage and bounds progress at both ends', () => {
+    const { updates, ports } = harness()
+
+    updates.available()
+
+    expect(updates.getStatus()).toBe(0)
+    updates.downloading(-1)
+    expect(ports.progressChanged).not.toHaveBeenCalled()
+    updates.downloading(100.9)
+    expect(updates.getStatus()).toBe(100)
+    updates.downloading(Infinity)
+    expect(updates.getStatus()).toBe(100)
+    expect(ports.progressChanged).toHaveBeenCalledOnce()
+  })
+
+  it('keeps late download progress from clearing failure feedback', () => {
+    const { updates, ports } = harness()
+    updates.available()
+    updates.fail('offline')
+
+    updates.downloading(42)
+
+    expect(updates.getStatus()).toBe('failed')
+    expect(ports.progressChanged).toHaveBeenCalledOnce()
+  })
+
+  it('clears incomplete progress after a successful check with no ready package', async () => {
+    const { updates, ports } = harness()
+    ports.check.mockImplementationOnce(async () => updates.downloading(42))
+
+    await updates.check()
+
+    expect(updates.getStatus()).toBeNull()
+    expect(updates.isReady()).toBe(false)
+  })
+
+  it('publishes waiting and notification states throughout a manual check', async () => {
+    const { updates, ports } = harness()
+    const states: string[] = []
+    ports.changed.mockImplementation(() => states.push(`${updates.isChecking()}:${updates.isNotifying()}`))
+
+    await updates.checkManually()
+
+    expect([...new Set(states)]).toEqual(['true:false', 'true:true', 'false:false'])
   })
 
   it('notifies menu observers when a background check starts and finishes', async () => {

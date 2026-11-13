@@ -80,13 +80,16 @@ describe('pending command input', () => {
     expect(state.lastFind).toBe(find)
   })
 
-  it.each(['0', 'g', 'ArrowLeft'])('leaves a non-count key available to the command adapter (%s)', (key) => {
-    const state = createVimCommandState()
+  it.each(['0', 'g', 'ArrowLeft', 'F1', 'F12'])(
+    'leaves a non-count key available to the command adapter (%s)',
+    (key) => {
+      const state = createVimCommandState()
 
-    expect(appendVimCount(state, key, 'editor')).toBe(false)
-    expect(appendVimCount(state, key, 'agenda-row')).toBe(false)
-    expect(state.pending).toBeUndefined()
-  })
+      expect(appendVimCount(state, key, 'editor')).toBe(false)
+      expect(appendVimCount(state, key, 'agenda-row')).toBe(false)
+      expect(state.pending).toBeUndefined()
+    },
+  )
 
   it.each(['editor', 'agenda-row'] as const)(
     'accumulates command and operator counts independently (%s)',

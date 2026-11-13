@@ -192,6 +192,7 @@ describe('command registry', () => {
         view: 'tree',
       })
 
+    expect(services.summarize).toHaveBeenCalledExactlyOnceWith()
     expect(services.imageToText).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
@@ -251,7 +252,15 @@ describe('command registry', () => {
       view: 'tree',
     } as const
 
-    for (const name of ['image-to-text', 'about-tree', 'find', 'find-next', 'find-previous', 'search-all-nodes']) {
+    for (const name of [
+      'summarize',
+      'image-to-text',
+      'about-tree',
+      'find',
+      'find-next',
+      'find-previous',
+      'search-all-nodes',
+    ]) {
       const command = commandRegistry.find((candidate) => candidate.name === name)!
 
       expect(command.active(state)).toBe(false)

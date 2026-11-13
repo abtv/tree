@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   attachImage,
+  appendTextChildren,
   attachmentSummary,
   deleteNode,
   insertSiblingAfter,
@@ -19,6 +20,46 @@ import { seedEmptyAttachmentSummary } from './document-attachments'
 import { requireNode } from './document-index'
 
 describe('derived attachment accounting', () => {
+  // @requirement PRODUCT.md §22.1
+  it.each([false, true])('caches replacement counts (shared old ID: %s)', (sharedOldId) => {
+    let reads = 0
+    const retainedId = sharedOldId ? 'old' : 'unrelated'
+    const watched: TreeNode = {
+      id: 'watched',
+      text: '',
+      children: [],
+      get attachment() {
+        reads += 1
+        return { id: retainedId, mimeType: 'image/png' as const }
+      },
+    }
+    const document: Document = {
+      roots: [
+        { id: 'target', text: '', children: [], attachment: { id: 'old', mimeType: 'image/png' } },
+        { id: 'existing-new', text: '', children: [], attachment: { id: 'new', mimeType: 'image/png' } },
+        watched,
+      ],
+    }
+    buildNodeIndex(document)
+    const original = attachmentSummary(document)
+    const before = reads
+
+    const result = attachImage(document, 'target', { id: 'new', mimeType: 'image/png' })
+    const summary = attachmentSummary(result)
+
+    expect(summary).toEqual(
+      new Map([
+        ['new', 2],
+        [retainedId, 1],
+      ]),
+    )
+    expect(reads).toBe(before)
+    expect(document.roots[0]!.attachment!.id).toBe('old')
+    expect(attachmentSummary(document)).toBe(original)
+    expect(original.get('old')).toBe(sharedOldId ? 2 : 1)
+    expect(original.get('new')).toBe(1)
+  })
+
   it('uses a seeded empty summary without traversing the known empty document', () => {
     let reads = 0
     const document: Document = {
@@ -81,7 +122,7 @@ describe('derived attachment accounting', () => {
     expect(() => requireNode(document, 'missing')).toThrow('Node missing does not exist.')
   })
 
-  it('answers summary queries after membership changes without traversing untouched nodes again', () => {
+  it('answers summary queries after document changes without traversing untouched nodes again', () => {
     let attachmentReads = 0
     const watched: TreeNode = {
       id: 'watched',
@@ -98,6 +139,7 @@ describe('derived attachment accounting', () => {
     const image = { id: 'added', mimeType: 'image/png' as const }
     const operations = [
       () => attachImage(document, 'target', image),
+      () => appendTextChildren(document, 'target', ['child'], () => 'new-child'),
       () => insertSiblingAfter(document, 'target', 'new', '', image),
       () =>
         insertSubtreeSibling(

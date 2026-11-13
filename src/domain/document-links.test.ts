@@ -7,7 +7,18 @@ import {
   reconcileLinkTextEdit,
   replaceLinkedText,
   replaceLinkedTextRanges,
+  splitLinks,
 } from './document-links'
+
+// @requirement PRODUCT.md §5.1
+it('keeps a complete hyperlink before a node split exactly at its end', () => {
+  const url = 'https://a.test'
+  const link = { start: 0, end: url.length, url }
+
+  const result = splitLinks([link], url.length)
+
+  expect(result).toEqual({ before: [link], after: [] })
+})
 
 describe('link normalization and edit outcomes', () => {
   it('recognizes split URL words only inside the edited link after a text prefix', () => {

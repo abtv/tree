@@ -108,3 +108,28 @@ it('measures only a changed projection of the same active node and consumes the 
   expect(state.takeLine()).toBe(latest)
   expect(state.takeLine()).toBeUndefined()
 })
+
+// @requirement PRODUCT.md §23.7
+it('anchors each later edit after consuming the previous correction', () => {
+  const state = new AgendaViewportState<object, object>()
+  const row = { key: 'node:1:a', nodeId: 'a', document: {}, rows: {} }
+
+  state.navigate('pointer')
+  state.captureAnchor(30)
+
+  expect(state.commit(row, true)).toBe(30)
+  expect(state.takeReveal(false, 'none')).toBe('cancel')
+
+  state.commit(row, true)
+
+  expect(state.takeReveal(false, 'none')).toBe('pointer-row')
+
+  state.captureAnchor(75)
+
+  expect(state.commit({ ...row, document: {}, rows: {} }, true)).toBe(75)
+  expect(state.takeReveal(false, 'none')).toBe('cancel')
+
+  state.commit(row, true)
+
+  expect(state.takeReveal(false, 'none')).toBe('pointer-row')
+})

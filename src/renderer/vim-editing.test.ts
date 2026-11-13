@@ -136,6 +136,20 @@ describe('Vim text motions', () => {
     expect(findCharacter('a.b.c', 3, '.', 'forward')).toBeUndefined()
   })
 
+  // @requirement PRODUCT.md §20.2.9
+  it.each([
+    { cursor: 0, count: 1 },
+    { cursor: 2, count: 2 },
+    { cursor: 2, count: 3 },
+  ])('does not reuse position zero during a backward find: %j', ({ cursor, count }) => {
+    expect(findCharacter('aba', cursor, 'a', 'backward', count)).toBeUndefined()
+  })
+
+  it('can find position zero once and still search forward from it', () => {
+    expect(findCharacter('aba', 2, 'a', 'backward')).toBe(0)
+    expect(findCharacter('aba', 0, 'a', 'forward')).toBe(2)
+  })
+
   it('moves by whitespace-delimited WORDs and backward word ends', () => {
     expect(moveWORDForward('foo.bar  baz', 0)).toBe(9)
     expect(moveWORDBackward('foo.bar  baz', 12)).toBe(9)

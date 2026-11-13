@@ -37,6 +37,17 @@ describe('Vim text command calculations', () => {
     expect(repeatedFindMotion(undefined, false)).toBeUndefined()
   })
 
+  // @requirement PRODUCT.md §20.2.11
+  // @requirement PRODUCT.md §20.2.16
+  it.each([
+    { cursor: 0, motion: 'Fa', count: 1 },
+    { cursor: 0, motion: 'Ta', count: 1 },
+    { cursor: 2, motion: 'Fa', count: 2 },
+    { cursor: 2, motion: 'Ta', count: 2 },
+  ])('does not calculate an edit for an exhausted backward find: %j', ({ cursor, motion, count }) => {
+    expect(calculateTextChange('aba', cursor, { kind: 'delete', motion, count })).toBeUndefined()
+  })
+
   it('calculates an edit and preserves the removed text for the register', () => {
     expect(calculateTextChange('one two', 0, { kind: 'delete', motion: 'w', count: 1 })).toEqual({
       kind: 'edit',

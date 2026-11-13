@@ -183,6 +183,34 @@ it('keeps the selected day when the active node leaves the agenda scope with a d
   expect(focusedAgendaDay(next)).toBeUndefined()
 })
 
+// @requirement PRODUCT.md §23.7
+// @requirement PRODUCT.md §23.15
+it('keeps the focused day when the edited active node moves outside the scope', () => {
+  const timeline = selected()
+  const focused = applyAgendaCommand(
+    timeline,
+    { kind: 'focus-day', key: 'day:100', scrollTop: 24 },
+    buildAgendaRows(agendaProjection(document, timeline), timeline),
+  )
+  const state = applyAgendaCommand(
+    focused,
+    { kind: 'select', key: 'node:100:match' },
+    buildAgendaRows(agendaProjection(document, focused), focused),
+  )
+  const moved: Document = {
+    roots: [
+      { ...document.roots[0]!, children: document.roots[0]!.children.slice(1) },
+      { id: 'match', text: '1970-04-09', children: [] },
+    ],
+  }
+
+  const next = reconcileAgenda(moved, state)!
+
+  expect(focusedAgendaDay(next)).toBe(100)
+  expect(next.selectedKey).toBe('day:100')
+  expect(activeAgendaOccurrence(next)).toBeUndefined()
+})
+
 it('scope membership excludes missing nodes, the scope root, and outside branches', () => {
   const state = selected()
 

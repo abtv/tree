@@ -13,6 +13,7 @@ import { createZipWriter } from '../../infrastructure/archive/zip-writer'
 import { concat } from '../../infrastructure/archive/zip-test-utils'
 import type { ArchiveWorkerMessage } from '../workers/archive-protocol'
 import { createImportJob, type ImportJobStorage } from './import-job'
+import { propertyRuns } from '../../test/property-runs'
 
 function headWithImages(ids: string[], text = 'Root') {
   const roots: TreeNode[] = [
@@ -329,7 +330,7 @@ describe('notes archive Deflate input', () => {
           }
         },
       ),
-      { seed: 2610, numRuns: 400, interruptAfterTimeLimit: 4000 },
+      { numRuns: propertyRuns(400) },
     )
   })
 })

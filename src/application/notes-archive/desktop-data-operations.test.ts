@@ -84,6 +84,53 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
 afterEach(() => vi.useRealTimers())
 
 describe('desktop notes operations', () => {
+  // @requirement PRODUCT.md §25.1
+  it('does not reopen native file panels after disposal while the editor is ready', async () => {
+    const h = harness()
+    h.operations.dispose()
+
+    await h.operations.exportNotes()
+    await h.operations.importNotes()
+
+    expect(h.api.chooseNotesExportDestination).not.toHaveBeenCalled()
+    expect(h.api.chooseNotesImportArchive).not.toHaveBeenCalled()
+  })
+
+  // @requirement PRODUCT.md §25.2
+  // @requirement PRODUCT.md §25.3
+  it.each(['export-flush', 'replace-flush', 'replace-result', 'cancel'] as const)(
+    'clears import preparation after %s before a later export panel is canceled',
+    async (outcome) => {
+      const h = harness()
+      await h.operations.importNotes()
+
+      if (outcome === 'cancel') await h.operations.cancel()
+      else if (outcome === 'export-flush') {
+        h.store.flushPersistence.mockRejectedValueOnce(new Error('Disk full'))
+        await h.operations.exportNotes(true)
+      } else {
+        if (outcome === 'replace-flush') h.store.flushPersistence.mockRejectedValueOnce(new Error('Disk full'))
+        else
+          h.api.commitNotesImport.mockResolvedValueOnce({
+            ok: false,
+            message: 'Replacement failed',
+            restartRequired: false,
+          })
+        await h.operations.replaceNotes()
+      }
+
+      expect(h.operations.getConfirmation()).toBeUndefined()
+      h.api.chooseNotesExportDestination.mockResolvedValueOnce({ ok: false, canceled: true })
+
+      await h.operations.exportNotes()
+
+      expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
+      expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: true, canImport: true })
+
+      h.operations.dispose()
+    },
+  )
+
   it('requests the import notice only once while its response is pending', async () => {
     const h = harness()
     h.operations.dispose()

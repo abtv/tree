@@ -1083,6 +1083,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: var(--color-background);
 }
 
+.status-bar:has(.command-input-line) {
+  flex-wrap: wrap;
+}
+
 .status-notifications {
   display: flex;
   flex: 0 1 auto;
@@ -1105,6 +1109,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 26px;
+}
+
+.status-controls:has(.command-input-line) {
+  min-width: min(100%, 320px);
 }
 .status-notifications .save-error {
   position: static;

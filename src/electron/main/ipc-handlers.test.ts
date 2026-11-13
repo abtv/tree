@@ -7,6 +7,7 @@ import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 import emojiCatalog from '../../domain/emoji-catalog.json'
 import { EventEmitter } from 'node:events'
+import { SUMMARY_INPUT_BYTES, SUMMARY_OUTPUT_BYTES } from '../../shared/summarize'
 
 const rendererUrl = 'app://tree/index.html'
 const validState = {
@@ -139,7 +140,196 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   }
 }
 
+function createSummaryHarness() {
+  const summary = {
+    available: vi.fn(async () => true),
+    begin: vi.fn<(id: string) => Promise<void>>(async () => undefined),
+    reduce: vi.fn<(id: string, text: string, final: boolean) => Promise<string>>(async () => 'Summary'),
+    finish: vi.fn<(id: string, text: string) => Promise<void>>(async () => undefined),
+    cancel: vi.fn<(id: string) => Promise<void>>(async () => undefined),
+  }
+  const harness = createHarness((dependencies) => {
+    dependencies.summarization = summary
+  })
+  const sender = new EventEmitter() as unknown as NonNullable<IpcInvokeEvent['sender']>
+  const event = { senderFrame: { url: rendererUrl }, sender }
+  const invoke = (channel: string, ...args: unknown[]) => harness.handlers.get(channel)!(event, ...args)
+  return { ...harness, summary, sender, event, invoke }
+}
+
 describe('main IPC handlers', () => {
+  it.each([42, '', '!job', 'job!', 'a'.repeat(101)])('rejects invalid Summary ID %j before starting', async (id) => {
+    const f = createSummaryHarness()
+
+    await expect(f.invoke(ipcChannels.summaryBegin, id)).rejects.toThrow('Invalid summarization ID.')
+
+    expect(f.summary.begin).not.toHaveBeenCalled()
+    expect(f.sender.eventNames()).toEqual([])
+  })
+
+  it.each([0, null, '', ' \n '])('rejects invalid Summary text %j before native inference or copying', async (text) => {
+    const f = createSummaryHarness()
+    await f.invoke(ipcChannels.summaryBegin, 'job')
+
+    expect(() => f.invoke(ipcChannels.summaryReduce, 'job', text, true)).toThrow('Invalid summary text.')
+    expect(() => f.invoke(ipcChannels.summaryFinish, 'job', text)).toThrow('Invalid summary text.')
+
+    expect(f.summary.reduce).not.toHaveBeenCalled()
+    expect(f.summary.finish).not.toHaveBeenCalled()
+    expect(f.nativeClipboard.writePlainText).not.toHaveBeenCalled()
+  })
+
+  it('accepts exact UTF-8 Summary limits and preserves arguments', async () => {
+    const f = createSummaryHarness()
+    const id = 'a'.repeat(100)
+    const input = 'é'.repeat(SUMMARY_INPUT_BYTES / 2)
+    const output = 'é'.repeat(SUMMARY_OUTPUT_BYTES / 2)
+    await f.invoke(ipcChannels.summaryBegin, id)
+
+    await expect(f.invoke(ipcChannels.summaryReduce, id, input, false)).resolves.toBe('Summary')
+    await f.invoke(ipcChannels.summaryFinish, id, output)
+
+    expect(f.summary.reduce).toHaveBeenCalledExactlyOnceWith(id, input, false)
+    expect(f.summary.finish).toHaveBeenCalledExactlyOnceWith(id, output)
+    expect(f.nativeClipboard.writePlainText).toHaveBeenCalledExactlyOnceWith(output)
+  })
+
+  it.each([
+    [ipcChannels.summaryAvailable, []],
+    [ipcChannels.summaryBegin, ['other']],
+    [ipcChannels.summaryReduce, ['job', 'Notes', true]],
+    [ipcChannels.summaryCancel, ['job']],
+    [ipcChannels.summaryFinish, ['job', 'Summary']],
+  ])('rejects extra arguments on %s without changing the active Summary', async (channel, args) => {
+    const f = createSummaryHarness()
+    await f.invoke(ipcChannels.summaryBegin, 'job')
+
+    await expect(Promise.resolve().then(() => f.invoke(channel as string, ...args, 'extra'))).rejects.toThrow(
+      'This request takes no arguments.',
+    )
+
+    expect(f.summary.available).not.toHaveBeenCalled()
+    expect(f.summary.begin).toHaveBeenCalledTimes(1)
+    expect(f.summary.reduce).not.toHaveBeenCalled()
+    expect(f.summary.cancel).not.toHaveBeenCalled()
+    expect(f.summary.finish).not.toHaveBeenCalled()
+  })
+
+  it.each([ipcChannels.summaryReduce, ipcChannels.summaryCancel, ipcChannels.summaryFinish])(
+    'rejects a different sender on %s even when it knows the active Summary ID',
+    async (channel) => {
+      const f = createSummaryHarness()
+      await f.invoke(ipcChannels.summaryBegin, 'job')
+      const other = { ...f.event, sender: new EventEmitter() as unknown as typeof f.sender }
+      const args = channel === ipcChannels.summaryCancel ? ['job'] : ['job', 'Notes', true]
+      if (channel === ipcChannels.summaryFinish) args.pop()
+
+      await expect(Promise.resolve().then(() => f.handlers.get(channel)!(other, ...args))).rejects.toThrow('canceled')
+
+      expect(f.summary.reduce).not.toHaveBeenCalled()
+      expect(f.summary.cancel).not.toHaveBeenCalled()
+      expect(f.summary.finish).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['destroyed', 'render-process-gone', 'did-start-loading'])(
+    'cleans Summary listeners after %s',
+    async (event) => {
+      const f = createSummaryHarness()
+      await f.invoke(ipcChannels.summaryBegin, 'job')
+
+      f.sender.emit(event)
+
+      expect(f.summary.cancel).toHaveBeenCalledExactlyOnceWith('job')
+      expect(f.sender.eventNames()).toEqual([])
+      await f.invoke(ipcChannels.summaryBegin, 'replacement')
+      await f.invoke(ipcChannels.commitNotesImport)
+      expect(f.sender.eventNames()).toEqual([])
+    },
+  )
+
+  it('rejects a final Summary when native text copying is unavailable', async () => {
+    const f = createSummaryHarness()
+    Reflect.deleteProperty(f.nativeClipboard, 'writePlainText')
+    await f.invoke(ipcChannels.summaryBegin, 'job')
+
+    await expect(f.invoke(ipcChannels.summaryFinish, 'job', 'Summary')).rejects.toThrow(
+      'Clipboard text copying is unavailable.',
+    )
+
+    expect(f.summary.finish).not.toHaveBeenCalled()
+  })
+
+  it('rechecks Summary cancellation after native finish resolves and before copying', async () => {
+    const f = createSummaryHarness()
+    let finish!: () => void
+    f.summary.finish.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    await f.invoke(ipcChannels.summaryBegin, 'job')
+    const pending = f.invoke(ipcChannels.summaryFinish, 'job', 'Summary')
+    const rejected = expect(pending).rejects.toThrow('canceled')
+    await vi.waitFor(() => expect(f.summary.finish).toHaveBeenCalledOnce())
+
+    await f.invoke(ipcChannels.summaryCancel, 'job')
+    expect(f.sender.eventNames()).toEqual([])
+    finish()
+    await rejected
+
+    expect(f.nativeClipboard.writePlainText).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])(
+    'preserves Summary cancellation when a retired begin fails (replacement=%s)',
+    async (replace) => {
+      const f = createSummaryHarness()
+      const failure = new Error('Native startup failed')
+      let finish!: () => void
+      f.summary.begin.mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => {
+          finish = resolve
+        })
+        throw failure
+      })
+      const pending = f.invoke(ipcChannels.summaryBegin, 'old')
+      const rejected = expect(pending).rejects.toBe(failure)
+      await f.invoke(ipcChannels.summaryCancel, 'old')
+      if (replace) await f.invoke(ipcChannels.summaryBegin, 'new')
+
+      finish()
+      await rejected
+
+      if (replace) {
+        await expect(f.invoke(ipcChannels.summaryReduce, 'new', 'Notes', true)).resolves.toBe('Summary')
+      } else {
+        expect(f.sender.eventNames()).toEqual([])
+      }
+    },
+  )
+
+  it('keeps an active Summary when choosing export', async () => {
+    const f = createSummaryHarness()
+    await f.invoke(ipcChannels.summaryBegin, 'job')
+
+    await f.invoke(ipcChannels.chooseNotesExportDestination)
+
+    expect(f.summary.cancel).not.toHaveBeenCalled()
+    await expect(f.invoke(ipcChannels.summaryReduce, 'job', 'Notes', true)).resolves.toBe('Summary')
+  })
+
+  it('rejects an overlong update acknowledgment before forwarding it', () => {
+    const f = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(() => f.handlers.get(ipcChannels.confirmAppUpdate)!(event, 'a'.repeat(101), true)).toThrow(
+      'Invalid update acknowledgment.',
+    )
+    expect(f.appUpdates.confirm).not.toHaveBeenCalled()
+  })
+
   // @requirement PRODUCT.md §15.2
   it('cancels a final summary queued behind image Copy before it reaches the clipboard commit', async () => {
     const summarization = {

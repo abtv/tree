@@ -220,7 +220,14 @@ describe('hierarchical completion', () => {
         return true as const
       },
     }))
-    const document = { roots: [branch('root', [leaf('typing', true), ...peers])] }
+    const document = {
+      roots: [
+        branch('root', [
+          branch('middle', [branch('parent', [leaf('typing', true)]), ...peers.slice(0, 5000)]),
+          ...peers.slice(5000),
+        ]),
+      ],
+    }
     requireNode(document, 'typing')
     reads = 0
 
@@ -228,7 +235,14 @@ describe('hierarchical completion', () => {
 
     expect(reads).toBe(0)
     expect(edited.roots[0]!.struckThrough).toBe(true)
-    expect(edited.roots[0]!.children[1]).toBe(peers[0])
+    expect(edited.roots[0]!.children[1]).toBe(peers[5000])
+
+    for (const nodeId of ['middle', 'root']) {
+      const editedHeading = editNodeText(document, nodeId, 'new heading')
+
+      expect(reads).toBe(0)
+      expect(requireNode(editedHeading, nodeId).node.struckThrough).toBe(true)
+    }
   })
 
   it('completes a large selected subtree without traversing an unrelated subtree', () => {

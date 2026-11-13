@@ -175,6 +175,29 @@ describe('Agenda rows', () => {
     expect(childrenReads).toBe(0)
   })
 
+  // @requirement PRODUCT.md §23.1
+  it('opens a newly added scope after caching a different document and scope', () => {
+    const cache = new AgendaRowsCache()
+    const state = openAgendaState(location, 0, today)
+    cache.get(document, state)
+    const updated: Document = {
+      roots: [
+        ...document.roots,
+        {
+          id: 'new-scope',
+          text: 'New scope',
+          children: [{ id: 'new-match', text: '2026-10-14 New match', children: [] }],
+        },
+      ],
+    }
+    const scoped = openAgendaState({ currentParentId: 'new-scope', selectedNodeId: 'new-match' }, 0, today)
+
+    const rows = cache.get(updated, scoped)
+
+    expect(rows.filter((row) => row.kind === 'node').map((row) => row.nodeId)).toEqual(['new-match'])
+    expect(cache.getProjection(updated, scoped)).toEqual(projectAgenda(updated, 'new-scope'))
+  })
+
   it('marks a focused heading as Today only on the current day', () => {
     const state = openAgendaState(location, 0, today)
     const projection = projectAgenda(document, null)

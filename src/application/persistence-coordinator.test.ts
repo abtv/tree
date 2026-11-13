@@ -7,6 +7,44 @@ const state = {
 }
 
 describe('PersistenceCoordinator', () => {
+  // @requirement PRODUCT.md §16.1
+  it('retains a cleanup requested while an earlier cleanup is failing', async () => {
+    let reject!: (error: Error) => void
+    const cleanupAttachments = vi
+      .fn(async (): Promise<void> => undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, fail) => {
+            reject = fail
+          }),
+      )
+    const save = vi.fn(async () => undefined)
+    const onResult = vi.fn()
+    const coordinator = new PersistenceCoordinator(
+      { save, cleanupAttachments },
+      {
+        currentState: () => state,
+        referencedAttachmentIds: () => ['retained'],
+        hasPendingDocumentChanges: () => false,
+        onSaveCaptured: vi.fn(),
+        onDocumentSaved: vi.fn(),
+        onResult,
+      },
+    )
+    coordinator.requestAttachmentCleanup()
+    await vi.waitFor(() => expect(cleanupAttachments).toHaveBeenCalledOnce())
+    const error = new Error('First cleanup failed')
+
+    coordinator.requestAttachmentCleanup()
+    reject(error)
+    await coordinator.flush()
+
+    expect(cleanupAttachments).toHaveBeenCalledTimes(2)
+    expect(cleanupAttachments).toHaveBeenLastCalledWith(['retained'])
+    expect(save).not.toHaveBeenCalled()
+    expect(onResult.mock.calls).toEqual([[error, 'cleanup'], [undefined]])
+  })
+
   it('waits for a save queued as the preceding persistence batch finishes', async () => {
     let release!: () => void
     const gate = new Promise<void>((resolve) => {

@@ -8,6 +8,53 @@ const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
 
 describe('Agenda projection', () => {
+  // @requirement PRODUCT.md §23.2
+  it.each(['remove-child', 'replace-root'] as const)('refreshes cached rows after %s', (change) => {
+    const child = node('child', '2026-10-14')
+    const document = { roots: [node('parent', '2026-10-14', [child])] }
+    const projection = projectAgenda(document, null)
+    const updated = {
+      roots: [change === 'remove-child' ? node('parent', '2026-10-14') : node('replacement', '2026-10-14', [child])],
+    }
+
+    const result = projectAgenda(updated, null, { document, projection })
+
+    expect(result[0]!.rows.map((row) => row.nodeId)).toEqual(
+      change === 'remove-child' ? ['parent'] : ['replacement', 'child'],
+    )
+  })
+
+  // @requirement PRODUCT.md §23.6
+  it('does not revisit unchanged subtrees belonging only to reused days', () => {
+    let childrenReads = 0
+    const empty: TreeNode[] = []
+    const children = Array.from({ length: 1000 }, (_, index): TreeNode => ({
+      id: `unrelated-${index}`,
+      text: '',
+      get children() {
+        childrenReads += 1
+        return empty
+      },
+    }))
+    const unrelated = node('unrelated', '2026-10-20', children)
+    const document = { roots: [node('scope', '', [node('target', '2026-10-14'), unrelated])] }
+    const projection = projectAgenda(document, null)
+    childrenReads = 0
+    const updated = { roots: [node('scope', '', [node('target', '2026-10-15'), unrelated])] }
+
+    const result = projectAgenda(updated, null, { document, projection })
+
+    expect(result[0]).toEqual({
+      day: day(15),
+      rows: [
+        { nodeId: 'scope', depth: 0, role: 'context' },
+        { nodeId: 'target', depth: 1, role: 'match' },
+      ],
+    })
+    expect(result[1]).toBe(projection[1])
+    expect(childrenReads).toBe(0)
+  })
+
   it('reuses unchanged dated rows inside a nested scope after editing outside it', () => {
     const scope = node('scope', '', [node('dated', '2026-10-14')])
     const document = { roots: [scope, node('outside', '')] }

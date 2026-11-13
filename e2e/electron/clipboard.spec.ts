@@ -6,7 +6,9 @@ import {
   clickApplicationMenuQuit,
   describeForEachEditingMode,
   expect,
+  fireIdleSave,
   firePaste,
+  idleSavePoll,
   launchTree,
   lockSystemClipboard,
   node,
@@ -53,6 +55,34 @@ describeForEachEditingMode('clipboard (paste at the cursor)', () => {
 
 // The tests below do not pass through an editing-mode divergence, so they run once.
 test.describe('clipboard (mode-independent)', () => {
+  // @requirement PRODUCT.md §13.1
+  test('preserves a pasted hyperlink with quoted inline tag delimiters', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    const url = 'https://example.com'
+    const text = `${url} ${url}`
+    await window.clock.install()
+    await writeClipboardTextAndHtml(
+      app,
+      text,
+      `<span title="a>b">${url} </span><a href="${url}"><span title='a>b'>${url}</span></a>`,
+    )
+
+    await firePaste(editor)
+
+    await expect.poll(() => nodeTexts(window)).toEqual([text])
+    const link = window.getByRole('link', { name: url, exact: true })
+    await expect(link).toHaveCount(1)
+    await expect(link).toHaveAttribute('href', 'https://example.com')
+    await window.screenshot({ path: test.info().outputPath('quoted-inline-link.png') })
+
+    await fireIdleSave(window)
+
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots[0]!.links, idleSavePoll)
+      .toEqual([{ start: url.length + 1, end: text.length, url }])
+  })
+
   // @requirement PRODUCT.md §12
   test('rejects an oversized clipboard image before reading bytes and allows a later paste', async ({
     userDataDir,

@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import {
   attachmentPath,
   expect,
+  fireIdleSave,
   firePaste,
   launchTree as launchTreeBase,
   lockSystemClipboard,
   node,
   pressShifted,
+  readPersisted,
   seedDocument,
   setCursor,
   sharedApplicationAdopted,
@@ -31,6 +33,55 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: text editing', () => {
+  // @requirement PRODUCT.md §20.2.9
+  // @requirement PRODUCT.md §20.2.11
+  // @requirement PRODUCT.md §20.2.16
+  test('keeps text after exhausted backward finds', { tag: '@linux' }, async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'aba', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await window.clock.install()
+    await editor.focus()
+    await setCursor(editor, 0)
+
+    await window.keyboard.press('d')
+    await pressShifted(window, 'T')
+    await window.keyboard.press('a')
+
+    await expect(editor).toHaveValue('aba')
+    await expect(editor).toBeFocused()
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.screenshot({ path: test.info().outputPath('backward-find-start.png') })
+
+    await setCursor(editor, 2)
+    await window.keyboard.press('2')
+    await pressShifted(window, 'F')
+    await window.keyboard.press('a')
+    await window.keyboard.press('d')
+    await window.keyboard.press('2')
+    await pressShifted(window, 'F')
+    await window.keyboard.press('a')
+
+    await expect(editor).toHaveValue('aba')
+    await expect(editor).toHaveJSProperty('selectionStart', 2)
+    await expect(editor).toHaveJSProperty('selectionEnd', 2)
+    await fireIdleSave(window)
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+    expect(readPersisted(userDataDir).document.roots).toEqual([{ id: 'root', text: 'aba', children: [] }])
+
+    await window.keyboard.press('x')
+    await expect(editor).toHaveValue('ab')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveValue('aba')
+  })
+
   // Unnamed groups preserve conformance titles while excluding unsupported nested seeds.
   test.describe(() => {
     test.use({ sharedApplicationReset: sharedApplicationAdopted() })

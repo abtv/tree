@@ -324,6 +324,54 @@ const cases: PersistedStateCase[] = [
 ]
 
 describe('persisted state validator conformance', () => {
+  // @requirement PRODUCT.md §22.1
+  it('reuses parsing validation for the first save of the same immutable document', () => {
+    const parsed = parsePersistedState(validState)
+    const root = parsed.document.roots[0]!
+    const text = root.text
+    let reads = 0
+    // Observe validation work without changing the parsed node's text value.
+    Object.defineProperty(root, 'text', {
+      get() {
+        reads += 1
+        return text
+      },
+    })
+
+    const saved = serializeState(parsed.document, parsed.location, parsed.view)
+
+    expect(saved.document).toBe(parsed.document)
+    expect(saved.location).toEqual(parsed.location)
+    expect(reads).toBe(0)
+  })
+
+  // @requirement PRODUCT.md §22.1
+  it('reuses validation when serializing the same immutable document again', () => {
+    let reads = 0
+    const document = {
+      roots: [
+        {
+          id: 'root',
+          get text() {
+            reads += 1
+            return 'Root'
+          },
+          children: [],
+        },
+      ],
+    }
+    const location = { currentParentId: null, selectedNodeId: 'root' }
+    const first = serializeState(document, location)
+    const before = reads
+
+    const repeated = serializeState(document, location)
+
+    expect(repeated.document).toBe(first.document)
+    expect(repeated.location).toEqual(location)
+    expect(before).toBeGreaterThan(0)
+    expect(reads).toBe(before)
+  })
+
   it('rejects non-string node fields and non-PNG attachment references independently', () => {
     for (const node of [
       { id: 7, text: '', children: [] },
