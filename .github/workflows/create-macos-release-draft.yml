@@ -115,6 +115,8 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
       - run: npm ci
+      - name: Select Xcode with the macOS 26 SDK
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
       - name: Build checked source
         run: npm run build
       - name: Build signed and notarized DMG

@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Select Xcode with the macOS 26 SDK
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+
       - name: Build application
         run: npm run build
 

@@ -42,6 +42,9 @@ jobs:
       - name: Enable Safari automation on the disposable runner
         if: runner.os == 'macOS'
         run: sudo safaridriver --enable
+      - name: Select Xcode with the macOS 26 SDK
+        if: runner.os == 'macOS'
+        run: sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
       - name: Build Electron application
         run: npm run build
       - name: Build browser application
