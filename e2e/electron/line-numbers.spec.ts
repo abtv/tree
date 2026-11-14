@@ -18,6 +18,7 @@ import {
 
 describeForEachEditingMode('line numbers', ({ screenshotName }) => {
   // @requirement PRODUCT.md §2.1
+  // @requirement PRODUCT.md §2.1.1
   // @requirement PRODUCT.md §20.2.28
   test('toggles through Control+L and the command panel, preserving selection and saved preference', async ({
     userDataDir,
@@ -115,6 +116,7 @@ describeForEachEditingMode('line numbers', ({ screenshotName }) => {
 test.describe('windowed line numbers', () => {
   test.use({ editingMode: 'vim' })
   // @requirement PRODUCT.md §2.1
+  // @requirement PRODUCT.md §2.1.1
   // @requirement PRODUCT.md §22.1
   test('keeps full-list indices while mounting a bounded Tree and Agenda window', async ({ userDataDir }) => {
     const today = new Date()

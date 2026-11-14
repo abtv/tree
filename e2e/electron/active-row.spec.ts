@@ -8,7 +8,7 @@ import {
   setAgendaToday,
   setCursor,
   test,
-  writeClipboardImage,
+  writeClipboardImageSized,
 } from './fixtures'
 
 async function highlight(row: Locator) {
@@ -44,13 +44,17 @@ async function expectTextLine(row: Locator): Promise<void> {
   expect(actual.rowHeight).toBeGreaterThan(actual.height)
 }
 
-async function expectFullRow(row: Locator): Promise<void> {
+async function expectImageFrame(row: Locator): Promise<void> {
+  const image = await row.locator('.attachment-image').boundingBox()
+  const bounds = await row.boundingBox()
+  // The approved image caret has a 2px outline outside a 2px gap.
+  await expect.poll(async () => (await highlight(row)).top).toBe(image!.y - bounds!.y - 4)
   const actual = await highlight(row)
 
   expect(actual.content).toBe('""')
   expect(Math.abs(actual.left - actual.listLeft)).toBeLessThan(1)
   expect(Math.abs(actual.right - actual.listRight)).toBeLessThan(1)
-  expect(Math.abs(actual.height - actual.rowHeight)).toBeLessThan(1)
+  expect(actual.height).toBe(image!.height + 8)
 }
 
 describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
@@ -79,7 +83,17 @@ describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
     const parent = window.locator('[data-node-id="parent"]')
     const other = window.locator('[data-node-id="other"]')
 
-    await expectFullRow(parent)
+    await expectTextLine(parent)
+    expect((await highlight(parent)).top).toBe(0)
+
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.emulateMedia({ colorScheme: appearance })
+
+      await expect(window.locator('.node-list')).toHaveScreenshot(
+        screenshotName(`active-single-line-${appearance}.png`),
+        { threshold: 0.02 },
+      )
+    }
 
     await other.hover()
 
@@ -127,7 +141,7 @@ describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
 
     await other.locator('.node-input').focus()
 
-    await expectFullRow(other)
+    await expectTextLine(other)
     expect((await highlight(child)).content).toBe('none')
 
     if (mode === 'vim') {
@@ -139,7 +153,7 @@ describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
 
       await window.keyboard.press('Escape')
 
-      await expectFullRow(other)
+      await expectTextLine(other)
     }
   })
 
@@ -164,20 +178,25 @@ describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
 
     await day.click()
 
-    await expectFullRow(day)
+    await expectTextLine(day)
+
+    const separator = window.locator('.agenda-row-separator').first()
+    await separator.click()
+
+    await expectTextLine(separator)
 
     const item = window.locator('.agenda-row[data-node-id="a"]')
 
     await item.locator('.node-input').click()
 
-    await expectFullRow(item)
+    await expectTextLine(item)
     expect((await highlight(day)).content).toBe('none')
     expect((await highlight(window.locator('.agenda-row[data-node-id="b"]'))).content).toBe('none')
 
     await day.click()
     await window.keyboard.press('Meta+.')
 
-    await expectFullRow(window.locator('.agenda-focused-heading'))
+    await expect.poll(async () => (await highlight(window.locator('.agenda-focused-heading'))).height).toBe(30)
   })
 
   test('highlights the empty final insertion line in plain and decorated editors', async ({ userDataDir }) => {
@@ -302,14 +321,14 @@ test.describe('Active visual line in Vim', () => {
     await expectTextLine(treeRow)
     await expect.poll(async () => (await highlight(treeRow)).top).toBe(20)
 
-    await writeClipboardImage(app)
+    await writeClipboardImageSized(app, 160, 100)
     await window.keyboard.press('Meta+v')
     await expect(treeRow.locator('.attachment-button')).toBeVisible()
     await window.keyboard.press('$')
     await window.keyboard.press('l')
 
     await expect(editor).toHaveClass(/node-input-image-caret/)
-    await expectFullRow(treeRow)
+    await expectImageFrame(treeRow)
 
     await window.keyboard.press('h')
 
@@ -331,10 +350,84 @@ test.describe('Active visual line in Vim', () => {
       await expect.poll(async () => (await highlight(item)).top).toBe(20)
       expect((await highlight(readonly)).content).toBe('none')
       await window.screenshot({ path: testInfo.outputPath(`active-line-agenda-${appearance}.png`) })
+
+      await window.keyboard.press('$')
+      await window.keyboard.press('l')
+
+      await expectImageFrame(item)
+      await expect(window.locator('.agenda-list')).toHaveScreenshot(`active-image-frame-agenda-${appearance}.png`, {
+        threshold: 0.02,
+      })
+
+      await window.keyboard.press('h')
+
+      await expectTextLine(item)
     }
     await window.setViewportSize({ width: 700, height: 700 })
     await expectTextLine(item)
     await window.keyboard.press('Meta+p')
     await expectTextLine(treeRow)
+  })
+})
+
+describeForEachEditingMode('image-only active row', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §2.1
+  test('keeps the image at the row top until its empty editor opens', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'image', text: '', children: [{ id: 'child', text: 'Image child', children: [] }] },
+          { id: 'neighbor', text: '📥 Neighbor', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'image' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const row = window.locator('.node-row[data-node-id="image"]')
+    const input = row.locator('.node-input')
+    const neighbor = window.locator('.node-row[data-node-id="neighbor"] .node-input')
+    await writeClipboardImageSized(app, 160, 100)
+    await window.keyboard.press('Meta+v')
+    await expect(row.locator('.attachment-image')).toBeVisible()
+
+    await neighbor.focus()
+    const imageTop = () =>
+      row.evaluate(
+        (element) =>
+          element.querySelector('.attachment-image')!.getBoundingClientRect().top - element.getBoundingClientRect().top,
+      )
+
+    await expect.poll(imageTop).toBe(0)
+
+    await input.focus()
+    if (mode === 'vim') {
+      await expectImageFrame(row)
+      await expect.poll(imageTop).toBe(0)
+    } else {
+      await expectTextLine(row)
+      await expect.poll(imageTop).toBe(26)
+    }
+
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.emulateMedia({ colorScheme: appearance })
+      await expect(window.locator('.scroll-viewport')).toHaveScreenshot(
+        screenshotName(`image-only-frame-${appearance}.png`),
+        {
+          threshold: 0.02,
+        },
+      )
+    }
+
+    if (mode === 'vim') {
+      await window.keyboard.press('i')
+
+      await expectTextLine(row)
+      await expect.poll(imageTop).toBe(26)
+
+      await window.keyboard.press('Escape')
+
+      await expectImageFrame(row)
+      await expect.poll(imageTop).toBe(0)
+    }
   })
 })

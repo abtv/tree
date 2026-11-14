@@ -598,7 +598,7 @@ body:not(.node-drag-active) .location-link:hover {
   top: 1.5px;
 }
 .agenda-row-day .node-focus-marker {
-  top: 6.5px;
+  top: 5px;
 }
 .agenda-today-badge {
   align-self: flex-start;
@@ -739,7 +739,9 @@ body:not(.node-drag-active) .location-link:hover {
 
 .node-enter-control {
   position: absolute;
-  top: 1.5px;
+  /* Preserve the half-pixel offset during painting instead of rounding the circle down at 1x. */
+  top: 0;
+  transform: translateY(1.5px);
   left: 2px;
   display: grid;
   place-items: center;
@@ -849,7 +851,8 @@ body:not(.node-drag-active) .location-link:hover {
    enter control's bullet (docs/PRODUCT.md §2.1). */
 .node-focus-marker {
   position: absolute;
-  top: 6.5px;
+  top: 5px;
+  transform: translateY(1.5px);
   left: 7px;
   z-index: 1;
   width: 7px;
@@ -1386,6 +1389,15 @@ body.node-drag-invalid * {
   border-radius: 3px;
   background: transparent;
   cursor: pointer;
+}
+
+/* A collapsed empty editor contributes 1px, but there is no text to separate from the image. */
+.node-input-image-only + .attachment-button {
+  margin-top: -1px;
+}
+
+.vim-state-insert .node-input-image-only:focus + .attachment-button {
+  margin-top: 6px;
 }
 
 .attachment-button:focus-visible {

@@ -23,15 +23,46 @@ export function createActiveLineHighlight() {
     if (element !== undefined) resize?.observe(element)
   }
 
+  const paint = (row: HTMLElement, top: number, height: number): void => {
+    const nextTop = `${top}px`
+    const nextHeight = `${height}px`
+    if (row.style.getPropertyValue('--active-line-top') !== nextTop) row.style.setProperty('--active-line-top', nextTop)
+    if (row.style.getPropertyValue('--active-line-height') !== nextHeight)
+      row.style.setProperty('--active-line-height', nextHeight)
+    if (!row.hasAttribute('data-active-line')) row.setAttribute('data-active-line', '')
+    previous = row
+  }
+
   const update = (root: HTMLElement | null = readRoot()): void => {
     const active = root?.ownerDocument.activeElement
     const row = active instanceof HTMLElement ? active.closest<HTMLElement>('.node-row,.agenda-row') : null
     if (row !== previous) clear()
-    if (root === null || row === null || !root.contains(row) || row.querySelector('.node-input-image-caret')) {
+    if (root === null || row === null || !root.contains(row)) {
       observe(undefined)
       clear()
       return
     }
+
+    if (row.querySelector('.node-input-image-caret')) {
+      const image = row.querySelector<HTMLElement>('.attachment-image,.attachment-placeholder')
+      observe(image ?? row)
+      if (image === null) return clear()
+      const bounds = image.getBoundingClientRect()
+      if (bounds.height <= 0) return clear()
+      const frame = image.closest<HTMLElement>('.attachment-image-caret')
+      const frameStyle = frame === null ? undefined : getComputedStyle(frame)
+      const outset =
+        frameStyle === undefined || frameStyle.outlineStyle === 'none'
+          ? 0
+          : Math.max(
+              0,
+              (Number.parseFloat(frameStyle.outlineWidth) || 0) + (Number.parseFloat(frameStyle.outlineOffset) || 0),
+            )
+      const framedBounds = frame?.getBoundingClientRect() ?? bounds
+      paint(row, framedBounds.top - row.getBoundingClientRect().top - outset, framedBounds.height + 2 * outset)
+      return
+    }
+
     const input =
       active instanceof HTMLElement && active.matches('.node-input')
         ? active
@@ -44,11 +75,14 @@ export function createActiveLineHighlight() {
       (total, property) => total + (Number.parseFloat(style.getPropertyValue(property)) || 0),
       0,
     )
-    if (!Number.isFinite(height) || bounds.height <= height + inset + 1) return clear()
+    if (!Number.isFinite(height) || bounds.height <= 0) return clear()
 
     let rect: DOMRect | undefined
     const marks = row.querySelectorAll<HTMLElement>('.agenda-caret,.agenda-selection')
-    if (marks.length > 0) {
+    if (bounds.height <= height + inset + 1) {
+      // A single line needs no caret measurement or textarea mirror, but its row may be taller.
+      rect = bounds
+    } else if (marks.length > 0) {
       const backwards = row.dataset.caretEnd === 'start'
       const mark = marks[backwards ? 0 : marks.length - 1]!
       const rects = mark.getClientRects()
@@ -84,13 +118,7 @@ export function createActiveLineHighlight() {
     if (rect === undefined || rect.height === 0) return clear()
     const line = Math.max(0, Math.round((rect.top - bounds.top) / height))
     const top = bounds.top - row.getBoundingClientRect().top + line * height
-    const nextTop = `${top}px`
-    const nextHeight = `${height}px`
-    if (row.style.getPropertyValue('--active-line-top') !== nextTop) row.style.setProperty('--active-line-top', nextTop)
-    if (row.style.getPropertyValue('--active-line-height') !== nextHeight)
-      row.style.setProperty('--active-line-height', nextHeight)
-    if (!row.hasAttribute('data-active-line')) row.setAttribute('data-active-line', '')
-    previous = row
+    paint(row, top, height)
   }
 
   const schedule = (): void => {

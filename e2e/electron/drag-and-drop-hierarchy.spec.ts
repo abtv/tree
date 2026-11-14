@@ -185,7 +185,8 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
       const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
       const row = window.locator('.node-row[data-node-id="x"]')
 
-      await startRowDrag(window, focused ? row.locator('.node-input') : row, { xOffset: focused ? 8 : 1 })
+      // Use the visible row gutter; the collapsed editor has no separate hit area above its image.
+      await startRowDrag(window, row, { xOffset: 1 })
       await hoverBreadcrumb(window, '.location-root')
 
       await expect(window.locator('.location-root')).toHaveClass(/location-drop-target/)

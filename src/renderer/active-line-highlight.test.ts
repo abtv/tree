@@ -142,16 +142,22 @@ it('coalesces pending layout work and removes listeners, observers and decoratio
   expect(disconnected).toBe(2)
 })
 
-it('clears a previous multiline projection when text becomes single-line or geometry disappears', () => {
+it('keeps a text-height band when multiline text becomes single-line and clears missing geometry', () => {
   const { row, input, owner } = fixture()
   vi.mocked(input.getBoundingClientRect).mockReturnValue(rect(100, 20))
 
   owner.update()
 
-  expect(row).not.toHaveAttribute('data-active-line')
+  expect(row.style.getPropertyValue('--active-line-top')).toBe('0px')
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('20px')
 
   input.style.paddingBottom = '2px'
   vi.mocked(input.getBoundingClientRect).mockReturnValue(rect(100, 22))
+  owner.update()
+
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('20px')
+
+  vi.mocked(input.getBoundingClientRect).mockReturnValue(rect(100, 0))
   owner.update()
 
   expect(row).not.toHaveAttribute('data-active-line')
@@ -162,6 +168,73 @@ it('clears a previous multiline projection when text becomes single-line or geom
   owner.update()
 
   expect(row.style.getPropertyValue('--active-line-height')).toBe('')
+})
+
+it('projects the same text-height band for a synthetic line and a textless separator', () => {
+  const { row, input, owner } = fixture(true)
+  vi.mocked(input.getBoundingClientRect).mockReturnValue(rect(100, 20))
+  rangeRects = []
+
+  owner.update()
+
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('20px')
+
+  row.classList.add('agenda-row-separator')
+  owner.update()
+
+  expect(row).toHaveAttribute('data-active-line')
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('20px')
+})
+
+it('follows a delayed image, its outer frame and resize without retaining the image band on text', () => {
+  const { row, input, owner } = fixture()
+  input.classList.add('node-input-image-caret')
+
+  owner.update()
+
+  expect(row).not.toHaveAttribute('data-active-line')
+  expect(observed.at(-1)).toBe(row)
+
+  const placeholder = document.createElement('span')
+  placeholder.className = 'attachment-placeholder'
+  vi.spyOn(placeholder, 'getBoundingClientRect').mockReturnValue(rect(136, 24))
+  row.append(placeholder)
+  owner.update()
+
+  expect(row.style.getPropertyValue('--active-line-top')).toBe('36px')
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('24px')
+
+  const button = document.createElement('button')
+  button.className = 'attachment-button attachment-image-caret'
+  button.style.outlineStyle = 'solid'
+  button.style.outlineWidth = '2px'
+  button.style.outlineOffset = '2px'
+  const image = document.createElement('img')
+  image.className = 'attachment-image'
+  const imageBounds = vi.spyOn(image, 'getBoundingClientRect').mockReturnValue(rect(136, 80))
+  const buttonBounds = vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(136, 80))
+  button.append(image)
+  placeholder.replaceWith(button)
+  owner.update()
+
+  expect(row.style.getPropertyValue('--active-line-top')).toBe('32px')
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('88px')
+  expect(observed.at(-1)).toBe(image)
+  expect(input).toHaveFocus()
+
+  imageBounds.mockReturnValue(rect(136, 120))
+  buttonBounds.mockReturnValue(rect(136, 120))
+  window.dispatchEvent(new Event('resize'))
+  frameCallback!(0)
+
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('128px')
+
+  input.classList.remove('node-input-image-caret')
+  owner.update()
+
+  expect(row.style.getPropertyValue('--active-line-top')).toBe('20px')
+  expect(row.style.getPropertyValue('--active-line-height')).toBe('20px')
+  expect(observed.at(-1)).toBe(input)
 })
 
 it('projects a rich editor insertion point after the trailing BR without inserting DOM markers', () => {

@@ -626,7 +626,7 @@ test.describe('Vim editing: image caret', () => {
 
     await expect(editor).toHaveClass(/node-input-image-caret/)
 
-    await startRowDrag(window, editor)
+    await startRowDrag(window, window.locator('.node-row').first(), { xOffset: 1 })
 
     await expect(window.locator('.node-row-dragging')).toHaveCount(1)
 
@@ -669,7 +669,9 @@ test.describe('Vim editing: image caret', () => {
       const editor = window.locator('.node-row[data-node-id="source"] .node-input')
       await editor.focus()
 
-      await startRowDrag(window, editor)
+      await startRowDrag(window, text === '' ? window.locator('.node-row[data-node-id="source"]') : editor, {
+        xOffset: text === '' ? 1 : 8,
+      })
       const cursor = await editor.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
       const target = window.locator('.node-row[data-node-id="parent"]')
       const box = await target.boundingBox()

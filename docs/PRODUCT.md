@@ -266,6 +266,8 @@ Nodes are presented as plain outline rows with a solid 7px circular bullet to th
 
 The visible center of each row's bullet, disclosure chevron, and selected-node focus indication aligns vertically with the center of the first text line. This alignment holds for wrapped text and remains correct as focus moves between rows. This is a product requirement, not a stylistic preference.
 
+Alignment is judged from the painted result, not only element rectangles. The outer circle and inner point remain concentric; selecting a node changes the point's color, not its size or position. The gutter keeps one first-line reference across different letters, descenders and emoji; it does not follow the ink bounds of each word. Light and dark appearances preserve geometry, including at different display pixel densities.
+
 Nodes with one or more direct children display a muted outer circle surrounding their solid bullet, producing two concentric circles. Nodes without children display only the solid bullet. Clicking the circular indicator enters that node and displays its children; it does not place the text cursor or edit the node.
 
 Nodes with children display a disclosure chevron to the left of their circular indicator: it points right when the node is collapsed and down when it is expanded. Clicking it expands or collapses that node inline without entering it, moving the text caret, or editing the node. Leaf rows retain the same text alignment without an active disclosure control. The selected node has a separate visible focus indication, whether or not it has children: its bullet is drawn in the ordinary text color instead of the muted gutter color, with the same size and center as the bullet of an unselected node. The editable current-parent heading has no disclosure chevron.
@@ -280,9 +282,10 @@ The editor uses the window width without a fixed centered page cap. Rows retain 
 
 While the Tree or Agenda list contains keyboard focus, only its selected row has a subtle background tint extending from the leading to the trailing edge of the scrolling content area, including the number column, side margins and indentation. Its width does not shrink to the text-width limit. The tint mixes the ordinary text color at 8% over the document surface in either appearance.
 
-* For multiline text, including soft wrapping, the tint covers only the current visual text line and follows the caret or active selection end.
+* For all text, including soft wrapping, the tint matches the current visual text line's height and position and follows the caret or active selection end.
 * A Normal block caret identifies its character's line.
-* Rows without multiline text, and an active image caret, retain full-height tint.
+* Textless day separators use one ordinary text-line-height band.
+* An active image caret uses a band whose top and bottom coincide with the outer edges of the image's visible focus outline. The band excludes the caption and surrounding spacing. Without a visible outline, the loading placeholder uses its own bounds.
 * The tint never changes the text selection.
 
 Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their existing feedback takes precedence.
@@ -297,10 +300,11 @@ At the root level, the first root node is positioned at the same height as the f
 
 * An attached image is displayed beneath its node's text and aligned with that node's text column.
 * When a node has an image but no text, its empty text editor remains keyboard-editable but occupies no visible row in Normal mode; the image begins at the node's text column. Clicking the blank portion of the node row focuses its text editor. While the image-only row shows no text line, its bullet and selected-node focus indication keep the vertical position they have on a single-line text row, which places them beside the top edge of the image.
+* A collapsed empty editor leaves no text-to-image gap: the image starts at the row's top, with its gutter markers within the image's first-line-height area. Selecting an image does not move or resize it; only its frame and band change. When the empty editor becomes visible for insertion, the ordinary spacing between text and image returns.
 * In Insert mode, and always while Vim editing is disabled, the focused empty editor displays a normal-height insertion line and caret until text is entered or Insert mode ends. The same presentation applies when the node is shown as the current parent.
 * In Normal mode, the image can be the active character after the node's text; the image is visibly marked while active. For an image-only node, the image is its sole character.
 
-#### Line Numbers
+#### 2.1.1 Line Numbers
 
 `Ctrl+L` and the `toggle-line-numbers` command toggle ordinary line numbers in
 Tree and Agenda, in standard editing and every Vim mode. Control is literal on

@@ -42,9 +42,8 @@ interface GutterAlignment {
   focusMarkerCenter: number | null
 }
 
-// Reads real layout geometry from the Electron renderer rather than asserting on fixed pixel
-// values, so the check survives future spacing tweaks and only fails when the bullet or triangle
-// actually drifts off the first text line (docs/PRODUCT.md §2.1).
+// Layout relationships supplement the painted regression images below. Equal DOM centers alone
+// do not establish optical alignment or correct subpixel rasterization (PRODUCT.md §2.1).
 function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignment> {
   return window
     .locator('.node-row')
@@ -85,6 +84,122 @@ function gutterAlignment(window: Page, rowIndex: number): Promise<GutterAlignmen
 }
 
 describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
+  // @requirement PRODUCT.md §2.1
+  // @requirement PRODUCT.md §2.1.1
+  test('preserves painted markers with emoji, nesting and focus at both pixel densities', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'parent', text: 'Feature Ideas', children: [{ id: 'child', text: 'Search', children: [] }] },
+          { id: 'emoji', text: '📥 Inbox — Meetings', children: [{ id: 'nested', text: 'Roadmap', children: [] }] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'parent' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.locator('[data-node-id="parent"] .node-disclosure-triangle').click()
+    await window.keyboard.press('Control+l')
+    await window.locator('.node-input').evaluateAll((inputs) => {
+      for (const input of inputs) (input as HTMLElement).style.setProperty('caret-animation', 'manual')
+    })
+    const session = await window.context().newCDPSession(window)
+    const size = await window.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+
+    try {
+      for (const scale of [1, 2]) {
+        await session.send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: scale, mobile: false })
+        await expect.poll(() => window.evaluate(() => devicePixelRatio)).toBe(scale)
+        for (const appearance of ['light', 'dark'] as const) {
+          await window.emulateMedia({ colorScheme: appearance })
+          for (const selected of ['parent', 'child']) {
+            await window.locator(`[data-node-id="${selected}"] .node-input`).focus()
+            await window.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+
+            if (selected === 'parent') {
+              const region = await window.locator('[data-node-id="parent"]').evaluate((row) => {
+                const circle = row.querySelector('.node-enter-control')!
+                const bounds = circle.getBoundingClientRect()
+                return {
+                  clip: { x: bounds.left - 1, y: row.getBoundingClientRect().top, width: 19, height: 20 },
+                  color: getComputedStyle(circle)
+                    .backgroundColor.match(/[\d.]+/g)!
+                    .slice(0, 3)
+                    .map(Number),
+                  pointColor: getComputedStyle(row.querySelector('.node-focus-marker')!)
+                    .backgroundColor.match(/[\d.]+/g)!
+                    .slice(0, 3)
+                    .map(Number),
+                }
+              })
+              const pixels = await session.send('Page.captureScreenshot', {
+                format: 'png',
+                clip: { ...region.clip, scale: 1 },
+                fromSurface: true,
+                captureBeyondViewport: true,
+              })
+              const painted = await app.evaluate(
+                ({ nativeImage }, { encoded, color, pointColor }) => {
+                  const image = nativeImage.createFromBuffer(Buffer.from(encoded, 'base64'))
+                  const { width, height } = image.getSize()
+                  const bitmap = image.toBitmap()
+                  const background = [bitmap[2]!, bitmap[1]!, bitmap[0]!]
+                  const center = (foreground: number[], background: number[]) => {
+                    const direction = foreground.map((value, index) => value - background[index]!)
+                    const norm = direction.reduce((sum, value) => sum + value * value, 0)
+                    let mass = 0
+                    let moment = 0
+                    // Sample the circle's vertical axis, excluding the notebook grid near its sides.
+                    const radius = width / 19
+                    for (let y = 0; y < height; y++)
+                      for (let x = Math.floor(width / 2 - radius); x <= Math.floor(width / 2 + radius); x++) {
+                        const offset = (y * width + x) * 4
+                        const rgb = [bitmap[offset + 2]!, bitmap[offset + 1]!, bitmap[offset]!]
+                        const alpha = Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            rgb.reduce(
+                              (sum, value, index) => sum + (value - background[index]!) * direction[index]!,
+                              0,
+                            ) / norm,
+                          ),
+                        )
+                        mass += alpha
+                        moment += alpha * (y + 0.5)
+                      }
+                    return moment / mass
+                  }
+                  return { center: center(color, background), pointCenter: center(pointColor, color), height, width }
+                },
+                { encoded: pixels.data, color: region.color, pointColor: region.pointColor },
+              )
+
+              expect(painted.width).toBe(19 * scale)
+              expect(painted.height).toBe(20 * scale)
+              expect(Math.abs(painted.center - painted.height / 2)).toBeLessThan(0.12 * scale)
+              expect(Math.abs(painted.pointCenter - painted.height / 2)).toBeLessThan(0.12 * scale)
+            }
+
+            const bounds = await window.locator('.node-list').boundingBox()
+            const screenshot = await session.send('Page.captureScreenshot', {
+              format: 'png',
+              clip: { ...bounds!, scale: 1 },
+              fromSurface: true,
+              captureBeyondViewport: true,
+            })
+            expect(Buffer.from(screenshot.data, 'base64')).toMatchSnapshot(
+              screenshotName(`painted-gutter-${scale}x-${appearance}-${selected}.png`),
+              { threshold: 0.02, maxDiffPixels: 0 },
+            )
+          }
+        }
+      }
+    } finally {
+      await session.send('Emulation.clearDeviceMetricsOverride')
+      await session.detach()
+    }
+  })
+
   // @requirement PRODUCT.md §2.1
   test('centers the bullet and disclosure triangle on the first line of node text', async ({ userDataDir }) => {
     seedDocument(userDataDir, seed())
