@@ -250,13 +250,20 @@ for (const view of ['Tree', 'Agenda'] as const) {
         await pending
         return invoke(...args)
       })
-      return nativeImage
-        .createFromBitmap(Buffer.alloc(200 * 150 * 4, 80), { width: 200, height: 150 })
-        .toPNG()
-        .toString('base64')
+      const bitmap = Buffer.alloc(200 * 150 * 4, 80)
+      for (let offset = 3; offset < bitmap.length; offset += 4) bitmap[offset] = 255
+      const png = nativeImage.createFromBitmap(bitmap, { width: 200, height: 150 }).toPNG()
+      return {
+        png: png.toString('base64'),
+        pixel: Array.from(nativeImage.createFromBuffer(png).toBitmap().subarray(0, 4)),
+      }
     })
+
+    // The ink detector needs an opaque dark fixture, including after its PNG round trip.
+    expect(image.pixel).toEqual([80, 80, 80, 255])
+
     mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
-    writeFileSync(join(userDataDir, 'data', 'attachments', 'late.png'), Buffer.from(image, 'base64'))
+    writeFileSync(join(userDataDir, 'data', 'attachments', 'late.png'), Buffer.from(image.png, 'base64'))
     if (view === 'Agenda') {
       await setAgendaToday(window)
       await window.keyboard.press('Meta+p')
