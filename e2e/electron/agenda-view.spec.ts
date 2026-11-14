@@ -344,6 +344,13 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await window.emulateMedia({ colorScheme: appearance })
       await window.locator('.agenda-row-day').filter({ hasText: 'Fri Oct 9' }).click()
 
+      const badgeOffset = await window.locator('.agenda-today').evaluate((element) => {
+        const label = element.querySelector('.agenda-label')!.getBoundingClientRect()
+        const badge = element.querySelector('.agenda-today-badge')!.getBoundingClientRect()
+        return Math.abs(badge.top + badge.height / 2 - label.top - label.height / 2)
+      })
+
+      expect(badgeOffset).toBeLessThanOrEqual(0.5)
       if (mode === 'standard')
         await expect(window).toHaveScreenshot(screenshotName(`agenda-timeline-${appearance}.png`))
     }
