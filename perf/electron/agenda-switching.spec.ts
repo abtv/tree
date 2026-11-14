@@ -8,6 +8,7 @@ interface SwitchProbe {
   ages: number[]
   paints: number[]
   positions: string[]
+  releaseDelay: number | null
 }
 
 for (const scenario of [
@@ -33,9 +34,17 @@ for (const scenario of [
     })
     const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
     await window.evaluate(() => {
-      const probe: SwitchProbe = { switches: 0, repeatedSwitches: 0, mounts: 0, ages: [], paints: [], positions: [] }
+      const probe: SwitchProbe = {
+        switches: 0,
+        repeatedSwitches: 0,
+        mounts: 0,
+        ages: [],
+        paints: [],
+        positions: [],
+        releaseDelay: null,
+      }
       ;(window as unknown as { switchProbe: SwitchProbe }).switchProbe = probe
-      document.addEventListener(
+      globalThis.addEventListener(
         'keydown',
         (event) => {
           if (event.metaKey && event.key.toLowerCase() === 'p') {
@@ -47,6 +56,14 @@ for (const scenario of [
               requestAnimationFrame(() => probe.paints.push(performance.now() - event.timeStamp)),
             )
           }
+        },
+        true,
+      )
+      globalThis.addEventListener(
+        'keyup',
+        (event) => {
+          if (event.key.toLowerCase() === 'p' && probe.releaseDelay === null)
+            probe.releaseDelay = performance.now() - event.timeStamp
         },
         true,
       )
@@ -66,7 +83,7 @@ for (const scenario of [
       }).observe(document.querySelector('main.tree-app')!, { childList: true, subtree: true })
     })
 
-    const sent = await app.evaluate(async ({ BrowserWindow }, scenario) => {
+    const switches = await app.evaluate(async ({ BrowserWindow }, scenario) => {
       const target = BrowserWindow.getAllWindows().find((win) =>
         win.webContents.getURL().includes('index.html'),
       )!.webContents
@@ -78,26 +95,46 @@ for (const scenario of [
       }, 1000 / scenario.hz)
       await new Promise((resolve) => setTimeout(resolve, 10000))
       clearInterval(timer)
-      if ((switches % 2 === 1) !== scenario.agenda) {
-        target.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers: ['meta', 'isautorepeat'] })
-        switches++
-      }
       target.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers: ['meta'] })
-
-      let navigation = 0
-      for (const keyCode of ['J', 'K']) {
-        target.sendInputEvent({ type: 'keyDown', keyCode })
-        navigation++
-        const held = setInterval(() => {
-          target.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['isautorepeat'] })
-          navigation++
-        }, 1000 / scenario.hz)
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        clearInterval(held)
-        target.sendInputEvent({ type: 'keyUp', keyCode })
-      }
-      return { switches, navigation }
+      return switches
     }, scenario)
+    await window.waitForFunction(
+      () => (globalThis as unknown as { switchProbe: SwitchProbe }).switchProbe.releaseDelay !== null,
+    )
+    const releaseDelay = await window.evaluate(
+      () => (globalThis as unknown as { switchProbe: SwitchProbe }).switchProbe.releaseDelay!,
+    )
+    expect(releaseDelay).toBeLessThan(50)
+    const correctDestination = (await window.locator('.agenda-list').count()) > 0 !== scenario.agenda
+    const navigation = await app.evaluate(
+      async ({ BrowserWindow }, { scenario, correctDestination }) => {
+        const target = BrowserWindow.getAllWindows().find((win) =>
+          win.webContents.getURL().includes('index.html'),
+        )!.webContents
+        // Select the destination with a distinct press, then feed navigation without waiting for
+        // that view to settle. The release-delay assertion above also detects a preexisting backlog.
+        if (correctDestination) {
+          target.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers: ['meta'] })
+          target.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers: ['meta'] })
+        }
+
+        let navigation = 0
+        for (const keyCode of ['J', 'K']) {
+          target.sendInputEvent({ type: 'keyDown', keyCode })
+          navigation++
+          const held = setInterval(() => {
+            target.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['isautorepeat'] })
+            navigation++
+          }, 1000 / scenario.hz)
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+          clearInterval(held)
+          target.sendInputEvent({ type: 'keyUp', keyCode })
+        }
+        return navigation
+      },
+      { scenario, correctDestination },
+    )
+    const sent = { switches: switches + (correctDestination ? 1 : 0), navigation }
     await window.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
     )
@@ -110,6 +147,7 @@ for (const scenario of [
       receivedNavigation: probe.ages.length,
       maxInputAgeMs: round(Math.max(...probe.ages)),
       maxPaintCallbackMs: round(Math.max(...probe.paints)),
+      releaseInputAgeMs: round(releaseDelay),
     }
     recordPerfResult({
       kind: 'state',
@@ -119,8 +157,9 @@ for (const scenario of [
     })
 
     expect(probe.switches).toBe(sent.switches)
-    expect(probe.repeatedSwitches).toBe(sent.switches - 1)
-    expect(probe.mounts).toBe(sent.switches)
+    expect(probe.repeatedSwitches).toBe(switches - 1)
+    expect(probe.mounts).toBeGreaterThan(10)
+    expect(probe.mounts).toBeLessThanOrEqual(sent.switches)
     expect(probe.ages).toHaveLength(sent.navigation)
     expect(probe.paints).toHaveLength(sent.navigation)
     expect(new Set(probe.positions).size).toBeGreaterThan(10)

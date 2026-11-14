@@ -13,7 +13,16 @@ for (const vimEnabled of [true, false]) {
 
       await window.evaluate(() => {
         const motions: { delay: number; feedback: number; row?: string | undefined }[] = []
-        Object.assign(window, { repeatRecovery: motions })
+        const release = { delay: null as number | null }
+        Object.assign(window, { repeatRecovery: motions, repeatRelease: release })
+        globalThis.addEventListener(
+          'keyup',
+          (event) => {
+            if (event.key.toLowerCase() === 'p' && release.delay === null)
+              release.delay = performance.now() - event.timeStamp
+          },
+          true,
+        )
         document.addEventListener(
           'keydown',
           (event) => {
@@ -34,26 +43,44 @@ for (const vimEnabled of [true, false]) {
 
       // Main-process delivery keeps feeding the renderer even when it falls behind. Waiting for
       // each key's renderer acknowledgment would conceal the backlog this regression guards.
-      const sent = await app.evaluate(
-        async ({ BrowserWindow }, { destination, vimEnabled }) => {
+      const switches = await app.evaluate(async ({ BrowserWindow }) => {
+        const contents = BrowserWindow.getAllWindows()[0]!.webContents
+        const started = Date.now()
+        let switches = 0
+        await new Promise<void>((resolve) => {
+          const timer = setInterval(() => {
+            contents.sendInputEvent({
+              type: 'keyDown',
+              keyCode: 'P',
+              modifiers: switches === 0 ? ['meta'] : ['meta', 'isautorepeat'],
+            })
+            switches++
+            if (Date.now() - started >= 10000) {
+              clearInterval(timer)
+              resolve()
+            }
+          }, 3)
+        })
+        contents.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers: ['meta'] })
+        return switches
+      })
+      await window.waitForFunction(
+        () => (globalThis as unknown as { repeatRelease: { delay: number | null } }).repeatRelease.delay !== null,
+      )
+      const releaseDelay = await window.evaluate(
+        () => (globalThis as unknown as { repeatRelease: { delay: number } }).repeatRelease.delay,
+      )
+      // Checking the release delay retains the backlog guard before choosing a destination.
+      // Autorepeat merging makes native-input parity independent of the final view.
+      expect(releaseDelay).toBeLessThan(250)
+      const correctDestination = (await window.locator('.agenda-list').count()) > 0 !== (destination === 'agenda')
+      const motions = await app.evaluate(
+        async ({ BrowserWindow }, { correctDestination, vimEnabled }) => {
           const contents = BrowserWindow.getAllWindows()[0]!.webContents
-          const started = Date.now()
-          let switches = 0
-          await new Promise<void>((resolve) => {
-            const timer = setInterval(() => {
-              contents.sendInputEvent({
-                type: 'keyDown',
-                keyCode: 'P',
-                modifiers: switches === 0 ? ['meta'] : ['meta', 'isautorepeat'],
-              })
-              switches++
-              if (Date.now() - started >= 10000 && switches % 2 === (destination === 'tree' ? 0 : 1)) {
-                clearInterval(timer)
-                resolve()
-              }
-            }, 3)
-          })
-          contents.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers: ['meta'] })
+          if (correctDestination) {
+            contents.sendInputEvent({ type: 'keyDown', keyCode: 'P', modifiers: ['meta'] })
+            contents.sendInputEvent({ type: 'keyUp', keyCode: 'P', modifiers: ['meta'] })
+          }
           let motions = 0
           await new Promise<void>((resolve) => {
             const timer = setInterval(() => {
@@ -67,10 +94,11 @@ for (const vimEnabled of [true, false]) {
               }
             }, 10)
           })
-          return { motions, switches }
+          return motions
         },
-        { destination, vimEnabled },
+        { correctDestination, vimEnabled },
       )
+      const sent = { switches, motions }
 
       await window.waitForFunction((count) => {
         const samples = (window as unknown as { repeatRecovery: { feedback: number }[] }).repeatRecovery
@@ -87,7 +115,12 @@ for (const vimEnabled of [true, false]) {
         kind: 'state',
         scenario: `agenda-repeat-${destination}-${vimEnabled ? 'vim' : 'standard'}`,
         samples: samples.length,
-        metrics: { switches: sent.switches, maxInputDelayMs: maxDelay, maxTwoRafMs: maxFeedback },
+        metrics: {
+          switches: sent.switches,
+          maxReleaseInputDelayMs: releaseDelay,
+          maxInputDelayMs: maxDelay,
+          maxTwoRafMs: maxFeedback,
+        },
       })
 
       // A slow producer can conceal a renderer backlog instead of exercising it.

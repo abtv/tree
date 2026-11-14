@@ -45,6 +45,8 @@ import { usePopupNavigation } from './use-popup-navigation'
 import { useLineNumbers } from './use-line-numbers'
 import { UpdateStatus } from './UpdateStatus'
 import { useActiveLineHighlight } from './use-active-line-highlight'
+import { getCaret } from './editor-dom'
+import { useAgendaRepeat } from './use-agenda-repeat'
 import { StatusBar } from './StatusBar'
 
 interface AppProps {
@@ -202,6 +204,21 @@ export function App({
       active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
     )
   }, [vimTextCommandState])
+  useAgendaRepeat({
+    shortcuts,
+    blocked: updateBlocked,
+    switchView: () => {
+      const current = store.getSnapshot()
+      if (current.status !== 'ready') return
+      beforeViewChange()
+      store.search.interruptNavigation()
+      if (current.agenda !== undefined) store.closeAgenda()
+      else {
+        const active = document.activeElement
+        store.openAgenda(active instanceof HTMLElement && active.matches('.node-input') ? getCaret(active) : undefined)
+      }
+    },
+  })
   const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     summarySelection: vimMode === 'visual-node' ? nodeVisualSelection : undefined,
