@@ -37,7 +37,10 @@ const document: Document = {
 }
 
 function selected(key = 'node:100:match'): AgendaState {
-  const state = openAgendaState({ currentParentId: 'scope', selectedNodeId: 'context' }, 4, 100)
+  const state = {
+    ...openAgendaState({ currentParentId: 'scope', selectedNodeId: 'context' }, 4, 100),
+    scopeParentId: 'scope',
+  }
   return applyAgendaCommand(state, { kind: 'select', key }, buildAgendaRows(agendaProjection(document, state), state))
 }
 

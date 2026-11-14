@@ -47,6 +47,7 @@ export type EditorSnapshot =
       focus: FocusIntent
       structuralVersion: number
       imageToTextStatus?: string
+      imageToTextStatusRevision?: number
       expansion: ExpansionState
       agenda?: AgendaState
       saveError?: string

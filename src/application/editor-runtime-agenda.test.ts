@@ -36,7 +36,7 @@ it('publishes the active Agenda node while preserving the recorded Tree origin',
   expect(activeAgendaOccurrence(runtime.ready().agenda)).toEqual({ nodeId: 'active', day: 100 })
 })
 
-it('returns to the nearest surviving origin ancestor when the Agenda scope is deleted', () => {
+it('keeps global Agenda open and records the nearest surviving ancestor when the Tree origin is deleted', () => {
   const closed = vi.fn()
   const runtime = new EditorRuntimeState(closed)
   const scope = { id: 'scope', text: 'Scope', children: [{ id: 'a', text: '1970-04-11', children: [] }] }
@@ -67,10 +67,14 @@ it('returns to the nearest surviving origin ancestor when the Agenda scope is de
     true,
   )
 
-  expect(runtime.ready().agenda).toBeUndefined()
-  expect(runtime.ready().location).toEqual({ currentParentId: 'grand', selectedNodeId: 'grand' })
-  expect(runtime.ready().focus).toEqual({ nodeId: 'grand', cursor: 0, token: previousToken + 1 })
-  expect(closed).toHaveBeenCalledOnce()
+  expect(runtime.ready().agenda!.origin).toEqual({
+    location: { currentParentId: 'grand', selectedNodeId: 'grand' },
+    cursor: 0,
+  })
+  expect(runtime.ready().agenda!.scopeParentId).toBeNull()
+  expect(runtime.ready().location).toEqual({ currentParentId: null, selectedNodeId: 'unrelated' })
+  expect(runtime.ready().focus).toEqual({ nodeId: 'unrelated', cursor: 0, token: previousToken + 1 })
+  expect(closed).not.toHaveBeenCalled()
 })
 
 it('short-circuits Agenda reconciliation in Tree and calls the seam once when Agenda is present', () => {
@@ -94,7 +98,7 @@ it('short-circuits Agenda reconciliation in Tree and calls the seam once when Ag
 
     runtime.replaceReady({ ...state, agenda })
 
-    expect(reconcile).toHaveBeenCalledExactlyOnceWith(state.document, agenda, false, undefined)
+    expect(reconcile).toHaveBeenCalledExactlyOnceWith(state.document, agenda, false, undefined, state.document)
     expect(runtime.ready().agenda).toBe(agenda)
 
     runtime.replaceReady({ ...runtime.ready(), agenda: { ...agenda, selectedKey: 'day:101' } })
@@ -115,6 +119,7 @@ it.each(['deleted', 'moved'] as const)(
     const location = { currentParentId: 'scope', selectedNodeId: 'a' }
     const agenda = {
       ...openAgendaState(location, 4, 100),
+      scopeParentId: 'scope',
       selectedKey: 'node:100:a',
       activity: { kind: 'dated' as const, occurrence: { nodeId: 'a', day: 100 } },
     }

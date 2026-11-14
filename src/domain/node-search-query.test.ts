@@ -1,6 +1,22 @@
 import { expect, it } from 'vitest'
-import { nodeSearchHighlights, prepareNodeSearch, searchNodeTerm } from './node-search-query'
+import { nodeSearchCompletionTerm, nodeSearchHighlights, prepareNodeSearch, searchNodeTerm } from './node-search-query'
 import type { TreeNode } from './document-types'
+
+// @requirement PRODUCT.md §20.14.4
+it.each([
+  ['@al task', 1, { start: 0, end: 3, text: '@al' }],
+  ['task @al next', 7, { start: 5, end: 8, text: '@al' }],
+  ['task #wo', 8, { start: 5, end: 8, text: '#wo' }],
+  ['😀\t&meet  task', 4, { start: 3, end: 8, text: '&meet' }],
+  ['task @al next', 5, { start: 5, end: 8, text: '@al' }],
+  ['task @al next', 8, { start: 5, end: 8, text: '@al' }],
+  ['task @al next', 9, undefined],
+  ['task@al', 7, undefined],
+  ['task ', 5, undefined],
+  ['', 0, undefined],
+] as const)('locates the complete marker term in %s at caret %s', (query, caret, expected) => {
+  expect(nodeSearchCompletionTerm(query, caret)).toEqual(expected)
+})
 
 function matches(query: string, node: TreeNode) {
   const preparation = prepareNodeSearch(query)

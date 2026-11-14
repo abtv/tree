@@ -93,6 +93,14 @@ export function App({
   const shortcuts = shortcutProfile(shortcutPlatform)
   const { lineNumbers, applyLineNumbers } = useLineNumbers(initialLineNumbers, store)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const imageToTextStatus = state.status === 'ready' ? state.imageToTextStatus : undefined
+  const imageToTextStatusRevision = state.status === 'ready' ? state.imageToTextStatusRevision : undefined
+  useEffect(() => {
+    if (imageToTextStatus === undefined) return
+    const timer = window.setTimeout(() => store.dismissImageToTextStatus(), 5000)
+    return () => window.clearTimeout(timer)
+  }, [store, imageToTextStatus, imageToTextStatusRevision])
+
   const summary = useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
   const agendaToday = state.status === 'ready' ? state.agenda?.today : undefined
   const treeToday = localToday()
@@ -240,6 +248,7 @@ export function App({
     lineNumbers,
     applyLineNumbers,
     beforeOpen: () => {
+      store.dismissImageToTextStatus()
       store.search.interruptNavigation()
       if (store.search.session.getSnapshot().draft !== undefined) {
         store.search.cancelDraft()
@@ -809,9 +818,9 @@ export function App({
           ) : null}
           {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
           {platformStatus}
-          {state.imageToTextStatus !== undefined ? (
-            <span role="status" title={state.imageToTextStatus}>
-              {state.imageToTextStatus}
+          {!commandPanel.open && imageToTextStatus !== undefined ? (
+            <span role="status" title={imageToTextStatus}>
+              {imageToTextStatus}
             </span>
           ) : null}
         </div>

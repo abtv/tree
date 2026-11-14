@@ -52,6 +52,36 @@ function seed(userDataDir: string): void {
 }
 
 describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §23.1
+  test('opens the whole document from a nested Tree location and restores the origin', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          node('ancestor', '2026-10-08 Ancestor', [
+            node('parent', '2026-10-08 Parent', [leaf('child', '2026-10-08 Child')]),
+          ]),
+          node('other', 'Other branch', [leaf('outside', '2026-10-08 Outside')]),
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+
+    await expect(window.locator('.agenda-row-node')).toHaveText([
+      '2026-10-08 Ancestor',
+      '2026-10-08 Parent',
+      '2026-10-08 Child',
+      '2026-10-08 Outside',
+    ])
+    await window.screenshot({ path: `test-results/agenda-global-${mode}.png` })
+    await window.keyboard.press('Meta+p')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveText('2026-10-08 Parent')
+    await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+  })
+
   // @requirement PRODUCT.md §23.6
   test('windows occurrences while keeping distant selection focused through scrolling, resizing and folding', async ({
     userDataDir,

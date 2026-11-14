@@ -51,7 +51,13 @@ export class EditorRuntimeState {
         previous.agenda === undefined ||
         (pinnedAgendaOccurrence(previous.agenda) !== undefined && pinnedAgendaOccurrence(state.agenda) === undefined))
     ) {
-      const agenda = reconcileAgenda(state.document, state.agenda, false, this.agendaRowsCache)
+      const agenda = reconcileAgenda(
+        state.document,
+        state.agenda,
+        false,
+        this.agendaRowsCache,
+        previous.status === 'ready' ? previous.document : state.document,
+      )
       if (agenda === undefined) {
         delete next.agenda
         next.location = normalizeVisibleLocation(

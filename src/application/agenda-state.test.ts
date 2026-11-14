@@ -25,7 +25,7 @@ it('captures the origin and retains identity for invalid or inapplicable command
 
   expect(state).toMatchObject({
     activity: { kind: 'inactive' },
-    scopeParentId: 'scope',
+    scopeParentId: null,
     selectedKey: 'day:100',
     today: 100,
     origin: { location: { currentParentId: 'scope', selectedNodeId: 'origin' }, cursor: 7 },

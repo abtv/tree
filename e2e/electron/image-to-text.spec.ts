@@ -17,6 +17,40 @@ import { onePixelPng } from '../../src/shared/png-test-utils'
 test.use({ editingMode: 'vim' })
 
 // @requirement PRODUCT.md §15.1
+test('expires OCR feedback and dismisses it before command input opens', async ({ userDataDir }) => {
+  test.skip(process.platform !== 'darwin' || process.arch !== 'arm64', 'Apple Silicon only')
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'task', text: 'Task without image', children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'task' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.clock.install()
+  const feedback = window.getByText('Image to text: select an editable node with an image.', { exact: true })
+  const command = window.getByRole('combobox', { name: 'Command' })
+  for (const dismiss of ['expiry', ':', 'Meta+Shift+p']) {
+    await window.keyboard.press(':')
+    await command.fill('image-to-text')
+    await command.press('Enter')
+    await expect(feedback).toBeVisible()
+
+    if (dismiss === 'expiry') {
+      await window.clock.runFor(5000)
+    } else {
+      await window.keyboard.press(dismiss)
+      await expect(command).toBeFocused()
+    }
+
+    await expect(feedback).toHaveCount(0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    if (dismiss !== 'expiry') {
+      await window.screenshot({ path: `test-results/ocr-command-${dismiss === ':' ? 'colon' : 'palette'}.png` })
+      await command.press('Escape')
+      await expect(feedback).toHaveCount(0)
+    }
+  }
+})
+
+// @requirement PRODUCT.md §15.1
 // @requirement PRODUCT.md §23.9
 test('does not start native recognition or create nodes from Agenda', async ({ userDataDir }) => {
   test.skip(process.platform !== 'darwin' || process.arch !== 'arm64', 'Apple Silicon only')

@@ -306,6 +306,30 @@ it.each(['#', '#work'])('closes Search on the first Escape with %s tag suggestio
   expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
 })
 
+it.each(['Enter', 'Tab', 'pointer'])(
+  'completes the term under the caret via %s without discarding the suffix',
+  (key) => {
+    const { store } = setup()
+    vi.mocked(store.searchNodeSuggestions).mockReturnValue(['alex', 'alexander'])
+    const input = screen.getByRole<HTMLInputElement>('searchbox')
+    fireEvent.change(input, { target: { value: 'task @al later' } })
+    input.setSelectionRange(7, 7)
+
+    fireEvent.select(input)
+
+    const people = screen.getByRole('listbox', { name: 'People' })
+    expect(people).toHaveTextContent('@alex')
+    if (key === 'pointer') fireEvent.click(screen.getByRole('option', { name: '@alex' }))
+    else fireEvent.keyDown(input, { key })
+
+    expect(input).toHaveValue('task @alex later')
+    expect(input).toHaveFocus()
+    expect([input.selectionStart, input.selectionEnd]).toEqual([10, 10])
+    expect(screen.queryByRole('listbox', { name: 'People' })).toBeNull()
+    expect(store.visitRecentNode).not.toHaveBeenCalled()
+  },
+)
+
 it('accepts tag suggestions with ordinary completion keys and respects IME', () => {
   const { store } = setup()
   vi.mocked(store.searchNodeSuggestions).mockReturnValue(['work', 'worker'])

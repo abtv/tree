@@ -1099,8 +1099,11 @@ Recognition runs outside the UI thread through a sequential queue. Duplicate pen
 requests for a node are ignored; the queue admits at most 20 requests. The status bar
 reports recognition, queued count, completion, no text and failures. Terminal feedback
 includes both the total added paragraphs and the error when a queue partly succeeds.
-It remains until another request; Find/Agenda feedback remains in the controls row,
-while recognition and update feedback stay visible alongside it. A missing image or noneditable selection is
+
+Recognition feedback disappears five seconds after its latest update, or immediately
+when the command panel opens with `:` or `Cmd+Shift+P`. It stays hidden while that
+panel is open. Find/Agenda feedback remains in the controls row, while recognition
+and update feedback can appear alongside it. A missing image or noneditable selection is
 reported without changing the document. Image-to-text does nothing throughout Agenda (§23.9), because recognition creates nodes.
 
 Each result is one Undo/Redo operation and uses normal autosave. Deleting or replacing
@@ -2133,16 +2136,10 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 * While tag suggestions are visible, an empty node-result list does not display `No results`.
 * Pending searches retain rows, empty-state text and list height; stale rows cannot be activated or navigated. Without tag suggestions, the footer keeps its hint for 200ms, then shows `Searching…`. Results replace the list atomically, including short queries and queries with no matches. Clearing restores recent nodes. Completion, clearing and closing cancel the indicator timer.
 * The popup is centered horizontally and vertically when opened, using its initial content height. Its top edge, width and input position then remain unchanged during query changes; only the bottom edge adapts to content, up to the available window height. Resizing the application window recenters the popup within the new available space. Lists scroll within the available space.
-* Popup width adapts to the application window: 680 px in ordinary windows, half the window width above that, capped at 1040 px. Narrow windows leave 24 px on each side. The document and application chrome behind Search are dimmed without blur or animation; the popup retains its normal appearance.
+* Popup width is 80% of the application window, with a 680 px minimum and 1040 px maximum; narrow windows leave 24 px on each side instead. Maximum height is 80% of the window, further constrained by the available space below its fixed top edge. Short lists retain a compact height. The document and application chrome behind Search are dimmed without blur or animation; the popup retains its normal appearance.
 * Visible headings distinguish `Recent` nodes, tag suggestions (`Tags`) and matching nodes (`Results`). Tags use compact rows beneath the input, with the same horizontal alignment and full-width separators as node results and no enclosing list border. Node results retain their text and parent paths. While tag suggestions are open, only their selected row is highlighted; matching nodes may appear below without a competing selection highlight.
 * The footer explains the active keyboard action: `↑ ↓ select · Enter/Tab apply · Esc close` while tag suggestions are open, otherwise `↑ ↓ select · Enter open · Esc close` when results are ready. Accepting a tag closes suggestions and leaves its full text in the input, so the results and their open action become active.
 * When the node-result list is active and nonempty, the trailing edge of its `Results` heading shows the selected row and total as `3 / 24`. The total covers all matching nodes, including those outside the rendered scroll window. Recent nodes with empty input have no counter. The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
-
-* A single leading `#`, `@` or `&` term retains its existing catalog suggestions. Global Search suggestions match a continuous, case-insensitive substring of the name; unlike inline tag completion (§20.13), they do not match letters separated by gaps. The existing exact-name, prefix, word-prefix and substring ranking remains. Multi-term queries do not offer completion suggestions; their terms use the same matching rules whether typed before or after ordinary text.
-* When the only matching tag suggestion exactly equals the input, Search omits the redundant suggestion and activates the node results as soon as they are ready. The first result is selected and Enter opens it directly. A nonexact fragment or a query with multiple matching tag suggestions keeps tag completion active, even when one suggestion is an exact match.
-* Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape closes the entire Search popup on the first press, including when tag suggestions are open, and restores the originating editor selection and mode.
-* A manually typed complete marker name searches immediately, including one-character names and case variants accepted by smart case; a fragment or unknown name has no node results. Search matches complete recognized names, excluding hyperlink ranges, and never creates tags.
-* Completion acceptance leaves focus in the search input and does not jump to a node. IME composition owns its keys and suspends suggestions until commitment.
 
 Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior. Resource constraints are in §20.14.3.
 
@@ -2192,6 +2189,14 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 
 Query preparation and matching retain only the current terms, result list and ancestor traversal state, without earlier query snapshots or a persistent full-text index. Ancestor term matches are accumulated during traversal, rather than rescanning all ancestor text for each descendant. Query input causes no document/history writes or syncs.
 
+#### 20.14.4 Marker Completion
+
+* The `#`, `@` or `&` term at the caret offers catalog suggestions in every position of a multi-term query. Typing or moving the caret with the keyboard or pointer updates suggestions for that whole whitespace-delimited term. A noncollapsed text selection suppresses suggestions. Global Search suggestions match a continuous, case-insensitive substring of the name; unlike inline tag completion (§20.13), they do not match letters separated by gaps. The existing exact-name, prefix, word-prefix and substring ranking remains.
+* When the only matching tag suggestion exactly equals the active term, Search omits the redundant suggestion and activates the node results as soon as they are ready. The first result is selected and Enter opens it directly. A nonexact fragment or a term with multiple matching tag suggestions keeps tag completion active, even when one suggestion is an exact match.
+* Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape closes the entire Search popup on the first press, including when tag suggestions are open, and restores the originating editor selection and mode.
+* A manually typed complete marker name searches immediately, including one-character names and case variants accepted by smart case; a fragment or unknown name has no node results. Search matches complete recognized names, excluding hyperlink ranges, and never creates tags.
+* Completion acceptance replaces only the active term, preserves all text and whitespace before and after it, leaves the caret immediately after the inserted name and retains focus in the search input without jumping to a node. Suggestions remain dismissed until the next edit or caret movement. IME composition owns its keys and suspends suggestions until commitment.
+
 ## 21. Unexpected Renderer Errors
 
 If the renderer encounters an unexpected error while rendering, the application must not leave the window blank.
@@ -2238,7 +2243,7 @@ Performance guards must exercise representative sequences in the running applica
 
 ### 23.1 Opening and Closing
 
-* `Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its Monday–Sunday week is displayed and its day container is initially selected. Closing and reopening always returns to the current week and Today.
+* `Cmd+P` opens Agenda for the entire document, including all roots, folded descendants, the current parent and its ancestors, regardless of Tree location or selection. Today is captured from the local calendar when Agenda opens; its Monday–Sunday week is displayed and its day container is initially selected. Closing and reopening always returns to the current week and Today.
 * Opening makes a best effort to center the complete Today block, including its heading and entries, within the content viewport. A block taller than the viewport starts at its heading with the ordinary context margin. Natural scroll limits apply; no blank padding is added just to center it. Alignment follows measured layout changes until explicit user scrolling or a subsequent command takes over.
 * `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
 
@@ -2302,9 +2307,9 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 * A pointer click on another row selects it with the caret at offset zero, and a click on the row that is already selected leaves its caret where it is.
 * Every command that would insert, change, delete, put, join, indent, surround or repeat text does nothing on these rows and keeps document, caret and mode unchanged.
 
-#### Opening Tree and Scoped Agenda
+#### Opening Tree from Agenda
 
-`Cmd+.` on a direct match closes Agenda and opens Tree with that node as current parent. `Cmd+P` there opens that node's own scoped Agenda at Today.
+`Cmd+.` on a direct match closes Agenda and opens Tree with that node as current parent. `Cmd+P` there reopens the entire document's Agenda at Today.
 
 ### 23.5 Folding Days
 
@@ -2324,7 +2329,7 @@ Selecting a direct match makes that node's occurrence on that day active. Adding
 
 Removing the last recognized date keeps the item on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
 
-If the scope root no longer exists, Agenda closes and returns to the nearest surviving Tree ancestor, or Root. A removed originating selection falls back to its surviving scope heading, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
+If the originating Tree parent or selection no longer exists, Agenda stays open and updates its return location to the nearest surviving Tree ancestor, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
 
 The active editor retains focus, caret, selection and mode when its active day changes.
 
@@ -2334,9 +2339,9 @@ While the last date is removed, the status bar shows `Add a date to keep this it
 
 ### 23.8 Agenda History Focus
 
-Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the Tree current parent, Agenda folds or Tree expansion while the scope exists.
+Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the captured Tree return location, Agenda folds or Tree expansion while the originating nodes still exist.
 
-After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, or the change is outside the Agenda scope, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
+After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
 
 `Cmd+Z` and `Cmd+Shift+Z` work throughout Agenda; Vim Normal `u` and `Ctrl+r` use the same history. Pending Insert and Replace sessions finish by the same rules as Tree before a history command.
 

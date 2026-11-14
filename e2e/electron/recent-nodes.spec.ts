@@ -15,6 +15,88 @@ import {
 
 describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
+  test('uses the enlarged viewport limits while keeping short result lists compact', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: Array.from({ length: 80 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await window.evaluate(() => globalThis.window.treeApi.setRecentNodes!(Array.from({ length: 8 }, (_, i) => `n${i}`)))
+    await window.reload()
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeVisible()
+    await setMainWindowBounds(app, { width: 1156, height: 1000 })
+    await window.keyboard.press('Meta+;')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const input = popup.getByRole('searchbox')
+    await input.fill('Node')
+    await expect(popup.getByLabel('Result position')).toHaveText('1 / 80')
+    const geometry = await popup.evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      return {
+        width: box.width,
+        height: box.height,
+        top: box.top,
+        viewportWidth: innerWidth,
+        viewportHeight: innerHeight,
+      }
+    })
+
+    expect(geometry.width).toBeCloseTo(geometry.viewportWidth * 0.8, 0)
+    expect(geometry.height).toBeGreaterThan(560)
+    expect(geometry.height).toBeCloseTo(
+      Math.min(geometry.viewportHeight * 0.8, geometry.viewportHeight - geometry.top - 40),
+      0,
+    )
+    await window.screenshot({ path: `test-results/search-enlarged-${mode.mode}.png` })
+
+    await input.fill('Node 79')
+    await expect(popup.getByRole('option')).toHaveCount(1)
+    expect((await popup.boundingBox())!.height).toBeLessThan(geometry.height)
+  })
+
+  // @requirement PRODUCT.md §20.14
+  // @requirement PRODUCT.md §20.14.4
+  test('completes marker terms at the caret throughout a multi-term query', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'task', text: 'task @alex #work &meeting later', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'task' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+;')
+    const input = window.getByRole('searchbox', { name: 'Search query' })
+
+    await input.fill('task @al later')
+    await input.press('Home')
+    for (let index = 0; index < 7; index++) await input.press('ArrowRight')
+    await expect(window.getByRole('listbox', { name: 'People' }).getByRole('option')).toHaveText(['@alex'])
+    await input.press('Tab')
+
+    await expect(input).toHaveValue('task @alex later')
+    await expect(input).toBeFocused()
+    expect(await input.evaluate((element: HTMLInputElement) => [element.selectionStart, element.selectionEnd])).toEqual(
+      [10, 10],
+    )
+    await expect(window.getByRole('listbox', { name: 'People' })).toHaveCount(0)
+
+    await input.fill('#wo task')
+    await input.press('Home')
+    await input.press('ArrowRight')
+    await expect(window.getByRole('listbox', { name: 'Tags' }).getByRole('option')).toHaveText(['#work'])
+    await window.getByRole('listbox', { name: 'Tags' }).getByRole('option').click()
+
+    await expect(input).toHaveValue('#work task')
+    expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(5)
+
+    await input.fill('task &mee')
+    await expect(window.getByRole('listbox', { name: 'Events' }).getByRole('option')).toHaveText(['&meeting'])
+    await input.press('Enter')
+
+    await expect(input).toHaveValue('task &meeting')
+    await expect(input).toBeFocused()
+    await window.screenshot({ path: `test-results/search-completion-anywhere-${mode.mode}.png` })
+  })
+
+  // @requirement PRODUCT.md §20.14
   // @requirement PRODUCT.md §20.14.3
   test('combines text and marker terms through all ancestors without including unmatched siblings', async ({
     userDataDir,
@@ -433,7 +515,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await expect(window).toHaveScreenshot(`search-tags-presentation-${appearance}.png`)
 
       await setMainWindowBounds(app, { width: 1904, height: 1194 })
-      await expect(popup).toHaveCSS('width', '952px')
+      await expect(popup).toHaveCSS('width', '1040px')
       await window.screenshot({ path: `test-results/search-wide-${appearance}.png` })
       await window.keyboard.press('Enter')
       await expect(input).toHaveValue('#beta')

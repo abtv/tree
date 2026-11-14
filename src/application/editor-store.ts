@@ -538,7 +538,19 @@ export class EditorStore {
 
   private setImageToTextStatus(message: string): void {
     if (this.runtime.snapshot.status !== 'ready') return
-    this.runtime.snapshot = { ...this.runtime.snapshot, imageToTextStatus: message }
+    this.runtime.snapshot = {
+      ...this.runtime.snapshot,
+      imageToTextStatus: message,
+      imageToTextStatusRevision: (this.runtime.snapshot.imageToTextStatusRevision ?? 0) + 1,
+    }
+    this.runtime.emit()
+  }
+
+  public dismissImageToTextStatus(): void {
+    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.imageToTextStatus === undefined) return
+    const next = { ...this.runtime.snapshot }
+    delete next.imageToTextStatus
+    this.runtime.snapshot = next
     this.runtime.emit()
   }
 
@@ -1575,7 +1587,7 @@ export class EditorStore {
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
     if (state.agenda !== undefined) {
-      const restored = reconcileAgenda(document, state.agenda, true, this.agendaRowsCache)
+      const restored = reconcileAgenda(document, state.agenda, true, this.agendaRowsCache, state.document)
       if (restored !== undefined) {
         const target = changeSiteFocus(state.document, document, state.location, () => true)
         const agenda =

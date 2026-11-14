@@ -25,13 +25,14 @@ export function reconcileAgenda(
   state: AgendaState,
   preservePresentation = false,
   cache?: AgendaRowsCache,
+  previousDocument = document,
 ): AgendaState | undefined {
   if (state.scopeParentId !== null && locateNode(document, state.scopeParentId) === undefined) return undefined
   let next = isValidLocation(document, state.origin.location)
     ? state
     : {
         ...state,
-        origin: { location: agendaOriginLocation(document, state), cursor: 0 },
+        origin: { location: agendaOriginLocation(document, state, previousDocument), cursor: 0 },
       }
   const active = activeAgendaOccurrence(state)
   if (active !== undefined) {

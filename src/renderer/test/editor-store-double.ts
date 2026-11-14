@@ -73,6 +73,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     summarize: vi.fn(),
     imageToTextAvailable: false,
     imageToText: vi.fn(),
+    dismissImageToTextStatus: vi.fn(),
     emojiHistory: new EmojiHistory(undefined, () => undefined),
     recentNodes: new RecentNodes(),
     searchOrigin: vi.fn((offset: number) => ({ nodeId: 'a', offset })),

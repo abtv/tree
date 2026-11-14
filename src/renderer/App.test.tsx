@@ -209,6 +209,50 @@ it.each(['insert', 'replace'])('preserves %s editing when background OCR complet
   }
 })
 
+it.each(['expiry', 'colon', 'palette'])(
+  'dismisses OCR feedback on %s while retaining persistent errors and mode',
+  async (action) => {
+    const store = await createSeededStore(
+      { roots: [{ id: 'root', text: 'Task', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+      async () => undefined,
+      { imageToText: async () => [] },
+    )
+    renderReact(<App store={store} initialVimEnabled={true} />)
+    await act(async () => {})
+    vi.useFakeTimers()
+    act(() => {
+      store.reportError(new Error('Persistent error'))
+      store.imageToText()
+    })
+
+    expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
+
+    if (action === 'expiry') {
+      act(() => vi.advanceTimersByTime(4000))
+      act(() => store.imageToText())
+      act(() => vi.advanceTimersByTime(4999))
+      expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+    } else {
+      fireEvent.keyDown(
+        document.activeElement!,
+        action === 'colon' ? { key: ':' } : { key: 'P', metaKey: true, shiftKey: true },
+      )
+      expect(screen.getByRole('combobox', { name: 'Command' })).toHaveFocus()
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    }
+
+    expect(screen.queryByText('Image to text: select an editable node with an image.')).toBeNull()
+    expect(screen.getByRole('alert')).toHaveTextContent('Persistent error')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+
+    act(() => store.imageToText())
+
+    expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
+  },
+)
+
 it('keeps update progress visible alongside completed OCR feedback', async () => {
   const store = await createSeededStore(
     { roots: [{ id: 'root', text: '', children: [] }] },

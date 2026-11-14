@@ -1,4 +1,5 @@
 import type { RecentNode } from '../application/recent-nodes'
+import { nodeSearchCompletionTerm } from '../domain/node-search-query'
 import { moveSuggestionIndex } from './completion-controller'
 
 interface SearchSource {
@@ -14,6 +15,7 @@ interface GlobalSearchSnapshot {
   readonly pending: boolean
   readonly selected: number
   readonly suggestions: readonly string[]
+  readonly completionQuery: string
   readonly suggestionIndex: number
 }
 
@@ -24,6 +26,7 @@ const closed: GlobalSearchSnapshot = {
   pending: false,
   selected: 0,
   suggestions: [],
+  completionQuery: '',
   suggestionIndex: 0,
 }
 
@@ -31,6 +34,9 @@ const closed: GlobalSearchSnapshot = {
 export class GlobalSearchSession {
   private snapshot = closed
   private composing = false
+  private completionAccepted = false
+  private selectionStart = 0
+  private selectionEnd = 0
   private generation = 0
   private cancelSearch: (() => void) | undefined
   private readonly listeners = new Set<() => void>()
@@ -47,6 +53,9 @@ export class GlobalSearchSession {
   public open(): void {
     this.cancel()
     this.composing = false
+    this.completionAccepted = false
+    this.selectionStart = 0
+    this.selectionEnd = 0
     this.set({ ...closed, items: this.source.recent() })
   }
 
@@ -58,16 +67,22 @@ export class GlobalSearchSession {
     return true
   }
 
-  public edit(query: string, completedTag = false): void {
+  public edit(query: string, completedTag = false, selectionStart = query.length, selectionEnd = selectionStart): void {
     if (this.snapshot.items === undefined) return
     this.cancel()
     const generation = this.generation
+    this.completionAccepted = completedTag
+    this.selectionStart = selectionStart
+    this.selectionEnd = selectionEnd
+    const completion = selectionStart === selectionEnd ? nodeSearchCompletionTerm(query, selectionStart) : undefined
     this.set({
       ...this.snapshot,
       query,
       selected: 0,
       suggestionIndex: 0,
-      suggestions: completedTag || this.composing ? [] : this.source.suggestions(query),
+      completionQuery: completion?.text ?? '',
+      suggestions:
+        completedTag || this.composing || completion === undefined ? [] : this.source.suggestions(completion.text),
       pending: query !== '',
     })
     if (query === '') {
@@ -81,7 +96,21 @@ export class GlobalSearchSession {
   }
 
   public refresh(): void {
-    this.edit(this.snapshot.query)
+    this.edit(this.snapshot.query, this.completionAccepted, this.selectionStart, this.selectionEnd)
+  }
+
+  public updateSelection(start: number, end = start): void {
+    if (this.snapshot.items === undefined || (start === this.selectionStart && end === this.selectionEnd)) return
+    this.completionAccepted = false
+    this.selectionStart = start
+    this.selectionEnd = end
+    const completion = start === end ? nodeSearchCompletionTerm(this.snapshot.query, start) : undefined
+    this.set({
+      ...this.snapshot,
+      completionQuery: completion?.text ?? '',
+      suggestionIndex: 0,
+      suggestions: this.composing || completion === undefined ? [] : this.source.suggestions(completion.text),
+    })
   }
 
   public beginComposition(): void {
@@ -89,9 +118,9 @@ export class GlobalSearchSession {
     this.dismissSuggestions()
   }
 
-  public endComposition(query: string): void {
+  public endComposition(query: string, selectionStart = query.length, selectionEnd = selectionStart): void {
     this.composing = false
-    this.edit(query)
+    this.edit(query, false, selectionStart, selectionEnd)
   }
 
   public dismissSuggestions(): void {
@@ -105,9 +134,19 @@ export class GlobalSearchSession {
     })
   }
 
-  public acceptSuggestion(index = this.snapshot.suggestionIndex): void {
+  public acceptSuggestion(index = this.snapshot.suggestionIndex): number | undefined {
     const tag = this.snapshot.suggestions[index]
-    if (tag !== undefined) this.edit(`${this.snapshot.query[0]}${tag}`, true)
+    const completion = nodeSearchCompletionTerm(this.snapshot.query, this.selectionStart)
+    if (tag !== undefined && completion !== undefined) {
+      const replacement = `${completion.text[0]}${tag}`
+      const caret = completion.start + replacement.length
+      this.edit(
+        `${this.snapshot.query.slice(0, completion.start)}${replacement}${this.snapshot.query.slice(completion.end)}`,
+        true,
+        caret,
+      )
+      return caret
+    }
   }
 
   public moveResult(direction: -1 | 1): void {

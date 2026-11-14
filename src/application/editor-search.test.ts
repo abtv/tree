@@ -187,7 +187,9 @@ it.each(['tree', 'agenda'] as const)(
     const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
     const scoped = (currentParentId: string, selectedNodeId: string): ReadySnapshot => {
       const location = { currentParentId, selectedNodeId }
-      return { ...state(), location, ...(kind === 'agenda' ? { agenda: openAgendaState(location, 0, 100) } : {}) }
+      const agenda =
+        kind === 'agenda' ? { ...openAgendaState(location, 0, 100), scopeParentId: currentParentId } : undefined
+      return { ...state(), location, ...(agenda === undefined ? {} : { agenda }) }
     }
     search.update(scoped('a', 'b'))
     search.begin({ nodeId: 'b', offset: 0 })

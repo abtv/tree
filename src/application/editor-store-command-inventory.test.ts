@@ -41,6 +41,7 @@ const exclusions: Record<string, string> = {
   registerPendingEditFinisher: 'Renderer edit lifecycle registration requires an input harness.',
   flushPersistence: 'Shutdown persistence lifecycle is covered by dedicated persistence tests.',
   reportError: 'Failure injection is covered by error and persistence-lock tests.',
+  dismissImageToTextStatus: 'Transient OCR feedback dismissal is covered by App timer and command-panel tests.',
   requestQuitWithoutSavingPrompt: 'Quit prompt lifecycle is covered by dedicated shutdown tests.',
   dismissQuitWithoutSavingPrompt: 'Quit prompt lifecycle is covered by dedicated shutdown tests.',
   initialize: 'Startup is performed by the property harness before command generation.',

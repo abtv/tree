@@ -190,7 +190,10 @@ describe('Agenda rows', () => {
         },
       ],
     }
-    const scoped = openAgendaState({ currentParentId: 'new-scope', selectedNodeId: 'new-match' }, 0, today)
+    const scoped = {
+      ...openAgendaState({ currentParentId: 'new-scope', selectedNodeId: 'new-match' }, 0, today),
+      scopeParentId: 'new-scope',
+    }
 
     const rows = cache.get(updated, scoped)
 

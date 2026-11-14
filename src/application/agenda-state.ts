@@ -85,7 +85,7 @@ export function agendaWeekDays(start: DayNumber): readonly DayNumber[] {
 export function openAgendaState(location: Location, cursor: number, today: DayNumber): AgendaState {
   return {
     origin: { location, cursor },
-    scopeParentId: location.currentParentId,
+    scopeParentId: null,
     today,
     weekStart: agendaWeekStart(today),
     selectedKey: dayKey(today),

@@ -1741,8 +1741,8 @@ body.node-drag-invalid * {
   top: var(--search-top);
   left: 50%;
   transform: translateX(-50%);
-  width: min(1040px, max(680px, 50vw), calc(100vw - 48px));
-  max-height: min(560px, calc(100vh - var(--search-top) - 40px));
+  width: min(1040px, max(680px, 80vw), calc(100vw - 48px));
+  max-height: min(80vh, calc(100vh - var(--search-top) - 40px));
   overflow: hidden;
   display: flex;
   flex-direction: column;

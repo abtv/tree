@@ -113,10 +113,8 @@ export function GlobalSearchPopup({
       }),
     [store],
   )
-  const { items, selected, query, completedQuery, suggestions, suggestionIndex, pending } = useSyncExternalStore(
-    session.subscribe,
-    session.getSnapshot,
-  )
+  const { items, selected, query, completedQuery, completionQuery, suggestions, suggestionIndex, pending } =
+    useSyncExternalStore(session.subscribe, session.getSnapshot)
   const [windowTop, setWindowTop] = useState(0)
   const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
   const [measurement, setMeasurement] = useState<{
@@ -171,13 +169,17 @@ export function GlobalSearchPopup({
     setWindowTop(0)
     if (panel.current) panel.current.scrollTop = 0
   }
-  const changeQuery = (value: string): void => {
+  const changeQuery = (value: string, start: number, end: number): void => {
     resetScroll()
-    session.edit(value)
+    session.edit(value, false, start, end)
   }
   const acceptSuggestion = (index?: number): void => {
     resetScroll()
-    session.acceptSuggestion(index)
+    let caret: number | undefined
+    flushSync(() => {
+      caret = session.acceptSuggestion(index)
+    })
+    if (caret !== undefined) input.current?.setSelectionRange(caret, caret)
   }
   const visit = (index?: number): void => {
     const id = session.takeResult(index)
@@ -453,19 +455,40 @@ export function GlobalSearchPopup({
         placeholder="Search text, #tag, @person or &event"
         value={query}
         data-editor-focus-borrow=""
-        onChange={(event) => changeQuery(event.target.value)}
+        onChange={(event) => {
+          const target = event.currentTarget
+          changeQuery(
+            target.value,
+            target.selectionStart ?? target.value.length,
+            target.selectionEnd ?? target.value.length,
+          )
+        }}
+        onSelect={(event) => {
+          const target = event.currentTarget
+          session.updateSelection(
+            target.selectionStart ?? target.value.length,
+            target.selectionEnd ?? target.value.length,
+          )
+        }}
         onCompositionStart={() => {
           session.beginComposition()
         }}
         onCompositionEnd={(event) => {
           resetScroll()
-          session.endComposition(event.currentTarget.value)
+          const target = event.currentTarget
+          session.endComposition(
+            target.value,
+            target.selectionStart ?? target.value.length,
+            target.selectionEnd ?? target.value.length,
+          )
         }}
       />
       {suggestions.length > 0 && (
         <>
-          <div className="node-search-section-title node-search-tags-heading">{tagGroupLabel(tagPrefix(query)!)}</div>
-          <div className="node-search-tags" role="listbox" aria-label={tagGroupLabel(tagPrefix(query)!)}>
+          <div className="node-search-section-title node-search-tags-heading">
+            {tagGroupLabel(tagPrefix(completionQuery)!)}
+          </div>
+          <div className="node-search-tags" role="listbox" aria-label={tagGroupLabel(tagPrefix(completionQuery)!)}>
             {suggestions.map((name, index) => (
               <div
                 key={name}
@@ -483,7 +506,7 @@ export function GlobalSearchPopup({
                   if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
                 }}
               >
-                <TagSuggestionText name={name} query={query} />
+                <TagSuggestionText name={name} query={completionQuery} />
               </div>
             ))}
           </div>

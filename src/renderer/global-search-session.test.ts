@@ -28,6 +28,71 @@ function fixture() {
 }
 
 describe('global Search session', () => {
+  it('keeps accepted completion dismissed through document refresh until editing or moving the caret', () => {
+    const { session, source } = fixture()
+    source.suggestions.mockReturnValue(['work', 'worker'])
+    session.edit('task #w next', false, 7)
+    session.acceptSuggestion()
+
+    session.refresh()
+
+    expect(session.getSnapshot()).toMatchObject({ query: 'task #work next', suggestions: [] })
+
+    session.updateSelection(8)
+
+    expect(session.getSnapshot().suggestions).toEqual(['work', 'worker'])
+    session.acceptSuggestion()
+    session.edit('task #work next', false, 8)
+
+    expect(session.getSnapshot().suggestions).toEqual(['work', 'worker'])
+  })
+
+  it.each(['#', '@', '&'])('completes a %s term anywhere while preserving surrounding terms and spacing', (prefix) => {
+    const { session, source } = fixture()
+    source.suggestions.mockReturnValue(['alex', 'alexander'])
+    const query = `task  ${prefix}al\tother`
+    session.edit(query)
+    const calls = source.search.mock.calls.length
+
+    session.updateSelection(8)
+
+    expect(source.suggestions).toHaveBeenLastCalledWith(`${prefix}al`)
+    expect(session.getSnapshot().completionQuery).toBe(`${prefix}al`)
+    expect(source.search).toHaveBeenCalledTimes(calls)
+
+    session.refresh()
+    session.acceptSuggestion(1)
+
+    expect(session.getSnapshot()).toMatchObject({ query: `task  ${prefix}alexander\tother`, suggestions: [] })
+    session.updateSelection(16)
+    expect(session.getSnapshot().suggestions).toEqual([])
+
+    session.edit(`${prefix}al task`, false, 1)
+    expect(session.acceptSuggestion()).toBe(5)
+    expect(session.getSnapshot().query).toBe(`${prefix}alex task`)
+  })
+
+  it('suppresses completion during text selection and composition, then uses the committed caret', () => {
+    const { session, source } = fixture()
+    source.suggestions.mockReturnValue(['alex'])
+    session.edit('task @al next', false, 6)
+
+    session.updateSelection(6, 8)
+
+    expect(session.getSnapshot().suggestions).toEqual([])
+
+    session.beginComposition()
+    session.updateSelection(7)
+
+    expect(session.getSnapshot().suggestions).toEqual([])
+
+    session.endComposition('task @al next', 7)
+
+    expect(session.getSnapshot().completionQuery).toBe('@al')
+    expect(session.acceptSuggestion()).toBe(10)
+    expect(session.getSnapshot().query).toBe('task @alex next')
+  })
+
   it.each(['s', 'se', 'second', '😀'])(
     'keeps completed results while refining to %s and forbids stale selection until replacement',
     (query) => {

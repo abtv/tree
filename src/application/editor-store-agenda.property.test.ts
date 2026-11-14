@@ -41,7 +41,8 @@ it('generated Agenda text edits round-trip through history with valid selection 
         const assertState = () => {
           const state = store.getSnapshot() as ReadySnapshot
 
-          expect(state.location.currentParentId).toBe('scope')
+          expect(state.agenda!.scopeParentId).toBeNull()
+          expect(state.agenda!.origin.location.currentParentId).toBe('scope')
           expect(store.getAgendaRows().some((row) => row.key === state.agenda!.selectedKey)).toBe(true)
 
           return state

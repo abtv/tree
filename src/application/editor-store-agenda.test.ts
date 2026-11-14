@@ -371,7 +371,8 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
 
   expect(ready(store).document).toBe(original.document)
   expect(ready(store).agenda!.selectedKey).toBe(key)
-  expect(ready(store).location.currentParentId).toBe('scope')
+  expect(ready(store).location.currentParentId).toBeNull()
+  expect(ready(store).agenda!.origin.location.currentParentId).toBe('scope')
 
   await store.flushPersistence()
 
@@ -380,7 +381,7 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
 })
 
 // @requirement PRODUCT.md §23.8
-it('history preserves Agenda day folds and focus for hidden or out-of-scope changes', async () => {
+it('history follows changes outside the Tree origin and preserves focus for folded changes', async () => {
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.editText('outside', '2026-10-08 Changed outside')
@@ -392,14 +393,14 @@ it('history preserves Agenda day folds and focus for hidden or out-of-scope chan
 
   store.undo()
 
-  expect(ready(store).agenda).toBe(before.agenda)
-  expect(ready(store).location).toEqual(before.location)
-  expect(ready(store).focus).toBe(before.focus)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today}:outside`)
+  expect(ready(store).agenda!.origin).toBe(before.agenda!.origin)
+  expect(ready(store).location.selectedNodeId).toBe('outside')
 
   store.redo()
 
-  expect(ready(store).agenda).toBe(before.agenda)
-  expect(ready(store).focus).toBe(before.focus)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today}:outside`)
+  expect(ready(store).focus.nodeId).toBe('outside')
 
   store.editText('match', '2026-10-09 Changed')
   store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
@@ -410,7 +411,8 @@ it('history preserves Agenda day folds and focus for hidden or out-of-scope chan
   expect(ready(store).agenda!.collapsed).toBe(folded.agenda!.collapsed)
   expect(ready(store).agenda!.selectedKey).toBe(folded.agenda!.selectedKey)
   expect(ready(store).focus).toBe(folded.focus)
-  expect(ready(store).location.currentParentId).toBe('scope')
+  expect(ready(store).location.currentParentId).toBeNull()
+  expect(ready(store).agenda!.origin.location.currentParentId).toBe('scope')
 
   await store.flushPersistence()
 })
@@ -434,7 +436,7 @@ it('clears a pin when its day is selected, maintaining a valid visible selection
   await store.flushPersistence()
 })
 
-it('closes Agenda when its scope disappears and normalizes a deleted origin on close', async () => {
+it('keeps global Agenda open when its originating parent disappears and normalizes the return location', async () => {
   const { store } = await agendaHarness()
   store.createSiblingOrFirstChild(0)
   store.selectNode('unused', 0)
@@ -442,11 +444,15 @@ it('closes Agenda when its scope disappears and normalizes a deleted origin on c
   store.enter()
   store.openAgenda()
 
-  expect(ready(store).agenda!.scopeParentId).toBe('unused')
+  expect(ready(store).agenda!.scopeParentId).toBeNull()
 
   store.undo()
 
-  expect(ready(store).agenda).toBeUndefined()
+  expect(ready(store).agenda!.scopeParentId).toBeNull()
+  expect(ready(store).agenda!.origin.location).toEqual({ currentParentId: null, selectedNodeId: 'scope' })
+
+  store.closeAgenda()
+
   expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'scope' })
   expect(ready(store).focus.nodeId).toBe('scope')
 
@@ -528,7 +534,7 @@ it('uses the selected day for history proximity and retains focus for path-only 
 
   expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 2}:match`)
   expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
-  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'match' })
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'match' })
 
   store.closeAgenda()
   store.editText('context', 'Modified context')
@@ -540,7 +546,7 @@ it('uses the selected day for history proximity and retains focus for path-only 
 
   expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 3}:other`)
   expect(activeAgendaOccurrence(ready(store).agenda!)).toEqual({ nodeId: 'other', day: today + 3 })
-  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'other' })
+  expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'other' })
   expect(ready(store).focus).toBe(before)
 
   await store.flushPersistence()
@@ -632,15 +638,14 @@ it.each([null, 'scope'] as const)(
 
     store.openAgenda(5)
 
-    expect(ready(store)).toMatchObject({ agenda: { scopeParentId: parent, today, selectedKey: `day:${today}` } })
+    expect(ready(store)).toMatchObject({ agenda: { scopeParentId: null, today, selectedKey: `day:${today}` } })
 
     const nodes = store
       .getAgendaRows()
       .filter((row) => row.kind === 'node')
       .map((row) => row.nodeId)
 
-    expect(nodes.includes('outside')).toBe(parent === null)
-    expect(nodes.includes('scope')).toBe(parent === null)
+    expect(nodes).toEqual(['scope', 'outside', 'match', 'other'])
 
     services.today = () => today + 1
     const opened = ready(store)

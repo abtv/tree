@@ -8,6 +8,20 @@ export interface NodeSearchTerm {
   readonly valid: boolean
 }
 
+/** Locate the marker term at the caret, retaining the surrounding query. */
+export function nodeSearchCompletionTerm(
+  query: string,
+  caret = query.length,
+): { readonly start: number; readonly end: number; readonly text: string } | undefined {
+  let start = Math.max(0, Math.min(caret, query.length))
+  let end = start
+  while (start > 0 && !/\s/u.test(query[start - 1]!)) start--
+  while (end < query.length && !/\s/u.test(query[end]!)) end++
+
+  const text = query.slice(start, end)
+  return tagPrefix(text) === undefined ? undefined : { start, end, text }
+}
+
 /** Prepare each term independently so an uppercase term does not change its neighbours. */
 export function* prepareNodeSearch(query: string): Generator<undefined, readonly NodeSearchTerm[]> {
   const terms: NodeSearchTerm[] = []
