@@ -28,7 +28,7 @@ for (const vimEnabled of [false, true]) {
         document.addEventListener(
           'keydown',
           (event) => {
-            if (event.key !== 'e') return
+            if (event.key !== 'E') return
             requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
           },
           true,
@@ -38,7 +38,7 @@ for (const vimEnabled of [false, true]) {
         name: prefix === '#' ? 'Tag suggestions' : prefix === '@' ? 'People suggestions' : 'Events suggestions',
       })
       for (let index = 0; index < 30; index++) {
-        await window.keyboard.press('e')
+        await window.keyboard.press('E')
 
         await expect(popup.getByRole('option')).toHaveText([`${prefix}Unique`])
         await window.waitForFunction(

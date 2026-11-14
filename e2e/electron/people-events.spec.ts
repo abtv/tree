@@ -59,22 +59,22 @@ describeForEachEditingMode('People and events', ({ mode, screenshotName }) => {
 
       await window.keyboard.press('Meta+z')
 
-      await expect.poll(text).toBe(`${prefix}@AS`)
+      await expect.poll(text).toBe(`${prefix}@as`)
       await expect(people).toHaveCount(0)
 
       await setCursor(input, prefix.length + 3)
       await window.keyboard.type(' &w')
       const events = window.getByRole('listbox', { name: 'Events suggestions' })
 
-      await expect.poll(text).toBe(`${prefix}@AS &w`)
+      await expect.poll(text).toBe(`${prefix}@as &w`)
       await expect(events.getByRole('option')).toHaveText(['&weekly-review', '&workshop'])
 
       await window.keyboard.press('ArrowDown')
       await window.keyboard.press('Enter')
       await window.keyboard.type(' #topic')
 
-      await expect.poll(text).toBe(`${prefix}@AS &workshop #topic`)
-      await expect(input.locator('.tag-text')).toHaveText(['@AS', '&workshop', '#topic'])
+      await expect.poll(text).toBe(`${prefix}@as &workshop #topic`)
+      await expect(input.locator('.tag-text')).toHaveText(['@as', '&workshop', '#topic'])
       if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
 
       for (const appearance of ['light', 'dark'] as const) {

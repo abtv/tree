@@ -14,8 +14,16 @@ import { calculateTextChange, insertPosition } from './vim-text-commands'
 import type { VimTextChange } from './vim-keyboard-types'
 
 // A single UTF-16 code unit, so `key.length === 1` holds for every generated character key.
-const characterKey = fc.integer({ min: 0x20, max: 0x7e }).map((code) => String.fromCharCode(code))
+const characterKey = fc.oneof(
+  fc.integer({ min: 0x20, max: 0x7e }).map((code) => String.fromCharCode(code)),
+  fc.constantFrom('İ', 'Ж', 'Σ'),
+)
 const replaceKey = fc.oneof(fc.constant('Backspace'), characterKey, fc.string({ minLength: 2, maxLength: 3 }))
+
+function expectedTypedKey(baseline: string, position: number, typed: string, key: string): string {
+  const precedingWord = (baseline.slice(0, position) + typed).split(/\s/u).at(-1)!
+  return /^[#@&][\p{L}\p{Nd}_-]*$/u.test(precedingWord) && /^\p{L}$/u.test(key) ? key.toLowerCase() : key
+}
 
 it('consumes each pending session at most once without disturbing the other session', () => {
   fc.assert(
@@ -168,16 +176,16 @@ it('keeps the incremental Replace working text equal to the splice its commit wo
       (baseline, seed, keys) => {
         const position = seed % (baseline.length + 1)
         const session = { nodeId: 'a', baseline, position, typed: '' }
-        let expected = ''
+        const emitted: string[] = []
         for (const key of keys) {
           const typedBefore = session.typed
 
           const result = applyReplaceKey(session, key)
           if (key === 'Backspace') {
-            expected = expected.slice(0, -1)
+            emitted.pop()
             if (result === undefined) throw new Error('expected Backspace to be consumed')
           } else if (key.length === 1) {
-            expected += key
+            emitted.push(expectedTypedKey(baseline, position, emitted.join(''), key))
             if (result === undefined) throw new Error('expected a character key to be consumed')
           } else {
             expect(result).toBeUndefined()
@@ -186,21 +194,24 @@ it('keeps the incremental Replace working text equal to the splice its commit wo
             continue
           }
 
+          const expected = emitted.join('')
+
           expect(session.typed).toBe(expected)
 
-          const replaced = Math.min(expected.length, baseline.length - position)
+          const replaced = Math.min(emitted.length, baseline.length - position)
 
           expect(result?.workingText).toBe(baseline.slice(0, position) + expected + baseline.slice(position + replaced))
           expect(result?.cursor).toBe(position + expected.length)
         }
 
+        const expected = emitted.join('')
         const commit = resolveReplaceCommit(session)
         if (expected === '') {
           expect(commit).toBeUndefined()
 
           return
         }
-        const replaced = Math.min(expected.length, baseline.length - position)
+        const replaced = Math.min(emitted.length, baseline.length - position)
 
         expect(commit?.finalText).toBe(baseline.slice(0, position) + expected + baseline.slice(position + replaced))
         expect(commit?.rawCursor).toBe(position + expected.length)
@@ -220,10 +231,10 @@ it('replaces a selected range once, overwrites its suffix, and restores the base
         const position = startSeed % (baseline.length + 1)
         const selectionEnd = position + (endSeed % (baseline.length - position + 1))
         const session = { nodeId: 'a', baseline, position, selectionEnd, typed: '' }
-        let typed = ''
+        const emitted: string[] = []
         for (const key of keys) {
-          if (key === 'Backspace') typed = typed.slice(0, -1)
-          else if (key.length === 1) typed += key
+          if (key === 'Backspace') emitted.pop()
+          else if (key.length === 1) emitted.push(expectedTypedKey(baseline, position, emitted.join(''), key))
 
           const result = applyReplaceKey(session, key)
           if (key !== 'Backspace' && key.length !== 1) {
@@ -231,8 +242,11 @@ it('replaces a selected range once, overwrites its suffix, and restores the base
 
             continue
           }
+          const typed = emitted.join('')
           const end =
-            typed === '' ? position : Math.min(baseline.length, Math.max(position + 1, selectionEnd) + typed.length - 1)
+            typed === ''
+              ? position
+              : Math.min(baseline.length, Math.max(position + 1, selectionEnd) + emitted.length - 1)
           const expected = baseline.slice(0, position) + typed + baseline.slice(end)
 
           expect(result).toEqual({ workingText: expected, cursor: position + typed.length })

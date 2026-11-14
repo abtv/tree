@@ -24,6 +24,42 @@ import type { NodeForest } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { VimRegister } from './vim-keyboard-types'
 
+// @requirement PRODUCT.md §20.13
+it.each(['#', '@', '&'])('lowercases Replace typing after %s while Backspace restores old spelling', (prefix) => {
+  const session = { nodeId: 'n', baseline: `${prefix}OldName`, position: 4, typed: '' }
+
+  expect(applyReplaceKey(session, 'W')).toEqual({ workingText: `${prefix}Oldwame`, cursor: 5 })
+  expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: `${prefix}OldName`, cursor: 4 })
+  expect(applyReplaceKey(session, 'Y')).toEqual({ workingText: `${prefix}Oldyame`, cursor: 5 })
+  expect(resolveReplaceCommit(session)?.finalText).toBe(`${prefix}Oldyame`)
+})
+
+// @requirement PRODUCT.md §20.13
+it('lowercases Replace typing after a bare prefix and after a newly typed prefix', () => {
+  const existing = { nodeId: 'n', baseline: '@', position: 1, typed: '' }
+  const fresh = { nodeId: 'n', baseline: '', position: 0, typed: '' }
+
+  expect(applyReplaceKey(existing, 'A')).toEqual({ workingText: '@a', cursor: 2 })
+  expect(applyReplaceKey(fresh, '#')).toEqual({ workingText: '#', cursor: 1 })
+  expect(applyReplaceKey(fresh, 'A')).toEqual({ workingText: '#a', cursor: 2 })
+})
+
+// @requirement PRODUCT.md §20.13
+it('keeps Replace overwrite width and Backspace tied to the original Unicode input', () => {
+  const session = { nodeId: 'n', baseline: '#XX End', position: 1, typed: '' }
+
+  expect(applyReplaceKey(session, 'İ')).toEqual({ workingText: '#i\u0307X End', cursor: 3 })
+  expect(resolveReplaceCommit(session)).toEqual({
+    finalText: '#i\u0307X End',
+    replacedStart: 1,
+    replacedEnd: 2,
+    rawCursor: 3,
+  })
+  expect(applyReplaceKey(session, 'W')).toEqual({ workingText: '#i\u0307W End', cursor: 4 })
+  expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: '#i\u0307X End', cursor: 3 })
+  expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: '#XX End', cursor: 1 })
+})
+
 describe('diffTypedText', () => {
   it('reports no change when the final text matches the baseline', () => {
     expect(diffTypedText('abc', 'abc', 1)).toEqual({ insertedText: '', insertOffset: 2, deleteCount: 0 })

@@ -21,6 +21,13 @@ Agenda direct matches reuse Tree text commands. Normal `Enter` opens the hyperli
 
 ## Mode and command families
 
+Typed letters inside marker names follow PRODUCT §20.13 in Insert and Replace.
+**Vim divergence:** the owner requested lowercase typing for `#`, `@`, and `&` names.
+Existing text, pasted or put text, accepted suggestions and explicit case commands keep
+their spelling. `src/domain/tags.test.ts`, `src/renderer/marker-typing.test.ts`,
+`src/renderer/vim-edit-session.test.ts` and `e2e/electron/tag-completion.spec.ts`
+cover the rule, Unicode overwrite width and native editor integration.
+
 `Ctrl+L` toggles visible-node line numbers in every editing mode (PRODUCT §2.1).
 **Vim divergence:** the owner requested this application shortcut instead of Vim's
 Normal-mode screen redraw. It preserves pending commands, selection and editing

@@ -7,6 +7,8 @@ import {
   setAgendaToday,
   setCursor,
   test,
+  unlockSystemClipboard,
+  writeClipboardText,
 } from './fixtures'
 
 describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
@@ -52,6 +54,120 @@ describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
   })
 
   for (const view of ['Tree', 'Agenda'] as const) {
+    // @requirement PRODUCT.md §20.13
+    test(`lowercases native marker typing while preserving old and pasted names in ${view}`, async ({
+      userDataDir,
+    }, testInfo) => {
+      const prefix = view === 'Tree' ? '' : '2026-10-08 '
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'n', text: prefix, children: [] },
+            { id: 'old', text: '#OldName @OldPerson &OldMeeting', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'n' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setAgendaToday(window)
+      if (view === 'Agenda') {
+        await window.keyboard.press('Meta+p')
+        await window.locator('.agenda-row[data-node-id="n"]').click()
+      }
+      const input = window.getByRole('textbox', { name: view === 'Tree' ? 'Node 1' : 'Agenda node n', exact: true })
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+      }
+      await setCursor(input, prefix.length)
+      if (view === 'Tree') {
+        await window.keyboard.type('#')
+        await window.keyboard.insertText('İ')
+
+        await expect(input).toHaveText('#i\u0307')
+
+        await window.keyboard.type('X')
+
+        await expect(input).toHaveText('#i\u0307X')
+
+        await window.keyboard.press('Meta+a')
+      }
+      await window.keyboard.type('#Work @')
+      const composition = await window.context().newCDPSession(window)
+
+      await composition.send('Input.imeSetComposition', { text: 'A', selectionStart: 1, selectionEnd: 1 })
+
+      await expect(input).toHaveText(`${prefix}#work @A`)
+
+      await composition.send('Input.insertText', { text: 'A' })
+
+      await expect(input).toHaveText(`${prefix}#work @a`)
+
+      await composition.detach()
+      await window.keyboard.type('nna &Meeting OUTSIDE ')
+
+      await expect(input).toHaveText(`${prefix}#work @anna &meeting OUTSIDE `)
+      await expect(input).toBeFocused()
+
+      await writeClipboardText(app, '@Pasted')
+      await window.keyboard.press('Meta+v')
+
+      await expect(input).toHaveText(`${prefix}#work @anna &meeting OUTSIDE @Pasted`)
+      unlockSystemClipboard()
+
+      const position = prefix.length + '#work @anna &meeting OUTSIDE @P'.length
+      await setCursor(input, position)
+      await window.keyboard.press('Shift+ArrowRight')
+      await window.keyboard.type('W')
+      await window.keyboard.type('X')
+
+      await expect(input).toHaveText(`${prefix}#work @anna &meeting OUTSIDE @Pwxsted`)
+      await expect(input).toBeFocused()
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`lowercase-${view}.png`)) })
+
+      if (view === 'Tree')
+        await expect(window.getByRole('textbox', { name: 'Node 2', exact: true })).toHaveText(
+          '#OldName @OldPerson &OldMeeting',
+        )
+
+      if (mode === 'vim') {
+        await window.keyboard.press('Escape')
+        await setCursor(input, position)
+        await window.keyboard.press('R')
+        await window.keyboard.type('Z')
+        await window.keyboard.press('Backspace')
+        await window.keyboard.type('Y')
+        await window.keyboard.press('Escape')
+
+        await expect(input).toHaveText(`${prefix}#work @anna &meeting OUTSIDE @Pyxsted`)
+
+        await window.keyboard.press('u')
+
+        await expect(input).toHaveText(`${prefix}#work @anna &meeting OUTSIDE @Pwxsted`)
+
+        if (view === 'Tree') {
+          await setCursor(input, 1)
+          await window.keyboard.press('R')
+          await input.dispatchEvent('keydown', { key: 'İ' })
+
+          await expect(input).toHaveText('#i\u0307ork @anna &meeting OUTSIDE @Pwxsted')
+
+          await window.keyboard.press('Backspace')
+
+          await expect(input).toHaveText('#work @anna &meeting OUTSIDE @Pwxsted')
+
+          await input.dispatchEvent('keydown', { key: 'İ' })
+          await window.keyboard.press('Escape')
+
+          await expect(input).toHaveText('#i\u0307ork @anna &meeting OUTSIDE @Pwxsted')
+
+          await window.keyboard.press('u')
+
+          await expect(input).toHaveText('#work @anna &meeting OUTSIDE @Pwxsted')
+        }
+      }
+    })
+
     // @requirement PRODUCT.md §20.13
     test(`highlights literal tags and completes from the whole document in ${view}`, async ({
       userDataDir,
@@ -123,11 +239,11 @@ describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
       await window.keyboard.type(' #New_2026-x ')
 
       await expect(popup).toHaveCount(0)
-      await expect(input.locator('.tag-text')).toHaveText(['#rocket', '#W', '#New_2026-x'])
+      await expect(input.locator('.tag-text')).toHaveText(['#rocket', '#w', '#new_2026-x'])
 
       await window.keyboard.type('#New')
 
-      await expect(popup.getByRole('option')).toHaveText(['#New_2026-x'])
+      await expect(popup.getByRole('option')).toHaveText(['#new_2026-x'])
 
       for (const appearance of ['light', 'dark'] as const) {
         await window.emulateMedia({ colorScheme: appearance })
@@ -135,13 +251,13 @@ describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
       }
       await window.keyboard.press('Enter')
 
-      await expect.poll(text).toBe(`${prefix}#rocket #W #New_2026-x #New_2026-x`)
+      await expect.poll(text).toBe(`${prefix}#rocket #w #new_2026-x #new_2026-x`)
       await expect(input).toBeFocused()
       if (mode === 'vim') await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
 
       await window.keyboard.type('!')
 
-      await expect.poll(text).toBe(`${prefix}#rocket #W #New_2026-x #New_2026-x!`)
+      await expect.poll(text).toBe(`${prefix}#rocket #w #new_2026-x #new_2026-x!`)
 
       // Accept from a bare hash, including when the replacement itself introduces decoration.
       if (view === 'Tree') {

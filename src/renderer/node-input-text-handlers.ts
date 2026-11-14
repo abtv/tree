@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import { reconcileLinkTextEdit, type LinkRange, type TreeNode } from '../domain/document'
+import { normalizeTypedInput } from './typed-marker-input'
 import type { NodeInputBindings } from './NodeInput'
 import type { PendingCaret } from './node-input-types'
 import { getCaret, readEditableContent } from './editor-dom'
@@ -41,10 +42,19 @@ export function createTextEditHandlers(
   } = deps
   return {
     onTextChange: (event) => {
-      const text = event.currentTarget.value
       // Replacing the textarea would cancel a native composition and orphan its compositionend,
       // so link recognition waits for the first edit after the composition.
-      const composingNow = composing || (event.nativeEvent as Partial<InputEvent> | undefined)?.isComposing === true
+      const native = event.nativeEvent as Partial<InputEvent> | undefined
+      const composingNow = composing || native?.isComposing === true
+      const { text, cursor } = normalizeTypedInput(
+        event.currentTarget.value,
+        event.currentTarget.selectionStart,
+        !composingNow && native?.inputType === 'insertText' ? native.data : undefined,
+      )
+      if (text !== event.currentTarget.value) {
+        event.currentTarget.value = text
+        event.currentTarget.setSelectionRange(cursor, cursor)
+      }
       // A textarea holds a node without links, so a link can only appear here when typing completes a URL.
       const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text)
       if (composingNow || edit.links.length === 0) {
@@ -55,16 +65,22 @@ export function createTextEditHandlers(
       // the caret on the new element once it is mounted.
       schedulePendingCaret({
         nodeId: node.id,
-        cursor: event.currentTarget.selectionStart,
+        cursor,
         refocus: true,
       })
       store.editContent(node.id, text, edit.links, edit.createsNewLink)
     },
     onContentInput: (event: FormEvent<HTMLElement>) => {
-      const cursor = getCaret(event.currentTarget)
       const content = readEditableContent(event.currentTarget)
       const agendaInput = event.currentTarget.closest('.agenda-row') !== null
-      const composingNow = composing || (event.nativeEvent as Partial<InputEvent> | undefined)?.isComposing === true
+      const native = event.nativeEvent as Partial<InputEvent> | undefined
+      const composingNow = composing || native?.isComposing === true
+      const { text, cursor } = normalizeTypedInput(
+        content.text,
+        getCaret(event.currentTarget),
+        !composingNow && native?.inputType === 'insertText' ? native.data : undefined,
+        content.links,
+      )
       if (!agendaInput || !composingNow)
         schedulePendingCaret({
           nodeId: node.id,
@@ -76,9 +92,9 @@ export function createTextEditHandlers(
         pendingLinkDraft.current?.nodeId === node.id
           ? currentLinkDraft(node.text, pendingLinkDraft.current.range)
           : undefined
-      const edit = reconcileLinkTextEdit(node.text, node.links ?? [], content.text, draft)
+      const edit = reconcileLinkTextEdit(node.text, node.links ?? [], text, draft)
       pendingLinkDraft.current = edit.draft === undefined ? undefined : { nodeId: node.id, range: edit.draft }
-      store.editContent(node.id, content.text, edit.links, edit.createsNewLink)
+      store.editContent(node.id, text, edit.links, edit.createsNewLink)
     },
     onContentChange: (event: FormEvent<HTMLElement>) => {
       const text = event.currentTarget.textContent ?? ''
@@ -91,23 +107,32 @@ export function createTextEditHandlers(
       store.editContent(node.id, text, edit.links, edit.createsNewLink)
     },
     onCompositionEnd: (event) => {
+      const input = event.currentTarget
+      const content =
+        input instanceof HTMLTextAreaElement ? { text: input.value, links: [] } : readEditableContent(input)
+      const normalized = normalizeTypedInput(content.text, getCaret(input), event.data, content.links)
+      if (normalized.text !== content.text) {
+        if (input instanceof HTMLTextAreaElement) {
+          input.value = normalized.text
+          input.setSelectionRange(normalized.cursor, normalized.cursor)
+        }
+        schedulePendingCaret({ nodeId: node.id, input, cursor: normalized.cursor, refocus: true })
+        const edit = reconcileLinkTextEdit(node.text, node.links ?? [], normalized.text)
+        store.editContent(node.id, normalized.text, edit.links, edit.createsNewLink)
+      }
       if (event.currentTarget.closest('.agenda-row') !== null)
         schedulePendingCaret({
           nodeId: node.id,
           input: event.currentTarget,
-          cursor: getCaret(event.currentTarget),
+          cursor: normalized.cursor,
           refocus: true,
         })
       setComposing(false)
       if (getMode() === 'replace') {
-        const baseline =
-          event.currentTarget instanceof HTMLTextAreaElement
-            ? event.currentTarget.value
-            : readEditableContent(event.currentTarget).text
         beginReplaceSession(session, {
           nodeId: node.id,
-          baseline,
-          position: getCaret(event.currentTarget),
+          baseline: normalized.text,
+          position: normalized.cursor,
         })
       }
     },

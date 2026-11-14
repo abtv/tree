@@ -1,5 +1,6 @@
 import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import { cloneNode, type TreeNode } from '../domain/document'
+import { lowercaseTypedMarkerText } from '../domain/tags'
 import type { VimRegister, VimTextChange } from './vim-keyboard-types'
 
 export interface VimTextDiff {
@@ -40,6 +41,7 @@ export function resolveReplaceCommit(session: {
   baseline: string
   position: number
   typed: string
+  typedKeyLengths?: number[]
   selectionEnd?: number
 }): VimReplaceCommit | undefined {
   if (session.typed === '') return undefined
@@ -66,14 +68,19 @@ export interface VimReplaceSession {
   baseline: string
   position: number
   typed: string
+  /** Emitted UTF-16 lengths per key, allocated only when lowercasing expands a character. */
+  typedKeyLengths?: number[]
   /** A pointer-selected word is replaced by the first character, before overwrite continues. */
   selectionEnd?: number
 }
 
-function replaceLength(session: Pick<VimReplaceSession, 'baseline' | 'position' | 'typed' | 'selectionEnd'>): number {
+function replaceLength(
+  session: Pick<VimReplaceSession, 'baseline' | 'position' | 'typed' | 'typedKeyLengths' | 'selectionEnd'>,
+): number {
   if (session.typed === '') return 0
   const selected = (session.selectionEnd ?? session.position) - session.position
-  return Math.min(session.typed.length + Math.max(0, selected - 1), session.baseline.length - session.position)
+  const keys = session.typedKeyLengths?.length ?? session.typed.length
+  return Math.min(keys + Math.max(0, selected - 1), session.baseline.length - session.position)
 }
 
 /**
@@ -174,9 +181,20 @@ export function applyReplaceKey(
   key: string,
 ): { workingText: string; cursor: number } | undefined {
   if (session === undefined) return undefined
-  if (key === 'Backspace') session.typed = session.typed.slice(0, -1)
-  else if (key.length === 1) session.typed += key
-  else return undefined
+  if (key === 'Backspace') session.typed = session.typed.slice(0, -(session.typedKeyLengths?.pop() ?? 1))
+  else if (key.length === 1) {
+    const previousLength = session.typed.length
+    session.typed += key
+    session.typedKeyLengths?.push(1)
+    const draft = resolveReplaceCommit(session)!
+    const normalized = lowercaseTypedMarkerText(draft.finalText, draft.rawCursor - key.length, draft.rawCursor)
+    const emittedLength = key.length + normalized.length - draft.finalText.length
+    if (emittedLength !== key.length && session.typedKeyLengths === undefined)
+      session.typedKeyLengths = [...Array<number>(previousLength).fill(1), emittedLength]
+    else if (session.typedKeyLengths !== undefined)
+      session.typedKeyLengths[session.typedKeyLengths.length - 1] = emittedLength
+    session.typed = normalized.slice(session.position, draft.rawCursor + normalized.length - draft.finalText.length)
+  } else return undefined
   // Mutation triage: a larger bound only matters once it exceeds the remaining baseline, where
   // `slice` past the end is already empty, so the working text is unchanged.
   const replaced = replaceLength(session)

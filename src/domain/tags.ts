@@ -17,6 +17,32 @@ export function tagGroupLabel(prefix: TagPrefix): string {
   return prefix === '@' ? 'People' : prefix === '&' ? 'Events' : 'Tags'
 }
 
+/** Normalize only newly typed text, preserving every character outside the inserted range. */
+export function lowercaseTypedMarkerText(
+  text: string,
+  start: number,
+  end: number,
+  excluded: readonly DateTextRange[] = [],
+): string {
+  const inserted = text.slice(start, end)
+  if (inserted === inserted.toLowerCase()) return text
+
+  let result = ''
+  let position = start
+  for (const match of text.matchAll(/(?:^|\s)[#@&]([\p{L}\p{Nd}_-]+)/gu)) {
+    const markerEnd = match.index + match[0].length
+    const markerStart = markerEnd - match[1]!.length - 1
+    if (excluded.some((range) => range.start < markerEnd && range.end > markerStart)) continue
+    const from = Math.max(start, markerStart + 1)
+    const to = Math.min(end, markerEnd)
+    if (from >= to) continue
+
+    result += text.slice(position, from) + text.slice(from, to).toLowerCase()
+    position = to
+  }
+  return text.slice(0, start) + result + text.slice(position)
+}
+
 /** Literal, case-sensitive tags. Offsets are UTF-16, like document links and selections. */
 export function findTags(
   text: string,

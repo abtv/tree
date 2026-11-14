@@ -2077,6 +2077,12 @@ The input placeholder is `Search text, #tag, @person or &event`.
 
 A word beginning with `#` at the start of text or after whitespace is a tag. Names contain one or more Unicode letters, decimal digits, hyphens or underscores. Other characters end the tag. A bare `#` is not a tag. Tags are case-sensitive: `#Work` and `#work` are distinct. Hyperlink ranges and hashes embedded in other words or URLs are excluded. Tags remain ordinary editable text; typing a new name creates a tag without accepting a suggestion. No separate tag record is persisted.
 
+* In Tree and Agenda, newly typed letters inside a `#`, `@`, or `&` name are automatically lowercased, including typing in the middle of an existing name and replacing selected text. Only the newly entered characters change; existing characters retain their spelling.
+* This applies to standard editing, Vim Insert and Vim Replace, and to committed composition text after native composition ends.
+* Text outside recognized marker names, including email addresses and hyperlinks, keeps its case. Existing documents are never normalized on load.
+* Paste, accepted suggestions, Undo/Redo, Vim puts and explicit case-changing commands preserve their text. Catalogs and search continue to distinguish existing case variants.
+* Automatic lowercasing is an owner-requested text-entry convention and a deliberate Vim divergence.
+
 Tree and Agenda highlight tags with a muted violet foreground and subtle rounded background adapted to light and dark appearance. The literal `#` remains visible. Recognized dates inside tags keep their date foreground. Highlighting does not add padding, change text size, or interfere with selection, caret placement, links or existing date interpretation. Whole-node selection retains its selection colors, and struck-through tags retain the muted completion color.
 
 Typing `#` in standard editing or Vim Insert offers all distinct tags from the entire current document, including folded nodes and nodes outside the current Tree or Agenda scope. The actively edited occurrence is excluded from suggestions; other occurrences in the same node still count. A tag disappears from suggestions after its last occurrence is removed; Undo and Redo restore the matching catalog. With no available matches, no popup is shown and the text remains literal.

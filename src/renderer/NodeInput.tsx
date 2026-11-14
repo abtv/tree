@@ -198,8 +198,8 @@ export function NodeInput({
         rows={1}
         value={node.text}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-          remember(event.target)
           onTextChange(event)
+          remember(event.target)
         }}
       />
     )

@@ -8,6 +8,7 @@ import type { NodeInputBindings } from './NodeInput'
 import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { VimMode } from './vim-editing'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
+import { normalizeTypedInput } from './typed-marker-input'
 
 export function useCompletion(
   store: EditorStore,
@@ -137,14 +138,19 @@ export function useCompletion(
       const today =
         (state.status === 'ready' ? state.agenda?.today : undefined) ??
         dayNumberOf({ year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() })
-      const caret = getCaret(element)
+      const { text, cursor: caret } = normalizeTypedInput(
+        content.text,
+        getCaret(element),
+        event?.inputType === 'insertText' || native?.type === 'compositionend' ? event.data : undefined,
+        content.links,
+      )
       owner.current.edit(
         node.id,
-        content.text,
+        text,
         caret,
         today,
         content.links,
-        store.suggestTags(node.id, content.text, caret, content.links),
+        store.suggestTags(node.id, text, caret, content.links),
         store.emojiHistory.suggestions,
       )
       context.current =
