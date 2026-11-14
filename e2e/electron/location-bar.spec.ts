@@ -34,7 +34,8 @@ test('aligns Tree and Agenda location icons and preserves the focused-day path',
   await window.locator(`[data-agenda-key="day:${day}"]`).click()
   await window.keyboard.press('Meta+.')
 
-  await expect(bar).toHaveText('›Oct 9')
+  await expect(bar).toHaveText('›Fri Oct 9')
+  await expect(bar.locator('.location-current')).toHaveText(await window.locator('.agenda-focused-heading').innerText())
   await expect(calendar).toBeVisible()
   await expect(bar).toHaveScreenshot('agenda-location-focused.png')
 

@@ -2342,7 +2342,7 @@ Vim `dd`, including counted forms, does nothing in Agenda: it neither deletes no
 
 ### 23.15 Focused Days
 
-`Cmd+.` on a day container opens that day's flat entries. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Oct 14`; a non-editable heading such as `Wed Oct 14` occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports day folding but no creation. If the focused day becomes empty, retain its heading and show the passive message `No entries for this day`.
+`Cmd+.` on a day container opens that day's flat entries. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Wed Oct 14`; its date label matches the non-editable heading, including the weekday and the year when it differs from the current year. The heading occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports day folding but no creation. If the focused day becomes empty, retain its heading and show the passive message `No entries for this day`.
 
 `Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position and folds instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes retain the ordinary text-session completion rules. `Cmd+.` or `gd` on a real node still opens Tree at that node.
 

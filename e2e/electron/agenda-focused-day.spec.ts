@@ -107,7 +107,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+.')
 
     await expect(window.locator('.agenda-focused-heading')).toHaveText('Fri Oct 9')
-    await expect(window.locator('.agenda-location-bar')).toHaveText('›Oct 9')
+    await expect(window.locator('.agenda-location-bar')).toHaveText('›Fri Oct 9')
     await expect(window.locator('.agenda-location-bar').getByRole('img', { name: 'Agenda' })).toBeVisible()
     await expect(window.locator('.agenda-row-day')).toHaveCount(0)
     await expect(window.locator(`[data-agenda-key="day:${later}"]`)).toHaveCount(0)

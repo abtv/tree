@@ -13,7 +13,7 @@ export function AgendaLocationBar({ agenda }: { agenda: AgendaState }): React.JS
       {agenda.presentation.kind === 'focused-day' && (
         <>
           <span className="location-separator">›</span>
-          <span className="location-current">{agendaDateLabel(agenda.presentation.day, agenda.today)}</span>
+          <span className="location-current">{agendaDateLabel(agenda.presentation.day, agenda.today, true)}</span>
         </>
       )}
     </header>
