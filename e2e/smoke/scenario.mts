@@ -278,11 +278,13 @@ export async function happyPath(driver: SmokeDriver) {
     ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
     ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
 
-  // Search outside the current parent, rather than selecting an unfiltered recent node.
+  // Search outside the current parent. The child also matches: "Smoke" is in its text,
+  // while "parent" is supplied by its ancestor under the required-term search rules.
   const query = 'input[aria-label="Search query"]'
   await restored.press(focused, 'Primary+;')
   await restored.fill(query, parentText)
-  await restored.waitFor(`return document.querySelectorAll('${recent} [role="option"]').length === 1 &&
+  await restored.waitFor(`return JSON.stringify(Array.from(document.querySelectorAll('${recent} [role="option"] .recent-node-text'),
+    node => node.textContent)) === ${JSON.stringify(JSON.stringify([parentText, agendaText]))} &&
     document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`)
   await restored.press(query, 'Enter')
 
