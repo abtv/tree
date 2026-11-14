@@ -5,7 +5,7 @@ import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
 import { agendaAncestorKeys, agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
-import { openAgendaState, focusAgendaState } from './agenda-state'
+import { openAgendaState, focusAgendaState, applyAgendaCommand } from './agenda-state'
 import { reconcileAgenda } from './agenda-reconcile'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
@@ -26,6 +26,90 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  it('keeps Overdue folds independent of Sunday and preserves active dates after an earlier date is added', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = { roots: [{ id: 'old', text: '2026-10-04 task', children: [] }] }
+    const cache = new AgendaRowsCache()
+    const rows = cache.get(source, state)
+    const row = rows.find((entry) => entry.kind === 'node')!
+    const selected = applyAgendaCommand(state, { kind: 'select', key: row.key }, rows)
+    const folded = applyAgendaCommand(selected, { kind: 'toggle-fold', key: rows[0]!.key }, rows)
+
+    expect(folded.collapsed.has(`day:${state.weekStart - 1}`)).toBe(false)
+    expect(
+      cache.get(source, { ...folded, weekStart: state.weekStart - 7 }).some((entry) => entry.kind === 'node'),
+    ).toBe(true)
+
+    const edited = editNodeText(source, 'old', '2026-10-04 task 2026-09-01')
+    const reconciled = reconcileAgenda(edited, selected, false, cache)!
+
+    expect(reconciled.selectedKey).toBe(row.key)
+    expect(cache.get(edited, reconciled).filter((entry) => entry.kind === 'node')).toHaveLength(1)
+    expect(cache.getProjection(edited, reconciled).map((day) => day.day)).toEqual([row.day])
+
+    const focused = focusAgendaState(reconciled, today, 0)
+
+    expect(cache.getProjection(edited, focused)).toEqual([])
+    expect(cache.getProjection(edited, reconciled).map((day) => day.day)).toEqual([row.day])
+  })
+
+  it('shows distinct unfinished overdue nodes only in the current week and updates after strikethrough', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Parent',
+          children: [
+            { id: 'old', text: '2026-09-01 2026-09-02', children: [] },
+            { id: 'done', text: '2026-09-01', struckThrough: true, children: [] },
+          ],
+        },
+        { id: 'this-week', text: '2026-10-05', children: [] },
+      ],
+    }
+    const cache = new AgendaRowsCache()
+
+    const rows = cache.get(source, state)
+
+    expect(rows[0]).toMatchObject({ kind: 'day', overdue: true })
+    expect(
+      rows
+        .filter((row) => row.kind === 'node')
+        .filter((row) => row.groupKey !== undefined)
+        .map((row) => row.nodeId),
+    ).toEqual(['old'])
+    const old = rows.find((row) => row.kind === 'node' && row.nodeId === 'old')!
+    const selected = applyAgendaCommand(state, { kind: 'select', key: old.key }, rows)
+    const folded = applyAgendaCommand(selected, { kind: 'toggle-fold', key: rows[0]!.key }, rows)
+
+    expect(folded.selectedKey).toBe(rows[0]!.key)
+    expect(cache.get(source, folded).some((row) => row.kind === 'node' && row.nodeId === 'old')).toBe(false)
+    expect(applyAgendaCommand(selected, { kind: 'shift-week', direction: -1 }, rows).weekStart).toBe(
+      state.weekStart - 7,
+    )
+    for (const offset of [-7, 7]) {
+      expect(
+        cache
+          .get(source, { ...state, weekStart: state.weekStart + offset })
+          .some((row) => row.kind === 'day' && row.overdue),
+      ).toBe(false)
+    }
+    expect(cache.get(source, focusAgendaState(state, today, 0)).some((row) => row.kind === 'day' && row.overdue)).toBe(
+      false,
+    )
+
+    const completed: Document = {
+      roots: [
+        { ...source.roots[0]!, children: source.roots[0]!.children.map((node) => ({ ...node, struckThrough: true })) },
+        source.roots[1]!,
+      ],
+    }
+    cache.get(source, state)
+
+    expect(cache.get(completed, state).some((row) => row.kind === 'day' && row.overdue)).toBe(false)
+  })
+
   it('does not enumerate unchanged folds during repeated caret publications', () => {
     const cache = new AgendaRowsCache()
     const collapsed = new Set(Array.from({ length: 10000 }, (_, index) => `day:${today + index}`))
@@ -527,37 +611,40 @@ describe('Agenda rows', () => {
     expect(cache.get(document, state)).not.toBe(before)
   })
 
-  it('keeps one row array and rescans one node for a same-date keystroke in a wide document', () => {
-    const wide: Document = {
-      roots: Array.from({ length: 10000 }, (_, index) => ({
-        id: String(index),
-        text: '2026-10-09 Item',
-        children: [],
-      })),
-    }
-    const cache = new AgendaRowsCache()
-    const state = openAgendaState({ currentParentId: null, selectedNodeId: '0' }, 0, today)
-    const rows = cache.get(wide, state)
-    const searchable = cache.getProjection(wide, state)
-    const scan = vi.spyOn(recognition, 'findCanonicalDates')
-    const project = vi.spyOn(projectionModule, 'projectAgenda')
-    try {
-      const edited = editNodeText(wide, '0', '2026-10-09 Item!')
+  it.each(['2026-10-09', '2026-09-01'])(
+    'reuses rows and rescans one node for a same-date keystroke at scale (%s)',
+    (date) => {
+      const wide: Document = {
+        roots: Array.from({ length: 10000 }, (_, index) => ({
+          id: String(index),
+          text: `${date} Item`,
+          children: [],
+        })),
+      }
+      const cache = new AgendaRowsCache()
+      const state = openAgendaState({ currentParentId: null, selectedNodeId: '0' }, 0, today)
+      const rows = cache.get(wide, state)
+      const searchable = cache.getProjection(wide, state)
+      const scan = vi.spyOn(recognition, 'findCanonicalDates')
+      const project = vi.spyOn(projectionModule, 'projectAgenda')
+      try {
+        const edited = editNodeText(wide, '0', `${date} Item!`)
 
-      expect(cache.get(edited, state)).toBe(rows)
-      expect(cache.getProjection(edited, state)).toBe(searchable)
-      expect(scan).toHaveBeenCalledTimes(1)
-      expect(project).toHaveBeenCalledTimes(1)
+        expect(cache.get(edited, state)).toBe(rows)
+        expect(cache.getProjection(edited, state)).toBe(searchable)
+        expect(scan).toHaveBeenCalledTimes(1)
+        expect(project).toHaveBeenCalledTimes(1)
 
-      scan.mockClear()
-      project.mockClear()
+        scan.mockClear()
+        project.mockClear()
 
-      for (let count = 0; count < 100; count++) expect(cache.get(edited, state)).toBe(rows)
-      expect(scan).not.toHaveBeenCalled()
-      expect(project).not.toHaveBeenCalled()
-    } finally {
-      scan.mockRestore()
-      project.mockRestore()
-    }
-  })
+        for (let count = 0; count < 100; count++) expect(cache.get(edited, state)).toBe(rows)
+        expect(scan).not.toHaveBeenCalled()
+        expect(project).not.toHaveBeenCalled()
+      } finally {
+        scan.mockRestore()
+        project.mockRestore()
+      }
+    },
+  )
 })

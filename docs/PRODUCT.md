@@ -2267,8 +2267,13 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 
 Show one Monday–Sunday week at a time, with all seven dated day headings in chronological order, including empty days. Empty days do not fold. No separate week-range label or return-to-Today command is shown. At the canonical calendar boundaries, omit dates outside years 0000–9999. A temporary last-date pin retains its occurrence until the item leaves Agenda (§23.7).
 
+* In the current week's timeline only, an `Overdue` group precedes Monday when the document contains non-struck-through nodes with recognized dates before that week's Monday. It includes nodes from the entire document, including folded branches.
+* Each qualifying node appears once, ordered by its earliest overdue date and then document order; an active occurrence retains its date while editing (§23.7).
+* The group uses the ordinary heading, flat rows and folding appearance; its fold is independent of dated days. It is hidden when empty and is not a dated day that can be opened separately.
+* Past and future weeks and focused-day views do not show it. Dates within the current week remain in their ordinary day groups.
+
 * Day headings use the same 15px text size as nodes, with a heavier weight and ordinary case. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. The badge is vertically centered on the heading's text line rather than the full row.
-* A thin neutral separator spans the scrolling content from its leading to trailing edge between days, with none before the first day. Each separator occupies one 25px row.
+* A thin neutral separator spans the scrolling content from its leading to trailing edge between groups (Overdue and dated days), with none before the first group. Each separator occupies one 25px row.
 * Headings and node rows use Tree's 25px minimum height and 20px text line height, without extra gaps after headings or between nodes. Agenda starts with the same 10px top inset as Tree inside a parent. Day headings and node text share one left alignment axis; disclosure and bullet markers occupy the gutter.
 
 Headers scroll with the content; none is sticky. Transitions between Agenda and Tree have no animation or contrasting background flash. Labels append the year only when it differs from Today's year.

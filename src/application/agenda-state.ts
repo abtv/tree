@@ -71,6 +71,10 @@ export function dayKey(day: DayNumber): string {
   return `day:${day}`
 }
 
+export function overdueKey(weekStart: DayNumber): string {
+  return `overdue:${weekStart}`
+}
+
 export function agendaWeekStart(day: DayNumber): DayNumber {
   return day - weekdayOf(day)
 }
@@ -123,7 +127,11 @@ export function applyAgendaCommand(
   if (command.kind === 'shift-week') {
     const selected = rows.find((row) => row.key === state.selectedKey)
     if (selected === undefined) return state
-    const day = selected.day + command.direction * 7
+    const reference =
+      (selected.kind === 'day' && selected.overdue) || (selected.kind === 'node' && selected.groupKey !== undefined)
+        ? state.weekStart
+        : selected.day
+    const day = reference + command.direction * 7
     if (day < firstDay || day > lastDay) return state
     return {
       ...state,
@@ -150,7 +158,7 @@ export function applyAgendaCommand(
   const row = rows.find((candidate) => candidate.key === command.key)
   if (row === undefined) return state
   if (command.kind === 'focus-day') {
-    if (row.kind !== 'day' || state.presentation.kind !== 'timeline') return state
+    if (row.kind !== 'day' || row.overdue || state.presentation.kind !== 'timeline') return state
     return focusAgendaState(state, row.day, command.scrollTop)
   }
   if (command.kind === 'select') {
@@ -172,10 +180,10 @@ export function applyAgendaCommand(
 
   const selected = rows.find((candidate) => candidate.key === state.selectedKey)
   const next = { ...state, collapsed }
-  if (selected?.kind === 'node' && collapsed.has(dayKey(selected.day))) {
+  if (selected?.kind === 'node' && collapsed.has(selected.groupKey ?? dayKey(selected.day))) {
     return selectAgendaRow(
       next,
-      rows.find((candidate) => candidate.key === dayKey(selected.day))!,
+      rows.find((candidate) => candidate.key === (selected.groupKey ?? dayKey(selected.day)))!,
     )
   }
   return next

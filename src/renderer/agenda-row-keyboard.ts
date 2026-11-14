@@ -418,9 +418,11 @@ export function createAgendaKeyDownHandler({
       ['/', 'n', 'N'].includes(event.key)
     ) {
       const origin =
-        row.kind === 'node'
-          ? { nodeId: row.nodeId, day: row.day, offset: sourceCursor() }
-          : { beforeDay: row.day, offset: 0 }
+        row.kind === 'day' && row.overdue
+          ? store.searchOrigin(0)
+          : row.kind === 'node'
+            ? { nodeId: row.nodeId, day: row.day, offset: sourceCursor() }
+            : { beforeDay: row.day, offset: 0 }
       clearCommandAssembly(vim.commandState)
       if (event.key === '/') store.search.begin(origin)
       else store.search.navigate(origin, event.key === 'n' ? 1 : -1, Math.max(1, Number(pending?.count || '1')))

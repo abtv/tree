@@ -2,7 +2,7 @@ import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
 import type { TreeNode } from '../domain/document'
 import { agendaDecorations } from './date-decorations'
-import { agendaDateLabel, agendaRowLabel } from './agenda-labels'
+import { agendaRowLabel } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
 import { markedNodes } from './marked-nodes'
 
@@ -104,7 +104,7 @@ export const AgendaRow = memo(function AgendaRow({
             className="node-disclosure-triangle"
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${agendaDateLabel(row.day, today, true)}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${agendaRowLabel(row, today)}`}
             tabIndex={-1}
             onPointerDown={(event) => event.preventDefault()}
             onMouseDown={(event) => event.preventDefault()}

@@ -215,7 +215,7 @@ it('searches node text across folded days, excludes parents and preserves focuse
   expect(f.container.querySelectorAll('.agenda-focused-heading')).toHaveLength(1)
 })
 
-it('shows all seven dated headings and keeps empty days nonfoldable', async () => {
+it('shows Overdue before all seven dated headings and keeps empty days nonfoldable', async () => {
   const f = await createAppHarness({
     vimEnabled: false,
     document: {
@@ -231,9 +231,12 @@ it('shows all seven dated headings and keeps empty days nonfoldable', async () =
   expect(
     f.store
       .getAgendaRows()
-      .filter((row) => row.kind === 'day')
+      .filter((row) => row.kind === 'day' && !row.overdue)
       .map((row) => row.day),
   ).toEqual(Array.from({ length: 7 }, (_, index) => today - 3 + index))
+  expect(f.container.querySelector('.agenda-label')).toHaveTextContent('Overdue')
+  expect(f.container.querySelectorAll('.agenda-row-node')).toHaveLength(1)
+  expect(f.container.querySelector('.agenda-row-node')).toHaveTextContent('2026-09-01 Earlier')
   expect(f.container.querySelectorAll('.agenda-row-gap')).toHaveLength(0)
   expect(screen.getByText('Thu Oct 8')).toBeVisible()
   const message = f.container.querySelector<HTMLElement>(`[data-agenda-key="${dayKey}"]`)!

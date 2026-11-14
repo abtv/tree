@@ -112,6 +112,10 @@ export class EditorSearch {
     if (state.agenda !== undefined) {
       const row = this.agendaRows.get(state.document, state.agenda).find((row) => row.key === state.agenda!.selectedKey)
       if (row !== undefined) {
+        if (row.kind === 'day' && row.overdue) {
+          const first = this.agendaRows.getProjection(state.document, state.agenda)[0]
+          return { beforeDay: first?.day ?? row.day, offset: 0 }
+        }
         return row.kind === 'node' ? { nodeId: row.nodeId, day: row.day, offset } : { beforeDay: row.day, offset: 0 }
       }
     }
@@ -124,7 +128,7 @@ export class EditorSearch {
       const agenda = state.agenda
       const selected = this.agendaRows.get(state.document, agenda).find((row) => row.key === agenda.selectedKey)
       const projection = this.agendaRows.getProjection(state.document, agenda)
-      const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected) : [])
+      const keep = new Set(selected?.kind === 'node' ? agendaAncestorKeys(projection, selected, agenda) : [])
       const collapsed = new Set(agenda.collapsed)
       for (const key of this.takeFoldsToClose(keep)) collapsed.add(key)
       this.hide()
@@ -145,7 +149,7 @@ export class EditorSearch {
       const agenda = state.agenda
       const occurrence = { nodeId: destination.nodeId, day: destination.day }
       const projection = this.agendaRows.getProjection(state.document, agenda)
-      const path = agendaAncestorKeys(projection, occurrence)
+      const path = agendaAncestorKeys(projection, occurrence, agenda)
       if (path === undefined) return undefined
       const collapsed = new Set(agenda.collapsed)
       for (const key of path) {

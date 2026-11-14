@@ -37,5 +37,6 @@ export function agendaRowLabel(
   today: DayNumber,
 ): string {
   if (row.kind === 'separator') return ''
+  if (row.overdue) return 'Overdue'
   return agendaDateLabel(row.day, today, true)
 }

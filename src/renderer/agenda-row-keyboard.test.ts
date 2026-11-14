@@ -35,6 +35,20 @@ async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-
 }
 
 describe('read-only Agenda keyboard', () => {
+  it.each(['/', 'n', 'N'])('starts Vim %s at the first overdue date from the Overdue heading', async (key) => {
+    const f = await fixture({ roots: [{ id: 'old', text: '2026-09-01 task', children: [] }] })
+    const header = f.store.getAgendaRows()[0]!
+    f.store.applyAgenda({ kind: 'select', key: header.key })
+    const begin = vi.spyOn(f.store.search, 'begin').mockImplementation(() => undefined)
+    const navigate = vi.spyOn(f.store.search, 'navigate').mockImplementation(() => undefined)
+
+    f.press(key)
+
+    const origin = { beforeDay: dayNumberOf({ year: 2026, month: 9, day: 1 }), offset: 0 }
+    if (key === '/') expect(begin).toHaveBeenCalledWith(origin)
+    else expect(navigate).toHaveBeenCalledWith(origin, key === 'n' ? 1 : -1, 1)
+  })
+
   it.each(['J', 'K'])('matches counted row navigation for %s on labels and editors', async (key) => {
     const document = {
       roots: Array.from({ length: 26 }, (_, i) => ({ id: `n${i}`, text: `2026-10-15 Row ${i}`, children: [] })),

@@ -6,6 +6,7 @@ import {
   activeAgendaOccurrence,
   pinnedAgendaOccurrence,
   dayKey,
+  overdueKey,
   agendaWeekStart,
   selectAgendaRow,
   type AgendaState,
@@ -58,10 +59,14 @@ export function reconcileAgenda(
         // A live edit continues in the nearest remaining occurrence. History never unfolds it.
         // If the day is unchanged, the active path is already visible; deleting its absent folds is equivalent.
         if (day !== active.day && !preservePresentation) {
-          next = { ...next, weekStart: agendaWeekStart(day) }
+          const overdue =
+            next.presentation.kind === 'timeline' &&
+            next.weekStart === agendaWeekStart(next.today) &&
+            day < next.weekStart
+          if (!overdue) next = { ...next, weekStart: agendaWeekStart(day) }
           if (next.presentation.kind === 'focused-day') next = { ...next, presentation: { ...next.presentation, day } }
           const collapsed = new Set(next.collapsed)
-          collapsed.delete(dayKey(day))
+          collapsed.delete(overdue ? overdueKey(next.weekStart) : dayKey(day))
           if (collapsed.size !== next.collapsed.size) next = { ...next, collapsed }
         }
       }
@@ -69,7 +74,7 @@ export function reconcileAgenda(
   }
   return reconcileAgendaSelection(
     next,
-    cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next),
+    cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next, undefined, document),
   )
 }
 
@@ -85,7 +90,7 @@ export function reconcileAgendaSelection(state: AgendaState, rows: readonly Agen
   )!
   return selectAgendaRow(
     state,
-    rows.find((row) => row.key === dayKey(day))!,
+    headers.find((row) => row.day === day)!,
   )
 }
 
@@ -122,7 +127,8 @@ export function agendaHistorySelection(
 ): AgendaState {
   if (!isInAgendaScope(document, state, nodeId)) return state
   // The projection is scoped too, so removing the preceding scope guard cannot find an outside occurrence.
-  const rows = cache?.get(document, state) ?? buildAgendaRows(agendaProjection(document, state), state)
+  const rows =
+    cache?.get(document, state) ?? buildAgendaRows(agendaProjection(document, state), state, undefined, document)
   const occurrences = rows.filter(
     // The ID test alone excludes day rows, which have no nodeId; the kind guard narrows the union.
     (row): row is Extract<AgendaRow, { kind: 'node' }> => row.kind === 'node' && row.nodeId === nodeId,
@@ -139,6 +145,6 @@ export function agendaHistorySelection(
     ? next
     : reconcileAgendaSelection(
         next,
-        cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next),
+        cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next, undefined, document),
       )
 }

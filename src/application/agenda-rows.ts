@@ -3,6 +3,9 @@ import {
   focusedAgendaDay,
   dayKey,
   agendaWeekDays,
+  agendaWeekStart,
+  activeAgendaOccurrence,
+  overdueKey,
   type AgendaState,
   type AgendaOccurrence,
 } from './agenda-state'
@@ -14,11 +17,19 @@ import type { DayNumber } from '../domain/calendar-date'
 export function agendaAncestorKeys(
   projection: readonly AgendaProjectionDay[],
   occurrence: AgendaOccurrence,
+  state?: AgendaState,
 ): readonly string[] | undefined {
   const rows = projection.find((entry) => entry.day === occurrence.day)?.rows
   const index = rows?.findIndex((row) => row.nodeId === occurrence.nodeId && row.role === 'match') ?? -1
   if (rows === undefined || index < 0) return undefined
-  return [dayKey(occurrence.day)]
+  return [
+    state !== undefined &&
+    state.presentation.kind === 'timeline' &&
+    state.weekStart === agendaWeekStart(state.today) &&
+    occurrence.day < state.weekStart
+      ? overdueKey(state.weekStart)
+      : dayKey(occurrence.day),
+  ]
 }
 
 export type AgendaRow =
@@ -33,6 +44,7 @@ export type AgendaRow =
       readonly day: DayNumber
       readonly content: boolean
       readonly isToday: boolean
+      readonly overdue?: boolean
     }
   | {
       readonly kind: 'node'
@@ -41,6 +53,7 @@ export type AgendaRow =
       readonly nodeId: NodeId
       readonly depth: number
       readonly role: 'match'
+      readonly groupKey?: string
     }
 
 /** Add the one temporarily invalid item and its ancestors without copying document nodes. */
@@ -82,15 +95,72 @@ interface DayRows {
   rows: readonly AgendaRow[]
 }
 
+/** Keep one dated occurrence per overdue node; an active editor retains its date. */
+function overdueProjection(
+  projection: readonly AgendaProjectionDay[],
+  state: AgendaState,
+  document: Document,
+): readonly AgendaProjectionDay[] {
+  if (state.presentation.kind !== 'timeline' || state.weekStart !== agendaWeekStart(state.today)) return []
+  const active = activeAgendaOccurrence(state)
+  const activePresent =
+    active !== undefined &&
+    active.day < state.weekStart &&
+    projection.some(
+      (entry) =>
+        entry.day === active.day && entry.rows.some((row) => row.role === 'match' && row.nodeId === active.nodeId),
+    )
+  const seen = new Set<NodeId>()
+  const result: AgendaProjectionDay[] = []
+  for (const entry of projection) {
+    if (entry.day >= state.weekStart) break
+    const rows = entry.rows.filter((row) => {
+      if (row.role !== 'match' || seen.has(row.nodeId)) return false
+      if (activePresent && row.nodeId === active.nodeId && entry.day !== active.day) return false
+      if (locateNode(document, row.nodeId)?.node.struckThrough) return false
+      seen.add(row.nodeId)
+      return true
+    })
+    if (rows.length > 0) result.push({ day: entry.day, rows })
+  }
+  return result
+}
+
 export function buildAgendaRows(
   projection: readonly AgendaProjectionDay[],
   state: AgendaState,
   cache?: Map<DayNumber, DayRows>,
+  document?: Document,
 ): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
   const timelineDays =
     state.presentation.kind === 'timeline' ? agendaWeekDays(state.weekStart) : [state.presentation.day]
   const rows: AgendaRow[] = []
+  if (
+    document !== undefined &&
+    state.presentation.kind === 'timeline' &&
+    state.weekStart === agendaWeekStart(state.today)
+  ) {
+    const overdue: AgendaRow[] = []
+    const key = overdueKey(state.weekStart)
+    for (const entry of overdueProjection(projection, state, document)) {
+      for (const row of entry.rows) {
+        overdue.push({
+          kind: 'node',
+          key: `node:${entry.day}:${row.nodeId}`,
+          day: entry.day,
+          nodeId: row.nodeId,
+          depth: 0,
+          role: 'match',
+          groupKey: key,
+        })
+      }
+    }
+    if (overdue.length > 0) {
+      rows.push({ kind: 'day', key, day: state.weekStart - 1, content: true, isToday: false, overdue: true })
+      if (!state.collapsed.has(key)) rows.push(...overdue)
+    }
+  }
   for (const day of timelineDays) {
     const entry = { kind: 'day' as const, day, content: days.has(day), isToday: day === state.today }
     const key = dayKey(entry.day)
@@ -159,6 +229,7 @@ export class AgendaRowsCache {
   }
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
+    const documentChanged = document !== this.document
     let changed = false
     if (
       document !== this.document ||
@@ -192,19 +263,48 @@ export class AgendaRowsCache {
       this.document = document
       this.scope = state.scopeParentId
     }
-    if (changed || this.state?.weekStart !== state.weekStart) {
-      this.weekProjection = this.searchProjection.filter(
-        (day) => day.day >= state.weekStart && day.day < state.weekStart + 7,
+    const overdueChanged = documentChanged && this.projection.some((day) => day.day < state.weekStart)
+    const activeChanged = activeAgendaOccurrence(this.state) !== activeAgendaOccurrence(state)
+    const presentationChanged = focusedAgendaDay(this.state) !== focusedAgendaDay(state)
+    if (
+      changed ||
+      overdueChanged ||
+      activeChanged ||
+      presentationChanged ||
+      this.state?.weekStart !== state.weekStart ||
+      this.state?.today !== state.today
+    ) {
+      const projection = [
+        ...overdueProjection(this.searchProjection, state, document),
+        ...this.searchProjection.filter((day) => day.day >= state.weekStart && day.day < state.weekStart + 7),
+      ]
+      if (
+        projection.length !== this.weekProjection.length ||
+        projection.some((day, index) => !sameDay(day, this.weekProjection[index]!))
       )
+        this.weekProjection = projection
     }
     if (
       changed ||
+      overdueChanged ||
+      activeChanged ||
       this.state?.weekStart !== state.weekStart ||
       this.state?.today !== state.today ||
       focusedAgendaDay(this.state) !== focusedAgendaDay(state) ||
       !sameFolds(this.state.collapsed, state.collapsed)
     ) {
-      this.rows = buildAgendaRows(this.projection, state, this.dayRows)
+      const rows = buildAgendaRows(this.projection, state, this.dayRows, document)
+      const same =
+        rows.length === this.rows.length &&
+        rows.every((row, index) => {
+          const old = this.rows[index]!
+          if (row.kind !== old.kind || row.key !== old.key) return false
+          if (row.kind === 'day' && old.kind === 'day')
+            return row.content === old.content && row.isToday === old.isToday && row.overdue === old.overdue
+          if (row.kind === 'node' && old.kind === 'node') return row.groupKey === old.groupKey
+          return true
+        })
+      if (changed || !same) this.rows = rows
     }
     this.state = state
     return this.rows

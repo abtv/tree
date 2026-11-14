@@ -136,7 +136,7 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
             const projection = projectAgenda(state.document, state.agenda.scopeParentId)
             const days = agendaWeekDays(state.agenda.weekStart)
 
-            expect(rows.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual(days)
+            expect(rows.filter((row) => row.kind === 'day' && !row.overdue).map((row) => row.day)).toEqual(days)
 
             for (const day of projection) {
               const expected = !days.includes(day.day) || state.agenda.collapsed.has(`day:${day.day}`) ? [] : day.rows
@@ -144,6 +144,7 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
               expect(
                 rows
                   .filter((row) => row.kind === 'node')
+                  .filter((row) => row.groupKey === undefined)
                   .filter((row) => row.day === day.day)
                   .map(({ nodeId, depth, role }) => ({ nodeId, depth, role })),
               ).toEqual(expected)
