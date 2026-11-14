@@ -10,6 +10,7 @@ import {
   type VimSurroundEdits,
 } from './vim-surround'
 import { calculateSurround } from './vim-text-commands'
+import { replaceLinkedTextRanges } from '../domain/document-links'
 
 function apply(text: string, result: VimSurroundEdits | undefined): string {
   return result === undefined ? text : applySurroundEdits(text, result.edits)
@@ -78,6 +79,22 @@ describe('Vim surround edits', () => {
   it('strips one padding space only for an opening-bracket target', () => {
     expect(apply('a ( b ) c', surroundDeleteEdits('a ( b ) c', 4, '(', 1))).toBe('a b c')
     expect(apply('a ( b ) c', surroundDeleteEdits('a ( b ) c', 4, ')', 1))).toBe('a  b  c')
+  })
+
+  // @requirement PRODUCT.md §20.2.18
+  it.each([
+    ['(', ')'],
+    ['[', ']'],
+    ['{', '}'],
+    ['<', '>'],
+  ])('applies delete and change to a single-space %s pair through the document edit contract', (open, close) => {
+    const text = `a ${open} ${close} z`
+
+    const deletion = surroundDeleteEdits(text, 3, open, 1)!
+    const change = surroundChangeEdits(text, 3, open, ']', 1)!
+
+    expect(replaceLinkedTextRanges(text, [], deletion.edits).text).toBe('a  z')
+    expect(replaceLinkedTextRanges(text, [], change.edits).text).toBe('a [] z')
   })
 
   it('deletes a compact bracket pair whether the target uses either delimiter', () => {

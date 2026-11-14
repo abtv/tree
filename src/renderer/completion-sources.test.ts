@@ -49,7 +49,10 @@ it('keeps date-like tag names literal when no existing tag matches', () => {
 })
 
 // @requirement PRODUCT.md §20.13
-it.each(['@', '&'])('preserves the %s prefix and presents its own completion label', (prefix) => {
+it.each([
+  ['@', 'person', 'People suggestions'],
+  ['&', 'event', 'Events suggestions'],
+])('preserves the %s prefix and presents its own completion label', (prefix, kind, listLabel) => {
   const match = recognizeCompletion(`${prefix}An`, 3, today, {
     start: 0,
     end: 3,
@@ -57,8 +60,21 @@ it.each(['@', '&'])('preserves the %s prefix and presents its own completion lab
     suggestions: ['Anna_Smith'],
   })
 
-  expect(match?.listLabel).toBe(prefix === '@' ? 'People suggestions' : 'Events suggestions')
-  expect(match?.suggestions[0]).toMatchObject({ replacement: `${prefix}Anna_Smith`, label: `${prefix}Anna_Smith` })
+  expect(match).toEqual({
+    start: 0,
+    end: 3,
+    listLabel,
+    retainsSelection: false,
+    preferredSuggestionId: `${kind}:Anna_Smith`,
+    suggestions: [
+      {
+        id: `${kind}:Anna_Smith`,
+        replacement: `${prefix}Anna_Smith`,
+        label: `${prefix}Anna_Smith`,
+        description: '',
+      },
+    ],
+  })
 })
 
 // @requirement PRODUCT.md §20.9

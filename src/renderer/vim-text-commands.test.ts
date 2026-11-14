@@ -200,7 +200,7 @@ describe('Vim motion ranges', () => {
     expect(textMotion('one two', 0, 'aq', 1)).toBeUndefined()
     expect(textMotion('one two', 0, 'i', 1)).toBeUndefined()
     expect(textMotion('one two', 0, 'zw', 1)).toBeUndefined()
-    expect(textMotion('one two', 0, 'qz', 1)).toBeUndefined()
+    expect(textMotion('one z two', 8, 'qz', 1)).toBeUndefined()
   })
 })
 
