@@ -5,6 +5,20 @@ it('slices a 10000-node result set and a 250000-character nonmatch', () => {
   for (const document of [
     { roots: Array.from({ length: 10_000 }, (_, i) => ({ id: String(i), text: 'needle', children: [] })) },
     { roots: [{ id: 'long', text: 'a'.repeat(250_000), children: [] }] },
+    {
+      roots: [
+        {
+          id: 'image',
+          text: '',
+          attachment: {
+            id: 'png',
+            mimeType: 'image/png' as const,
+            searchText: 'a'.repeat(1_048_576),
+          },
+          children: [],
+        },
+      ],
+    },
   ]) {
     const callbacks: (() => void)[] = []
     let count = -1

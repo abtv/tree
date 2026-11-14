@@ -15,7 +15,7 @@ import { cleanupStaleElectronProcesses } from './electron-process'
 export interface PersistedNode {
   id: string
   text: string
-  attachment?: { id: string; mimeType: string }
+  attachment?: { id: string; mimeType: string; searchText?: string }
   links?: { start: number; end: number; url: string }[]
   struckThrough?: true
   children: PersistedNode[]

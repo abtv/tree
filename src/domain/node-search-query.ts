@@ -37,6 +37,7 @@ export function* prepareNodeSearch(query: string): Generator<undefined, readonly
 export function* searchNodeTerm(node: TreeNode, term: NodeSearchTerm): SearchWork<TextMatch> {
   if (term.prefix === undefined) {
     yield* searchText(node.text, term.pattern)
+    if (node.attachment?.searchText) yield* searchText(node.attachment.searchText, term.pattern)
     return
   }
   if (!term.valid) return

@@ -427,6 +427,7 @@ export function App({
         {node.attachment === undefined ? null : (
           <AttachmentImage
             attachmentId={node.attachment.id}
+            recognitionComplete={node.attachment.searchText !== undefined}
             imageCaretActive={isImageCaretActive(node)}
             images={attachmentImages}
             onOpen={setPreviewAttachmentId}
@@ -441,6 +442,7 @@ export function App({
       node.attachment === undefined ? null : (
         <AttachmentImage
           attachmentId={node.attachment.id}
+          recognitionComplete={node.attachment.searchText !== undefined}
           imageCaretActive={editable && isImageCaretActive(node)}
           images={attachmentImages}
           onOpen={setPreviewAttachmentId}
@@ -685,6 +687,7 @@ export function App({
                   {currentParent.attachment === undefined ? null : (
                     <AttachmentImage
                       attachmentId={currentParent.attachment.id}
+                      recognitionComplete={currentParent.attachment.searchText !== undefined}
                       imageCaretActive={isImageCaretActive(currentParent)}
                       images={attachmentImages}
                       onOpen={setPreviewAttachmentId}

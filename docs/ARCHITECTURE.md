@@ -260,6 +260,21 @@ The parent relationship is derived from the tree structure.
 
 `links` is a list of non-overlapping ranges into `text`. Each range stores its HTTP(S) URL, which must equal the text covered by the range. Version-one persisted documents without links are migrated in memory and are saved using the current format (§13).
 
+Attachment references may contain optional derived `searchText`. Parsing validates its
+type and size; older documents need no migration. Global ordinary-term search reads it
+without exposing it to text editors, local search, tag/date parsers or result highlights.
+Automatic OCR after image paste shares the explicit OCR queue and its native service.
+It publishes metadata without a history entry and enriches retained undo/redo documents
+using one temporary node/document memo, preserving attachment summaries and subtree
+sharing. Removing an attachment removes its search text; canceled jobs cannot restore it.
+Automatic queued entries contain identities only and canceled pending entries are pruned.
+Recognition adds one ordinary autosave change, no search-time writes or syncs. Enrichment
+work reuses image positions only after checking their identity and multiplicity in
+each snapshot, otherwise locating them again. It copies only affected ancestor arrays
+and shares replacements across snapshots;
+its memo is released after completion. Hidden text adds storage proportional to recognized
+text and search work proportional to that text, under the existing yielding search executor.
+
 The domain invariant `MAX_DOCUMENT_DEPTH` enforces the product depth limit defined in `docs/PRODUCT.md` §2.3, counting top-level roots as level 1. Domain creation, document assertions, and persisted-state parsing reject a document that exceeds the limit with the product operation error; the limit did not change the schema version.
 
 `isValidLocation` (`document-operations.ts`) accepts `selectedNodeId` as the current parent itself or any of its descendants at any depth, not only a direct child, because inline expansion (`docs/PRODUCT.md` §2.4) can display and select a descendant several levels below the current parent while it stays the same. `document-serialization.ts` mirrors the same descendant-or-self rule for the pre-parse structural check. `normalizeVisibleLocation` walks a location back up to the outermost collapsed ancestor between the current parent and a deeper `selectedNodeId`, so the caret after a restart, a `zM`, or an undo that falls back to a recorded location always lands on a rendered row. A restored selection whose ancestors are all expanded is kept.

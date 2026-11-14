@@ -62,7 +62,18 @@ it('appends paragraphs after existing children in one undo step without moving f
 
   store.undo()
 
-  expect(ready(store).document).toBe(before.document)
+  expect(ready(store).document).toEqual({
+    roots: [
+      {
+        ...before.document.roots[0],
+        attachment: {
+          ...before.document.roots[0]!.attachment,
+          searchText: '\nFirst line\nSecond line\n\nNext paragraph\n\n\n\nLast\n',
+        },
+      },
+      before.document.roots[1],
+    ],
+  })
 })
 
 it('serializes recognition and ignores duplicate commands while a node is queued', async () => {
@@ -240,7 +251,15 @@ it('keeps the editor usable during recognition and appends after newly created c
   ])
   expect(ready(store).focus).toBe(before.focus)
   store.undo()
-  expect(ready(store).document).toBe(before.document)
+  expect(ready(store).document).toEqual({
+    roots: [
+      {
+        ...before.document.roots[0],
+        attachment: { ...before.document.roots[0]!.attachment, searchText: 'OCR result' },
+      },
+      before.document.roots[1],
+    ],
+  })
   store.redo()
   expect(ready(store).document.roots[0]!.children.at(-1)?.text).toBe('OCR result')
 })
@@ -291,7 +310,12 @@ it('does not create empty children for a whitespace-only result', async () => {
   store.imageToText()
   await vi.waitFor(() => expect(ready(store).imageToTextStatus).toContain('no English text'))
 
-  expect(ready(store).document).toBe(before)
+  expect(ready(store).document).toEqual({
+    roots: [
+      { ...before.roots[0], attachment: { ...before.roots[0]!.attachment, searchText: '\n \n \n' } },
+      before.roots[1],
+    ],
+  })
 })
 
 it('counts recognized words toward the normal autosave threshold', async () => {

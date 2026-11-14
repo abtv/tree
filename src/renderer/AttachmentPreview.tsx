@@ -97,11 +97,13 @@ export function AttachmentImage({
   attachmentId,
   onOpen,
   imageCaretActive = false,
+  recognitionComplete = false,
   images = attachmentImageCache,
 }: {
   attachmentId: string
   onOpen: (attachmentId: string) => void
   imageCaretActive?: boolean
+  recognitionComplete?: boolean
   images?: AttachmentImageCache
 }): React.JSX.Element | null {
   const { state, onImageError } = useAttachmentImage(images, attachmentId)
@@ -115,6 +117,9 @@ export function AttachmentImage({
   return (
     <button
       aria-label="Open image preview"
+      aria-description={recognitionComplete ? undefined : 'Image text recognition is not complete'}
+      title={recognitionComplete ? undefined : 'Image text recognition is not complete'}
+      data-recognition-incomplete={recognitionComplete ? undefined : true}
       className={imageCaretActive ? 'attachment-button attachment-image-caret' : 'attachment-button'}
       onClick={() => onOpen(attachmentId)}
       onPointerDown={(event) => {

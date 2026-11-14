@@ -263,6 +263,12 @@ describeForEachEditingMode('Agenda editing', ({ mode, screenshotName }) => {
       })
       .toBeDefined()
 
+    // Finish the first image's background metadata write before testing a no-op paste.
+    await expect(image.locator('..')).not.toHaveAttribute('data-recognition-incomplete', 'true')
+    await fireIdleSave(window)
+    await expect
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]!.children[0]!.attachment?.searchText, idleSavePoll)
+      .toBe('')
     const withImage = readPersisted(userDataDir).document
     await writeClipboardImageSized(app, 40, 40)
     await firePaste(input)

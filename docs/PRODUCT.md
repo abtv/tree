@@ -1084,7 +1084,7 @@ Dragging a node moves its image together with the node.
 
 On Apple Silicon macOS Electron, `image-to-text` in the command panel recognizes
 English text from the selected node's image. It is unavailable in the browser,
-Linux and Intel Electron. Recognition is explicit, never triggered by image paste.
+Linux and Intel Electron. The explicit command creates visible text as described below.
 Apple Vision processes the image locally without model downloads, network calls,
 telemetry or task creation.
 
@@ -1111,6 +1111,29 @@ recognition and rejects new requests until the save flush ends. An archive expor
 does not cancel recognition. Pending OCR itself is not saved or resumed on restart.
 Each image is limited to 25 MiB and the normal decoded-image dimensions. Native work
 times out after 60 seconds; results are limited to 1 MiB and 1,000 entries.
+
+Pasting a new image also recognizes its English text automatically when image-to-text
+is available, including image paste in Agenda. This background result stays hidden and
+participates only in global Search (`Cmd+;`), not local Find or Vim `/`. It does not
+create children, tags, dates, or status feedback, and never moves focus. Failures leave
+the image usable without search text. Existing images are not automatically backfilled.
+Automatic and explicit requests share sequential native execution; the explicit-request
+limit does not discard automatic requests. Automatic pending work retains only image
+identities and is retired when its source disappears or shutdown cancels recognition.
+
+Hidden text is saved with the attachment and survives restart and archive round trips.
+Deleting or replacing the image removes its hidden text from search immediately. Late
+results follow the cancellation rules above. Completed text follows the image through
+Undo/Redo without adding an invisible undo step or clearing redo. Hidden text is derived
+data: older Tree versions may discard it when re-saving the document.
+
+An image without a completed hidden recognition result has a yellow border and the
+tooltip `Image text recognition is not complete`. This includes queued work, errors,
+timeouts, interrupted work after restart, older images, and platforms without OCR.
+A successful empty result counts as completed and removes the border. No automatic
+retry occurs. Successful explicit `image-to-text` also stores the hidden result.
+The border does not change image geometry or replace the image-caret
+indicator, and appears in Tree and Agenda, including the current-parent image.
 
 ---
 
@@ -2165,6 +2188,7 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 * Every term must match somewhere in the result node or its complete ancestor chain up to the root, regardless of depth or the displayed parent-path cutoff. At least one term must match the result node itself. Intermediate ancestors need not match; siblings and other branches never contribute. A matching ancestor and its matching descendant may both appear.
 * Ordinary terms match literal substrings. Terms beginning with `#`, `@` or `&` match complete recognized tags, people or events, excluding hyperlinks and embedded markers (§20.13); incomplete names and bare markers do not match nodes. Different terms may match different ancestors. For example, `@alex #k8s opensearch` can find a node containing `opensearch-dashboards` under ancestors containing `@Alex` and `#K8s`.
 * Smart case applies independently to each term: a term without uppercase letters ignores case; a term containing an uppercase letter requires that case. This applies equally to ordinary text and complete marker names. Local Cmd+F and Vim `/` retain their separate literal phrase-search rules (§20.2).
+* Ordinary terms also match hidden recognized image text (§15.1), including ancestor context. Results still display only the node's ordinary text and path; hidden matches never highlight unrelated visible text. Marker terms and completion catalogs use only ordinary node text.
 
 Query preparation and matching retain only the current terms, result list and ancestor traversal state, without earlier query snapshots or a persistent full-text index. Ancestor term matches are accumulated during traversal, rather than rescanning all ancestor text for each descendant. Query input causes no document/history writes or syncs.
 

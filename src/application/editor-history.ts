@@ -60,6 +60,12 @@ export class EditorHistory {
     return [...this.past, ...this.future].map((entry) => entry.document)
   }
 
+  /** Derived attachment metadata changes neither history order nor attachment reachability. */
+  public enrichImageSearchText(enrich: (document: Document) => Document): void {
+    for (const entry of this.past) entry.document = enrich(entry.document)
+    for (const entry of this.future) entry.document = enrich(entry.document)
+  }
+
   public attachmentIds(): Iterable<AttachmentId> {
     return this.attachmentCounts.keys()
   }

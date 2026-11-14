@@ -107,6 +107,7 @@ import { EmojiHistory } from './emoji-history'
 import { runNodeSearch } from './node-search'
 import type { RecentNode } from './recent-nodes'
 import { Summarization, summaryRoots, type SummarySelection } from './summarization'
+import { imageSearchTextEnrichment } from '../domain/image-search-text'
 
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
@@ -135,12 +136,21 @@ export class EditorStore {
     for (const job of this.imageToTextJobs) {
       if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) job.canceled = true
     }
+    for (let index = this.imageToTextJobs.length - 1; index > 0; index--) {
+      const job = this.imageToTextJobs[index]!
+      if (job.hidden && job.canceled) this.imageToTextJobs.splice(index, 1)
+    }
     for (const catalog of this.tags.values()) catalog.update(state.document)
     this.searchOwner.update(state)
     this.recentNodesOwner.update(state.document)
   })
   private readonly history = new EditorHistory()
-  private readonly imageToTextJobs: Array<{ nodeId: NodeId; attachmentId: AttachmentId; canceled: boolean }> = []
+  private readonly imageToTextJobs: Array<{
+    nodeId: NodeId
+    attachmentId: AttachmentId
+    canceled: boolean
+    hidden?: boolean
+  }> = []
   private imageToTextRunning = false
   private imageToTextFlushes = 0
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
@@ -513,11 +523,11 @@ export class EditorStore {
       this.setImageToTextStatus('Image to text: select an editable node with an image.')
       return
     }
-    if (this.imageToTextJobs.some((job) => !job.canceled && job.nodeId === nodeId)) {
+    if (this.imageToTextJobs.some((job) => !job.hidden && !job.canceled && job.nodeId === nodeId)) {
       this.setImageToTextStatus('Image to text: this image is already queued.')
       return
     }
-    if (this.imageToTextJobs.length >= 20) {
+    if (this.imageToTextJobs.filter((job) => !job.hidden).length >= 20) {
       this.setImageToTextStatus('Image to text: the queue is full. Please wait.')
       return
     }
@@ -538,15 +548,17 @@ export class EditorStore {
     let result = 'Image to text: finished.'
     let failure: string | undefined
     let addedParagraphs = 0
+    let explicit = false
     try {
       while (this.imageToTextJobs.length > 0) {
         const job = this.imageToTextJobs[0]!
+        if (!job.hidden) explicit = true
         try {
           if (job.canceled) {
             result = 'Image to text: canceled.'
             continue
           }
-          this.setImageToTextStatus(`Recognizing image… ${this.imageToTextJobs.length - 1} queued`)
+          if (!job.hidden) this.setImageToTextStatus(`Recognizing image… ${this.imageToTextJobs.length - 1} queued`)
           const paragraphs = await this.services.imageToText!(job.attachmentId)
           if (job.canceled || this.runtime.snapshot.status !== 'ready') {
             result = 'Image to text: canceled.'
@@ -554,6 +566,13 @@ export class EditorStore {
           }
           if (this.isPersistenceLocked())
             throw new Error('Saving is unavailable. Please retry after saving is restored.')
+          const current = this.runtime.ready()
+          const enrich = imageSearchTextEnrichment(job.attachmentId, paragraphs.join('\n').slice(0, 1_048_576))
+          const enriched = enrich(current.document)
+          this.history.enrichImageSearchText(enrich)
+          this.runtime.replaceReady({ ...current, document: enriched })
+          this.markPersistedChange()
+          if (job.hidden) continue
           const normalized = paragraphs.map((text) =>
             text
               .split(/\r\n|[\r\n\u2028\u2029]/u)
@@ -578,8 +597,10 @@ export class EditorStore {
           addedParagraphs += paragraphCount
           result = `Image to text: added ${paragraphCount} ${paragraphCount === 1 ? 'paragraph' : 'paragraphs'}.`
         } catch (error) {
-          failure = `Image to text failed: ${messageOf(error)}`
-          this.setImageToTextStatus(failure)
+          if (!job.hidden) {
+            failure = `Image to text failed: ${messageOf(error)}`
+            this.setImageToTextStatus(failure)
+          }
         } finally {
           this.imageToTextJobs.shift()
         }
@@ -590,9 +611,10 @@ export class EditorStore {
         addedParagraphs > 0 && failure !== undefined
           ? `Image to text: added ${addedParagraphs} ${addedParagraphs === 1 ? 'paragraph' : 'paragraphs'}.`
           : result
-      this.setImageToTextStatus(
-        failure === undefined ? summary : addedParagraphs > 0 ? `${summary} ${failure}` : failure,
-      )
+      if (explicit)
+        this.setImageToTextStatus(
+          failure === undefined ? summary : addedParagraphs > 0 ? `${summary} ${failure}` : failure,
+        )
     }
   }
 
@@ -1479,6 +1501,15 @@ export class EditorStore {
           this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
         )
         this.requestImmediateSave()
+        if (this.imageToTextAvailable && this.imageToTextFlushes === 0) {
+          this.imageToTextJobs.push({
+            nodeId: transition.focus.nodeId,
+            attachmentId: attachment.id,
+            canceled: false,
+            hidden: true,
+          })
+          void this.runImageToTextQueue()
+        }
       } finally {
         this.pendingAttachmentIds.delete(attachment.id)
         this.queueAttachmentCleanup()

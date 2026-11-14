@@ -311,11 +311,16 @@ function parseAttachment(value: unknown): AttachmentReference | undefined {
     !isRecord(value) ||
     typeof value.id !== 'string' ||
     !isValidAttachmentId(value.id) ||
-    value.mimeType !== 'image/png'
+    value.mimeType !== 'image/png' ||
+    (value.searchText !== undefined && (typeof value.searchText !== 'string' || value.searchText.length > 1_048_576))
   ) {
     throw new Error('A saved attachment is invalid.')
   }
-  return { id: value.id, mimeType: value.mimeType }
+  return {
+    id: value.id,
+    mimeType: value.mimeType,
+    ...(value.searchText === undefined ? {} : { searchText: value.searchText as string }),
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

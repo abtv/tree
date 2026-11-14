@@ -73,6 +73,7 @@
   --color-overlay-button-focus-outline: #fbf8f1;
   --color-attachment-error-on-overlay: #f3d6d3;
   --color-attachment-error: #9c3b34;
+  --color-image-recognition-incomplete: #c99700;
   --color-save-error: #b42318;
   --color-mode-background: #59636a;
   --color-mode-indicator-background: var(--color-mode-background);
@@ -1415,6 +1416,11 @@ body.node-drag-invalid * {
   max-width: 200px;
   max-height: 200px;
   border-radius: 3px;
+}
+
+.attachment-button[data-recognition-incomplete] .attachment-image {
+  outline: 2px solid var(--color-image-recognition-incomplete);
+  outline-offset: 0;
 }
 
 .attachment-placeholder {

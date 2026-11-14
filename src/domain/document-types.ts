@@ -7,6 +7,7 @@ export const MAX_DOCUMENT_DEPTH = 20
 export interface AttachmentReference {
   readonly id: AttachmentId
   readonly mimeType: 'image/png'
+  readonly searchText?: string
 }
 
 export interface LinkRange {

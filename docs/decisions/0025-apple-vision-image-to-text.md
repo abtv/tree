@@ -19,6 +19,11 @@ input, output and duration. Only one helper runs at a time. The renderer applica
 owns a bounded queue and inserts results through the existing immutable domain/history.
 No shell command, renderer-provided path, telemetry or network operation is involved.
 
+Image paste also uses this queue to derive hidden attachment search text. Automatic
+results enrich current and retained history snapshots without a separate Undo step;
+the explicit command continues to append visible children. Both purposes share native
+execution and source-lifetime cancellation.
+
 Build the helper with the installed Apple toolchain for arm64 macOS 13.0, matching
 the current Electron bundle minimum. Package it in `Contents/Helpers` so standard
 nested-code signing discovers it. Retain existing hardened runtime, entitlements,
