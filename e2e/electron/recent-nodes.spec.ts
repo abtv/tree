@@ -50,6 +50,18 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
           },
           { id: 'outside', text: 'opensearch', children: [] },
           { id: 'direct', text: '@Alex #K8s &Meeting Infrastructure opensearch', children: [] },
+          {
+            id: 'images',
+            text: 'Image recognition',
+            children: [
+              {
+                id: 'description',
+                text: 'Analyze image and video content using object detection, text recognition, and image segmentation.',
+                children: [],
+              },
+              { id: 'barcodes', text: 'Detecting barcodes and QR codes', children: [] },
+            ],
+          },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'root' },
@@ -65,6 +77,34 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
       'opensearch-dashboards',
       '@Alex #K8s &Meeting Infrastructure opensearch',
     ])
+    await expect(results.locator('.recent-node-group-path .node-search-match')).toHaveText([
+      '@Alex',
+      'Infrastructure',
+      '#K8s',
+      '&Meeting',
+    ])
+    await expect(results.getByRole('option').nth(1).locator('.node-search-match')).toHaveText([
+      '@Alex',
+      '#K8s',
+      '&Meeting',
+      'Infrastructure',
+      'opensearch',
+    ])
+
+    await input.fill('tect image')
+
+    await expect(results.locator('.recent-node-group-path .node-search-match')).toHaveText(['Image'])
+    await expect(results.getByRole('option').first().locator('.node-search-match')).toHaveText([
+      'image',
+      'tect',
+      'image',
+    ])
+    await expect(results.getByRole('option').nth(1).locator('.node-search-match')).toHaveText(['tect'])
+    await window.screenshot({ path: `test-results/search-multi-terms-${mode.mode}.png` })
+    await window.keyboard.press('ArrowDown')
+    await expect(results.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
+    await expect(results.getByRole('option').first().locator('.node-search-match')).toHaveCount(3)
+
     await input.fill('opensearch infrastructure @Alex #k8s &meeting')
     await expect(results.getByRole('option')).toHaveCount(2)
     await input.fill('@ALEX #k8s opensearch')

@@ -1,5 +1,5 @@
 import type { Document, TreeNode } from '../domain/document'
-import { prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
+import { mergeSearchMatches, prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
 import { label, resultText, type RecentNode } from './recent-nodes'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import type { TextMatch } from '../domain/text-search'
@@ -26,7 +26,7 @@ function* pathTagMatches(
 export function* searchNodes(document: Document, query: string): Generator<undefined, readonly RecentNode[]> {
   const terms = yield* prepareNodeSearch(query)
   if (terms.length === 0) return []
-  const singleTag = terms.length === 1 && terms[0]!.prefix !== undefined ? terms[0] : undefined
+  const tagTerms = terms.filter((term) => term.prefix !== undefined)
   const counts = terms.map(() => 0)
   let covered = 0
   const results: RecentNode[] = []
@@ -58,22 +58,26 @@ export function* searchNodes(document: Document, query: string): Generator<undef
       }
     }
     if (own.length > 0 && covered === terms.length) {
-      const tagMatches: TextMatch[] = []
-      if (singleTag !== undefined) {
-        for (const match of searchNodeTerm(node, singleTag)) {
+      let tagMatches: TextMatch[] = []
+      let pathMatches: TextMatch[] = []
+      for (const term of tagTerms) {
+        const matches: TextMatch[] = []
+        for (const match of searchNodeTerm(node, term)) {
           yield undefined
-          if (match !== undefined) tagMatches.push(match)
+          if (match !== undefined) matches.push(match)
         }
+        tagMatches = yield* mergeSearchMatches(tagMatches, matches)
+        pathMatches = yield* mergeSearchMatches(pathMatches, yield* pathTagMatches(ancestors, term))
       }
       results.push({
         id: node.id,
         text: resultText(node),
         path: ancestors.length ? ancestors.map(label).join(' › ') : null,
-        ...(singleTag === undefined
+        ...(tagTerms.length === 0
           ? {}
           : {
               tagMatches,
-              pathTagMatches: yield* pathTagMatches(ancestors, singleTag),
+              pathTagMatches: pathMatches,
             }),
       })
     }

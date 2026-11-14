@@ -51,3 +51,42 @@ export function* searchNodeTerm(node: TreeNode, term: NodeSearchTerm): SearchWor
     }
   }
 }
+
+/** Merge sorted highlight ranges without duplicating text or blocking cancellation. */
+export function* mergeSearchMatches(
+  left: readonly TextMatch[],
+  right: readonly TextMatch[],
+): Generator<undefined, TextMatch[]> {
+  const merged: TextMatch[] = []
+  let a = 0
+  let b = 0
+  while (a < left.length || b < right.length) {
+    const match = b >= right.length || (a < left.length && left[a]!.start <= right[b]!.start) ? left[a++]! : right[b++]!
+    const previous = merged.at(-1)
+    if (previous !== undefined && match.start < previous.end) {
+      merged[merged.length - 1] = { start: previous.start, end: Math.max(previous.end, match.end) }
+    } else merged.push(match)
+    yield undefined
+  }
+  return merged
+}
+
+/** Marker ranges come from actual nodes, retaining link exclusions and complete names. */
+export function* nodeSearchHighlights(
+  text: string,
+  query: string,
+  tagMatches: readonly TextMatch[],
+): Generator<undefined, readonly TextMatch[]> {
+  const terms = yield* prepareNodeSearch(query)
+  let ranges = tagMatches
+  for (const term of terms) {
+    if (term.prefix !== undefined) continue
+    const matches: TextMatch[] = []
+    for (const match of searchText(text, term.pattern)) {
+      if (match !== undefined) matches.push(match)
+      yield undefined
+    }
+    ranges = yield* mergeSearchMatches(ranges, matches)
+  }
+  return ranges
+}

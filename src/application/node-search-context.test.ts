@@ -80,3 +80,29 @@ it('inherits from complete ancestor text beyond the displayed path cutoff', () =
 
   expect(ids(document, 'alpha beta')).toEqual(['leaf'])
 })
+
+// @requirement PRODUCT.md §20.14.2
+it('projects all marker highlights through normalized paths and preserves link and name boundaries', () => {
+  const document = {
+    roots: [
+      node('root', '  @Alex\n #K8s ' + 'x'.repeat(160) + ' &Meeting', [
+        {
+          ...node('leaf', '@Alex @Alexander #K8s &Meeting image @Alex'),
+          links: [{ start: 35, end: 40, url: 'https://example.com' }],
+        },
+      ]),
+    ],
+  }
+  const work = searchNodes(document, 'image &meeting #k8s @alex @Alex')
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toHaveLength(1)
+  const result = step.value[0]!
+  expect(result.tagMatches?.map(({ start, end }) => result.text.slice(start, end))).toEqual([
+    '@Alex',
+    '#K8s',
+    '&Meeting',
+  ])
+  expect(result.pathTagMatches?.map(({ start, end }) => result.path!.slice(start, end))).toEqual(['@Alex', '#K8s'])
+})

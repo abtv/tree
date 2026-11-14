@@ -62,8 +62,7 @@ function SearchResultText({
   onReveal(): void
   tagMatches?: readonly TextMatch[] | undefined
 }): React.JSX.Element {
-  const textMatches = useSearchDecorations(text, tagPrefix(query) !== undefined ? '' : query)
-  const matches = tagPrefix(query) !== undefined ? tagMatches : textMatches
+  const matches = useSearchDecorations(text, query, tagMatches)
   const firstMatch = useRef<HTMLElement>(null)
   const previousMatches = useRef(matches)
   useEffect(() => {
