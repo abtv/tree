@@ -11,6 +11,23 @@ const document: Document = {
   ],
 }
 
+it.each(['', ' \t\n'])('finishes an empty query %j without traversing the document', (query) => {
+  const roots = vi.fn(() => document.roots)
+  const work = searchNodes(
+    {
+      get roots() {
+        return roots()
+      },
+    },
+    query,
+  )
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toEqual([])
+  expect(roots).not.toHaveBeenCalled()
+})
+
 // @requirement PRODUCT.md §20.13
 // @requirement PRODUCT.md §20.14
 it.each(['@', '&'] as const)('searches only complete %s names and maps real matches in paths and text', (prefix) => {

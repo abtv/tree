@@ -47,6 +47,25 @@ it.each([
   expect(applyAgendaCommand(state, { kind: 'shift-week', direction }, rows)).toBe(state)
 })
 
+it.each([
+  [{ year: 0, month: 1, day: 1 }, -1],
+  [{ year: 9999, month: 12, day: 31 }, 1],
+] as const)('allows a week shift landing exactly on the canonical boundary %j', (date, direction) => {
+  const boundary = dayNumberOf(date)
+  const state = openAgendaState(location, 4, boundary - direction * 7)
+
+  const next = applyAgendaCommand(state, { kind: 'shift-week', direction }, buildAgendaRows([], state))
+
+  expect(next.selectedKey).toBe(dayKey(boundary))
+  expect(next.weekStart).toBe(agendaWeekStart(boundary))
+  expect(next.selectionCursor).toBe(0)
+
+  const days = agendaWeekDays(next.weekStart)
+
+  expect(days).toContain(boundary)
+  expect(days.every((day) => (direction === -1 ? day >= boundary : day <= boundary))).toBe(true)
+})
+
 // @requirement PRODUCT.md §23.1
 // @requirement PRODUCT.md §23.3
 // @requirement PRODUCT.md §23.4

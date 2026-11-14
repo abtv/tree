@@ -24,6 +24,22 @@ function controlledSession() {
   return { session, jobs }
 }
 
+it('does not start corpus work before a context is installed or after disposal', () => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+
+  for (const disposed of [false, true]) {
+    if (disposed) session.dispose()
+    session.begin(origin)
+    session.edit('aa')
+    session.confirm(jump)
+    session.navigate(origin, 1, 1, jump)
+
+    expect(jobs).toHaveLength(0)
+    expect(jump).not.toHaveBeenCalled()
+  }
+})
+
 it('starts inactive and publishes pending draft state before count responses', () => {
   const { session } = controlledSession()
 

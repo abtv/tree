@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { prepareNodeSearch, searchNodeTerm } from './node-search-query'
+import { nodeSearchHighlights, prepareNodeSearch, searchNodeTerm } from './node-search-query'
 import type { TreeNode } from './document-types'
 
 function matches(query: string, node: TreeNode) {
@@ -34,4 +34,25 @@ it('can interrupt preparation of a long pasted term before compiling a search pa
   preparation.return([])
 
   expect(preparation.next().done).toBe(true)
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('retains the full union when literal highlight ranges overlap', () => {
+  const work = nodeSearchHighlights('abcdef', 'abcd cdef', [])
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toEqual([{ start: 0, end: 6 }])
+})
+
+// @requirement PRODUCT.md §20.14.3
+it('prepares repeated terms once while preserving independent smart case', () => {
+  const work = prepareNodeSearch('  alpha alpha\tAlpha\nalpha ')
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value.map(({ pattern }) => [pattern.characters.join(''), pattern.sensitive])).toEqual([
+    ['alpha', false],
+    ['Alpha', true],
+  ])
 })

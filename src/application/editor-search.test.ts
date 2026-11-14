@@ -319,6 +319,36 @@ it('keeps different repeat counts distinct while navigation is pending', async (
   expect(state().location.selectedNodeId).toBe('d')
 })
 
+it('preserves every destination in a mixed queue of rapid jumps', async () => {
+  const { store, state } = await setup()
+  const origin = { nodeId: 'a', offset: 0 }
+  let previous = state().focus
+  const destinations: [string, number][] = []
+  const unsubscribe = store.subscribe(() => {
+    const focus = state().focus
+    if (focus !== previous) destinations.push([focus.nodeId, focus.cursor])
+    previous = focus
+  })
+
+  store.search.begin(origin)
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate(origin, 1, 1)
+  store.search.navigate(origin, -1, 1)
+  store.search.navigate(origin, 1, 2)
+  store.search.navigate(origin, -1, 1)
+  await vi.runAllTimersAsync()
+  unsubscribe()
+
+  expect(destinations).toEqual([
+    ['a', 6],
+    ['b', 0],
+    ['a', 6],
+    ['c', 0],
+    ['b', 0],
+  ])
+})
+
 it('releases scheduled corpus work when manual input interrupts navigation', async () => {
   const { state } = await setup(2000)
   const apply = vi.fn()
