@@ -40,7 +40,7 @@ describeForEachEditingMode('Weekly Agenda', ({ mode }) => {
     await expect(window.locator('.search-count')).toHaveText('1')
     await window.keyboard.press('Escape')
     await window.locator('.agenda-today').click()
-    await window.keyboard.press('Meta+]')
+    await window.keyboard.press('Meta+Shift+]')
 
     const selected = window.locator('.agenda-row[aria-selected="true"]')
     await expect(selected).toContainText('Thu Oct 15')
@@ -52,13 +52,13 @@ describeForEachEditingMode('Weekly Agenda', ({ mode }) => {
     if (mode === 'vim') await window.keyboard.press('A')
     else await window.keyboard.press('End')
     await window.keyboard.type(' edited')
-    await window.keyboard.press('Meta+]')
+    await window.keyboard.press('Meta+Shift+]')
 
     await expect(selected).toContainText('Thu Oct 22')
     await expect(selected).toBeFocused()
     await expect(window.locator('.agenda-row-day')).toHaveCount(7)
     await expect(window.locator('.agenda-row[data-node-id]')).toHaveCount(0)
-    await window.keyboard.press('Meta+[')
+    await window.keyboard.press('Meta+Shift+[')
     await expect(window.locator('.agenda-row[data-node-id="next"]')).toContainText('edited')
     await window.keyboard.press('Meta+[')
     await expect(window.locator('.agenda-today')).toBeFocused()
@@ -72,7 +72,7 @@ describeForEachEditingMode('Weekly Agenda', ({ mode }) => {
 
     await window.keyboard.press('Meta+.')
     await expect(window.locator('.agenda-focused-heading')).toHaveCount(1)
-    await window.keyboard.press('Meta+]')
+    await window.keyboard.press('Meta+Shift+]')
     await expect(selected).toContainText('Thu Oct 15')
     await expect(window.locator('.agenda-focused-heading')).toHaveCount(1)
     await window.keyboard.press('Meta+,')

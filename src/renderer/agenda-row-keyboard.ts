@@ -12,6 +12,7 @@ import { handleRowTextKey, rowCaretMode } from './agenda-row-text-keys'
 import { arrivalCaret, clampCaret, type RowCaret } from './agenda-row-caret'
 import { requireNode } from '../domain/document'
 import { agendaRowLabel } from './agenda-labels'
+import { agendaWeekDirection } from './agenda-week-shortcut'
 import { firstNonWhitespace } from './vim-editing'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
 import { horizontalNavigation } from './vim-horizontal-navigation'
@@ -322,12 +323,13 @@ export function createAgendaKeyDownHandler({
     // Ctrl+D/U/O/R stay Vim commands where Ctrl is the primary modifier; the app has no such Cmd shortcut.
     const vimCtrl = event.ctrlKey && !event.metaKey && !event.altKey && isVimCtrlKey(event.key)
     if (shortcuts.isPrimary(event) && !vimCtrl) {
-      if (!event.shiftKey && !event.altKey && (event.key === '[' || event.key === ']')) {
+      const weekDirection = agendaWeekDirection(event)
+      if (weekDirection !== undefined) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
         beforeSelect?.(false)
-        store.applyAgenda({ kind: 'shift-week', direction: event.key === '[' ? -1 : 1 })
+        store.applyAgenda({ kind: 'shift-week', direction: weekDirection })
       } else if (rowTextKey()) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)

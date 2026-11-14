@@ -94,21 +94,30 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       platform = 'apple'
     })
 
-    it.each([false, true])(
-      'switches weeks from this row and preserves document and origin (standard: %s)',
-      async (standard) => {
+    it.each(
+      [false, true].flatMap((standard) =>
+        [
+          { previous: '[', next: ']', shiftKey: false },
+          { previous: '[', next: ']', shiftKey: true },
+          { previous: '{', next: '}', shiftKey: true },
+        ].map((shortcut) => ({ standard, ...shortcut })),
+      ),
+    )(
+      'switches weeks with $next (Shift: $shiftKey, standard: $standard) and preserves document and origin',
+      async ({ standard, previous, next, shiftKey }) => {
         const f = await fixture(element, standard)
         const before = f.snapshot()
 
-        f.press(']', { metaKey: true })
+        const forward = f.press(next, { metaKey: true, shiftKey })
 
+        expect(forward.preventDefault).toHaveBeenCalledOnce()
         expect(f.snapshot().agenda?.selectedKey).toBe(`day:${f.selected.day + 7}`)
         expect(f.snapshot().agenda?.selectionCursor).toBe(0)
         expect(f.snapshot().agenda?.activity.kind).toBe('inactive')
         expect(f.snapshot().document).toBe(before.document)
         expect(f.snapshot().agenda?.origin).toBe(before.agenda?.origin)
 
-        f.press('[', { metaKey: true })
+        f.press(previous, { metaKey: true, shiftKey })
 
         expect(f.snapshot().agenda?.selectedKey).toBe(`day:${f.selected.day}`)
         expect(f.saves).toHaveLength(0)

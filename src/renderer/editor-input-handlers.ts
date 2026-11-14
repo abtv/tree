@@ -9,6 +9,7 @@ import { getCaret, getSelectionRange, nodeTextLength, readEditableContent, selec
 import { handleVimKey, handleVimNumberKey } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
+import { agendaWeekDirection } from './agenda-week-shortcut'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { APPLE_SHORTCUTS, isMappedPrimaryKey, type ShortcutProfile } from './shortcut-profile'
 import { prepareVimCommand, type VimTextCommandState } from './vim-session-finish'
@@ -108,10 +109,11 @@ export function createEditorKeyDownHandler({
     const snapshot = store.getSnapshot()
     const agenda = snapshot.status === 'ready' ? snapshot.agenda : undefined
     if (agenda !== undefined) {
-      if (primary && !event.altKey && !event.shiftKey && (event.key === '[' || event.key === ']')) {
+      const weekDirection = primary ? agendaWeekDirection(event) : undefined
+      if (weekDirection !== undefined) {
         event.preventDefault()
         prepareVimCommand(vim, 'navigation', event.currentTarget)
-        store.applyAgenda({ kind: 'shift-week', direction: event.key === '[' ? -1 : 1 })
+        store.applyAgenda({ kind: 'shift-week', direction: weekDirection })
         return
       }
       const row = store.getAgendaRows().find((candidate) => candidate.key === agenda.selectedKey)
