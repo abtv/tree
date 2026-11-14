@@ -33,6 +33,103 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 }
 
 test.describe('Vim editing: text editing', () => {
+  for (const rich of [false, true]) {
+    // @requirement PRODUCT.md §20.2.17
+    // @requirement PRODUCT.md §20.2.19
+    test(
+      `keeps counted word-object ranges through editing and Visual selection (${rich ? 'rich' : 'plain'})`,
+      {
+        tag: '@linux',
+      },
+      async ({ userDataDir }) => {
+        const suffix = rich ? ' https://example.com' : ''
+        const original = `one.two  three${suffix}`
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              { id: 'root', text: original, children: [] },
+              { id: 'next', text: 'one  two  three', children: [] },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'root' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        const text = () =>
+          editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : element.textContent))
+        const selection = () =>
+          editor.evaluate((element) =>
+            element instanceof HTMLTextAreaElement
+              ? element.value.slice(element.selectionStart, element.selectionEnd)
+              : document.getSelection()?.toString(),
+          )
+        await editor.focus()
+        await setCursor(editor, 1)
+
+        await window.keyboard.press('v')
+        await window.keyboard.press('2')
+        await window.keyboard.press('i')
+        await pressShifted(window, 'W')
+
+        await expect.poll(selection).toBe('one.two  ')
+        await expect(editor).toBeFocused()
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        await window.screenshot({ path: test.info().outputPath('counted-word-visual.png') })
+
+        await window.keyboard.press('Escape')
+        await setCursor(editor, 1)
+        await window.keyboard.press('d')
+        await window.keyboard.press('2')
+        await window.keyboard.press('i')
+        await window.keyboard.press('w')
+
+        await expect.poll(text).toBe(`two  three${suffix}`)
+        await expect(editor).toBeFocused()
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+        await window.keyboard.press('u')
+
+        await expect.poll(text).toBe(original)
+
+        await setCursor(editor, 1)
+        await window.keyboard.press('.')
+
+        await expect.poll(text).toBe(`two  three${suffix}`)
+
+        await window.keyboard.press('u')
+        await setCursor(editor, 1)
+        await window.keyboard.press('d')
+        await window.keyboard.press('9')
+        await window.keyboard.press('9')
+        await window.keyboard.press('i')
+        await window.keyboard.press('w')
+
+        await expect.poll(text).toBe(original)
+        await expect(editor).toBeFocused()
+
+        if (!rich) {
+          const next = node(window, 2)
+          await next.focus()
+          await setCursor(next, 3)
+
+          await window.keyboard.press('c')
+          await window.keyboard.press('2')
+          await window.keyboard.press('a')
+          await window.keyboard.press('w')
+
+          await expect(next).toHaveValue('one')
+          await expect(next).toBeFocused()
+          await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+
+          await window.keyboard.press('Escape')
+          await window.keyboard.press('u')
+
+          await expect(next).toHaveValue('one  two  three')
+        }
+      },
+    )
+  }
+
   // @requirement PRODUCT.md §20.2.9
   // @requirement PRODUCT.md §20.2.11
   // @requirement PRODUCT.md §20.2.16

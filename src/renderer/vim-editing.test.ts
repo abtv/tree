@@ -164,7 +164,7 @@ describe('Vim text objects', () => {
     expect(textObjectRange('one.two  three', 1, 'i', 'w')).toEqual({ start: 0, end: 3 })
     expect(textObjectRange('one.two  three', 1, 'a', 'w')).toEqual({ start: 0, end: 3 })
     expect(textObjectRange('one.two  three', 1, 'i', 'W')).toEqual({ start: 0, end: 7 })
-    expect(textObjectRange('one two three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 7 })
+    expect(textObjectRange('one two three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
     expect(textObjectRange('one  two', 6, 'a', 'w')).toEqual({ start: 3, end: 8 })
     expect(textObjectRange('café next', 2, 'i', 'w')).toEqual({ start: 0, end: 4 })
     expect(textObjectRange('', 0, 'i', 'w')).toBeUndefined()
@@ -197,7 +197,40 @@ describe('Vim text objects', () => {
     expect(textObjectRange(')orphan(', 0, 'i', ')')).toBeUndefined()
     expect(textObjectRange('abc', 0, 'i', '?')).toBeUndefined()
     expect(textObjectRange('abc', 0, 'i', 'w', 0)).toBeUndefined()
-    expect(textObjectRange('abc', 2, 'i', 'w', 3)).toEqual({ start: 0, end: 3 })
+    expect(textObjectRange('abc', 2, 'i', 'w', 3)).toBeUndefined()
+  })
+})
+
+describe('Vim counted word objects', () => {
+  // @requirement PRODUCT.md §20.2.17
+  // Expected ranges verified with Vim 9.1 using y[count]iw/iW/aw/aW on the same one-line text.
+  it.each([
+    ['one ...', 1, 'i', 'w', 2, { start: 0, end: 4 }],
+    ['one ...', 7, 'i', 'w', 1, { start: 4, end: 7 }],
+    ['one.two  three', 1, 'i', 'W', 2, { start: 0, end: 9 }],
+    ['one.two  three', 1, 'i', 'W', 3, { start: 0, end: 14 }],
+    ['one.two  three', 1, 'i', 'w', 3, { start: 0, end: 7 }],
+    ['one  two  three', 3, 'a', 'w', 1, { start: 3, end: 8 }],
+    ['one  two  three', 3, 'a', 'w', 2, { start: 3, end: 15 }],
+    ['one  two  three', 3, 'a', 'W', 2, { start: 3, end: 15 }],
+    ['one  two  three', 3, 'i', 'w', 3, { start: 3, end: 10 }],
+    ['one.two three', 3, 'a', 'w', 2, { start: 3, end: 8 }],
+    ['  one two  ', 0, 'a', 'W', 2, { start: 0, end: 9 }],
+    ['one two', 4, 'a', 'w', 1, { start: 3, end: 7 }],
+    ['one  ', 4, 'a', 'w', 1, undefined],
+    ['   ', 1, 'a', 'W', 1, undefined],
+    ['   ', 1, 'i', 'W', 1, { start: 0, end: 3 }],
+    ['one two', 0, 'i', 'w', 4, undefined],
+    ['one.two', 0, 'a', 'W', 2, undefined],
+  ] as const)('resolves %s at %i with %s%s count %i', (text, cursor, modifier, object, count, expected) => {
+    expect(textObjectRange(text, cursor, modifier, object, count)).toEqual(expected)
+  })
+
+  // @requirement PRODUCT.md §20.2.17
+  // @requirement PRODUCT.md §22.1
+  it.each(['w', 'W'])('rejects an unavailable %s count without iterating beyond the node', (object) => {
+    expect(textObjectRange('one two', 0, 'i', object, Number.MAX_SAFE_INTEGER)).toBeUndefined()
+    expect(textObjectRange('one two', 0, 'a', object, Number.MAX_SAFE_INTEGER)).toBeUndefined()
   })
 })
 
@@ -308,10 +341,10 @@ describe('Vim text-object boundaries', () => {
 
   it('selects words, whitespace runs and counts without leaving the node', () => {
     expect(textObjectRange('one  two', 1, 'i', 'w')).toEqual({ start: 0, end: 3 })
-    expect(textObjectRange('one  two', 3, 'a', 'w')).toEqual({ start: 3, end: 5 })
+    expect(textObjectRange('one  two', 3, 'a', 'w')).toEqual({ start: 3, end: 8 })
     expect(textObjectRange('  ', 1, 'i', 'w')).toEqual({ start: 0, end: 2 })
     expect(textObjectRange('one', 0, 'a', 'w')).toEqual({ start: 0, end: 3 })
-    expect(textObjectRange('one two', 0, 'i', 'w', 5)).toEqual({ start: 0, end: 7 })
+    expect(textObjectRange('one two', 0, 'i', 'w', 5)).toBeUndefined()
   })
 
   it('honors backslash parity before a quote delimiter', () => {
@@ -350,7 +383,7 @@ describe('Vim text-object boundaries', () => {
   it('extends a count across a following punctuation run and spaces', () => {
     expect(textObjectRange('one.two', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
     expect(textObjectRange('one.', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
-    expect(textObjectRange('one two.three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 7 })
+    expect(textObjectRange('one two.three', 1, 'i', 'w', 2)).toEqual({ start: 0, end: 4 })
   })
 })
 

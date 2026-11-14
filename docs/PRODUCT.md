@@ -1553,6 +1553,7 @@ Normal mode also supports:
 
 * Text objects may follow `d`, `y`, or `c`, and may be selected in character-wise Visual mode.
 * `iw`, `aw`, `iW`, and `aW` select a word or whitespace-delimited WORD, with `a` including adjacent whitespace where available.
+* Counts follow Vim: `iw` and `iW` count each word/WORD run and each intervening whitespace run. `aw` and `aW` count only words/WORDs. Starting an around object in whitespace includes that leading run and the requested following words without adding trailing whitespace. Otherwise, around objects prefer trailing whitespace and include preceding whitespace when none follows. If the requested count is unavailable within the node, the command makes no change.
 * Inner and around quote objects use `"`, `'`, or backtick; bracket objects use either delimiter of `()`, `[]`, `{}`, or `<>`.
 * Inner objects exclude delimiters; around objects include them.
 * Bracket objects choose the nearest enclosing matched pair and counts choose successively outer pairs.

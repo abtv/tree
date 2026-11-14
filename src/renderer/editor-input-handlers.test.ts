@@ -448,6 +448,85 @@ describe('editor keyboard handler', () => {
     expect(input.selectionEnd).toBe(14)
   })
 
+  // @requirement PRODUCT.md §20.2.17
+  it.each([
+    ['2', 'y', 'i', 'Shift', 'W'],
+    ['y', '2', 'i', 'Shift', 'W'],
+  ])('uses the same counted WORD range for operator and motion prefixes (%j)', async (...keys) => {
+    const { node, input, press, vim } = await textFixture({ id: 'node', text: 'one.two  three', children: [] })
+    input.setSelectionRange(1, 1)
+
+    press(...keys)
+
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'one.two  ' })
+    expect(node().text).toBe('one.two  three')
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(1)
+  })
+
+  // @requirement PRODUCT.md §20.2.17
+  // @requirement PRODUCT.md §20.2.19
+  it('deletes and repeats a counted inner word range as one undoable change', async () => {
+    const { node, input, press, store, vim } = await textFixture({ id: 'node', text: 'one ...', children: [] })
+    input.setSelectionRange(1, 1)
+
+    press('d', '2', 'i', 'w')
+
+    expect(node().text).toBe('...')
+    expect(vim.register.current).toEqual({ kind: 'text', value: 'one ' })
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(0)
+
+    store.undo()
+    input.value = node().text
+    input.setSelectionRange(1, 1)
+    press('.')
+
+    expect(node().text).toBe('...')
+
+    store.undo()
+
+    expect(node().text).toBe('one ...')
+  })
+
+  // @requirement PRODUCT.md §20.2.17
+  it('changes around words from whitespace and selects counted WORDs in character Visual mode', async () => {
+    const change = await textFixture({ id: 'node', text: 'one  two  three', children: [] })
+    change.input.setSelectionRange(3, 3)
+
+    change.press('c', '2', 'a', 'w')
+
+    expect(change.node().text).toBe('one')
+    expect(change.vim.register.current).toEqual({ kind: 'text', value: '  two  three' })
+    expect(change.vim.mode).toBe('insert')
+
+    const visual = await textFixture({ id: 'node', text: 'one.two  three', children: [] })
+    visual.input.setSelectionRange(1, 1)
+
+    visual.press('v', '2', 'i', 'Shift', 'W')
+
+    expect(visual.vim.mode).toBe('visual')
+    expect(visual.input.selectionStart).toBe(0)
+    expect(visual.input.selectionEnd).toBe(9)
+    expect(visual.vim.commandState.visualAnchor).toBe(0)
+    expect(visual.vim.commandState.visualFocus).toBe(8)
+  })
+
+  // @requirement PRODUCT.md §20.2.17
+  it('keeps text, register and caret when the requested word count is unavailable', async () => {
+    const { node, input, press, vim } = await textFixture({ id: 'node', text: 'one two', children: [] })
+    const register = { kind: 'text' as const, value: 'kept' }
+    vim.register.current = register
+    input.setSelectionRange(4, 4)
+
+    press('d', '2', 'i', 'w')
+
+    expect(node().text).toBe('one two')
+    expect(vim.register.current).toBe(register)
+    expect(vim.mode).toBe('normal')
+    expect(input.selectionStart).toBe(4)
+  })
+
   it('routes whole-node Visual commands and leaves the parent heading unavailable', () => {
     const store = createStore()
     const input = document.createElement('textarea')

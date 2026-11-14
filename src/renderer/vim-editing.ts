@@ -47,33 +47,28 @@ export function textObjectRange(
   if (text.length === 0 || count < 1) return undefined
   const position = Math.max(0, Math.min(cursor, text.length - 1))
   if (object === 'w' || object === 'W') {
-    // Mutation triage: as in `characterClass`, the `'space'`/`'WORD'` labels only separate
-    // whitespace from non-whitespace; the around-extension below re-tests whitespace directly.
     const classify = (character: string): string =>
       object === 'W' ? (/\s/u.test(character) ? 'space' : 'WORD') : characterClass(character)
-    const kind = classify(text[position] ?? '')
+    const initialKind = classify(text[position]!)
     let start = position
-    let end = position + 1
-    while (start > 0 && classify(text[start - 1] ?? '') === kind) start -= 1
-    while (end < text.length && classify(text[end] ?? '') === kind) end += 1
-    // Mutation triage: `end` never exceeds `text.length` here, so an inclusive bound or forced-true
-    // guard reads only the empty string at `text[text.length]`, which cannot extend a run.
-    for (let index = 1; index < count; index += 1) {
-      if (end >= text.length) break
-      const nextKind = classify(text[end] ?? '')
-      while (end < text.length && classify(text[end] ?? '') === nextKind) end += 1
-      if (nextKind === 'space' && end < text.length) {
-        const following = classify(text[end] ?? '')
-        while (end < text.length && classify(text[end] ?? '') === following) end += 1
-      }
+    while (start > 0 && classify(text[start - 1]!) === initialKind) start -= 1
+
+    let end = position
+    for (let index = 0; index < count; index += 1) {
+      // Inner objects count whitespace runs; around objects count only non-whitespace runs.
+      if (modifier === 'a') while (end < text.length && /\s/u.test(text[end]!)) end += 1
+      if (end === text.length) return undefined
+
+      const kind = classify(text[end]!)
+      while (end < text.length && classify(text[end]!) === kind) end += 1
     }
-    // Mutation triage: forcing this guard true only enters whitespace re-tests that the characters
-    // already decide, and the inclusive bounds read an undefined non-space neighbor at the node edge.
-    if (modifier === 'a' && kind !== 'space') {
-      if (end < text.length && /\s/u.test(text[end] ?? '')) {
-        while (end < text.length && /\s/u.test(text[end] ?? '')) end += 1
+
+    // Starting in whitespace already includes the leading separator. Otherwise prefer trailing space.
+    if (modifier === 'a' && initialKind !== 'space') {
+      if (end < text.length && /\s/u.test(text[end]!)) {
+        while (end < text.length && /\s/u.test(text[end]!)) end += 1
       } else {
-        while (start > 0 && /\s/u.test(text[start - 1] ?? '')) start -= 1
+        while (start > 0 && /\s/u.test(text[start - 1]!)) start -= 1
       }
     }
     return { start, end }

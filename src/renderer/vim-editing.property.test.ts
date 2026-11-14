@@ -176,6 +176,46 @@ describe('Vim word-motion invariants', () => {
 })
 
 describe('Vim text-object invariants', () => {
+  // @requirement PRODUCT.md §20.2.17
+  it('matches the word-run contract for inner and around counts at arbitrary positions', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom('alpha', 'βeta', '...', '_id', '  ', '\t'), { minLength: 1, maxLength: 12 }),
+        fc.nat(100),
+        fc.constantFrom('w', 'W'),
+        fc.constantFrom('i' as const, 'a' as const),
+        fc.integer({ min: 1, max: 20 }),
+        (parts, cursorSeed, object, modifier, count) => {
+          const text = parts.join('')
+          const cursor = cursorSeed % text.length
+          const pattern = object === 'W' ? /\s+|\S+/gu : /\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]+/gu
+          const runs = Array.from(text.matchAll(pattern), (match) => ({
+            start: match.index,
+            end: match.index + match[0].length,
+            space: /^\s/u.test(match[0]),
+          }))
+          const first = runs.findIndex((run) => run.start <= cursor && cursor < run.end)
+          const candidates = runs.slice(first).filter((run) => modifier === 'i' || !run.space)
+          const last = candidates[count - 1]
+          let expected: { start: number; end: number } | undefined
+          if (last !== undefined) {
+            let start = runs[first]!.start
+            let end = last.end
+            if (modifier === 'a' && !runs[first]!.space) {
+              const trailing = runs.find((run) => run.start === end && run.space)
+              if (trailing !== undefined) end = trailing.end
+              else if (runs[first - 1]?.space === true) start = runs[first - 1]!.start
+            }
+            expected = { start, end }
+          }
+
+          expect(textObjectRange(text, cursor, modifier, object, count)).toEqual(expected)
+        },
+      ),
+      { numRuns: propertyRuns(500) },
+    )
+  })
+
   it('keeps each selected range inside its node and inner ranges inside around ranges', () => {
     fc.assert(
       fc.property(
