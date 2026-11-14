@@ -103,8 +103,8 @@ it('searches the complete tree once per node using literal smart case and parent
   expect(results('alpha')[1]).toMatchObject({ path: 'Alpha #work #w' })
 })
 
-it('matches complete case-sensitive tags, excluding links and prefixes', () => {
-  expect(results('#work').map(({ id }) => id)).toEqual(['a'])
+it('matches complete smart-case tags, excluding links and prefixes', () => {
+  expect(results('#work').map(({ id }) => id)).toEqual(['a', 'b'])
   expect(results('#Work').map(({ id }) => id)).toEqual(['b'])
   expect(results('#w').map(({ id }) => id)).toEqual(['a'])
   expect(results('#new_tag')).toEqual([])

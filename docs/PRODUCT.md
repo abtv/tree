@@ -2084,7 +2084,7 @@ A word beginning with `#` at the start of text or after whitespace is a tag. Nam
 * In Tree and Agenda, newly typed letters inside a `#`, `@`, or `&` name are automatically lowercased, including typing in the middle of an existing name and replacing selected text. Only the newly entered characters change; existing characters retain their spelling.
 * This applies to standard editing, Vim Insert and Vim Replace, and to committed composition text after native composition ends.
 * Text outside recognized marker names, including email addresses and hyperlinks, keeps its case. Existing documents are never normalized on load.
-* Paste, accepted suggestions, Undo/Redo, Vim puts and explicit case-changing commands preserve their text. Catalogs and search continue to distinguish existing case variants.
+* Paste, accepted suggestions, Undo/Redo, Vim puts and explicit case-changing commands preserve their text. Catalogs retain existing case variants as separate names; global Search applies per-term smart case (§20.14).
 * Automatic lowercasing is an owner-requested text-entry convention and a deliberate Vim divergence.
 
 Tree and Agenda highlight tags with a muted violet foreground and subtle rounded background adapted to light and dark appearance. The literal `#` remains visible. Recognized dates inside tags keep their date foreground. Highlighting does not add padding, change text size, or interfere with selection, caret placement, links or existing date interpretation. Whole-node selection retains its selection colors, and struck-through tags retain the muted completion color.
@@ -2104,7 +2104,7 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 `Cmd+;` opens global Search in Tree or Agenda, in standard editing and every Vim mode. `Cmd+F` opens local search (§20.2). Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
 
 * The input receives focus and starts empty on every opening. Empty input shows recent nodes as below.
-* Every nonempty text query starts literal text search, including one- and two-character queries. Results update as the input changes, using the smart-case rules of Vim `/` (§20.2).
+* Every nonempty query searches required terms using the ancestor-context and per-term smart-case rules in §20.14.3. Results update as the input changes.
 * Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once in depth-first tree order with its text and parent path.
 * All results are reachable by scrolling and keyboard selection. Pending work lasting more than 200ms displays `Searching…` once in the footer; no matches displays `No results`. Typing does not navigate or edit the document.
 * While tag suggestions are visible, an empty node-result list does not display `No results`.
@@ -2115,13 +2115,13 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 * The footer explains the active keyboard action: `↑ ↓ select · Enter/Tab apply · Esc close` while tag suggestions are open, otherwise `↑ ↓ select · Enter open · Esc close` when results are ready. Accepting a tag closes suggestions and leaves its full text in the input, so the results and their open action become active.
 * When the node-result list is active and nonempty, the trailing edge of its `Results` heading shows the selected row and total as `3 / 24`. The total covers all matching nodes, including those outside the rendered scroll window. Recent nodes with empty input have no counter. The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
 
-* A leading `#` searches tags. Global Search suggestions match a continuous, case-insensitive substring of the tag name; unlike inline tag completion (§20.13), they do not match letters separated by gaps. The existing exact-name, prefix, word-prefix and substring ranking remains. Node results match complete case-sensitive tags.
+* A single leading `#`, `@` or `&` term retains its existing catalog suggestions. Global Search suggestions match a continuous, case-insensitive substring of the name; unlike inline tag completion (§20.13), they do not match letters separated by gaps. The existing exact-name, prefix, word-prefix and substring ranking remains. Multi-term queries do not offer completion suggestions; their terms use the same matching rules whether typed before or after ordinary text.
 * When the only matching tag suggestion exactly equals the input, Search omits the redundant suggestion and activates the node results as soon as they are ready. The first result is selected and Enter opens it directly. A nonexact fragment or a query with multiple matching tag suggestions keeps tag completion active, even when one suggestion is an exact match.
 * Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape closes the entire Search popup on the first press, including when tag suggestions are open, and restores the originating editor selection and mode.
-* A manually typed exact existing tag searches immediately, including one-character names; a fragment or unknown tag has no node results. Search matches complete recognized tags, excluding hyperlink ranges, and never creates tags.
+* A manually typed complete marker name searches immediately, including one-character names and case variants accepted by smart case; a fragment or unknown name has no node results. Search matches complete recognized names, excluding hyperlink ranges, and never creates tags.
 * Completion acceptance leaves focus in the search input and does not jump to a node. IME composition owns its keys and suspends suggestions until commitment.
 
-Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. Memory scales with the current result list and traversal depth, without retaining earlier query snapshots. Query input causes no document/history writes or syncs. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior.
+Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior. Resource constraints are in §20.14.3.
 
 With empty input the popup lists up to eight distinct recent nodes, most recently used first, with each node's text and parent path (§20.14.2). The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
 
@@ -2155,9 +2155,18 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 * Selected nodes and tag suggestions use a distinct fill and a complete inset frame with 4 px rounded corners, adapted to Light, Dark and Automatic appearance. Selection does not change row geometry or text alignment.
 * Trailing scroll space is reserved only for overflowing node results. A list that fits has no extra trailing space. Tags and node results use the same gap before the footer.
 * Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in every node title also have a visible underline, including unselected nodes and short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.
-* Tag results highlight only complete, case-sensitive recognized tags, excluding hyperlink ranges.
+* Single-marker results highlight only complete recognized names matching that term's smart case, excluding hyperlink ranges. Multi-term queries change result eligibility without adding per-term highlighting or changing the existing result layout and parent-path presentation.
 * Tag suggestions highlight only the continuous matched fragment, preserving the suggestion's original spelling; a matching prefix includes its leading `#`.
 * Bare `#` does not highlight every suggestion.
+
+#### 20.14.3 Query Terms and Ancestor Context
+
+* Every nonempty query starts search, including one- and two-character terms. Whitespace separates required terms; repeated and leading/trailing whitespace is ignored. A whitespace-only query has no results. Term order is irrelevant, and repeating a term does not require multiple occurrences. Quotes and regular-expression syntax have no special meaning.
+* Every term must match somewhere in the result node or its complete ancestor chain up to the root, regardless of depth or the displayed parent-path cutoff. At least one term must match the result node itself. Intermediate ancestors need not match; siblings and other branches never contribute. A matching ancestor and its matching descendant may both appear.
+* Ordinary terms match literal substrings. Terms beginning with `#`, `@` or `&` match complete recognized tags, people or events, excluding hyperlinks and embedded markers (§20.13); incomplete names and bare markers do not match nodes. Different terms may match different ancestors. For example, `@alex #k8s opensearch` can find a node containing `opensearch-dashboards` under ancestors containing `@Alex` and `#K8s`.
+* Smart case applies independently to each term: a term without uppercase letters ignores case; a term containing an uppercase letter requires that case. This applies equally to ordinary text and complete marker names. Local Cmd+F and Vim `/` retain their separate literal phrase-search rules (§20.2).
+
+Query preparation and matching retain only the current terms, result list and ancestor traversal state, without earlier query snapshots or a persistent full-text index. Ancestor term matches are accumulated during traversal, rather than rescanning all ancestor text for each descendant. Query input causes no document/history writes or syncs.
 
 ## 21. Unexpected Renderer Errors
 

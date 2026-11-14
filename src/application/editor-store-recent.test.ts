@@ -168,7 +168,8 @@ it('omits only a sole exact tag suggestion and restores completion when the quer
 })
 
 // @requirement PRODUCT.md §20.14
-it('gates empty and unknown-tag queries and searches short text without changing editor state', async () => {
+it('returns no matches for empty and unknown-tag queries without changing editor state', async () => {
+  vi.useFakeTimers()
   const { store } = await setup()
   store.editText('a', 'Alpha #w')
   const before = store.getSnapshot()
@@ -177,8 +178,11 @@ it('gates empty and unknown-tag queries and searches short text without changing
 
   store.searchNodes('', publish)
   store.searchNodes('#new_tag', publish)
+  await vi.runAllTimersAsync()
+
   expect(publish.mock.calls).toEqual([[[]], [[]]])
   expect(store.searchNodeSuggestions('#')).toEqual(['w'])
+  vi.useRealTimers()
   await new Promise<void>((resolve) =>
     store.searchNodes('Al', (results) => {
       expect(results.map(({ id }) => id)).toEqual(['a'])

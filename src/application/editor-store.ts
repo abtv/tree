@@ -210,8 +210,7 @@ export class EditorStore {
   }
 
   public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
-    const prefix = tagPrefix(query)
-    if (query === '' || (prefix !== undefined && !this.tags.get(prefix)!.has(query.slice(1)))) {
+    if (query === '') {
       publish([])
       return () => undefined
     }

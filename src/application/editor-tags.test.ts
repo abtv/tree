@@ -23,13 +23,15 @@ it('routes global Search to independent marker catalogs and suppresses redundant
   expect(store.searchNodeSuggestions('@anna')).toEqual(['Anna_Smith'])
   expect(store.searchNodeSuggestions('@Anna_Smith')).toEqual([])
   expect(store.searchNodeSuggestions('&weekly-review')).toEqual([])
-  for (const query of ['@Anna', '&Anna_Smith', '@anna_smith']) {
-    let called = false
-    store.searchNodes(query, (results) => {
-      called = true
-      expect(results).toEqual([])
-    })
-    expect(called).toBe(true)
+  for (const [query, expected] of [
+    ['@Anna', []],
+    ['&Anna_Smith', []],
+    ['@anna_smith', ['a']],
+    ['@anna_smith #anna &weekly-review', ['a']],
+  ] as const) {
+    const results = await new Promise<readonly { id: string }[]>((resolve) => store.searchNodes(query, resolve))
+
+    expect(results.map(({ id }) => id)).toEqual(expected)
   }
 
   store.editText('a', '#Anna')

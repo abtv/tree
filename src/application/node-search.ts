@@ -1,19 +1,22 @@
 import type { Document, TreeNode } from '../domain/document'
-import { nodeTags, tagPrefix, type TagPrefix } from '../domain/tags'
-import { prepareSearch, searchText } from '../domain/text-search'
+import { prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
 import { label, resultText, type RecentNode } from './recent-nodes'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import type { TextMatch } from '../domain/text-search'
 
-function pathTagMatches(ancestors: readonly TreeNode[], tag: string, prefix: TagPrefix): readonly TextMatch[] {
+function* pathTagMatches(
+  ancestors: readonly TreeNode[],
+  term: NodeSearchTerm,
+): Generator<undefined, readonly TextMatch[]> {
   const matches: TextMatch[] = []
   let offset = 0
   for (const ancestor of ancestors) {
     const text = ancestor.text.slice(0, 160)
-    for (const match of nodeTags(ancestor, prefix)) {
-      if (match.name !== tag || match.end > text.length) continue
+    for (const match of searchNodeTerm(ancestor, term)) {
+      yield undefined
+      if (match === undefined || match.end > text.length) continue
       const start = text.slice(0, match.start).replace(/\s+/g, ' ').trimStart().length
-      matches.push({ start: offset + start, end: offset + start + tag.length + 1 })
+      matches.push({ start: offset + start, end: offset + start + match.end - match.start })
     }
     offset += label(ancestor).length + 3
   }
@@ -21,47 +24,67 @@ function pathTagMatches(ancestors: readonly TreeNode[], tag: string, prefix: Tag
 }
 
 export function* searchNodes(document: Document, query: string): Generator<undefined, readonly RecentNode[]> {
-  const prefix = tagPrefix(query)
-  const tag = prefix !== undefined ? query.slice(1) : undefined
-  const pattern = tag === undefined ? yield* prepareSearch(query) : undefined
+  const terms = yield* prepareNodeSearch(query)
+  if (terms.length === 0) return []
+  const singleTag = terms.length === 1 && terms[0]!.prefix !== undefined ? terms[0] : undefined
+  const counts = terms.map(() => 0)
+  let covered = 0
   const results: RecentNode[] = []
   const ancestors: TreeNode[] = []
-  const stack = [{ nodes: document.roots, index: 0 }]
+  const stack = [{ nodes: document.roots, index: 0, inherited: [] as number[] }]
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
     const node = frame.nodes[frame.index++]
     if (node === undefined) {
       stack.pop()
       ancestors.pop()
+      for (const index of frame.inherited) {
+        if (--counts[index]! === 0) covered--
+        yield undefined
+      }
       continue
     }
     yield undefined
-    let matches = false
-    if (tag !== undefined) matches = nodeTags(node, prefix).some(({ name }) => name === tag)
-    else if (pattern !== undefined) {
-      for (const match of searchText(node.text, pattern)) {
+    const own: number[] = []
+    for (let index = 0; index < terms.length; index++) {
+      yield undefined
+      for (const match of searchNodeTerm(node, terms[index]!)) {
         yield undefined
         if (match !== undefined) {
-          matches = true
+          own.push(index)
+          if (counts[index]!++ === 0) covered++
           break
         }
       }
     }
-    if (matches)
+    if (own.length > 0 && covered === terms.length) {
+      const tagMatches: TextMatch[] = []
+      if (singleTag !== undefined) {
+        for (const match of searchNodeTerm(node, singleTag)) {
+          yield undefined
+          if (match !== undefined) tagMatches.push(match)
+        }
+      }
       results.push({
         id: node.id,
         text: resultText(node),
         path: ancestors.length ? ancestors.map(label).join(' › ') : null,
-        ...(tag === undefined
+        ...(singleTag === undefined
           ? {}
           : {
-              tagMatches: nodeTags(node, prefix).filter((match) => match.name === tag),
-              pathTagMatches: pathTagMatches(ancestors, tag, prefix!),
+              tagMatches,
+              pathTagMatches: yield* pathTagMatches(ancestors, singleTag),
             }),
       })
+    }
     if (node.children.length > 0) {
       ancestors.push(node)
-      stack.push({ nodes: node.children, index: 0 })
+      stack.push({ nodes: node.children, index: 0, inherited: own })
+    } else {
+      for (const index of own) {
+        if (--counts[index]! === 0) covered--
+        yield undefined
+      }
     }
   }
   return results

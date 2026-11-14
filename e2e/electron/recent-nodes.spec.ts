@@ -15,6 +15,69 @@ import {
 
 describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
+  // @requirement PRODUCT.md §20.14.3
+  test('combines text and marker terms through all ancestors without including unmatched siblings', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'root',
+            text: '@Alex Infrastructure',
+            children: [
+              {
+                id: 'second',
+                text: '#K8s',
+                children: [
+                  {
+                    id: 'third',
+                    text: '&Meeting',
+                    children: [
+                      {
+                        id: 'fourth',
+                        text: 'Tasks',
+                        children: [
+                          { id: 'leaf', text: 'opensearch-dashboards', children: [] },
+                          { id: 'sibling', text: 'postgres', children: [] },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          { id: 'outside', text: 'opensearch', children: [] },
+          { id: 'direct', text: '@Alex #K8s &Meeting Infrastructure opensearch', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+;')
+    const input = window.getByRole('searchbox', { name: 'Search query' })
+    const results = window.getByRole('listbox', { name: 'Search results' })
+
+    await input.fill('@alex   #k8s &meeting infrastructure opensearch')
+
+    await expect(results.locator('.recent-node-text')).toHaveText([
+      'opensearch-dashboards',
+      '@Alex #K8s &Meeting Infrastructure opensearch',
+    ])
+    await input.fill('opensearch infrastructure @Alex #k8s &meeting')
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await input.fill('@ALEX #k8s opensearch')
+    await expect(window.getByText('No results', { exact: true })).toBeVisible()
+    await input.fill('@alex #k8s opensearch')
+    await expect(results.getByRole('option')).toHaveCount(2)
+    await window.keyboard.press('Enter')
+
+    await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
+    await expect(window.locator('[data-node-id="leaf"] .node-input')).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('opens a sole exact tag result with one Enter and restores suggestions for a fragment', async ({
     userDataDir,
   }) => {
@@ -60,6 +123,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await window.keyboard.press('Tab')
     await expect(tags).toHaveCount(0)
     await expect(input).toHaveValue('#p1')
+    await expect(results).toHaveAttribute('aria-busy', 'false')
     await expect(results.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
     await window.keyboard.press('ArrowDown')
     await expect(results.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
@@ -121,7 +185,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await window.keyboard.press('Tab')
     await expect(input).toHaveValue('#work')
     await expect(tags).toHaveCount(0)
-    await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w'])
+    await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w', 'alpha #Work'])
     await input.fill('#w')
     await expect(tags).toBeVisible()
     await window.keyboard.press('Escape')
