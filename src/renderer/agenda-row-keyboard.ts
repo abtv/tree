@@ -67,7 +67,7 @@ export function createAgendaKeyDownHandler({
     const textOf = (candidate: AgendaRow): string =>
       candidate.kind === 'node'
         ? requireNode(state.document, candidate.nodeId).node.text
-        : agendaRowLabel(candidate, state.agenda!.today, focusedAgendaDay(state.agenda) !== undefined)
+        : agendaRowLabel(candidate, state.agenda!.today)
     const hasImage = (candidate: AgendaRow): boolean =>
       candidate.kind === 'node' &&
       candidate.role === 'match' &&
@@ -322,7 +322,13 @@ export function createAgendaKeyDownHandler({
     // Ctrl+D/U/O/R stay Vim commands where Ctrl is the primary modifier; the app has no such Cmd shortcut.
     const vimCtrl = event.ctrlKey && !event.metaKey && !event.altKey && isVimCtrlKey(event.key)
     if (shortcuts.isPrimary(event) && !vimCtrl) {
-      if (rowTextKey()) {
+      if (!event.shiftKey && !event.altKey && (event.key === '[' || event.key === ']')) {
+        event.preventDefault()
+        if (vim !== undefined) clearCommandAssembly(vim.commandState)
+        finishClickReplace()
+        beforeSelect?.(false)
+        store.applyAgenda({ kind: 'shift-week', direction: event.key === '[' ? -1 : 1 })
+      } else if (rowTextKey()) {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
       } else if (event.key.toLowerCase() === 'p' && !event.shiftKey && !event.altKey) {

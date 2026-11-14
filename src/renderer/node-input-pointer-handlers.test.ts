@@ -50,7 +50,7 @@ it('defers readonly link focus until click without intercepting ordinary text', 
 })
 
 it('selects the focused Agenda occurrence without issuing Tree selection, and keeps same-occurrence focus stable', async () => {
-  const f = await fixture({ node: { text: '2026-10-14 hello' } })
+  const f = await fixture({ node: { text: '2026-10-09 hello' } })
 
   f.store.openAgenda()
   const row = f.store.getAgendaRows().find((candidate) => candidate.kind === 'node')!
@@ -107,6 +107,7 @@ async function fixture(
   const other: TreeNode = { id: 'other', text: 'other', children: [] }
   const node: TreeNode = { id: 'node', text: 'hello', children: [], ...options.node }
   const harness = await createRealStoreHarness({
+    services: { today: () => 20734 },
     document: { roots: [node, other] },
     location: { currentParentId: null, selectedNodeId: 'node' },
   })

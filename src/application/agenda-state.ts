@@ -1,4 +1,4 @@
-import type { DayNumber } from '../domain/calendar-date'
+import { dayNumberOf, weekdayOf, type DayNumber } from '../domain/calendar-date'
 import type { Location, NodeId } from '../domain/document'
 import type { AgendaRow } from './agenda-rows'
 
@@ -8,6 +8,7 @@ export interface AgendaState {
   readonly origin: { readonly location: Location; readonly cursor: number }
   readonly scopeParentId: NodeId | null
   readonly today: DayNumber
+  readonly weekStart: DayNumber
   readonly selectedKey: string
   readonly collapsed: ReadonlySet<string>
   readonly presentation: AgendaPresentation
@@ -15,6 +16,7 @@ export interface AgendaState {
 }
 
 export interface AgendaTimelineReturn {
+  readonly weekStart: DayNumber
   readonly selectedKey: string
   readonly collapsed: ReadonlySet<string>
   readonly scrollTop: number
@@ -54,6 +56,7 @@ export function pinnedAgendaOccurrence(state: Pick<AgendaState, 'activity'> | un
 }
 
 export type AgendaCommand =
+  | { readonly kind: 'shift-week'; readonly direction: -1 | 1 }
   | { readonly kind: 'select'; readonly key: string; readonly cursor?: number; readonly revealLine?: boolean }
   | { readonly kind: 'focus-day'; readonly key: string; readonly scrollTop: number }
   | { readonly kind: 'return-timeline'; readonly key: string }
@@ -68,11 +71,23 @@ export function dayKey(day: DayNumber): string {
   return `day:${day}`
 }
 
+export function agendaWeekStart(day: DayNumber): DayNumber {
+  return day - weekdayOf(day)
+}
+
+const firstDay = dayNumberOf({ year: 0, month: 1, day: 1 })
+const lastDay = dayNumberOf({ year: 9999, month: 12, day: 31 })
+
+export function agendaWeekDays(start: DayNumber): readonly DayNumber[] {
+  return Array.from({ length: 7 }, (_, index) => start + index).filter((day) => day >= firstDay && day <= lastDay)
+}
+
 export function openAgendaState(location: Location, cursor: number, today: DayNumber): AgendaState {
   return {
     origin: { location, cursor },
     scopeParentId: location.currentParentId,
     today,
+    weekStart: agendaWeekStart(today),
     selectedKey: dayKey(today),
     collapsed: new Set(),
     presentation: { kind: 'timeline' },
@@ -91,6 +106,7 @@ export function focusAgendaState(state: AgendaState, day: DayNumber, scrollTop: 
       kind: 'focused-day',
       day,
       timelineReturn: {
+        weekStart: state.weekStart,
         selectedKey: state.selectedKey,
         collapsed: state.collapsed,
         scrollTop: Math.max(0, scrollTop),
@@ -104,6 +120,20 @@ export function applyAgendaCommand(
   command: AgendaCommand,
   rows: readonly AgendaRow[],
 ): AgendaState {
+  if (command.kind === 'shift-week') {
+    const selected = rows.find((row) => row.key === state.selectedKey)
+    if (selected === undefined) return state
+    const day = selected.day + command.direction * 7
+    if (day < firstDay || day > lastDay) return state
+    return {
+      ...state,
+      weekStart: agendaWeekStart(day),
+      selectedKey: dayKey(day),
+      selectionCursor: 0,
+      activity: { kind: 'inactive' },
+      presentation: state.presentation.kind === 'focused-day' ? { ...state.presentation, day } : state.presentation,
+    }
+  }
   if (command.kind === 'return-timeline') {
     if (state.presentation.kind !== 'focused-day') return state
     const timelineReturn = state.presentation.timelineReturn
@@ -111,6 +141,7 @@ export function applyAgendaCommand(
       ...state,
       activity: { kind: 'inactive' },
       presentation: { kind: 'timeline' },
+      weekStart: timelineReturn.weekStart,
       selectedKey: timelineReturn.selectedKey,
       collapsed: timelineReturn.collapsed,
     }

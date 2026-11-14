@@ -281,8 +281,9 @@ export class EditorStore {
       this.searchOwner.manualAgendaFold(command)
     }
     const changed = applyAgendaCommand(state.agenda, command, rows)
-    const nextRows = command.kind === 'return-timeline' ? this.agendaRowsCache.get(state.document, changed) : rows
-    const agenda = command.kind === 'return-timeline' ? reconcileAgendaSelection(changed, nextRows) : changed
+    const changedPresentation = command.kind === 'return-timeline' || command.kind === 'shift-week'
+    const nextRows = changedPresentation ? this.agendaRowsCache.get(state.document, changed) : rows
+    const agenda = changedPresentation ? reconcileAgendaSelection(changed, nextRows) : changed
     const selected = nextRows.find((row) => row.key === agenda.selectedKey)
     const realSelection =
       selected?.kind === 'node' && (agenda.selectedKey !== state.agenda.selectedKey || command.kind === 'select')

@@ -42,7 +42,7 @@ it('reveals the matching Agenda text line while Search retains focus', async () 
     return reveal
   })
   const f = await fixture({
-    document: { roots: [node('node', '2026-10-14 Head needle')] },
+    document: { roots: [node('node', '2026-10-09 Head needle')] },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
   f.input()
@@ -591,7 +591,8 @@ describe('useNodeInputBindings', () => {
     'continues Replace from an Agenda row surface after focus settles (pending: %s)',
     async (pending) => {
       const f = await fixture({
-        document: { roots: [node('node', '2026-10-14 First'), node('peer', '2026-10-14 Other')] },
+        document: { roots: [node('node', '2026-10-09 First'), node('peer', '2026-10-09 Other')] },
+        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
       })
 
       act(() => f.store.openAgenda())
@@ -619,7 +620,7 @@ describe('useNodeInputBindings', () => {
       })
 
       expect(f.result.current.vimMode).toBe('replace')
-      expect(f.node('node').text).toBe(`2026-10-14 ${pending ? 'X' : 'F'}irst`)
+      expect(f.node('node').text).toBe(`2026-10-09 ${pending ? 'X' : 'F'}irst`)
 
       const destination = f.input('peer')
       const row = destination.parentElement!
@@ -639,11 +640,11 @@ describe('useNodeInputBindings', () => {
       })
       f.press('Y', {}, 'peer')
 
-      expect(destination.value).toBe('2026-10-14 Yther')
+      expect(destination.value).toBe('2026-10-09 Yther')
 
       f.press('Escape', {}, 'peer')
 
-      expect(f.node('peer').text).toBe('2026-10-14 Yther')
+      expect(f.node('peer').text).toBe('2026-10-09 Yther')
     },
   )
 
@@ -753,8 +754,11 @@ describe('useNodeInputBindings', () => {
 
   // @requirement PRODUCT.md §23.4
   it('shares the editor image return position with Agenda row navigation', async () => {
-    const text = '2026-10-15 Image'
-    const f = await fixture({ document: { roots: [image(text)] } })
+    const text = '2026-10-11 Image'
+    const f = await fixture({
+      document: { roots: [image(text)] },
+      services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+    })
     const input = f.input()
 
     input.classList.add('node-input')

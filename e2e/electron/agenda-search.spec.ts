@@ -10,8 +10,8 @@ import {
   test,
 } from './fixtures'
 
-const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
-const later = dayNumberOf({ year: 2026, month: 10, day: 20 })
+const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
+const later = dayNumberOf({ year: 2026, month: 10, day: 11 })
 const row = (value: number, id: string) => `[data-agenda-key="node:${value}:${id}"]`
 const header = (value: number) => `[data-agenda-key="day:${value}"]`
 function seed(directory: string): void {
@@ -24,13 +24,13 @@ function seed(directory: string): void {
           children: [
             {
               id: 'child',
-              text: 'apple 2026-10-14 2026-10-20 https://example.com/apple',
+              text: 'apple 2026-10-09 2026-10-11 https://example.com/apple',
               children: [],
               links: [{ start: 28, end: 53, url: 'https://example.com/apple' }],
             },
           ],
         },
-        { id: 'other', text: 'apple 2026-10-20', children: [] },
+        { id: 'other', text: 'apple 2026-10-11', children: [] },
       ],
     },
     location: { currentParentId: null, selectedNodeId: 'parent' },
@@ -238,7 +238,7 @@ test('reveals the matching line of a long direct match after returning from a fo
         {
           id: 'context',
           text: 'needle path context',
-          children: [{ id: 'child', text: `2026-10-14 ${'content '.repeat(500)}needle`, children: [] }],
+          children: [{ id: 'child', text: `2026-10-09 ${'content '.repeat(500)}needle`, children: [] }],
         },
       ],
     },

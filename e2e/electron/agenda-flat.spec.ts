@@ -32,7 +32,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
       document: {
         roots: [
           { id: 'first', text: '2026-10-08 First', children: [] },
-          { id: 'later', text: '2026-10-14 Later', children: [] },
+          { id: 'later', text: '2026-10-09 Later', children: [] },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'first' },
@@ -70,7 +70,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
 
     expect(readPersisted(userDataDir).document).toEqual(original)
     await expect(window.locator('.agenda-row[data-node-id="first"]')).toHaveText('2026-10-08 First')
-    await expect(window.locator('.agenda-row[data-node-id="later"]')).toHaveText('2026-10-14 Later')
+    await expect(window.locator('.agenda-row[data-node-id="later"]')).toHaveText('2026-10-09 Later')
   })
 
   // @requirement PRODUCT.md §23.1
@@ -187,11 +187,9 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     })
   }
 
-  test('retains the last dated entry until leaving it and then shows only the Today message', async ({
-    userDataDir,
-  }) => {
+  test('retains the last dated entry until leaving it and then shows seven empty days', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
-      document: { roots: [{ id: 'only', text: '2026-12-20 Only entry', children: [] }] },
+      document: { roots: [{ id: 'only', text: '2026-10-09 Only entry', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'only' },
     })
     const { window, app } = await launchTree(userDataDir, { shortcut: 'stub' })
@@ -200,9 +198,9 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await window.keyboard.press('Meta+p')
     if (mode === 'vim') await window.keyboard.press('Escape')
     const todayMessage = window.locator('.agenda-row-day.agenda-today')
-    await expect(todayMessage).toHaveText('No entries for today')
+    await expect(todayMessage.locator('.agenda-label')).toHaveText('Thu Oct 8')
     await expect(todayMessage.locator('button')).toHaveCount(0)
-    await expect(window.locator('.agenda-row-day')).toHaveCount(2)
+    await expect(window.locator('.agenda-row-day')).toHaveCount(7)
     await expect(window.locator('.agenda-row-gap')).toHaveCount(0)
     await expectSeparatedDays(window)
 
@@ -212,11 +210,11 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await window.keyboard.press('Meta+a')
     await window.keyboard.type('Undated')
     await expect(input).toHaveText('Undated')
-    await expect(window.locator('.agenda-row-day')).toHaveCount(2)
+    await expect(window.locator('.agenda-row-day')).toHaveCount(7)
     await todayMessage.click()
     await expect(input).toHaveCount(0)
-    await expect(window.locator('.agenda-row-day')).toHaveCount(1)
-    await expect(todayMessage).toHaveText('No entries for today')
+    await expect(window.locator('.agenda-row-day')).toHaveCount(7)
+    await expect(todayMessage.locator('.agenda-label')).toHaveText('Thu Oct 8')
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
       await window.screenshot({ path: test.info().outputPath(`empty-${appearance}-${mode}.png`) })
@@ -349,7 +347,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await expect(window.locator('.agenda-row-day .agenda-rule')).toHaveCount(0)
     await expect(window.locator('.agenda-entry-day').first().locator('.agenda-day-separator')).toHaveCount(0)
     const followingDay = window.locator('.agenda-row-day').nth(1)
-    const separator = await window.locator('.agenda-day-separator').boundingBox()
+    const separator = await window.locator('.agenda-day-separator').first().boundingBox()
     const heading = await followingDay.boundingBox()
     expect(separator!.y + separator!.height).toBeLessThan(heading!.y)
 

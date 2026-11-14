@@ -18,7 +18,7 @@ let platform: ShortcutPlatform = 'apple'
 
 async function fixture(element: AgendaElement, standard = false, children = true) {
   const f = await createRealStoreHarness({
-    services: { today: () => day(8) },
+    services: { today: () => day(12) },
     document: {
       roots: [
         {
@@ -93,6 +93,27 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
     afterEach(() => {
       platform = 'apple'
     })
+
+    it.each([false, true])(
+      'switches weeks from this row and preserves document and origin (standard: %s)',
+      async (standard) => {
+        const f = await fixture(element, standard)
+        const before = f.snapshot()
+
+        f.press(']', { metaKey: true })
+
+        expect(f.snapshot().agenda?.selectedKey).toBe(`day:${f.selected.day + 7}`)
+        expect(f.snapshot().agenda?.selectionCursor).toBe(0)
+        expect(f.snapshot().agenda?.activity.kind).toBe('inactive')
+        expect(f.snapshot().document).toBe(before.document)
+        expect(f.snapshot().agenda?.origin).toBe(before.agenda?.origin)
+
+        f.press('[', { metaKey: true })
+
+        expect(f.snapshot().agenda?.selectedKey).toBe(`day:${f.selected.day}`)
+        expect(f.saves).toHaveLength(0)
+      },
+    )
 
     it.each(['ArrowDown', 'ArrowUp', 'j', 'k'])('%s selects the adjacent visible row', async (key) => {
       const f = await fixture(element)

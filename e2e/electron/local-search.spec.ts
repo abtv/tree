@@ -5,6 +5,7 @@ import {
   launchTree,
   seedDocument,
   setCursor,
+  setAgendaToday,
   describeForEachEditingMode,
   clickApplicationMenuItem,
 } from './fixtures'
@@ -170,13 +171,14 @@ describeForEachEditingMode('Local search', () => {
           {
             id: 'parent',
             text: 'apple apple',
-            children: [{ id: 'dated', text: 'apple apple apple 2026-10-14', children: [] }],
+            children: [{ id: 'dated', text: 'apple apple apple 2026-10-09', children: [] }],
           },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'parent' },
     })
     const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     const entry = window.getByRole('textbox', { name: 'Agenda node dated', exact: true })
     await entry.click()

@@ -7,7 +7,7 @@ import { expect, launchTree, seedDocument, setAgendaToday, test } from './fixtur
 // @requirement PRODUCT.md §23.15
 test('aligns Tree and Agenda location icons and preserves the focused-day path', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
-    document: { roots: [{ id: 'item', text: '2026-10-14 Review', children: [] }] },
+    document: { roots: [{ id: 'item', text: '2026-10-09 Review', children: [] }] },
     location: { currentParentId: null, selectedNodeId: 'item' },
   })
   const { window } = await launchTree(userDataDir)
@@ -29,12 +29,12 @@ test('aligns Tree and Agenda location icons and preserves the focused-day path',
   await expect(bar).toHaveText('')
   await expect(bar).toHaveScreenshot('agenda-location-timeline.png')
 
-  const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
+  const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
 
   await window.locator(`[data-agenda-key="day:${day}"]`).click()
   await window.keyboard.press('Meta+.')
 
-  await expect(bar).toHaveText('›Oct 14')
+  await expect(bar).toHaveText('›Oct 9')
   await expect(calendar).toBeVisible()
   await expect(bar).toHaveScreenshot('agenda-location-focused.png')
 

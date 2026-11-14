@@ -7,10 +7,12 @@ import { createVimCommandState } from './vim-command-state'
 import type { VimTextCommandState } from './vim-session-finish'
 import { getCaret, setCaret } from './editor-dom'
 import type { VimCaretState } from './vim-caret-transition'
+import { dayNumberOf } from '../domain/calendar-date'
 
 async function fixture(withImage = false) {
   const texts = ['2026-10-15 ' + 'x'.repeat(29), '2026-10-15', '2026-10-15 ' + 'z'.repeat(29)]
   const f = await createRealStoreHarness({
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 15 }) },
     document: {
       roots: texts.map((text, index) => ({
         id: String(index),

@@ -50,7 +50,7 @@ export class EditorSearch {
     const key =
       agenda === undefined
         ? `tree:${state.location.currentParentId ?? ''}`
-        : `agenda:${agenda.scopeParentId ?? ''}:${focusedAgendaDay(agenda) ?? 'timeline'}`
+        : `agenda:${agenda.scopeParentId ?? ''}:${agenda.weekStart}:${focusedAgendaDay(agenda) ?? 'timeline'}`
     const projection = agenda === undefined ? undefined : this.agendaRows.getProjection(state.document, agenda)
     const changedProjection = this.scope.kind === 'agenda' && this.scope.projection !== projection
     const changedScope = key !== this.scopeKey

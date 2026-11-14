@@ -6,6 +6,7 @@ import {
   activeAgendaOccurrence,
   pinnedAgendaOccurrence,
   dayKey,
+  agendaWeekStart,
   selectAgendaRow,
   type AgendaState,
 } from './agenda-state'
@@ -56,6 +57,7 @@ export function reconcileAgenda(
         // A live edit continues in the nearest remaining occurrence. History never unfolds it.
         // If the day is unchanged, the active path is already visible; deleting its absent folds is equivalent.
         if (day !== active.day && !preservePresentation) {
+          next = { ...next, weekStart: agendaWeekStart(day) }
           if (next.presentation.kind === 'focused-day') next = { ...next, presentation: { ...next.presentation, day } }
           const collapsed = new Set(next.collapsed)
           collapsed.delete(dayKey(day))

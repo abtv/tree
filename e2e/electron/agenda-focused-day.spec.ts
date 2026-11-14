@@ -12,8 +12,8 @@ import {
   test,
 } from './fixtures'
 
-const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
-const later = dayNumberOf({ year: 2026, month: 10, day: 20 })
+const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
+const later = dayNumberOf({ year: 2026, month: 10, day: 11 })
 
 describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.15
@@ -22,7 +22,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       document: {
         roots: Array.from({ length: 600 }, (_, index) => ({
           id: `item-${index}`,
-          text: `2026-10-14 Synthetic item ${index}`,
+          text: `2026-10-09 Synthetic item ${index}`,
           children: [],
         })),
       },
@@ -77,10 +77,10 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
         roots: [
           ...Array.from({ length: 50 }, (_, index) => ({
             id: `item-${index}`,
-            text: '2026-10-14 Synthetic item',
+            text: '2026-10-09 Synthetic item',
             children: [],
           })),
-          { id: 'later', text: '2026-10-20 Later item', children: [] },
+          { id: 'later', text: '2026-10-11 Later item', children: [] },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'item-0' },
@@ -106,8 +106,8 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
 
     await window.keyboard.press('Meta+.')
 
-    await expect(window.locator('.agenda-focused-heading')).toHaveText('Wed Oct 14')
-    await expect(window.locator('.agenda-location-bar')).toHaveText('›Oct 14')
+    await expect(window.locator('.agenda-focused-heading')).toHaveText('Fri Oct 9')
+    await expect(window.locator('.agenda-location-bar')).toHaveText('›Oct 9')
     await expect(window.locator('.agenda-location-bar').getByRole('img', { name: 'Agenda' })).toBeVisible()
     await expect(window.locator('.agenda-row-day')).toHaveCount(0)
     await expect(window.locator(`[data-agenda-key="day:${later}"]`)).toHaveCount(0)
@@ -146,7 +146,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.15
   test('follows a live date edit and rejects creation from the focused heading', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
-      document: { roots: [{ id: 'item', text: '2026-10-14 Prepare 2026-10-20', children: [] }] },
+      document: { roots: [{ id: 'item', text: '2026-10-09 Prepare 2026-10-11', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'item' },
     })
     const { window } = await launchTree(userDataDir)
@@ -158,9 +158,9 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     await window.locator(`[data-agenda-key="node:${day}:item"]`).click()
     if (mode === 'vim') await window.keyboard.press('i')
 
-    await window.locator('.node-input').fill('Prepare 2026-10-20')
+    await window.locator('.node-input').fill('Prepare 2026-10-11')
 
-    await expect(window.locator('.agenda-focused-heading')).toHaveText('Tue Oct 20')
+    await expect(window.locator('.agenda-focused-heading')).toHaveText('Sun Oct 11')
     await expect(window.locator(`[data-agenda-key="node:${later}:item"] .node-input`)).toBeFocused()
 
     await window.keyboard.press('Meta+,')
@@ -168,7 +168,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     await expect(window.locator('.agenda-focused-heading')).toHaveCount(0)
     await expect(window.locator('[data-agenda-key][aria-selected="true"]')).toHaveAttribute(
       'data-agenda-key',
-      `day:${dayNumberOf({ year: 2026, month: 10, day: 8 })}`,
+      `day:${day}`,
     )
 
     await window.locator(`[data-agenda-key="day:${later}"]`).click()
@@ -178,10 +178,10 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       await window.keyboard.press('o')
     } else await window.keyboard.press('Enter')
 
-    await expect(window.locator('.agenda-focused-heading')).toHaveText('Tue Oct 20')
+    await expect(window.locator('.agenda-focused-heading')).toHaveText('Sun Oct 11')
     await expect(window.locator('.agenda-focused-heading')).toBeFocused()
     await expect(window.getByRole('textbox', { name: 'Agenda node item', exact: true })).toHaveText(
-      'Prepare 2026-10-20',
+      'Prepare 2026-10-11',
     )
   })
 
@@ -198,8 +198,8 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
                 id: 'release',
                 text: 'Release',
                 children: [
-                  { id: 'prepare', text: '2026-10-14 Prepare rollout 2026-10-20', children: [] },
-                  { id: 'review', text: '2026-10-14 Review release notes', children: [] },
+                  { id: 'prepare', text: '2026-10-09 Prepare rollout 2026-10-11', children: [] },
+                  { id: 'review', text: '2026-10-09 Review release notes', children: [] },
                 ],
               },
             ],
@@ -279,11 +279,11 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       await window.keyboard.press('g')
       await window.keyboard.press('d')
 
-      await expect(window.locator('.agenda-focused-heading')).toHaveText('Wed Oct 14')
+      await expect(window.locator('.agenda-focused-heading')).toHaveText('Fri Oct 9')
 
       await window.keyboard.press('O')
 
-      await expect(window.locator('.agenda-focused-heading')).toHaveText('Wed Oct 14')
+      await expect(window.locator('.agenda-focused-heading')).toHaveText('Fri Oct 9')
       await expect(window.locator('.agenda-focused-heading')).toBeFocused()
 
       await window.keyboard.press('j')
@@ -291,7 +291,7 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       await window.keyboard.press('d')
 
       await expect(window.locator('.agenda-list')).toHaveCount(0)
-      await expect(window.locator('.current-parent .node-input')).toContainText('2026-10-14 Prepare')
+      await expect(window.locator('.current-parent .node-input')).toContainText('2026-10-09 Prepare')
     }
   })
 })

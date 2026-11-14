@@ -31,14 +31,14 @@ const caretOffset = (field: Locator): Promise<number> =>
 
 // @requirement PRODUCT.md §23.4
 test('walks wrapped visual lines with j and k before crossing Agenda nodes', async ({ userDataDir }, testInfo) => {
-  const text = `2026-10-15 ${'Wrapped navigation words. '.repeat(150)}`
+  const text = `2026-10-10 ${'Wrapped navigation words. '.repeat(150)}`
   seedDocument(userDataDir, {
-    document: { roots: [node('wrapped', text), node('next', '2026-10-15 Next')] },
+    document: { roots: [node('wrapped', text), node('next', '2026-10-10 Next')] },
     location: { currentParentId: null, selectedNodeId: 'wrapped' },
   })
   const { window } = await launchTree(userDataDir)
 
-  await openAndSelect(window, nodeKey(10, 15, 'wrapped'))
+  await openAndSelect(window, nodeKey(10, 10, 'wrapped'))
   const input = window.getByRole('textbox', { name: 'Agenda node wrapped', exact: true })
   await window.keyboard.press('0')
   await window.keyboard.press('j')
@@ -98,21 +98,21 @@ test('counted wrapped motion measures windowed Agenda destinations like repeated
   seedDocument(userDataDir, {
     document: {
       roots: Array.from({ length: 150 }, (_, index) =>
-        node(`row-${index}`, `2026-10-15 Row ${index} ${'Windowed wrapped text. '.repeat(24)}`),
+        node(`row-${index}`, `2026-10-10 Row ${index} ${'Windowed wrapped text. '.repeat(24)}`),
       ),
     },
     location: { currentParentId: null, selectedNodeId: 'row-0' },
   })
   const { window } = await launchTree(userDataDir)
 
-  await openAndSelect(window, nodeKey(10, 15, 'row-0'))
+  await openAndSelect(window, nodeKey(10, 10, 'row-0'))
   await window.keyboard.press('0')
   await window.keyboard.type('100j')
   const countedKey = await window.locator('.agenda-row[aria-selected="true"]').getAttribute('data-agenda-key')
   const countedCursor = await caretOffset(window.locator('.node-input:focus'))
 
   await window.keyboard.type('gg')
-  await row(window, nodeKey(10, 15, 'row-0')).click()
+  await row(window, nodeKey(10, 10, 'row-0')).click()
   await window.keyboard.press('0')
   for (let index = 0; index < 100; index++) await window.keyboard.press('j')
 
@@ -126,17 +126,17 @@ for (const interruption of ['pointer', 'focus'] as const) {
   test(`resets the desired column after ${interruption} interrupts a selected day`, async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
-        roots: [node('before', `2026-10-14 ${'a'.repeat(50)}`), node('after', `2026-10-15 ${'b'.repeat(70)}`)],
+        roots: [node('before', `2026-10-09 ${'a'.repeat(50)}`), node('after', `2026-10-10 ${'b'.repeat(70)}`)],
       },
       location: { currentParentId: null, selectedNodeId: 'before' },
     })
     const { window } = await launchTree(userDataDir)
 
-    await openAndSelect(window, nodeKey(10, 14, 'before'))
+    await openAndSelect(window, nodeKey(10, 9, 'before'))
     await window.keyboard.press('$')
     await window.keyboard.press('j')
     await window.keyboard.press('j')
-    const day = row(window, dayKey(10, 15))
+    const day = row(window, dayKey(10, 10))
 
     await expect(day).toHaveAttribute('aria-selected', 'true')
 
@@ -157,7 +157,7 @@ for (const interruption of ['pointer', 'focus'] as const) {
 test('keeps horizontal image carets separate across repeated Agenda occurrences and a focused-day heading', async ({
   userDataDir,
 }, testInfo) => {
-  const text = '2026-10-14 2026-10-15 Shared'
+  const text = '2026-10-09 2026-10-10 Shared'
   seedDocument(userDataDir, {
     document: { roots: [{ ...node('shared', text), attachment: { id: 'image', mimeType: 'image/png' } }] },
     location: { currentParentId: null, selectedNodeId: 'shared' },
@@ -173,9 +173,9 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
   )
   const { window } = await launchTree(userDataDir)
 
-  await openAndSelect(window, nodeKey(10, 14, 'shared'))
-  const firstRow = row(window, nodeKey(10, 14, 'shared'))
-  const secondRow = row(window, nodeKey(10, 15, 'shared'))
+  await openAndSelect(window, nodeKey(10, 9, 'shared'))
+  const firstRow = row(window, nodeKey(10, 9, 'shared'))
+  const secondRow = row(window, nodeKey(10, 10, 'shared'))
 
   await window.keyboard.type('0l')
   await window.keyboard.press('j')
@@ -183,9 +183,9 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
   await expect(firstRow.locator('.node-input')).toHaveClass(/node-input-image-caret/)
 
   await window.keyboard.press('l')
-  await expect(row(window, `separator:${dayNumber(10, 15)}`)).toHaveAttribute('aria-selected', 'true')
+  await expect(row(window, `separator:${dayNumber(10, 10)}`)).toHaveAttribute('aria-selected', 'true')
   await window.keyboard.press('l')
-  const day = row(window, dayKey(10, 15))
+  const day = row(window, dayKey(10, 10))
 
   await expect(day).toHaveAttribute('aria-selected', 'true')
   await expect(firstRow.locator('.node-input-image-caret')).toHaveCount(0)
@@ -207,8 +207,12 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
   await expect.poll(() => caretOffset(second)).toBe(text.length - 1)
 
   await window.keyboard.press('l')
-  await window.keyboard.press('l')
 
+  await expect(second).toHaveClass(/node-input-image-caret/)
+
+  await window.keyboard.press('l')
+  await expect(row(window, `separator:${dayNumber(10, 11)}`)).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.press('h')
   await expect(second).toHaveClass(/node-input-image-caret/)
 
   await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-mirror-image.png') })
@@ -237,9 +241,9 @@ test('continues h and l through Agenda editors and dates while skipping passive 
   seedPending(userDataDir)
   const { window } = await launchTree(userDataDir)
 
-  await openAndSelect(window, nodeKey(10, 14, 'plan'))
-  const plan = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
-  const other = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+  await openAndSelect(window, nodeKey(10, 9, 'plan'))
+  const plan = row(window, nodeKey(10, 9, 'plan')).locator('.node-input')
+  const other = row(window, nodeKey(10, 9, 'other')).locator('.node-input')
 
   await window.keyboard.type('$l')
 
@@ -249,13 +253,13 @@ test('continues h and l through Agenda editors and dates while skipping passive 
   await window.keyboard.press('h')
 
   await expect(plan).toBeFocused()
-  await expect.poll(() => caretOffset(plan)).toBe('2026-10-14 Prepare'.length - 1)
+  await expect.poll(() => caretOffset(plan)).toBe('2026-10-09 Prepare'.length - 1)
 
   await window.keyboard.type('0h')
-  const day = row(window, dayKey(10, 14))
+  const day = row(window, dayKey(10, 9))
 
   await expect(day).toHaveAttribute('aria-selected', 'true')
-  await expect(day.locator('.agenda-caret')).toHaveText('4')
+  await expect(day.locator('.agenda-caret')).toHaveText('9')
 
   await window.keyboard.press('l')
 
@@ -281,30 +285,30 @@ test('continues h and l through Agenda editors and dates while skipping passive 
 // @requirement PRODUCT.md §23.14
 test('J and K navigate Agenda labels and matches by ten while V stays inactive', async ({ userDataDir }, testInfo) => {
   seedDocument(userDataDir, {
-    document: { roots: Array.from({ length: 26 }, (_, i) => node(`n${i}`, `2026-10-14 Row ${i}`)) },
+    document: { roots: Array.from({ length: 26 }, (_, i) => node(`n${i}`, `2026-10-09 Row ${i}`)) },
     location: { currentParentId: null, selectedNodeId: 'n0' },
   })
   const { window } = await launchTree(userDataDir)
 
-  await openAndSelect(window, nodeKey(10, 14, 'n0'))
+  await openAndSelect(window, nodeKey(10, 9, 'n0'))
   await window.keyboard.press('Shift+J')
 
-  await expect(row(window, nodeKey(10, 14, 'n10')).locator('.node-input')).toBeFocused()
+  await expect(row(window, nodeKey(10, 9, 'n10')).locator('.node-input')).toBeFocused()
 
   await window.keyboard.press('Shift+K')
 
-  await expect(row(window, nodeKey(10, 14, 'n0')).locator('.node-input')).toBeFocused()
+  await expect(row(window, nodeKey(10, 9, 'n0')).locator('.node-input')).toBeFocused()
 
-  await row(window, dayKey(10, 14)).locator('.agenda-label').click()
+  await row(window, dayKey(10, 9)).locator('.agenda-label').click()
   await window.keyboard.press('Shift+J')
 
-  await expect(row(window, nodeKey(10, 14, 'n9')).locator('.node-input')).toBeFocused()
+  await expect(row(window, nodeKey(10, 9, 'n9')).locator('.node-input')).toBeFocused()
 
   await window.keyboard.press('Shift+K')
 
-  await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+  await expect(row(window, dayKey(10, 9))).toHaveAttribute('aria-selected', 'true')
 
-  await row(window, nodeKey(10, 14, 'n0'))
+  await row(window, nodeKey(10, 9, 'n0'))
     .locator('.node-input')
     .click()
   await window.keyboard.press('Escape')
@@ -312,7 +316,7 @@ test('J and K navigate Agenda labels and matches by ten while V stays inactive',
   await window.keyboard.press('2')
   await window.keyboard.press('Shift+J')
 
-  await expect(row(window, nodeKey(10, 14, 'n20')).locator('.node-input')).toBeFocused()
+  await expect(row(window, nodeKey(10, 9, 'n20')).locator('.node-input')).toBeFocused()
   await expect(window.locator('.agenda-row-visual-selected')).toHaveCount(0)
 
   await window.keyboard.press('Shift+K')
@@ -331,8 +335,8 @@ function seedPending(userDataDir: string): void {
     document: {
       roots: [
         node('context', 'Context', [
-          node('plan', '2026-10-14 Prepare', [node('step', 'Step')]),
-          node('other', '2026-10-14 Other'),
+          node('plan', '2026-10-09 Prepare', [node('step', 'Step')]),
+          node('other', '2026-10-09 Other'),
           node('later', '2026-10-16 Later'),
         ]),
         node('far', '2026-12-01 Far'),
@@ -357,18 +361,18 @@ test.describe('Agenda Vim commands', () => {
       seedPending(userDataDir)
       const { window } = await launchTree(userDataDir)
 
-      await openAndSelect(window, nodeKey(10, 14, 'plan'))
+      await openAndSelect(window, nodeKey(10, 9, 'plan'))
       if (command === 'Meta+,') {
-        await row(window, dayKey(10, 14)).click()
+        await row(window, dayKey(10, 9)).click()
         await window.keyboard.press('Meta+.')
-        await row(window, nodeKey(10, 14, 'plan')).click()
-        await row(window, nodeKey(10, 14, 'plan'))
+        await row(window, nodeKey(10, 9, 'plan')).click()
+        await row(window, nodeKey(10, 9, 'plan'))
           .locator('.node-input')
           .focus()
       }
 
       await window.keyboard.press('R')
-      await row(window, dayKey(10, 14)).click()
+      await row(window, dayKey(10, 9)).click()
 
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
@@ -377,12 +381,12 @@ test.describe('Agenda Vim commands', () => {
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
       if (command === 'ArrowDown') {
-        await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toBeFocused()
+        await expect(row(window, nodeKey(10, 9, 'plan')).locator('.node-input')).toBeFocused()
 
         await window.keyboard.press('i')
         await window.keyboard.type('Q')
 
-        await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toContainText('Q')
+        await expect(row(window, nodeKey(10, 9, 'plan')).locator('.node-input')).toContainText('Q')
       }
     })
   }
@@ -394,8 +398,8 @@ test.describe('Agenda Vim commands', () => {
       seedPending(userDataDir)
       const { window } = await launchTree(userDataDir)
 
-      await openAndSelect(window, nodeKey(10, 14, 'plan'))
-      const editor = row(window, nodeKey(10, 14, 'plan')).locator('.node-input')
+      await openAndSelect(window, nodeKey(10, 9, 'plan'))
+      const editor = row(window, nodeKey(10, 9, 'plan')).locator('.node-input')
 
       await setCursor(editor, 11)
       await window.keyboard.press('R')
@@ -412,18 +416,18 @@ test.describe('Agenda Vim commands', () => {
       expect((await caret.boundingBox())!.height).toBeGreaterThan(0)
       await window.screenshot({ path: test.info().outputPath(`replace-separator-${pending}.png`) })
 
-      await row(window, dayKey(10, 14)).locator('.agenda-label').click()
+      await row(window, dayKey(10, 9)).locator('.agenda-label').click()
 
       await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
-      await expect(row(window, dayKey(10, 14))).toBeFocused()
+      await expect(row(window, dayKey(10, 9))).toBeFocused()
 
       await window.keyboard.type('ZY')
 
-      await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+      await expect(row(window, dayKey(10, 9))).toHaveAttribute('aria-selected', 'true')
 
       if (pending) await expect(window.locator('.agenda-list')).toHaveScreenshot('agenda-replace-readonly-row.png')
 
-      const destination = row(window, nodeKey(10, 14, 'other'))
+      const destination = row(window, nodeKey(10, 9, 'other'))
 
       await destination.locator('.node-enter-control').click()
 
@@ -436,17 +440,17 @@ test.describe('Agenda Vim commands', () => {
 
       await window.keyboard.type('Y')
 
-      await expect(nextInput).toHaveText('Y026-10-14 Other')
+      await expect(nextInput).toHaveText('Y026-10-09 Other')
 
       await window.keyboard.press('Escape')
       await window.keyboard.press('Meta+z')
 
-      await expect(destination.locator('.node-input')).toHaveText('2026-10-14 Other')
+      await expect(destination.locator('.node-input')).toHaveText('2026-10-09 Other')
 
-      await row(window, nodeKey(10, 14, 'plan')).click()
+      await row(window, nodeKey(10, 9, 'plan')).click()
 
-      await expect(row(window, nodeKey(10, 14, 'plan')).locator('.node-input')).toHaveText(
-        `2026-10-14 ${pending ? 'X' : 'P'}repare`,
+      await expect(row(window, nodeKey(10, 9, 'plan')).locator('.node-input')).toHaveText(
+        `2026-10-09 ${pending ? 'X' : 'P'}repare`,
       )
     })
   }
@@ -455,46 +459,46 @@ test.describe('Agenda Vim commands', () => {
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
-      document: { roots: [node('multi', '2026-10-14 2026-10-16 Shared'), node('other', '2026-10-14 Other')] },
+      document: { roots: [node('multi', '2026-10-09 2026-10-10 Shared'), node('other', '2026-10-09 Other')] },
       location: { currentParentId: null, selectedNodeId: 'multi' },
     })
     const { window } = await launchTree(userDataDir)
 
-    await openAndSelect(window, nodeKey(10, 14, 'multi'))
+    await openAndSelect(window, nodeKey(10, 9, 'multi'))
     await window.keyboard.press('R')
-    await row(window, nodeKey(10, 16, 'multi'))
+    await row(window, nodeKey(10, 10, 'multi'))
       .locator('.node-enter-control')
       .click()
 
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
-    const active = row(window, nodeKey(10, 16, 'multi')).locator('.node-input')
+    const active = row(window, nodeKey(10, 10, 'multi')).locator('.node-input')
 
     await expect(active).toBeFocused()
 
     await window.keyboard.type('X')
 
-    await expect(active).toHaveText('X026-10-14 2026-10-16 Shared')
+    await expect(active).toHaveText('X026-10-09 2026-10-10 Shared')
 
     await window.keyboard.press('Escape')
     await window.keyboard.press('Meta+z')
-    await row(window, dayKey(10, 14)).click()
+    await row(window, dayKey(10, 9)).click()
     await window.keyboard.press('Meta+.')
-    const editor = row(window, nodeKey(10, 14, 'other')).locator('.node-input')
+    const editor = row(window, nodeKey(10, 9, 'other')).locator('.node-input')
 
-    await row(window, nodeKey(10, 14, 'other')).click()
+    await row(window, nodeKey(10, 9, 'other')).click()
     await editor.focus()
 
     await window.keyboard.press('R')
-    await row(window, dayKey(10, 14)).click()
+    await row(window, dayKey(10, 9)).click()
 
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
     await window.keyboard.type('Z')
 
-    await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, dayKey(10, 9))).toHaveAttribute('aria-selected', 'true')
 
-    await row(window, nodeKey(10, 14, 'other'))
+    await row(window, nodeKey(10, 9, 'other'))
       .locator('.node-enter-control')
       .click()
 
@@ -502,14 +506,14 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.type('Y')
 
-    await expect(editor).toHaveText('Y026-10-14 Other')
+    await expect(editor).toHaveText('Y026-10-09 Other')
 
     await window.keyboard.press('Escape')
 
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await window.keyboard.press('R')
-    await row(window, dayKey(10, 14)).click()
+    await row(window, dayKey(10, 9)).click()
 
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
@@ -521,7 +525,7 @@ test.describe('Agenda Vim commands', () => {
   test('lands boundary and viewport motions on destination text before its image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
-        roots: [{ ...node('image', '  2026-10-14 Image'), attachment: { id: 'image', mimeType: 'image/png' } }],
+        roots: [{ ...node('image', '  2026-10-09 Image'), attachment: { id: 'image', mimeType: 'image/png' } }],
       },
       location: { currentParentId: null, selectedNodeId: 'image' },
     })
@@ -536,10 +540,10 @@ test.describe('Agenda Vim commands', () => {
     )
     const { window } = await launchTree(userDataDir)
 
-    await openAndSelect(window, nodeKey(10, 14, 'image'))
-    await row(window, dayKey(10, 14)).click()
+    await openAndSelect(window, nodeKey(10, 9, 'image'))
+    await row(window, dayKey(10, 9)).click()
     await window.keyboard.press('Meta+.')
-    const editor = row(window, nodeKey(10, 14, 'image')).locator('.node-input')
+    const editor = row(window, nodeKey(10, 9, 'image')).locator('.node-input')
 
     await editor.click()
     await window.keyboard.press('Escape')
@@ -563,7 +567,7 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('g')
     await window.keyboard.press('g')
 
-    await expect(row(window, dayKey(10, 14))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, dayKey(10, 9))).toHaveAttribute('aria-selected', 'true')
 
     await window.keyboard.press('Control+d')
 
@@ -578,9 +582,9 @@ test.describe('Agenda Vim commands', () => {
     seedDocument(userDataDir, {
       document: {
         roots: [
-          node('before', '2026-10-14 Before'),
-          { ...node('image', '2026-10-14 Image'), attachment: { id: 'image', mimeType: 'image/png' } },
-          node('after', '2026-10-14 After'),
+          node('before', '2026-10-09 Before'),
+          { ...node('image', '2026-10-09 Image'), attachment: { id: 'image', mimeType: 'image/png' } },
+          node('after', '2026-10-09 After'),
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'before' },
@@ -608,10 +612,10 @@ test.describe('Agenda Vim commands', () => {
 
     const returnedColumn = await caretOffset(treeInput)
 
-    expect(returnedColumn).toBe('2026-10-14 Image'.length - 1)
+    expect(returnedColumn).toBe('2026-10-09 Image'.length - 1)
 
-    await openAndSelect(window, nodeKey(10, 14, 'image'))
-    const imageRow = row(window, nodeKey(10, 14, 'image'))
+    await openAndSelect(window, nodeKey(10, 9, 'image'))
+    const imageRow = row(window, nodeKey(10, 9, 'image'))
     const input = imageRow.locator('.node-input')
     const image = imageRow.getByRole('button', { name: 'Open image preview' })
     const offset = async (): Promise<number> =>
@@ -640,7 +644,7 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.type('2j')
 
-    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, nodeKey(10, 9, 'after'))).toHaveAttribute('aria-selected', 'true')
 
     await window.keyboard.press('k')
 
@@ -651,14 +655,16 @@ test.describe('Agenda Vim commands', () => {
     await expect(image).not.toHaveClass(/attachment-image-caret/)
     expect(await offset()).toBe(returnedColumn)
 
+    await row(window, dayKey(10, 9)).click()
+    await window.keyboard.press('Meta+.')
     await window.keyboard.press('G')
 
-    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, nodeKey(10, 9, 'after'))).toHaveAttribute('aria-selected', 'true')
 
     await window.keyboard.type('07l')
     await window.keyboard.press('j')
     await window.keyboard.press('j')
-    const afterInput = row(window, nodeKey(10, 14, 'after')).locator('.node-input')
+    const afterInput = row(window, nodeKey(10, 9, 'after')).locator('.node-input')
 
     expect(
       await afterInput.evaluate((element) => {
@@ -672,11 +678,11 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.type('2k')
 
-    await expect(row(window, nodeKey(10, 14, 'before'))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, nodeKey(10, 9, 'before'))).toHaveAttribute('aria-selected', 'true')
 
     await window.keyboard.type('2j')
 
-    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, nodeKey(10, 9, 'after'))).toHaveAttribute('aria-selected', 'true')
 
     const imageIndex = await imageRow.evaluate((element) =>
       [...document.querySelectorAll('.agenda-row')].indexOf(element),
@@ -693,14 +699,14 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.press('L')
 
-    await expect(row(window, nodeKey(10, 14, 'after'))).toHaveAttribute('aria-selected', 'true')
+    await expect(row(window, nodeKey(10, 9, 'after'))).toHaveAttribute('aria-selected', 'true')
   })
 
   // @requirement PRODUCT.md §23.9
   // @requirement PRODUCT.md §23.10
   test('Normal Enter opens links and images without splitting or leaving Agenda', async ({ userDataDir }) => {
     const url = 'https://example.com'
-    const text = `2026-10-14 ${url}`
+    const text = `2026-10-09 ${url}`
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -733,8 +739,8 @@ test.describe('Agenda Vim commands', () => {
         state.agendaOpenedUrls!.push(url)
       }
     })
-    await openAndSelect(window, nodeKey(10, 14, 'linked'))
-    const input = row(window, nodeKey(10, 14, 'linked')).locator('.node-input')
+    await openAndSelect(window, nodeKey(10, 9, 'linked'))
+    const input = row(window, nodeKey(10, 9, 'linked')).locator('.node-input')
 
     await setCursor(input, 12)
     await window.keyboard.press('Enter')
@@ -752,9 +758,9 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('$')
     await window.keyboard.press('l')
 
-    await expect(
-      row(window, nodeKey(10, 14, 'linked')).getByRole('button', { name: 'Open image preview' }),
-    ).toHaveClass(/attachment-image-caret/)
+    await expect(row(window, nodeKey(10, 9, 'linked')).getByRole('button', { name: 'Open image preview' })).toHaveClass(
+      /attachment-image-caret/,
+    )
 
     await window.keyboard.press('Enter')
 
@@ -791,15 +797,15 @@ test.describe('Agenda Vim commands', () => {
     seedPending(userDataDir)
     const { window } = await launchTree(userDataDir)
 
-    await openAndSelect(window, nodeKey(10, 14, 'plan'))
+    await openAndSelect(window, nodeKey(10, 9, 'plan'))
     await window.keyboard.press('p')
     await window.keyboard.press('P')
-    await row(window, dayKey(10, 16)).locator('.agenda-label').click()
+    await row(window, dayKey(10, 10)).locator('.agenda-label').click()
     await window.keyboard.press('p')
 
     await expect(message(window)).toHaveCount(0)
-    expect(persistedTexts(userDataDir)).toEqual(['2026-10-14 Prepare', '2026-10-14 Other', '2026-10-16 Later'])
-    await expect(row(window, nodeKey(10, 14, 'plan'))).toHaveCount(1)
+    expect(persistedTexts(userDataDir)).toEqual(['2026-10-09 Prepare', '2026-10-09 Other', '2026-10-16 Later'])
+    await expect(row(window, nodeKey(10, 9, 'plan'))).toHaveCount(1)
   })
 
   // @requirement PRODUCT.md §23.13

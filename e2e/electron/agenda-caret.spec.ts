@@ -21,7 +21,7 @@ function seed(userDataDir: string): void {
     document: {
       roots: [
         node('work', 'Work', [
-          node('team', 'Team A', [leaf('prepare', '2026-10-14 Prepare rollout'), leaf('later', '2026-11-01 Review')]),
+          node('team', 'Team A', [leaf('prepare', '2026-10-09 Prepare rollout'), leaf('later', '2026-11-01 Review')]),
         ]),
       ],
     },
@@ -29,7 +29,7 @@ function seed(userDataDir: string): void {
   })
 }
 
-const TODAY_LABEL = 'No entries for today'
+const TODAY_LABEL = 'Thu Oct 8'
 
 interface Mark {
   text: string
@@ -159,7 +159,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       }
     }
 
-    await expectCaret(today, 'N')
+    await expectCaret(today, 'T')
 
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
@@ -170,8 +170,8 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
     await window.keyboard.press('ArrowDown')
 
-    await expect(selected).toContainText('Wed Oct 14')
-    await expectCaret(selected, 'W')
+    await expect(selected).toContainText('Fri Oct 9')
+    await expectCaret(selected, 'F')
     expect(await caretMark(today)).toBeUndefined()
 
     await window.keyboard.press('ArrowDown')
@@ -239,7 +239,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
       await window.keyboard.press('$')
 
-      expect((await caretMark(today))!).toMatchObject({ before: TODAY_LABEL.length - 1, text: 'y' })
+      expect((await caretMark(today))!).toMatchObject({ before: TODAY_LABEL.length - 1, text: '8' })
 
       await window.keyboard.press('l')
 
@@ -254,18 +254,18 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
       expect((await caretMark(today))!.before).toBe(0)
 
-      await window.keyboard.type('fe')
+      await window.keyboard.type('fO')
 
-      expect((await caretMark(today))!.before).toBe(3)
+      expect((await caretMark(today))!.before).toBe(4)
 
       await window.keyboard.type('w')
 
-      expect((await caretMark(today))!.before).toBe(11)
+      expect((await caretMark(today))!.before).toBe(8)
 
       await window.keyboard.type('0vee')
 
       await expect(window.locator('.vim-mode-indicator, [aria-label="Vim mode"]').first()).toHaveText('VISUAL')
-      expect(await selectionText(today)).toBe('No entries')
+      expect(await selectionText(today)).toBe('Thu Oct')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
 
       await window.emulateMedia({ colorScheme: 'dark' })
@@ -276,14 +276,14 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await lockSystemClipboard()
       await window.keyboard.press('y')
 
-      await expect.poll(clipboard).toBe('No entries')
+      await expect.poll(clipboard).toBe('Thu Oct')
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
       expect((await caretMark(today))!.before).toBe(0)
 
       await window.keyboard.press('l')
       await window.keyboard.press('Meta+c')
 
-      await expect.poll(clipboard).toBe('o')
+      await expect.poll(clipboard).toBe('h')
 
       for (const exitKey of ['Escape', 'v']) {
         for (const [keys, endpoint] of [
@@ -313,7 +313,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await window.keyboard.press('Shift+ArrowRight')
       await window.keyboard.press('Shift+ArrowRight')
 
-      expect(await selectionText(today)).toBe(' en')
+      expect(await selectionText(today)).toBe('u O')
       await expect(window).toHaveScreenshot(screenshotName('agenda-caret-selection-light.png'))
 
       await window.emulateMedia({ colorScheme: 'dark' })
@@ -324,7 +324,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
       await lockSystemClipboard()
       await window.keyboard.press('Meta+c')
 
-      await expect.poll(clipboard).toBe(' en')
+      await expect.poll(clipboard).toBe('u O')
 
       await window.keyboard.press('ArrowLeft')
 

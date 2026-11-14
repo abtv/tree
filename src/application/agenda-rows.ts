@@ -2,6 +2,7 @@ import {
   pinnedAgendaOccurrence,
   focusedAgendaDay,
   dayKey,
+  agendaWeekDays,
   type AgendaState,
   type AgendaOccurrence,
 } from './agenda-state'
@@ -88,9 +89,7 @@ export function buildAgendaRows(
 ): readonly AgendaRow[] {
   const days = new Map(projection.map((day) => [day.day, day.rows]))
   const timelineDays =
-    state.presentation.kind === 'timeline'
-      ? [...new Set([...days.keys(), state.today])].sort((left, right) => left - right)
-      : [state.presentation.day]
+    state.presentation.kind === 'timeline' ? agendaWeekDays(state.weekStart) : [state.presentation.day]
   const rows: AgendaRow[] = []
   for (const day of timelineDays) {
     const entry = { kind: 'day' as const, day, content: days.has(day), isToday: day === state.today }
@@ -149,13 +148,14 @@ export class AgendaRowsCache {
   private scope: NodeId | null | undefined
   private projection: readonly AgendaProjectionDay[] = []
   private searchProjection: readonly AgendaProjectionDay[] = []
+  private weekProjection: readonly AgendaProjectionDay[] = []
   private state: AgendaState | undefined
   private rows: readonly AgendaRow[] = []
   private readonly dayRows = new Map<DayNumber, DayRows>()
 
   public getProjection(document: Document, state: AgendaState): readonly AgendaProjectionDay[] {
     this.get(document, state)
-    return this.searchProjection
+    return this.weekProjection
   }
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
@@ -192,8 +192,14 @@ export class AgendaRowsCache {
       this.document = document
       this.scope = state.scopeParentId
     }
+    if (changed || this.state?.weekStart !== state.weekStart) {
+      this.weekProjection = this.searchProjection.filter(
+        (day) => day.day >= state.weekStart && day.day < state.weekStart + 7,
+      )
+    }
     if (
       changed ||
+      this.state?.weekStart !== state.weekStart ||
       this.state?.today !== state.today ||
       focusedAgendaDay(this.state) !== focusedAgendaDay(state) ||
       !sameFolds(this.state.collapsed, state.collapsed)
@@ -211,6 +217,7 @@ export class AgendaRowsCache {
     this.scope = undefined
     this.projection = []
     this.searchProjection = []
+    this.weekProjection = []
     this.state = undefined
     this.rows = []
     this.dayRows.clear()

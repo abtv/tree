@@ -266,7 +266,7 @@ it('history measures nearest occurrences from the outgoing day rather than a mig
 
   expect(agendaHistorySelection(document, header, 'match').selectedKey).toBe('node:98:match')
   expect(agendaHistorySelection(document, header, 'missing')).toBe(header)
-  expect(agendaHistorySelection(document, state, 'match', 103).selectedKey).toBe('node:102:match')
+  expect(agendaHistorySelection(document, state, 'match', 103).selectedKey).toBe('node:100:match')
 
   const withPin = reconcileAgenda(editNodeText(document, 'match', 'Undated'), selected())!
   const invalid = editNodeText(document, 'match', 'Undated')
@@ -287,10 +287,10 @@ it.each([
   expect(selectedAgendaDay(key)).toBe(expected)
 })
 
-it('falls back to the nearest displayed day, earlier on a tie', () => {
+it('falls back to the same displayed day when its last occurrence disappears', () => {
   const state = { ...selected(), selectedKey: 'node:99:removed' }
 
   const rows = buildAgendaRows(agendaProjection(document, state), state)
 
-  expect(reconcileAgendaSelection(state, rows).selectedKey).toBe('day:98')
+  expect(reconcileAgendaSelection(state, rows).selectedKey).toBe('day:99')
 })

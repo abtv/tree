@@ -14,7 +14,7 @@ import {
 } from './fixtures'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
-const oct20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+const oct20 = dayNumberOf({ year: 2026, month: 10, day: 11 })
 const hint = 'Add a date to keep this item in Agenda'
 
 function seed(userDataDir: string): void {
@@ -23,10 +23,10 @@ function seed(userDataDir: string): void {
     document: {
       roots: [
         node('context', 'Context', [
-          node('first', '2026-10-14 Prepare 2026-10-20'),
-          node('solo', '2026-10-15 Solo'),
-          node('other', '2026-10-15 Other'),
-          ...Array.from({ length: 24 }, (_, index) => node(`tail${index}`, `2026-10-30 Tail ${index}`)),
+          node('first', '2026-10-09 Prepare 2026-10-11'),
+          node('solo', '2026-10-10 Solo'),
+          node('other', '2026-10-10 Other'),
+          ...Array.from({ length: 24 }, (_, index) => node(`tail${index}`, `2026-10-11 Tail ${index}`)),
         ]),
       ],
     },
@@ -89,10 +89,10 @@ describeForEachEditingMode('Agenda live occurrences', ({ mode, screenshotName })
     const scrollTop = (): Promise<number> => window.locator('.scroll-viewport').evaluate((element) => element.scrollTop)
     const before = await scrollTop()
 
-    await setCursor(input, '2026-10-14 Prepare 2026-10-20'.length)
+    await setCursor(input, '2026-10-09 Prepare 2026-10-11'.length)
     await window.keyboard.type(' now')
 
-    await expect(mirror).toHaveText('2026-10-14 Prepare 2026-10-20 now')
+    await expect(mirror).toHaveText('2026-10-09 Prepare 2026-10-11 now')
     await expect(input).toBeFocused()
     expect(await scrollTop()).toBe(before)
 
@@ -115,7 +115,7 @@ describeForEachEditingMode('Agenda live occurrences', ({ mode, screenshotName })
 
     await window.keyboard.type('!')
 
-    await expect(input).toHaveText('2026-10-1! Prepare 2026-10-20 now')
+    await expect(input).toHaveText('2026-10-0! Prepare 2026-10-11 now')
     await expect(window.getByRole('status')).toHaveCount(0)
   })
 
@@ -174,7 +174,7 @@ describeForEachEditingMode('Agenda live occurrences', ({ mode, screenshotName })
     await window.keyboard.press('Meta+z')
 
     await expect(solo).toHaveCount(1)
-    await expect(solo).toHaveText('2026-10-15 Solo')
+    await expect(solo).toHaveText('2026-10-10 Solo')
     await expect(window.getByRole('status')).toHaveCount(0)
   })
 })

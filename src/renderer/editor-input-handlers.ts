@@ -108,6 +108,12 @@ export function createEditorKeyDownHandler({
     const snapshot = store.getSnapshot()
     const agenda = snapshot.status === 'ready' ? snapshot.agenda : undefined
     if (agenda !== undefined) {
+      if (primary && !event.altKey && !event.shiftKey && (event.key === '[' || event.key === ']')) {
+        event.preventDefault()
+        prepareVimCommand(vim, 'navigation', event.currentTarget)
+        store.applyAgenda({ kind: 'shift-week', direction: event.key === '[' ? -1 : 1 })
+        return
+      }
       const row = store.getAgendaRows().find((candidate) => candidate.key === agenda.selectedKey)
       const element = row?.kind === 'node' ? row.role : row?.kind
       if (element === undefined) return

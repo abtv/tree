@@ -239,12 +239,12 @@ export function wideSeed(count: number): Seed {
 export function agendaSeed(count: number, withMirrorPair = false): Seed {
   const today = new Date()
   const later = new Date(today)
-  later.setDate(today.getDate() + 6)
+  later.setDate(today.getDate() + (today.getDay() === 0 ? -1 : 1))
   const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
+  yesterday.setDate(today.getDate() + (today.getDay() === 1 ? 1 : -1))
   const canonical = (date: Date): string =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  // The optional first node is dated yesterday and today, so both of its occurrences are mounted together.
+  // Keep both dates in the displayed week, including at Monday and Sunday boundaries.
   const pair = withMirrorPair
     ? [{ id: 'pair', text: `${canonical(yesterday)} ${canonical(today)} Pair `, children: [] }]
     : []

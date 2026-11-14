@@ -283,7 +283,7 @@ test.describe('Active visual line in Vim', () => {
   test('follows decorated multiline text through resize, image entry and view switching', async ({
     userDataDir,
   }, testInfo) => {
-    const text = `2026-10-08 ${'Wrapped shared text. '.repeat(20)}2026-10-14`
+    const text = `2026-10-08 ${'Wrapped shared text. '.repeat(20)}2026-10-09`
     seedDocument(userDataDir, {
       document: {
         roots: [

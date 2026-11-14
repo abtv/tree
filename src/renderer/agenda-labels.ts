@@ -35,9 +35,7 @@ export function isAgendaMirror(
 export function agendaRowLabel(
   row: Extract<AgendaRow, { readonly kind: 'day' | 'separator' }>,
   today: DayNumber,
-  heading = false,
 ): string {
   if (row.kind === 'separator') return ''
-  if (!heading && !row.content) return row.isToday ? 'No entries for today' : 'No entries for this day'
   return agendaDateLabel(row.day, today, true)
 }

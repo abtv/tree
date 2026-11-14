@@ -45,7 +45,7 @@ describe('focused Agenda day', () => {
       })),
     }
     const cache = new AgendaRowsCache()
-    const timeline = openAgendaState({ currentParentId: null, selectedNodeId: 'item-0' }, 0, today)
+    const timeline = openAgendaState({ currentParentId: null, selectedNodeId: 'item-0' }, 0, day)
     const timelineRows = cache.get(document, timeline)
 
     const focused = applyAgendaCommand(timeline, { kind: 'focus-day', key: dayKey(day), scrollTop: 120 }, timelineRows)

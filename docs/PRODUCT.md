@@ -1682,7 +1682,7 @@ Displayed link text participates, including phrases crossing a link boundary.
 
 Tree scope includes the current-parent heading before all descendants, regardless of folds.
 
-Agenda searches all direct-match occurrences, including collapsed days. Day headings and separators are excluded. Focused-day search includes only that day. Each occurrence
+Agenda searches direct-match occurrences in the displayed week, including collapsed days. Changing weeks closes search and cancels pending navigation while retaining query recall. Day headings and separators are excluded. Focused-day search includes only that day. Each occurrence
 of a node on a different day counts separately. Synthetic day labels are
 excluded. Order is chronological by day, then depth-first through projected rows.
 From a day header, forward search starts before that day's contents and reverse
@@ -2201,7 +2201,7 @@ Performance guards must exercise representative sequences in the running applica
 
 ### 23.1 Opening and Closing
 
-* `Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its day container is initially selected.
+* `Cmd+P` opens Agenda for the current Tree location's descendants, or all roots at Root. The current parent's own text and ancestors at or above it are excluded. Today is captured from the local calendar when Agenda opens; its Monday–Sunday week is displayed and its day container is initially selected. Closing and reopening always returns to the current week and Today.
 * Opening makes a best effort to center the complete Today block, including its heading and entries, within the content viewport. A block taller than the viewport starts at its heading with the ordinary context margin. Natural scroll limits apply; no blank padding is added just to center it. Alignment follows measured layout changes until explicit user scrolling or a subsequent command takes over.
 * `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
 
@@ -2223,7 +2223,7 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 
 ### 23.3 Timeline
 
-Days are ordered chronologically. Show only days containing projected entries, plus Today as the opening anchor. Empty days and gap placeholders are omitted, even when neighboring days are folded. When Today has no entries, show a nonfoldable `No entries for today` row. A temporary last-date pin retains its day until the item leaves Agenda (§23.7).
+Show one Monday–Sunday week at a time, with all seven dated day headings in chronological order, including empty days. Empty days do not fold. No separate week-range label or return-to-Today command is shown. At the canonical calendar boundaries, omit dates outside years 0000–9999. A temporary last-date pin retains its occurrence until the item leaves Agenda (§23.7).
 
 Day headings use the same 15px text size as nodes, with a heavier weight and ordinary case. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. A thin neutral separator spans the scrolling content from its leading to trailing edge between days, with none before the first day. Each separator occupies one 25px row. Headings and node rows use Tree's 25px minimum height and 20px text line height, without extra gaps after headings or between nodes. Agenda starts with the same 10px top inset as Tree inside a parent. Day headings and node text share one left alignment axis; disclosure and bullet markers occupy the gutter.
 
@@ -2233,6 +2233,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 
 #### Moving Between Rows
 
+* `Cmd+[` and `Cmd+]` move exactly one calendar week backward or forward, including empty weeks. Select the same weekday's heading with its caret at the beginning, using the selected occurrence or separator's day when applicable. Finish pending editing as for other navigation; leave any temporary pin. In focused-day presentation, retain that presentation and shift its day by seven days. Returning to the timeline restores its captured week. A transition beyond the canonical calendar range does nothing.
 * Up and Down move over visible Agenda rows, including one stop on each day separator, and clamp at either edge. Separators remain between folded days and expose an empty, read-only caret position without a node dot or line number. This deliberately makes a visual separator selectable so movement follows the same row rhythm as Tree, as requested by the Product Owner. Separators can also be selected by a row click; editing, folding and opening them do nothing.
 * In Vim Normal, `j`/`k` and Up/Down first move through the current row's visible text lines, then cross to another Agenda row, using Tree's desired horizontal position, image and caret-line reveal rules (§20.2.9). Counts and `J`/`K` consume these same steps, including when the selected occurrence does not change. Day labels, inactive occurrences and the focused-day heading use their own displayed text and wrapping. `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` retain their row-based boundary and viewport rules.
 * In Vim Normal, `h` and `l` continue through all visible rows, including direct matches, day containers and the focused-day heading. `l` crosses from the final character to the next row's first character; `h` crosses from the first character to the previous row's final character. Counts include character and crossing steps as in Tree (§4.3), and stop at the outer boundaries.
@@ -2280,7 +2281,7 @@ Scrolling must populate the newly visible range before the next rendered frame, 
 
 ### 23.7 Active Occurrence and Date Removal
 
-Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded so editing can continue; unrelated folds remain unchanged.
+Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded and switches to its week when needed so editing can continue; unrelated folds remain unchanged. Undo and Redo preserve the displayed week.
 
 Removing the last recognized date keeps the item on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
 

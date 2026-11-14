@@ -50,11 +50,11 @@ it('renders attachments on inactive direct matches and excludes contextual ances
       roots: [
         {
           id: 'parent',
-          text: '2026-10-20 Parent',
+          text: '2026-10-10 Parent',
           children: [
             {
               id: 'child',
-              text: '2026-10-14 Child 2026-10-20',
+              text: '2026-10-09 Child 2026-10-10',
               children: [],
             },
           ],
@@ -146,8 +146,8 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
   const harness = await createRealStoreHarness({
     document: {
       roots: [
-        { id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] },
-        { id: 'single', text: '2026-10-14 Single', children: [] },
+        { id: 'multi', text: '2026-10-09 Multi 2026-10-10', children: [] },
+        { id: 'single', text: '2026-10-09 Single', children: [] },
       ],
     },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
@@ -155,8 +155,8 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
 
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
-  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
-  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+  const day14 = dayNumberOf({ year: 2026, month: 10, day: 9 })
+  const day20 = dayNumberOf({ year: 2026, month: 10, day: 10 })
   const isMirror = (key: string): boolean =>
     container.querySelector(`[data-agenda-key="${key}"]`)!.classList.contains('agenda-mirror')
 
@@ -180,13 +180,13 @@ it('marks only other-day occurrences of the active node as live mirrors', async 
 // @requirement PRODUCT.md §23.7
 it('keeps the active occurrence at its viewport position when a document change moves it', async () => {
   const harness = await createRealStoreHarness({
-    document: { roots: [{ id: 'multi', text: '2026-10-14 Multi 2026-10-20', children: [] }] },
+    document: { roots: [{ id: 'multi', text: '2026-10-09 Multi 2026-10-10', children: [] }] },
     services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
   })
   harness.store.openAgenda()
   const { container } = render(<View store={harness.store} />)
-  const day14 = dayNumberOf({ year: 2026, month: 10, day: 14 })
-  const day20 = dayNumberOf({ year: 2026, month: 10, day: 20 })
+  const day14 = dayNumberOf({ year: 2026, month: 10, day: 9 })
+  const day20 = dayNumberOf({ year: 2026, month: 10, day: 10 })
   act(() => harness.store.applyAgenda({ kind: 'select', key: `node:${day14}:multi` }))
   const tops = new Map([
     [`node:${day14}:multi`, 100],
@@ -200,7 +200,7 @@ it('keeps the active occurrence at its viewport position when a document change 
   })
   const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation(() => undefined)
   try {
-    act(() => harness.store.editText('multi', 'Multi 2026-10-20'))
+    act(() => harness.store.editText('multi', 'Multi 2026-10-10'))
 
     expect(scroll).toHaveBeenCalledTimes(1)
     expect(scroll).toHaveBeenCalledWith(0, 240)

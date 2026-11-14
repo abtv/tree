@@ -38,7 +38,7 @@ function seed(userDataDir: string): void {
         node('work', 'Work', [
           node('team', 'Team A', [
             node('release', 'Release', [
-              leaf('prepare', '2026-10-14 Prepare rollout 2026-10-20'),
+              leaf('prepare', '2026-10-09 Prepare rollout 2026-10-11'),
               leaf('later', '2026-11-01 Review'),
             ]),
           ]),
@@ -61,7 +61,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
         roots: Array.from({ length: 600 }, (_, index) =>
           leaf(
             `dated-${index}`,
-            `2026-10-08 Item ${index} 2026-10-14 ${'Synthetic wrapping details. '.repeat(index % 3 === 0 ? 8 : 1)}`,
+            `2026-10-08 Item ${index} 2026-10-09 ${'Synthetic wrapping details. '.repeat(index % 3 === 0 ? 8 : 1)}`,
           ),
         ),
       },
@@ -268,7 +268,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       const today = window.locator('.agenda-today')
 
       await expectFocused(today)
-      await expect(today).toHaveText('No entries for today')
+      await expect(today.locator('.agenda-label')).toHaveText('Thu Oct 8')
       await expect(today.locator('.node-input')).toHaveCount(0)
 
       await window.keyboard.press('ArrowDown')
@@ -309,20 +309,22 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
 
     await expect(window.locator('.agenda-row-day .agenda-label')).toHaveText([
-      'Tue Sep 1',
-      'No entries for today',
-      'Wed Oct 14',
-      'Tue Oct 20',
-      'Sun Nov 1',
+      'Mon Oct 5',
+      'Tue Oct 6',
+      'Wed Oct 7',
+      'Thu Oct 8',
+      'Fri Oct 9',
+      'Sat Oct 10',
+      'Sun Oct 11',
     ])
     await expect(window.locator('.agenda-row-gap, .agenda-role-context')).toHaveCount(0)
     await expect(window.locator('[data-node-id="invalid"]')).toHaveCount(0)
     await expect(window.locator('.agenda-path-label')).toHaveCount(0)
 
     const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()
-    await expect(prepare).toHaveText('2026-10-14 Prepare rollout 2026-10-20')
-    await expect(prepare.locator('.agenda-date-active')).toHaveText('2026-10-14')
-    await expect(prepare.locator('.agenda-date-secondary')).toHaveText('2026-10-20')
+    await expect(prepare).toHaveText('2026-10-09 Prepare rollout 2026-10-11')
+    await expect(prepare.locator('.agenda-date-active')).toHaveText('2026-10-09')
+    await expect(prepare.locator('.agenda-date-secondary')).toHaveText('2026-10-11')
 
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Meta+.')
@@ -340,7 +342,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
 
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
-      await window.locator('.agenda-row-day').filter({ hasText: 'Wed Oct 14' }).click()
+      await window.locator('.agenda-row-day').filter({ hasText: 'Fri Oct 9' }).click()
 
       if (mode === 'standard')
         await expect(window).toHaveScreenshot(screenshotName(`agenda-timeline-${appearance}.png`))
@@ -361,15 +363,15 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       if (mode === 'vim') {
         await window.keyboard.type('3j')
 
-        await expect(window.locator('[aria-selected="true"]')).toContainText('2026-10-14 Prepare')
+        await expect(window.locator('[aria-selected="true"]')).toContainText('2026-10-09 Prepare')
 
         await window.keyboard.type('gg')
 
-        await expect(window.locator('[aria-selected="true"]')).toContainText('Tue Sep 1')
+        await expect(window.locator('[aria-selected="true"]')).toContainText('Mon Oct 5')
 
         await window.keyboard.type('G')
 
-        await expect(window.locator('[aria-selected="true"]')).toContainText('2026-11-01 Review')
+        await expect(window.locator('[aria-selected="true"]')).toContainText('2026-10-09 Prepare')
 
         await window.evaluate(() => {
           document.querySelector('.scroll-viewport')!.scrollTop = 180

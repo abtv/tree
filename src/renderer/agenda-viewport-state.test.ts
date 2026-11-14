@@ -5,7 +5,7 @@ const timeline = { kind: 'timeline' as const }
 const focused = {
   kind: 'focused-day' as const,
   day: 1,
-  timelineReturn: { selectedKey: 'node:1:a', collapsed: new Set<string>(), scrollTop: 0 },
+  timelineReturn: { weekStart: 0, selectedKey: 'node:1:a', collapsed: new Set<string>(), scrollTop: 0 },
 }
 
 it('orders opening, line delegation, anchor suppression and row intent; remount restores opening', () => {

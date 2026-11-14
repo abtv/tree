@@ -277,19 +277,27 @@ test('Agenda mirror updates keep focus and stay within the interactive budget', 
 })
 
 // @requirement PRODUCT.md §22.1
-test('Agenda open, scroll and vertical motion stay responsive on a large dated document', async ({ userDataDir }) => {
+test('Agenda open, scroll, week switching and vertical motion stay responsive on a large dated document', async ({
+  userDataDir,
+}) => {
   seedDocument(userDataDir, agendaSeed(3000))
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
 
   await installSaveProbe(app)
   await window.evaluate(() => {
-    const probe = { open: [] as number[], motion: [] as number[] }
+    const probe = { open: [] as number[], motion: [] as number[], weeks: [] as number[] }
     ;(window as unknown as { agendaProbe: typeof probe }).agendaProbe = probe
     document.addEventListener(
       'keydown',
       (event) => {
         const samples =
-          event.metaKey && event.key === 'p' ? probe.open : ['j', 'k'].includes(event.key) ? probe.motion : undefined
+          event.metaKey && event.key === 'p'
+            ? probe.open
+            : event.metaKey && ['[', ']'].includes(event.key)
+              ? probe.weeks
+              : ['j', 'k'].includes(event.key)
+                ? probe.motion
+                : undefined
         if (samples !== undefined)
           requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
       },
@@ -325,8 +333,16 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   await window.waitForFunction(
     () => (window as unknown as { agendaProbe: { motion: number[] } }).agendaProbe.motion.length === 42,
   )
+
+  for (let index = 0; index < 10; index += 1) {
+    await window.keyboard.press('Meta+]')
+    await window.keyboard.press('Meta+[')
+  }
+  await window.waitForFunction(
+    () => (window as unknown as { agendaProbe: { weeks: number[] } }).agendaProbe.weeks.length === 20,
+  )
   const probe = await window.evaluate(
-    () => (window as unknown as { agendaProbe: { open: number[]; motion: number[] } }).agendaProbe,
+    () => (window as unknown as { agendaProbe: { open: number[]; motion: number[]; weeks: number[] } }).agendaProbe,
   )
   const saves = await readSaves(app)
   const sorted = probe.motion.slice(0, 40).toSorted((a, b) => a - b)
@@ -342,6 +358,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
       countedMotionMs: round(countedMotionMs),
       motionP95Ms: round(sorted[38]!),
       motionMaxMs: round(sorted[39]!),
+      weekSwitchMaxMs: round(Math.max(...probe.weeks)),
       saves,
     },
   })
@@ -349,6 +366,7 @@ test('Agenda open, scroll and vertical motion stay responsive on a large dated d
   expect(probe.open[0]).toBeLessThan(100)
   expect(scroll).toBeLessThan(100)
   expect(countedMotionMs).toBeLessThan(100)
+  expect(Math.max(...probe.weeks)).toBeLessThan(100)
   expect(sorted[38]).toBeLessThan(50)
   expect(sorted[39]).toBeLessThan(100)
   expect(saves).toBe(0)

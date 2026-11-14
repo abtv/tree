@@ -17,7 +17,7 @@ afterEach(() => {
 async function fixture(mode?: VimMode) {
   vi.useFakeTimers()
   const f = await createRealStoreHarness({
-    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
     document: {
       roots: [
         {

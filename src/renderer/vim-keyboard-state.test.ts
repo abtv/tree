@@ -20,6 +20,7 @@ function input(text = 'hello'): HTMLTextAreaElement {
 
 async function fixture(selection?: NodeVisualSelection, text = 'hello', unavailable = false) {
   const harness = await createRealStoreHarness({
+    services: { today: () => 20734 },
     document: { roots: [{ id: 'node', text, children: [{ id: 'child', text: 'child', children: [] }] }] },
     ...(unavailable
       ? {
@@ -364,7 +365,7 @@ describe('session and command ports', () => {
 describe('whole-node Visual and structural owners', () => {
   // @requirement PRODUCT.md §23.14
   it('rejects whole-node Visual entry and swaps on every Agenda occurrence', async () => {
-    const f = await fixture({ anchorId: 'node', focusId: 'node' }, '2026-10-14 hello')
+    const f = await fixture({ anchorId: 'node', focusId: 'node' }, '2026-10-09 hello')
 
     f.store.openAgenda()
 

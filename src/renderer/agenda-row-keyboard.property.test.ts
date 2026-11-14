@@ -35,7 +35,7 @@ it('matches flattened Agenda character positions across contextual, synthetic an
             { id: 'far', text: '2026-12-01 Z', children: [] },
           ],
         },
-        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
       })
 
       f.store.openAgenda()
@@ -120,7 +120,7 @@ it('carries the original column through a short contextual row during counted na
             { id: 'context', text: 'C', children: [{ id: 'second', text, children: [] }] },
           ],
         },
-        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
       })
       f.store.openAgenda()
       const first = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'first')!
@@ -151,11 +151,11 @@ it('carries the original column through a short contextual row during counted na
 it('preserves every image entry position through repeated clamped motions and an exit', async () => {
   await fc.assert(
     fc.asyncProperty(fc.integer({ min: 0, max: 40 }), fc.integer({ min: 1, max: 8 }), async (extra, repeats) => {
-      const text = `2026-10-15 ${'x'.repeat(extra)}`
+      const text = `2026-10-18 ${'x'.repeat(extra)}`
       const cursor = extra % text.length
       const f = await createRealStoreHarness({
         document: { roots: [{ id: 'image', text, children: [], attachment: { id: 'image', mimeType: 'image/png' } }] },
-        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+        services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
       })
       f.store.openAgenda()
       const last = f.store.getAgendaRows().at(-1)!

@@ -11,9 +11,28 @@ const second = dayNumberOf({ year: 2026, month: 10, day: 23 })
 const key = (day: number, id: string) => `node:${day}:${id}`
 afterEach(() => vi.useRealTimers())
 
+// @requirement PRODUCT.md §20.2.26
+it('cancels pending search on week changes and searches only the new week with shared recall', async () => {
+  const { store, state, begin, save } = await setup()
+  begin()
+  store.search.confirm()
+  store.applyAgenda({ kind: 'shift-week', direction: 1 })
+  const selected = state().agenda!.selectedKey
+
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.selectedKey).toBe(selected)
+  expect(store.search.session.getSnapshot()).toMatchObject({ visible: false, confirmed: 'apple' })
+  store.search.begin(store.searchOrigin(0))
+  await vi.runAllTimersAsync()
+
+  expect(store.search.session.getSnapshot().count?.total).toBe(0)
+  expect(save).not.toHaveBeenCalled()
+})
+
 async function setup() {
   vi.useFakeTimers()
-  vi.setSystemTime(new Date(2026, 9, 30))
+  vi.setSystemTime(new Date(2026, 9, 22))
   const save = vi.fn(async () => undefined)
   const store = new EditorStore(
     {

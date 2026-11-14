@@ -137,10 +137,10 @@ export const AgendaRow = memo(function AgendaRow({
           </>
         ) : (
           <>
-            <span className={`agenda-label${row.kind === 'day' && !row.content ? ' agenda-label-empty' : ''}`}>
+            <span className="agenda-label">
               {markedNodes(agendaRowLabel(row, today), 0, agendaRowLabel(row, today).length, marks, true)}
             </span>
-            {row.kind === 'day' && row.isToday && row.content ? (
+            {row.kind === 'day' && row.isToday ? (
               <span aria-hidden="true" className="agenda-today-badge">
                 Today
               </span>

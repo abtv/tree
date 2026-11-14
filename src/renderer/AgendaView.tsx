@@ -131,7 +131,7 @@ export function AgendaView({
       const state = store.getSnapshot()
       if (state.status !== 'ready' || state.agenda === undefined) return ''
       if (row.kind === 'node') return requireNode(state.document, row.nodeId).node.text
-      return agendaRowLabel(row, state.agenda.today, row.kind === 'day' && focusedAgendaDay(state.agenda) !== undefined)
+      return agendaRowLabel(row, state.agenda.today)
     },
     [store],
   )
@@ -464,7 +464,7 @@ export function AgendaView({
           }}
         >
           {(() => {
-            const label = agendaRowLabel(row, agenda.today, true)
+            const label = agendaRowLabel(row, agenda.today)
             return markedNodes(label, 0, label.length, marksFor(row) ?? [], true)
           })()}
         </div>

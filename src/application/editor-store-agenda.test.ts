@@ -13,8 +13,8 @@ export const roots: TreeNode[] = [
     id: 'scope',
     text: '2026-10-08 Scope',
     children: [
-      { id: 'context', text: 'Context', children: [{ id: 'match', text: '2026-10-14 Match', children: [] }] },
-      { id: 'other', text: '2026-10-28 Other', children: [] },
+      { id: 'context', text: 'Context', children: [{ id: 'match', text: '2026-10-09 Match', children: [] }] },
+      { id: 'other', text: '2026-10-11 Other', children: [] },
     ],
   },
   { id: 'outside', text: '2026-10-08 Outside', children: [] },
@@ -162,7 +162,7 @@ it.each(['toggle-fold', 'fold'] as const)(
   async (kind) => {
     vi.useFakeTimers()
     const { store } = await agendaHarness()
-    const key = `day:${today + 6}`
+    const key = `day:${today + 1}`
     store.openAgenda()
     store.applyAgenda({ kind: 'fold', key, operation: 'close' })
     store.search.begin(store.searchOrigin(0))
@@ -205,7 +205,7 @@ it('keeps search ownership when an opened Agenda day is selected without folding
   vi.useFakeTimers()
   const { store } = await agendaHarness()
   store.openAgenda()
-  const contextKey = `day:${today + 6}`
+  const contextKey = `day:${today + 1}`
   store.applyAgenda({ kind: 'fold', key: contextKey, operation: 'close' })
   store.search.begin(store.searchOrigin(0))
   store.search.edit('Match')
@@ -224,8 +224,8 @@ it('publishes and hides Agenda search while separating typing around the search 
   vi.useFakeTimers()
   const { store } = await agendaHarness()
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
-  store.editText('match', '2026-10-14 First needle')
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
+  store.editText('match', '2026-10-09 First needle')
   const first = ready(store).document
 
   store.search.begin(store.searchOrigin(0))
@@ -238,7 +238,7 @@ it('publishes and hides Agenda search while separating typing around the search 
   store.hideSearch()
   expect(store.search.session.getSnapshot().visible).toBe(false)
 
-  store.editText('match', '2026-10-14 Second')
+  store.editText('match', '2026-10-09 Second')
   store.undo()
 
   expect(ready(store).document).toEqual(first)
@@ -251,7 +251,7 @@ it('cancels an unfinished search when selecting an Agenda occurrence', async () 
   store.search.begin(store.searchOrigin(0))
   store.search.edit('Match')
 
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match`, cursor: 4 })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match`, cursor: 4 })
 
   expect(store.search.session.getSnapshot().draft).toBeUndefined()
   expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 4 })
@@ -260,14 +260,14 @@ it('cancels an unfinished search when selecting an Agenda occurrence', async () 
 it.each(['unrelated-fold', 'reselect'] as const)('respects the typing boundary for %s in Agenda', async (command) => {
   const { store } = await agendaHarness()
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
   const original = ready(store).document
-  store.editText('match', '2026-10-14 First')
+  store.editText('match', '2026-10-09 First')
   const first = ready(store).document
 
-  if (command === 'reselect') store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  if (command === 'reselect') store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
   else store.applyAgenda({ kind: 'toggle-fold', key: `day:${today}` })
-  store.editText('match', '2026-10-14 Second')
+  store.editText('match', '2026-10-09 Second')
   store.undo()
 
   expect(ready(store).document).toEqual(command === 'reselect' ? first : original)
@@ -278,7 +278,7 @@ it('keeps a restored date folded when undo changes the active occurrence day', a
   const { store } = await agendaHarness()
   store.openAgenda()
   store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
-  store.editText('scope', '2026-10-28 Scope')
+  store.editText('scope', '2026-10-11 Scope')
   store.applyAgenda({ kind: 'fold', key: `day:${today}`, operation: 'close' })
   const collapsed = ready(store).agenda!.collapsed
 
@@ -293,14 +293,14 @@ it('keeps a restored date folded when undo changes the active occurrence day', a
 it('recursive day folds hide the flat entries and opening the day restores them', async () => {
   const { store } = await agendaHarness()
   store.openAgenda()
-  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 6}:scope` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today + 1}:scope` })
 
-  store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'close-recursive' })
+  store.applyAgenda({ kind: 'fold', key: `day:${today + 1}`, operation: 'close-recursive' })
 
-  expect([...ready(store).agenda!.collapsed]).toEqual([`day:${today + 6}`])
+  expect([...ready(store).agenda!.collapsed]).toEqual([`day:${today + 1}`])
 
-  store.applyAgenda({ kind: 'fold', key: `day:${today + 6}`, operation: 'open' })
-  store.applyAgenda({ kind: 'fold', key: `node:${today + 6}:scope`, operation: 'open' })
+  store.applyAgenda({ kind: 'fold', key: `day:${today + 1}`, operation: 'open' })
+  store.applyAgenda({ kind: 'fold', key: `node:${today + 1}:scope`, operation: 'open' })
 
   expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'match')).toBe(true)
 })
@@ -308,13 +308,13 @@ it('recursive day folds hide the flat entries and opening the day restores them'
 it('restores the real selection from another day when returning to the timeline', async () => {
   const { store } = await agendaHarness()
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
   store.applyAgenda({ kind: 'focus-day', key: `day:${today}`, scrollTop: 0 })
   store.applyAgenda({ kind: 'select', key: `node:${today}:outside` })
 
   store.applyAgenda({ kind: 'return-timeline', key: `day:${today}` })
 
-  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 6}:match`)
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 1}:match`)
   expect(ready(store).location.selectedNodeId).toBe('match')
   expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 0 })
 })
@@ -322,13 +322,13 @@ it('restores the real selection from another day when returning to the timeline'
 it('returns to a visible day when the timeline selection was an expired pin', async () => {
   const { store } = await agendaHarness()
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
   store.editText('match', '')
   store.applyAgenda({ kind: 'focus-day', key: `day:${today}`, scrollTop: 0 })
 
   store.applyAgenda({ kind: 'return-timeline', key: `day:${today}` })
 
-  expect(ready(store).agenda?.selectedKey).toBe(`day:${today}`)
+  expect(ready(store).agenda?.selectedKey).toBe(`day:${today + 1}`)
   expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda?.selectedKey)).toBe(true)
 })
 
@@ -338,7 +338,7 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
   const { store, save } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.openAgenda()
-  const key = `node:${today + 6}:match`
+  const key = `node:${today + 1}:match`
 
   store.applyAgenda({ kind: 'select', key, cursor: 12 })
   const original = ready(store)
@@ -347,7 +347,7 @@ it('pins the last date through Undo/Redo and leaves it only on another selection
 
   expect(ready(store).agenda).toMatchObject({
     selectedKey: key,
-    activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'match', day: today + 6 } },
+    activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'match', day: today + 1 } },
   })
   expect(ready(store).focus).toBe(original.focus)
   expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
@@ -385,7 +385,7 @@ it('history preserves Agenda day folds and focus for hidden or out-of-scope chan
 
   store.editText('outside', '2026-10-08 Changed outside')
   store.openAgenda()
-  const key = `node:${today + 6}:match`
+  const key = `node:${today + 1}:match`
 
   store.applyAgenda({ kind: 'select', key, cursor: 7 })
   const before = ready(store)
@@ -401,8 +401,8 @@ it('history preserves Agenda day folds and focus for hidden or out-of-scope chan
   expect(ready(store).agenda).toBe(before.agenda)
   expect(ready(store).focus).toBe(before.focus)
 
-  store.editText('match', '2026-10-14 Changed')
-  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+  store.editText('match', '2026-10-09 Changed')
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
   const folded = ready(store)
 
   store.undo()
@@ -420,9 +420,9 @@ it('clears a pin when its day is selected, maintaining a valid visible selection
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 6}:match` })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
   store.editText('match', 'No date')
-  store.applyAgenda({ kind: 'select', key: `day:${today + 6}` })
+  store.applyAgenda({ kind: 'select', key: `day:${today + 1}` })
 
   expect(pinnedAgendaOccurrence(ready(store).agenda!)).toBeUndefined()
   expect(store.getAgendaRows().some((row) => row.key === ready(store).agenda!.selectedKey)).toBe(true)
@@ -493,14 +493,14 @@ it('rejects edits and history while persistence is locked, but allows leaving a 
 it('publishes the change-site cursor and real-node selection when history switches occurrences', async () => {
   const { store } = await agendaHarness()
 
-  store.editText('match', '2026-10-14 2026-10-20 Match')
+  store.editText('match', '2026-10-09 2026-10-10 Match')
   store.openAgenda()
   store.applyAgenda({ kind: 'select', key: `node:${today}:outside`, cursor: 2 })
   const before = ready(store)
 
   store.undo()
 
-  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 6}:match`)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 1}:match`)
   expect(ready(store).location).toEqual({ currentParentId: null, selectedNodeId: 'match' })
   expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
   expect(ready(store).focus.token).toBeGreaterThan(before.focus.token)
@@ -519,27 +519,27 @@ it('publishes the change-site cursor and real-node selection when history switch
 it('uses the selected day for history proximity and retains focus for path-only change sites', async () => {
   const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
 
-  store.editText('match', '2026-10-14 Match 2026-10-20')
+  store.editText('match', '2026-10-09 Match 2026-10-10')
   store.endTextSession()
-  store.editText('match', '2026-10-14 Changed 2026-10-20')
+  store.editText('match', '2026-10-09 Changed 2026-10-10')
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `day:${today + 12}` })
+  store.applyAgenda({ kind: 'select', key: `day:${today + 2}` })
   store.undo()
 
-  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 12}:match`)
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 2}:match`)
   expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 11 })
   expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'match' })
 
   store.closeAgenda()
   store.editText('context', 'Modified context')
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today + 20}:other`, cursor: 5 })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 3}:other`, cursor: 5 })
   const before = ready(store).focus
 
   store.undo()
 
-  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 20}:other`)
-  expect(activeAgendaOccurrence(ready(store).agenda!)).toEqual({ nodeId: 'other', day: today + 20 })
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today + 3}:other`)
+  expect(activeAgendaOccurrence(ready(store).agenda!)).toEqual({ nodeId: 'other', day: today + 3 })
   expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'other' })
   expect(ready(store).focus).toBe(before)
 
@@ -576,7 +576,7 @@ it('ends text grouping at open, close, day selection, and real-row reselection',
     store.editText('scope', '2026-10-08 First')
     if (transition === 'open') store.openAgenda()
     else if (transition === 'close') store.closeAgenda()
-    else store.applyAgenda({ kind: 'select', key: transition === 'day' ? `day:${today + 6}` : key })
+    else store.applyAgenda({ kind: 'select', key: transition === 'day' ? `day:${today + 1}` : key })
 
     store.editText('scope', '2026-10-08 Second')
     store.closeAgenda()
@@ -604,12 +604,12 @@ it('keeps the derived cache warm when closing and does not republish focus on an
     store.applyAgenda({ kind: 'select', key: outside.key, cursor: 2 })
     const focus = ready(store).focus
 
-    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
 
     expect(ready(store).focus).toBe(focus)
     expect(ready(store).agenda!.selectedKey).toBe(outside.key)
 
-    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
     store.applyAgenda({ kind: 'select', key: match.key, cursor: 3 })
     store.applyAgenda({ kind: 'toggle-fold', key: `day:${today}` })
 
@@ -734,15 +734,15 @@ it('keeps day folds runtime-only and returns hidden selection to its day', async
   const { store, save } = await agendaHarness()
   store.openAgenda()
   const original = ready(store)
-  const key = `node:${today + 6}:match`
+  const key = `node:${today + 1}:match`
 
   store.applyAgenda({ kind: 'select', key })
-  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
 
-  expect(ready(store).agenda!.selectedKey).toBe(`day:${today + 6}`)
+  expect(ready(store).agenda!.selectedKey).toBe(`day:${today + 1}`)
   expect(store.getAgendaRows().some((row) => row.key === key)).toBe(false)
 
-  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
 
   expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
   expect(ready(store).expansion).toBe(original.expansion)
@@ -773,7 +773,7 @@ it('captures identical serialized Tree state during Agenda even when a save was 
     kind: 'select',
     key: store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'match')!.key,
   })
-  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 6}` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
   await store.flushPersistence()
 
   expect(JSON.stringify(save.mock.calls[0])).toBe(before.replace('42', '80'))

@@ -14,7 +14,7 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
   // @requirement PRODUCT.md §23.6
   test('keeps entries, separators and headings on the same viewport boundary as Tree', async ({ userDataDir }) => {
     const children = Array.from({ length: 80 }, (_, index) => {
-      const date = new Date(Date.UTC(2026, 9, 8 + Math.floor(index / 2))).toISOString().slice(0, 10)
+      const date = new Date(Date.UTC(2026, 9, 8 + Math.floor(index / 20))).toISOString().slice(0, 10)
       return { id: `item-${index}`, text: `Note ${index} ${date}`, children: [] }
     })
     seedDocument(userDataDir, {
@@ -36,18 +36,19 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
 
     await window.keyboard.press('Meta+p')
     await window.getByRole('textbox', { name: 'Agenda node item-0', exact: true }).click()
+    const initialScroll = await window.locator('.scroll-viewport').evaluate((element) => element.scrollTop)
     const samples: { kind: string; top: number }[] = []
     for (let step = 0; step < 44; step++) {
       await window.keyboard.press(down)
       await window.evaluate(
         () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
       )
-      const sample = await window.evaluate(() => {
+      const sample = await window.evaluate((initialScroll) => {
         const viewport = document.querySelector('.scroll-viewport')!
-        if (viewport.scrollTop < 100) return undefined
+        if (viewport.scrollTop < initialScroll + 100) return undefined
         const row = document.querySelector<HTMLElement>('.agenda-row[aria-selected="true"]')!
         return { kind: row.dataset.agendaKey!.split(':')[0]!, top: row.getBoundingClientRect().top }
-      })
+      }, initialScroll)
       if (sample !== undefined) samples.push(sample)
     }
 

@@ -215,7 +215,7 @@ it('searches node text across folded days, excludes parents and preserves focuse
   expect(f.container.querySelectorAll('.agenda-focused-heading')).toHaveLength(1)
 })
 
-it('omits empty calendar days and gaps while retaining a nonfoldable Today message', async () => {
+it('shows all seven dated headings and keeps empty days nonfoldable', async () => {
   const f = await createAppHarness({
     vimEnabled: false,
     document: {
@@ -233,9 +233,9 @@ it('omits empty calendar days and gaps while retaining a nonfoldable Today messa
       .getAgendaRows()
       .filter((row) => row.kind === 'day')
       .map((row) => row.day),
-  ).toEqual([dayNumberOf({ year: 2026, month: 9, day: 1 }), today, dayNumberOf({ year: 2026, month: 12, day: 20 })])
+  ).toEqual(Array.from({ length: 7 }, (_, index) => today - 3 + index))
   expect(f.container.querySelectorAll('.agenda-row-gap')).toHaveLength(0)
-  expect(screen.getByText('No entries for today')).toBeVisible()
+  expect(screen.getByText('Thu Oct 8')).toBeVisible()
   const message = f.container.querySelector<HTMLElement>(`[data-agenda-key="${dayKey}"]`)!
   expect(message.querySelector('button')).toBeNull()
   await f.press(message, 'e', { metaKey: true })
@@ -243,10 +243,10 @@ it('omits empty calendar days and gaps while retaining a nonfoldable Today messa
 })
 
 it('retains the last dated day while editing and shows an empty state after leaving the pinned node', async () => {
-  const date = dayNumberOf({ year: 2026, month: 12, day: 20 })
+  const date = today + 1
   const f = await createAppHarness({
     vimEnabled: false,
-    document: { roots: [{ id: 'only', text: '2026-12-20 Only entry', children: [] }] },
+    document: { roots: [{ id: 'only', text: '2026-10-09 Only entry', children: [] }] },
   })
   act(() => {
     f.store.openAgenda()
@@ -261,8 +261,9 @@ it('retains the last dated day while editing and shows an empty state after leav
   act(() => f.store.applyAgenda({ kind: 'select', key: dayKey }))
   await settleApp()
 
-  expect(f.store.getAgendaRows().map((row) => row.key)).toEqual([dayKey])
-  expect(screen.getByText('No entries for today')).toBeVisible()
+  expect(f.store.getAgendaRows().filter((row) => row.kind === 'day')).toHaveLength(7)
+  expect(f.store.getAgendaRows().filter((row) => row.kind === 'node')).toHaveLength(0)
+  expect(screen.getByText('Thu Oct 8')).toBeVisible()
   expect(f.node('only').text).toBe('Undated')
 
   act(() => f.store.undo())

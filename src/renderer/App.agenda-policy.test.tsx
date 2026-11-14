@@ -41,10 +41,10 @@ describe.each([false, true])('App Agenda no-op policy (Vim %s)', (vimEnabled) =>
             id: 'context',
             text: 'Context',
             children: [
-              { id: 'first', text: '2026-10-14 Prepare 2026-10-20', children: [] },
+              { id: 'first', text: '2026-10-09 Prepare 2026-10-20', children: [] },
               {
                 id: 'second',
-                text: '2026-10-14 Review',
+                text: '2026-10-09 Review',
                 children: [{ id: 'child', text: '2026-10-20 Child', children: [] }],
               },
             ],
@@ -59,7 +59,7 @@ describe.each([false, true])('App Agenda no-op policy (Vim %s)', (vimEnabled) =>
       f.store.openAgenda()
     })
     await settleApp()
-    const day = dayNumberOf({ year: 2026, month: 10, day: 14 })
+    const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
     const selector = role === 'day' ? `[data-agenda-key="day:${day}"]` : '.agenda-role-match'
     const row = f.container.querySelector<HTMLElement>(selector)!
     const rowKey = row.getAttribute('data-agenda-key')!

@@ -1,5 +1,5 @@
 // @editing-modes: vim
-import { expect, launchTree, node, seedDocument, setCursor, test } from './fixtures'
+import { expect, launchTree, node, seedDocument, setAgendaToday, setCursor, test } from './fixtures'
 
 // @requirement PRODUCT.md §20.2.10
 test('changes numbers through real keys, repeats, undoes and projects the final digit caret', async ({
@@ -43,7 +43,7 @@ test('changes numbers through real keys, repeats, undoes and projects the final 
 // @requirement PRODUCT.md §23.10
 test('changes a rich Agenda match and leaves read-only day text unchanged', async ({ userDataDir }, testInfo) => {
   const url = 'https://example.com'
-  const text = `2026-10-14 ${url} Count 9`
+  const text = `2026-10-09 ${url} Count 9`
   seedDocument(userDataDir, {
     document: {
       roots: [
@@ -58,6 +58,7 @@ test('changes a rich Agenda match and leaves read-only day text unchanged', asyn
     location: { currentParentId: null, selectedNodeId: 'counter' },
   })
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await setAgendaToday(window)
   await window.keyboard.press('Meta+p')
   const editor = window.locator('.agenda-row[data-agenda-key$=":counter"] .node-input').first()
   await editor.click()

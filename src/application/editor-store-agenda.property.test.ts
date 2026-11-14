@@ -5,6 +5,7 @@ import { projectAgenda } from '../domain/agenda-projection'
 import { EditorStore } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { calendarDateOf, formatCanonicalDate } from '../domain/calendar-date'
+import { agendaWeekDays } from './agenda-state'
 
 // @requirement PRODUCT.md §23.7
 // @requirement PRODUCT.md §23.8
@@ -132,14 +133,12 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
             expect(rows.some((row) => row.key === state.agenda!.selectedKey)).toBe(true)
 
             const projection = projectAgenda(state.document, state.agenda.scopeParentId)
-            const days = [...new Set([...projection.map((entry) => entry.day), state.agenda.today])].sort(
-              (a, b) => a - b,
-            )
+            const days = agendaWeekDays(state.agenda.weekStart)
 
             expect(rows.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual(days)
 
             for (const day of projection) {
-              const expected = state.agenda.collapsed.has(`day:${day.day}`) ? [] : day.rows
+              const expected = !days.includes(day.day) || state.agenda.collapsed.has(`day:${day.day}`) ? [] : day.rows
 
               expect(
                 rows

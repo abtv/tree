@@ -26,7 +26,7 @@ const primary = (platform: ShortcutPlatform): Press => (platform === 'apple' ? {
 
 async function fixture(platform: ShortcutPlatform, vimMode: VimTextCommandState['mode'] | 'standard' = 'normal') {
   const harness = await createRealStoreHarness({
-    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
     document: NESTED,
   })
   harness.store.openAgenda(2)

@@ -14,7 +14,7 @@ import type { VimCaretState } from './vim-caret-transition'
 
 async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] }) {
   const harness = await createRealStoreHarness({
-    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
     document,
   })
   harness.store.openAgenda(2)
@@ -425,7 +425,7 @@ describe('read-only Agenda keyboard', () => {
 
     expect(focusedAgendaDay(f.snapshot().agenda)).toBeUndefined()
 
-    f.press('G')
+    f.store.applyAgenda({ kind: 'select', key: f.store.getAgendaRows().find((row) => row.kind === 'node')!.key })
     f.press('.', { metaKey: true })
 
     expect(f.snapshot().agenda).toBeUndefined()
