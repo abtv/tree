@@ -375,7 +375,7 @@ describe('Agenda rows', () => {
       project.mockRestore()
     }
   })
-  it('omits empty dates and gives immediate children no parent path', () => {
+  it('omits empty dates and inserts one separator before each following day', () => {
     const state = openAgendaState(location, 0, 100)
 
     const rows = buildAgendaRows(
@@ -392,8 +392,7 @@ describe('Agenda rows', () => {
     )
 
     expect(rows.filter((row) => row.kind === 'day').map((row) => row.key)).toEqual(['day:100', 'day:120'])
-    expect(rows.filter((row) => row.kind === 'node').map((row) => row.parentPath)).toEqual([[], []])
-    expect(rows.filter((row) => row.kind === 'node').map((row) => row.startsPathGroup)).toEqual([true, false])
+    expect(rows.map((row) => row.key)).toEqual(['day:100', 'separator:120', 'day:120', 'node:120:a', 'node:120:b'])
   })
 
   it('invalidates semantic cache inputs separately and releases cached rows on clear', () => {
@@ -469,17 +468,17 @@ describe('Agenda rows', () => {
     expect(cache.get(empty, state)).toEqual(rows)
     expect(cache.get(empty, state)).not.toBe(rows)
   })
-  it('groups only direct matches by their real parent and folds only days', () => {
+  it('flattens only direct matches and folds only days', () => {
     const state = openAgendaState(location, 0, today)
 
     const projection = projectAgenda(document, null)
     const rows = buildAgendaRows(projection, state)
     const nodes = rows.filter((row) => row.kind === 'node')
 
-    expect(nodes.map((row) => [row.nodeId, row.parentPath, row.startsPathGroup])).toEqual([
-      ['a', ['parent'], true],
-      ['b', ['parent', 'a'], true],
-      ['c', ['parent'], true],
+    expect(nodes.map((row) => [row.nodeId, row.depth])).toEqual([
+      ['a', 0],
+      ['b', 0],
+      ['c', 0],
     ])
 
     const folded = buildAgendaRows(projection, { ...state, collapsed: new Set([nodes[1]!.key]) })

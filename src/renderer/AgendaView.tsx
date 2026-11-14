@@ -9,7 +9,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
-import { label } from '../application/recent-nodes'
 import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
@@ -277,7 +276,7 @@ export function AgendaView({
   }, [viewportState])
   useLayoutEffect(() => {
     if (windowed) {
-      // Newly measured path labels can grow the list after a jump to its estimated end.
+      // Newly measured wrapped rows can grow the list after a jump to its estimated end.
       // Keep that explicit end position while the visible range settles.
       const scroller = viewportScroller()
       if (viewportState.followsEnd && scroller !== undefined) scroller.scrollTop = scroller.scrollHeight
@@ -486,14 +485,6 @@ export function AgendaView({
         lineNumber={numbers?.get(row.key)}
         key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
         row={row}
-        startsGroup={row.kind === 'node' && row.startsPathGroup === true}
-        startsDay={row.kind === 'node' && rows[index - 1]?.kind === 'day'}
-        separatesDay={row.kind === 'day' && index > 0}
-        pathLabel={
-          row.kind === 'node' && row.startsPathGroup && (row.parentPath?.length ?? 0) > 0
-            ? row.parentPath?.map((id) => label(requireNode(document, id).node)).join(' › ')
-            : undefined
-        }
         node={node}
         renderInput={editable ? renderInput : undefined}
         renderAttachment={renderAttachment}

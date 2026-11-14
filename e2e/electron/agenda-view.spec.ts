@@ -301,9 +301,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.2
   // @requirement PRODUCT.md §23.3
   // @requirement PRODUCT.md §23.4
-  test('groups direct matches under passive scope-relative paths and navigates to scoped Tree', async ({
-    userDataDir,
-  }) => {
+  test('shows only direct matches and navigates to scoped Tree', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
     await setMainWindowContentSize(app, screenshotContentSize)
@@ -319,11 +317,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     ])
     await expect(window.locator('.agenda-row-gap, .agenda-role-context')).toHaveCount(0)
     await expect(window.locator('[data-node-id="invalid"]')).toHaveCount(0)
-    await expect(window.locator('.agenda-path-label')).toHaveText([
-      'Work › Team A › Release',
-      'Work › Team A › Release',
-      'Work › Team A › Release',
-    ])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
 
     const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()
     await expect(prepare).toHaveText('2026-10-14 Prepare rollout 2026-10-20')
@@ -336,17 +330,13 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
 
     await expect(window.locator('.agenda-row[data-node-id="outside"]')).toHaveCount(0)
-    await expect(window.locator('.agenda-path-label')).toHaveText([
-      'Team A › Release',
-      'Team A › Release',
-      'Team A › Release',
-    ])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
 
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Meta+.')
     await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Team A')
     await window.keyboard.press('Meta+p')
-    await expect(window.locator('.agenda-path-label')).toHaveText(['Release', 'Release', 'Release'])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
 
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
@@ -369,7 +359,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await window.keyboard.press('Meta+p')
       await window.keyboard.press('Escape')
       if (mode === 'vim') {
-        await window.keyboard.type('2j')
+        await window.keyboard.type('3j')
 
         await expect(window.locator('[aria-selected="true"]')).toContainText('2026-10-14 Prepare')
 

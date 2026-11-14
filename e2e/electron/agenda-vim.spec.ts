@@ -135,6 +135,7 @@ for (const interruption of ['pointer', 'focus'] as const) {
     await openAndSelect(window, nodeKey(10, 14, 'before'))
     await window.keyboard.press('$')
     await window.keyboard.press('j')
+    await window.keyboard.press('j')
     const day = row(window, dayKey(10, 15))
 
     await expect(day).toHaveAttribute('aria-selected', 'true')
@@ -181,6 +182,8 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
 
   await expect(firstRow.locator('.node-input')).toHaveClass(/node-input-image-caret/)
 
+  await window.keyboard.press('l')
+  await expect(row(window, `separator:${dayNumber(10, 15)}`)).toHaveAttribute('aria-selected', 'true')
   await window.keyboard.press('l')
   const day = row(window, dayKey(10, 15))
 
@@ -397,6 +400,17 @@ test.describe('Agenda Vim commands', () => {
       await setCursor(editor, 11)
       await window.keyboard.press('R')
       if (pending) await window.keyboard.type('X')
+
+      const separator = window.locator('.agenda-row-separator').first()
+      await separator.click()
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await expect(separator).toBeFocused()
+      const caret = separator.locator('.agenda-caret')
+      await expect(caret).toHaveCSS('border-left-style', 'solid')
+      await expect(caret).toHaveCSS('border-left-width', '1px')
+      expect((await caret.boundingBox())!.height).toBeGreaterThan(0)
+      await window.screenshot({ path: test.info().outputPath(`replace-separator-${pending}.png`) })
 
       await row(window, dayKey(10, 14)).locator('.agenda-label').click()
 

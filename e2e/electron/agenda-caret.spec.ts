@@ -63,9 +63,7 @@ const selectionText = (row: Locator): Promise<string | undefined> =>
 
 describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.4
-  test('carries the caret through a day into another editor while skipping its passive path', async ({
-    userDataDir,
-  }) => {
+  test('carries the caret through a separator and day into another editor', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -81,6 +79,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await setAgendaToday(window)
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Escape')
+    await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
@@ -100,8 +99,14 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
     await window.keyboard.press(down)
 
+    await expect(selected).toHaveClass(/agenda-row-separator/u)
+    await expect(selected).toBeFocused()
+    expect((await caretMark(selected))!.before).toBe(0)
+
+    await window.keyboard.press(down)
+
     await expect(selected).toHaveClass(/agenda-row-day/u)
-    expect((await caretMark(selected))!.before).toBe(5)
+    expect((await caretMark(selected))!.before).toBe(mode === 'vim' ? 5 : 0)
     await expect(window).toHaveScreenshot(screenshotName('agenda-caret-arrival-light.png'))
 
     await window.emulateMedia({ colorScheme: 'dark' })
@@ -111,7 +116,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.emulateMedia({ colorScheme: 'light' })
     await window.keyboard.press(down)
 
-    await expect(window.locator('.agenda-path-label')).toContainText(['Context ancestor'])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
     await expect(selected).toHaveAttribute('data-node-id', 'second')
     expect(
       await selected.locator('.node-input').evaluate((input) => {
@@ -122,11 +127,11 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
         range.setEnd(selection.anchorNode!, selection.anchorOffset)
         return range.toString().length
       }),
-    ).toBe(5)
+    ).toBe(mode === 'vim' ? 5 : 0)
   })
 
   // @requirement PRODUCT.md §23.4
-  test('shows the caret only on the selected day and skips path labels', async ({ userDataDir }) => {
+  test('shows the caret only on the selected separator or day without parent labels', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
 
@@ -159,6 +164,12 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.keyboard.press('ArrowDown')
     const selected = window.locator('.agenda-row[aria-selected="true"]')
 
+    await expect(selected).toHaveClass(/agenda-row-separator/u)
+    await expectCaret(selected, '')
+    expect(await caretMark(today)).toBeUndefined()
+
+    await window.keyboard.press('ArrowDown')
+
     await expect(selected).toContainText('Wed Oct 14')
     await expectCaret(selected, 'W')
     expect(await caretMark(today)).toBeUndefined()
@@ -166,7 +177,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.keyboard.press('ArrowDown')
 
     await expect(selected).toHaveAttribute('data-node-id', 'prepare')
-    await expect(window.locator('.agenda-path-label')).toHaveText(['Work › Team A', 'Work › Team A'])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
     expect(await caretMark(today)).toBeUndefined()
     await expect(window.locator('.agenda-path-label .agenda-caret')).toHaveCount(0)
   })
@@ -193,6 +204,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
         )
       })
 
+    await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('ArrowDown')
 

@@ -87,7 +87,7 @@ export function reconcileAgendaSelection(state: AgendaState, rows: readonly Agen
 }
 
 export function selectedAgendaDay(key: string): number | undefined {
-  const match = /^(?:day|node):(-?\d+)(?::|$)/.exec(key)
+  const match = /^(?:day|node|separator):(-?\d+)(?::|$)/.exec(key)
   return match === null ? undefined : Number(match[1])
 }
 

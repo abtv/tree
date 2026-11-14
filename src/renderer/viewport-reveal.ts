@@ -64,7 +64,18 @@ export function createViewportReveal() {
       if (rect === undefined) return
       centerRectInViewport(rect)
     } else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
-    else revealRectInViewport(caretLineRect(element as HTMLElement, intent.cursor), intent.keepContext, element)
+    else {
+      let rect = caretLineRect(element as HTMLElement, intent.cursor)
+      const agendaRow = element.closest<HTMLElement>('.agenda-row')
+      if (agendaRow !== null) {
+        const bounds = agendaRow.getBoundingClientRect()
+        const minimum = Number.parseFloat(getComputedStyle(agendaRow).minHeight)
+        // Single-line entries share the same scroll boundary as Agenda's headings and separators.
+        // Wrapped text and attachments still reveal only the current text line.
+        if (bounds.height > 0 && bounds.height <= minimum + 1) rect = bounds
+      }
+      revealRectInViewport(rect, intent.keepContext, element)
+    }
     rememberScroll()
     if (typeof ResizeObserver === 'undefined' || observedElement === element) return
     observer ??= new ResizeObserver(correct)

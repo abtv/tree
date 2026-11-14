@@ -42,10 +42,6 @@ export const AgendaRow = memo(function AgendaRow({
   renderInput,
   renderAttachment,
   renderText,
-  pathLabel,
-  startsGroup = false,
-  startsDay = false,
-  separatesDay = false,
 }: {
   lineNumber?: number | undefined
   row: Row
@@ -65,21 +61,16 @@ export const AgendaRow = memo(function AgendaRow({
   renderInput?: ((node: TreeNode, day: number) => ReactNode) | undefined
   renderAttachment?: ((node: TreeNode, editable: boolean) => ReactNode) | undefined
   renderText?: ((node: TreeNode, day: number, marks: readonly CaretMark[], context: boolean) => ReactNode) | undefined
-  pathLabel?: string | undefined
-  startsGroup?: boolean
-  startsDay?: boolean
-  separatesDay?: boolean
 }): React.JSX.Element {
   const depth = row.kind === 'node' ? row.depth + 1 : 0
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${startsGroup ? ' agenda-entry-group-start' : ''}${startsDay ? ' agenda-entry-first-in-day' : ''}${separatesDay ? ' agenda-entry-separated' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
+      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
       data-agenda-measure-key={row.key}
       style={pinned ? { top: pinnedOffset } : undefined}
     >
-      {separatesDay ? <span aria-hidden="true" className="agenda-day-separator" /> : null}
-      {pathLabel === undefined ? null : <div className="agenda-path-label">{pathLabel}</div>}
+      {row.kind === 'separator' ? <span aria-hidden="true" className="agenda-day-separator" /> : null}
       <div
         className={`agenda-row agenda-row-${row.kind}${row.kind === 'node' ? ` agenda-role-${row.role}` : ''}${row.kind === 'day' && row.isToday ? ' agenda-today' : ''}${mirror ? ' agenda-mirror' : ''}`}
         data-agenda-key={row.key}
@@ -88,6 +79,7 @@ export const AgendaRow = memo(function AgendaRow({
         data-node-id={row.kind === 'node' ? row.nodeId : undefined}
         data-has-attachment={row.kind === 'node' && node?.attachment !== undefined}
         aria-selected={selected}
+        aria-label={row.kind === 'separator' ? 'Day separator' : undefined}
         aria-current={row.kind === 'day' && row.isToday ? 'date' : undefined}
         role="row"
         tabIndex={selected ? 0 : -1}
@@ -101,7 +93,7 @@ export const AgendaRow = memo(function AgendaRow({
         }}
         style={{ '--row-depth': 0 } as CSSProperties}
       >
-        {selected ? <span aria-hidden="true" className="node-focus-marker" /> : null}
+        {selected && row.kind !== 'separator' ? <span aria-hidden="true" className="node-focus-marker" /> : null}
         {lineNumber === undefined ? null : (
           <span aria-hidden="true" className="line-number">
             {lineNumber}
@@ -122,7 +114,9 @@ export const AgendaRow = memo(function AgendaRow({
             }}
           />
         ) : null}
-        {row.kind === 'node' ? (
+        {row.kind === 'separator' ? (
+          <span className="agenda-text">{markedNodes('', 0, 0, marks, true)}</span>
+        ) : row.kind === 'node' ? (
           <>
             <span
               aria-hidden="true"

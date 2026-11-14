@@ -30,31 +30,47 @@ const roots = [
   },
 ]
 
-it('groups by parent identity, keeps scope-relative labels passive and navigates only flat matches', async () => {
+it.each([false, true])('stops on day separators without editing content (Vim %s)', async (vimEnabled) => {
   const f = await createAppHarness({
-    vimEnabled: true,
-    document: { roots },
-    location: { currentParentId: 'work', selectedNodeId: 'project' },
+    vimEnabled,
+    document: {
+      roots: [
+        { id: 'first', text: '2026-10-08 First', children: [] },
+        { id: 'second', text: '2026-10-09 Second', children: [] },
+      ],
+    },
   })
-  act(() => f.store.openAgenda())
+  act(() => {
+    f.store.openAgenda()
+    f.store.applyAgenda({ kind: 'select', key: `node:${today}:first` })
+  })
   await settleApp()
+  const before = f.snapshot().document
+  const down = vimEnabled ? 'j' : 'ArrowDown'
+  const up = vimEnabled ? 'k' : 'ArrowUp'
+  const separatorKey = `separator:${today + 1}`
+  const separator = f.container.querySelector<HTMLElement>(`[data-agenda-key="${separatorKey}"]`)!
 
-  expect([...f.container.querySelectorAll('.agenda-path-label')].map((element) => element.textContent)).toEqual([
-    'Project',
-    'Project',
-  ])
-  const rows = f.store.getAgendaRows().filter((row) => row.kind === 'node')
-  expect(rows.map((row) => row.nodeId)).toEqual(['a', 'b', 'c', 'direct'])
-  expect(rows.every((row) => row.depth === 0 && row.role === 'match')).toBe(true)
-  expect(f.container.querySelectorAll('.agenda-row-node .node-disclosure-triangle')).toHaveLength(0)
+  await f.press(screen.getByRole('textbox', { name: 'Agenda node first' }), down)
+  expect(f.snapshot().agenda?.selectedKey).toBe(separatorKey)
+  expect(separator).toHaveFocus()
+  expect(separator.querySelector('.agenda-caret')).not.toBeNull()
+  await f.press(separator, 'Enter')
+  await f.press(separator, '.', { metaKey: true })
+  expect(f.snapshot().document).toBe(before)
+  expect(f.snapshot().agenda?.selectedKey).toBe(separatorKey)
 
-  const day = f.container.querySelector<HTMLElement>(`[data-agenda-key="${dayKey}"]`)!
-  await f.press(day, 'j')
-  expect(f.snapshot().agenda?.selectedKey).toBe(`node:${today}:a`)
-  await f.press(screen.getByRole('textbox', { name: 'Agenda node a' }), 'j')
-  expect(f.snapshot().agenda?.selectedKey).toBe(`node:${today}:b`)
-  await f.press(screen.getByRole('textbox', { name: 'Agenda node b' }), 'j')
-  expect(f.snapshot().agenda?.selectedKey).toBe(`node:${today}:c`)
+  await f.press(separator, down)
+  expect(f.snapshot().agenda?.selectedKey).toBe(`day:${today + 1}`)
+  await f.press(f.container.querySelector<HTMLElement>(`[data-agenda-key="day:${today + 1}"]`)!, up)
+  expect(f.snapshot().agenda?.selectedKey).toBe(separatorKey)
+  await f.press(separator, up)
+  expect(f.snapshot().agenda?.selectedKey).toBe(`node:${today}:first`)
+
+  fireEvent.click(separator)
+  await settleApp()
+  expect(f.snapshot().agenda?.selectedKey).toBe(separatorKey)
+  expect(separator).toHaveFocus()
 })
 
 it.each([false, true])('blocks node operations and folds only days (Vim %s)', async (vimEnabled) => {
@@ -168,7 +184,7 @@ it.each([false, true].flatMap((vimEnabled) => [false, true].map((returned) => ({
   },
 )
 
-it('searches node text across folded days, excludes path labels and preserves focused days', async () => {
+it('searches node text across folded days, excludes parents and preserves focused days', async () => {
   const f = await createAppHarness({ vimEnabled: false, document: { roots } })
   Object.defineProperty(f.container.querySelector('.scroll-viewport'), 'scrollTo', { value: vi.fn() })
   act(() => {
@@ -194,7 +210,8 @@ it('searches node text across folded days, excludes path labels and preserves fo
   })
   await settleApp()
   expect(focusedAgendaDay(f.snapshot().agenda)).toBe(today)
-  expect(f.container.querySelectorAll('.agenda-path-label')).toHaveLength(3)
+  expect(f.container.querySelectorAll('.agenda-path-label')).toHaveLength(0)
+  expect(f.container.querySelectorAll('.agenda-row-node')).toHaveLength(4)
   expect(f.container.querySelectorAll('.agenda-focused-heading')).toHaveLength(1)
 })
 

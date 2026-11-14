@@ -29,10 +29,15 @@ export function isAgendaMirror(
 }
 
 /**
- * The source text of a day row as drawn; these offsets are the
+ * The source text of a day row or an empty separator; these offsets are the
  * caret offsets of the row (`docs/PRODUCT.md` §23.4). The Today badge is separate presentation.
  */
-export function agendaRowLabel(row: AgendaRow & { readonly kind: 'day' }, today: DayNumber, heading = false): string {
+export function agendaRowLabel(
+  row: Extract<AgendaRow, { readonly kind: 'day' | 'separator' }>,
+  today: DayNumber,
+  heading = false,
+): string {
+  if (row.kind === 'separator') return ''
   if (!heading && !row.content) return row.isToday ? 'No entries for today' : 'No entries for this day'
   return agendaDateLabel(row.day, today, true)
 }

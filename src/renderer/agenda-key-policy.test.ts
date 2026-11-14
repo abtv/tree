@@ -4,7 +4,7 @@ import { agendaAllows, type AgendaElement, type AgendaAction } from './agenda-ke
 // @requirement PRODUCT.md §23.9
 // @requirement PRODUCT.md §23.10
 describe('Agenda command policy', () => {
-  const elements: AgendaElement[] = ['day', 'match']
+  const elements: AgendaElement[] = ['day', 'separator', 'match']
   const editing: AgendaAction[] = ['text', 'clipboard', 'strikethrough']
   const prohibited: AgendaAction[] = [
     'structure',

@@ -22,6 +22,11 @@ export function agendaAncestorKeys(
 
 export type AgendaRow =
   | {
+      readonly kind: 'separator'
+      readonly key: string
+      readonly day: DayNumber
+    }
+  | {
       readonly kind: 'day'
       readonly key: string
       readonly day: DayNumber
@@ -35,8 +40,6 @@ export type AgendaRow =
       readonly nodeId: NodeId
       readonly depth: number
       readonly role: 'match'
-      readonly parentPath?: readonly NodeId[]
-      readonly startsPathGroup?: boolean
     }
 
 /** Add the one temporarily invalid item and its ancestors without copying document nodes. */
@@ -92,6 +95,7 @@ export function buildAgendaRows(
   for (const day of timelineDays) {
     const entry = { kind: 'day' as const, day, content: days.has(day), isToday: day === state.today }
     const key = dayKey(entry.day)
+    if (rows.length > 0) rows.push({ kind: 'separator', key: `separator:${day}`, day })
     rows.push({ ...entry, key })
     if (state.collapsed.has(key)) continue
     const projected = days.get(entry.day) ?? []
@@ -101,15 +105,9 @@ export function buildAgendaRows(
       continue
     }
     const dayRows: AgendaRow[] = []
-    const ancestors: NodeId[] = []
-    let previousParent: NodeId | undefined
     for (let index = 0; index < projected.length; index++) {
       const node = projected[index]!
-      ancestors.length = node.depth
-      const parentPath = [...ancestors]
-      ancestors.push(node.nodeId)
       if (node.role !== 'match') continue
-      const parent = parentPath.at(-1)
       const nodeKey = `node:${entry.day}:${node.nodeId}`
       dayRows.push({
         kind: 'node',
@@ -118,10 +116,7 @@ export function buildAgendaRows(
         nodeId: node.nodeId,
         depth: 0,
         role: 'match',
-        parentPath,
-        startsPathGroup: dayRows.length === 0 || parent !== previousParent,
       })
-      previousParent = parent
     }
     cache?.set(entry.day, { projected, rows: dayRows })
     for (const row of dayRows) rows.push(row)

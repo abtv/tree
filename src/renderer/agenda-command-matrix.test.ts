@@ -11,7 +11,7 @@ import type { AgendaElement } from './agenda-key-policy'
 import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 
 const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
-const elements: AgendaElement[] = ['day', 'match']
+const elements: AgendaElement[] = ['day', 'separator', 'match']
 const platforms: ShortcutPlatform[] = ['apple', 'other']
 /** The profile under test; the matrix sends Cmd on Apple and Ctrl on the other profile (PRODUCT §1.5). */
 let platform: ShortcutPlatform = 'apple'
@@ -39,7 +39,7 @@ async function fixture(element: AgendaElement, standard = false, children = true
   f.store.openAgenda()
   const rows = f.store.getAgendaRows()
   const selected = rows.find((row) =>
-    element === 'day' ? row.kind === 'day' && row.day === day(15) : row.kind === 'node' && row.nodeId === 'match',
+    element === 'match' ? row.kind === 'node' && row.nodeId === 'match' : row.kind === element && row.day === day(15),
   )!
   f.store.applyAgenda({ kind: 'select', key: selected.key })
   const shortcuts = shortcutProfile(platform)
@@ -237,6 +237,7 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       f.press('.', { metaKey: true })
 
       if (element === 'day') expect(focusedAgendaDay(f.snapshot().agenda)).toBe(day(15))
+      else if (element === 'separator') expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
       else {
         expect(f.snapshot().agenda).toBeUndefined()
         expect(f.snapshot().location.currentParentId).toBe(element)

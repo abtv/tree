@@ -1,7 +1,61 @@
 // @editing-modes: both
-import { describeForEachEditingMode, expect, launchTree, seedDocument, setAgendaToday, test } from './fixtures'
+import {
+  describeForEachEditingMode,
+  expect,
+  launchTree,
+  seedDocument,
+  setAgendaToday,
+  setMainWindowContentSize,
+  test,
+} from './fixtures'
 
 describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
+  // @requirement PRODUCT.md §23.4
+  // @requirement PRODUCT.md §23.6
+  test('keeps entries, separators and headings on the same viewport boundary as Tree', async ({ userDataDir }) => {
+    const children = Array.from({ length: 80 }, (_, index) => {
+      const date = new Date(Date.UTC(2026, 9, 8 + Math.floor(index / 2))).toISOString().slice(0, 10)
+      return { id: `item-${index}`, text: `Note ${index} ${date}`, children: [] }
+    })
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: 'Synthetic calendar', children }] },
+      location: { currentParentId: 'root', selectedNodeId: 'item-0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, { width: 680, height: 620 })
+    await setAgendaToday(window)
+    if (mode === 'vim') await window.keyboard.press('Escape')
+    const down = mode === 'vim' ? 'j' : 'ArrowDown'
+    for (let step = 0; step < 30; step++) await window.keyboard.press(down)
+    await window.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    )
+    const treeTop = await window
+      .getByRole('textbox', { name: 'Node 31', exact: true })
+      .evaluate((input) => input.closest('.node-row')!.getBoundingClientRect().top)
+
+    await window.keyboard.press('Meta+p')
+    await window.getByRole('textbox', { name: 'Agenda node item-0', exact: true }).click()
+    const samples: { kind: string; top: number }[] = []
+    for (let step = 0; step < 44; step++) {
+      await window.keyboard.press(down)
+      await window.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+      )
+      const sample = await window.evaluate(() => {
+        const viewport = document.querySelector('.scroll-viewport')!
+        if (viewport.scrollTop < 100) return undefined
+        const row = document.querySelector<HTMLElement>('.agenda-row[aria-selected="true"]')!
+        return { kind: row.dataset.agendaKey!.split(':')[0]!, top: row.getBoundingClientRect().top }
+      })
+      if (sample !== undefined) samples.push(sample)
+    }
+
+    expect(new Set(samples.map((sample) => sample.kind))).toEqual(new Set(['node', 'separator', 'day']))
+    for (const sample of samples) expect(Math.abs(sample.top - treeTop)).toBeLessThan(1)
+    await window.screenshot({ path: test.info().outputPath(`edge-cadence-${mode}.png`) })
+  })
+
   // @requirement PRODUCT.md §23.6
   test('populates the viewport before a scroll event finishes without moving the pinned caret', async ({
     userDataDir,

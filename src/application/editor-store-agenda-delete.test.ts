@@ -98,7 +98,7 @@ it('rejects Agenda Backspace even when Tree has an empty preceding sibling', asy
   expect(ready().document).toBe(before)
 })
 
-it('retains the pinned item and its context after a rejected deletion', async () => {
+it('retains the pinned nested item after a rejected deletion', async () => {
   const { store, ready } = await setup([
     {
       id: 'outer',
@@ -113,7 +113,8 @@ it('retains the pinned item and its context after a rejected deletion', async ()
 
   expect(ready().agenda?.selectedKey).toBe('node:100:target')
   expect(store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === 'target')).toMatchObject({
-    parentPath: ['outer', 'parent'],
+    key: 'node:100:target',
+    depth: 0,
   })
 })
 

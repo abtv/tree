@@ -13,10 +13,10 @@ import {
 } from './fixtures'
 
 async function expectSeparatedDays(window: Page): Promise<void> {
-  const gaps = await window.locator('.agenda-entry-separated').evaluateAll((entries) =>
+  const gaps = await window.locator('.agenda-entry-separator').evaluateAll((entries) =>
     entries.map((entry) => {
       const separator = entry.querySelector('.agenda-day-separator')!.getBoundingClientRect()
-      const heading = entry.querySelector('.agenda-row-day')!.getBoundingClientRect()
+      const heading = entry.nextElementSibling!.querySelector('.agenda-row-day')!.getBoundingClientRect()
       return heading.top - separator.bottom
     }),
   )
@@ -225,9 +225,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('Undated')
   })
 
-  test('windows wrapped path labels and retains the active editor across large scroll jumps', async ({
-    userDataDir,
-  }) => {
+  test('windows nested matches and retains the active editor across large scroll jumps', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 180 }, (_, index) => ({
@@ -264,7 +262,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await window.screenshot({ path: test.info().outputPath(`windowed-${mode}.png`) })
   })
 
-  test('shows passive paths, day folds and single-node editing in the real renderer', async ({ userDataDir }) => {
+  test('shows compact rows, full-width separators, day folds and single-node editing', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -326,36 +324,38 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
 
     const alignment = await window.evaluate(() => {
       const heading = document.querySelector('.agenda-today .agenda-label')!
-      const path = document.querySelector('.agenda-path-label')!
-      const input = path.parentElement!.querySelector('.node-input')!
+      const input = document.querySelector('.agenda-row-node .node-input')!
+      const nodes = [...document.querySelectorAll('.agenda-row-node')]
+      const viewport = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
+      const separator = document.querySelector('.agenda-day-separator')!.getBoundingClientRect()
       return {
         heading: heading.getBoundingClientRect().left,
-        path: path.getBoundingClientRect().left,
         input: input.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(input).paddingLeft),
-        headingToPath: path.getBoundingClientRect().top - heading.getBoundingClientRect().bottom,
-        pathToInput: input.getBoundingClientRect().top - path.getBoundingClientRect().bottom,
+        steps: nodes
+          .slice(1, 5)
+          .map((row, index) => row.getBoundingClientRect().top - nodes[index]!.getBoundingClientRect().top),
+        headingStep:
+          nodes[0]!.getBoundingClientRect().top - heading.closest('.agenda-row')!.getBoundingClientRect().top,
+        separatorLeft: separator.left - viewport.left,
+        separatorRight: viewport.right - separator.right,
       }
     })
-    expect(alignment.path).toBeCloseTo(alignment.heading, 0)
-    expect(alignment.input).toBeCloseTo(alignment.path, 0)
-    expect(alignment.headingToPath).toBe(8)
-    expect(alignment.pathToInput).toBe(4)
+    expect(alignment.input).toBeCloseTo(alignment.heading, 0)
+    expect(alignment.steps).toEqual([25, 25, 25, 25])
+    expect(alignment.headingStep).toBe(25)
+    expect(Math.abs(alignment.separatorLeft)).toBeLessThan(1)
+    expect(Math.abs(alignment.separatorRight)).toBeLessThan(1)
 
     await expect(window.locator('.agenda-row-day .agenda-rule')).toHaveCount(0)
     await expect(window.locator('.agenda-entry-day').first().locator('.agenda-day-separator')).toHaveCount(0)
     const followingDay = window.locator('.agenda-row-day').nth(1)
-    const separator = await followingDay.locator('..').locator('.agenda-day-separator').boundingBox()
+    const separator = await window.locator('.agenda-day-separator').boundingBox()
     const heading = await followingDay.boundingBox()
     expect(separator!.y + separator!.height).toBeLessThan(heading!.y)
 
     await expect(window.locator('.agenda-row-node')).toHaveCount(6)
     await expect(window.locator('.agenda-role-context')).toHaveCount(0)
-    await expect(window.locator('.agenda-path-label')).toHaveText([
-      'Work › Tree › Search',
-      'Work › Tree › Agenda',
-      'Personal › Home',
-      'Work › Tree › Agenda',
-    ])
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
     await expect(window.locator('.agenda-row-node .node-disclosure-triangle')).toHaveCount(0)
     const columns = await window
       .locator('.agenda-row-node')
@@ -392,7 +392,7 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await day.click()
     await window.keyboard.press('Meta+.')
     await expect(window.locator('.agenda-focused-heading')).toBeVisible()
-    await expect(window.locator('.agenda-path-label')).toHaveCount(3)
+    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
     await window.screenshot({ path: test.info().outputPath(`focused-${mode}.png`) })
   })
 })

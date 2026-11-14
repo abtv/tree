@@ -61,6 +61,26 @@ function fixture() {
 }
 
 describe('viewport reveal lifecycle', () => {
+  it.each([25, 45])('uses the full Agenda row only when it is one line (%ipx)', (height) => {
+    const { row, reveal } = fixture()
+    row.className = 'agenda-row'
+    row.style.minHeight = '25px'
+    row.getBoundingClientRect = () => new DOMRect(0, 700, 400, height)
+    const input = document.createElement('div')
+    row.append(input)
+
+    reveal.beginLine(
+      () => input,
+      0,
+      () => true,
+    )
+
+    const call = vi.mocked(revealRectInViewport).mock.calls.at(-1)!
+    expect(call[0].height).toBe(height === 25 ? 25 : 20)
+    expect(call[1]).toBe(true)
+    expect(call[2]).toBe(input)
+  })
+
   it.each(['layout', 'resize', 'observer', 'scroll'])(
     'relinquishes an end jump before a %s correction even when content has grown',
     (signal) => {

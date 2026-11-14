@@ -507,10 +507,6 @@ body:not(.node-drag-active) .location-link:hover {
 }
 
 .agenda-shell {
-  padding-top: 48px;
-}
-
-.agenda-shell-focused {
   padding-top: 10px;
 }
 
@@ -532,44 +528,19 @@ body:not(.node-drag-active) .location-link:hover {
   position: relative;
   --row-indent: 20px;
   --agenda-text-inset: calc(var(--row-gutter, 28px) + 24px);
-  --agenda-context-gap: 4px;
-  --agenda-heading-gap: 8px;
-  --agenda-group-gap: 16px;
-  --agenda-day-gap: 24px;
 }
 .agenda-entry {
   position: relative;
   display: flow-root;
 }
-.agenda-entry-day {
-  padding-top: var(--agenda-day-gap);
-  padding-bottom: var(--agenda-heading-gap);
-}
-.agenda-entry-day:not(.agenda-entry-separated) {
-  padding-top: 0;
-}
-.agenda-entry-group-start {
-  padding-top: var(--agenda-group-gap);
-}
-.agenda-entry-first-in-day {
-  padding-top: 0;
-}
 .agenda-day-separator {
   position: absolute;
-  top: calc(var(--agenda-day-gap) / 2);
-  right: 0;
-  left: var(--agenda-text-inset);
+  top: 10px;
+  right: -28px;
+  left: calc(-4px - var(--line-number-digits) * 1ch);
+  font-size: 11px;
   border-top: 1px solid var(--color-location-border);
   pointer-events: none;
-}
-.agenda-path-label {
-  margin: 0 0 var(--agenda-context-gap) var(--agenda-text-inset);
-  color: var(--color-secondary);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 /* Retain the painted window while native scrolling waits for its range update. The inner offset
    and rows change together; the compositor never scrolls the old window into an empty spacer. */
@@ -596,13 +567,6 @@ body:not(.node-drag-active) .location-link:hover {
   gap: 12px;
   height: var(--node-row-min-height);
 }
-.agenda-row-day,
-.agenda-row-node {
-  min-height: 24px;
-}
-.agenda-row-day {
-  height: 24px;
-}
 .agenda-label {
   line-height: 20px;
   margin-left: 6px;
@@ -618,9 +582,9 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .agenda-row-day .agenda-label {
   color: var(--color-text);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 650;
-  line-height: 24px;
+  line-height: 20px;
   letter-spacing: -0.02em;
   text-transform: none;
 }
@@ -631,10 +595,10 @@ body:not(.node-drag-active) .location-link:hover {
   letter-spacing: normal;
 }
 .agenda-row-day .node-disclosure-triangle {
-  top: 3.5px;
+  top: 1.5px;
 }
 .agenda-row-day .node-focus-marker {
-  top: 8.5px;
+  top: 6.5px;
 }
 .agenda-today-badge {
   align-self: center;
@@ -651,7 +615,7 @@ body:not(.node-drag-active) .location-link:hover {
   font-size: 13px;
 }
 .agenda-empty-message {
-  margin: var(--agenda-heading-gap) 0 0 var(--agenda-text-inset);
+  margin: 0 0 0 var(--agenda-text-inset);
   color: var(--color-secondary);
   font-size: 13px;
   line-height: 20px;
@@ -678,7 +642,8 @@ body:not(.node-drag-active) .location-link:hover {
   height: 1.3em;
   vertical-align: text-bottom;
 }
-.vim-state-insert .agenda-caret {
+.vim-state-insert .agenda-caret,
+.vim-state-replace .agenda-caret {
   margin-right: -1px;
   border-left: 1px solid var(--color-caret);
 }
