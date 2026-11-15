@@ -1932,6 +1932,8 @@ Every current and future appearance preserves the same semantic presentation rul
 
 Selected hyperlinks use the same foreground and background as the surrounding text selection in every appearance and editing mode. Any link highlight retained when focus moves to another control keeps that appearance's selection colors.
 
+Save-error and inline image-error messages remain legible against the document surface in every appearance. Dark uses a lighter muted red for these messages; Light and Gray retain their darker error colors.
+
 The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
 
 The window's top strip, which holds the window controls (close, minimize, zoom) and the title `Tree`, has the same color as the document background in every appearance. The system title bar is not shown, so the strip never differs in tone from the content below it. The strip drags the window, the window controls keep their standard behavior, and the title uses the secondary text color of the current appearance.

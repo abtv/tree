@@ -1688,6 +1688,8 @@ body.node-drag-invalid * {
     --color-hover-text: #f0f0e0;
     --color-link: #8cd0d3;
     --color-caret: #dcdccc;
+    --color-attachment-error: #dca3a3;
+    --color-save-error: var(--color-attachment-error);
     --color-gutter-mark: #9f9f8f;
     --color-disclosure-background: #4f4f4f;
     --color-disclosure-hover-background: #5f5f5f;

@@ -18,11 +18,13 @@ The complete batch is known; there is no unverified remainder.
 | ID | Outcome and expected files | Validation and acceptance | Status |
 | --- | --- | --- | --- |
 | T1 | Selected hyperlinks use the shared highlight pair, including focus transfer. `src/renderer/styles.css`, `e2e/electron/completion-links.spec.ts`, `docs/PRODUCT.md`. | Moderate Risk: `npm run check`, 13 focused completion/selection E2E passed, Light/Dark/Gray screenshots inspected, separate product verifier passed. | Done |
-| T2 | Save and attachment errors remain legible in Dark. `src/renderer/styles.css`, focused error-appearance E2E and baselines, `docs/PRODUCT.md`. | Moderate Risk: `npm run check`, actual error rendering and contrast assertions, inspected Light/Dark/Gray screenshots. | Ready |
+| T2 | Save and attachment errors remain legible in Dark. `src/renderer/styles.css`, focused error-appearance E2E and baselines, `docs/PRODUCT.md`. | Moderate Risk: `npm run check` and real error-appearance E2E passed; six Light/Dark/Gray screenshots inspected. Dark contrast is 4.92:1. | Done |
 | T3 | Browser shadows use shared color properties; the guard includes Gray, browser styles and named colors. `src/renderer/styles.css`, `src/web/styles.css`, `src/renderer/styles.test.ts`, `docs/ARCHITECTURE.md`. | Low Risk: `npm run check`, a failing-before-fix color-ownership guard, unchanged computed shadow values. | Ready |
 
 T2 follows T1; T3 follows T2. Each task receives its own validated commit.
-Exact next task: T2, readable Dark error messages.
+Exact next task: T3, centralized browser shadows and complete color-ownership guard.
+
+T1 delivered in `1e9b89e`.
 
 ## Findings and choices
 
