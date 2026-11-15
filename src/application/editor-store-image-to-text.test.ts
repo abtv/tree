@@ -373,6 +373,57 @@ it('does not retire recognition for an ordinary archive snapshot flush', async (
   await vi.waitFor(() => expect(ready(store).imageToTextStatus).toContain('added 1'))
 })
 
+it('keeps recognition suspended across overlapping shutdown flushes and releases it after a failure', async () => {
+  let finishRecognition!: (text: string[]) => void
+  let finishFirst!: () => void
+  let failSecond!: (error: Error) => void
+  const recognize = vi
+    .fn<NonNullable<EditorServices['imageToText']>>()
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRecognition = resolve
+        }),
+    )
+    .mockResolvedValue(['Retry'])
+  const store = await setup(recognize)
+  const flushHistory = vi
+    .spyOn(store.emojiHistory, 'flush')
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishFirst = resolve
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failSecond = reject
+        }),
+    )
+  store.imageToText()
+
+  const first = store.flushPersistence({ cancelImageRecognition: true })
+  const second = store.flushPersistence({ cancelImageRecognition: true })
+  await vi.waitFor(() => expect(flushHistory).toHaveBeenCalledTimes(2))
+  finishFirst()
+  await first
+  store.imageToText()
+  store.reindexAllImages()
+
+  expect(ready(store).imageToTextStatus).toBe('Image to text: saving in progress. Please wait.')
+  expect(recognize).toHaveBeenCalledOnce()
+
+  failSecond(new Error('history unavailable'))
+  await expect(second).rejects.toThrow('history unavailable')
+  store.imageToText()
+  finishRecognition(['Discarded'])
+  await vi.waitFor(() => expect(ready(store).imageToTextStatus).toBe('Image to text: added 1 paragraph.'))
+
+  expect(recognize).toHaveBeenCalledTimes(2)
+  expect(ready(store).document.roots[0]!.children.map((node) => node.text)).toEqual(['Existing child', 'Retry'])
+})
+
 it.each([1, 2])('reports %s successful paragraphs as well as failures from a mixed queue', async (count) => {
   let fail!: (error: Error) => void
   const recognize = vi

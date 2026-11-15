@@ -1163,6 +1163,15 @@ ID; main reads its local bytes and pipes them to the helper. Vision decoding and
 run in that process, which returns bounded JSON text entries, including empty spacing
 markers. The application owns queueing, source-identity checks and atomic child
 insertion through the domain. No native API or filesystem dependency enters the domain.
+`image-to-text-queue.ts` owns pending identities and an explicit idle/draining state
+with one active job. Job kinds distinguish visible child insertion, automatic indexing
+and reindexing. Admission, permanent source invalidation, reindex owner transfer and
+nested shutdown suspension go through this owner; pending pruning never removes the
+active job. `EditorStore` retains native execution, metadata/history enrichment,
+child insertion, saving and batch status, with the same await and publication order.
+The owner retains no image bytes or document snapshots and adds no writes, syncs or
+document scans to the existing paths. Queue and store scale guards cover unique-image
+retention and sequential execution; the explicit limit remains 20 jobs.
 Main cancels work on renderer loss/reload and quit. The packaged helper lives in
 `Contents/Helpers`; development builds use `out/native`. See
 [ADR 0025](decisions/0025-apple-vision-image-to-text.md).

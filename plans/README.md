@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [State-machine follow-ups](state-machine-follow-ups.md) | In progress | SM3: extract image-recognition queue ownership |
+| [State-machine follow-ups](state-machine-follow-ups.md) | Awaiting owner acceptance | Accept the delivered result and confirm no further batch tasks |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
