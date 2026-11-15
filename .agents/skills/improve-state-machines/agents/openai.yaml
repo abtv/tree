@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Improve State Machines'
+  short_description: 'Find and assess implicit state machines in code'
+  default_prompt: 'Use $improve-state-machines to investigate implicit state machines and rank evidence-backed proposals without modifying application code. Default to all repository areas and a maximum of 15 minutes including the report, unless I specify different areas or a different time limit. Report actual coverage and unfinished investigation.'
