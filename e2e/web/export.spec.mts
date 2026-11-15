@@ -239,7 +239,8 @@ test('cancels, refuses invalid notes, stays responsive and is unavailable while 
   expect(archive.names).toHaveLength(25)
   expect(archive.bytes.byteLength).toBeGreaterThan(24 * large.length)
 
-  await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
+  await expect(activity(page).getByRole('button', { name: 'OK', exact: true })).toHaveCount(0)
+  await expect(activity(page)).toBeHidden({ timeout: 7000 })
   downloads.length = 0
 
   // Cancel while the worker script is still loading.

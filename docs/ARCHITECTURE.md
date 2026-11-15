@@ -193,6 +193,9 @@ through its renderer owner; `EditorStore.searchOrigin` resolves occurrence or sy
 origins. Native Find menu commands use a validated main-to-renderer notification;
 command-panel actions call the same renderer entry points. These controls retain
 bounded session-only references and add no document-scale work or persistence.
+The renderer presents the same session as a Find panel in standard editing and a
+bottom status-bar prompt in Vim. Vim confirmation returns focus through the existing
+search-focus owner; confirmed feedback contains no editable field.
 While Find owns focus, navigation updates selection and reveal without focusing
 an editor or writing its native caret. The input bindings delegate search focus policy
 to the DOM-independent `SearchFocusController`, supplying live search and DOM focus
@@ -275,6 +278,9 @@ It publishes metadata without a history entry and enriches retained undo/redo do
 using one temporary node/document memo, preserving attachment summaries and subtree
 sharing. Removing an attachment removes its search text; canceled jobs cannot restore it.
 Automatic queued entries contain identities only and canceled pending entries are pruned.
+`reindex-all-images` scans the document once to enqueue unique image identities through
+the hidden OCR path. A reindex job can transfer to another node referencing the same
+image when its original node disappears; removal of the last owner cancels it permanently.
 Recognition adds one ordinary autosave change, no search-time writes or syncs. Enrichment
 work reuses image positions only after checking their identity and multiplicity in
 each snapshot, otherwise locating them again. It copies only affected ancestor arrays

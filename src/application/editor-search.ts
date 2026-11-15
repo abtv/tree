@@ -164,7 +164,7 @@ export class EditorSearch {
       )
       return {
         kind: 'agenda',
-        agenda: next,
+        agenda: { ...next, activity: { kind: 'dated', occurrence } },
         location: { ...state.location, selectedNodeId: destination.nodeId },
         focus: { nodeId: destination.nodeId, cursor: destination.caret, revealLine: true },
       }

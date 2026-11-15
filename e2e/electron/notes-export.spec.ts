@@ -176,9 +176,10 @@ test.describe('desktop Export Notes', () => {
 
       await expect(panel).toContainText('Exported “Notes.zip”.')
       expect(exportedText(destination)).toBe('The latest notes before export')
+      await expect(panel.getByRole('button', { name: 'OK' })).toHaveCount(0)
       await expect(panel).toHaveScreenshot(`export-done-${appearance}.png`)
 
-      await window.clock.fastForward(6000)
+      await window.clock.fastForward(5000)
 
       await expect(panel).toHaveCount(0)
 

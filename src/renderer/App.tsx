@@ -729,7 +729,7 @@ export function App({
       </div>
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
       {commandList}
-      {search.visible && !commandPanel.open ? (
+      {search.visible && !commandPanel.open && !vimEnabled ? (
         <section className="local-search-panel" aria-label="Find in current view" data-editor-focus-borrow>
           <SearchPrompt
             store={store}
@@ -825,6 +825,32 @@ export function App({
           ) : null}
         </div>
         <div className="status-controls">
+          {vimEnabled && search.visible && !commandPanel.open ? (
+            <div className="vim-search-line" aria-label="Find in current view" data-editor-focus-borrow>
+              {search.draft !== undefined ? (
+                <SearchPrompt
+                  store={store}
+                  snapshot={search}
+                  restoreEditor={restoreSearchFocus}
+                  shortcuts={shortcuts}
+                  navigate={localSearch.navigate}
+                  vim
+                />
+              ) : (
+                <span>/{search.confirmed}</span>
+              )}
+              <SearchCount
+                pending={search.pending}
+                label={
+                  search.count?.capped
+                    ? '100+'
+                    : searchResult?.ordinal === undefined
+                      ? `${search.count?.total ?? 0}`
+                      : `${searchResult.ordinal} / ${search.count?.total ?? 0}`
+                }
+              />
+            </div>
+          ) : null}
           {commandPanel.open ? (
             commandInput
           ) : commandPanel.message !== undefined ? (

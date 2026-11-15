@@ -6,11 +6,11 @@ import {
   seedDocument,
   setCursor,
   setAgendaToday,
-  describeForEachEditingMode,
   clickApplicationMenuItem,
+  describeForEachEditingMode,
 } from './fixtures'
 
-describeForEachEditingMode('Local search', () => {
+describeForEachEditingMode('Local search', ({ mode }) => {
   test('keeps Find geometry and focus stable while typing and counting', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'one', text: 'apple apple', children: [] }] },
@@ -20,7 +20,7 @@ describeForEachEditingMode('Local search', () => {
     await window.keyboard.press('Meta+f')
     const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
     await window.evaluate(() => {
-      const panel = document.querySelector('.local-search-panel')!
+      const panel = document.querySelector('.local-search-panel, .vim-search-line')!
       const input = panel.querySelector('input')!
       const probe = {
         widths: [input.getBoundingClientRect().width],
@@ -40,8 +40,10 @@ describeForEachEditingMode('Local search', () => {
 
     await prompt.pressSequentially('apple', { delay: 30 })
     await expect(window.locator('.search-count')).toHaveText('2')
-    await prompt.press('Enter')
-    await expect(window.locator('.search-count')).toHaveText('2 / 2')
+    if (mode === 'standard') {
+      await prompt.press('Enter')
+      await expect(window.locator('.search-count')).toHaveText('2 / 2')
+    }
     await prompt.press('End')
     await prompt.pressSequentially('xyz', { delay: 30 })
     await expect(window.locator('.search-count')).toHaveText('0')
@@ -115,6 +117,19 @@ describeForEachEditingMode('Local search', () => {
     const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
     await prompt.fill('apple')
 
+    if (mode === 'vim') {
+      await window.keyboard.press('Enter')
+      await expect(window.locator('.node-input:focus')).toHaveCount(1)
+      await window.keyboard.press('Meta+g')
+      await expect(window.locator('.search-count')).toHaveText('3 / 3')
+      await window.keyboard.press('Meta+Shift+g')
+      await expect(window.locator('.search-count')).toHaveText('2 / 3')
+      await window.keyboard.press('Escape')
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await window.keyboard.press('Escape')
+      await expect(window.locator('.search-count')).toHaveCount(0)
+      return
+    }
     for (const count of ['2 / 3', '3 / 3']) {
       await window.keyboard.press('Enter')
       await expect(window.locator('.search-count')).toHaveText(count)
@@ -193,6 +208,14 @@ describeForEachEditingMode('Local search', () => {
 
     await expect(window.locator('.search-count')).toHaveText('2 / 3')
     await expect(window.locator('.agenda-path-label .search-match')).toHaveCount(0)
+    if (mode === 'vim') {
+      await expect(entry).toBeFocused()
+      await window.keyboard.press('Meta+g')
+      await expect(window.locator('.search-count')).toHaveText('3 / 3')
+      await window.keyboard.press('Meta+Shift+g')
+      await expect(window.locator('.search-count')).toHaveText('2 / 3')
+      return
+    }
     await window.keyboard.press('Enter')
     await expect(window.locator('.search-count')).toHaveText('3 / 3')
     await expect(prompt).toBeFocused()
@@ -235,6 +258,17 @@ describeForEachEditingMode('Local search', () => {
     const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
     await expect(prompt).toBeFocused()
     await expect(prompt).toHaveAttribute('placeholder', 'Find')
+    if (mode === 'vim') {
+      await expect(window.locator('.local-search-panel')).toHaveCount(0)
+      await expect(window.locator('.status-bar').getByRole('textbox', { name: 'Search' })).toBeFocused()
+      await prompt.fill('apple')
+      await window.keyboard.press('Enter')
+      await expect(window.locator('.node-input:focus')).toHaveCount(1)
+      await window.keyboard.press('Meta+;')
+      await expect(window.getByRole('dialog', { name: 'Search', exact: true })).toBeVisible()
+      await expect(window.getByRole('searchbox')).toBeFocused()
+      return
+    }
     const panel = window.locator('.local-search-panel')
     for (const name of ['Previous match', 'Next match', 'Close search']) {
       const button = window.getByRole('button', { name, exact: true })

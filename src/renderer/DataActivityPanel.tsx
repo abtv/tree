@@ -4,7 +4,7 @@ import { ImportConfirmationDialog } from './ImportConfirmationDialog'
 
 interface Props {
   text: string
-  action: 'Cancel' | 'OK'
+  action?: 'Cancel' | 'OK' | undefined
   onAction(): void
   onShowFolder?(): void
   focusAction?: boolean
@@ -40,15 +40,17 @@ export function DataActivityPanel({
           Show in Finder
         </button>
       )}
-      <button
-        type="button"
-        ref={actionButton}
-        data-popup-dismiss
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={onAction}
-      >
-        {action}
-      </button>
+      {action === undefined ? null : (
+        <button
+          type="button"
+          ref={actionButton}
+          data-popup-dismiss
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onAction}
+        >
+          {action}
+        </button>
+      )}
     </aside>
   )
 }
@@ -70,7 +72,7 @@ export function DesktopDataActivity({ operations }: { operations: DesktopDataOpe
       text={state.text}
       focusAction={state.focusAction ?? false}
       {...(state.phase === 'done' && state.showFolder ? { onShowFolder: operations.showReplacedFolder } : {})}
-      action={state.phase === 'running' ? 'Cancel' : 'OK'}
+      action={state.phase === 'running' ? 'Cancel' : state.autoDismiss ? undefined : 'OK'}
       onAction={
         state.phase === 'running'
           ? () => {

@@ -18,6 +18,25 @@ import {
 } from './fixtures'
 import { controlPostedTasksWithClock } from './search-clock'
 
+test('keeps a long confirmed query inside the bottom status bar', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'one', text: 'apple', children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await window.keyboard.press('/')
+  await window.getByRole('textbox', { name: 'Search' }).fill('x'.repeat(1000))
+  await window.keyboard.press('Enter')
+
+  const bounds = await window.locator('.vim-search-line').evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const count = element.querySelector('.search-count')!.getBoundingClientRect()
+    return { right: box.right, countRight: count.right, width: document.documentElement.clientWidth }
+  })
+  expect(bounds.right).toBeLessThanOrEqual(bounds.width)
+  expect(bounds.countRight).toBeLessThanOrEqual(bounds.width)
+})
+
 test('keeps draft feedback out of persistence and forgets confirmed recall after restart', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
     document: { roots: [{ id: 'one', text: 'apple apple', children: [] }] },
@@ -258,7 +277,7 @@ test('keeps a hidden logical origin through manual folding and cancels on text c
 
   await window.keyboard.press('Enter')
 
-  await expect(prompt).toBeFocused()
+  await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
   await expect(window.locator('.search-count')).toHaveText('2 / 3')
 
   await window.locator('[data-node-id="child"] .node-input').click()
@@ -339,7 +358,7 @@ test('navigates beyond capped counts and mounts highlights after scrolling', asy
 
   await window.screenshot({ path: testInfo.outputPath('search-windowed-draft.png') })
   await window.keyboard.press('Enter')
-  await expect(prompt).toBeFocused()
+  await expect(window.locator('[data-node-id="n1"] .node-input')).toBeFocused()
   await expect(window.locator('[data-node-id="n1"] .search-match-current')).toHaveText('apple')
   await window.keyboard.press('Escape')
 
@@ -404,7 +423,7 @@ test('composes match, link and date rendering without moving rows or losing Inse
 
     await window.keyboard.press('Enter')
 
-    await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
+    await expect(row.locator('.node-input')).toBeFocused()
     await expect(row.locator('.search-match-current')).toHaveText('apple')
     await expect(window).toHaveScreenshot(`search-current-${appearance}.png`)
 
@@ -469,7 +488,7 @@ test('preserves the image caret on canceled and absent searches and replaces it 
   await window.keyboard.press('Enter')
 
   await expect(editor).not.toHaveClass(/node-input-image-caret/u)
-  await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
+  await expect(editor).toBeFocused()
   await expect(window.locator('.search-count')).toContainText('1 / 1')
   await window.keyboard.press('Escape')
   await expect(editor).toBeFocused()

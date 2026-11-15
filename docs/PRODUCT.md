@@ -1126,6 +1126,15 @@ Automatic and explicit requests share sequential native execution; the explicit-
 limit does not discard automatic requests. Automatic pending work retains only image
 identities and is retired when its source disappears or shutdown cancels recognition.
 
+`reindex-all-images` repeats hidden English text recognition for every unique image in
+the document, including images with completed results. It is available on the same
+platforms as `image-to-text`, in Tree and Agenda. It uses the existing sequential queue,
+does not duplicate pending image requests, and creates no children or Undo steps.
+Existing hidden text stays usable until recognition succeeds; failures retain it.
+The command does nothing while saving is locked or shutdown recognition is suspended.
+Queue storage contains image identities, not image bytes, and grows linearly with the
+number of unique images. Results use the ordinary metadata save policy.
+
 Hidden text is saved with the attachment and survives restart and archive round trips.
 Deleting or replacing the image removes its hidden text from search immediately. Late
 results follow the cancellation rules above. Completed text follows the image through
@@ -1712,6 +1721,14 @@ replacement, or starts empty. Smart case ignores case unless the query contains 
 uppercase character. Matches do not overlap and do not cross node boundaries.
 Displayed link text participates, including phrases crossing a link boundary.
 
+With Vim enabled, local search uses `/query` and the match count in the bottom status
+bar instead of the Find panel. Both `/` in Normal and `Cmd+F` use this entry.
+Enter (or Shift+Enter backward) confirms and returns focus to the editor; `n` and `N`
+repeat from the current position. Escape cancels entry or hides confirmed feedback.
+The confirmed query and count remain visible without an editable field. Navigation
+and close buttons belong only to the standard Find panel. The standard-panel focus
+and placement rules below apply only with Vim disabled; other search rules are shared.
+
 Tree scope includes the current-parent heading before all descendants, regardless of folds.
 
 Agenda searches direct-match occurrences in the displayed week and its Overdue group (§23.3), including collapsed days and a collapsed Overdue group. Changing weeks closes search and cancels pending navigation while retaining query recall. Day headings and separators are excluded. Focused-day search includes only that day. Each occurrence
@@ -1850,6 +1867,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | --- | --- | --- | --- | --- | --- |
 | `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |
 | `image-to-text` | — | Recognize English text in the selected image | — | — | Append recognized children on Apple Silicon macOS Electron (§15.1) |
+| `reindex-all-images` | — | Reindex English text from all images | — | — | Refresh hidden search text for all document images (§15.1) |
 | `summarize` | — | Summarize selected nodes and copy the summary | — | — | On-device English summary to clipboard; disabled when unavailable or busy (§15.2) |
 | `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.2.26) |
 | `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |
@@ -1880,7 +1898,7 @@ Results match the corresponding menu item or toggle, including saved preferences
 
 View changes resolve editing sessions and selection as `Cmd+P` does; an already-active destination preserves them. Neither edits the document nor adds undo history. Both update command history.
 
-Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions; data verbs name their menu actions. New verbs require updating this rule. `q` is the only alias; new aliases require an owner decision. `theme` means Appearance; `auto` means Automatic.
+Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. New verbs require updating this rule. `q` is the only alias; new aliases require an owner decision. `theme` means Appearance; `auto` means Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 
@@ -2279,6 +2297,7 @@ Show one Monday–Sunday week at a time, with all seven dated day headings in ch
 
 * In the current week's timeline only, an `Overdue` group precedes Monday when the document contains non-struck-through nodes with recognized dates before that week's Monday. It includes nodes from the entire document, including folded branches.
 * Each qualifying node appears once, ordered by its earliest overdue date and then document order; an active occurrence retains its date while editing (§23.7).
+* Completing an Overdue item with `Cmd+Enter` selects the remaining item at the same list position, or the preceding item at the end, retaining the text offset where possible. If no Overdue items remain, ordinary nearest-day selection applies. Other completion selections remain unchanged.
 * The group uses the ordinary heading, flat rows and folding appearance; its fold is independent of dated days. It is hidden when empty and is not a dated day that can be opened separately.
 * Past and future weeks and focused-day views do not show it. Dates within the current week remain in their ordinary day groups.
 
@@ -2442,7 +2461,7 @@ Export runs in the background, and editing remains available. Changes made after
 
 While it runs, an activity in the bottom status bar shows `Exporting Notes…`, then `Exporting Notes… 3 of 120 images`, with a **Cancel** button. Cancel stops the export immediately, closes the activity and produces no file.
 
-On success the browser downloads the archive as `Tree Notes YYYY-MM-DD.zip`, named with the local date, to its usual download location. The panel shows `Exported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with **OK**.
+On success the browser downloads the archive as `Tree Notes YYYY-MM-DD.zip`, named with the local date, to its usual download location. The bottom status bar shows `Exported “Tree Notes 2026-10-20.zip”.` without an **OK** button and closes after five seconds.
 
 A referenced image that is missing from browser storage, or stored there as empty or oversized data that an archive cannot hold, does not stop the export. The image is left out, the result adds `1 image could not be found and was not included.` (or the count of such images), and the panel stays until **OK**. This matches §16.1: a document opens with a missing image and shows the image error.
 

@@ -69,7 +69,7 @@ test('searches folded direct matches and skips passive paths during same-node an
 
   await window.keyboard.press('Enter')
 
-  await expect(prompt).toBeFocused()
+  await expect(window.locator(`${row(day, 'child')} .node-input`)).toBeFocused()
   await expect(window.locator('.search-count')).toHaveText('1 / 5')
 
   const input = window.locator(`${row(day, 'child')} .node-input`)
@@ -185,7 +185,8 @@ test('keeps the invalid-date hint beside search and updates matches across mirro
     }),
   )
   expect(positions[0]!.right).toBeLessThanOrEqual(positions[2]!.left)
-  expect(positions[0]!.bottom).toBeLessThan(positions[1]!.top)
+  expect(positions[2]!.right).toBeLessThanOrEqual(positions[1]!.left)
+  expect(Math.abs(positions[0]!.top - positions[1]!.top)).toBeLessThan(5)
 
   for (const appearance of ['light', 'dark'] as const) {
     await window.emulateMedia({ colorScheme: appearance })
@@ -256,7 +257,7 @@ test('reveals the matching line of a long direct match after returning from a fo
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
   await window.keyboard.press('Enter')
 
-  await expect(window.getByRole('textbox', { name: 'Search', exact: true })).toBeFocused()
+  await expect(window.locator(`${row(day, 'child')} .node-input`)).toBeFocused()
   await expect(window.locator('.search-count')).toHaveText('1 / 1')
   await expect
     .poll(() =>

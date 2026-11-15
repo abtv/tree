@@ -151,7 +151,7 @@ it.each([false, true])(
 )
 
 it.each([false, true].flatMap((vimEnabled) => [false, true].map((returned) => ({ vimEnabled, returned }))))(
-  'repeats Find from the native Agenda caret while the prompt retains focus (Vim $vimEnabled, returned $returned)',
+  'repeats Find with the correct input focus (Vim $vimEnabled, returned $returned)',
   async ({ vimEnabled, returned }) => {
     const f = await createAppHarness({
       vimEnabled,
@@ -175,11 +175,12 @@ it.each([false, true].flatMap((vimEnabled) => [false, true].map((returned) => ({
     await settleApp()
 
     for (const expected of ['2 / 3', '3 / 3']) {
-      await f.press(prompt, 'Enter')
+      if (vimEnabled && expected === '3 / 3') await f.press(editor, 'n')
+      else await f.press(prompt, 'Enter')
 
       expect(screen.getByText(expected)).toBeInTheDocument()
-      expect(prompt).toHaveFocus()
-      expect(f.snapshot().agenda?.activity.kind).toBe(returned ? 'inactive' : 'dated')
+      expect(vimEnabled ? editor : prompt).toHaveFocus()
+      expect(f.snapshot().agenda?.activity.kind).toBe('dated')
     }
   },
 )

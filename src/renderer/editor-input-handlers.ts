@@ -442,8 +442,12 @@ export function createEditorKeyDownHandler({
       event.preventDefault()
       if (event.shiftKey || event.altKey) return
       const range = vim?.mode === 'visual-node' ? vim.nodeVisual.selection() : undefined
+      const cursor = getCaret(event.currentTarget)
       prepareVimCommand(vim, 'selection-command', event.currentTarget)
-      store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
+      const snapshot = store.getSnapshot()
+      if (snapshot.status === 'ready' && snapshot.agenda !== undefined)
+        store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id, cursor)
+      else store.toggleStrikethrough(range?.anchorId ?? node.id, range?.focusId ?? node.id)
     } else if (primary && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'y') {
       event.preventDefault()
       if (node.attachment !== undefined) {

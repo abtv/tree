@@ -732,11 +732,12 @@ describe('browser data operations', () => {
       expect(f.status()).toBe(
         `Exported “Tree Notes 2026-10-23.zip”.${missingImageCount ? ' 1 image could not be found and was not included.' : ''}`,
       )
-      vi.advanceTimersByTime(5_999)
+      expect(document.getElementById('data-activity-action')!.hidden).toBe(missingImageCount === 0)
+      vi.advanceTimersByTime(4_999)
       expect(document.getElementById('data-activity')!.hidden).toBe(false)
       vi.advanceTimersByTime(1)
       expect(document.getElementById('data-activity')!.hidden).toBe(missingImageCount === 0)
-      vi.advanceTimersByTime(53_999)
+      vi.advanceTimersByTime(54_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:https://tree.test/archive')

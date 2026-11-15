@@ -18,6 +18,7 @@ export interface CommandCapabilities {
 export interface CommandServices {
   summarize?(): Promise<void>
   imageToText?(): Promise<void>
+  reindexAllImages?(): Promise<void>
   showAbout?(): Promise<void>
   find?(): Promise<void>
   findNext?(): Promise<void>
@@ -59,6 +60,16 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  {
+    name: 'reindex-all-images',
+    aliases: [],
+    description: 'Reindex English text from all images',
+    requires: 'imageToText',
+    active: () => false,
+    run: async (services) => {
+      await services.reindexAllImages?.()
+    },
+  },
   {
     name: 'summarize',
     aliases: [],

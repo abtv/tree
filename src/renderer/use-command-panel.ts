@@ -147,6 +147,7 @@ export function useCommandPanel(options: {
           {
             summarize: async () => store.summarize(options.summarySelection),
             imageToText: async () => store.imageToText(),
+            reindexAllImages: async () => store.reindexAllImages(),
             showAbout: async () => {
               showAbout?.()
             },

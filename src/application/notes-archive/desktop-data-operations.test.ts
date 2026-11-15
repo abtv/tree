@@ -889,9 +889,9 @@ describe('desktop notes operations', () => {
     await job
 
     expect(api.startNotesExport).toHaveBeenCalledOnce()
-    expect(operations.getSnapshot()).toEqual({ phase: 'done', text: 'Exported “Notes.zip”.' })
+    expect(operations.getSnapshot()).toEqual({ phase: 'done', text: 'Exported “Notes.zip”.', autoDismiss: true })
 
-    await vi.advanceTimersByTimeAsync(5999)
+    await vi.advanceTimersByTimeAsync(4999)
 
     expect(operations.getSnapshot().phase).toBe('done')
 

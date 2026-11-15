@@ -11,6 +11,7 @@ export function SearchPrompt({
   shortcuts = APPLE_SHORTCUTS,
   navigate,
   beginEditing,
+  vim = false,
 }: {
   store: EditorStore
   snapshot: SearchSessionSnapshot
@@ -18,6 +19,7 @@ export function SearchPrompt({
   shortcuts?: ShortcutProfile
   navigate?: (direction: -1 | 1) => void
   beginEditing?: () => void
+  vim?: boolean
 }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
   const editing = snapshot.draft !== undefined
@@ -39,6 +41,7 @@ export function SearchPrompt({
   }, [store])
   return (
     <label className="search-input-line" data-editor-focus-borrow>
+      {vim ? <span aria-hidden="true">/</span> : null}
       <input
         ref={input}
         aria-label="Search"
@@ -84,6 +87,7 @@ export function SearchPrompt({
             event.preventDefault()
             if (navigate !== undefined) navigate(event.shiftKey ? -1 : 1)
             else store.search.confirm(event.shiftKey ? -1 : 1)
+            if (vim) restoreEditor()
           }
         }}
       />

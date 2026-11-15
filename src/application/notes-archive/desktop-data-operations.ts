@@ -42,6 +42,7 @@ export type DataActivity =
       readonly text: string
       readonly showFolder?: boolean
       readonly focusAction?: boolean
+      readonly autoDismiss?: boolean
     }
   | { readonly phase: 'confirming' | 'replacing' | 'restart'; readonly text: string }
 
@@ -63,7 +64,7 @@ type OperationState =
     }
   | { phase: 'confirming' | 'restart'; text: string }
   | { phase: 'replacing'; attempt: ReplacementAttempt }
-  | { phase: 'done' | 'failed'; text: string; showFolder?: boolean; focusAction?: boolean }
+  | { phase: 'done' | 'failed'; text: string; showFolder?: boolean; focusAction?: boolean; autoDismiss?: boolean }
 
 function activityOf(operation: OperationState): DataActivity {
   switch (operation.phase) {
@@ -232,11 +233,15 @@ export class DesktopDataOperations {
         this.publish({ phase: 'confirming', text: exportResultText(result.fileName, result.summary) })
         return
       }
-      this.publish({ phase: 'done', text: exportResultText(result.fileName, result.summary) })
+      this.publish({
+        phase: 'done',
+        text: exportResultText(result.fileName, result.summary),
+        ...(result.summary.missingImageCount === 0 ? { autoDismiss: true } : {}),
+      })
       if (result.summary.missingImageCount === 0)
         this.timer = setTimeout(() => {
           if (current()) this.dismiss()
-        }, 6_000)
+        }, 5_000)
     } catch {
       if (!current()) return
       // A failed pre-export flush still owns the dialog-chosen destination in main.

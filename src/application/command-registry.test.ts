@@ -18,7 +18,10 @@ describe('command registry', () => {
     const supported = availableCommands({ alwaysOnTop: true, vim: true, imageToText: true })
 
     expect(matchCommands('image', history, unsupported)).toEqual([])
-    expect(matchCommands('image', history, supported).map((command) => command.name)).toEqual(['image-to-text'])
+    expect(matchCommands('image', history, supported).map((command) => command.name)).toEqual([
+      'image-to-text',
+      'reindex-all-images',
+    ])
   })
   // @requirement PRODUCT.md §20.2.30
   // @requirement PRODUCT.md §20.2.28
@@ -143,6 +146,7 @@ describe('command registry', () => {
       'find-previous',
       'image-to-text',
       'quit',
+      'reindex-all-images',
       'search-all-nodes',
       'set-theme-auto',
       'set-theme-gray',
@@ -173,6 +177,7 @@ describe('command registry', () => {
     const services = {
       summarize: vi.fn(async () => undefined),
       imageToText: vi.fn(async () => undefined),
+      reindexAllImages: vi.fn(async () => undefined),
       showAbout: vi.fn(async () => undefined),
       find: vi.fn(async () => undefined),
       findNext: vi.fn(async () => undefined),
@@ -197,6 +202,7 @@ describe('command registry', () => {
 
     expect(services.summarize).toHaveBeenCalledExactlyOnceWith()
     expect(services.imageToText).toHaveBeenCalledExactlyOnceWith()
+    expect(services.reindexAllImages).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
     expect(services.find).toHaveBeenCalledExactlyOnceWith()
@@ -234,7 +240,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(17)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(18)
   })
 
   it('keeps optional actions unchecked and tolerates unavailable services', async () => {

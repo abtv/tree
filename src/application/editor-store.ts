@@ -134,7 +134,19 @@ export class EditorStore {
     if (state.agenda === undefined) this.agendaRowsCache.releaseIfStale(state.document)
 
     for (const job of this.imageToTextJobs) {
-      if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) job.canceled = true
+      if (locateNode(state.document, job.nodeId)?.node.attachment?.id !== job.attachmentId) {
+        const findOwner = (nodes: readonly TreeNode[]): TreeNode | undefined => {
+          for (const node of nodes) {
+            if (node.attachment?.id === job.attachmentId) return node
+            const child = findOwner(node.children)
+            if (child !== undefined) return child
+          }
+          return undefined
+        }
+        const owner = job.reindex && !job.canceled ? findOwner(state.document.roots) : undefined
+        if (owner === undefined) job.canceled = true
+        else job.nodeId = owner.id
+      }
     }
     for (let index = this.imageToTextJobs.length - 1; index > 0; index--) {
       const job = this.imageToTextJobs[index]!
@@ -150,6 +162,7 @@ export class EditorStore {
     attachmentId: AttachmentId
     canceled: boolean
     hidden?: boolean
+    reindex?: boolean
   }> = []
   private imageToTextRunning = false
   private imageToTextFlushes = 0
@@ -533,6 +546,24 @@ export class EditorStore {
     }
     this.imageToTextJobs.push({ nodeId, attachmentId, canceled: false })
     this.setImageToTextStatus(`Recognizing image… ${this.imageToTextJobs.length - 1} queued`)
+    void this.runImageToTextQueue()
+  }
+
+  public reindexAllImages(): void {
+    if (!this.imageToTextAvailable || this.runtime.snapshot.status !== 'ready') return
+    if (this.isPersistenceLocked() || this.imageToTextFlushes > 0) return
+    const pending = new Set(this.imageToTextJobs.filter((job) => !job.canceled).map((job) => job.attachmentId))
+    const visit = (nodes: readonly TreeNode[]): void => {
+      for (const node of nodes) {
+        const id = node.attachment?.id
+        if (id !== undefined && !pending.has(id)) {
+          pending.add(id)
+          this.imageToTextJobs.push({ nodeId: node.id, attachmentId: id, canceled: false, hidden: true, reindex: true })
+        }
+        visit(node.children)
+      }
+    }
+    visit(this.runtime.ready().document.roots)
     void this.runImageToTextQueue()
   }
 
@@ -1369,16 +1400,39 @@ export class EditorStore {
   /**
    * `Cmd+Enter` (`docs/PRODUCT.md` §2.5): toggles the strikethrough of the sibling range between
    * `anchorId` and `focusId` — one node when they are equal, including the current-parent heading —
-   * as one undoable command. The location and the caret stay where they are, and the change is saved
-   * by the ordinary pending-change policy. Returns whether it changed the document.
+   * as one undoable command. Selection stays in place unless completion removes the Overdue row;
+   * then its nearest remaining neighbor receives the supplied caret offset. The ordinary pending-change
+   * policy saves the change. Returns whether it changed the document.
    */
-  public toggleStrikethrough(anchorId: NodeId, focusId: NodeId): boolean {
+  public toggleStrikethrough(anchorId: NodeId, focusId: NodeId, cursor?: number): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     const document = toggleStrikethrough(state.document, anchorId, focusId)
     if (document === undefined) return false
+    const rows = state.agenda === undefined ? [] : this.getAgendaRows()
+    const selected = rows.find((row) => row.key === state.agenda?.selectedKey)
+    const group = selected?.kind === 'node' ? selected.groupKey : undefined
+    const index =
+      group === undefined
+        ? -1
+        : rows
+            .filter((row) => row.kind === 'node' && row.groupKey === group)
+            .findIndex((row) => row.key === selected?.key)
     this.endTextSession()
     this.applyStructural(document, state.location, state.focus)
+    if (index >= 0) {
+      const remaining = this.getAgendaRows()
+      if (!remaining.some((row) => row.key === selected?.key)) {
+        const siblings = remaining.filter((row) => row.kind === 'node' && row.groupKey === group)
+        const next = siblings[Math.min(index, siblings.length - 1)]
+        if (next !== undefined)
+          this.applyAgenda({
+            kind: 'select',
+            key: next.key,
+            cursor: cursor ?? state.agenda?.selectionCursor ?? state.focus.cursor,
+          })
+      }
+    }
     return true
   }
 

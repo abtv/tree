@@ -93,6 +93,27 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
       'data-recognition-incomplete',
       'true',
     )
+    await reopened.app.evaluate(() => {
+      const probe = globalThis as typeof globalThis & { reindexedImages: number }
+      probe.reindexedImages = 0
+      globalThis.__treeIpc.wrap('tree:image-to-text', async (original, ...args) => {
+        const result = await original(...args)
+        probe.reindexedImages++
+        return result
+      })
+    })
+    await reopened.window.keyboard.press('Meta+Shift+p')
+    await reopened.window.getByRole('combobox', { name: 'Command' }).fill('reindex-all-images')
+    await reopened.window.keyboard.press('Enter')
+
+    await expect
+      .poll(
+        () =>
+          reopened.app.evaluate(() => (globalThis as typeof globalThis & { reindexedImages: number }).reindexedImages),
+        { timeout: 30_000 },
+      )
+      .toBe(1)
+    await expect(reopened.window.locator('.node-input')).toHaveCount(1)
     await reopened.window.keyboard.press('Meta+;')
     await reopened.window.getByRole('searchbox', { name: 'Search query' }).fill('secret zebra')
     await expect(reopened.window.getByRole('listbox', { name: 'Search results' }).getByRole('option')).toHaveCount(1)

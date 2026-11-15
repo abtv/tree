@@ -6,6 +6,20 @@ import type { TreeNode } from '../domain/document'
 
 const dated = (id: string): TreeNode => ({ id, text: '1970-04-11', children: [] })
 
+it.each([
+  ['a', 'b'],
+  ['b', 'c'],
+  ['c', 'b'],
+] as const)('keeps the nearest Overdue row after completing %s', async (selected, expected) => {
+  const { store, ready } = await setup(['a', 'b', 'c'].map((id) => ({ id, text: '1970-04-01', children: [] })))
+  store.applyAgenda({ kind: 'select', key: `node:90:${selected}`, cursor: 4 })
+
+  store.toggleStrikethrough(selected, selected)
+
+  expect(ready().agenda?.selectedKey).toBe(`node:90:${expected}`)
+  expect(ready().location.selectedNodeId).toBe(expected)
+})
+
 async function setup(roots: TreeNode[], cursor = 0) {
   const store = new EditorStore(
     {

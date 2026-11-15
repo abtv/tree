@@ -16,12 +16,12 @@ import { BrowserMenuCommands } from './menu-commands'
 
 // Keep the object URL until the browser has taken the download.
 const DOWNLOAD_URL_LIFETIME_MILLISECONDS = 60_000
-const SUCCESS_MESSAGE_MILLISECONDS = 6_000
+const SUCCESS_MESSAGE_MILLISECONDS = 5_000
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 interface ActivityPanel {
-  show(text: string, action: 'Cancel' | 'OK', onAction: () => void): void
+  show(text: string, action: 'Cancel' | 'OK' | undefined, onAction: () => void): void
   hide(): void
 }
 
@@ -32,7 +32,8 @@ function activityPanel(restoreFocus: () => void): ActivityPanel {
   return {
     show(message, action, onAction) {
       text.textContent = message
-      button.textContent = action
+      button.textContent = action ?? ''
+      button.hidden = action === undefined
       button.onclick = onAction
       panel.hidden = false
     },
@@ -193,7 +194,7 @@ export function installDataMenu(
         return
       }
       setRunning(false)
-      panel.show(update.text, 'OK', () => panel.hide())
+      panel.show(update.text, update.state === 'done' && update.complete ? undefined : 'OK', () => panel.hide())
       if (update.state === 'done' && update.complete) {
         hideTimer = setTimeout(() => panel.hide(), SUCCESS_MESSAGE_MILLISECONDS)
       }

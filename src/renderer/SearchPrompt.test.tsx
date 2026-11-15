@@ -7,6 +7,25 @@ import { SearchPrompt } from './SearchPrompt'
 
 afterEach(cleanup)
 
+it('returns to the editor after confirming a Vim query', () => {
+  const store = createEditorStoreDouble()
+  const confirm = vi.spyOn(store.search, 'confirm')
+  const restoreEditor = vi.fn()
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'apple', visible: true, pending: false }}
+      restoreEditor={restoreEditor}
+      vim
+    />,
+  )
+
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'Enter' })
+
+  expect(confirm).toHaveBeenCalledWith(1)
+  expect(restoreEditor).toHaveBeenCalledOnce()
+})
+
 it('confirms backward with Shift+Enter while retaining input focus', () => {
   const store = createEditorStoreDouble()
   const confirm = vi.spyOn(store.search, 'confirm')

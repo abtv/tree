@@ -12,6 +12,7 @@ import {
   screenshotContentSize,
   seedDocument,
   setAgendaToday,
+  setCursor,
   setMainWindowBounds,
   setMainWindowContentSize,
   test,
@@ -327,6 +328,40 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await expect(restarted.window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('Work')
     },
   )
+
+  // @requirement PRODUCT.md §23.3
+  test('keeps the nearest Overdue row after completion', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: ['a', 'b', 'c'].map((id) => ({ id, text: `2026-10-01 ${id}`, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="b"]').click()
+    await setCursor(window.locator('.agenda-row[data-node-id="b"] .node-input'), 8)
+
+    await window.keyboard.press('Meta+Enter')
+
+    await expect(window.locator('.agenda-row[aria-selected="true"]')).toHaveAttribute('data-node-id', 'c')
+    await expect
+      .poll(() =>
+        window.locator('.agenda-row[data-node-id="c"] .node-input').evaluate((element) => {
+          const range = document.createRange()
+          range.selectNodeContents(element)
+          const selection = getSelection()!
+          range.setEnd(selection.anchorNode!, selection.anchorOffset)
+          return range.toString().length
+        }),
+      )
+      .toBe(8)
+    await window.keyboard.press('Meta+Enter')
+
+    await expect(window.locator('.agenda-row[aria-selected="true"]')).toHaveAttribute('data-node-id', 'a')
+    await window.keyboard.press('Meta+Enter')
+
+    await expect(window.locator('.agenda-row-day').filter({ hasText: 'Overdue' })).toHaveCount(0)
+  })
 
   // @requirement PRODUCT.md §23.2
   // @requirement PRODUCT.md §23.3
