@@ -1,11 +1,14 @@
-import { agendaSeed, expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
+import { agendaSeed, expect, launchTree, round, seedDocument, setCalendarDate, test, wideSeed } from './fixtures'
 import { MemoryProbe } from './memory-probe'
 import { recordPerfResult } from '../results'
 import type { TreeNode } from '../../src/domain/document'
 
 test('bounds repeated Agenda search and scrolling while retaining the draft', async ({ userDataDir }) => {
-  seedDocument(userDataDir, agendaSeed(3000))
+  // Start before the first occurrence on a stable weekday; Sundays reverse the seed's date order.
+  const today = new Date(2026, 10, 11, 12)
+  seedDocument(userDataDir, agendaSeed(3000, false, today))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await setCalendarDate(window, today)
 
   await window.keyboard.press('Meta+p')
   await window.keyboard.press('/')

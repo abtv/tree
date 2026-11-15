@@ -1,4 +1,4 @@
-import { agendaSeed, expect, launchTree, round, seedDocument, test } from './fixtures'
+import { agendaSeed, expect, launchTree, round, seedDocument, setCalendarDate, test } from './fixtures'
 import { recordPerfResult } from '../results'
 
 type LaunchedApp = Awaited<ReturnType<typeof launchTree>>['app']
@@ -228,8 +228,11 @@ test('Agenda keystrokes that change date recognition stay within the interactive
 
 // @requirement PRODUCT.md §22.1
 test('Agenda mirror updates keep focus and stay within the interactive budget', async ({ userDataDir }) => {
-  seedDocument(userDataDir, agendaSeed(3000, true))
+  // Keep the pair adjacent across days, before the large groups, regardless of the host weekday.
+  const today = new Date(2026, 10, 11, 12)
+  seedDocument(userDataDir, agendaSeed(3000, true, today))
   const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await setCalendarDate(window, today)
 
   await window.keyboard.press('Meta+p')
   const occurrences = window.locator('.agenda-row[data-node-id="pair"]')

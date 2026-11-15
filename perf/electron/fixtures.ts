@@ -54,6 +54,17 @@ export const test = base.extend<{ userDataDir: string }>({
 
 export { expect }
 
+/** Fix calendar dates without replacing the native timers, animation frames or performance clock being measured. */
+export async function setCalendarDate(window: Page, today: Date): Promise<void> {
+  await window.evaluate((timestamp) => {
+    globalThis.Date = new Proxy(Date, {
+      construct: (target, args) => Reflect.construct(target, args.length === 0 ? [timestamp] : args),
+      apply: (target) => new target(timestamp).toString(),
+      get: (target, key, receiver) => (key === 'now' ? () => timestamp : Reflect.get(target, key, receiver)),
+    })
+  }, today.getTime())
+}
+
 async function closeTrackedApps(): Promise<void> {
   await Promise.all(launchedApps.splice(0).map((app) => closeApp(app)))
 }
@@ -236,8 +247,7 @@ export function wideSeed(count: number): Seed {
 }
 
 /** Dated siblings with wrapping text; two occurrences per real node. */
-export function agendaSeed(count: number, withMirrorPair = false): Seed {
-  const today = new Date()
+export function agendaSeed(count: number, withMirrorPair = false, today = new Date()): Seed {
   const later = new Date(today)
   later.setDate(today.getDate() + (today.getDay() === 0 ? -1 : 1))
   const yesterday = new Date(today)
