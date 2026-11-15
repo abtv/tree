@@ -111,8 +111,11 @@ describeForEachEditingMode('node gutter alignment', ({ screenshotName }) => {
         await expect.poll(() => window.evaluate(() => devicePixelRatio)).toBe(scale)
         for (const appearance of ['light', 'dark'] as const) {
           await window.emulateMedia({ colorScheme: appearance })
+          // Capture idle markers in both hidden and visible windows, independent of the setup click.
+          await window.mouse.move(600, 20)
           for (const selected of ['parent', 'child']) {
             await window.locator(`[data-node-id="${selected}"] .node-input`).focus()
+            await expect(window.locator('.node-disclosure-triangle:hover')).toHaveCount(0)
             await window.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
 
             if (selected === 'parent') {

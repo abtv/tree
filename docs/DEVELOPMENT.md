@@ -904,6 +904,15 @@ The separate `Publish demo video and screenshots` workflow is dispatched after s
 
 ### Screenshot Rendering Scale
 
+The E2E fixture also passes `--force-color-profile=srgb` before the test entry. PNG
+comparisons use encoded RGB channels without applying embedded ICC profiles. A
+display-profile capture can therefore differ from an sRGB baseline even when a
+color-managed viewer displays both correctly. Keep screenshot colors independent
+of the attached display. The color regression in `screenshot-stability.spec.ts`
+checks the encoded channels of known CSS and image swatches without applying a
+profile during decoding. Do not remove a PNG profile as a substitute for capturing
+in sRGB: that leaves the converted channels unchanged.
+
 The E2E fixture passes `--force-device-scale-factor=1` in Electron's launch arguments, before the test entry, and asserts `window.devicePixelRatio === 1` after launch. This makes screenshot rasterization independent of the attached display's backing scale. Keep GPU rendering and the existing Playwright comparison settings: CSS-sized output does not by itself fix the scale at which Chromium draws glyphs. The performance fixture retains the native display scale for presented-window measurements.
 
 The fixture also passes `-AppleShowScrollBars WhenScrolling` after the test entry and asserts after launch that a scrolling element reserves no scrollbar width. macOS shows classic scrollbars when no trackpad is attached, as on GitHub Actions runners; a classic scrollbar narrows the scrolling area by 15 pixels and shifts the centered outline, so every screenshot of overflowing content differs from baselines captured with overlay scrollbars. The value is a user-defaults argument rather than a Chromium switch, and it must follow the entry, or Electron treats it as the application path.

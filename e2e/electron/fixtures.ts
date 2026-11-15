@@ -710,6 +710,9 @@ export async function launchTree(
               // Set the backing scale before Electron initializes Chromium. CSS-sized screenshots still
               // rasterize text differently at native scales 1 and 2; setting this in the entry is too late.
               '--force-device-scale-factor=1',
+              // PNG comparisons ignore embedded display profiles. Capture sRGB channel values
+              // regardless of the attached display's color space.
+              '--force-color-profile=srgb',
               `--user-data-dir=${userDataDir}`,
               join(process.cwd(), 'e2e', 'electron', 'electron-entry.cjs'),
               ...(shared === undefined ? [] : ['--tree-test-shared-application']),
