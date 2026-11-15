@@ -105,11 +105,13 @@ async function search(driver: SmokeDriver, query: string) {
   await driver.fill(searchInput, query)
   await driver.waitFor(`return document.querySelector('.search-count')?.textContent === '1'`)
   await driver.press(searchInput, 'Enter')
-  await driver.waitFor(`return document.activeElement?.matches(${JSON.stringify(searchInput)}) &&
+  await driver.waitFor(`return !document.querySelector(${JSON.stringify(searchInput)}) &&
+    document.activeElement?.matches('.node-input, .agenda-row') &&
     document.querySelector('.search-count')?.textContent === '1 / 1' &&
     document.querySelector('.search-match-current')?.textContent === ${JSON.stringify(query)}`)
-  await driver.press(searchInput, 'Escape')
-  await driver.waitFor(`return !document.querySelector(${JSON.stringify(searchInput)}) &&
+  await driver.press(':focus', 'Escape')
+  await driver.waitFor(`return !document.querySelector('.search-count') &&
+    !document.querySelector('.search-match-current') &&
     document.activeElement?.matches('.node-input, .agenda-row')`)
 }
 
@@ -213,7 +215,6 @@ export async function happyPath(driver: SmokeDriver) {
   // Start on the child and require search to move focus to another node in Tree.
   await search(restored, parentText)
   await restored.waitFor(selectedText(parentText))
-  await restored.press(':focus', 'Escape')
 
   const commandInput = 'input[aria-label="Command"]'
   await restored.press(':focus', ':')
@@ -235,7 +236,6 @@ export async function happyPath(driver: SmokeDriver) {
   await search(restored, 'Smoke child')
   await restored.waitFor(`return document.activeElement?.closest('.agenda-role-match')?.getAttribute('aria-selected') === 'true' &&
     document.activeElement?.textContent === ${JSON.stringify('Vim ' + childText)}`)
-  await restored.press(':focus', 'Escape')
 
   const agendaText = 'Agenda Vim ' + childText
   await restored.press(focused, '0')
