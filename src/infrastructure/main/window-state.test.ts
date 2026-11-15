@@ -116,7 +116,7 @@ describe('createAppearancePreferenceStore', () => {
 
     expect(store.load()).toBe('system')
 
-    for (const value of ['dark', 'light', 'system'] as const) {
+    for (const value of ['dark', 'light', 'gray', 'system'] as const) {
       store.save(value)
 
       expect(createAppearancePreferenceStore(path).load()).toBe(value)

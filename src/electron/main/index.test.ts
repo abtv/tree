@@ -122,6 +122,7 @@ vi.mock('electron', async () => {
     isDestroyed = vi.fn(() => false)
     isAlwaysOnTop = vi.fn(() => false)
     setAlwaysOnTop = vi.fn()
+    setBackgroundColor = vi.fn()
     getBounds = vi.fn(() => ({ x: 10, y: 20, width: 800, height: 600 }))
     loadURL = mocks.loadURL
     constructor(readonly options: unknown) {
@@ -956,6 +957,28 @@ describe('desktop entry wiring', () => {
     expect(f.state()).toMatchObject({ vimEnabled: true, alwaysOnTop: true, appearance: 'dark' })
   })
 
+  it('restores Gray as a light native scheme and caches subsequent choices without rereading disk', async () => {
+    mocks.appearanceStore.load.mockReturnValue('gray')
+    const f = await setup()
+
+    expect(f.electron.nativeTheme.themeSource).toBe('light')
+    expect(f.ipc.getAppearance!()).toBe('gray')
+    expect(f.state().appearance).toBe('gray')
+    expect(mocks.appearanceStore.load).toHaveBeenCalledOnce()
+
+    f.ipc.setAppearance('light')
+
+    expect(f.ipc.getAppearance!()).toBe('light')
+    expect(f.state().appearance).toBe('light')
+    expect(mocks.appearanceStore.load).toHaveBeenCalledOnce()
+    expect(f.window.setBackgroundColor).toHaveBeenCalled()
+
+    f.ipc.setAppearance('system')
+
+    expect(f.electron.nativeTheme.themeSource).toBe('system')
+    expect(f.state().appearance).toBe('system')
+  })
+
   it('reports a renderer load failure, quits without a save and prevents window recreation', async () => {
     const failure = new Error('renderer missing')
     mocks.loadURL.mockRejectedValueOnce(failure)
@@ -1127,7 +1150,7 @@ describe('desktop entry wiring', () => {
       url: 'app://tree/index.html',
     })
     expect(window.loadURL).toHaveBeenCalledExactlyOnceWith('app://tree/index.html')
-    expect(mocks.appearance).toHaveBeenCalledWith(window, electron.nativeTheme)
+    expect(mocks.appearance).toHaveBeenCalledWith(window, electron.nativeTheme, expect.any(Function))
     const surface = vi.fn()
 
     expect(lifecycle.registerShortcut(surface)).toBe(true)

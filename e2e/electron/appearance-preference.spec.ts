@@ -82,7 +82,7 @@ test.describe('appearance preference', () => {
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getBounds().y),
     )
 
-    for (const label of ['Light', 'Dark']) {
+    for (const label of ['Light', 'Dark', 'Gray']) {
       await clickApplicationSubmenuItem(app, { ...appearanceMenu, label })
 
       await expect.poll(async () => (await colors()).strip).toBe((await colors()).document)

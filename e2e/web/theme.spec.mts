@@ -1,6 +1,34 @@
 // @editing-modes: independent
 import { test, expect, capture, primaryKey } from './fixtures.mts'
 
+test('selects Gray from the menu and keeps ordinary clicks out of appearance handling', async ({
+  newContext,
+  baseURL,
+}) => {
+  const context = await newContext({ colorScheme: 'dark' })
+  const page = await context.newPage()
+  await page.goto(baseURL!)
+  await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
+  await page.getByRole('button', { name: 'Tree menu' }).click()
+  await expect(page.locator('#tree-menu')).toBeVisible()
+  await page.getByRole('button', { name: 'Gray', exact: true }).click()
+
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'gray')
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await page.locator('.node-input').first().click()
+  expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('gray')
+
+  await page.getByRole('button', { name: 'Tree menu' }).click()
+  await expect(page.getByRole('button', { name: 'Gray', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Automatic', exact: true }).click()
+
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(63, 63, 63)')
+  await page.reload()
+  await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+  expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('system')
+})
+
 test('persists appearance and follows system changes', async ({ newContext, baseURL }) => {
   const context = await newContext({ colorScheme: 'light', viewport: { width: 1100, height: 760 } })
   const page = await context.newPage()
@@ -17,6 +45,19 @@ test('persists appearance and follows system changes', async ({ newContext, base
     page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim())
 
   expect(await background()).toBe('#fbf8f1')
+
+  await command('set-theme-gray')
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await capture(page, 'theme-gray-explicit.png')
+  await page.reload()
+  await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('gray')
+
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await page.emulateMedia({ colorScheme: 'light' })
 
   await command('set-theme-dark')
 

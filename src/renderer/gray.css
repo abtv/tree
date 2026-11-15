@@ -1,0 +1,109 @@
+/*! Gray palette adapted from Dayfox (nightfox.nvim), via iTerm2-Color-Schemes.
+ * https://github.com/EdenEast/nightfox.nvim
+ * https://github.com/mbadolato/iTerm2-Color-Schemes/blob/master/ghostty/Dayfox
+ *
+ * MIT License
+ * Copyright (c) 2021 James Simpson
+ * Copyright (c) 2011 to Present Mark Badolato (theme collection)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+:root[data-appearance='gray'] {
+  --color-search-selection-background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  --color-search-selection-border: transparent;
+  --color-search-divider: color-mix(in srgb, var(--color-location-border) 60%, transparent);
+  --color-grid-dot: transparent;
+  --color-text: #3d2b5a;
+  --color-background: #dddddd;
+  --color-shell-text: #706b77;
+  --color-secondary: #706b77;
+  --color-location-separator: #b5b1ba;
+  --color-location-border: #c8c5cc;
+  --color-hover-text: #534c45;
+  --color-ink: #3d2b5a;
+  --color-link: #2848a9;
+  --color-caret: #3d2b5a;
+  --color-attachment-error: #a5222f;
+  --color-image-recognition-incomplete: #ac5402;
+  --color-save-error: #a5222f;
+  --color-mode-background: #287980;
+  --color-mode-normal-background: #396847;
+  --color-mode-replace-background: #a5222f;
+  --color-gutter-mark: #a39ea9;
+  --color-disclosure-hover-background: #cbc8d0;
+  --color-drag-highlight: #d3cfd9;
+  --color-drop-marker: #6e33ce;
+  --color-date-like: #b3434e;
+  --color-date-past: #a5222f;
+  --color-date-today: #ac5402;
+  --color-date-future: #396847;
+  --color-tag: var(--color-text);
+  --color-person: #287980;
+  --color-event: #ac5402;
+  --color-node-search-match: #287980;
+  --color-node-search-match-background: #c6d9d9;
+  --color-disclosure-background: #d3d0d7;
+  --color-enter-ring-background: #c4c0ca;
+  --color-enter-ring-hover-background: #b5afbf;
+  --color-disclosure-arrow: #827b8c;
+  --highlight-background: color-mix(in srgb, var(--color-text) 16%, var(--color-background));
+  --highlight-foreground: var(--color-text);
+}
+
+:root[data-appearance='gray'] .tag-text:not(.person-text):not(.event-text) {
+  background: none;
+}
+
+:root[data-appearance='gray'] .command-row-selected {
+  background: var(--color-search-selection-background);
+  color: var(--color-text);
+}
+
+:root[data-appearance='gray'] .recent-nodes-popup {
+  color: var(--color-text);
+}
+
+:root[data-appearance='gray'] .node-search-input:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+}
+
+:root[data-appearance='gray'] .node-search-input::placeholder {
+  color: var(--color-secondary);
+  opacity: 1;
+}
+
+:root[data-appearance='gray'] .node-search-results-heading,
+:root[data-appearance='gray'] .node-search-tags-heading,
+:root[data-appearance='gray'] .recent-node-row[data-result-divider]::after,
+:root[data-appearance='gray'] .node-search-tag[data-result-divider]::after {
+  border-bottom-color: var(--color-search-divider);
+}
+
+:root[data-appearance='gray'] .node-search-footer {
+  border-top-color: var(--color-search-divider);
+}
+
+:root[data-appearance='gray'] .node-search-section-title,
+:root[data-appearance='gray'] .node-search-footer,
+:root[data-appearance='gray'] .recent-nodes-title,
+:root[data-appearance='gray'] .recent-node-path {
+  color: var(--color-secondary);
+  opacity: 1;
+}

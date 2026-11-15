@@ -34,8 +34,18 @@ it('switches the dark palette and browser chrome and restores their original med
     expect(palette.media.mediaText).toBe('not all')
     expect([light.media, dark.media]).toEqual(['all', 'not all'])
 
+    applyAppearance('gray')
+
+    expect(document.documentElement.dataset.appearance).toBe('gray')
+    expect(document.documentElement.style.colorScheme).toBe('light')
+    expect(palette.media.mediaText).toBe('not all')
+    expect(light.content).toBe('#dddddd')
+    expect([light.media, dark.media]).toEqual(['all', 'not all'])
+
     applyAppearance('system')
 
+    expect(document.documentElement.dataset.appearance).toBe('system')
+    expect(light.content).toBe('#fbf8f1')
     expect(document.documentElement.style.colorScheme).toBe('light dark')
     expect(palette.media.mediaText).toBe('(prefers-color-scheme: dark)')
     expect([light.media, dark.media]).toEqual(['(prefers-color-scheme: light)', '(prefers-color-scheme: dark)'])
@@ -45,5 +55,6 @@ it('switches the dark palette and browser chrome and restores their original med
     dark.remove()
     unrelated.remove()
     document.documentElement.style.removeProperty('color-scheme')
+    delete document.documentElement.dataset.appearance
   }
 })

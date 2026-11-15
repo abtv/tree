@@ -66,6 +66,7 @@ let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
 let lineNumbersStore: BooleanPreferenceStore | null = null
 let appearanceStore: AppearancePreferenceStore | null = null
+let selectedAppearance: AppearancePreference = 'system'
 let requestQuitFromMenu: () => void = () => undefined
 let notesArchive: NotesArchiveController | null = null
 let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
@@ -103,12 +104,14 @@ function isVimEnabled(): boolean {
 }
 
 function currentAppearance(): AppearancePreference {
-  return appearanceStore?.load() ?? 'system'
+  return selectedAppearance
 }
 
 function setAppearance(value: AppearancePreference): void {
   appearanceStore?.save(value)
-  nativeTheme.themeSource = value
+  selectedAppearance = value
+  nativeTheme.themeSource = value === 'gray' ? 'light' : value
+  mainWindow?.setBackgroundColor(windowBackgroundColor(nativeTheme.shouldUseDarkColors, value))
   mainWindow?.webContents.send(ipcEvents.appearanceChanged, value)
   rebuildApplicationMenu()
 }
@@ -222,11 +225,11 @@ function createMainWindow(quitWithoutSave: () => void): void {
     minHeight: 480,
     title: 'Tree',
     titleBarStyle: 'hidden',
-    backgroundColor: windowBackgroundColor(nativeTheme.shouldUseDarkColors),
+    backgroundColor: windowBackgroundColor(nativeTheme.shouldUseDarkColors, currentAppearance()),
     webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })
   window.setAlwaysOnTop(windowAlwaysOnTopStore.load())
-  followWindowAppearance(window, nativeTheme)
+  followWindowAppearance(window, nativeTheme, currentAppearance)
   mainWindow = window
   const resetNotesMenu = (): void => {
     aboutOpen = false
@@ -434,7 +437,10 @@ bootstrapApplication({
     appearanceStore = createAppearancePreferenceStore(join(app.getPath('userData'), 'data', 'appearance.json'))
     // Leave the default untouched for Automatic so the system appearance applies as Electron starts it.
     const savedAppearance = appearanceStore.load()
-    if (savedAppearance !== 'system') nativeTheme.themeSource = savedAppearance
+    selectedAppearance = savedAppearance
+    if (savedAppearance !== 'system') {
+      nativeTheme.themeSource = savedAppearance === 'gray' ? 'light' : savedAppearance
+    }
     registerIpcHandlers({
       ...(summarization === undefined ? {} : { summarization }),
       ...(imageToText === undefined ? {} : { imageToText }),

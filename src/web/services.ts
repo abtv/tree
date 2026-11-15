@@ -121,10 +121,10 @@ export async function installBrowserPrototype(): Promise<{
   let lineNumbers = (await read<unknown>('preferences', 'line-numbers')) === true
   document.getElementById('prototype-vim-controls')!.hidden = !vimAvailable
   const savedAppearance = await read<string>('preferences', 'appearance')
-  let appearance: 'system' | 'light' | 'dark' =
-    savedAppearance === 'light' || savedAppearance === 'dark' ? savedAppearance : 'system'
+  let appearance: 'system' | 'light' | 'dark' | 'gray' =
+    savedAppearance === 'light' || savedAppearance === 'dark' || savedAppearance === 'gray' ? savedAppearance : 'system'
   applyAppearance(appearance)
-  const appearanceListeners = new Set<(value: 'system' | 'light' | 'dark') => void>()
+  const appearanceListeners = new Set<(value: 'system' | 'light' | 'dark' | 'gray') => void>()
   const vimListeners = new Set<(value: boolean) => void>()
   const updateVim = () => document.getElementById('prototype-vim')!.setAttribute('aria-pressed', String(vimEnabled))
   updateVim()

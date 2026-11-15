@@ -1,3 +1,10 @@
+@import './gray.css';
+
+/* The native window already has the saved surface while appearance IPC is pending. */
+:root[data-desktop]:not([data-appearance]) {
+  background: transparent;
+}
+
 .date-popup {
   position: fixed;
   width: max-content;

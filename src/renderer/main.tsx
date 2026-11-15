@@ -12,7 +12,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import { startAppUpdates } from './app-updates'
 import { installUpdateCommands } from './update-commands'
-import type { CommandServices } from '../application/command-registry'
+import type { CommandAppearance, CommandServices } from '../application/command-registry'
 import './styles.css'
 import { blockExternalDrops } from './external-drop'
 import { installAboutDialog } from './about-dialog'
@@ -21,6 +21,17 @@ declare const __TREE_APP_VERSION__: string
 declare const __TREE_BUILD_DATE__: string
 
 blockExternalDrops(window)
+
+const applyAppearance = (value: CommandAppearance): void => {
+  document.documentElement.dataset.appearance = value
+  document.documentElement.style.colorScheme = value === 'gray' ? 'light' : value === 'system' ? 'light dark' : value
+}
+let appearanceChanged = false
+const stopAppearanceChanges = window.treeApi.onAppearanceChanged?.((value) => {
+  appearanceChanged = true
+  applyAppearance(value)
+})
+window.addEventListener('pagehide', () => stopAppearanceChanges?.(), { once: true })
 
 const rootElement = document.getElementById('root')
 
@@ -79,7 +90,10 @@ const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'show
 void Promise.all([
   window.treeApi.getVimEnabled().catch(() => false),
   window.treeApi.getLineNumbers().catch(() => false),
-]).then(([initialVimEnabled, initialLineNumbers]) => {
+  window.treeApi.getAppearance().catch((): CommandAppearance => 'system'),
+]).then(([initialVimEnabled, initialLineNumbers, initialAppearance]) => {
+  if (!appearanceChanged) applyAppearance(initialAppearance)
+
   createRoot(rootElement).render(
     <StrictMode>
       <ErrorBoundary>

@@ -34,6 +34,7 @@ const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreferenc
   { label: 'Automatic', value: 'system' },
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
+  { label: 'Gray', value: 'gray' },
 ]
 
 // Commands follow the macOS menu conventions (docs/PRODUCT.md §1.3): the window command lives in Window,

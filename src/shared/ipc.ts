@@ -169,13 +169,13 @@ export interface TreeApi {
   onAppUpdateFinished?: (listener: (message: string | null) => void) => () => void
   getRecentNodes?: () => Promise<string[]>
   setRecentNodes?: (value: readonly string[]) => Promise<void>
-  getAppearance: () => Promise<'system' | 'light' | 'dark'>
-  setAppearance: (value: 'system' | 'light' | 'dark') => Promise<void>
+  getAppearance: () => Promise<'system' | 'light' | 'dark' | 'gray'>
+  setAppearance: (value: 'system' | 'light' | 'dark' | 'gray') => Promise<void>
   getCommandHistory: () => Promise<string[]>
   getEmojiHistory?: () => Promise<string[]>
   setEmojiHistory?: (value: readonly string[]) => Promise<void>
   setCommandHistory: (value: string[]) => Promise<void>
-  onAppearanceChanged?: (listener: (value: 'system' | 'light' | 'dark') => void) => () => void
+  onAppearanceChanged?: (listener: (value: 'system' | 'light' | 'dark' | 'gray') => void) => () => void
   quit(requestId?: string): Promise<void>
   quitWithoutSaving(): Promise<void>
   onQuitRequested(listener: (requestId: string) => void): () => void

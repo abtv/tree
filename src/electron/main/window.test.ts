@@ -15,9 +15,28 @@ import {
 } from './window'
 
 describe('window appearance', () => {
+  it('keeps Gray on native updates and resumes system colors after leaving Gray', () => {
+    const theme = { shouldUseDarkColors: true, on: vi.fn(), removeListener: vi.fn() }
+    const window = { setBackgroundColor: vi.fn(), once: vi.fn() }
+    let appearance: 'gray' | 'system' = 'gray'
+    followWindowAppearance(window, theme, () => appearance)
+    const update = theme.on.mock.calls[0]![1] as () => void
+
+    update()
+
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#dddddd')
+
+    appearance = 'system'
+    update()
+
+    expect(window.setBackgroundColor).toHaveBeenLastCalledWith('#3f3f3f')
+  })
+
   it('uses the document surface for both appearances', () => {
     expect(windowBackgroundColor(true)).toBe('#3f3f3f')
     expect(windowBackgroundColor(false)).toBe('#fbf8f1')
+    expect(windowBackgroundColor(false, 'gray')).toBe('#dddddd')
+    expect(windowBackgroundColor(true, 'gray')).toBe('#dddddd')
   })
 
   it('updates the native background and removes its listener when the window closes', () => {

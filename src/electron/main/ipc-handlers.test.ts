@@ -849,9 +849,9 @@ describe('main IPC handlers', () => {
     expect(handlers.get(ipcChannels.getAppearance)!(event)).toBe('system')
     expect(handlers.get(ipcChannels.getCommandHistory)!(event)).toEqual(['set-theme-dark'])
 
-    for (const value of ['system', 'light', 'dark']) handlers.get(ipcChannels.setAppearance)!(event, value)
+    for (const value of ['system', 'light', 'dark', 'gray']) handlers.get(ipcChannels.setAppearance)!(event, value)
 
-    expect(setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark']])
+    expect(setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark'], ['gray']])
     for (const value of [null, true, 'auto', {}])
       expect(() => handlers.get(ipcChannels.setAppearance)!(event, value)).toThrow('Invalid appearance')
 

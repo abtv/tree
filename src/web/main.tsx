@@ -107,14 +107,16 @@ try {
     await window.treeApi.setVimEnabled(!(await window.treeApi.getVimEnabled()))
   })
   const updateAppearance = (value: string) => {
-    for (const button of document.querySelectorAll<HTMLButtonElement>('[data-appearance]')) {
+    for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-appearance]')) {
       button.setAttribute('aria-pressed', String(button.dataset.appearance === value))
     }
   }
   updateAppearance(await window.treeApi.getAppearance())
   window.treeApi.onAppearanceChanged?.(updateAppearance)
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-appearance]')) {
-    button.onclick = run(() => window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark'))
+  for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-appearance]')) {
+    button.onclick = run(() =>
+      window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark' | 'gray'),
+    )
   }
   Object.assign(window, { prototypeStore: store })
   void requestPersistentStorage(navigator.storage).then((protection) => {

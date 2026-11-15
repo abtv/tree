@@ -445,7 +445,7 @@ describe('preload bridge', () => {
   })
 })
 
-it('delivers appearance notifications and removes the listener', async () => {
+it.each(['dark', 'gray'])('delivers %s appearance notifications and removes the listener', async (appearance) => {
   const { treeApi } = await import('./index')
   const listener = vi.fn()
   mocks.on.mockClear()
@@ -454,9 +454,9 @@ it('delivers appearance notifications and removes the listener', async () => {
 
   expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.appearanceChanged)
 
-  handler({}, 'dark')
+  handler({}, appearance)
 
-  expect(listener).toHaveBeenCalledExactlyOnceWith('dark')
+  expect(listener).toHaveBeenCalledExactlyOnceWith(appearance)
 
   remove?.()
 

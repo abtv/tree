@@ -22,7 +22,7 @@ async function setup(
   menuCommands?: MenuCommandSource,
 ) {
   const historyWrite = vi.fn(async () => undefined)
-  const appearanceWrite = vi.fn<(value: 'system' | 'light' | 'dark') => Promise<void>>(async () => undefined)
+  const appearanceWrite = vi.fn<(value: 'system' | 'light' | 'dark' | 'gray') => Promise<void>>(async () => undefined)
   window.treeApi = {
     getAppearance: async () => 'system',
     setAppearance: appearanceWrite,

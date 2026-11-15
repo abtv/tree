@@ -258,7 +258,7 @@ describe('application menu template', () => {
       'separator',
       'Appearance',
     ])
-    expect(appearanceItems(template).map((item) => item.label)).toEqual(['Automatic', 'Light', 'Dark'])
+    expect(appearanceItems(template).map((item) => item.label)).toEqual(['Automatic', 'Light', 'Dark', 'Gray'])
     expect(submenuItems(template, 'Window').map((item) => item.label)).toEqual(['Always on Top'])
   })
 
@@ -310,13 +310,14 @@ describe('application menu template', () => {
   // @requirement PRODUCT.md §9.3
   // @requirement PRODUCT.md §20.5
   it.each([
-    ['system', [true, false, false]],
-    ['light', [false, true, false]],
-    ['dark', [false, false, true]],
+    ['system', [true, false, false, false]],
+    ['light', [false, true, false, false]],
+    ['dark', [false, false, true, false]],
+    ['gray', [false, false, false, true]],
   ] as const)('checks exactly the %s appearance radio item', (appearance, checked) => {
     const items = appearanceItems(applicationMenuTemplate(state({ appearance }), createActions()))
 
-    expect(items.map((item) => item.type)).toEqual(['radio', 'radio', 'radio'])
+    expect(items.map((item) => item.type)).toEqual(['radio', 'radio', 'radio', 'radio'])
     expect(items.map((item) => item.checked)).toEqual(checked)
   })
 
@@ -327,9 +328,10 @@ describe('application menu template', () => {
 
     clickWithChecked(items[1]!, true)
     clickWithChecked(items[2]!, true)
+    clickWithChecked(items[3]!, true)
     clickWithChecked(items[0]!, true)
 
-    expect(actions.setAppearance.mock.calls).toEqual([['light'], ['dark'], ['system']])
+    expect(actions.setAppearance.mock.calls).toEqual([['light'], ['dark'], ['gray'], ['system']])
   })
 
   // @requirement PRODUCT.md §9.3
