@@ -21,7 +21,72 @@ async function setAppearance(window: Page, appearance: 'light' | 'dark' | 'gray'
   )
 }
 
-describeForEachEditingMode('Completed rich text', ({ screenshotName }) => {
+describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.5
+  test('keeps selected hyperlinks on the palette when command-panel focus changes', async ({
+    userDataDir,
+  }, testInfo) => {
+    const url = 'https://example.com'
+    const text = `before ${url} after`
+    const links = [{ start: 7, end: 7 + url.length, url }]
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'one', text, links, children: [] },
+          { id: 'two', text, links, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const link = editor.locator('a')
+    const neighbor = window.getByRole('textbox', { name: 'Node 2', exact: true }).locator('a')
+
+    for (const appearance of ['light', 'dark', 'gray'] as const) {
+      await setAppearance(window, appearance)
+      await editor.focus()
+      await window.keyboard.press('Meta+a')
+      await expect(editor).toHaveClass(/select-all/)
+      const highlight = await link.evaluate((element) => {
+        const style = getComputedStyle(element, '::selection')
+        return { color: style.color, background: style.backgroundColor }
+      })
+
+      await expect(link).toHaveCSS('color', highlight.color)
+      await expect(link).toHaveCSS('background-color', highlight.background)
+      await expect(neighbor).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+      if (mode === 'standard') {
+        await expect(editor).toHaveScreenshot(`selected-link-${appearance}.png`)
+      }
+
+      await window.keyboard.press('Meta+Shift+p')
+      await expect(window.getByRole('combobox', { name: 'Command', exact: true })).toBeFocused()
+      // Focus transfer may clear the native selection. Any retained link highlight
+      // must use the same pair; a cleared selection must leave the link unpainted.
+      await expect
+        .poll(() =>
+          link.evaluate((element) => {
+            const style = getComputedStyle(element)
+            const selection = getComputedStyle(element, '::selection')
+            return (
+              style.backgroundColor === 'rgba(0, 0, 0, 0)' ||
+              (style.backgroundColor === selection.backgroundColor && style.color === selection.color)
+            )
+          }),
+        )
+        .toBe(true)
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`selected-link-blurred-${appearance}.png`)) })
+
+      await window.keyboard.press('Escape')
+      await expect(editor).toBeFocused()
+      await setCursor(editor, 0)
+      await expect(link).not.toHaveClass(/link-selected/)
+      await expect(link).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+      await expect(link).toHaveCSS('color', await neighbor.evaluate((element) => getComputedStyle(element).color))
+    }
+  })
+
   // @requirement PRODUCT.md §2.5
   // @requirement PRODUCT.md §23.9
   test('retains completion and link styling across headings, search and Agenda occurrences', async ({

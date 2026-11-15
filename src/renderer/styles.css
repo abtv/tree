@@ -1341,8 +1341,8 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .node-input.select-all a,
 .node-input a.link-selected {
-  color: HighlightText;
-  background: Highlight;
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
 }
 
 .node-row-visual-selected .node-input a {
