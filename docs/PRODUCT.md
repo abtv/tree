@@ -2267,6 +2267,8 @@ Text recognition must avoid quadratic retries over whitespace when joining nodes
 
 An idle Vim Normal editor must not continuously mutate its selection or generate a self-sustaining selection-change event loop in Tree or Agenda.
 
+Vertical Vim navigation through long wrapped text must remain responsive in Tree and Agenda, including near the beginning, middle and end of a node. Repeated character-position lookups must not rescan every character boundary for each measured position. This does not impose a node or clipboard text-length limit.
+
 Everyday Vim editing must feel lightweight and consistently responsive on supported documents. Typing, caret movement, moving between nearby nodes, switching modes, and common edit commands must give prompt visible feedback so the user can stay in an editing flow. Repeated interactions must not develop noticeable pauses, and work that only changes the active node or caret must not become slower merely because the document contains more off-screen nodes.
 
 Performance guards must exercise representative sequences in the running application, including key-to-visible-frame latency for Vim interactions and typing, as well as document-scale cases that could expose renderer or React work on the interactive path. Measure both typical and slow interactions; investigate regressions before adding further editing features. This requirement does not imply support for Vim-sized files or prescribe a particular UI implementation.
