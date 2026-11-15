@@ -1,6 +1,13 @@
 import { dataMenuCommands } from './menu-commands'
 
-export type CommandAppearance = 'system' | 'light' | 'dark' | 'gray'
+export const appearanceCommands = [
+  ['auto', 'system', 'Follow the system appearance'],
+  ['light', 'light', 'Use the light appearance'],
+  ['dark', 'dark', 'Use the dark appearance'],
+  ['gray', 'gray', 'Use the gray appearance'],
+] as const
+
+export type CommandAppearance = (typeof appearanceCommands)[number][1]
 
 export interface CommandCapabilities {
   imageToText?: boolean
@@ -144,14 +151,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     active: (context) => context.lineNumbers,
     run: (services, context) => services.setLineNumbers(!context.lineNumbers),
   },
-  ...(
-    [
-      ['auto', 'system', 'Follow the system appearance'],
-      ['light', 'light', 'Use the light appearance'],
-      ['dark', 'dark', 'Use the dark appearance'],
-      ['gray', 'gray', 'Use the gray appearance'],
-    ] as const
-  ).map(([name, value, description]): ApplicationCommand => ({
+  ...appearanceCommands.map(([name, value, description]): ApplicationCommand => ({
     name: `set-theme-${name}`,
     aliases: [],
     description,

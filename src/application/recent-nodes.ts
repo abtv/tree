@@ -10,6 +10,8 @@ export interface RecentNode {
   readonly path: string | null
   readonly tagMatches?: readonly TextMatch[]
   readonly pathTagMatches?: readonly TextMatch[]
+  readonly struckThrough?: true
+  readonly pathStruckMatches?: readonly TextMatch[]
 }
 
 export function normalizeRecentNodes(value: unknown): string[] {
@@ -110,6 +112,7 @@ export class RecentNodes {
         id,
         text: resultText(found.at(-1)!),
         path: found.length === 1 ? null : found.slice(0, -1).map(label).join(' › '),
+        ...completionPresentation(found.at(-1)!, found.slice(0, -1)),
       })
       if (results.length === RECENT_NODE_RESULTS) break
     }
@@ -130,4 +133,19 @@ export function label(node: TreeNode): string {
 
 export function resultText(node: TreeNode): string {
   return node.text || label(node)
+}
+
+/** Completion ranges use the same compact labels and separators as search paths. */
+export function completionPresentation(node: TreeNode, ancestors: readonly TreeNode[]): Partial<RecentNode> {
+  const pathStruckMatches: TextMatch[] = []
+  let offset = 0
+  for (const ancestor of ancestors) {
+    const length = label(ancestor).length
+    if (ancestor.struckThrough) pathStruckMatches.push({ start: offset, end: offset + length })
+    offset += length + 3
+  }
+  return {
+    ...(node.struckThrough ? { struckThrough: true as const } : {}),
+    ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
+  }
 }

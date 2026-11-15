@@ -20,6 +20,7 @@ import { useSearchDecorations } from './search-decorations'
 import { computeListWindow, computeOffsets } from './list-window'
 import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
+import { SearchQueryInput } from './SearchQueryInput'
 
 const RESULT_EDGE_INSET = 12
 
@@ -55,12 +56,14 @@ function SearchResultText({
   active,
   onReveal,
   tagMatches = NO_MATCHES,
+  struckMatches = NO_MATCHES,
 }: {
   text: string
   query: string
   active: boolean
   onReveal(): void
   tagMatches?: readonly TextMatch[] | undefined
+  struckMatches?: readonly TextMatch[] | undefined
 }): React.JSX.Element {
   const matches = useSearchDecorations(text, query, tagMatches)
   const firstMatch = useRef<HTMLElement>(null)
@@ -74,17 +77,36 @@ function SearchResultText({
     if (active && row) onReveal()
   }, [active, matches, onReveal])
 
+  function renderText(start: number, end: number): React.ReactNode {
+    const parts: React.ReactNode[] = []
+    let offset = start
+    for (const range of struckMatches) {
+      const from = Math.max(offset, range.start)
+      const to = Math.min(end, range.end)
+      if (from >= to) continue
+      parts.push(text.slice(offset, from))
+      parts.push(
+        <span className="node-text-struck" key={from}>
+          {text.slice(from, to)}
+        </span>,
+      )
+      offset = to
+    }
+    parts.push(text.slice(offset, end))
+    return parts
+  }
+
   return (
     <>
       {matches.map((match, index) => (
         <Fragment key={match.start}>
-          {text.slice(matches[index - 1]?.end ?? 0, match.start)}
+          {renderText(matches[index - 1]?.end ?? 0, match.start)}
           <strong ref={index === 0 ? firstMatch : undefined} className="node-search-match">
-            {text.slice(match.start, match.end)}
+            {renderText(match.start, match.end)}
           </strong>
         </Fragment>
       ))}
-      {text.slice(matches.at(-1)?.end ?? 0)}
+      {renderText(matches.at(-1)?.end ?? 0, text.length)}
     </>
   )
 }
@@ -447,7 +469,7 @@ export function GlobalSearchPopup({
   return (
     <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
       <div className="recent-nodes-title">Search</div>
-      <input
+      <SearchQueryInput
         ref={input}
         type="search"
         className="node-search-input"
@@ -576,6 +598,7 @@ export function GlobalSearchPopup({
                           text={item.path}
                           query={displayedQuery}
                           tagMatches={item.pathTagMatches}
+                          struckMatches={item.pathStruckMatches}
                           active={false}
                           onReveal={requestReveal}
                         />
@@ -598,7 +621,7 @@ export function GlobalSearchPopup({
                       onClick={() => visit(index)}
                     >
                       <span className="recent-node-title-line">
-                        <span className="recent-node-text">
+                        <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
                           <SearchResultText
                             text={item.text}
                             query={displayedQuery}

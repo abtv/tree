@@ -1,6 +1,6 @@
 import type { Document, TreeNode } from '../domain/document'
 import { mergeSearchMatches, prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
-import { label, resultText, type RecentNode } from './recent-nodes'
+import { completionPresentation, label, resultText, type RecentNode } from './recent-nodes'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import type { TextMatch } from '../domain/text-search'
 
@@ -73,6 +73,7 @@ export function* searchNodes(document: Document, query: string): Generator<undef
         id: node.id,
         text: resultText(node),
         path: ancestors.length ? ancestors.map(label).join(' › ') : null,
+        ...completionPresentation(node, ancestors),
         ...(tagTerms.length === 0
           ? {}
           : {

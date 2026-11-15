@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RecentNodes, normalizeRecentNodes, label } from './recent-nodes'
+import { searchNodes } from './node-search'
 import { RecentNodePersistence } from './recent-node-persistence'
 import { editNodeContent, moveSubtree, deleteNode } from '../domain/document'
 import type { TreeNode } from '../domain/document'
@@ -12,6 +13,42 @@ const document = {
 }
 
 describe('recent nodes', () => {
+  it('preserves completion in recent and searched titles and compact ancestor labels', () => {
+    const leaf: TreeNode = { id: 'leaf', text: 'Finished task', struckThrough: true, children: [] }
+    const source = {
+      roots: [
+        {
+          id: 'root',
+          text: 'Open',
+          children: [
+            { id: 'done', text: '  Done\n branch  ', struckThrough: true as const, children: [leaf] },
+            { id: 'other', text: 'Unfinished', children: [] },
+          ],
+        },
+      ],
+    }
+    const recent = new RecentNodes()
+    recent.load(['leaf'], source)
+    const work = searchNodes(source, 'Finished task')
+    let result = work.next()
+    while (!result.done) result = work.next()
+
+    const expected = [
+      {
+        id: 'leaf',
+        text: 'Finished task',
+        path: 'Open › Done branch',
+        struckThrough: true,
+        pathStruckMatches: [{ start: 7, end: 18 }],
+      },
+    ]
+    expect(recent.getResults()).toEqual(expected)
+    expect(result.value).toEqual(expected)
+
+    recent.update({ roots: [{ id: leaf.id, text: leaf.text, children: [] }] })
+
+    expect(recent.getResults()).toEqual([{ id: 'leaf', text: 'Finished task', path: null }])
+  })
   // @requirement PRODUCT.md §20.14.1
   it('reuses retained paths without traversing unrelated roots on a new document snapshot', () => {
     let childrenReads = 0

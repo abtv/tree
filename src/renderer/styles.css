@@ -660,6 +660,8 @@ body:not(.node-drag-active) .location-link:hover {
   color: var(--highlight-foreground);
   background: var(--highlight-background);
 }
+.node-input.node-input-struck,
+.node-text-struck,
 .agenda-text-struck {
   text-decoration: line-through;
   color: var(--color-struck-text);
@@ -946,13 +948,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   white-space: pre-wrap;
   font-size: 15px;
   line-height: 20px;
-}
-
-/* A struck-through node (docs/PRODUCT.md §2.5): a line through its text, which is muted in both
-   appearances. Hyperlinks keep their own color under the same line. */
-.node-input.node-input-struck {
-  color: var(--color-struck-text);
-  text-decoration: line-through;
 }
 
 /* Inside the whole-node Visual highlight the struck text takes the highlight pair, keeping its line. */
@@ -1310,10 +1305,20 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   cursor: pointer;
 }
 
+.node-input-struck a,
+.agenda-text-struck a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .node-input.select-all a,
 .node-input a.link-selected {
   color: HighlightText;
   background: Highlight;
+}
+
+.node-row-visual-selected .node-input a {
+  color: var(--highlight-foreground);
 }
 
 .node-input:focus {
@@ -1763,9 +1768,18 @@ body.node-drag-invalid * {
   font-size: 15px;
 }
 
-.node-search-input {
+.node-search-input-wrap {
+  position: relative;
   flex-shrink: 0;
   margin: 0 10px 8px;
+  min-width: 0;
+}
+
+.node-search-input {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
   padding: 8px;
   min-width: 0;
   font: inherit;
@@ -1773,6 +1787,37 @@ body.node-drag-invalid * {
   background: transparent;
   border: 1px solid var(--color-location-border);
   border-radius: 4px;
+}
+
+.node-search-input-wrap[data-decorated] .node-search-input {
+  color: transparent;
+  caret-color: var(--color-text);
+}
+
+.node-search-input-wrap[data-decorated] .node-search-input::-webkit-search-cancel-button {
+  width: 13px;
+  height: 13px;
+  margin: 0 0 0 8px;
+}
+
+.node-search-input-wrap[data-decorated] .node-search-input::selection {
+  color: var(--highlight-foreground);
+  background: var(--highlight-background);
+}
+
+.node-search-input-mirror {
+  position: absolute;
+  /* Clip at the clear button, retaining its leading margin for native end-of-text scrolling. */
+  inset: 1px 22px 1px 9px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre;
+}
+
+.node-search-input-mirror > span {
+  flex-shrink: 0;
 }
 
 .node-search-results {

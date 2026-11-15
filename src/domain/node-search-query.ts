@@ -8,6 +8,11 @@ export interface NodeSearchTerm {
   readonly valid: boolean
 }
 
+/** A complete marker term uses the same syntax for matching and query presentation. */
+export function validNodeSearchMarker(text: string): TagPrefix | undefined {
+  return /^[#@&][\p{L}\p{Nd}_-]+$/u.test(text) ? tagPrefix(text) : undefined
+}
+
 /** Locate the marker term at the caret, retaining the surrounding query. */
 export function nodeSearchCompletionTerm(
   query: string,
@@ -32,7 +37,7 @@ export function* prepareNodeSearch(query: string): Generator<undefined, readonly
     seen.add(token)
     const prefix = tagPrefix(token)
     const pattern = yield* prepareSearch(prefix === undefined ? token : token.slice(1))
-    const valid = prefix === undefined || /^[#@&][\p{L}\p{Nd}_-]+$/u.test(token)
+    const valid = prefix === undefined || validNodeSearchMarker(token) !== undefined
     terms.push({ pattern, prefix, valid })
   }
 

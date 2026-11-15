@@ -32,11 +32,16 @@ export function LocationBar({
         >
           <span className="location-separator">›</span>
           {node.id === currentParentId ? (
-            <span className="location-current" title={node.text}>
+            <span className={`location-current${node.struckThrough ? ' node-text-struck' : ''}`} title={node.text}>
               {node.text}
             </span>
           ) : (
-            <button className="location-link" onClick={() => onNavigate(node.id)} title={node.text} type="button">
+            <button
+              className={`location-link${node.struckThrough ? ' node-text-struck' : ''}`}
+              onClick={() => onNavigate(node.id)}
+              title={node.text}
+              type="button"
+            >
               {node.text}
             </button>
           )}
