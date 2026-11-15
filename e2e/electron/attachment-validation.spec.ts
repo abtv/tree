@@ -348,6 +348,7 @@ test.describe('image-only blank row click in standard editing', () => {
   // @requirement PRODUCT.md §2.1
   test('focuses the editor, shows the insertion line, and accepts typing', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
+
     const first = node(window, 1)
 
     await typeInto(first, 'other')
@@ -379,6 +380,12 @@ test.describe('image-only blank row click in standard editing', () => {
     await editor.evaluate((element) => element.style.setProperty('caret-animation', 'manual'))
 
     await expect(editor).toHaveCSS('caret-animation', 'manual')
+    // Compare the completed image state, independently of background OCR speed.
+    await expect(row.getByRole('button', { name: 'Open image preview' })).not.toHaveAttribute(
+      'data-recognition-incomplete',
+      'true',
+      { timeout: 30_000 },
+    )
     await expect(row).toHaveScreenshot('image-only-standard-blank-row.png', { caret: 'initial' })
 
     await editor.evaluate((element) => element.style.removeProperty('caret-animation'))
