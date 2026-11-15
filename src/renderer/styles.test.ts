@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest'
 import styles from './styles.css?raw'
+import grayStyles from './gray.css?raw'
+import browserStyles from '../web/styles.css?raw'
 
 // @requirement PRODUCT.md §2.2
 it('keeps the location toolbar outside the scrolling content area, with an opaque background', () => {
@@ -67,20 +69,28 @@ it('shows the text-editing cursor only over a focused node editor', () => {
 
 // docs/ARCHITECTURE.md: every color is a custom property declared once per appearance, so rules
 // cannot drift apart by repeating a value.
-it('declares color values only as custom properties', () => {
+function colorLiterals(source: string): string[] {
   const sheet = document.createElement('style')
-  sheet.textContent = styles
+  sheet.textContent = source
   document.head.append(sheet)
   try {
     const literals: string[] = []
+    const colorProbe = document.createElement('span').style
+    const references = new Set(['transparent', 'currentcolor', 'inherit', 'initial', 'unset', 'revert', 'revert-layer'])
     const inspect = (rules: CSSRuleList) => {
       for (const rule of Array.from(rules)) {
         if ('style' in rule) {
           const { selectorText, style } = rule as CSSStyleRule
           for (const property of Array.from(style)) {
             if (property.startsWith('--')) continue
-            const value = style.getPropertyValue(property)
-            if (/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i.test(value)) {
+            const value = style.getPropertyValue(property).replace(/url\([^)]*\)|"[^"]*"|'[^']*'/g, '')
+            const hasNamedColor = Array.from(value.matchAll(/[a-z_-][\w-]*/gi), ([word]) => word).some((word) => {
+              if (references.has(word.toLowerCase())) return false
+              colorProbe.color = ''
+              colorProbe.color = word
+              return colorProbe.color !== ''
+            })
+            if (hasNamedColor || /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i.test(value)) {
               literals.push(`${selectorText} { ${property}: ${value} }`)
             }
           }
@@ -93,10 +103,29 @@ it('declares color values only as custom properties', () => {
 
     inspect(sheet.sheet!.cssRules)
 
-    expect(literals).toEqual([])
+    return literals
   } finally {
     sheet.remove()
   }
+}
+
+it.each([
+  ['shared', styles],
+  ['Gray', grayStyles],
+  ['browser', browserStyles],
+])('declares %s color values only as custom properties', (_, source) => {
+  expect(colorLiterals(source)).toEqual([])
+})
+
+it('detects named and system colors without treating references or strings as colors', () => {
+  expect(colorLiterals('.a { color: HighlightText; } .b { color: aliceblue; } .c { color: red; }')).toHaveLength(3)
+  expect(
+    colorLiterals(`
+      :root { --red: red; --highlight: Highlight; }
+      .a { color: currentColor; background: transparent; border-color: var(--red); }
+      .b { color: inherit; background: var(--highlight); content: "red"; }
+    `),
+  ).toEqual([])
 })
 
 // @requirement PRODUCT.md §20.10

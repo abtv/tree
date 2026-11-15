@@ -53,7 +53,8 @@
   --color-search-backdrop: rgba(0, 0, 0, 0.18);
   --color-search-selection-background: #ebd89f;
   --color-search-selection-border: #8c784d;
-  --color-data-activity-shadow: rgba(0, 0, 0, 0.2);
+  --color-panel-shadow: rgba(0, 0, 0, 0.2);
+  --color-dialog-shadow: #0004;
   --color-import-backdrop: rgba(0, 0, 0, 0.3);
   /* Every color is defined once here or in the single dark override. The selection highlight is
      one background/foreground pair per appearance, shared by the Visual row, Visual text
@@ -1565,7 +1566,7 @@ body.node-drag-invalid * {
   border-radius: 8px;
   background: var(--color-background);
   color: var(--color-text);
-  box-shadow: 0 6px 24px var(--color-data-activity-shadow);
+  box-shadow: 0 6px 24px var(--color-panel-shadow);
   font:
     13px/1.5 system-ui,
     sans-serif;
@@ -1602,7 +1603,7 @@ body.node-drag-invalid * {
   border-radius: 12px;
   background: var(--color-background);
   color: var(--color-text);
-  box-shadow: 0 6px 24px var(--color-data-activity-shadow);
+  box-shadow: 0 6px 24px var(--color-panel-shadow);
   font:
     13px/1.5 system-ui,
     sans-serif;

@@ -60,7 +60,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
   border-radius: 8px;
   background: var(--color-background);
   color: var(--color-text);
-  box-shadow: 0 6px 24px #0003;
+  box-shadow: 0 6px 24px var(--color-panel-shadow);
   font:
     13px/1.5 system-ui,
     sans-serif;
@@ -170,7 +170,7 @@ body:has(.image-preview-overlay) #tree-menu-button {
   border-radius: 8px;
   background: var(--color-background);
   color: var(--color-text);
-  box-shadow: 0 6px 24px #0003;
+  box-shadow: 0 6px 24px var(--color-panel-shadow);
   font:
     13px/1.5 system-ui,
     sans-serif;
@@ -230,7 +230,7 @@ body:has(#prototype-problem:not([hidden])) #data-activity {
   border-radius: 10px;
   background: var(--color-background);
   color: var(--color-text);
-  box-shadow: 0 10px 40px #0004;
+  box-shadow: 0 10px 40px var(--color-dialog-shadow);
   font:
     13px/1.5 system-ui,
     sans-serif;

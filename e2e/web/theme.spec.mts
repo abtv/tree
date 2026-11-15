@@ -43,11 +43,18 @@ test('persists appearance and follows system changes', async ({ newContext, base
   }
   const background = () =>
     page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim())
+  const assertShadows = async () => {
+    await expect(page.locator('#tree-menu')).toHaveCSS('box-shadow', 'rgba(0, 0, 0, 0.2) 0px 6px 24px 0px')
+    for (const selector of ['#import-confirm', '#backup-confirm']) {
+      await expect(page.locator(selector)).toHaveCSS('box-shadow', 'rgba(0, 0, 0, 0.267) 0px 10px 40px 0px')
+    }
+  }
 
   expect(await background()).toBe('#fbf8f1')
 
   await command('set-theme-gray')
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await assertShadows()
   await capture(page, 'theme-gray-explicit.png')
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
@@ -67,6 +74,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
     { timeout: 2000 },
   )
 
+  await assertShadows()
   await capture(page, 'theme-dark-explicit.png')
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
@@ -80,6 +88,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#fbf8f1',
   )
 
+  await assertShadows()
   await capture(page, 'theme-light-explicit.png')
   await page.reload()
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')

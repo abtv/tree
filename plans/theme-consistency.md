@@ -1,6 +1,6 @@
 # Theme consistency follow-ups
 
-Status: In progress
+Status: Awaiting owner acceptance
 
 ## Authorization and scope
 
@@ -19,12 +19,38 @@ The complete batch is known; there is no unverified remainder.
 | --- | --- | --- | --- |
 | T1 | Selected hyperlinks use the shared highlight pair, including focus transfer. `src/renderer/styles.css`, `e2e/electron/completion-links.spec.ts`, `docs/PRODUCT.md`. | Moderate Risk: `npm run check`, 13 focused completion/selection E2E passed, Light/Dark/Gray screenshots inspected, separate product verifier passed. | Done |
 | T2 | Save and attachment errors remain legible in Dark. `src/renderer/styles.css`, focused error-appearance E2E and baselines, `docs/PRODUCT.md`. | Moderate Risk: `npm run check` and real error-appearance E2E passed; six Light/Dark/Gray screenshots inspected. Dark contrast is 4.92:1. | Done |
-| T3 | Browser shadows use shared color properties; the guard includes Gray, browser styles and named colors. `src/renderer/styles.css`, `src/web/styles.css`, `src/renderer/styles.test.ts`, `docs/ARCHITECTURE.md`. | Low Risk: `npm run check`, a failing-before-fix color-ownership guard, unchanged computed shadow values. | Ready |
+| T3 | Browser shadows use shared color properties; the guard includes Gray, browser styles and named colors. `src/renderer/styles.css`, `src/web/styles.css`, `src/renderer/styles.test.ts`, `e2e/web/theme.spec.mts`, `docs/ARCHITECTURE.md`. | Low Risk: `npm run check` passed (6725 tests); guard failed before extraction and passed afterward; two built-Chrome theme scenarios confirm unchanged computed shadows. | Done |
 
-T2 follows T1; T3 follows T2. Each task receives its own validated commit.
-Exact next task: T3, centralized browser shadows and complete color-ownership guard.
+All three implementation tasks are complete and validated in separate commits.
+Exact next step: owner acceptance of the delivered result and confirmation that
+no further tasks remain. No implementation task remains ready.
 
-T1 delivered in `1e9b89e`.
+T1 delivered in `1e9b89e`, T2 in `ed2252f`; T3 is delivered by the commit containing
+this acceptance-state update.
+
+## Delivered result
+
+Selected hyperlinks use their appearance's highlight pair across focus changes.
+Save and inline-image errors use a lighter Dark red with 4.92:1 contrast.
+Browser shadows retain their original values through shared properties. The
+color guard now covers all three stylesheets and named/system colors.
+
+All required checks passed. Existing unrelated AgendaView lint and browser bundle
+size warnings remain. No startup/window-surface behavior changed; this batch does
+not claim a new lifecycle-flash audit. Independent T1 product verification found
+no meaningful issues; the primary verified T2 and T3's contained flows.
+
+Representative inspected baselines:
+[Dark selection](../e2e/electron/completion-links.spec.ts-snapshots/selected-link-dark-darwin.png),
+[Gray selection](../e2e/electron/completion-links.spec.ts-snapshots/selected-link-gray-darwin.png),
+[Dark save error](../e2e/electron/error-appearance.spec.ts-snapshots/save-error-dark-darwin.png),
+[Dark image error](../e2e/electron/error-appearance.spec.ts-snapshots/image-error-dark-darwin.png).
+
+Temporary acceptance evidence:
+[T1](../.scratch/theme-consistency-fixes/t1.md),
+[T2](../.scratch/theme-consistency-fixes/t2.md),
+[T3](../.scratch/theme-consistency-fixes/t3.md).
+Retain it until acceptance; remove these dependencies before plan retirement.
 
 ## Findings and choices
 
@@ -51,8 +77,8 @@ for these contained, already investigated corrections.
 
 Required capabilities already verified in this session: repository inspection,
 native file edits, unit tests, isolated Electron execution, screenshot inspection.
-Product-verifier access will be verified on its first review. No manual pre-commit
-owner check is planned. Surface colors and window lifecycle are unchanged; startup
+Product-verifier inspection and screenshot access were verified in T1. No manual
+pre-commit owner check was needed. Surface colors and window lifecycle are unchanged; startup
 and closing transition verification is outside these corrections.
 
 Working-task count: three. One final owner acceptance round is required by
