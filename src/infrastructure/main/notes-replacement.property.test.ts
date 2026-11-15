@@ -119,6 +119,48 @@ const oldNotes = fc.oneof(
 
 // @requirement PRODUCT.md §25.4
 describe('notes replacement after a crash', () => {
+  it('preserves both sets of notes across repeated failures at every recovery operation', async () => {
+    const old = { newProfile: false, documents: DOCUMENT_NAMES, images: 2 }
+    const prepare = async () => {
+      const layout = await fixture(old)
+      const before = await tree(layout.dataDirectory)
+      const fs: ReplacementFileSystem = {
+        ...nodeReplacementFileSystem,
+        rename: async (from, to) => {
+          if (from.startsWith(`${layout.dataDirectory}/`)) throw new Error('interrupted after commit')
+          await nodeReplacementFileSystem.rename(from, to)
+        },
+      }
+
+      await expect(commitReplacement(fs, layout, 'staged', NOW)).rejects.toThrow('interrupted after commit')
+
+      return { layout, before }
+    }
+    const baseline = await prepare()
+    const counting = crashingFileSystem(Number.POSITIVE_INFINITY)
+    await recoverReplacement(counting.fs, baseline.layout, new Set())
+
+    for (let crashAt = 0; crashAt <= counting.calls(); crashAt += 1) {
+      const { layout, before } = await prepare()
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await recoverReplacement(crashingFileSystem(crashAt).fs, layout, new Set()).catch(() => undefined)
+      }
+      await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
+
+      expect(await tree(layout.dataDirectory), `recovery operation ${crashAt}`).toEqual({
+        'vim-enabled.json': 'true',
+        'document.json': 'new document',
+        'attachments/': '',
+        'attachments/new.png': 'new image',
+      })
+      const { 'vim-enabled.json': preference, ...previousNotes } = before
+      expect(preference).toBe('true')
+      expect(await tree(join(layout.replacedNotesDirectory, '2026-10-23 14-05-09'))).toEqual(previousNotes)
+      expect(await tree(layout.importDirectory)).toEqual({})
+    }
+  }, 120_000)
+
   it('opens either the untouched previous notes or the complete imported notes', async () => {
     await fc.assert(
       fc.asyncProperty(oldNotes, fc.nat(), fc.nat({ max: 40 }), async (old, crashSeed, recoveryCrashAt) => {

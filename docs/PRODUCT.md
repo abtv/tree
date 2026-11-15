@@ -1712,7 +1712,7 @@ Displayed link text participates, including phrases crossing a link boundary.
 
 Tree scope includes the current-parent heading before all descendants, regardless of folds.
 
-Agenda searches direct-match occurrences in the displayed week, including collapsed days. Changing weeks closes search and cancels pending navigation while retaining query recall. Day headings and separators are excluded. Focused-day search includes only that day. Each occurrence
+Agenda searches direct-match occurrences in the displayed week and its Overdue group (§23.3), including collapsed days and a collapsed Overdue group. Changing weeks closes search and cancels pending navigation while retaining query recall. Day headings and separators are excluded. Focused-day search includes only that day. Each occurrence
 of a node on a different day counts separately. Synthetic day labels are
 excluded. Order is chronological by day, then depth-first through projected rows.
 From a day header, forward search starts before that day's contents and reverse
@@ -2586,12 +2586,15 @@ Tab and Shift+Tab move between the confirmation buttons and stay inside the dial
 * Without previous notes it shows `Imported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with OK.
 * After import, OK receives keyboard focus. Enter or Space closes the result; with previous notes, Shift+Tab reaches Show in Finder, and Tab returns to OK. Closing the focused result returns focus to the editor.
 * Cancel and every failure before the replacement leave the notes unchanged and remove what the import prepared; failures show `Import failed. <reason>` until OK.
+* A failure after replacement has committed keeps editing blocked and shows `Import failed. <reason> Restart Tree to complete the import.` The next start attempts the recovery described in §25.4.
 
 ### 25.4 Replaced Notes
 
-Replace Notes moves the current `document.json`, its retained generations, any interrupted-save and legacy backup files, and the `attachments` folder into a new folder `Replaced Notes/YYYY-MM-DD HH-MM-SS` (local time) in `~/Library/Application Support/Tree/`, keeping the data-directory layout. Files are moved, not copied. When that name exists, ` 2`, ` 3`, … is appended; nothing is moved and no folder is created when there were no stored notes. Preferences stay in place. Tree never changes or deletes a Replaced Notes folder; the user removes old ones in the Finder.
+Replace Notes moves the current `document.json`, its retained generations, any interrupted-save and legacy backup files, and the `attachments` folder into a new folder `Replaced Notes/YYYY-MM-DD HH-MM-SS` (local time) in `~/Library/Application Support/Tree/`, keeping the data-directory layout. Files are moved, not copied. When that name exists, ` 2`, ` 3`, … is appended; nothing is moved and no folder is created when there were no stored notes. Preferences stay in place. Once replacement completes, Tree never changes or deletes its Replaced Notes folder; the user removes old ones in the Finder.
 
-The replacement is one unit. The imported notes start without retained generations, and a replaced document or generation is never opened again after the replacement begins. If Tree stops during the replacement, the next start completes it before opening the notes and shows the result of §25.3. Quitting during the replacement waits for it. If it cannot be completed, loading fails with `The notes import could not be completed: <reason>` and changes no files.
+The replacement is one logical unit, completed through resumable file moves rather than an all-or-nothing filesystem operation. Before its commit journal is installed, a failure leaves the current notes unchanged. After that point, recovery completes the import instead of rolling it back. The imported notes start without retained generations, and a replaced document or generation is never opened again after the replacement begins. If Tree stops during the replacement, the next start completes it before opening the notes and shows the result of §25.3. Quitting during the replacement waits for it.
+
+If recovery cannot complete, loading fails with `The notes import could not be completed: <reason>` and opens no notes. An unreadable or invalid journal fails before recovery changes files. Recovery from a valid journal may move some files before a later failure; it retains the journal and remaining staged data while replacement is unfinished so a later start can continue. Repeated interruptions must preserve both the imported notes and the previous notes moved to Replaced Notes, without opening a partial replacement.
 
 ## 26. Desktop App Updates
 

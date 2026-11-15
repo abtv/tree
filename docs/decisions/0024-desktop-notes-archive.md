@@ -3,6 +3,13 @@
 Status: Accepted
 Date: 2026-10-23
 
+Clarification (2026-11-15): the owner confirmed resumable roll-forward recovery.
+The original "changes no files" statement below applies to rejection of an unreadable
+or invalid journal, not to a later failure during valid recovery. Completed moves
+remain in place and loading stays blocked until recovery completes. Current guarantees
+are in [PRODUCT §25.4](../PRODUCT.md#254-replaced-notes) and
+[Desktop notes replacement](../ARCHITECTURE.md#desktop-notes-replacement).
+
 ## Context
 
 The Product Owner wants notes to move in both directions between the browser version and the desktop application through the notes archive of [ADR 0022](0022-notes-archive-format-and-worker.md) and `docs/PRODUCT.md` §24.2. The desktop application stores notes in `userData/data/`: `document.json`, an interrupted-save `document.json.tmp`, retained generations `document.<N>.json`, a legacy `document.json.bak`, and `attachments/<id>.png` ([ADR 0008](0008-fsync-based-persistence-durability.md), [ADR 0009](0009-bounded-loss-document-generations.md)). Preference files share that directory and can be written at any time. Loading promotes the newest valid candidate among the primary, the temporary file and every generation, so an old generation left beside imported notes could reopen the replaced notes. On macOS the Electron main thread routes input to the renderer; archive work there would stall typing (`docs/PRODUCT.md` §1.1, §22). The production renderer CSP has `worker-src 'none'`.
