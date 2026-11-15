@@ -5,6 +5,10 @@ import {
   openAgendaState,
   applyAgendaCommand,
   type AgendaState,
+  agendaWeekStart,
+  dayKey,
+  overdueKey,
+  focusAgendaState,
 } from './agenda-state'
 import { expect, it } from 'vitest'
 import { editNodeText, type Document } from '../domain/document'
@@ -16,7 +20,7 @@ import {
   reconcileAgendaSelection,
   selectedAgendaDay,
 } from './agenda-reconcile'
-import { agendaProjection, buildAgendaRows } from './agenda-rows'
+import { agendaProjection, buildAgendaRows, AgendaRowsCache } from './agenda-rows'
 
 const document: Document = {
   roots: [
@@ -43,6 +47,53 @@ function selected(key = 'node:100:match'): AgendaState {
   }
   return applyAgendaCommand(state, { kind: 'select', key }, buildAgendaRows(agendaProjection(document, state), state))
 }
+
+// @requirement PRODUCT.md §23.3
+// @requirement PRODUCT.md §23.7
+// @requirement PRODUCT.md §23.15
+it.each([
+  ['current', 100, '1970-04-11', 93, '1970-04-04', true],
+  ['current', 100, '1970-04-11', 93, '1970-04-04', false],
+  ['current', 100, '1970-04-11', 95, '1970-04-06', true],
+  ['past', 93, '1970-04-04', 86, '1970-03-28', true],
+  ['focused', 100, '1970-04-11', 93, '1970-04-04', true],
+] as const)('migrates %s %s %s to %s %s (cache %s)', (kind, activeDay, text, day, replacement, cached) => {
+  const source: Document = {
+    roots: [
+      { id: 'match', text, children: [] },
+      { id: 'other', text: '1970-04-01 1970-04-06', children: [] },
+    ],
+  }
+  const cache = cached ? new AgendaRowsCache() : undefined
+  const opened = openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 3, 100)
+  let base = opened
+  if (kind === 'focused') base = focusAgendaState(opened, activeDay, 24)
+  if (kind === 'past') {
+    base = applyAgendaCommand(
+      opened,
+      { kind: 'shift-week', direction: -1 },
+      buildAgendaRows(agendaProjection(source, opened), opened, undefined, source),
+    )
+  }
+  const state = { ...base, collapsed: new Set([overdueKey(base.weekStart), dayKey(base.weekStart)]) }
+  const rows = cache?.get(source, state) ?? buildAgendaRows(agendaProjection(source, state), state, undefined, source)
+  const active = applyAgendaCommand(state, { kind: 'select', key: `node:${activeDay}:match`, cursor: 2 }, rows)
+
+  const edited = editNodeText(source, 'match', replacement)
+  const next = reconcileAgenda(edited, active, false, cache)!
+
+  expect(next.selectedKey).toBe(`node:${day}:match`)
+  expect(activeAgendaOccurrence(next)).toEqual({ nodeId: 'match', day })
+  expect(next.weekStart).toBe(kind === 'current' ? opened.weekStart : agendaWeekStart(day))
+  expect(next.origin).toBe(active.origin)
+  if (kind === 'focused') expect(focusedAgendaDay(next)).toBe(day)
+  if (kind === 'current') {
+    const overdue = day < opened.weekStart
+
+    expect(next.collapsed.has(overdueKey(opened.weekStart))).toBe(!overdue)
+    expect(next.collapsed.has(dayKey(opened.weekStart))).toBe(overdue)
+  }
+})
 
 // @requirement PRODUCT.md §23.7
 it('tracks explicit active occurrences, keeps added dates stable, and chooses the earlier nearest remaining day', () => {

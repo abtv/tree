@@ -8,12 +8,37 @@ import {
   dayKey,
   openAgendaState,
   focusAgendaState,
+  overdueKey,
 } from './agenda-state'
 import { AgendaRowsCache, buildAgendaRows } from './agenda-rows'
 import { reconcileAgenda } from './agenda-reconcile'
 
 const location = { currentParentId: null, selectedNodeId: 'a' }
 const today = dayNumberOf({ year: 2026, month: 12, day: 30 })
+
+// @requirement PRODUCT.md §23.3
+// @requirement PRODUCT.md §23.4
+it.each([
+  ['header', -1],
+  ['header', 1],
+  ['node', -1],
+  ['node', 1],
+] as const)('shifts from an overdue %s to Monday in the adjacent week with direction %s', (kind, direction) => {
+  const document = { roots: [{ id: 'a', text: '2026-12-01 task', children: [] }] }
+  const opened = openAgendaState(location, 4, today)
+  const rows = new AgendaRowsCache().get(document, opened)
+  const key = kind === 'header' ? overdueKey(opened.weekStart) : rows.find((row) => row.kind === 'node')!.key
+  const selected = applyAgendaCommand(opened, { kind: 'select', key, cursor: 5 }, rows)
+
+  const next = applyAgendaCommand(selected, { kind: 'shift-week', direction }, rows)
+
+  expect(next.weekStart).toBe(opened.weekStart + direction * 7)
+  expect(next.selectedKey).toBe(dayKey(next.weekStart))
+  expect(next.selectionCursor).toBe(0)
+  expect(next.activity).toEqual({ kind: 'inactive' })
+  expect(next.origin).toBe(opened.origin)
+  expect(next.today).toBe(today)
+})
 
 it('shifts a focused day and restores the original week, selection, folds and scroll anchor', () => {
   const original = openAgendaState(location, 4, today)

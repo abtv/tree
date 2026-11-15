@@ -5,7 +5,7 @@ import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
 import { agendaAncestorKeys, agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
-import { openAgendaState, focusAgendaState, applyAgendaCommand } from './agenda-state'
+import { openAgendaState, focusAgendaState, applyAgendaCommand, dayKey, overdueKey } from './agenda-state'
 import { reconcileAgenda } from './agenda-reconcile'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
@@ -26,6 +26,153 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  // @requirement PRODUCT.md §23.5
+  it('refreshes rows for equal-size overlapping fold sets', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = {
+      roots: [
+        { id: 'parent', text: '2026-10-05', children: [] },
+        { id: 'tuesday', text: '2026-10-06', children: [] },
+        { id: 'wednesday', text: '2026-10-07', children: [] },
+      ],
+    }
+    const monday = dayKey(state.weekStart)
+    const tuesday = dayKey(state.weekStart + 1)
+    const wednesday = dayKey(state.weekStart + 2)
+    const cache = new AgendaRowsCache()
+    const before = cache.get(source, { ...state, collapsed: new Set([monday, tuesday]) })
+
+    const after = cache.get(source, { ...state, collapsed: new Set([monday, wednesday]) })
+
+    expect(before.filter((row) => row.kind === 'node').map((row) => row.nodeId)).toEqual(['wednesday'])
+    expect(after.filter((row) => row.kind === 'node').map((row) => row.nodeId)).toEqual(['tuesday'])
+  })
+
+  // @requirement PRODUCT.md §23.3
+  it.each([false, true])('refreshes overdue rows and search after completion changes from %s', (struckThrough) => {
+    const state = openAgendaState(location, 0, today)
+    const node = { id: 'parent', text: '2026-10-04', children: [] }
+    const source: Document = { roots: [{ ...node, ...(struckThrough ? { struckThrough: true as const } : {}) }] }
+    const cache = new AgendaRowsCache()
+
+    expect(cache.get(source, state).some((row) => row.kind === 'node')).toBe(!struckThrough)
+    expect(cache.getProjection(source, state).flatMap((day) => day.rows)).toHaveLength(struckThrough ? 0 : 1)
+
+    const edited: Document = { roots: [{ ...node, ...(!struckThrough ? { struckThrough: true as const } : {}) }] }
+
+    expect(cache.get(edited, state).some((row) => row.kind === 'node')).toBe(struckThrough)
+    expect(cache.getProjection(edited, state).flatMap((day) => day.rows)).toHaveLength(struckThrough ? 1 : 0)
+  })
+
+  // @requirement PRODUCT.md §23.3
+  // @requirement PRODUCT.md §23.4
+  it('replaces cached headings between two empty past weeks with equal row counts', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = { roots: [{ id: 'parent', text: 'Undated', children: [] }] }
+    const cache = new AgendaRowsCache()
+    const previous = applyAgendaCommand(state, { kind: 'shift-week', direction: -1 }, cache.get(source, state))
+    const before = cache.get(source, previous)
+
+    const earlier = applyAgendaCommand(previous, { kind: 'shift-week', direction: -1 }, before)
+    const after = cache.get(source, earlier)
+
+    expect(after).not.toBe(before)
+    expect(after.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual(
+      Array.from({ length: 7 }, (_, index) => earlier.weekStart + index),
+    )
+  })
+
+  // @requirement PRODUCT.md §23.3
+  // @requirement PRODUCT.md §23.7
+  it('restores the earliest overdue date after leaving an active occurrence with same-day peers', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = {
+      roots: [
+        { id: 'old', text: '2026-10-04 task', children: [] },
+        { id: 'peer', text: '2026-10-04 peer', children: [] },
+        { id: 'older-peer', text: '2026-09-15 peer', children: [] },
+      ],
+    }
+    const cache = new AgendaRowsCache()
+    const rows = cache.get(source, state)
+    const row = rows.find((entry) => entry.kind === 'node' && entry.nodeId === 'old')!
+    const selected = applyAgendaCommand(state, { kind: 'select', key: row.key }, rows)
+    const edited = editNodeText(source, 'old', '2026-09-01 2026-10-04 task')
+    const active = reconcileAgenda(edited, selected, false, cache)!
+    const dates = (state: typeof active) =>
+      cache.getProjection(edited, state).map((day) => [day.day, day.rows.map((entry) => entry.nodeId)])
+
+    expect(dates(active)).toEqual([
+      [dayNumberOf({ year: 2026, month: 9, day: 15 }), ['older-peer']],
+      [row.day, ['old', 'peer']],
+    ])
+
+    const left = applyAgendaCommand(active, { kind: 'select', key: dayKey(today) }, cache.get(edited, active))
+
+    expect(dates(left)).toEqual([
+      [dayNumberOf({ year: 2026, month: 9, day: 1 }), ['old']],
+      [dayNumberOf({ year: 2026, month: 9, day: 15 }), ['older-peer']],
+      [row.day, ['peer']],
+    ])
+    expect(cache.get(edited, left).filter((entry) => entry.kind === 'node')).toHaveLength(3)
+  })
+
+  // @requirement PRODUCT.md §20.2.26
+  // @requirement PRODUCT.md §23.7
+  it('updates the searchable day when a lone node changes date within the same week', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = { roots: [{ id: 'parent', text: '2026-10-05 task', children: [] }] }
+    const cache = new AgendaRowsCache()
+
+    expect(cache.getProjection(source, state).map((entry) => entry.day)).toEqual([state.weekStart])
+
+    const edited = editNodeText(source, 'parent', '2026-10-06 task')
+
+    expect(cache.getProjection(edited, state).map((entry) => entry.day)).toEqual([state.weekStart + 1])
+    expect(cache.get(edited, state).filter((entry) => entry.kind === 'node')).toMatchObject([
+      { nodeId: 'parent', day: state.weekStart + 1 },
+    ])
+  })
+
+  // @requirement PRODUCT.md §20.2.26
+  // @requirement PRODUCT.md §23.3
+  it('includes Monday and overdue dates but excludes the following Monday even with an active Monday occurrence', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = { roots: [{ id: 'parent', text: '2026-10-04 2026-10-05 2026-10-12', children: [] }] }
+    const cache = new AgendaRowsCache()
+    const projectedDays = () => cache.getProjection(source, state).map((entry) => entry.day)
+
+    expect(projectedDays()).toEqual([state.weekStart - 1, state.weekStart])
+
+    const rows = cache.get(source, state)
+    const selected = applyAgendaCommand(state, { kind: 'select', key: `node:${state.weekStart}:parent` }, rows)
+
+    expect(cache.getProjection(source, selected).map((entry) => entry.day)).toEqual([
+      state.weekStart - 1,
+      state.weekStart,
+    ])
+    expect(cache.get(source, selected).filter((entry) => entry.kind === 'node')).toHaveLength(2)
+  })
+
+  // @requirement PRODUCT.md §23.3
+  it('resolves reveal folds for overdue, ordinary-week and focused-day occurrences', () => {
+    const state = openAgendaState(location, 0, today)
+    const source: Document = { roots: [{ id: 'parent', text: '2026-10-04 2026-10-05', children: [] }] }
+    const projection = projectAgenda(source, null)
+    const overdue = { nodeId: 'parent', day: state.weekStart - 1 }
+
+    expect(agendaAncestorKeys(projection, overdue, state)).toEqual([overdueKey(state.weekStart)])
+    expect(agendaAncestorKeys(projection, { ...overdue, day: state.weekStart }, state)).toEqual([
+      dayKey(state.weekStart),
+    ])
+    expect(agendaAncestorKeys(projection, overdue, { ...state, weekStart: state.weekStart - 7 })).toEqual([
+      dayKey(overdue.day),
+    ])
+    expect(agendaAncestorKeys(projection, overdue, focusAgendaState(state, overdue.day, 0))).toEqual([
+      dayKey(overdue.day),
+    ])
+  })
+
   it('keeps Overdue folds independent of Sunday and preserves active dates after an earlier date is added', () => {
     const state = openAgendaState(location, 0, today)
     const source: Document = { roots: [{ id: 'old', text: '2026-10-04 task', children: [] }] }
@@ -72,7 +219,7 @@ describe('Agenda rows', () => {
 
     const rows = cache.get(source, state)
 
-    expect(rows[0]).toMatchObject({ kind: 'day', overdue: true })
+    expect(rows[0]).toMatchObject({ kind: 'day', overdue: true, isToday: false })
     expect(
       rows
         .filter((row) => row.kind === 'node')
@@ -80,6 +227,9 @@ describe('Agenda rows', () => {
         .map((row) => row.nodeId),
     ).toEqual(['old'])
     const old = rows.find((row) => row.kind === 'node' && row.nodeId === 'old')!
+
+    expect(old).toMatchObject({ role: 'match' })
+
     const selected = applyAgendaCommand(state, { kind: 'select', key: old.key }, rows)
     const folded = applyAgendaCommand(selected, { kind: 'toggle-fold', key: rows[0]!.key }, rows)
 

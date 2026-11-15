@@ -3,9 +3,45 @@ import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { EditorSearch } from './editor-search'
 import { AgendaRowsCache } from './agenda-rows'
-import { focusAgendaState, openAgendaState } from './agenda-state'
+import { dayKey, focusAgendaState, openAgendaState, overdueKey } from './agenda-state'
 
 afterEach(() => vi.useRealTimers())
+
+// @requirement PRODUCT.md §20.2.26
+// @requirement PRODUCT.md §23.3
+it('starts search before the earliest overdue item and retains node and dated-heading origins', async () => {
+  const { state } = await setup()
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const base = {
+    ...state(),
+    document: {
+      roots: [
+        { id: 'a', text: 'apple 1970-04-01', children: [] },
+        { id: 'c', text: 'apple 1970-04-11', children: [] },
+      ],
+    },
+  }
+  const agenda = openAgendaState(base.location, 0, 100)
+
+  expect(search.origin({ ...base, agenda: { ...agenda, selectedKey: overdueKey(agenda.weekStart) } }, 4)).toEqual({
+    beforeDay: 90,
+    offset: 0,
+  })
+  expect(search.origin({ ...base, agenda: { ...agenda, selectedKey: dayKey(100) } }, 4)).toEqual({
+    beforeDay: 100,
+    offset: 0,
+  })
+  expect(search.origin({ ...base, agenda: { ...agenda, selectedKey: 'node:90:a' } }, 4)).toEqual({
+    nodeId: 'a',
+    day: 90,
+    offset: 4,
+  })
+  expect(search.origin({ ...base, agenda: { ...agenda, selectedKey: 'node:100:c' } }, 4)).toEqual({
+    nodeId: 'c',
+    day: 100,
+    offset: 4,
+  })
+})
 
 it('publishes a zero-result search without applying an absent destination', async () => {
   const { state } = await setup()
