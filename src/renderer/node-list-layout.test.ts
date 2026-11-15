@@ -1,11 +1,29 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { breadcrumbAtPoint, buildLayout } from './node-list-layout'
+import { breadcrumbAtPoint, buildLayout, measureElement } from './node-list-layout'
 import { ROW_HEIGHT_ESTIMATE } from './list-window'
 
 afterEach(() => {
   document.body.replaceChildren()
   vi.restoreAllMocks()
+})
+
+it('records an estimated row height without invalidating unchanged layout, then reports a real resize', () => {
+  const element = document.createElement('div')
+  const bounds = vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, ROW_HEIGHT_ESTIMATE))
+  const heights = new Map<string, number>()
+  const revise = vi.fn()
+
+  measureElement('row', element, heights, revise)
+
+  expect(heights.get('row')).toBe(ROW_HEIGHT_ESTIMATE)
+  expect(revise).not.toHaveBeenCalled()
+
+  bounds.mockReturnValue(new DOMRect(0, 0, 100, ROW_HEIGHT_ESTIMATE * 2))
+  measureElement('row', element, heights, revise)
+
+  expect(heights.get('row')).toBe(ROW_HEIGHT_ESTIMATE * 2)
+  expect(revise).toHaveBeenCalledOnce()
 })
 
 it('reuses row identities for repeated layout while applying current sparse measurements', () => {

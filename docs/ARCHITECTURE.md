@@ -518,6 +518,17 @@ A top-level React error boundary wraps the application in `src/renderer/ErrorBou
 
 The displayed list is rendered by `src/renderer/NodeList.tsx`, which composes memoized rows from `src/renderer/NodeRow.tsx`. Above the displayed-row threshold in PRODUCT §20.1, a fixed-height list mounts a viewport range plus overscan in the same sticky-anchor arrangement as Agenda. The scroll listener synchronously commits the new range and its offset together. Focused and dragged rows stay mounted as pins positioned relative to that range; keyed rows retain their parent and input when entering the range. A `ResizeObserver` records row heights, unmeasured rows use an estimate, and width changes invalidate measurements.
 
+Tree resolves structural layout changes before committing the corresponding row window and tracks
+the viewport even below the windowing threshold. Crossing that threshold therefore preserves rows
+inside the resulting window instead of removing and recreating them through an intermediate range
+computed from stale offsets. Row observation remains attached across ordinary renders; confirming
+an estimated height records the measurement without invalidating unchanged offsets. These measures
+bound transient DOM/layout allocation during repeated structural edits, add no writes or syncs,
+and retain the row-height cache, its current published measurement snapshot, and one viewport record.
+DOM measurements publish after commit; render reads that snapshot rather than mutable observer state.
+Each Tree row contains its layout work without size or paint containment, so gutter markers,
+focus feedback and wrapped content retain their existing bounds and overflow.
+
 Tree and Agenda use two CSS grid columns: a hidden number-font sizer and the outline content. Both preference states retain the sizer, whose digit count comes from the full displayed list rather than the mounted window. Number glyphs and the selected-row background use that same font cell width. CSS caps editable/read-only text at 120 cells without capping row feedback. This adds no DOM polling or font-measurement loop. Tree derives a digit count from its cached row count; Agenda memoizes an occurrence count when its projected rows change. It adds constant retained state, no document copies, disk writes or syncs.
 
 Windowed lists expose their last committed viewport origin as `data-window-start`. Navigation reveal projects row and caret rectangles back to document coordinates when native scrolling has advanced beyond that origin. This prevents repeated focus or image-growth corrections from treating deliberately retained paint as an unscrolled destination. The projection reads one ancestor rectangle and adds no subscriptions, retained rows or writes.

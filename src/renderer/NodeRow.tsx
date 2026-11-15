@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useCallback } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import { TouchDragSurface } from './TouchDragSurface'
@@ -52,6 +52,8 @@ export const NodeRow = memo(function NodeRow({
   pinned = false,
   pinnedOffset = 0,
 }: NodeRowProps): React.JSX.Element {
+  const attach = useCallback((element: HTMLDivElement | null) => rowRef(node.id, element), [node.id, rowRef])
+
   const hasChildren = node.children.length > 0
   const className = [
     pinned ? 'node-row node-row-pinned' : 'node-row',
@@ -90,7 +92,7 @@ export const NodeRow = memo(function NodeRow({
       }}
       onPointerDown={(event) => onPointerDown(node, index, event)}
       onPointerLeave={(event) => onPointerLeave(node.id, event)}
-      ref={(element) => rowRef(node.id, element)}
+      ref={attach}
       style={style}
     >
       <TouchDragSurface />

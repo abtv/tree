@@ -514,6 +514,11 @@ body:not(.node-drag-active) .location-link:hover {
   padding-left: 18px;
 }
 
+.node-row {
+  /* Bound layout invalidation during structural edits without clipping gutter or focus paint. */
+  contain: layout;
+}
+
 .agenda-shell {
   padding-top: 10px;
 }

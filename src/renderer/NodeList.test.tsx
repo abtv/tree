@@ -1236,6 +1236,79 @@ describe('NodeList windowing', () => {
     )
   })
 
+  it.each([false, true])('keeps viewport rows mounted across the threshold after scrolling: %s', (scroll) => {
+    mockRows(0)
+    const list = buildNodes(WINDOWING_THRESHOLD + 1)
+    const props = {
+      dragFreeze: stubDragFreeze(),
+      onEnter: () => undefined,
+      onDrop: () => undefined,
+      renderInput: (node: TreeNode, label: string) => <textarea aria-label={label} readOnly value={node.text} />,
+    }
+    const { container, rerender } = render(<NodeList {...props} nodes={list.slice(0, -1)} structuralVersion={0} />)
+    if (scroll) {
+      mockRows(-40 * ROW_HEIGHT_ESTIMATE)
+      fireEvent.scroll(window)
+    }
+    const selector = `[data-node-id="n${scroll ? 60 : 20}"]`
+    const row = container.querySelector(selector)!
+
+    rerender(<NodeList {...props} nodes={list} structuralVersion={1} />)
+
+    expect(container.querySelector(selector)).toBe(row)
+    expect(container.querySelectorAll('.node-row').length).toBeLessThan(list.length)
+
+    rerender(<NodeList {...props} nodes={list.slice(0, -1)} structuralVersion={2} />)
+    rerender(<NodeList {...props} nodes={list} structuralVersion={3} />)
+
+    expect(container.querySelector(selector)).toBe(row)
+  })
+
+  it('keeps unchanged row observations while text and focus update', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const props = {
+      dragFreeze: stubDragFreeze(),
+      onEnter: () => undefined,
+      onDrop: () => undefined,
+      renderInput: (node: TreeNode, label: string) => <textarea aria-label={label} readOnly value={node.text} />,
+    }
+    const { rerender } = render(<NodeList {...props} nodes={nodes} focusedNodeId="a" />)
+    const observer = TestResizeObserver.instances[0]!
+    observer.observe.mockClear()
+    observer.unobserve.mockClear()
+
+    rerender(<NodeList {...props} nodes={[{ ...nodes[0]!, text: 'Changed' }, nodes[1]!]} focusedNodeId="b" />)
+
+    expect(observer.observe).not.toHaveBeenCalled()
+    expect(observer.unobserve).not.toHaveBeenCalled()
+  })
+
+  it('discards a removed row measurement before the same identity returns at the estimated height', () => {
+    mockRows(0)
+    const list = buildNodes(200)
+    let tall = true
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, tall && this.dataset.nodeId === 'n20' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
+    })
+    const props = {
+      dragFreeze: stubDragFreeze(),
+      onEnter: () => undefined,
+      onDrop: () => undefined,
+      renderInput: (node: TreeNode, label: string) => <textarea aria-label={label} readOnly value={node.text} />,
+    }
+    const { container, rerender } = render(<NodeList {...props} nodes={list} structuralVersion={0} />)
+    const height = () => Number.parseFloat(container.querySelector<HTMLElement>('.node-list')!.style.height)
+    expect(height()).toBe(201 * ROW_HEIGHT_ESTIMATE)
+
+    rerender(<NodeList {...props} nodes={list.filter((node) => node.id !== 'n20')} structuralVersion={1} />)
+    tall = false
+    rerender(<NodeList {...props} nodes={list} structuralVersion={2} />)
+
+    expect(height()).toBe(200 * ROW_HEIGHT_ESTIMATE)
+  })
+
   it('updates measured height from a ResizeObserver border box and re-lays out', () => {
     vi.stubGlobal('ResizeObserver', TestResizeObserver)
     TestResizeObserver.instances = []
@@ -1298,6 +1371,26 @@ describe('NodeList windowing', () => {
 
     expect(measuredHeight).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
     expect(Number.parseFloat(list.style.height)).toBe(measuredHeight)
+  })
+
+  it('remeasures mounted rows after width changes without waiting for a resize entry', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    mockRows(0)
+    const { container } = renderRows({ focusedNodeId: 'n550', list: buildNodes(600) })
+    const observer = TestResizeObserver.instances[0]!
+    const list = container.querySelector<HTMLElement>('.node-list')!
+    const initialHeight = Number.parseFloat(list.style.height)
+    const row = container.querySelector<HTMLElement>('[data-node-id="n550"]')!
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return rect(0, this.dataset.nodeId === 'n550' ? ROW_HEIGHT_ESTIMATE * 2 : ROW_HEIGHT_ESTIMATE)
+    })
+    observer.trigger([resizeEntry(row, ROW_HEIGHT_ESTIMATE * 2)])
+
+    vi.stubGlobal('innerWidth', globalThis.innerWidth + 1)
+    fireEvent.resize(window)
+
+    expect(Number.parseFloat(list.style.height)).toBe(initialHeight + ROW_HEIGHT_ESTIMATE)
   })
 
   it('clears and remeasures heights only when the window width changes', () => {

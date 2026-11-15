@@ -68,6 +68,8 @@ export function NodeList({
   const observerRef = useRef<ResizeObserver | undefined>(undefined)
   const widthRef = useRef(typeof globalThis.innerWidth === 'number' ? globalThis.innerWidth : 0)
   const [measureRevision, setMeasureRevision] = useState(0)
+  const [measuredHeights, setMeasuredHeights] = useState<ReadonlyMap<string, number>>(EMPTY_HEIGHTS)
+  const committedStructuralVersion = useRef(structuralVersion)
   const [viewport, setViewport] = useState({ start: 0, end: 0 })
   // The rendered, windowed, and measured row list is the flattened projection of `nodes` and every
   // expanded node's descendants (docs/PRODUCT.md §2.4), not `nodes` itself; a collapsed subtree still
@@ -80,6 +82,11 @@ export function NodeList({
     structuralVersion,
   }))
   const windowed = shouldWindow(visibleRows.length)
+
+  const publishMeasurements = useCallback(() => {
+    setMeasuredHeights(new Map(heightsRef.current))
+    setMeasureRevision((revision) => revision + 1)
+  }, [])
 
   const measureRow = useCallback((nodeId: string, element: HTMLElement | null) => {
     if (element === null) {
@@ -99,13 +106,17 @@ export function NodeList({
   // Editor refs project rich content while React attaches siblings. Read geometry only after
   // that stage, so each subsequent editor does not invalidate the previous row's layout read.
   // Run after every commit: draining pending refs cannot enqueue another measurement itself.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
+    let changed = false
     for (const nodeId of pendingMeasurementsRef.current) {
       const element = observedElementsRef.current.get(nodeId)
-      if (element !== undefined) measureElement(nodeId, element, heightsRef.current, setMeasureRevision)
+      if (element !== undefined)
+        measureElement(nodeId, element, heightsRef.current, () => {
+          changed = true
+        })
     }
     pendingMeasurementsRef.current.clear()
+    if (changed) publishMeasurements()
   })
 
   useEffect(() => {
@@ -124,7 +135,7 @@ export function NodeList({
         }
       }
       // Content growth must expand the scroll range before reveal observers run in this frame.
-      if (changed) flushSync(() => setMeasureRevision((revision) => revision + 1))
+      if (changed) flushSync(publishMeasurements)
     })
     observerRef.current = observer
     observedElementsRef.current.forEach((element) => observer.observe(element))
@@ -132,7 +143,7 @@ export function NodeList({
       observer.disconnect()
       observerRef.current = undefined
     }
-  }, [])
+  }, [publishMeasurements])
 
   useEffect(() => {
     const onResize = (): void => {
@@ -140,22 +151,35 @@ export function NodeList({
       if (widthRef.current === width) return
       widthRef.current = width
       heightsRef.current.clear()
-      setMeasureRevision((revision) => revision + 1)
+      for (const id of observedElementsRef.current.keys()) pendingMeasurementsRef.current.add(id)
+      publishMeasurements()
     }
     globalThis.addEventListener('resize', onResize)
     return () => globalThis.removeEventListener('resize', onResize)
-  }, [])
+  }, [publishMeasurements])
 
-  useLayoutEffect(() => {
-    const key = `${structuralVersion}:${measureRevision}:${visibleRows.length}`
-    if (layoutState.key === key) return
-    if (layoutState.structuralVersion !== structuralVersion) pruneHeights(heightsRef.current, visibleRows)
+  // Resolve the new offsets before committing its window. An effect would first commit a
+  // window based on the previous (possibly empty) layout and remount still-visible editors.
+  const layoutKey = `${structuralVersion}:${measureRevision}:${visibleRows.length}`
+  if (layoutState.key !== layoutKey) {
     setLayoutState({
-      key,
-      layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, heightsRef.current) : EMPTY_LAYOUT,
+      key: layoutKey,
+      layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, measuredHeights) : EMPTY_LAYOUT,
       structuralVersion,
     })
-  }, [layoutState.key, layoutState.structuralVersion, measureRevision, structuralVersion, visibleRows])
+  }
+
+  useLayoutEffect(() => {
+    if (committedStructuralVersion.current === structuralVersion) return
+    pruneHeights(heightsRef.current, visibleRows)
+    setMeasuredHeights((previous) => {
+      if (previous.size === 0) return previous
+      const next = new Map(previous)
+      pruneHeights(next, visibleRows)
+      return next.size === previous.size ? previous : next
+    })
+    committedStructuralVersion.current = structuralVersion
+  }, [structuralVersion, visibleRows])
 
   const updateViewport = useCallback(() => {
     const element = listRef.current
@@ -170,11 +194,11 @@ export function NodeList({
   useLayoutEffect(() => {
     notifyViewportLayout()
     // Revealing a grown row can scroll synchronously; anchor to that resulting position.
-    if (windowed) updateViewport()
+    // Keep the ordinary list ready for its first transition to a window too.
+    updateViewport()
   }, [layoutState.key, measureRevision, structuralVersion, updateViewport, windowed])
 
   useEffect(() => {
-    if (!windowed) return undefined
     // Commit the rows and their anchored offset together when native scroll is delivered.
     const unsubscribe = onViewportScroll(() => flushSync(updateViewport))
     globalThis.addEventListener('resize', updateViewport)
@@ -182,7 +206,7 @@ export function NodeList({
       unsubscribe()
       globalThis.removeEventListener('resize', updateViewport)
     }
-  }, [updateViewport, windowed])
+  }, [updateViewport])
 
   const {
     freeze,

@@ -101,6 +101,8 @@ export function measureElement(
 ): void {
   const height = element.getBoundingClientRect().height
   if (height <= 0 || heights.get(nodeId) === height) return
+  const previous = heights.get(nodeId) ?? ROW_HEIGHT_ESTIMATE
   heights.set(nodeId, height)
-  setMeasureRevision((revision) => revision + 1)
+  // Confirming an estimate adds a real measurement, but does not change any offset.
+  if (previous !== height) setMeasureRevision((revision) => revision + 1)
 }
