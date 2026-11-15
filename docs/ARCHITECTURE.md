@@ -348,7 +348,11 @@ Installation is `idle`, `awaiting-save` (request ID and deadline), or
 availability are derived from these states. A failed recheck can coexist with a
 ready package; failure feedback takes precedence without discarding that package.
 The native Tree menu requests a renderer flush through trusted IPC. Renderer input is
-blocked until installation or failure. Automatic installation on quit is disabled.
+blocked until installation or failure. The renderer keeps request identity and
+the focus to restore in one attempt record. Save and acknowledgment continuations
+check that record before confirming, reporting a late failure or releasing input;
+completion of an earlier attempt cannot release a retry or a replacement owner.
+Automatic installation on quit is disabled.
 The ZIP-download notification enables Restart and Install; only after successful saving does
 the main process ask Squirrel.Mac to stage and verify it, then quit and install.
 One persistent native listener avoids accumulating deferred installation callbacks on retry.

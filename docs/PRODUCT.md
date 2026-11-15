@@ -2674,6 +2674,8 @@ it blocks editing, saves pending work including Vim buffers and attachments, and
 asks the macOS installer to verify, install and restart Tree. A failed or timed-out
 save leaves the application open and editable; it never offers to discard notes
 to install an update. Repeated requests do not start concurrent installations.
+When the user retries after a failure, completion of the earlier attempt does not
+restore editing or interrupt the new attempt's save acknowledgment.
 
 An installation error or preparation timeout restores editing and allows another attempt. Ordinary Quit
 does not initiate installation of an update the user has not requested.

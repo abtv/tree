@@ -1,43 +1,52 @@
 import type { TreeApi } from '../shared/ipc'
 import type { RendererLifecycleStore } from './lifecycle'
 
+interface UpdateAttempt {
+  id: string
+  previousFocus: HTMLElement | null
+}
+
 /** Projects the main-process save request onto the renderer's input and persistence boundary. */
 export function startAppUpdates(store: RendererLifecycleStore, api: TreeApi): () => void {
-  let request: string | undefined
-  let previousFocus: HTMLElement | null = null
+  let attempt: UpdateAttempt | undefined
   const root = document.getElementById('root')!
   const events = ['keydown', 'beforeinput', 'paste', 'cut', 'drop', 'pointerdown', 'click']
   const block = (event: Event) => {
     event.preventDefault()
     event.stopImmediatePropagation()
   }
-  const unlock = () => {
-    request = undefined
+  const unlock = (current = attempt) => {
+    if (current === undefined || attempt !== current) return
+    const previousFocus = current.previousFocus
+    current.previousFocus = null
+    attempt = undefined
     root.inert = false
     for (const event of events) window.removeEventListener(event, block, true)
     if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
-    previousFocus = null
   }
   const removeRequest = api.onAppUpdateRequested?.((id) => {
-    if (request !== undefined) return
-    request = id
-    previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (attempt !== undefined) return
+    const current: UpdateAttempt = {
+      id,
+      previousFocus: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+    }
+    attempt = current
     root.inert = true
     for (const event of events) window.addEventListener(event, block, true)
     void store
       .flushPersistence({ cancelImageRecognition: true })
       .then(async () => {
-        if (request === id) await api.confirmAppUpdate?.(id, true)
+        if (attempt === current) await api.confirmAppUpdate?.(current.id, true)
       })
       .catch(async (error: unknown) => {
-        if (request !== id) return
+        if (attempt !== current) return
         store.reportError(error)
         try {
-          await api.confirmAppUpdate?.(id, false)
+          await api.confirmAppUpdate?.(current.id, false)
         } catch (failure) {
-          store.reportError(failure)
+          if (attempt === current) store.reportError(failure)
         } finally {
-          unlock()
+          unlock(current)
         }
       })
   })

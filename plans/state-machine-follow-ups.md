@@ -28,8 +28,8 @@ Audit probes and original evidence are temporarily available in
 | ID | Outcome | Dependencies | Validation tier and acceptance evidence | Status |
 | --- | --- | --- | --- | --- |
 | SM1 | Stop drag autoscroll when a lock or missing source cancels the gesture | None | Moderate; failing component regression, real Electron cancellation/scroll and caret checks, inspected renderer image, `npm run check`, independent review and product verification | Done |
-| SM2 | Verify and repair stale update completion releasing a newer attempt | SM1 committed | High; real delayed IPC regression before fixing, focused attempt-identity tests, existing protocol/failure coverage, `npm run check`, full local E2E, audit, independent review and product verification | Ready |
-| SM3 | Give image-recognition queue transitions one application owner | SM2 resolved and committed if changed | High; preserve queue admission, cancellation, flush nesting, result/status and undo behavior; owner/store tests, existing native boundary tests, `npm run check`, full local E2E, audit, independent review and product verification | Planned |
+| SM2 | Verify and repair stale update completion releasing a newer attempt | SM1 committed | High; real delayed IPC regression before fixing, focused attempt-identity tests, existing protocol/failure coverage, `npm run check`, full local E2E, audit, independent review and product verification | Done |
+| SM3 | Give image-recognition queue transitions one application owner | SM2 resolved and committed if changed | High; preserve queue admission, cancellation, flush nesting, result/status and undo behavior; owner/store tests, existing native boundary tests, `npm run check`, full local E2E, audit, independent review and product verification | Ready |
 
 SM1 expected files: `src/renderer/use-node-list-drag.ts`,
 `src/renderer/NodeList.test.tsx`, focused drag/persistence-lock Electron tests,
@@ -78,13 +78,21 @@ automation cannot inspect remain a possible additional round, not a confirmed ga
 
 ## Next task
 
-SM1 is implemented and validated: resolved drag phase owns autoscroll; a new press
+SM1 landed as `82d5de6`: resolved drag phase owns autoscroll; a new press
 clears stale targets. Component and real Electron regressions demonstrated the old
 failure and now pass. Caret-freeze release remains unchanged. Both independent
 roles found no meaningful issues.
 
-SM2: verify the delayed negative-confirmation sequence through real Electron IPC,
-then repair attempt ownership if confirmed. Continue without renewed implementation approval.
+SM2 is implemented and validated. Controlled delay of an actual Electron negative
+acknowledgment reproduced the retry losing its input lock. One renderer attempt now
+owns request identity, focus and release; stale completions cannot retire a retry.
+Main/preload/IPC contracts are unchanged. Full functional validation and both
+independent roles passed. Audit reported 16 moderate development-only findings;
+production dependencies had none. This is accepted under the existing audit policy,
+not a clean audit result.
+
+SM3: extract image-recognition queue transitions into one application owner while
+preserving observable behavior and platform effects. Continue without renewed approval.
 
 ## Resume prompt
 

@@ -17,6 +17,103 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { onePixelPng } from '../../src/electron/main/png-test-utils'
 
+interface UpdateRetryProbe {
+  confirmations: boolean[]
+  saves: number
+  releaseConfirmation(): void
+  releaseSave(): void
+}
+
+// @requirement PRODUCT.md §26
+test('keeps a retry locked when an earlier failed-save acknowledgment arrives late', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+  await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
+  allowRendererError(/retry save blocked/)
+  allowRendererError(/Update failed/)
+  await app.evaluate(() => {
+    const runtime = globalThis as typeof globalThis & {
+      __treeUpdateRetry: UpdateRetryProbe
+      __treeUpdates: { downloaded(): void; fail: boolean }
+    }
+    const probe: UpdateRetryProbe = {
+      confirmations: [],
+      saves: 0,
+      releaseConfirmation: () => undefined,
+      releaseSave: () => undefined,
+    }
+    runtime.__treeUpdateRetry = probe
+    const confirmation = new Promise<void>((resolve) => {
+      probe.releaseConfirmation = resolve
+    })
+    const save = new Promise<void>((resolve) => {
+      probe.releaseSave = resolve
+    })
+    globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+      if (++probe.saves === 1) throw new Error('retry save blocked')
+      await save
+      return original(...args)
+    })
+    globalThis.__treeIpc.wrap('tree:confirm-app-update', async (original, event, id, saved, ...args) => {
+      probe.confirmations.push(saved as boolean)
+      const result = original(event, id, saved, ...args)
+      // Main sends its real finished event before the negative invoke response is released.
+      if (!saved) await confirmation
+      return result
+    })
+    runtime.__treeUpdates.fail = true
+    runtime.__treeUpdates.downloaded()
+  })
+  const confirmations = () =>
+    app.evaluate(
+      () => (globalThis as typeof globalThis & { __treeUpdateRetry: UpdateRetryProbe }).__treeUpdateRetry.confirmations,
+    )
+  const inert = () => window.evaluate(() => document.getElementById('root')!.inert)
+  const editor = window.locator('.node-input').first()
+  await editor.fill('Pending retry')
+
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
+
+  await expect.poll(confirmations).toEqual([false])
+  await expect.poll(inert).toBe(false)
+
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
+
+  await expect.poll(inert).toBe(true)
+  await expect
+    .poll(() =>
+      app.evaluate(
+        () => (globalThis as typeof globalThis & { __treeUpdateRetry: UpdateRetryProbe }).__treeUpdateRetry.saves,
+      ),
+    )
+    .toBe(2)
+
+  await app.evaluate(() =>
+    (globalThis as typeof globalThis & { __treeUpdateRetry: UpdateRetryProbe }).__treeUpdateRetry.releaseConfirmation(),
+  )
+  // Drain a later IPC response before inspecting the old acknowledgment's renderer continuation.
+  await window.evaluate(() =>
+    (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+  )
+
+  expect(await inert()).toBe(true)
+  await window.keyboard.type('ignored')
+  await expect(editor).toHaveValue('Pending retry')
+  await app.evaluate(() =>
+    (globalThis as typeof globalThis & { __treeUpdateRetry: UpdateRetryProbe }).__treeUpdateRetry.releaseSave(),
+  )
+
+  await expect.poll(confirmations).toEqual([false, true])
+  await expect
+    .poll(() =>
+      app.evaluate(() => (globalThis as unknown as { __treeUpdates: { installs: number } }).__treeUpdates.installs),
+    )
+    .toBe(1)
+  await expect.poll(inert).toBe(false)
+  expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Pending retry')
+  await editor.fill('Editable after retry')
+  await expect(editor).toHaveValue('Editable after retry')
+})
+
 // @requirement PRODUCT.md §26
 test('rechecks a ready package, replaces it only after a successful download and reports failure', async ({
   userDataDir,
