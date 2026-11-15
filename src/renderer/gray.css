@@ -53,7 +53,7 @@
   --color-date-past: #a5222f;
   --color-date-today: #ac5402;
   --color-date-future: #396847;
-  --color-tag: var(--color-text);
+  --color-tag: #5b496c;
   --color-person: #287980;
   --color-event: #ac5402;
   --color-node-search-match: #287980;
@@ -64,10 +64,6 @@
   --color-disclosure-arrow: #827b8c;
   --highlight-background: color-mix(in srgb, var(--color-text) 16%, var(--color-background));
   --highlight-foreground: var(--color-text);
-}
-
-:root[data-appearance='gray'] .tag-text:not(.person-text):not(.event-text) {
-  background: none;
 }
 
 :root[data-appearance='gray'] .command-row-selected {

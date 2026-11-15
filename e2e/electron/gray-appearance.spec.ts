@@ -99,11 +99,17 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
   await clickApplicationSubmenuItem(app, { ...appearanceMenu, label: 'Gray' })
   await expect(window.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  const tag = window.locator('.tag-text').filter({ hasText: '#design' })
+  const input = window.locator('.node-input').first()
+  await expect(tag).not.toHaveCSS('color', await input.evaluate((el) => getComputedStyle(el).color))
+  await expect(tag).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(window).toHaveScreenshot('gray-tree.png')
 
   await window.keyboard.press('V')
   await window.keyboard.press('j')
   await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+  await expect(tag).toHaveCSS('color', await input.evaluate((el) => getComputedStyle(el).color))
+  await expect(tag).toHaveCSS('background-color', await input.evaluate((el) => getComputedStyle(el).backgroundColor))
   await expect(window).toHaveScreenshot('gray-visual.png')
   await window.keyboard.press('Escape')
   await window.keyboard.press('j')
@@ -113,6 +119,13 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
   await window.getByRole('searchbox', { name: 'Search query', exact: true }).fill('gray')
   await expect(window.locator('.recent-node-row')).toHaveCount(1)
   await expect(window.locator('.recent-nodes-popup')).toHaveScreenshot('gray-search.png')
+
+  await window.getByRole('searchbox', { name: 'Search query', exact: true }).fill('#design')
+  const popup = window.locator('.recent-nodes-popup')
+  await expect(popup.locator('.recent-node-row')).toHaveCount(1)
+  await expect(popup.locator('.tag-text')).toHaveCount(0)
+  await expect(popup.locator('.recent-node-text .node-search-match')).toHaveText('#design')
+  await expect(popup).toHaveScreenshot('gray-tag-search.png')
   await window.keyboard.press('Escape')
 
   await window.keyboard.press('Meta+Shift+p')
@@ -124,7 +137,7 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
 
 // @requirement PRODUCT.md §20.12
 // @requirement PRODUCT.md §20.13
-test('keeps date colors and weight inside Gray tags in Tree and Agenda', async ({ userDataDir }) => {
+test('highlights Gray tags and keeps date colors and weight in Tree and Agenda', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
     document: {
       roots: [
@@ -145,6 +158,10 @@ test('keeps date colors and weight inside Gray tags in Tree and Agenda', async (
 
     const taggedDate = window.locator('.tag-text.date-past').first()
     const plainDate = window.locator('.date-past:not(.tag-text)').first()
+    const tag = window.locator('.tag-text').filter({ hasText: '#design' }).first()
+    await expect(tag).toBeVisible()
+    await expect(tag).not.toHaveCSS('color', await tag.evaluate((el) => getComputedStyle(el.parentElement!).color))
+    await expect(tag).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await expect(plainDate).toBeVisible()
     await expect(taggedDate).toHaveCSS('color', await plainDate.evaluate((el) => getComputedStyle(el).color))
     await expect(taggedDate).toHaveCSS('font-weight', await plainDate.evaluate((el) => getComputedStyle(el).fontWeight))
