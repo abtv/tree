@@ -197,11 +197,17 @@ test.describe('desktop Import Notes', () => {
     archive(path)
     await window.keyboard.press('Meta+Shift+p')
     await window.getByRole('combobox', { name: 'Command' }).fill('import-notes')
-    const commandBounds = await window.locator('.command-panel').boundingBox()
-    const footerBounds = await window.locator('.status-bar').boundingBox()
+    // ResizeObserver updates popup placement after the status messages wrap.
+    await expect
+      .poll(() =>
+        window.evaluate(() => {
+          const command = document.querySelector('.command-panel')!.getBoundingClientRect()
+          const footer = document.querySelector('.status-bar')!.getBoundingClientRect()
 
-    expect(commandBounds!.y + commandBounds!.height).toBe(footerBounds!.y)
-    expect(footerBounds!.y + footerBounds!.height).toBe(await window.evaluate(() => innerHeight))
+          return { panelGap: footer.top - command.bottom, viewportGap: innerHeight - footer.bottom }
+        }),
+      )
+      .toEqual({ panelGap: 0, viewportGap: 0 })
 
     await window.screenshot({ path: '.scratch/menu-command-parity/load-error-command.png' })
     await window.keyboard.press('Enter')

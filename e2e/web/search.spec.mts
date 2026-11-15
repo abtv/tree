@@ -86,8 +86,7 @@ test('searches Agenda entries and mirrors while excluding passive paths through 
   const editor = page.getByRole('textbox', { name: 'Agenda node child', exact: true })
 
   await expect(page.locator('.search-count')).toHaveText('1 / 2')
-  await expect(prompt).toBeFocused()
-  await page.keyboard.press('Escape')
+  await expect(prompt).toHaveCount(0)
   await expect(editor).toBeFocused()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
 
@@ -149,12 +148,11 @@ test('searches through noneditable Normal text and resumes native Insert editing
   await page.keyboard.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Node 1', exact: true })
 
-  await expect(prompt).toBeFocused()
+  await expect(prompt).toHaveCount(0)
+  await expect(editor).toBeFocused()
   await expect(editor).toHaveAttribute('contenteditable', 'false')
   await expect(page.locator('.search-count')).toHaveText('2 / 3')
 
-  await page.keyboard.press('Escape')
-  await expect(editor).toBeFocused()
   await page.keyboard.press('i')
 
   await expect(editor).toHaveAttribute('contenteditable', 'true')
