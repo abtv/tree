@@ -48,6 +48,8 @@ test('searches Agenda entries and mirrors while excluding passive paths through 
   const context = await newContext()
   const page = await context.newPage()
 
+  // Keep one occurrence overdue and the other in the displayed week.
+  await page.clock.setFixedTime(new Date('2026-10-20T12:00:00'))
   await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 

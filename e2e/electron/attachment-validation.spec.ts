@@ -196,6 +196,10 @@ describeForEachEditingMode('image-only node presentation', ({ screenshotName }) 
     const row = window.locator('.node-row').first()
 
     await expect(row).toHaveClass(/node-row-image-only/)
+    // Compare the completed image state, independently of background OCR speed.
+    await expect(row.locator('.attachment-button')).not.toHaveAttribute('data-recognition-incomplete', 'true', {
+      timeout: 30_000,
+    })
     await expect(row).toHaveScreenshot(screenshotName('image-only-node.png'))
 
     await window.getByRole('button', { name: 'Enter node 1' }).click()
@@ -241,6 +245,9 @@ test.describe('image-only text caret (Vim editing only)', () => {
     await expect(editor).toBeFocused()
     await expect(row.getByRole('button', { name: 'Open image preview' })).toHaveClass(/attachment-image-caret/)
     await expect(editor).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)')
+    await expect(row.locator('.attachment-button')).not.toHaveAttribute('data-recognition-incomplete', 'true', {
+      timeout: 30_000,
+    })
     await expect(row).toHaveScreenshot('image-only-normal-focused.png', { caret: 'initial' })
 
     await window.keyboard.press('Enter')
@@ -317,6 +324,7 @@ test.describe('image-only text caret (Vim editing only)', () => {
 
     await expect(imageButton).toHaveClass(/attachment-image-caret/)
     await expect(editor).toHaveClass(/node-input-image-caret/)
+    await expect(imageButton).not.toHaveAttribute('data-recognition-incomplete', 'true', { timeout: 30_000 })
     await expect(row).toHaveScreenshot('text-and-image-image-caret.png', { caret: 'initial' })
 
     await window.keyboard.press('Enter')

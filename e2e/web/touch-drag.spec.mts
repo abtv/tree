@@ -117,7 +117,8 @@ test('keeps a windowed Agenda occurrence unchanged after a touch hold on an iPad
   })
   const page = await context.newPage()
 
-  await page.clock.install({ time: new Date('2026-10-18T12:00:00') })
+  // Sunday is overdue; Monday and the large Friday group share the displayed week.
+  await page.clock.install({ time: new Date('2026-10-19T12:00:00') })
   await page.goto(baseURL!)
   await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
   const [sourceId, targetId] = await page.evaluate(() => {

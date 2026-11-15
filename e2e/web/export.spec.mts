@@ -78,6 +78,7 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Automatic',
     'Light',
     'Dark',
+    'Gray',
     'Data',
     'Export Notes…',
     'Import Notes…',
