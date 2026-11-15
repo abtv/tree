@@ -16,6 +16,15 @@ export interface SearchPattern {
 function equal(left: string, right: string, sensitive: boolean): boolean {
   if (left === right) return true
   if (sensitive) return false
+
+  const leftCode = left.charCodeAt(0)
+  const rightCode = right.charCodeAt(0)
+  if (leftCode < 128 && rightCode < 128) {
+    const foldedLeft = leftCode >= 65 && leftCode <= 90 ? leftCode + 32 : leftCode
+    const foldedRight = rightCode >= 65 && rightCode <= 90 ? rightCode + 32 : rightCode
+    return foldedLeft === foldedRight
+  }
+
   return new RegExp(`^(?:${left.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})$`, 'iu').test(right)
 }
 

@@ -11,6 +11,23 @@ export function pattern(query: string): SearchPattern {
 }
 
 describe('literal search', () => {
+  it('preserves literal Unicode case equivalence for ASCII and cross-ASCII matches', () => {
+    const text = Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)).join('') + 'ſK'
+
+    for (const query of text) {
+      const literal = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const expected = [...text.matchAll(new RegExp(literal, /\p{Lu}/u.test(query) ? 'gu' : 'giu'))].map((match) => [
+        match.index,
+        match.index + match[0].length,
+      ])
+      const actual = [...searchText(text, pattern(query))]
+        .filter((match) => match !== undefined)
+        .map(({ start, end }) => [start, end])
+
+      expect(actual, JSON.stringify(query)).toEqual(expected)
+    }
+  })
+
   it.each([
     [
       'a.b [x] a.b',

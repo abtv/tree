@@ -49,6 +49,20 @@ export interface SearchScheduler {
 
 export const searchScheduler: SearchScheduler = {
   schedule(callback) {
+    if (typeof globalThis.scheduler?.postTask === 'function') {
+      const controller = new AbortController()
+      void globalThis.scheduler
+        .postTask(callback, { priority: 'user-visible', signal: controller.signal })
+        .catch((error: unknown) => {
+          if (!controller.signal.aborted || error !== controller.signal.reason) {
+            queueMicrotask(() => {
+              throw error
+            })
+          }
+        })
+      return () => controller.abort()
+    }
+
     const handle = globalThis.setTimeout(callback, 0)
     return () => globalThis.clearTimeout(handle)
   },

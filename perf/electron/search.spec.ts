@@ -19,19 +19,27 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
   // Attribute the long scan to callback work versus scheduler wait, without production hooks.
   await window.evaluate(() => {
     const probe = { callbacks: 0, workMs: 0, maxWorkMs: 0 }
-    ;(window as unknown as { searchTimers: typeof probe }).searchTimers = probe
-    const browser = globalThis as unknown as Window
-    const schedule = browser.setTimeout.bind(browser)
-    browser.setTimeout = (handler, timeout, ...args) => {
-      if (typeof handler !== 'function' || timeout !== 0) return schedule(handler, timeout, ...args)
-      return schedule(() => {
-        const start = performance.now()
-        handler(...args)
+    ;(window as unknown as { searchTasks: typeof probe }).searchTasks = probe
+    const measure = <T>(callback: () => T): T => {
+      const start = performance.now()
+      try {
+        return callback()
+      } finally {
         const elapsed = performance.now() - start
         probe.callbacks++
         probe.workMs += elapsed
         probe.maxWorkMs = Math.max(probe.maxWorkMs, elapsed)
-      }, timeout)
+      }
+    }
+    const browser = globalThis as unknown as Window
+    const schedule = browser.setTimeout.bind(browser)
+    browser.setTimeout = (handler, timeout, ...args) => {
+      if (typeof handler !== 'function' || timeout !== 0) return schedule(handler, timeout, ...args)
+      return schedule(() => measure(() => handler(...args)), timeout)
+    }
+    if (typeof globalThis.scheduler?.postTask === 'function') {
+      const postTask = globalThis.scheduler.postTask.bind(globalThis.scheduler)
+      globalThis.scheduler.postTask = (callback, options) => postTask(() => measure(callback), options)
     }
   })
   const start = performance.now()
@@ -83,9 +91,8 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
   const navigationPaintMs = await window.evaluate(
     () => (window as unknown as { agendaSearchNavigation: { elapsed: number } }).agendaSearchNavigation.elapsed,
   )
-  const timers = await window.evaluate(
-    () =>
-      (window as unknown as { searchTimers: { callbacks: number; workMs: number; maxWorkMs: number } }).searchTimers,
+  const tasks = await window.evaluate(
+    () => (window as unknown as { searchTasks: { callbacks: number; workMs: number; maxWorkMs: number } }).searchTasks,
   )
   const repeats: number[] = []
   await window.keyboard.press('Escape')
@@ -112,9 +119,9 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
       navigationPaintMs: round(navigationPaintMs),
       scrollMs: round(scrollMs),
       repeatMaxMs: round(Math.max(...repeats)),
-      timerCallbacks: timers.callbacks,
-      timerWorkMs: round(timers.workMs),
-      timerMaxWorkMs: round(timers.maxWorkMs),
+      schedulerCallbacks: tasks.callbacks,
+      schedulerWorkMs: round(tasks.workMs),
+      schedulerMaxWorkMs: round(tasks.maxWorkMs),
     },
   })
 
@@ -122,7 +129,8 @@ test('bounds repeated Agenda search and scrolling while retaining the draft', as
   expect(navigationMs).toBeLessThan(3000)
   expect(scrollMs).toBeLessThan(100)
   expect(Math.max(...repeats)).toBeLessThan(3000)
-  expect(timers.maxWorkMs).toBeLessThan(50)
+  expect(tasks.callbacks).toBeGreaterThan(0)
+  expect(tasks.maxWorkMs).toBeLessThan(50)
 })
 
 test(

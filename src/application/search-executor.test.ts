@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSearchExecutor, searchCaret, searchScheduler, type SearchRequest } from './search-executor'
 import { searchHarness } from './test/search-harness'
 import type { DayNumber } from '../domain/calendar-date'
@@ -12,6 +12,70 @@ const base: SearchRequest = {
   query: 'aa',
   operation: { kind: 'count' },
 }
+
+describe('native search scheduling', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('posts a cancellable user-visible task without running it synchronously', async () => {
+    const callback = vi.fn()
+    const postTask = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('scheduler', { postTask })
+
+    const cancel = searchScheduler.schedule(callback)
+
+    expect(callback).not.toHaveBeenCalled()
+    expect(postTask).toHaveBeenCalledExactlyOnceWith(callback, {
+      priority: 'user-visible',
+      signal: expect.any(AbortSignal),
+    })
+    const signal = postTask.mock.calls[0]![1].signal as AbortSignal
+    expect(signal.aborted).toBe(false)
+
+    cancel()
+    cancel()
+    await Promise.resolve()
+
+    expect(signal.aborted).toBe(true)
+  })
+
+  it('consumes the native cancellation rejection', async () => {
+    let reject!: (error: unknown) => void
+    const postTask = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((_, fail) => {
+          reject = fail
+        }),
+    )
+    const report = vi.fn()
+    vi.stubGlobal('scheduler', { postTask })
+    vi.stubGlobal('queueMicrotask', report)
+
+    const cancel = searchScheduler.schedule(() => undefined)
+
+    expect(postTask).toHaveBeenCalledOnce()
+    const signal = postTask.mock.calls[0]![1].signal as AbortSignal
+    cancel()
+    reject(signal.reason)
+    await Promise.resolve()
+
+    expect(report).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('surfaces task failures even if cancellation follows: %s', async (cancelAfterFailure) => {
+    const failure = new Error('Search task failed')
+    const postTask = vi.fn().mockRejectedValue(failure)
+    const report = vi.fn()
+    vi.stubGlobal('scheduler', { postTask })
+    vi.stubGlobal('queueMicrotask', report)
+
+    const cancel = searchScheduler.schedule(() => undefined)
+    if (cancelAfterFailure) cancel()
+    await Promise.resolve()
+
+    expect(report).toHaveBeenCalledOnce()
+    expect(() => report.mock.calls[0]![0]()).toThrow(failure)
+  })
+})
 
 describe('incremental executor', () => {
   it('publishes a small completed search within its scheduled work budget', () => {
@@ -303,8 +367,9 @@ describe('incremental executor', () => {
     expect(searchHarness(1).run(base)).toEqual({ kind: 'count', total: 3, capped: false })
   })
 
-  it('uses cancellable macrotasks in the default scheduler', () => {
+  it.each([undefined, {}])('uses cancellable timer tasks without postTask: %j', (scheduler) => {
     vi.useFakeTimers()
+    vi.stubGlobal('scheduler', scheduler)
     try {
       const publish = vi.fn()
 
@@ -319,6 +384,7 @@ describe('incremental executor', () => {
       expect(publish).toHaveBeenCalledWith({ kind: 'count', total: 3, capped: false })
     } finally {
       vi.useRealTimers()
+      vi.unstubAllGlobals()
     }
   })
 })

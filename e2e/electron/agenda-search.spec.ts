@@ -9,6 +9,7 @@ import {
   screenshotContentSize,
   test,
 } from './fixtures'
+import { controlPostedTasksWithClock } from './search-clock'
 
 const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
 const later = dayNumberOf({ year: 2026, month: 10, day: 11 })
@@ -221,6 +222,7 @@ test('uses the day origin for search and cancels a pending jump on a newer day s
 
   await window.clock.install()
   await window.clock.pauseAt(Date.now() + 1000)
+  await controlPostedTasksWithClock(window)
   await window.keyboard.press('n')
   await window.locator(header(day)).click()
   await window.clock.runFor(1000)

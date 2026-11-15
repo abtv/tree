@@ -16,6 +16,7 @@ import {
   screenshotContentSize,
   test,
 } from './fixtures'
+import { controlPostedTasksWithClock } from './search-clock'
 
 test('keeps draft feedback out of persistence and forgets confirmed recall after restart', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
@@ -135,6 +136,8 @@ test('lets newer Insert and pointer actions cancel a pending search destination'
 
   await window.clock.install()
   await window.clock.pauseAt(new Date())
+  await controlPostedTasksWithClock(window)
+
   await window.keyboard.press('/')
   await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
   await window.keyboard.press('Enter')

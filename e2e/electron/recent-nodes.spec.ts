@@ -12,6 +12,7 @@ import {
   describeForEachEditingMode,
   setMainWindowBounds,
 } from './fixtures'
+import { controlPostedTasksWithClock } from './search-clock'
 
 describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
@@ -698,14 +699,18 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const before = await popup.boundingBox()
     await window.clock.install()
     await window.clock.pauseAt(Date.now() + 1000)
+    await controlPostedTasksWithClock(window)
 
     await input.press('e')
+    const results = window.getByRole('listbox', { name: 'Search results' })
+    await expect(results).toHaveAttribute('aria-busy', 'true')
     await window.screenshot({ path: 'test-results/search-refinement-pending.png' })
 
     expect(await popup.boundingBox()).toEqual(before)
     expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
     await expect(window.getByRole('option').first()).toContainText('Result node 0')
     await window.clock.resume()
+    await expect(results).toHaveAttribute('aria-busy', 'false')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
     expect(await popup.boundingBox()).toEqual(before)
     await window.screenshot({ path: 'test-results/search-refinement-complete.png' })

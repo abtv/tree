@@ -146,7 +146,9 @@ Product rules that determine how the tree behaves belong in the domain or applic
 
 `text-search.ts` provides incremental literal matching and query preparation. Unicode simple
 case equivalence preserves original UTF-16 spans without text normalization or full-text
-case conversion. A streaming prefix matcher emits a forward, nonoverlapping match stream;
+case conversion. Comparisons between two ASCII characters fold letter codes directly;
+any non-ASCII character retains Unicode regular-expression equivalence, including folds
+across the ASCII boundary. A streaming prefix matcher emits a forward, nonoverlapping match stream;
 reverse navigation selects from that same stream. `search-scope.ts` traverses Tree with a
 depth-sized stack, including the current-parent heading. Agenda traversal consumes an
 immutable projection supplied before fold filtering and keeps day/node occurrence identity.
@@ -160,13 +162,18 @@ destination invokes native grapheme segmentation. JavaScript matching and traver
 explicit checkpoints; a native ICU segmentation call is indivisible, so oversized ordinary,
 combining and emoji text have measured performance guards rather than a claimed universal
 time bound. Cancellation releases its generator, captured document and queued callback.
-The default slice amortizes nested timer delays while keeping a fixed checkpoint limit.
-Integrated Electron measurements found scheduler waiting dominated repeated Agenda
-navigation; increasing the bounded slice reduced result latency without increasing measured
-input-to-paint latency. `perf/electron/search.spec.ts` guards repeated navigation, deep and
+The default scheduler uses cancellable `scheduler.postTask` tasks at `user-visible` priority
+where supported, with zero-delay timers as the fallback. This avoids nested timer delays
+without changing the fixed checkpoint limit. Integrated Electron measurements on large
+documents confirmed lower completed-search CPU time and elapsed time; rapid cancellation
+can consume more CPU because more work runs before cancellation. These measurements do not
+establish improved input latency or power consumption. No search index or extra persistence
+work is introduced. `perf/electron/node-search.spec.ts` guards complete scans of large ASCII
+and Cyrillic documents. `perf/electron/search.spec.ts` guards repeated navigation, deep and
 wide scopes, long mounted text, cancellation retention and current-result latency separately
-from paint latency. Its timer probe includes all zero-delay callbacks in the measured phase,
-so it supports cost attribution without claiming every callback belongs to search.
+from animation-frame scheduling latency. Its task probe includes native posted tasks and
+all zero-delay timer callbacks in the measured phase, without attributing every callback
+to search. Animation-frame timings do not establish physical display presentation.
 
 `search-session.ts` owns memory-only query recall, draft entry, feedback and request validity.
 Its local mode is hidden, editing (with the captured origin and cancellation visibility),

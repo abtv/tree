@@ -1,6 +1,53 @@
 import { expect, launchTree, seedDocument, test } from './fixtures'
 import { recordPerfResult } from '../results'
 
+for (const script of ['ASCII', 'Cyrillic'] as const) {
+  // @requirement PRODUCT.md §20.14.3
+  test(`completes an absent ${script} query across a large mixed-length document`, async ({ userDataDir }) => {
+    const cyrillic = script === 'Cyrillic'
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 200 }, (_, root) => ({
+          id: `r${root}`,
+          text: cyrillic ? `Группа проектов ${root}` : `Project group ${root}`,
+          children: Array.from({ length: 250 }, (_, child) => {
+            const index = root * 250 + child
+            const date = index % 4 === 0 ? '2026-11-11' : ''
+            const detail = cyrillic
+              ? 'план выпуска и открытые задачи для проверки. '
+              : 'the synthetic release plan and open tasks. '
+            return {
+              id: `n${index}`,
+              text: `${cyrillic ? 'Проект' : 'Project'} ${index} ${date} ${cyrillic ? 'Обзор #работа' : 'Review #work'} ${detail.repeat(index % 7 === 0 ? 8 : 2)}`,
+              children: [],
+            }
+          }),
+        })),
+      },
+      location: { currentParentId: 'r0', selectedNodeId: 'n1' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+;')
+    const input = window.getByRole('searchbox')
+    await expect(input).toBeFocused()
+    const start = performance.now()
+
+    await input.fill(cyrillic ? 'отсутствует' : 'zzabsent')
+
+    await expect(window.getByText('No results', { exact: true })).toBeVisible({ timeout: 15_000 })
+    const completeMs = performance.now() - start
+    await expect(input).toBeFocused()
+    recordPerfResult({
+      kind: 'node-search',
+      scenario: `absent-${script.toLowerCase()}-50200-mixed-length`,
+      samples: 1,
+      metrics: { completeMs },
+    })
+
+    expect(completeMs).toBeLessThan(5000)
+  })
+}
+
 // @requirement PRODUCT.md §20.14
 test('complete-document search keeps rendered results bounded and accepts fresh input', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
