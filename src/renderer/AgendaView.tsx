@@ -84,6 +84,7 @@ export function AgendaView({
     | undefined
 }): React.JSX.Element {
   const elements = useRef(new Map<string, HTMLDivElement>())
+  const pendingMeasurements = useRef(new Set<string>())
   // The caret of a row without an editor is renderer state: it changes on every motion key, so it
   // stays out of the store and the document. Navigation supplies the arrival offset.
   const snapshot = store.getSnapshot()
@@ -211,14 +212,28 @@ export function AgendaView({
   const rowRef = useCallback((key: string, element: HTMLDivElement | null): void => {
     const previous = elements.current.get(key)
     if (previous !== undefined) observer.current?.unobserve(previous.closest('.agenda-entry') ?? previous)
-    if (element === null) elements.current.delete(key)
-    else {
+    if (element === null) {
+      elements.current.delete(key)
+      pendingMeasurements.current.delete(key)
+    } else {
       elements.current.set(key, element)
       const measured = element.closest<HTMLElement>('.agenda-entry') ?? element
       observer.current?.observe(measured)
-      measureElement(key, measured, heights.current, setRevision)
+      pendingMeasurements.current.add(key)
     }
   }, [])
+  // Sibling editor refs can still change rich content. Measure their complete entries together,
+  // before rebuilding offsets or consuming Agenda's opening, restoration and anchor intents.
+  useLayoutEffect(() => {
+    if (pendingMeasurements.current.size === 0) return
+
+    for (const key of pendingMeasurements.current) {
+      const element = elements.current.get(key)
+      if (element !== undefined)
+        measureElement(key, element.closest<HTMLElement>('.agenda-entry') ?? element, heights.current, setRevision)
+    }
+    pendingMeasurements.current.clear()
+  })
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return undefined
     const resizeObserver = new ResizeObserver((entries) => {

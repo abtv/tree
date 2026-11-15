@@ -443,6 +443,10 @@ The existing `vim-edit-session.ts` owner represents Replace pointer continuation
 
 Tree row refs register pending measurements; `NodeList` reads their geometry together in its layout effect after sibling editor refs have projected their content. This avoids alternating rich-content DOM writes and forced layout during view switching. The pending set is bounded by attached rows and cleared each commit. ResizeObserver retains ownership of later geometry changes. This changes no document state, writes, syncs or caret authority; measurement CPU remains proportional to attached rows.
 
+Agenda also batches newly attached rows, measuring each complete `.agenda-entry` after sibling editor refs finish and before its existing offset, opening, restoration and edit-anchor effects. React batches the resulting measurement revision updates. Detached rows leave the pending set; later resize and image measurements retain their existing observer path. Agenda keeps its own viewport and caret owners. Same-machine comparisons confirmed fewer forced layouts and a smaller renderer working set; overall process CPU and input latency did not improve consistently across scenarios. The extra set is bounded by mounted rows, is emptied each commit and adds no writes or syncs.
+
+The numeric offset array remains a full immutable layout snapshot. Profiles of wrapped text and image loading at large Tree and Agenda sizes showed a small absolute cost for rebuilding it compared with total renderer work. Incremental mutable offsets would add invalidation and snapshot-lifetime rules without a demonstrated interaction benefit; reconsider them only with new measurements identifying this work as a bottleneck.
+
 `use-line-numbers.ts` owns the shared Tree/Agenda line-number preference and its
 literal Control shortcut. The command panel uses the same setter. Both platform
 entries read it before mounting the editor; Electron uses the existing boolean

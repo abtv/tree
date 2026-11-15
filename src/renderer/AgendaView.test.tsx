@@ -12,6 +12,55 @@ import * as revealModule from './viewport-reveal'
 
 afterEach(cleanup)
 
+// @requirement PRODUCT.md §22.1
+it('measures attached entries after all sibling editors project their content', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: Array.from({ length: 8 }, (_, index) => ({
+        id: `n${index}`,
+        text: `2026-10-08 Wrapped entry ${index}`,
+        children: [],
+      })),
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const state = harness.snapshot()
+  const projectedCounts: number[] = []
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    if (this.matches('.agenda-entry-node'))
+      projectedCounts.push(document.querySelectorAll('.test-editor[data-projected]').length)
+    return { top: 0, bottom: 25, left: 0, right: 0, width: 0, height: 25, x: 0, y: 0, toJSON: () => ({}) }
+  })
+  try {
+    render(
+      <AgendaView
+        store={harness.store}
+        agenda={state.agenda!}
+        document={state.document}
+        renderInput={(node) => (
+          <div
+            className="test-editor"
+            ref={(element) => {
+              if (element !== null) {
+                element.textContent = node.text
+                element.dataset.projected = 'true'
+              }
+            }}
+          />
+        )}
+      />,
+    )
+
+    expect(projectedCounts).toHaveLength(8)
+    expect(projectedCounts).toEqual(Array(8).fill(8))
+  } finally {
+    rect.mockRestore()
+  }
+})
+
 // @requirement PRODUCT.md §23.1
 it('restores the complete-day opening intent after StrictMode mount-effect cleanup', async () => {
   const harness = await createRealStoreHarness({
