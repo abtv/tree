@@ -339,6 +339,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
 
     await expect(window.locator('.agenda-row-day .agenda-label')).toHaveText([
+      'Overdue',
       'Mon Oct 5',
       'Tue Oct 6',
       'Wed Oct 7',
@@ -361,7 +362,8 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Work')
     await window.keyboard.press('Meta+p')
 
-    await expect(window.locator('.agenda-row[data-node-id="outside"]')).toHaveCount(0)
+    // Overdue includes unfinished nodes from the entire document, even outside the focused Tree branch.
+    await expect(window.locator('.agenda-row[data-node-id="outside"]')).toHaveText('2026-09-01 Outside')
     await expect(window.locator('.agenda-path-label')).toHaveCount(0)
 
     await window.keyboard.press('Meta+p')
@@ -404,7 +406,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
 
         await window.keyboard.type('gg')
 
-        await expect(window.locator('[aria-selected="true"]')).toContainText('Mon Oct 5')
+        await expect(window.locator('[aria-selected="true"]')).toContainText('Overdue')
 
         await window.keyboard.type('G')
 
