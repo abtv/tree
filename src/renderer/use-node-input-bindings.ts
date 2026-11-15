@@ -16,6 +16,7 @@ import {
   hasMultiCharacterSelection,
   nodeText,
   getCaret,
+  getSelectionEndpoints,
   readEditableContent,
   hasAttachmentCharacter,
   setCaret,
@@ -665,7 +666,8 @@ export function useNodeInputBindings({
       const registeredInput = inputs.current.get(pending.nodeId)
       const input = currentPendingCaretInput(pending, state, projection.currentRevision, registeredInput)
       if (input !== undefined && searchFocus.canProjectFocus()) {
-        if (pending.refocus === true && input.ownerDocument.activeElement !== input) input.focus()
+        if (pending.refocus === true && input.ownerDocument.activeElement !== input)
+          input.focus({ preventScroll: pending.retainedSelection !== undefined })
         if (pending.restoredCaret !== undefined) {
           projection.restoreDrag(
             pending.nodeId,
@@ -675,6 +677,9 @@ export function useNodeInputBindings({
           setImageCaretNodeId(pending.restoredCaret.imageActive ? pending.nodeId : undefined)
           if (vimMode === 'normal') setNormalCaret(input, pending.cursor)
           else setCaret(input, pending.cursor)
+        } else if (pending.retainedSelection !== undefined) {
+          const { anchor, focus: selectionFocus } = pending.retainedSelection
+          setSelectionRange(input, anchor, selectionFocus)
         } else if (pending.normal) setNormalCaret(input, pending.cursor)
         else if (vimMode !== 'normal') setCaret(input, pending.cursor)
       }
@@ -849,6 +854,8 @@ export function useNodeInputBindings({
         inputRef: (input: HTMLElement | null) => {
           if (input === null) {
             const previous = inputs.current.get(node.id)
+            if (previous instanceof HTMLTextAreaElement && previous.ownerDocument.activeElement === previous)
+              caretProjection.current.retainInputSelection(node.id, previous, getSelectionEndpoints(previous))
             if (previous !== undefined) normalCaretResizeObserver.current?.unobserve(previous)
             inputs.current.delete(node.id)
           } else {

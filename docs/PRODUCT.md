@@ -1021,6 +1021,8 @@ The first line is inserted at the current cursor position.
 
 The remaining original text is moved to the final resulting node.
 
+The final resulting node receives focus, with the caret after the final pasted line and before the remaining original text. Date or hyperlink decoration of any pasted line must preserve this destination, including when it is outside the previous visible range.
+
 Example:
 
 Current node:

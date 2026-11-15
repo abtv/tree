@@ -33,6 +33,8 @@ export function currentPendingCaretInput(
     pending.revision !== revision ||
     input === undefined ||
     !input.isConnected ||
+    (pending.retainedSelection !== undefined &&
+      (pending.input === undefined || !replacedByRichElement(pending.input, input))) ||
     (pending.input !== undefined && pending.input !== input && !replacedByRichElement(pending.input, input))
   )
     return undefined

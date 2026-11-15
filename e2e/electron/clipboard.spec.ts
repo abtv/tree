@@ -17,6 +17,7 @@ import {
   setCursor,
   test,
   typeInto,
+  unlockSystemClipboard,
   writeClipboardImage,
   writeClipboardImageAndText,
   writeClipboardTextAndHtml,
@@ -40,6 +41,30 @@ async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
 }
 
 describeForEachEditingMode('clipboard (paste at the cursor)', () => {
+  // @requirement PRODUCT.md §14
+  for (const count of [3, 160]) {
+    test(`keeps native paste focus on the final decorated node (${count} lines)`, async ({ userDataDir }) => {
+      const { app, window } = await launchTree(userDataDir)
+      await typeInto(node(window, 1), 'left right')
+      await setCursor(node(window, 1), 5)
+      const lines = Array.from({ length: count }, (_, index) => `2026-10-08 Pasted ${index + 1}`)
+      await writeClipboardText(app, lines.join('\n'))
+
+      await window.keyboard.press('Meta+v')
+
+      const last = window.getByRole('textbox', { name: `Node ${count}`, exact: true })
+      await expect(last).toHaveText(`${lines.at(-1)}right`)
+      await expect(last).toBeFocused()
+      await expect(last).toBeInViewport()
+      unlockSystemClipboard()
+
+      await window.keyboard.type('!')
+
+      await expect(last).toHaveText(`${lines.at(-1)}!right`)
+      await window.screenshot({ path: test.info().outputPath('final-pasted-node.png') })
+    })
+  }
+
   // @requirement PRODUCT.md §13
   test('inserts plain clipboard text at the caret', { tag: '@shared-clipboard-text' }, async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)

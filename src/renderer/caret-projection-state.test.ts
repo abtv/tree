@@ -119,6 +119,51 @@ describe('caret projection ownership', () => {
     expect(owner.authority.caret).toBe(caret)
   })
 
+  it('retains replacement selection with the previous committed focus currency', () => {
+    const owner = new CaretProjectionState<string>(focus, 'insert')
+    owner.beginCommit(focus, 'insert')
+    const work = owner.captureFocusWork()
+
+    owner.retainInputSelection('first', 'textarea', { anchor: 4, focus: 1 })
+    owner.beginCommit({ ...focus, cursor: 7, token: 2 }, 'insert')
+
+    expect(owner.takeCaret()).toEqual({
+      nodeId: 'first',
+      input: 'textarea',
+      cursor: 1,
+      normal: false,
+      revision: work.revision,
+      focusToken: 1,
+      refocus: true,
+      retainedSelection: { anchor: 4, focus: 1 },
+    })
+    expect(owner.focusToken).toBe(2)
+  })
+
+  it('lets explicit caret or Visual work win over replacement selection in either order', () => {
+    const owner = new CaretProjectionState<string>(focus, 'insert')
+    const retain = (): void => owner.retainInputSelection('first', 'textarea', { anchor: 4, focus: 1 })
+
+    retain()
+    owner.requestCaret({ nodeId: 'first', cursor: 8 }, 1)
+    retain()
+
+    expect(owner.takeCaret()).toMatchObject({ cursor: 8 })
+
+    owner.requestVisual({ nodeId: 'first', start: 2, end: 6 })
+    retain()
+
+    expect(owner.takeCaret()).toBeUndefined()
+    expect(owner.takeVisual()).toEqual({ nodeId: 'first', start: 2, end: 6 })
+
+    retain()
+    const pending = owner.pendingCaret!
+    owner.requestVisual({ nodeId: 'first', start: 3, end: 7 })
+    owner.takeVisual()
+
+    expect(pending.revision).not.toBe(owner.currentRevision)
+  })
+
   it('keeps a change command insertion through a compatible mode switch without reviving old focus work', () => {
     const owner = new CaretProjectionState(focus, 'normal')
     const work = owner.captureFocusWork()

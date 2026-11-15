@@ -1,6 +1,6 @@
 # Clipboard responsiveness follow-ups
 
-Status: In progress
+Status: Awaiting owner confirmation
 
 ## Authorization and scope
 
@@ -10,7 +10,7 @@ This follow-up batch contains two substantive working tasks. The preceding inves
 
 ## T1: Bound long-row character-position lookup cost
 
-Status: Complete; recorded in the commit that first marks this task complete
+Status: Complete in `d305b3b`
 
 - Files: `src/domain/text-characters.ts`, its focused/property/performance tests, a maintained `perf/electron/` long-row navigation scenario, and the owning performance requirement in `docs/PRODUCT.md`.
 - Preserve UTF-16 offsets, whole-grapheme motion, count/clamp behavior and the existing bounded segmentation cache. Replace repeated linear boundary searches with logarithmic lookup. Do not add persistent state, dependencies or content limits.
@@ -20,7 +20,7 @@ Status: Complete; recorded in the commit that first marks this task complete
 
 ## T2: Preserve the current focus intent during plain-to-rich conversion
 
-Status: In progress
+Status: Complete; recorded in the commit that marks this task complete
 
 - Files: `src/renderer/NodeInput.tsx` and/or existing caret projection owners as established by focused diagnosis, corresponding component/store integration tests, `e2e/electron/clipboard.spec.ts`, and `docs/PRODUCT.md` §14.
 - Honor the current selected-node/focus request when converting the old row to a decorated editor. Preserve same-node typing, URL/date decoration, selection and composition behavior; do not introduce a second focus authority.
@@ -28,8 +28,10 @@ Status: In progress
 - Validation: component/integration regressions, real native clipboard E2E in both modes, inspected Electron screenshots of final and neighboring rows, retained composition/selection/Agenda coverage, final full tier as above.
 - Review: fresh independent review and product verification trace the transition inventory in `WORKING_PLAN.md`. No unresolved product decision.
 
-## Evidence and continuation
+## Delivered result and next action
 
-The original findings and controlled baseline/candidate/baseline measurements are summarized in `.scratch/clipboard-lag/evidence.md`. Temporary implementation evidence lives in `.scratch/clipboard-fixes/validation.md`; `WORKING_PLAN.md` owns the active transition inventory and exact next action. These references are temporary and must be removed before plan closure.
+Both corrections and maintained regression guards are complete. Long-row navigation uses logarithmic lookup without changing Unicode boundaries or imposing text limits. Replacement editors preserve the current focus intent through the existing caret owner. The owning requirements are in `docs/PRODUCT.md` §§14 and 22.2; focus ownership is documented in `docs/ARCHITECTURE.md`.
 
-Both fixes passed the full functional tier, affected performance checks, independent implementation review and product verification. T1 is ready for its separate validated commit. Next: commit T2 with the final batch status, then request the owner's no-further-tasks confirmation before retiring this plan.
+Full functional validation, affected performance checks, independent implementation review and product verification passed. The full dependency audit still reports existing moderate development-only minimatch findings; the production-only audit reports none. This is the standing exception in `docs/AGENT_WORKFLOW.md` §10, not a passing full audit.
+
+No implementation task remains in the authorized two-task batch. Await the owner's confirmation that no further follow-ups remain, as required for report follow-up batches by `docs/AGENT_WORKFLOW.md` §8. That confirmation authorizes removal of this plan and its index entry. No additional manual application check or renewed implementation approval is required.

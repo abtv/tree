@@ -106,14 +106,6 @@ export function NodeInput({
   const plain = decorations === undefined && !hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)
   const element = useRef<HTMLElement | null>(null)
   const retainedSelection = useRef<{ anchor: number; focus: number } | undefined>(undefined)
-  const wasPlain = useRef(plain)
-  // The textarea's focus and selection, kept from its events: replacing it with the rich element
-  // unmounts it, which would otherwise drop both.
-  const textarea = useRef({ focused: false, start: 0, end: 0 })
-  const remember = (target: EventTarget): void => {
-    if (!(target instanceof HTMLTextAreaElement)) return
-    textarea.current = { focused: true, start: target.selectionStart, end: target.selectionEnd }
-  }
   useLayoutEffect(() => {
     const input = element.current
     if (input !== null && retainedSelection.current !== undefined) {
@@ -121,11 +113,6 @@ export function NodeInput({
       retainedSelection.current = undefined
       if (input.ownerDocument.activeElement === input) setSelectionRange(input, anchor, focus)
     }
-    if (wasPlain.current && !plain && textarea.current.focused && input !== null) {
-      input.focus({ preventScroll: true })
-      setSelectionRange(input, textarea.current.start, textarea.current.end)
-    }
-    wasPlain.current = plain
   })
   const attach = (input: HTMLElement | null): void => {
     const previous = element.current
@@ -156,10 +143,7 @@ export function NodeInput({
   const commonProps = {
     'aria-label': label,
     className,
-    onBlur: (event: FocusEvent<HTMLElement>) => {
-      textarea.current.focused = false
-      onBlur(event)
-    },
+    onBlur,
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {
       onCompositionEnd(event)
       setComposing(false)
@@ -174,7 +158,6 @@ export function NodeInput({
     onClick,
     onCut,
     onFocus: (event: FocusEvent<HTMLElement>) => {
-      remember(event.target)
       if (hasLinks) setRichEditor({ nodeId: node.id, enabled: true })
       onFocus(event)
     },
@@ -182,26 +165,13 @@ export function NodeInput({
     onMouseDown,
     onMouseUp,
     onPaste,
-    onSelect: (event: SyntheticEvent<HTMLElement>) => {
-      remember(event.target)
-      onSelect(event)
-    },
+    onSelect,
     spellCheck: false,
   }
 
   if (plain) {
     return (
-      <textarea
-        {...commonProps}
-        ref={attach}
-        readOnly={disabled}
-        rows={1}
-        value={node.text}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-          onTextChange(event)
-          remember(event.target)
-        }}
-      />
+      <textarea {...commonProps} ref={attach} readOnly={disabled} rows={1} value={node.text} onChange={onTextChange} />
     )
   }
 

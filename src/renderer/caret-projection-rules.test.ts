@@ -136,6 +136,23 @@ describe('pending caret currency', () => {
   })
 
   // @requirement PRODUCT.md §20.10
+  it('restores retained selection only after actual textarea replacement', async () => {
+    const { state, input, request } = await fixture()
+    const retained = { ...request, input, retainedSelection: { anchor: 3, focus: 1 } }
+
+    expect(currentPendingCaretInput(retained, state, 3, input)).toBeUndefined()
+
+    const rich = document.createElement('div')
+    document.body.append(rich)
+    input.remove()
+
+    expect(currentPendingCaretInput(retained, state, 3, rich)).toBe(rich)
+    expect(
+      currentPendingCaretInput(retained, { ...state, focus: { ...state.focus, token: 9 } }, 3, rich),
+    ).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §20.10
   it('follows a removed textarea to the rich element that replaced it, and only then', async () => {
     const { state, request } = await fixture()
     const removed = document.createElement('textarea')

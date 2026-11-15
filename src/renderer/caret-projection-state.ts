@@ -18,6 +18,8 @@ export interface PendingCaretPlacement<Input> {
   refocus?: boolean
   /** A released drag restores the captured caret after the move's focus intent. */
   restoredCaret?: VimCaretState
+  /** Fallback selection for a removed textarea, subordinate to explicit caret work. */
+  retainedSelection?: { anchor: number; focus: number }
 }
 
 export interface PendingVisualSelection {
@@ -106,6 +108,22 @@ export class CaretProjectionState<Input> {
     focusToken: number | undefined,
   ): void {
     this.pending = { ...request, normal: false, revision: ++this.revision, focusToken }
+  }
+
+  public retainInputSelection(nodeId: string, input: Input, selection: { anchor: number; focus: number }): void {
+    if (this.pending !== undefined || this.visual !== undefined) return
+    // Ref detachment also happens on ordinary renders. It must not invalidate newer work or
+    // adopt the next commit's focus token; the DOM adapter applies this only to a replaced input.
+    this.pending = {
+      nodeId,
+      input,
+      cursor: Math.min(selection.anchor, selection.focus),
+      normal: this.currentMode === 'normal',
+      revision: this.revision,
+      focusToken: this.focusToken,
+      refocus: true,
+      retainedSelection: selection,
+    }
   }
 
   public placeCaret(
