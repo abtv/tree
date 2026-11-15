@@ -1584,6 +1584,72 @@ describe('NodeList windowing', () => {
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1)
   })
 
+  it.each(['locked', 'hidden'] as const)('stops auto-scrolling when the source becomes %s', (reason) => {
+    vi.useFakeTimers()
+    const frames = new Map<number, FrameRequestCallback>()
+    let frameId = 0
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.set(++frameId, callback)
+      return frameId
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id))
+    const scrollBy = vi.fn()
+    vi.stubGlobal('scrollBy', scrollBy)
+    mockRowRects()
+    const view = renderRows()
+    const row = rowElements(view.container)[0]!
+    const renderList = (canceled: boolean): ReactNode => (
+      <NodeList
+        dragFreeze={view.dragFreeze}
+        locked={canceled && reason === 'locked'}
+        nodes={canceled && reason === 'hidden' ? nodes.slice(1) : nodes}
+        renderInput={(node, label) => <textarea aria-label={label} readOnly value={node.text} />}
+        onEnter={() => undefined}
+        onDrop={view.onMove}
+      />
+    )
+
+    activate(row, 13)
+    pointerMoveAt(row, globalThis.innerHeight - 1)
+
+    expect(frames.size).toBe(1)
+    const frame = frames.values().next().value!
+    frames.clear()
+    act(() => frame(0))
+
+    expect(scrollBy).toHaveBeenCalledWith(0, EDGE_SCROLL_STEP)
+    expect(frames.size).toBe(1)
+
+    view.rerender(renderList(true))
+
+    expect(document.body).not.toHaveClass('node-drag-active')
+    expect(frames.size).toBe(0)
+    // Cancellation leaves caret release to the pointer-release owner.
+    expect(view.dragFreeze.end).toHaveBeenCalledTimes(1)
+
+    view.rerender(renderList(false))
+    pointerMoveAt(view.container.querySelector('.node-list')!, globalThis.innerHeight - 1)
+
+    expect(frames.size).toBe(0)
+    expect(scrollBy).toHaveBeenCalledTimes(1)
+    expect(view.onMove).not.toHaveBeenCalled()
+
+    const nextSource = rowElements(view.container)[0]!
+    activate(nextSource, 13)
+
+    expect(frames.size).toBe(0)
+    expect(view.container.querySelector('.node-row-drop-on, .node-row-drop-before, .node-row-drop-after')).toBeNull()
+
+    pointerMoveAt(nextSource, globalThis.innerHeight - 1)
+
+    expect(frames.size).toBe(1)
+
+    pointerUpAt(nextSource, globalThis.innerHeight - 1)
+
+    expect(frames.size).toBe(0)
+    expect(view.onMove).toHaveBeenCalledWith('a', { parentId: null, index: 1 })
+  })
+
   it('stops auto-scrolling while the pointer is over the toolbar', () => {
     vi.useFakeTimers()
     const frames: FrameRequestCallback[] = []

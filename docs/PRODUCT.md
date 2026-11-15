@@ -1397,7 +1397,7 @@ Windowing starts at this medium-list size to bound keyboard-driven row updates a
 
 The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
 
-A node drag that reaches the top or bottom edge of the content area scrolls the list automatically, so the node can be moved to a position outside the visible rows. This holds in every list that overflows the window, whether or not its rows are windowed; a list that fits the window does not scroll. Hovering the location toolbar does not scroll the list (§2.2).
+A node drag that reaches the top or bottom edge of the content area scrolls the list automatically, so the node can be moved to a position outside the visible rows. This holds in every list that overflows the window, whether or not its rows are windowed; a list that fits the window does not scroll. Hovering the location toolbar does not scroll the list (§2.2). Autoscroll stops when the drag ends or is cancelled, including when saving locks editing or the source is no longer displayed. Removing that condition does not resume the cancelled gesture.
 
 The content continues to scroll as a single document. The location bar stays fixed (§2.2); the current-parent heading scrolls with the content.
 

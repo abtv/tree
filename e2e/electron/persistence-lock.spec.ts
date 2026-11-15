@@ -17,12 +17,68 @@ import {
   readPersisted,
   readSaveAttempts,
   restoreSaves,
+  seedDocument,
+  startRowDrag,
   test,
   typeInto,
 } from './fixtures'
 
 test.describe('save failure lock', () => {
   configureHiddenParallelTests()
+
+  // @requirement PRODUCT.md §11
+  // @requirement PRODUCT.md §20.1
+  test('stops drag autoscroll when a save failure locks editing', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 100 }, (_, index) => ({ id: `n${index}`, text: `Row ${index}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    const scrollTop = (): Promise<number> =>
+      window.evaluate(() => document.querySelector('.scroll-viewport')?.scrollTop ?? 0)
+    allowRendererError(
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+    )
+    allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    await window.clock.install()
+    await blockSaves(app, { countAttempts: true })
+    const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await typeInto(input, ' edited')
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      await fireIdleSave(window)
+      await expect.poll(() => readSaveAttempts(app), idleSavePoll).toBe(attempt)
+      await window.evaluate(() =>
+        (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+      )
+    }
+
+    const source = window.locator('.node-row').first()
+    await startRowDrag(window, source.locator('.node-input'))
+    const viewport = await window.locator('.scroll-viewport').boundingBox()
+    if (viewport === null) throw new Error('The scroll viewport was not rendered.')
+    await window.mouse.move(viewport.x + viewport.width / 2, viewport.y + viewport.height - 1)
+
+    await expect.poll(scrollTop).toBeGreaterThan(100)
+    await window.screenshot({ path: testInfo.outputPath('drag-scrolling.png') })
+
+    await fireIdleSave(window)
+
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible(idleSavePoll)
+    await expect(window.locator('.node-row-dragging')).toHaveCount(0)
+    await expect(window.locator('.node-row-drop-on, .node-row-drop-before, .node-row-drop-after')).toHaveCount(0)
+    const stopped = await scrollTop()
+    await window.waitForTimeout(300)
+
+    expect(await scrollTop()).toBe(stopped)
+    await window.screenshot({ path: testInfo.outputPath('drag-cancelled.png') })
+    await window.mouse.up()
+
+    await expect(input).not.toBeEditable()
+    await restoreSaves(app)
+  })
 
   // @requirement PRODUCT.md §16.2
   test('stops after three failed saves and persists on quit once saving works again', async ({ userDataDir }) => {

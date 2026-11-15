@@ -136,7 +136,7 @@ export function useNodeListDrag({
   )
 
   useEffect(() => {
-    if (autoScrollDirection === 0) return undefined
+    if (resolved.phase !== 'dragging' || autoScrollDirection === 0) return undefined
     const direction = autoScrollDirection
     let frame = 0
     function step(): void {
@@ -196,6 +196,7 @@ export function useNodeListDrag({
       pressPointRef.current = { x: event.clientX, y: event.clientY }
       pointerYRef.current = event.clientY
       pointerXRef.current = event.clientX
+      setDrop(undefined)
       setAutoScrollDirection(0)
       dispatch({
         type: 'press',
