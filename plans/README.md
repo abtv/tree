@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Clipboard responsiveness follow-ups](clipboard-responsiveness-fixes.md) | Awaiting owner confirmation | Confirm that no further follow-ups remain; then retire the plan |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
