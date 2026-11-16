@@ -28,6 +28,9 @@ export async function collectMemory({
 }): Promise<MemoryMetrics> {
   const session = await window.context().newCDPSession(window)
   try {
+    // The first pass can release JS wrappers that keep detached Blink objects alive.
+    // Collect again before sampling so native growth does not depend on that GC phase.
+    await session.send('HeapProfiler.collectGarbage')
     await session.send('HeapProfiler.collectGarbage')
     const heap = await session.send('Runtime.getHeapUsage')
     const native = await collectWithGpuMemory(
