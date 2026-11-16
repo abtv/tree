@@ -37,27 +37,35 @@ describeForEachEditingMode('Measured scroll continuity', ({ mode }) => {
       }
       const editor = window.locator('[data-node-id="row-0"] .node-input')
       await editor.focus()
+      const viewport = window.locator('.scroll-viewport')
+      const beforeWheel = await viewport.evaluate((element) => element.scrollTop)
       await window.mouse.move(420, 300)
       await window.mouse.wheel(0, 24)
-      await window.locator('.scroll-viewport').evaluate((element) => {
+      await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(beforeWheel)
+      await viewport.evaluate((element) => {
         element.scrollTop = element.scrollHeight - element.clientHeight - 100
       })
-      await window.evaluate(
-        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-      )
-      const anchor = await window.evaluate(() => {
-        const bounds = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
+      // Agenda's fixed date installs Playwright's clock. Its animation callbacks do not
+      // acknowledge native scroll delivery, so wait for a visible row before measuring it.
+      const anchorHandle = await window.waitForFunction(() => {
+        const viewport = document.querySelector('.scroll-viewport')!
+        const bounds = viewport.getBoundingClientRect()
         const row = [...document.querySelectorAll<HTMLElement>('.node-row, .agenda-row')].find((row) => {
           const rect = row.getBoundingClientRect()
           return row.dataset.nodeId !== undefined && rect.top >= bounds.top && rect.bottom < bounds.bottom
-        })!
-        return { id: row.dataset.nodeId!, top: row.getBoundingClientRect().top }
+        })
+        return row === undefined
+          ? undefined
+          : { id: row.dataset.nodeId!, top: row.getBoundingClientRect().top, scrollTop: viewport.scrollTop }
       })
+      const anchor = (await anchorHandle.jsonValue())!
+      await anchorHandle.dispose()
 
       await setMainWindowContentSize(app, { width: 1100, height: 600 })
-      await window.evaluate(
-        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-      )
+
+      await expect
+        .poll(() => viewport.evaluate((element) => element.scrollHeight - element.clientHeight))
+        .toBeLessThan(anchor.scrollTop)
 
       await expect
         .poll(() =>
