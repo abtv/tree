@@ -49,7 +49,7 @@ async function fixture(platform: ShortcutPlatform, vimMode: VimTextCommandState[
       if (state.status !== 'ready' || state.agenda === undefined) return ''
       return row.kind === 'node'
         ? requireNode(state.document, row.nodeId).node.text
-        : agendaRowLabel(row, state.agenda.today)
+        : agendaRowLabel(row, state.agenda.today, state.document)
     },
     hasEditor: () => false,
     caret: () => {

@@ -26,6 +26,44 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
+  // @requirement PRODUCT.md §23.2
+  // @requirement PRODUCT.md §23.3
+  // @requirement PRODUCT.md §23.15
+  it('groups overdue siblings across dates and repeats paths in separate days and focused days', () => {
+    const source: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Work',
+          children: [
+            { id: 'a', text: '2026-10-01 2026-10-08 2026-10-09', children: [] },
+            { id: 'b', text: '2026-10-02 2026-10-08', children: [] },
+          ],
+        },
+      ],
+    }
+    const state = openAgendaState(location, 0, today)
+    const cache = new AgendaRowsCache()
+
+    const rows = cache.get(source, state)
+    const paths = rows.filter((row) => row.kind === 'path')
+
+    expect(paths.map((row) => row.parentId)).toEqual(['parent', 'parent', 'parent'])
+    expect(paths.every((row) => row.leading)).toBe(true)
+    expect(paths[0]!.groupKey).toBe(overdueKey(state.weekStart))
+    expect(rows.filter((row) => row.kind === 'node').map((row) => row.nodeId)).toEqual(['a', 'b', 'a', 'b', 'a'])
+
+    const selected = applyAgendaCommand(state, { kind: 'select', key: paths[0]!.key }, rows)
+    const shifted = applyAgendaCommand(selected, { kind: 'shift-week', direction: 1 }, rows)
+
+    expect(shifted.selectedKey).toBe(dayKey(state.weekStart + 7))
+
+    const focused = cache.get(source, focusAgendaState(state, today, 0))
+
+    expect(focused.map((row) => row.kind)).toEqual(['day', 'path', 'node', 'node'])
+    expect(focused.filter((row) => row.kind === 'path').map((row) => row.parentId)).toEqual(['parent'])
+  })
+
   // @requirement PRODUCT.md §23.5
   it('refreshes rows for equal-size overlapping fold sets', () => {
     const state = openAgendaState(location, 0, today)
@@ -473,7 +511,7 @@ describe('Agenda rows', () => {
 
     expect(after.find((row) => row.key === oldNode.key)).toBe(oldNode)
     expect(cache.getProjection(edited, state)[0]).toBe(searchableDay)
-    expect(after).toEqual(buildAgendaRows(projectAgenda(edited, null), state))
+    expect(after).toEqual(buildAgendaRows(projectAgenda(edited, null), state, undefined, edited))
 
     const folded = cache.get(edited, { ...state, collapsed: new Set([oldNode.key]) })
 
@@ -654,7 +692,7 @@ describe('Agenda rows', () => {
       const after = cache.get(changed, state)
 
       expect(after).not.toBe(before)
-      expect(after).toEqual(buildAgendaRows(projectAgenda(changed, null), state))
+      expect(after).toEqual(buildAgendaRows(projectAgenda(changed, null), state, undefined, changed))
     }
     const cache = new AgendaRowsCache()
     const before = cache.get(initial, state)

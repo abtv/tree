@@ -644,6 +644,19 @@ body:not(.node-drag-active) .location-link:hover {
   overflow-wrap: anywhere;
   line-height: 20px;
 }
+.agenda-path {
+  color: var(--color-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.agenda-entry-path {
+  border-top: 1px solid var(--color-location-border);
+  padding-top: 13px;
+}
+.agenda-entry-leading-path {
+  border-top: 0;
+  padding-top: 0;
+}
 /* A selected row without an editor (day or mirror) has no native caret, so the
    renderer draws one as marks in its text (docs/PRODUCT.md §23.4), like the Tree caret: a block in Vim
    Normal and a thin line in Insert and standard editing. */

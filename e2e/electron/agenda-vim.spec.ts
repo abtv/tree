@@ -235,9 +235,7 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
 })
 
 // @requirement PRODUCT.md §23.4
-test('continues h and l through Agenda editors and dates while skipping passive paths', async ({
-  userDataDir,
-}, testInfo) => {
+test('continues h and l through Agenda editors, paths and dates', async ({ userDataDir }, testInfo) => {
   seedPending(userDataDir)
   const { window } = await launchTree(userDataDir)
 
@@ -257,9 +255,10 @@ test('continues h and l through Agenda editors and dates while skipping passive 
 
   await window.keyboard.type('0h')
   const day = row(window, dayKey(10, 9))
+  const path = window.locator('.agenda-row-path').first()
 
-  await expect(day).toHaveAttribute('aria-selected', 'true')
-  await expect(day.locator('.agenda-caret')).toHaveText('9')
+  await expect(path).toHaveAttribute('aria-selected', 'true')
+  await expect(path.locator('.agenda-caret')).toHaveText('t')
 
   await window.keyboard.press('l')
 
@@ -270,6 +269,8 @@ test('continues h and l through Agenda editors and dates while skipping passive 
   await expect.poll(() => caretOffset(plan)).toBe(0)
 
   await window.keyboard.press('h')
+  await expect(path).toHaveAttribute('aria-selected', 'true')
+  await window.keyboard.type('0h')
   await expect(day).toHaveAttribute('aria-selected', 'true')
   await window.screenshot({ path: testInfo.outputPath('agenda-horizontal-day.png') })
 
@@ -381,6 +382,10 @@ test.describe('Agenda Vim commands', () => {
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
       if (command === 'ArrowDown') {
+        await expect(window.locator('.agenda-row-path[aria-selected="true"]')).toBeFocused()
+
+        await window.keyboard.press('ArrowDown')
+
         await expect(row(window, nodeKey(10, 9, 'plan')).locator('.node-input')).toBeFocused()
 
         await window.keyboard.press('i')

@@ -88,7 +88,7 @@ describe('focused Agenda day', () => {
     expect(returned.collapsed).toBe(timeline.collapsed)
   })
 
-  it('includes only the focused heading and its matches with their passive parent paths, including an empty focused day', () => {
+  it('projects only the focused heading and its direct matches, including an empty focused day', () => {
     const state = focusAgendaState(
       openAgendaState({ currentParentId: null, selectedNodeId: 'match' }, 0, today),
       day,

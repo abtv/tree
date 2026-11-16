@@ -287,6 +287,9 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
       await expect(window.locator('.agenda-focused-heading')).toBeFocused()
 
       await window.keyboard.press('j')
+      await expect(window.locator('.agenda-row-path[aria-selected="true"]')).toBeFocused()
+
+      await window.keyboard.press('j')
       await window.keyboard.press('g')
       await window.keyboard.press('d')
 

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
+import { agendaPath } from '../application/agenda-path'
 import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
@@ -132,7 +133,7 @@ export function AgendaView({
       const state = store.getSnapshot()
       if (state.status !== 'ready' || state.agenda === undefined) return ''
       if (row.kind === 'node') return requireNode(state.document, row.nodeId).node.text
-      return agendaRowLabel(row, state.agenda.today)
+      return agendaRowLabel(row, state.agenda.today, state.document)
     },
     [store],
   )
@@ -202,7 +203,7 @@ export function AgendaView({
   const todayRange = useMemo(() => {
     const start = rows.findIndex((row) => row.kind === 'day' && row.day === agenda.today)
     let end = start + 1
-    while (start >= 0 && rows[end]?.kind === 'node') end++
+    while (start >= 0 && (rows[end]?.kind === 'node' || rows[end]?.kind === 'path')) end++
     return { start, end }
   }, [rows, agenda.today])
   const openingGeometry = useRef({ layout, range: todayRange })
@@ -500,6 +501,7 @@ export function AgendaView({
         lineNumber={numbers?.get(row.key)}
         key={editable ? `editor:${row.kind === 'node' ? row.nodeId : ''}` : row.key}
         row={row}
+        path={row.kind === 'path' ? agendaPath(document, row.parentId) : undefined}
         node={node}
         renderInput={editable ? renderInput : undefined}
         renderAttachment={renderAttachment}

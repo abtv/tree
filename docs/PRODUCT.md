@@ -2294,7 +2294,8 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 * Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end.
 * Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
 * A node appears under every distinct date it contains. Only direct matches are node rows, ordered by Tree preorder within each day.
-* Parent nodes and ancestor paths are not shown. Direct matches form one flat list within each day, without spacing by parent.
+* Consecutive direct matches with the same parent share one ancestor-path heading, using Search's compact ancestor labels (§20.14.2). A different parent starts a new group; a path that recurs after another group appears again. Grouping preserves node order within each day and Overdue. Top-level nodes have no path heading. Ancestors are not editable node rows.
+* Path headings use 12px secondary text, wrap when needed and align with node text. Space and a thin divider distinguish successive path groups. Each path is a selectable, read-only Agenda row; keyboard navigation and clicks can stop on it, and text selection and copying work as on day headings. Editing, folding and opening a path do nothing. Global Search path headings remain nonselectable.
 * Full text is shown and wraps as in Tree.
 * Every recognized date uses a quieter variant of the temporal color of §20.11, independent of the displayed day. Dates are slightly smaller than node text; the displayed day's date has medium weight. Date colors yield to struck-through text color (§2.5). Direct matches retain Tree text colors, including depth colors in dark appearance.
 * An outer bullet ring reflects real children. Node rows have no disclosure chevron.
@@ -2311,7 +2312,7 @@ Show one Monday–Sunday week at a time, with all seven dated day headings in ch
 
 * Day headings use the same 15px text size as nodes, with a heavier weight and ordinary case. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. The badge is vertically centered on the heading's text line rather than the full row.
 * A thin neutral separator spans the scrolling content from its leading to trailing edge between groups (Overdue and dated days), with none before the first group. Each separator occupies one 25px row.
-* Headings and node rows use Tree's 25px minimum height and 20px text line height, without extra gaps after headings or between nodes. Agenda starts with the same 10px top inset as Tree inside a parent. Day headings and node text share one left alignment axis; disclosure and bullet markers occupy the gutter.
+* Headings and node rows use Tree's 25px minimum height and 20px text line height, without extra gaps after day headings or between nodes within a path group. Agenda starts with the same 10px top inset as Tree inside a parent. Day headings and node text share one left alignment axis; disclosure and bullet markers occupy the gutter.
 
 Headers scroll with the content; none is sticky. Transitions between Agenda and Tree have no animation or contrasting background flash. Labels append the year only when it differs from Today's year.
 
@@ -2334,7 +2335,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda, except when it dismisses an open completion popup in Insert (§20.2.4).
 * Day containers accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 * The caret never disappears while selection moves.
-* A selected row without an editor (a day container, a separator, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert/Replace and standard editing, and the shared selection highlight for a selection. Whole-node Visual selection is unavailable in Agenda.
+* A selected row without an editor (a day container, a parent path, a separator, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert/Replace and standard editing, and the shared selection highlight for a selection. Whole-node Visual selection is unavailable in Agenda.
 * Explicit pointer selection of a different row without an editor places its caret at offset zero; keyboard navigation carries its offset as above.
 * An empty text shows the caret at its end.
 
@@ -2362,7 +2363,7 @@ Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected popul
 
 ### 23.6 Large Timelines
 
-Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers and separators. The selected row stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Day folding and window resizing update the layout without losing selection or focus; windowing adds no document saves. Single-line entries, headings and separators use the same row bounds for keyboard reveal, so crossing between them does not shift the caret vertically at a viewport edge. Wrapped text and attached images retain their caret-line reveal behavior.
+Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers, parent paths and separators. The selected row stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Day folding and window resizing update the layout without losing selection or focus; windowing adds no document saves. Single-line entries, headings and separators use the same row bounds for keyboard reveal, so crossing between them does not shift the caret vertically at a viewport edge. Wrapped text and attached images retain their caret-line reveal behavior.
 
 Scrolling must populate the newly visible range before the next rendered frame, including large scrollbar jumps and rapid direction changes. The viewport must not flash empty while its rows are replaced. Scrolling preserves the selected occurrence, active editor, caret, text selection and editing mode.
 

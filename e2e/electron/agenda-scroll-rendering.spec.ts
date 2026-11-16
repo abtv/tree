@@ -52,7 +52,7 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
       if (sample !== undefined) samples.push(sample)
     }
 
-    expect(new Set(samples.map((sample) => sample.kind))).toEqual(new Set(['node', 'separator', 'day']))
+    expect(new Set(samples.map((sample) => sample.kind))).toEqual(new Set(['node', 'separator', 'day', 'path']))
     for (const sample of samples) expect(Math.abs(sample.top - treeTop)).toBeLessThan(1)
     await window.screenshot({ path: test.info().outputPath(`edge-cadence-${mode}.png`) })
   })

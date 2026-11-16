@@ -2,6 +2,8 @@ import { pinnedAgendaOccurrence, activeAgendaOccurrence } from '../application/a
 import type { AgendaRow } from '../application/agenda-rows'
 import type { AgendaState } from '../application/agenda-state'
 import { calendarDateOf, weekdayOf, type DayNumber } from '../domain/calendar-date'
+import type { Document } from '../domain/document'
+import { agendaPath } from '../application/agenda-path'
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -29,14 +31,25 @@ export function isAgendaMirror(
 }
 
 /**
- * The source text of a day row or an empty separator; these offsets are the
+ * The source text of a day, parent path or empty separator; these offsets are the
  * caret offsets of the row (`docs/PRODUCT.md` §23.4). The Today badge is separate presentation.
  */
 export function agendaRowLabel(
   row: Extract<AgendaRow, { readonly kind: 'day' | 'separator' }>,
   today: DayNumber,
+): string
+export function agendaRowLabel(
+  row: Exclude<AgendaRow, { readonly kind: 'node' }>,
+  today: DayNumber,
+  document: Document,
+): string
+export function agendaRowLabel(
+  row: Exclude<AgendaRow, { readonly kind: 'node' }>,
+  today: DayNumber,
+  document?: Document,
 ): string {
   if (row.kind === 'separator') return ''
+  if (row.kind === 'path') return agendaPath(document!, row.parentId).text
   if (row.overdue) return 'Overdue'
   return agendaDateLabel(row.day, today, true)
 }

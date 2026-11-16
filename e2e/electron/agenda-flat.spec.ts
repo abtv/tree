@@ -25,7 +25,7 @@ async function expectSeparatedDays(window: Page): Promise<void> {
   for (const gap of gaps) expect(gap).toBeGreaterThan(0)
 }
 
-describeForEachEditingMode('Flat Agenda', ({ mode }) => {
+describeForEachEditingMode('Flat Agenda', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.12
   test('mouse and touch holds cannot drag a dated node to another day', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -260,7 +260,9 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await window.screenshot({ path: test.info().outputPath(`windowed-${mode}.png`) })
   })
 
-  test('shows compact rows, full-width separators, day folds and single-node editing', async ({ userDataDir }) => {
+  // @requirement PRODUCT.md §23.2
+  // @requirement PRODUCT.md §23.4
+  test('groups nodes under selectable read-only paths', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -328,6 +330,9 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
       const separator = document.querySelector('.agenda-day-separator')!.getBoundingClientRect()
       return {
         heading: heading.getBoundingClientRect().left,
+        path:
+          document.querySelector('.agenda-path')!.getBoundingClientRect().left +
+          Number.parseFloat(getComputedStyle(document.querySelector('.agenda-path')!).paddingLeft),
         input: input.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(input).paddingLeft),
         steps: nodes
           .slice(1, 5)
@@ -339,8 +344,9 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
       }
     })
     expect(alignment.input).toBeCloseTo(alignment.heading, 0)
-    expect(alignment.steps).toEqual([25, 25, 25, 25])
-    expect(alignment.headingStep).toBe(25)
+    expect(alignment.path).toBeCloseTo(alignment.heading, 0)
+    expect(alignment.steps).toEqual([25, 64, 64, 25])
+    expect(alignment.headingStep).toBe(50)
     expect(Math.abs(alignment.separatorLeft)).toBeLessThan(1)
     expect(Math.abs(alignment.separatorRight)).toBeLessThan(1)
 
@@ -353,16 +359,40 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
 
     await expect(window.locator('.agenda-row-node')).toHaveCount(6)
     await expect(window.locator('.agenda-role-context')).toHaveCount(0)
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(window.locator('.agenda-path')).toHaveText([
+      'Work › Tree › Search',
+      'Work › Tree › Agenda',
+      'Personal › Home',
+      'Work › Tree › Agenda',
+    ])
     await expect(window.locator('.agenda-row-node .node-disclosure-triangle')).toHaveCount(0)
     const columns = await window
       .locator('.agenda-row-node')
       .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().left))
     expect(new Set(columns).size).toBe(1)
 
+    await day.click()
+    await window.keyboard.press('ArrowDown')
+    const path = window.locator('.agenda-row-path').first()
+
+    await expect(path).toBeFocused()
+    await expect(path).toHaveAttribute('aria-selected', 'true')
+    await expect(path.locator('.node-input, [contenteditable], .line-number')).toHaveCount(0)
+    await window.keyboard.type('x')
+    for (const key of ['Backspace', 'Enter', 'Meta+e', 'Meta+.']) await window.keyboard.press(key)
+
+    await expect(path).toBeFocused()
+    await expect(path).toHaveText('Work › Tree › Search')
+    await expect(first).toHaveText('2026-10-08 Improve result grouping')
+
+    await window.keyboard.press('ArrowDown')
+    await expect(first).toBeFocused()
+    await window.keyboard.press('ArrowUp')
+    await expect(path).toBeFocused()
+
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
-      await window.screenshot({ path: test.info().outputPath(`preview-${appearance}-${mode}.png`) })
+      await expect(window).toHaveScreenshot(screenshotName(`agenda-paths-${appearance}.png`))
     }
     await day.locator('button').click()
     await expect(first).toHaveCount(0)
@@ -390,7 +420,11 @@ describeForEachEditingMode('Flat Agenda', ({ mode }) => {
     await day.click()
     await window.keyboard.press('Meta+.')
     await expect(window.locator('.agenda-focused-heading')).toBeVisible()
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(window.locator('.agenda-path')).toHaveText([
+      'Work › Tree › Search',
+      'Work › Tree › Agenda',
+      'Personal › Home',
+    ])
     await window.screenshot({ path: test.info().outputPath(`focused-${mode}.png`) })
   })
 })

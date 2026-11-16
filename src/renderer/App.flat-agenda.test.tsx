@@ -100,7 +100,7 @@ it.each([false, true])('blocks node operations and folds only days (Vim %s)', as
   act(() => f.store.applyAgenda({ kind: 'toggle-fold', key: dayKey }))
   await settleApp()
   expect(f.snapshot().agenda?.selectedKey).toBe(dayKey)
-  expect(f.container.querySelectorAll('.agenda-path-label, .agenda-row-node')).toHaveLength(0)
+  expect(f.container.querySelectorAll('.agenda-row-path, .agenda-row-node')).toHaveLength(0)
 
   act(() => f.store.applyAgenda({ kind: 'toggle-fold', key: dayKey }))
   await settleApp()
@@ -211,7 +211,11 @@ it('searches node text across folded days, excludes parents and preserves focuse
   })
   await settleApp()
   expect(focusedAgendaDay(f.snapshot().agenda)).toBe(today)
-  expect(f.container.querySelectorAll('.agenda-path-label')).toHaveLength(0)
+  expect([...f.container.querySelectorAll('.agenda-path')].map((path) => path.textContent)).toEqual([
+    'Work › Project',
+    'Work › Project',
+    'Work',
+  ])
   expect(f.container.querySelectorAll('.agenda-row-node')).toHaveLength(4)
   expect(f.container.querySelectorAll('.agenda-focused-heading')).toHaveLength(1)
 })

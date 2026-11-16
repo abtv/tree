@@ -1,4 +1,4 @@
-export type AgendaElement = 'day' | 'separator' | 'match'
+export type AgendaElement = 'day' | 'path' | 'separator' | 'match'
 export type AgendaAction =
   | 'navigate'
   | 'fold'
@@ -18,12 +18,12 @@ export type AgendaAction =
 
 /** Agenda policy: which synthetic or real row accepts each command family. */
 const POLICY: Readonly<Record<AgendaAction, readonly AgendaElement[]>> = {
-  navigate: ['day', 'separator', 'match'],
+  navigate: ['day', 'path', 'separator', 'match'],
   fold: ['day'],
   text: ['match'],
   clipboard: ['match'],
   strikethrough: ['match'],
-  history: ['day', 'separator', 'match'],
+  history: ['day', 'path', 'separator', 'match'],
   'empty-delete': [],
   // Stryker disable next-line ArrayDeclaration: The injected string is not an AgendaElement, so this still rejects every valid element.
   structure: [],

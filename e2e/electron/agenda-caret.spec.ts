@@ -63,7 +63,7 @@ const selectionText = (row: Locator): Promise<string | undefined> =>
 
 describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §23.4
-  test('carries the caret through a separator and day into another editor', async ({ userDataDir }) => {
+  test('carries the caret through a separator, day and path into another editor', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -116,7 +116,13 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
     await window.emulateMedia({ colorScheme: 'light' })
     await window.keyboard.press(down)
 
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(selected).toHaveClass(/agenda-row-path/u)
+    await expect(selected).toBeFocused()
+    await expect(selected).toHaveText('Context ancestor')
+    expect(await caretMark(selected)).toBeDefined()
+
+    await window.keyboard.press(down)
+
     await expect(selected).toHaveAttribute('data-node-id', 'second')
     expect(
       await selected.locator('.node-input').evaluate((input) => {
@@ -131,7 +137,7 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
   })
 
   // @requirement PRODUCT.md §23.4
-  test('shows the caret only on the selected separator or day without parent labels', async ({ userDataDir }) => {
+  test('shows the caret only on the selected separator, day or parent path', async ({ userDataDir }) => {
     seed(userDataDir)
     const { window, app } = await launchTree(userDataDir)
 
@@ -176,10 +182,14 @@ describeForEachEditingMode('Agenda caret on rows without an editor', ({ mode, sc
 
     await window.keyboard.press('ArrowDown')
 
-    await expect(selected).toHaveAttribute('data-node-id', 'prepare')
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(selected).toHaveClass(/agenda-row-path/u)
+    await expectCaret(selected, 'W')
     expect(await caretMark(today)).toBeUndefined()
-    await expect(window.locator('.agenda-path-label .agenda-caret')).toHaveCount(0)
+
+    await window.keyboard.press('ArrowDown')
+
+    await expect(selected).toHaveAttribute('data-node-id', 'prepare')
+    await expect(window.locator('.agenda-row-path .agenda-caret')).toHaveCount(0)
   })
 
   // @requirement PRODUCT.md §23.4

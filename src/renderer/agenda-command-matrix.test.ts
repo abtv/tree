@@ -11,7 +11,7 @@ import type { AgendaElement } from './agenda-key-policy'
 import { shortcutProfile, type ShortcutPlatform } from './shortcut-profile'
 
 const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
-const elements: AgendaElement[] = ['day', 'separator', 'match']
+const elements: AgendaElement[] = ['day', 'path', 'separator', 'match']
 const platforms: ShortcutPlatform[] = ['apple', 'other']
 /** The profile under test; the matrix sends Cmd on Apple and Ctrl on the other profile (PRODUCT §1.5). */
 let platform: ShortcutPlatform = 'apple'
@@ -267,7 +267,8 @@ describe.each(platforms.flatMap((profile) => elements.map((element) => [profile,
       f.press('.', { metaKey: true })
 
       if (element === 'day') expect(focusedAgendaDay(f.snapshot().agenda)).toBe(day(15))
-      else if (element === 'separator') expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
+      else if (element === 'separator' || element === 'path')
+        expect(f.snapshot().agenda?.selectedKey).toBe(f.selected.key)
       else {
         expect(f.snapshot().agenda).toBeUndefined()
         expect(f.snapshot().location.currentParentId).toBe(element)

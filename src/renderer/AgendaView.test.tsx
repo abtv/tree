@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { StrictMode, useSyncExternalStore } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import './test/setup'
@@ -11,6 +11,140 @@ import { AgendaSearchText } from './AgendaSearchText'
 import * as revealModule from './viewport-reveal'
 
 afterEach(cleanup)
+
+// @requirement PRODUCT.md §23.2
+// @requirement PRODUCT.md §23.4
+it('groups adjacent siblings by path and lets navigation stop on a read-only path', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: [
+        {
+          id: 'work',
+          text: 'Work',
+          struckThrough: true,
+          children: [
+            { id: 'a', text: '2026-10-08 A', struckThrough: true, children: [] },
+            {
+              id: 'b',
+              text: '2026-10-08 B',
+              struckThrough: true,
+              children: [{ id: 'nested', text: '2026-10-08 Nested', struckThrough: true, children: [] }],
+            },
+            { id: 'c', text: '2026-10-08 C', struckThrough: true, children: [] },
+          ],
+        },
+        { id: 'root', text: '2026-10-08 Root', children: [] },
+      ],
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const before = harness.snapshot().document
+  const { container } = render(<View store={harness.store} />)
+  const paths = container.querySelectorAll<HTMLElement>('.agenda-row-path')
+
+  expect([...paths].map((path) => path.textContent)).toEqual(['Work', 'Work › 2026-10-08 B', 'Work'])
+  expect(paths[0]!.closest('.agenda-entry')).toHaveClass('agenda-entry-leading-path')
+  expect(paths[1]!.closest('.agenda-entry')).not.toHaveClass('agenda-entry-leading-path')
+  expect([...paths[1]!.querySelectorAll('.node-text-struck')].map((part) => part.textContent)).toEqual([
+    'Work',
+    '2026-10-08 B',
+  ])
+  expect([...container.querySelectorAll('.agenda-row-node')].map((row) => row.getAttribute('data-node-id'))).toEqual([
+    'a',
+    'b',
+    'nested',
+    'c',
+    'root',
+  ])
+
+  fireEvent.keyDown(container.querySelector('.agenda-today')!, { key: 'ArrowDown' })
+
+  expect(paths[0]).toHaveFocus()
+  expect(paths[0]!.querySelector('input,textarea,[contenteditable],.line-number')).toBeNull()
+
+  fireEvent.keyDown(paths[0]!, { key: 'A' })
+  fireEvent.keyDown(paths[0]!, { key: 'Backspace' })
+  fireEvent.keyDown(paths[0]!, { key: 'Enter' })
+  fireEvent.keyDown(paths[0]!, { key: 'v', metaKey: true })
+
+  expect(harness.snapshot().document).toBe(before)
+  expect(paths[0]).toHaveFocus()
+
+  fireEvent.keyDown(paths[0]!, { key: 'a', metaKey: true })
+  fireEvent.keyDown(paths[0]!, { key: 'c', metaKey: true })
+
+  expect(harness.clipboard.content).toEqual({ kind: 'text', text: 'Work' })
+
+  fireEvent.keyDown(paths[0]!, { key: 'ArrowDown' })
+
+  expect(container.querySelector('[data-node-id="a"]')).toHaveFocus()
+
+  fireEvent.click(paths[1]!)
+
+  expect(paths[1]).toHaveFocus()
+
+  act(() => harness.store.applyAgenda({ kind: 'fold', key: paths[1]!.dataset.agendaKey!, operation: 'close-all' }))
+
+  expect(container.querySelector('.agenda-row-path')).toBeNull()
+  expect(container.querySelector('.agenda-today')).toHaveFocus()
+})
+
+// @requirement PRODUCT.md §23.2
+it('refreshes path labels after editing a dated ancestor without changing grouped row identities', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: [
+        {
+          id: 'parent',
+          text: '2026-10-08 Parent',
+          children: [{ id: 'child', text: '2026-10-08 Child', children: [] }],
+        },
+      ],
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const { container } = render(<View store={harness.store} />)
+  const rows = harness.store.getAgendaRows()
+  const parent = rows.find((row) => row.kind === 'node' && row.nodeId === 'parent')!
+
+  act(() => {
+    harness.store.applyAgenda({ kind: 'select', key: parent.key })
+    harness.store.editText('parent', '2026-10-08 Renamed')
+  })
+
+  expect(harness.store.getAgendaRows()).toBe(rows)
+  expect(container.querySelector('.agenda-path')).toHaveTextContent('2026-10-08 Renamed')
+})
+
+// @requirement PRODUCT.md §22.1
+// @requirement PRODUCT.md §23.6
+it('windows path groups and retains a selected offscreen path without an editor or line number', async () => {
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: Array.from({ length: 200 }, (_, index) => ({
+        id: `parent${index}`,
+        text: `Project ${index}`,
+        children: [{ id: `task${index}`, text: `2026-10-08 Task ${index}`, children: [] }],
+      })),
+    },
+    services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 8 }) },
+  })
+  harness.store.openAgenda()
+  const { container } = render(<View store={harness.store} />)
+  const paths = harness.store.getAgendaRows().filter((row) => row.kind === 'path')
+
+  act(() => harness.store.applyAgenda({ kind: 'select', key: paths.at(-1)!.key }))
+
+  const selected = container.querySelector('.agenda-row-path[aria-selected="true"]')!
+  expect(paths).toHaveLength(200)
+  expect(container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
+  expect(selected).toHaveTextContent('Project 199')
+  expect(selected).toHaveFocus()
+  expect(selected.closest('.agenda-entry')).toHaveClass('agenda-row-pinned')
+  expect(selected.querySelector('input,textarea,[contenteditable],.line-number')).toBeNull()
+})
 
 // @requirement PRODUCT.md §22.1
 it('measures attached entries after all sibling editors project their content', async () => {

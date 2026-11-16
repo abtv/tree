@@ -9,7 +9,7 @@ import {
   type AgendaState,
   type AgendaOccurrence,
 } from './agenda-state'
-import { locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
+import { buildNodeIndex, locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
 import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
 import type { DayNumber } from '../domain/calendar-date'
 
@@ -33,6 +33,14 @@ export function agendaAncestorKeys(
 }
 
 export type AgendaRow =
+  | {
+      readonly kind: 'path'
+      readonly key: string
+      readonly day: DayNumber
+      readonly parentId: NodeId
+      readonly leading: boolean
+      readonly groupKey?: string
+    }
   | {
       readonly kind: 'separator'
       readonly key: string
@@ -93,6 +101,31 @@ export function agendaProjection(
 interface DayRows {
   projected: readonly AgendaProjectionRow[]
   rows: readonly AgendaRow[]
+}
+
+/** Paths are read-only navigation rows; document order and dated occurrences stay intact. */
+function withParentPaths(rows: readonly AgendaRow[], document?: Document): readonly AgendaRow[] {
+  if (document === undefined) return rows
+  const parents = buildNodeIndex(document)
+  const grouped: AgendaRow[] = []
+  let previousParent: NodeId | null | undefined
+  for (const row of rows) {
+    if (row.kind !== 'node') continue
+    const parentId = parents.get(row.nodeId)
+    if (parentId !== null && parentId !== undefined && parentId !== previousParent) {
+      grouped.push({
+        kind: 'path',
+        key: `path:${row.day}:${row.nodeId}`,
+        day: row.day,
+        parentId,
+        leading: grouped.length === 0,
+        ...(row.groupKey === undefined ? {} : { groupKey: row.groupKey }),
+      })
+    }
+    grouped.push(row)
+    previousParent = parentId
+  }
+  return grouped
 }
 
 /** Keep one dated occurrence per overdue node; an active editor retains its date. */
@@ -158,7 +191,7 @@ export function buildAgendaRows(
     }
     if (overdue.length > 0) {
       rows.push({ kind: 'day', key, day: state.weekStart - 1, content: true, isToday: false, overdue: true })
-      if (!state.collapsed.has(key)) rows.push(...overdue)
+      if (!state.collapsed.has(key)) rows.push(...withParentPaths(overdue, document))
     }
   }
   for (const day of timelineDays) {
@@ -187,8 +220,9 @@ export function buildAgendaRows(
         role: 'match',
       })
     }
-    cache?.set(entry.day, { projected, rows: dayRows })
-    for (const row of dayRows) rows.push(row)
+    const grouped = withParentPaths(dayRows, document)
+    cache?.set(entry.day, { projected, rows: grouped })
+    for (const row of grouped) rows.push(row)
   }
   if (cache !== undefined) {
     for (const day of cache.keys()) if (!days.has(day)) cache.delete(day)
@@ -302,6 +336,8 @@ export class AgendaRowsCache {
           if (row.kind === 'day' && old.kind === 'day')
             return row.content === old.content && row.isToday === old.isToday && row.overdue === old.overdue
           if (row.kind === 'node' && old.kind === 'node') return row.groupKey === old.groupKey
+          if (row.kind === 'path' && old.kind === 'path')
+            return row.parentId === old.parentId && row.leading === old.leading && row.groupKey === old.groupKey
           return true
         })
       if (changed || !same) this.rows = rows

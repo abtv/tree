@@ -207,7 +207,7 @@ describeForEachEditingMode('Local search', ({ mode }) => {
     await window.keyboard.press('Enter')
 
     await expect(window.locator('.search-count')).toHaveText('2 / 3')
-    await expect(window.locator('.agenda-path-label .search-match')).toHaveCount(0)
+    await expect(window.locator('.agenda-path .search-match')).toHaveCount(0)
     if (mode === 'vim') {
       await expect(entry).toBeFocused()
       await window.keyboard.press('Meta+g')

@@ -385,7 +385,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
     ])
     await expect(window.locator('.agenda-row-gap, .agenda-role-context')).toHaveCount(0)
     await expect(window.locator('[data-node-id="invalid"]')).toHaveCount(0)
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(window.locator('.agenda-path')).toHaveText(['Work › Team A › Release', 'Work › Team A › Release'])
 
     const prepare = window.locator('.agenda-row[data-node-id="prepare"]').first()
     await expect(prepare).toHaveText('2026-10-09 Prepare rollout 2026-10-11')
@@ -399,13 +399,13 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
 
     // Overdue includes unfinished nodes from the entire document, even outside the focused Tree branch.
     await expect(window.locator('.agenda-row[data-node-id="outside"]')).toHaveText('2026-09-01 Outside')
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(window.locator('.agenda-path')).toHaveText(['Work › Team A › Release', 'Work › Team A › Release'])
 
     await window.keyboard.press('Meta+p')
     await window.keyboard.press('Meta+.')
     await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Team A')
     await window.keyboard.press('Meta+p')
-    await expect(window.locator('.agenda-path-label')).toHaveCount(0)
+    await expect(window.locator('.agenda-path')).toHaveText(['Work › Team A › Release', 'Work › Team A › Release'])
 
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })
@@ -435,7 +435,7 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
       await window.keyboard.press('Meta+p')
       await window.keyboard.press('Escape')
       if (mode === 'vim') {
-        await window.keyboard.type('3j')
+        await window.keyboard.type('4j')
 
         await expect(window.locator('[aria-selected="true"]')).toContainText('2026-10-09 Prepare')
 

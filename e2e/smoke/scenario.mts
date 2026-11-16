@@ -226,12 +226,21 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.press(commandInput, 'Enter')
   await restored.waitFor(`return !document.querySelector('.command-panel') &&
     !document.querySelector(${JSON.stringify(commandInput)})`)
-  // Today's dated child appears in the flat projection without its undated parent or ancestor paths.
+  // Today's dated child appears under its selectable, read-only parent path.
   await restored.waitFor(`return !!document.querySelector('.agenda-list') &&
     document.activeElement?.closest('.agenda-today')?.getAttribute('aria-selected') === 'true' &&
     Array.from(document.querySelectorAll('.agenda-role-match')).some(row => row.querySelector('.node-input, .agenda-text')?.textContent === ${JSON.stringify('Vim ' + childText)}) &&
-    !document.querySelector('.agenda-path-label') &&
-    !Array.from(document.querySelectorAll('.agenda-list .agenda-row')).some(row => row.textContent?.includes(${JSON.stringify(parentText)}))`)
+    document.querySelector('.agenda-path')?.textContent === ${JSON.stringify(parentText)}`)
+
+  await restored.press(':focus', 'j')
+  await restored.waitFor(`return document.activeElement?.matches('.agenda-row-path[aria-selected="true"]') &&
+    document.activeElement?.textContent === ${JSON.stringify(parentText)} &&
+    !document.activeElement?.querySelector('[contenteditable="true"]')`)
+  await restored.press(':focus', 'k')
+  await restored.waitFor(
+    `return document.activeElement?.closest('.agenda-today')?.getAttribute('aria-selected') === 'true'`,
+  )
+
   // Search from the day header, so a no-op confirmation cannot pass as a successful jump.
   await search(restored, 'Smoke child')
   await restored.waitFor(`return document.activeElement?.closest('.agenda-role-match')?.getAttribute('aria-selected') === 'true' &&

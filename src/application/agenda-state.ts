@@ -128,7 +128,8 @@ export function applyAgendaCommand(
     const selected = rows.find((row) => row.key === state.selectedKey)
     if (selected === undefined) return state
     const reference =
-      (selected.kind === 'day' && selected.overdue) || (selected.kind === 'node' && selected.groupKey !== undefined)
+      (selected.kind === 'day' && selected.overdue) ||
+      ((selected.kind === 'node' || selected.kind === 'path') && selected.groupKey !== undefined)
         ? state.weekStart
         : selected.day
     const day = reference + command.direction * 7
@@ -180,7 +181,10 @@ export function applyAgendaCommand(
 
   const selected = rows.find((candidate) => candidate.key === state.selectedKey)
   const next = { ...state, collapsed }
-  if (selected?.kind === 'node' && collapsed.has(selected.groupKey ?? dayKey(selected.day))) {
+  if (
+    (selected?.kind === 'node' || selected?.kind === 'path') &&
+    collapsed.has(selected.groupKey ?? dayKey(selected.day))
+  ) {
     return selectAgendaRow(
       next,
       rows.find((candidate) => candidate.key === (selected.groupKey ?? dayKey(selected.day)))!,

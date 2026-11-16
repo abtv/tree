@@ -68,7 +68,7 @@ export function createAgendaKeyDownHandler({
     const textOf = (candidate: AgendaRow): string =>
       candidate.kind === 'node'
         ? requireNode(state.document, candidate.nodeId).node.text
-        : agendaRowLabel(candidate, state.agenda!.today)
+        : agendaRowLabel(candidate, state.agenda!.today, state.document)
     const hasImage = (candidate: AgendaRow): boolean =>
       candidate.kind === 'node' &&
       candidate.role === 'match' &&

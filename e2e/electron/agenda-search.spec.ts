@@ -65,7 +65,7 @@ test('searches folded direct matches and skips passive paths during same-node an
 
   await expect(window.locator('.search-count')).toHaveText('5')
   await expect(window.locator(row(day, 'child'))).toHaveCount(0)
-  await expect(window.locator('.agenda-path-label .search-match')).toHaveCount(0)
+  await expect(window.locator('.agenda-path .search-match')).toHaveCount(0)
 
   await window.keyboard.press('Enter')
 

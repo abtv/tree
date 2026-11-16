@@ -56,11 +56,13 @@ export function measureAgendaRow(
   label.className =
     row.kind === 'separator'
       ? 'agenda-text'
-      : row.kind === 'node'
-        ? editorDestination
-          ? 'node-input'
-          : 'agenda-text'
-        : `agenda-label${row.kind === 'day' && !row.content ? ' agenda-label-empty' : ''}`
+      : row.kind === 'path'
+        ? 'agenda-text agenda-path'
+        : row.kind === 'node'
+          ? editorDestination
+            ? 'node-input'
+            : 'agenda-text'
+          : `agenda-label${row.kind === 'day' && !row.content ? ' agenda-label-empty' : ''}`
   if (node !== undefined && row.kind === 'node')
     label.innerHTML = richTextHtml(node, agendaDecorations(node, row.day, today))
   else label.textContent = text

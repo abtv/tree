@@ -334,6 +334,9 @@ it.each([
   ['day:100', 100],
   ['node:12345:node:id', 12345],
   ['node:-123:a', -123],
+  ['path:99:node:id', 99],
+  ['path:-123:a', -123],
+  ['prefixpath:99:a', undefined],
   ['day:0', 0],
   ['gap:100:110', undefined],
   ['prefixday:100', undefined],
@@ -341,8 +344,8 @@ it.each([
   expect(selectedAgendaDay(key)).toBe(expected)
 })
 
-it('falls back to the same displayed day when its last occurrence disappears', () => {
-  const state = { ...selected(), selectedKey: 'node:99:removed' }
+it.each(['node', 'path'])('falls back to the same displayed day when its selected %s disappears', (kind) => {
+  const state = { ...selected(), selectedKey: `${kind}:99:removed` }
 
   const rows = buildAgendaRows(agendaProjection(document, state), state)
 

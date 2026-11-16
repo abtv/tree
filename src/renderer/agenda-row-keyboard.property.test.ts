@@ -43,7 +43,7 @@ it('matches flattened Agenda character positions across contextual, synthetic an
       const textOf = (row: (typeof rows)[number]): string =>
         row.kind === 'node'
           ? requireNode(f.snapshot().document, row.nodeId).node.text
-          : agendaRowLabel(row, f.snapshot().agenda!.today)
+          : agendaRowLabel(row, f.snapshot().agenda!.today, f.snapshot().document)
       const positions = rows.flatMap((row) => {
         const text = textOf(row)
         const image =

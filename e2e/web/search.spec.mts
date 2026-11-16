@@ -80,7 +80,8 @@ test('searches Agenda entries and mirrors while excluding passive paths through 
   await prompt.fill('apple')
 
   await expect(page.locator('.search-count')).toHaveText('2')
-  await expect(page.locator('.agenda-path-label .search-match')).toHaveCount(0)
+  await expect(page.locator('.agenda-path')).toHaveCount(2)
+  await expect(page.locator('.agenda-path .search-match')).toHaveCount(0)
 
   await page.keyboard.press('Enter')
   const editor = page.getByRole('textbox', { name: 'Agenda node child', exact: true })

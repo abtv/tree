@@ -1,5 +1,6 @@
 import { memo, useCallback, type CSSProperties, type ReactNode } from 'react'
 import type { AgendaRow as Row } from '../application/agenda-rows'
+import type { AgendaPath } from '../application/agenda-path'
 import type { TreeNode } from '../domain/document'
 import { agendaDecorations } from './date-decorations'
 import { agendaRowLabel } from './agenda-labels'
@@ -24,9 +25,26 @@ function datedText(node: TreeNode, day: number, today: number, marks: readonly C
 
 const NO_MARKS: readonly CaretMark[] = []
 
+function pathText(path: AgendaPath, marks: readonly CaretMark[]): ReactNode[] {
+  const parts: ReactNode[] = []
+  let start = 0
+  for (const range of path.struckMatches) {
+    parts.push(...markedNodes(path.text, start, range.start, marks, false))
+    parts.push(
+      <span key={range.start} className="node-text-struck">
+        {markedNodes(path.text, range.start, range.end, marks, false)}
+      </span>,
+    )
+    start = range.end
+  }
+  parts.push(...markedNodes(path.text, start, path.text.length, marks, true))
+  return parts
+}
+
 export const AgendaRow = memo(function AgendaRow({
   lineNumber,
   row,
+  path,
   node,
   today,
   selected,
@@ -45,6 +63,7 @@ export const AgendaRow = memo(function AgendaRow({
 }: {
   lineNumber?: number | undefined
   row: Row
+  path?: AgendaPath | undefined
   node?: TreeNode | undefined
   today: number
   selected: boolean
@@ -66,7 +85,7 @@ export const AgendaRow = memo(function AgendaRow({
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
+      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${row.kind === 'path' && row.leading ? ' agenda-entry-leading-path' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
       data-agenda-measure-key={row.key}
       style={pinned ? { top: pinnedOffset } : undefined}
     >
@@ -116,6 +135,8 @@ export const AgendaRow = memo(function AgendaRow({
         ) : null}
         {row.kind === 'separator' ? (
           <span className="agenda-text">{markedNodes('', 0, 0, marks, true)}</span>
+        ) : row.kind === 'path' ? (
+          <span className="agenda-text agenda-path">{pathText(path!, marks)}</span>
         ) : row.kind === 'node' ? (
           <>
             <span
