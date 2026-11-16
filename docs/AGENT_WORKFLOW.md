@@ -204,13 +204,15 @@ If a plan or architectural decision would affect product behavior, the Product O
 
 Tests are part of the implementation contract.
 
-When behavior changes, assess existing coverage and add or update tests where it is insufficient.
+Before implementing a behavior change, find its setup and assertions across `src/`, `e2e/` (Electron, browser, and smoke), `perf/`, and relevant tests under `scripts/`. Search by the affected behavior, commands, selectors, and fixtures; nearby tests and import-based selection alone do not establish the affected scope. Check expectations against the requirements, update stale expectations, and add missing coverage. Record the affected scenarios and gaps in existing task evidence; no separate inventory document is required.
 
 Every user-visible behavior described in `docs/PRODUCT.md` must be covered by at least one automated test. Behaviors that cross a process, persistence, or platform boundary — the Electron shell, preload/IPC, persistence, attachments, clipboard, drag-and-drop, and global shortcuts — must also have an end-to-end test, in addition to any unit test for the underlying rule.
 
 ### Selecting the test level
 
 Cover each behavior at the fastest level that can reliably detect the relevant failure. Unit and property tests cover rules, edge cases, input tables and state combinations. Component and integration tests cover collaborating handlers, hooks and application state; use a real store when asserting store outcomes. E2E covers distinct risks in real Electron wiring, keyboard and pointer dispatch, native boundaries, focus, caret, selection and rendering that the lower levels cannot faithfully exercise. Detailed examples live in `docs/DEVELOPMENT.md` §8.
+
+For each affected behavior, identify a concrete incorrect outcome and the assertion that would detect it. Derive expected results from requirements, not from the implementation under test. Check the observable: frame time or nonempty content does not establish scroll continuity; post-collection memory does not establish peak memory. Passing test counts and requirement markers do not replace this assessment.
 
 When selecting E2E coverage for a change, identify the failure each selected case can detect while the relevant focused tests remain green. Similar assertions at different levels are justified when they detect different failures. Do not repeat an entire input or state matrix at every level, in every editor or in every editing mode merely because those combinations exist. Select representative real-boundary cases and retain distinct handlers, editor implementations, native/DOM behavior and important failure paths.
 
@@ -225,6 +227,8 @@ Property-based tests using `fast-check` guard domain invariants. When a change a
 Do not remove or weaken tests merely to make an implementation pass.
 
 Removing or moving redundant E2E coverage is allowed when the change identifies the focused test covering the rule and the retained E2E covering the distinct boundary or rendered state. Add missing coverage before removing the old case, preserve important failure paths and defect regressions at a level that can reproduce them, and update affected requirement/test references and screenshot ownership. Explain the mapping in the change or temporary task evidence; a permanent per-test justification registry is not required. Do not replace real boundary or rendering evidence with mocks that cannot detect the same failure.
+
+While updating affected tests, simplify unrelated setup and duplicated rule matrices when the retained coverage above still detects the same failures. Keep this work within the affected scenarios.
 
 ### Navigation and caret changes
 
@@ -300,6 +304,8 @@ Run timing guards locally, outside CI. Ordinary validation retains functional an
 
 For a local run, identify a concrete affected cost: interactive or startup latency, document-scale CPU work, memory growth, or disk operations. Changes to these paths, fixes for a reported slowdown, and changes to performance measurements require the smallest set of scenarios that can detect the affected regression. Preserve the assessment and scale-guard obligations in `docs/PRODUCT.md` §22. A plausible regression mechanism is enough to require a check; do not wait for proof that the change is slow.
 
+Performance scenarios also contain functional setup and assertions. A behavior change that invalidates these requires updating and running the affected scenarios even when no timing regression is expected. This alone does not require the full performance suite.
+
 Run the full Electron performance suite when the performance impact spans the application and cannot be bounded to affected scenarios, such as an Electron or React upgrade or a broad change to rendering, state, persistence, or shared performance fixtures. A tooling-only dependency update or a correctness-only boundary fix does not automatically require Electron performance tests. Inspect the changed paths before selecting the scope. Preparing a release does not require another timing or full Electron performance run; use the affected-cost rules above. The local version command and main-driven draft workflow are described in `docs/DEVELOPMENT.md` §12. CI does not run these timing suites.
 
 Record the affected cost and selected scenarios, or a brief reason why no Electron performance run is needed, in the task's validation evidence. Use same-machine before/after measurements for performance fixes and changes expected to affect measured costs; interpret timing noise using `docs/DEVELOPMENT.md` §12. Reuse valid measurements, and rerun only invalidated scenarios. Use the all-suites command only when its full performance stage is justified by these rules or explicitly requested.
@@ -319,6 +325,10 @@ A passing result may be reused only for the same command and scope while its rep
 Edits invalidate only checks whose inputs or exercised behavior may have changed. Documentation-only edits do not invalidate runtime suites. Source edits invalidate affected static checks, tests, builds, and suites using prior build output. Test, fixture, dependency, build-tool, test-runner, or agent-policy changes invalidate their affected stages. Read-only review and verification do not invalidate results. After a fix, rerun the affected checks and their dependencies; repeat full validation only when required by the risk matrix or when a substantial, architectural, high-risk, or materially scope-changing fix invalidated it.
 
 If validation fails, fix the problem before considering the task complete.
+
+For an unexpected or intermittent failure, preserve the failing evidence and determine whether its cause is a product defect, a stale expectation, setup or synchronization, or measurement or environment effects before changing assertions, timeouts, retries, or budgets. Check dates, focus, and completion conditions when relevant. A passing rerun alone does not identify the cause; apply the bounded recovery rules in §12 if it remains unresolved.
+
+When correcting a measurement, state what it measures and excludes. Keep the workload and limits unchanged unless evidence justifies changing them. Check a normal workload and an available deliberate-failure control to verify that the corrected measurement still detects the intended failure.
 
 If a failure is unrelated to the current task, report it explicitly rather than hiding or ignoring it.
 
@@ -463,7 +473,7 @@ A task is complete only when:
 
 When a working plan is required, satisfy it and extract durable knowledge before deleting it.
 
-The primary agent reviews every completed diff against the request, tests, policy, and validation evidence. An independent code-review pass is additionally required for shared interaction-state changes, process or persistence boundaries, major architecture, and High Risk changes under `docs/DEVELOPMENT.md` §9. Product verification is required for changed user-visible behavior: the primary agent checks contained flows, while a separate product verifier checks changes spanning interaction states or process/platform boundaries and other High Risk user-visible changes. Inspect affected flows and nearby states. Review roles receive the validation record and reuse still-valid results. Contained internal changes need no separate reviewer or product verifier. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes when those roles are used.
+The primary agent reviews every completed diff against the request, tests, policy, and validation evidence, including the affected-test assessment in §9. An independent code-review pass is additionally required for shared interaction-state changes, process or persistence boundaries, major architecture, and High Risk changes under `docs/DEVELOPMENT.md` §9. Product verification is required for changed user-visible behavior: the primary agent checks contained flows, while a separate product verifier checks changes spanning interaction states or process/platform boundaries and other High Risk user-visible changes. Inspect affected flows and nearby states. Review roles receive the validation record and reuse still-valid results. Contained internal changes need no separate reviewer or product verifier. Confirmed meaningful findings must be resolved and the affected checks rerun. Repeat a review or product-verification pass only when a fix materially invalidates that pass; a full repeat is required only when fixes are substantial, architectural, high-risk, or likely to introduce new problems. `No meaningful issues found` and `No meaningful product issues found` are successful outcomes when those roles are used.
 
 ---
 
