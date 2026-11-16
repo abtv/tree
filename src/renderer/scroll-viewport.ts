@@ -41,6 +41,14 @@ export function scrollViewportBy(deltaY: number): void {
   else element.scrollBy(0, deltaY)
 }
 
+/** A shrinking extent can clamp native scroll before the measured layout's commit effect runs. */
+export function scrollViewportAfterMeasurement(deltaY: number, beforeTop: number): void {
+  const element = viewportScroller()
+  const maximum = element === undefined ? beforeTop : Math.max(0, element.scrollHeight - element.clientHeight)
+  // Correct only the known clamp. Current scroll minus the snapshot can also include user input.
+  scrollViewportBy(deltaY + Math.max(0, beforeTop - maximum))
+}
+
 /**
  * Scrolls the content area so the element is fully visible (docs/PRODUCT.md §20.8). Focusing an
  * element scrolls it into view natively, but centers it and not reliably when the focus change

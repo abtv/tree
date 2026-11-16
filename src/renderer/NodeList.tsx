@@ -12,12 +12,18 @@ import {
   EMPTY_HEIGHTS,
   EMPTY_LAYOUT,
   measureElement,
+  measuredScrollDelta,
   pruneHeights,
   type LayoutState,
 } from './node-list-layout'
 import { DROP_LEVEL_STEP_PX, dropMarkerFor } from './node-drag'
 import type { DropTarget } from '../application/drop-targets'
-import { notifyViewportLayout, onViewportScroll, viewportBounds } from './scroll-viewport'
+import {
+  notifyViewportLayout,
+  onViewportScroll,
+  scrollViewportAfterMeasurement,
+  viewportBounds,
+} from './scroll-viewport'
 import { useNodeListDrag } from './use-node-list-drag'
 
 interface NodeListProps {
@@ -69,7 +75,9 @@ export function NodeList({
   const widthRef = useRef(typeof globalThis.innerWidth === 'number' ? globalThis.innerWidth : 0)
   const [measureRevision, setMeasureRevision] = useState(0)
   const [measuredHeights, setMeasuredHeights] = useState<ReadonlyMap<string, number>>(EMPTY_HEIGHTS)
+  const [measurementScrollTop, setMeasurementScrollTop] = useState(0)
   const committedStructuralVersion = useRef(structuralVersion)
+  const appliedCorrection = useRef<LayoutState['correction']>(undefined)
   const [viewport, setViewport] = useState({ start: 0, end: 0 })
   // The rendered, windowed, and measured row list is the flattened projection of `nodes` and every
   // expanded node's descendants (docs/PRODUCT.md §2.4), not `nodes` itself; a collapsed subtree still
@@ -80,10 +88,21 @@ export function NodeList({
     key: `initial:${visibleRows.length}`,
     layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, EMPTY_HEIGHTS) : EMPTY_LAYOUT,
     structuralVersion,
+    correction: undefined,
   }))
   const windowed = shouldWindow(visibleRows.length)
 
+  useLayoutEffect(() => {
+    const correction = layoutState.correction
+    if (correction === undefined || appliedCorrection.current === correction) return
+    appliedCorrection.current = correction
+    scrollViewportAfterMeasurement(correction.delta, correction.beforeTop)
+    setLayoutState((current) => (current.correction === correction ? { ...current, correction: undefined } : current))
+  }, [layoutState.correction])
+
   const publishMeasurements = useCallback(() => {
+    // External measurement publication is synchronous; layout effects also finish before input.
+    setMeasurementScrollTop(listRef.current?.closest('.scroll-viewport')?.scrollTop ?? globalThis.scrollY)
     setMeasuredHeights(new Map(heightsRef.current))
     setMeasureRevision((revision) => revision + 1)
   }, [])
@@ -152,7 +171,7 @@ export function NodeList({
       widthRef.current = width
       heightsRef.current.clear()
       for (const id of observedElementsRef.current.keys()) pendingMeasurementsRef.current.add(id)
-      publishMeasurements()
+      flushSync(publishMeasurements)
     }
     globalThis.addEventListener('resize', onResize)
     return () => globalThis.removeEventListener('resize', onResize)
@@ -162,10 +181,24 @@ export function NodeList({
   // window based on the previous (possibly empty) layout and remount still-visible editors.
   const layoutKey = `${structuralVersion}:${measureRevision}:${visibleRows.length}`
   if (layoutState.key !== layoutKey) {
+    const layout = windowed ? buildLayout(visibleRows, measuredHeights) : EMPTY_LAYOUT
+    const compatible =
+      windowed && layoutState.structuralVersion === structuralVersion && layoutState.layout.count === layout.count
+    const pending = layoutState.correction?.delta ?? 0
+    const delta = compatible ? measuredScrollDelta(layoutState.layout, layout, viewport.start) : -pending
+    const correction = compatible ? pending + delta : 0
+    if (delta !== 0) setViewport({ start: viewport.start + delta, end: viewport.end + delta })
     setLayoutState({
       key: layoutKey,
-      layout: shouldWindow(visibleRows.length) ? buildLayout(visibleRows, measuredHeights) : EMPTY_LAYOUT,
+      layout,
       structuralVersion,
+      correction:
+        correction === 0
+          ? undefined
+          : {
+              delta: correction,
+              beforeTop: layoutState.correction?.beforeTop ?? measurementScrollTop,
+            },
     })
   }
 

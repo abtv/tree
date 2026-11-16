@@ -2,7 +2,7 @@
 
 import { act, cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
-import type { ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import './test/setup'
 import { NodeList } from './NodeList'
@@ -1214,6 +1214,66 @@ describe('NodeList windowing', () => {
   function renderList(count: number, focusedNodeId?: string): ReturnType<typeof render> {
     return renderRows({ focusedNodeId, list: buildNodes(count) })
   }
+
+  it('compensates measured growth and shrink once in StrictMode without replacing the focused editor', () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    TestResizeObserver.instances = []
+    let scrollTop = 500
+    let rowHeight = ROW_HEIGHT_ESTIMATE
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('node-list')) return rect(-scrollTop, 5000)
+      return rect(0, this.dataset.nodeId === 'n8' ? rowHeight : ROW_HEIGHT_ESTIMATE)
+    })
+    const scrollBy = vi.fn((_x: number, delta: number) => {
+      scrollTop += delta
+    })
+    vi.stubGlobal('scrollBy', scrollBy)
+    const list = buildNodes(200)
+    const props = {
+      dragFreeze: stubDragFreeze(),
+      onEnter: () => undefined,
+      onDrop: () => undefined,
+      renderInput: (node: TreeNode, label: string) => <textarea aria-label={label} readOnly value={node.text} />,
+    }
+    const { container, rerender } = render(
+      <StrictMode>
+        <NodeList {...props} nodes={list} focusedNodeId="n20" structuralVersion={0} />
+      </StrictMode>,
+    )
+    const editor = container.querySelector<HTMLTextAreaElement>('[data-node-id="n20"] textarea')!
+    editor.focus()
+    editor.setSelectionRange(2, 4)
+    const row = container.querySelector<HTMLElement>('[data-node-id="n8"]')!
+    const observer = TestResizeObserver.instances.at(-1)!
+
+    rowHeight = 80
+    observer.trigger([resizeEntry(row, rowHeight)])
+    observer.trigger([resizeEntry(row, rowHeight)])
+
+    expect(scrollBy.mock.calls).toEqual([[0, 55]])
+    expect(scrollTop).toBe(555)
+    expect(container.querySelector('[data-node-id="n20"] textarea')).toBe(editor)
+    expect(editor).toHaveFocus()
+    expect([editor.selectionStart, editor.selectionEnd]).toEqual([2, 4])
+
+    rowHeight = ROW_HEIGHT_ESTIMATE
+    observer.trigger([resizeEntry(row, rowHeight)])
+
+    expect(scrollBy.mock.calls).toEqual([
+      [0, 55],
+      [0, -55],
+    ])
+    expect(scrollTop).toBe(500)
+
+    rerender(
+      <StrictMode>
+        <NodeList {...props} nodes={list.toReversed()} focusedNodeId="n20" structuralVersion={1} />
+      </StrictMode>,
+    )
+
+    expect(scrollBy).toHaveBeenCalledTimes(2)
+    expect(editor).toHaveFocus()
+  })
 
   it('renders every row without a fixed-height window at the threshold', () => {
     mockRows(0)

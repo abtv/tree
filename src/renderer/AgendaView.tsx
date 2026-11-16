@@ -23,13 +23,21 @@ import { AgendaRow } from './AgendaRow'
 import { markedNodes } from './marked-nodes'
 import { createViewportReveal } from './viewport-reveal'
 import { agendaListWindow } from './agenda-list-layout'
-import { buildLayout, EMPTY_HEIGHTS, measureElement, pruneHeights } from './node-list-layout'
+import {
+  buildLayout,
+  EMPTY_HEIGHTS,
+  measureElement,
+  measuredScrollDelta,
+  pruneHeights,
+  type MeasuredScrollCorrection,
+} from './node-list-layout'
 import { shouldWindow } from './list-window'
 import { agendaRowLabel, isAgendaMirror } from './agenda-labels'
 import {
   notifyViewportLayout,
   onViewportScroll,
   scrollViewportBy,
+  scrollViewportAfterMeasurement,
   viewportBounds,
   viewportScroller,
 } from './scroll-viewport'
@@ -176,7 +184,7 @@ export function AgendaView({
   const observer = useRef<ResizeObserver | undefined>(undefined)
   const width = useRef(globalThis.innerWidth)
   const [revision, setRevision] = useState(0)
-  const [viewport, setViewport] = useState({ start: 0, end: 0 })
+  const appliedCorrection = useRef<MeasuredScrollCorrection | undefined>(undefined)
   const viewportReveal = useMemo(() => createViewportReveal(), [])
   useLayoutEffect(() => {
     // Development StrictMode replays mount effects; restore the opening intent after its cleanup.
@@ -197,7 +205,10 @@ export function AgendaView({
     rows,
     revision: -1,
     layout: buildLayout(rows, EMPTY_HEIGHTS),
+    viewport: { start: 0, end: 0 },
+    correction: undefined as MeasuredScrollCorrection | undefined,
   }))
+  const viewport = layoutState.viewport
   // Opening uses the complete day extent, including context labels and rows outside the mounted window.
   const layout = layoutState.rows === rows ? layoutState.layout : buildLayout(rows, EMPTY_HEIGHTS)
   const todayRange = useMemo(() => {
@@ -271,26 +282,44 @@ export function AgendaView({
     return () => globalThis.removeEventListener('resize', resize)
   }, [])
   useLayoutEffect(() => {
+    const correction = layoutState.correction
+    if (correction === undefined || appliedCorrection.current === correction) return
+    appliedCorrection.current = correction
+    scrollViewportAfterMeasurement(correction.delta, correction.beforeTop)
+    setLayoutState((current) => (current.correction === correction ? { ...current, correction: undefined } : current))
+  }, [layoutState.correction])
+  useLayoutEffect(() => {
     if (layoutState.rows === rows && layoutState.revision === revision) return
     if (layoutState.rows !== rows) pruneHeights(heights.current, rows)
-    setLayoutState({ rows, revision, layout: buildLayout(rows, heights.current) })
-  }, [rows, revision, layoutState])
+    const next = buildLayout(rows, heights.current)
+    const beforeTop = viewportScroller()?.scrollTop ?? globalThis.scrollY
+    setLayoutState((current) => {
+      if (current.rows === rows && current.revision === revision) return current
+      const delta =
+        windowed && current.rows === rows ? measuredScrollDelta(current.layout, next, current.viewport.start) : 0
+      return {
+        rows,
+        revision,
+        layout: next,
+        viewport: { start: current.viewport.start + delta, end: current.viewport.end + delta },
+        correction: delta === 0 ? undefined : { delta, beforeTop },
+      }
+    })
+  }, [rows, revision, layoutState.rows, layoutState.revision, windowed])
   const updateViewport = useCallback(() => {
     const element = listRef.current
     if (element === null) return
-    // Capture an explicit end jump before mounting wrapped rows increases the estimated extent.
-    const scroller = viewportScroller()
-    viewportState.followEnd(
-      scroller !== undefined &&
-        scroller.scrollTop > 0 &&
-        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
-    )
     const top = element.getBoundingClientRect().top
     const start = Math.max(0, viewportBounds().top - top)
     const end = Math.max(0, viewportBounds().bottom - top)
-    setViewport((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
-  }, [viewportState])
+    setLayoutState((current) =>
+      current.viewport.start === start && current.viewport.end === end
+        ? current
+        : { ...current, viewport: { start, end } },
+    )
+  }, [])
   useLayoutEffect(() => {
+    if (layoutState.rows !== rows || layoutState.revision !== revision) return
     if (windowed) {
       // Newly measured wrapped rows can grow the list after a jump to its estimated end.
       // Keep that explicit end position while the visible range settles.
@@ -299,7 +328,16 @@ export function AgendaView({
       updateViewport()
     }
     notifyViewportLayout()
-  }, [layoutState, updateViewport, windowed, viewportState])
+  }, [
+    layoutState.layout,
+    layoutState.rows,
+    layoutState.revision,
+    rows,
+    revision,
+    updateViewport,
+    windowed,
+    viewportState,
+  ])
   useLayoutEffect(() => {
     const top = viewportState.takeRestoration(layoutState.rows === rows && layoutState.revision === revision)
     if (top === undefined) return
@@ -310,13 +348,22 @@ export function AgendaView({
     if (!windowed) return undefined
     // Replace the anchored window in this event; it retains its previous paint until delivery.
     // Flush only this external event; layout-effect updates keep their existing commit ordering.
-    const unsubscribe = onViewportScroll(() => {
-      flushSync(updateViewport)
-    })
-    globalThis.addEventListener('resize', updateViewport)
+    const updateFromViewport = (): void => {
+      // Resize can arrive after an end jump but before native scroll delivery. Capture end
+      // navigation before mounting grows the extent; internal correction reads only geometry.
+      const scroller = viewportScroller()
+      viewportState.followEnd(
+        scroller !== undefined &&
+          scroller.scrollTop > 0 &&
+          scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1,
+      )
+      updateViewport()
+    }
+    const unsubscribe = onViewportScroll(() => flushSync(updateFromViewport))
+    globalThis.addEventListener('resize', updateFromViewport)
     return () => {
       unsubscribe()
-      globalThis.removeEventListener('resize', updateViewport)
+      globalThis.removeEventListener('resize', updateFromViewport)
     }
   }, [updateViewport, windowed, viewportState])
   // Rows a document change re-derives keep the selected occurrence at its viewport position, so a

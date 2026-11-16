@@ -284,6 +284,91 @@ function View({ store }: { store: EditorStore }): React.JSX.Element {
 }
 
 // @requirement PRODUCT.md §23.6
+it('applies measured growth and shrink once in StrictMode while retaining the selected row', async () => {
+  const day = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: Array.from({ length: 200 }, (_, index) => ({
+        id: `n${index}`,
+        text: '2026-10-08 Task',
+        children: [],
+      })),
+    },
+    services: { today: () => day },
+  })
+  harness.store.openAgenda()
+  harness.store.applyAgenda({ kind: 'select', key: `node:${day}:n20` })
+  let resize: ResizeObserverCallback | undefined
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = callback
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  )
+  let scrollTop = 500
+  let height = 25
+  const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    if (this.classList.contains('agenda-list')) return new DOMRect(0, -scrollTop, 600, 5000)
+    return new DOMRect(
+      0,
+      0,
+      600,
+      this.matches('.agenda-entry') && this.querySelector('[data-node-id="n8"]') !== null ? height : 25,
+    )
+  })
+  const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation((_x, delta) => {
+    scrollTop += delta
+  })
+  const createReveal = revealModule.createViewportReveal
+  const factory = vi.spyOn(revealModule, 'createViewportReveal').mockImplementation(() => ({
+    ...createReveal(),
+    begin: vi.fn(),
+    beginRegion: vi.fn(),
+  }))
+  try {
+    const { container } = render(
+      <StrictMode>
+        <View store={harness.store} />
+      </StrictMode>,
+    )
+    const selected = container.querySelector('[data-node-id="n20"]')!
+    const entry = container.querySelector('[data-node-id="n8"]')!.closest('.agenda-entry')!
+    const notify = () => act(() => resize!([{ target: entry } as ResizeObserverEntry], {} as ResizeObserver))
+
+    height = 80
+    notify()
+    notify()
+
+    expect(scroll.mock.calls).toEqual([[0, 55]])
+    expect(scrollTop).toBe(555)
+    expect(container.querySelector('[data-node-id="n20"]')).toBe(selected)
+    expect(selected).toHaveFocus()
+
+    height = 25
+    notify()
+
+    expect(scroll.mock.calls).toEqual([
+      [0, 55],
+      [0, -55],
+    ])
+    expect(scrollTop).toBe(500)
+  } finally {
+    cleanup()
+    factory.mockRestore()
+    bounds.mockRestore()
+    scroll.mockRestore()
+    vi.unstubAllGlobals()
+  }
+})
+
+// @requirement PRODUCT.md §23.6
 it('bounds mounted rows, pins distant selection and preserves its DOM across a fold threshold', async () => {
   const harness = await createRealStoreHarness({
     document: {

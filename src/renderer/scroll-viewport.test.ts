@@ -9,6 +9,7 @@ import {
   centerRectInViewport,
   viewportScrollEdges,
   scrollViewportBy,
+  scrollViewportAfterMeasurement,
   SCROLL_VIEWPORT_CLASS,
   viewportBounds,
   viewportContent,
@@ -31,6 +32,35 @@ afterEach(() => {
 })
 
 describe('scroll viewport', () => {
+  // @requirement PRODUCT.md §20.1
+  // @requirement PRODUCT.md §23.6
+  it.each([
+    { before: 9900, maximum: 9600, delta: -400, correction: -100 },
+    { before: 9500, maximum: 9600, delta: -400, correction: -400 },
+    { before: 9600, maximum: 9600, delta: 50, correction: 50 },
+    { before: 100, maximum: 0, delta: -150, correction: -50 },
+  ])(
+    'accounts for native clamping after a measured extent shrinks ($before, $maximum)',
+    ({ before, maximum, delta, correction }) => {
+      const viewport = mountScroller({ top: 30, bottom: 630 })
+      viewport.scrollBy = vi.fn()
+      Object.defineProperties(viewport, {
+        clientHeight: { value: 600 },
+        scrollHeight: { value: maximum + 600 },
+        // A later input can change this value; it must not be treated as a layout correction.
+        scrollTop: {
+          get: () => {
+            throw new Error('Do not consume pending user scroll')
+          },
+        },
+      })
+
+      scrollViewportAfterMeasurement(delta, before)
+
+      expect(viewport.scrollBy).toHaveBeenCalledExactlyOnceWith(0, correction)
+    },
+  )
+
   it.each([
     { top: 700, height: 200, delta: 470 },
     { top: 100, height: 200, delta: -130 },

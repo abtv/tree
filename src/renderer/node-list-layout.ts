@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import { ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
+import { computeListWindow, ROW_HEIGHT_ESTIMATE, type ListWindow } from './list-window'
 import type { VisibleRow } from '../application/visible-rows'
 
 export interface ListLayout {
@@ -12,10 +12,30 @@ export interface LayoutState {
   key: string
   layout: ListLayout
   structuralVersion: number
+  correction: MeasuredScrollCorrection | undefined
+}
+
+export interface MeasuredScrollCorrection {
+  delta: number
+  beforeTop: number
 }
 
 export const EMPTY_HEIGHTS: ReadonlyMap<string, number> = new Map()
 export const EMPTY_LAYOUT: ListLayout = { offsets: new Float64Array(1), total: 0, count: 0 }
+
+/** Preserve the first visible row's position when the same projection receives new measurements. */
+export function measuredScrollDelta(previous: ListLayout, next: ListLayout, viewportStart: number): number {
+  if (previous === next || previous.count === 0 || previous.count !== next.count) return 0
+  const { start } = computeListWindow({
+    count: previous.count,
+    offsets: previous.offsets,
+    viewportStart,
+    viewportEnd: viewportStart,
+    overscan: 0,
+    focusedIndex: undefined,
+  })
+  return next.offsets[start]! - previous.offsets[start]!
+}
 
 /** Pointer capture belongs to the list, so breadcrumb targets are resolved by geometry. */
 export function breadcrumbAtPoint(

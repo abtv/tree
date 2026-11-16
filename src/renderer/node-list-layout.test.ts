@@ -1,11 +1,54 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { breadcrumbAtPoint, buildLayout, measureElement } from './node-list-layout'
+import { breadcrumbAtPoint, buildLayout, EMPTY_LAYOUT, measureElement, measuredScrollDelta } from './node-list-layout'
 import { ROW_HEIGHT_ESTIMATE } from './list-window'
 
 afterEach(() => {
   document.body.replaceChildren()
   vi.restoreAllMocks()
+})
+
+// @requirement PRODUCT.md §20.1
+// @requirement PRODUCT.md §23.6
+it.each([
+  { start: 25, heights: [50, 25, 25], delta: 25 },
+  { start: 30.5, heights: [12.5, 25, 25], delta: -12.5 },
+  { start: 49.5, heights: [50, 10, 80], delta: 25 },
+  { start: 0, heights: [50, 25, 25], delta: 0 },
+  { start: -10, heights: [50, 25, 25], delta: 0 },
+  { start: 75, heights: [30, 35, 25], delta: 15 },
+])('preserves the first visible row at $start after measurements change', ({ start, heights, delta }) => {
+  const rows = heights.map((_, index) => ({ key: String(index) }))
+  const before = buildLayout(rows, new Map())
+  const after = buildLayout(rows, new Map(heights.map((height, index) => [String(index), height])))
+
+  expect(measuredScrollDelta(before, after, start)).toBe(delta)
+})
+
+it('does not compensate an empty, unchanged or incompatible layout', () => {
+  const before = buildLayout([{ key: 'a' }, { key: 'b' }], new Map())
+  const after = buildLayout([{ key: 'a' }], new Map([['a', 50]]))
+
+  expect(measuredScrollDelta(EMPTY_LAYOUT, before, 25)).toBe(0)
+  expect(measuredScrollDelta(before, before, 25)).toBe(0)
+  expect(measuredScrollDelta(before, after, 25)).toBe(0)
+})
+
+// @requirement PRODUCT.md §22.1
+it('bounds offset reads when anchoring measurements near the end of a large list', () => {
+  const rows = Array.from({ length: 10000 }, (_, index) => ({ key: String(index) }))
+  const before = buildLayout(rows, new Map())
+  const after = buildLayout(rows, new Map([['0', 50]]))
+  let reads = 0
+  const offsets = new Proxy(before.offsets, {
+    get(target, key) {
+      if (typeof key === 'string' && /^\d+$/.test(key)) reads++
+      return Reflect.get(target, key, target)
+    },
+  })
+
+  expect(measuredScrollDelta({ ...before, offsets }, after, before.total - 5)).toBe(25)
+  expect(reads).toBeLessThan(40)
 })
 
 it('records an estimated row height without invalidating unchanged layout, then reports a real resize', () => {
