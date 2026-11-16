@@ -2,6 +2,7 @@ import type { ApiError, Reference, Request } from './types.mts'
 
 export function isTransient(error: unknown): boolean {
   return (
+    (error as ApiError | null)?.rateLimited === true ||
     [500, 502, 503, 504].includes((error as ApiError | null)?.status ?? -1) ||
     (error instanceof TypeError && error.message === 'fetch failed') ||
     (error instanceof Error && error.name === 'TimeoutError')
@@ -9,15 +10,23 @@ export function isTransient(error: unknown): boolean {
 }
 
 export async function retry<T>(operation: () => Promise<T>): Promise<T> {
+  const deadline = Date.now() + 90000
   for (let attempt = 0; ; attempt++) {
     try {
       return await operation()
     } catch (error) {
-      const minimum = (error as ApiError | null)?.retryAfterMs ?? 0
-      if (!isTransient(error) || attempt === 3 || minimum > 60000) throw error
+      const failure = error as ApiError | null
+      const minimum = failure?.retryAfterMs ?? 0
+      if (!isTransient(error) || attempt === 3 || (!failure?.rateLimited && minimum > 60000)) throw error
 
-      const delay = Math.max(minimum, 1000 * 2 ** attempt + Math.floor(Math.random() * 1000))
-      console.error(`GitHub API temporary failure; retrying in ${delay}ms`)
+      const delay = Math.max(
+        minimum * (failure?.rateLimited ? 2 ** attempt : 1),
+        1000 * 2 ** attempt + Math.floor(Math.random() * 1000),
+      )
+      if (Date.now() + delay > deadline) throw error
+
+      const reason = failure?.rateLimited ? 'rate limit' : 'temporary failure'
+      console.error(`GitHub API ${reason}; retrying in ${delay}ms`)
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
@@ -47,6 +56,8 @@ export async function advanceReference(root: string, base: string, sha: string, 
       if (!isTransient(error)) throw error
 
       uncertain = true
+      // A rate limit applies to reconciliation reads too. Wait before any request.
+      if ((error as ApiError).rateLimited) throw error
       if (await reconcile()) return
 
       throw error

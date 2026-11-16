@@ -199,20 +199,30 @@ does not change the installed workflow or rerun a failed deployment.
 
 The web GitHub API client retries reads and immutable Git blob/tree/commit creation
 at most three times after the initial request, only for HTTP 500, 502, 503, 504,
-fetch connection failures or timeouts. Delays increase from 1 to 2 to 4 seconds,
-with up to one second of random jitter. `Retry-After` can lengthen a delay to
-60 seconds; a longer requested delay stops the operation instead. Replayed
-commit creation can leave unused Git objects but never appends another release
+fetch connection failures, timeouts or identified rate limits. HTTP 429 always
+indicates a rate limit; HTTP 403 requires `Retry-After`, an exhausted
+`x-ratelimit-remaining` header or a recognized GitHub rate-limit message.
+Ordinary transient delays increase from 1 to 2 to 4 seconds, with up to one
+second of random jitter; `Retry-After` may lengthen those delays to 60 seconds.
+Rate limits honor both `Retry-After` and the primary limit's `x-ratelimit-reset`.
+Without timing metadata, a secondary limit waits at least one minute. Repeated
+rate limits increase the wait exponentially. Each retry loop stops rather than
+scheduling a wait past its 90-second deadline. Invalid timing metadata or a
+longer required wait stops the operation without shortening GitHub's delay.
+Diagnostics identify rate limits without printing remote response text.
+See GitHub's [rate-limit recovery rules](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit).
+Replayed commit creation can leave unused Git objects but never appends another release
 commit to main. The client does not blindly retry temporary permission-probe
 branch creation, Contents writes or cleanup. Their failures still stop publication.
-Authorization errors, rate limits, conflicts and trust/verification failures are
+Authorization errors, conflicts and trust/verification failures are
 not retried or treated as permission-denial evidence.
 
 After a transient branch-update error, transfer reads main before repeating the
 same non-forced update. The expected new SHA means the write already succeeded;
 the original parent permits retry; another SHA stops publication. If that read
 fails, subsequent attempts must resolve it before issuing another write. These
-retries do not expand token permissions or repeat the whole publication job.
+reads also wait when the update hit a rate limit. Retries do not expand token
+permissions or repeat the whole publication job.
 
 After transfer, the source verifies provenance and deployment at the exact target
 commit returned by the write, avoiding a stale branch-head read immediately after

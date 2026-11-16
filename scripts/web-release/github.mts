@@ -27,21 +27,44 @@ async function singleRequest(path: string, { token, method = 'GET', body }: ApiO
   if (!response.ok) {
     const error: ApiError = new Error(`GitHub API ${method} failed (${response.status})`)
     error.status = response.status
+    // Classify known denials without exposing remote response text in diagnostics.
+    const data = response.status === 403 ? await response.json().catch(() => null) : null
+    const message = typeof data?.message === 'string' ? data.message : ''
     const retryAfter = response.headers?.get('retry-after')
-    if (retryAfter) {
+    const exhausted = response.headers?.get('x-ratelimit-remaining') === '0'
+    error.rateLimited =
+      response.status === 429 ||
+      (response.status === 403 &&
+        (retryAfter != null ||
+          exhausted ||
+          /^API rate limit exceeded(?: for |$)/.test(message) ||
+          /^You have exceeded a secondary rate limit(?:\.|$)/.test(message)))
+    if (retryAfter != null) {
       const seconds = Number(retryAfter)
-      const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now()
-      if (Number.isFinite(delay)) error.retryAfterMs = Math.max(0, delay)
+      const delay = Number.isFinite(seconds)
+        ? retryAfter.trim() && seconds >= 0
+          ? seconds * 1000
+          : Infinity
+        : Date.parse(retryAfter) - Date.now()
+      error.retryAfterMs = Number.isFinite(delay) ? Math.max(0, delay) : Infinity
     }
-    // Keep remote text out of diagnostics. The probe establishes ordinary
-    // Contents writes before accepting this documented permission denial.
+    if (error.rateLimited && exhausted) {
+      const reset = response.headers?.get('x-ratelimit-reset') ?? ''
+      const delay = /^\d+$/.test(reset) ? Number(reset) * 1000 - Date.now() : Infinity
+      error.retryAfterMs = Math.max(error.retryAfterMs ?? 0, delay)
+    }
+    if (error.rateLimited) {
+      error.retryAfterMs ??= 60000
+      error.message += '; rate limit'
+    }
+    // The probe establishes ordinary Contents writes before accepting this denial.
     if (response.status === 403 && method === 'PUT' && path.includes('/contents/.github/workflows/')) {
-      const data = (await response.json().catch(() => null)) as { message?: string } | null
       const workflow = path.slice(path.indexOf('/contents/') + '/contents/'.length)
       error.workflowWriteDenied =
-        data?.message === 'Resource not accessible by integration' ||
-        data?.message ===
-          `refusing to allow a GitHub App to create or update workflow \`${workflow}\` without \`workflows\` permission`
+        !error.rateLimited &&
+        (message === 'Resource not accessible by integration' ||
+          message ===
+            `refusing to allow a GitHub App to create or update workflow \`${workflow}\` without \`workflows\` permission`)
     }
     throw error
   }

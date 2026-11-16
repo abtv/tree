@@ -21,6 +21,7 @@ export interface ApiOptions {
 export type Request = (path: string, options?: ApiOptions) => Promise<unknown>
 export interface ApiError extends Error {
   status?: number
+  rateLimited?: boolean
   retryAfterMs?: number
   workflowWriteDenied?: boolean
 }

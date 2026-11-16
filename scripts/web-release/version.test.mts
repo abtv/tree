@@ -1,5 +1,10 @@
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { isNewWebVersion } from './version.mts'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 const sha = 'a'.repeat(40)
 const blob = (value: unknown) => {
@@ -48,4 +53,28 @@ it('fails closed on missing or malformed previous release metadata', async () =>
   request.mockResolvedValue(blob({ ...provenance, sourceSha: 'main' }))
 
   await expect(isNewWebVersion('0.1.3', { request, targetSha: sha })).rejects.toThrow()
+})
+
+it.each([
+  ['0.1.3', true],
+  ['0.1.2', false],
+] as const)('resumes the version comparison for %s after a hosting rate limit', async (version, expected) => {
+  vi.useFakeTimers()
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(new Response('{}', { status: 403, headers: { 'retry-after': '3' } }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ object: { sha } })))
+    .mockResolvedValueOnce(new Response(JSON.stringify(blob(provenance))))
+    .mockResolvedValueOnce(new Response(JSON.stringify(blob({ version: '0.1.2' }))))
+  vi.stubGlobal('fetch', fetch)
+
+  const result = isNewWebVersion(version, { token: 'source' }).catch((error) => error)
+  await vi.runAllTimersAsync()
+
+  expect(await result).toBe(expected)
+  expect(fetch).toHaveBeenCalledTimes(4)
+  expect(fetch.mock.calls[0]).toEqual(fetch.mock.calls[1])
+  expect(fetch.mock.calls[2]![0]).toContain(`/contents/provenance.json?ref=${sha}`)
+  expect(fetch.mock.calls[3]![0]).toContain(`/contents/package.json?ref=${sha}`)
+  expect(fetch.mock.calls[3]![1].headers.Authorization).toBe('Bearer source')
 })

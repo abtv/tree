@@ -20,7 +20,7 @@ it.each([500, 502, 503, 504])('bounds retries for HTTP %i to four total requests
   expect(fetch).toHaveBeenCalledTimes(4)
 })
 
-it.each([401, 403, 404, 409, 422, 429])('does not retry HTTP %i', async (status) => {
+it.each([401, 403, 404, 409, 422])('does not retry HTTP %i without rate-limit evidence', async (status) => {
   const fetch = vi.fn().mockResolvedValue(new Response('{}', { status }))
   vi.stubGlobal('fetch', fetch)
 

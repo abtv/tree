@@ -81,7 +81,7 @@ function sourceRequest({
 describe('GitHub release trust', () => {
   afterEach(() => vi.unstubAllGlobals())
   it('pins API origin and fails closed without printing response secrets', async () => {
-    const fetch = vi.fn().mockResolvedValue({ ok: false, status: 403 })
+    const fetch = vi.fn().mockResolvedValue(new Response('{"message":"secret"}', { status: 403 }))
     vi.stubGlobal('fetch', fetch)
 
     await expect(api('https://evil.test/repos/a/b/x', { token: 'secret' })).rejects.toThrow('Invalid')
@@ -106,10 +106,14 @@ describe('GitHub release trust', () => {
       [500, refusal, undefined],
     ] as const) {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message }), { status })))
+      const limited =
+        status === 429 ||
+        (status === 403 &&
+          (message === 'API rate limit exceeded' || message === 'You have exceeded a secondary rate limit'))
 
       await expect(api(path, { token: 'secret', method: 'PUT', body: {} })).rejects.toMatchObject({
         status,
-        message: `GitHub API PUT failed (${status})`,
+        message: `GitHub API PUT failed (${status})${limited ? '; rate limit' : ''}`,
         ...(expected === undefined ? {} : { workflowWriteDenied: expected }),
       })
     }
