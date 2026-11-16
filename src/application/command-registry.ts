@@ -16,6 +16,7 @@ export interface CommandCapabilities {
 }
 
 export interface CommandServices {
+  toggleStarNode?(): Promise<void>
   summarize?(): Promise<void>
   imageToText?(): Promise<void>
   reindexAllImages?(): Promise<void>
@@ -34,6 +35,7 @@ export interface CommandServices {
 }
 
 export interface CommandContext {
+  starred?: boolean
   alwaysOnTop: boolean
   appearance: CommandAppearance
   vimEnabled: boolean
@@ -60,6 +62,15 @@ export interface ApplicationCommand {
 }
 
 export const commandRegistry: readonly ApplicationCommand[] = [
+  {
+    name: 'toggle-star-node',
+    aliases: [],
+    description: 'Star or unstar the current node',
+    active: (context) => context.starred === true,
+    run: async (services) => {
+      await services.toggleStarNode?.()
+    },
+  },
   {
     name: 'reindex-all-images',
     aliases: [],

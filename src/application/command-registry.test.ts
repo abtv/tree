@@ -60,10 +60,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 16],
-    [false, true, 15],
-    [false, false, 14],
-    [true, false, 15],
+    [true, true, 17],
+    [false, true, 16],
+    [false, false, 15],
+    [true, false, 16],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -92,6 +92,7 @@ describe('command registry', () => {
       'show-tree',
       'summarize',
       'toggle-line-numbers',
+      'toggle-star-node',
     ])
     expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
   })
@@ -122,7 +123,7 @@ describe('command registry', () => {
     ['agenda', ['show-agenda']],
     ['tree', ['about-tree', 'show-tree']],
     ['about', ['about-tree']],
-    ['toggle', ['toggle-always-on-top', 'toggle-line-numbers', 'toggle-vim-mode']],
+    ['toggle', ['toggle-always-on-top', 'toggle-line-numbers', 'toggle-star-node', 'toggle-vim-mode']],
     ['q', ['quit']],
     ['qui', ['quit']],
     ['  dark  ', ['set-theme-dark']],
@@ -155,6 +156,7 @@ describe('command registry', () => {
       'summarize',
       'toggle-always-on-top',
       'toggle-line-numbers',
+      'toggle-star-node',
       'toggle-vim-mode',
     ])
     expect(names('set-theme-dark', history)).toEqual(['set-theme-dark'])
@@ -183,6 +185,7 @@ describe('command registry', () => {
       findNext: vi.fn(async () => undefined),
       findPrevious: vi.fn(async () => undefined),
       searchAllNodes: vi.fn(async () => undefined),
+      toggleStarNode: vi.fn(async () => undefined),
       quit: vi.fn(async () => undefined),
       setAlwaysOnTop: vi.fn(async () => undefined),
       setAppearance: vi.fn(async () => undefined),
@@ -209,6 +212,7 @@ describe('command registry', () => {
     expect(services.findNext).toHaveBeenCalledExactlyOnceWith()
     expect(services.findPrevious).toHaveBeenCalledExactlyOnceWith()
     expect(services.searchAllNodes).toHaveBeenCalledExactlyOnceWith()
+    expect(services.toggleStarNode).toHaveBeenCalledExactlyOnceWith()
     expect(services.showTree).toHaveBeenCalledExactlyOnceWith()
     expect(services.quit).toHaveBeenCalledExactlyOnceWith()
     expect(services.setAlwaysOnTop).toHaveBeenCalledExactlyOnceWith(false)
@@ -240,7 +244,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(18)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(19)
   })
 
   it('keeps optional actions unchecked and tolerates unavailable services', async () => {

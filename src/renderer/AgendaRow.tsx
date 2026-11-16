@@ -141,6 +141,7 @@ export const AgendaRow = memo(function AgendaRow({
           <>
             <span
               aria-hidden="true"
+              data-starred={node!.starred}
               className={`node-enter-control${node!.children.length > 0 ? ' node-enter-control-has-children' : ''}`}
             />
             {renderInput === undefined ? (

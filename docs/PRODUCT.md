@@ -437,6 +437,14 @@ The state belongs to the node and travels with it:
 
 ---
 
+### 2.6 Starred Nodes
+
+`toggle-star-node` in the command panel adds or removes a star on the current real node. It changes only that node, including the editable Tree parent heading and real Agenda nodes; synthetic Agenda rows cannot be starred. It has no default keyboard shortcut. The command shows its active state when the current node is starred.
+
+A small star replaces the node's circular marker in Tree and Agenda. For the current node, the star itself takes the focused marker's text color; no circular focus dot is drawn over it. The editable parent heading shows it to the left of its text; Search results show a star beside the title. The indicator is outside editable text and does not change text, caret offsets or the marker's navigation action.
+
+The star is document content. A toggle is one undoable change, keeps selection and caret in place, and uses the ordinary pending-save policy and save-failure lock (§16). A pending Vim Replace edit finishes as a separate change before the toggle, returning to Normal mode. Undo/Redo uses the changed node's beginning as its change site (§10). Stars survive restart, content edits and moves. Subtree copies retain each copied node's star. Newly created nodes start without a star; splitting retains it on the original identity and joining retains the surviving identity's star. Older documents load without stars. Text-only clipboard copies contain no star metadata.
+
 ## 3. Initial State
 
 On first launch, when no document exists:
@@ -2187,7 +2195,7 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior. Resource constraints are in §20.14.3.
 
-With empty input the popup lists up to eight distinct recent nodes, most recently used first, with each node's text and parent path (§20.14.2). The first result is selected, including the current node when it is most recent. Empty history displays `No recent nodes`.
+With empty input the popup first lists all starred nodes (§2.6), sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. Then it lists up to eight distinct nonstarred recent nodes, most recently used first, without repeating starred entries. Both parts use the existing consecutive-parent grouping (§20.14.2). The first result is selected. The heading is `Starred and recent` when stars are present and `Recent` otherwise. An empty combined list displays `No recent nodes`. Every nonempty query, including one character or whitespace, uses the existing query logic without star priority; clearing restores the combined list.
 
 Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
 

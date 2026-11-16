@@ -129,7 +129,7 @@ export function GlobalSearchPopup({
   const session = useMemo(
     () =>
       new GlobalSearchSession({
-        recent: () => store.recentNodes.getResults(),
+        recent: () => store.initialSearchResults(),
         suggestions: (query) => store.searchNodeSuggestions(query),
         search: (query, publish) => store.searchNodes(query, publish),
       }),
@@ -536,7 +536,9 @@ export function GlobalSearchPopup({
       )}
       {(suggestions.length === 0 || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">
-          <span>{query === '' ? 'Recent' : 'Results'}</span>
+          <span>
+            {query === '' ? (items.some((item) => item.starred) ? 'Starred and recent' : 'Recent') : 'Results'}
+          </span>
           {query !== '' && suggestions.length === 0 && items.length > 0 && (
             <output
               className="node-search-position"
@@ -621,6 +623,11 @@ export function GlobalSearchPopup({
                       onClick={() => visit(index)}
                     >
                       <span className="recent-node-title-line">
+                        {item.starred ? (
+                          <span className="node-star" role="img" aria-label="Starred">
+                            ★
+                          </span>
+                        ) : null}
                         <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
                           <SearchResultText
                             text={item.text}

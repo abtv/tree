@@ -142,6 +142,7 @@ export function NodeInput({
     .join(' ')
   const commonProps = {
     'aria-label': label,
+    'aria-description': node.starred ? 'Starred' : undefined,
     className,
     onBlur,
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {

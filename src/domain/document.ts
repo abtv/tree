@@ -65,6 +65,7 @@ export {
   splitNode,
   subtreeHeight,
   toggleStrikethrough,
+  toggleStarNode,
   wouldExceedMaximumDepth,
 } from './document-operations'
 export type { SiblingRangeJoin, SiblingRangeShift, SubtreeMove } from './document-operations'

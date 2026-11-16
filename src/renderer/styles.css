@@ -820,6 +820,36 @@ body:not(.node-drag-active) .location-link:hover {
   content: '';
 }
 
+.node-enter-control[data-starred='true']::before {
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
+  background: var(--color-gutter-mark);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.current-parent[data-starred='true']::before {
+  content: '★';
+  position: absolute;
+  left: -22px;
+  top: 2px;
+  font-size: 13px;
+  color: var(--color-gutter-mark);
+  pointer-events: none;
+}
+
+.current-parent[data-starred='true'] {
+  position: relative;
+}
+
+.node-star {
+  color: var(--color-gutter-mark);
+  font-size: 20px;
+  flex: none;
+  /* Center the star glyph optically on the first text line, including multiline results. */
+  transform: translateY(-2px);
+}
+
 .node-enter-control-has-children {
   background: var(--color-enter-ring-background);
 }
@@ -889,6 +919,15 @@ body:not(.node-drag-active) .location-link:hover {
   border-radius: 50%;
   background: var(--color-text);
   pointer-events: none;
+}
+
+/* Starred rows use the star itself for focus; retain the marker as the active-row hook. */
+.node-focus-marker:has(~ .node-enter-control[data-starred='true']) {
+  background: transparent;
+}
+
+.node-focus-marker ~ .node-enter-control[data-starred='true']::before {
+  background: var(--color-text);
 }
 
 /* Extend active-line feedback through indentation without moving content or dimming other rows. */

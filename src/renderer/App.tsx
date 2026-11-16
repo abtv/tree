@@ -670,6 +670,7 @@ export function App({
                 <section
                   aria-label="Current parent"
                   className="current-parent"
+                  data-starred={currentParent.starred}
                   data-color-depth={path.length - 1}
                   data-has-attachment={currentParent.attachment !== undefined}
                   onClick={(event) => {

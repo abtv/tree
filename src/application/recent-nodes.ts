@@ -11,6 +11,7 @@ export interface RecentNode {
   readonly tagMatches?: readonly TextMatch[]
   readonly pathTagMatches?: readonly TextMatch[]
   readonly struckThrough?: true
+  readonly starred?: true
   readonly pathStruckMatches?: readonly TextMatch[]
 }
 
@@ -108,6 +109,7 @@ export class RecentNodes {
         missing.add(id)
         continue
       }
+      if (found.at(-1)!.starred) continue
       results.push({
         id,
         text: resultText(found.at(-1)!),
@@ -146,6 +148,7 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
   }
   return {
     ...(node.struckThrough ? { struckThrough: true as const } : {}),
+    ...(node.starred ? { starred: true as const } : {}),
     ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
   }
 }

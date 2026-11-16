@@ -51,7 +51,7 @@ export function serializeState(
   for (const id of view.expandedIds) if (buildNodeIndex(document).has(id)) expandedIds.push(id)
   const agendaFolds = normalizeAgendaFolds(view.agendaFolds)
   return {
-    version: 4,
+    version: 5,
     document,
     location: { ...location },
     view: {
@@ -62,17 +62,17 @@ export function serializeState(
   }
 }
 
-function isSupportedVersion(version: unknown): version is 1 | 2 | 3 | 4 {
-  return version === 1 || version === 2 || version === 3 || version === 4
+function isSupportedVersion(version: unknown): version is 1 | 2 | 3 | 4 | 5 {
+  return version === 1 || version === 2 || version === 3 || version === 4 || version === 5
 }
 
-/** Version 3 added the view block; version 4 keeps it and adds the per-node strikethrough. */
+/** Version 3 added the view block; subsequent content schema versions retain it. */
 function hasView(version: unknown): boolean {
-  return version === 3 || version === 4
+  return version === 3 || version === 4 || version === 5
 }
 
 /**
- * Checks the view shape of a version 3 or 4 state. An expanded id that names no node is tolerated,
+ * Checks the view shape of a version 3–5 state. An expanded id that names no node is tolerated,
  * since it cannot display anything; a malformed view is rejected like any other malformed field.
  */
 function assertView(value: Record<string, unknown>): void {
@@ -208,7 +208,7 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
     throw new Error('The saved document location does not match its tree.')
   }
   validatedDocuments.add(document)
-  return { version: 4, document, location, view: parseView(value, nodeIds) }
+  return { version: 5, document, location, view: parseView(value, nodeIds) }
 }
 
 function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {
@@ -284,7 +284,8 @@ function walkNodes(
       typeof candidate.id !== 'string' ||
       candidate.id.length === 0 ||
       typeof candidate.text !== 'string' ||
-      (candidate.struckThrough !== undefined && candidate.struckThrough !== true)
+      (candidate.struckThrough !== undefined && candidate.struckThrough !== true) ||
+      (candidate.starred !== undefined && candidate.starred !== true)
     ) {
       throw new Error('A saved node is invalid.')
     }
@@ -307,6 +308,7 @@ function walkNodes(
         ...(links.length === 0 ? {} : { links }),
         ...(attachment === undefined ? {} : { attachment }),
         ...(candidate.struckThrough === true ? { struckThrough: true as const } : {}),
+        ...(candidate.starred === true ? { starred: true as const } : {}),
         children: [],
       }
       frame.output.push(node)

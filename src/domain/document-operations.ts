@@ -60,6 +60,7 @@ function cloneNodeShallow(node: TreeNode): BuildNode {
     ...(node.links === undefined ? {} : { links: node.links.map((link) => ({ ...link })) }),
     ...(node.attachment === undefined ? {} : { attachment: { ...node.attachment } }),
     ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
+    ...(node.starred === true ? { starred: true as const } : {}),
     children: [],
   }
 }
@@ -115,6 +116,7 @@ function contentReplacement(
     ...(links.length === 0 ? {} : { links }),
     ...(attachment === undefined ? {} : { attachment }),
     ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
+    ...(node.starred === true ? { starred: true as const } : {}),
     children: node.children,
   }
 }
@@ -374,6 +376,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
     ...(source.links === undefined ? {} : { links: source.links.map((link) => ({ ...link })) }),
     ...(source.attachment === undefined ? {} : { attachment: { ...source.attachment } }),
     ...(source.struckThrough === true ? { struckThrough: true as const } : {}),
+    ...(source.starred === true ? { starred: true as const } : {}),
     children: [],
   }
   const stack: Array<{ source: TreeNode; target: BuildNode }> = [{ source, target: root }]
@@ -386,6 +389,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
         ...(child.links === undefined ? {} : { links: child.links.map((link) => ({ ...link })) }),
         ...(child.attachment === undefined ? {} : { attachment: { ...child.attachment } }),
         ...(child.struckThrough === true ? { struckThrough: true as const } : {}),
+        ...(child.starred === true ? { starred: true as const } : {}),
         children: [],
       }
       target.children.push(copy)
@@ -755,6 +759,18 @@ export function attachImage(document: Document, nodeId: NodeId, attachment: Atta
     setAttachmentSummary(next, counts)
   }
   return next
+}
+
+/** Toggle one node's star without changing its identity, children, or content. */
+export function toggleStarNode(document: Document, nodeId: NodeId): Document {
+  const located = requireNode(document, nodeId)
+  const replacement = { ...located.node }
+  if (replacement.starred) delete replacement.starred
+  else replacement.starred = true
+  const result = replaceNode(document, located, replacement)
+  shareIndex(document, result)
+  inheritAttachmentIds(document, result)
+  return result
 }
 
 /**

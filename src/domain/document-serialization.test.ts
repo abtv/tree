@@ -135,7 +135,7 @@ const cases: PersistedStateCase[] = [
   },
   {
     name: 'rejects an unsupported version',
-    state: { ...validState, version: 5, view: { expandedIds: [] } },
+    state: { ...validState, version: 6, view: { expandedIds: [] } },
     decision: 'reject',
     error: 'The saved document has an unsupported format.',
   },
@@ -454,14 +454,14 @@ describe('persisted state validator conformance', () => {
 
     const parsed = parsePersistedState(state)
 
-    expect(parsed.version).toBe(4)
+    expect(parsed.version).toBe(5)
     expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
     expect(parsed.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
     expect(parsed.view).toEqual({ expandedIds: ['root'] })
 
     const saved = serializeState(parsed.document, parsed.location, parsed.view)
 
-    expect(saved.version).toBe(4)
+    expect(saved.version).toBe(5)
     expect(parsePersistedState(JSON.parse(JSON.stringify(saved)))).toEqual(parsed)
     expect(state.document.roots[0]!.struckThrough).toBe(true)
   })
@@ -469,7 +469,7 @@ describe('persisted state validator conformance', () => {
   it.each([1, 2, 3])('loads a schema version %i file with no struck-through node', (version) => {
     const parsed = parsePersistedState({ ...validState, version, view: { expandedIds: [] } })
 
-    expect(parsed.version).toBe(4)
+    expect(parsed.version).toBe(5)
     expect(parsed.document.roots[0]).not.toHaveProperty('struckThrough')
   })
 

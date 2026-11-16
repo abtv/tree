@@ -445,7 +445,7 @@ describeForEachEditingMode('inline node expansion', ({ mode, screenshotName }) =
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
 
-    expect(persisted.version).toBe(4)
+    expect(persisted.version).toBe(5)
     expect(persisted.location).toEqual({ currentParentId: null, selectedNodeId: 'a1a' })
     expect(new Set(persisted.view?.expandedIds)).toEqual(new Set(['a', 'a1']))
 

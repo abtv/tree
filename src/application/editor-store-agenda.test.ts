@@ -53,6 +53,24 @@ export function ready(store: EditorStore): ReadySnapshot {
 
 afterEach(() => vi.useRealTimers())
 
+// @requirement PRODUCT.md §2.6
+it('stars the real Agenda node and rejects synthetic selections', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `day:${today}` })
+  const before = ready(store).document
+
+  expect(store.starTarget).toBeUndefined()
+  expect(store.toggleStarNode()).toBe(false)
+  expect(ready(store).document).toBe(before)
+
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  expect(store.toggleStarNode()).toBe(true)
+  expect(store.starTarget).toMatchObject({ id: 'scope', starred: true })
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today}:scope`)
+  await store.flushPersistence()
+})
+
 // @requirement PRODUCT.md §23.5
 it.each(['close', 'enter'] as const)('remembers folded days after leaving Agenda with %s', async (exit) => {
   vi.useFakeTimers()

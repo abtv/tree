@@ -14,6 +14,7 @@ import {
   removeTextRange,
   requireNode,
   toggleStrikethrough,
+  toggleStarNode,
   type AttachmentId,
   type AttachmentReference,
   type Document,
@@ -68,6 +69,7 @@ import {
 import { EditorSaveScheduler, type SaveSchedulerResult } from './editor-save-scheduler'
 import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
+import { starredNodes } from './starred-nodes'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
@@ -205,6 +207,30 @@ export class EditorStore {
   public getSnapshot = this.runtime.getSnapshot
 
   public subscribe = this.runtime.subscribe
+
+  public initialSearchResults(): readonly RecentNode[] {
+    return [...starredNodes(this.runtime.ready().document), ...this.recentNodes.getResults()]
+  }
+
+  public get starTarget(): TreeNode | undefined {
+    const state = this.getSnapshot()
+    if (state.status !== 'ready' || this.isPersistenceLocked()) return undefined
+    const selected =
+      state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda?.selectedKey)
+    if (state.agenda !== undefined && selected?.kind !== 'node') return undefined
+    const id = selected?.kind === 'node' ? selected.nodeId : state.location.selectedNodeId
+    return locateNode(state.document, id)?.node
+  }
+
+  public toggleStarNode(): boolean {
+    const target = this.starTarget
+    if (target === undefined) return false
+    this.finishPendingEdits()
+    this.endTextSession()
+    const state = this.runtime.ready()
+    this.applyStructural(toggleStarNode(state.document, target.id), state.location, state.focus)
+    return true
+  }
 
   public searchNodeSuggestions(query: string): readonly string[] {
     const prefix = tagPrefix(query)

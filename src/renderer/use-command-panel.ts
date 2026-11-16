@@ -61,6 +61,9 @@ export function useCommandPanel(options: {
   }, [])
   const running = useRef(false)
   const snapshot = store.getSnapshot()
+  const starTarget = store.starTarget
+  const starred = starTarget?.starred === true
+  const canStar = starTarget !== undefined
   useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
   const canSummarize = store.canSummarize
   const imageToTextAvailable = store.imageToTextAvailable === true
@@ -72,10 +75,16 @@ export function useCommandPanel(options: {
           vim: vimAvailable,
           alwaysOnTop: alwaysOnTopAvailable,
           imageToText: imageToTextAvailable,
-        }).map((command) => (command.name === 'summarize' ? { ...command, enabled: canSummarize } : command)),
+        }).map((command) =>
+          command.name === 'toggle-star-node'
+            ? { ...command, enabled: canStar }
+            : command.name === 'summarize'
+              ? { ...command, enabled: canSummarize }
+              : command,
+        ),
         ...menuEntries,
       ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canSummarize],
+    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canSummarize, canStar],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -145,6 +154,9 @@ export function useCommandPanel(options: {
       try {
         await command.run(
           {
+            toggleStarNode: async () => {
+              store.toggleStarNode()
+            },
             summarize: async () => store.summarize(options.summarySelection),
             imageToText: async () => store.imageToText(),
             reindexAllImages: async () => store.reindexAllImages(),
@@ -169,7 +181,7 @@ export function useCommandPanel(options: {
               setAppearance(value)
             },
           },
-          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view },
+          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred },
         )
         if (command.name !== 'quit') {
           const next = rememberCommand(history, command.name)
@@ -184,6 +196,7 @@ export function useCommandPanel(options: {
     },
     [
       close,
+      starred,
       searchCommand,
       showAbout,
       input,
@@ -333,7 +346,7 @@ export function useCommandPanel(options: {
     bindInput,
     matches,
     total: commands.length,
-    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view },
+    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred },
     changeInput: (value: string) => {
       setInput(value)
       setSelected(0)

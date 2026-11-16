@@ -106,7 +106,7 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 22 : 20
+    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 23 : 21
     await expect(window.locator('.command-count')).toHaveText(`${commandCount} of ${commandCount}`)
 
     await window.keyboard.press('ArrowUp')
@@ -255,6 +255,7 @@ test.describe('Normal command panel', () => {
       'show-tree',
       'summarize',
       'toggle-line-numbers',
+      'toggle-star-node',
       'toggle-vim-mode',
       'update-app',
     ])

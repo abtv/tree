@@ -52,6 +52,7 @@ interface RawNode {
   text: string
   hasAttachment: boolean
   struckThrough: boolean
+  starred: boolean
   children: RawNode[]
 }
 
@@ -61,6 +62,7 @@ function rawNode(depth: number): fc.Arbitrary<RawNode> {
       text: fc.string(),
       hasAttachment: fc.boolean(),
       struckThrough: fc.boolean(),
+      starred: fc.boolean(),
       children: fc.constant<RawNode[]>([]),
     })
   }
@@ -68,6 +70,7 @@ function rawNode(depth: number): fc.Arbitrary<RawNode> {
     text: fc.string(),
     hasAttachment: fc.boolean(),
     struckThrough: fc.boolean(),
+    starred: fc.boolean(),
     children: fc.array(rawNode(depth - 1), { maxLength: 3 }),
   })
 }
@@ -85,6 +88,7 @@ function materialize(rawForest: RawNode[]): Document {
       text: raw.text,
       ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
       ...(complete ? { struckThrough: true as const } : {}),
+      ...(raw.starred ? { starred: true as const } : {}),
       children,
     }
   }

@@ -104,6 +104,8 @@ export const NodeRow = memo(function NodeRow({
       {focused ? <span aria-hidden="true" className="node-focus-marker" /> : null}
       <button
         aria-label={`Enter node ${index + 1}`}
+        data-starred={node.starred}
+        title={node.starred ? 'Starred' : undefined}
         className={`node-enter-control${hasChildren ? ' node-enter-control-has-children' : ''}`}
         onClick={() => onEnter(node)}
         onMouseDown={(event) => {

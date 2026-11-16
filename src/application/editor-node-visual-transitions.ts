@@ -339,6 +339,7 @@ export function nodeVisualTransition(
         ...(links.length === 0 ? {} : { links }),
         ...(node.attachment === undefined ? {} : { attachment: node.attachment }),
         ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
+        ...(node.starred === true ? { starred: true as const } : {}),
         children: node.children.map(transform),
       }
     }
