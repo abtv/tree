@@ -30,6 +30,10 @@ export class EmojiHistory {
     void this.flush().catch(this.report)
   }
 
+  public hasPendingChanges(): boolean {
+    return this.write !== undefined && this.saved !== this.revision
+  }
+
   public flush(): Promise<void> {
     this.pending = this.pending
       .catch(() => undefined)

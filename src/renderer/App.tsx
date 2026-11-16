@@ -51,6 +51,7 @@ import { StatusBar } from './StatusBar'
 
 interface AppProps {
   platformStatus?: React.ReactNode
+  dismissTransientStatus?: () => void
   showAbout?: () => void
   registerSearchCommands?: (run: (command: import('../shared/ipc').FindMenuCommand) => void) => () => void
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
@@ -75,6 +76,7 @@ interface AppProps {
 
 export function App({
   platformStatus,
+  dismissTransientStatus,
   showAbout,
   registerSearchCommands,
   store,
@@ -249,6 +251,8 @@ export function App({
     applyLineNumbers,
     beforeOpen: () => {
       store.dismissImageToTextStatus()
+      dataOperations?.dismissTransientStatus()
+      dismissTransientStatus?.()
       store.search.interruptNavigation()
       if (store.search.session.getSnapshot().draft !== undefined) {
         store.search.cancelDraft()

@@ -21,6 +21,34 @@ const today = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+// @requirement PRODUCT.md §20.2.28
+// @requirement PRODUCT.md §24.3
+test('dismisses completed export feedback when the command panel opens', async ({ newContext, baseURL }) => {
+  const context = await newContext()
+  const page = await context.newPage()
+  await page.goto(baseURL!)
+  await ready(page)
+  const editor = page.locator('.node-input').first()
+  await editor.focus()
+  const downloading = page.waitForEvent('download')
+
+  await chooseMenuItem(page, 'Export Notes…')
+  await downloading
+
+  await expect(activityText(page)).toContainText('Exported')
+  await expect(activity(page)).toBeVisible()
+
+  await page.keyboard.press(`${primaryKey}+Shift+p`)
+
+  await expect(page.getByRole('combobox', { name: 'Command' })).toBeFocused()
+  expect(await activity(page).isHidden()).toBe(true)
+
+  await page.keyboard.press('Escape')
+
+  expect(await activity(page).isHidden()).toBe(true)
+  await expect(editor).toBeFocused()
+})
+
 // @requirement PRODUCT.md §24.3
 test('exports the saved notes and referenced images from a worker', async ({ newContext, baseURL }) => {
   const context = await newContext()

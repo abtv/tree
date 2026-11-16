@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import type { TreeNode } from '../../src/domain/document'
 import {
+  clickApplicationMenuQuit,
   describeForEachEditingMode,
   expect,
   fireIdleSave,
@@ -53,6 +54,46 @@ function seed(userDataDir: string): void {
 }
 
 describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §16
+  // @requirement PRODUCT.md §23.5
+  test('remembers folded days after native quit and restart', async ({ userDataDir }, testInfo) => {
+    seed(userDataDir)
+    const { window, app } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    const before = readPersisted(userDataDir)
+    await window.keyboard.press('Meta+p')
+    const friday = window.locator('.agenda-row-day').filter({ hasText: 'Fri Oct 9' })
+    await friday.click()
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('z')
+      await window.keyboard.press('a')
+    } else await window.keyboard.press('Meta+e')
+
+    await expect(friday.getByRole('button', { name: 'Expand Fri Oct 9', exact: true })).toBeVisible()
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+
+    const restarted = await launchTree(userDataDir)
+    await setAgendaToday(restarted.window)
+    await expect(restarted.window.locator('.agenda-list')).toHaveCount(0)
+    await restarted.window.keyboard.press('Meta+p')
+
+    const restored = restarted.window.locator('.agenda-row-day').filter({ hasText: 'Fri Oct 9' })
+    await expect(restored.getByRole('button', { name: 'Expand Fri Oct 9', exact: true })).toBeVisible()
+    await expectFocused(restarted.window.locator('.agenda-today'))
+    expect(readPersisted(userDataDir).document).toEqual(before.document)
+    expect(readPersisted(userDataDir).location).toEqual(before.location)
+    await restarted.window.screenshot({ path: testInfo.outputPath(`remembered-days-${mode}.png`) })
+
+    await restored.getByRole('button', { name: 'Expand Fri Oct 9', exact: true }).click()
+    await expect(restored.getByRole('button', { name: 'Collapse Fri Oct 9', exact: true })).toBeVisible()
+    await restarted.window.keyboard.press('Meta+p')
+    await restarted.window.keyboard.press('Meta+p')
+    await expect(restored.getByRole('button', { name: 'Collapse Fri Oct 9', exact: true })).toBeVisible()
+  })
+
   // @requirement PRODUCT.md §23.1
   test('opens the whole document from a nested Tree location and restores the origin', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -81,6 +122,54 @@ describeForEachEditingMode('Agenda timeline', ({ mode, screenshotName }) => {
 
     await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveText('2026-10-08 Parent')
     await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §23.4
+  // @requirement PRODUCT.md §6.1
+  test('opens the selected Agenda match outside the original Tree branch', async ({ userDataDir }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          node('origin', 'Original branch', [
+            node('origin-parent', '2026-10-08 Original parent', [leaf('origin-child', 'Original selection')]),
+          ]),
+          node('target', '2026-10-08 Target', [leaf('first', 'First child'), leaf('second', 'Second child')]),
+        ],
+      },
+      location: { currentParentId: 'origin-parent', selectedNodeId: 'origin-child' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await expect(window.locator('[data-node-id="origin-child"] .node-input')).toBeFocused()
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row-node[data-node-id="target"]').click()
+    await window.keyboard.press('Escape')
+    await expect(window.locator('.agenda-row-node[data-node-id="target"]')).toHaveAttribute('aria-selected', 'true')
+
+    if (mode === 'vim') {
+      await window.keyboard.press('g')
+      await window.keyboard.press('d')
+    } else await window.keyboard.press('Meta+.')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveText('2026-10-08 Target')
+    const first = window.locator('[data-node-id="first"] .node-input')
+    await expect(first).toBeFocused()
+    expect(await first.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(0)
+    await window.screenshot({ path: testInfo.outputPath(`agenda-target-${mode}.png`) })
+
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row-node[data-node-id="origin-parent"]').click()
+    await window.keyboard.press('Escape')
+    const origin = window.locator('.agenda-row-node[data-node-id="origin-parent"] .node-input')
+    await setCursor(origin, 11)
+    if (mode === 'vim') await window.keyboard.press('R')
+    await window.keyboard.type('q')
+    await window.keyboard.press('Meta+.')
+
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveText(
+      mode === 'vim' ? '2026-10-08 qriginal parent' : '2026-10-08 qOriginal parent',
+    )
+    await expect(window.locator('[data-node-id="origin-child"] .node-input')).toBeFocused()
   })
 
   // @requirement PRODUCT.md §23.6

@@ -212,13 +212,14 @@ it.each(['insert', 'replace'])('preserves %s editing when background OCR complet
 it.each(['expiry', 'colon', 'palette'])(
   'dismisses OCR feedback on %s while retaining persistent errors and mode',
   async (action) => {
+    const dismissTransientStatus = vi.fn()
     const store = await createSeededStore(
       { roots: [{ id: 'root', text: 'Task', children: [] }] },
       { currentParentId: null, selectedNodeId: 'root' },
       async () => undefined,
       { imageToText: async () => [] },
     )
-    renderReact(<App store={store} initialVimEnabled={true} />)
+    renderReact(<App store={store} initialVimEnabled={true} dismissTransientStatus={dismissTransientStatus} />)
     await act(async () => {})
     vi.useFakeTimers()
     act(() => {
@@ -244,6 +245,7 @@ it.each(['expiry', 'colon', 'palette'])(
     }
 
     expect(screen.queryByText('Image to text: select an editable node with an image.')).toBeNull()
+    expect(dismissTransientStatus).toHaveBeenCalledTimes(action === 'expiry' ? 0 : 1)
     expect(screen.getByRole('alert')).toHaveTextContent('Persistent error')
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
 

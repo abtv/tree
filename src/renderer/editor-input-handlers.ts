@@ -172,8 +172,6 @@ export function createEditorKeyDownHandler({
       if (primary && event.key === '.') {
         event.preventDefault()
         prepareVimCommand(vim, 'navigation', event.currentTarget)
-        store.closeAgenda()
-        store.selectNode(node.id, getCaret(event.currentTarget))
         store.enter()
         vim?.syncImageCaretToFocus()
         return

@@ -201,6 +201,30 @@ describe('EditorSaveScheduler volume trigger', () => {
 })
 
 describe('EditorSaveScheduler failure lifecycle', () => {
+  it.each(['initial', 'immediate', 'volume', 'link'] as const)(
+    'rejects an automatic %s request after the failure limit',
+    async (trigger) => {
+      const { clock, save, scheduler, locked } = createHarness()
+      save.mockRejectedValue(new Error('disk full'))
+      scheduler.markPersistedChange()
+      await clock.advanceTo(IDLE * 3)
+
+      expect(locked()).toBe(true)
+      expect(save).toHaveBeenCalledTimes(3)
+      save.mockResolvedValue(undefined)
+
+      if (trigger === 'initial') scheduler.requestSave()
+      else if (trigger === 'immediate') scheduler.requestImmediateSave()
+      else scheduler.noteChange(trigger === 'volume' ? 10 : 0, trigger === 'link')
+      await clock.advanceTo(IDLE * 10)
+      await settle()
+
+      expect(save).toHaveBeenCalledTimes(3)
+      expect(locked()).toBe(true)
+      expect(scheduler.hasPendingChanges()).toBe(true)
+    },
+  )
+
   it('stops automatic writes at the failure limit and unlocks after a successful final save', async () => {
     const { clock, save, scheduler, locked, report } = createHarness()
     const error = new Error('disk full')
@@ -220,7 +244,7 @@ describe('EditorSaveScheduler failure lifecycle', () => {
     expect(save).toHaveBeenCalledTimes(3)
 
     save.mockResolvedValue(undefined)
-    scheduler.requestImmediateSave()
+    scheduler.requestImmediateSave('flush')
     await scheduler.flush()
 
     expect(save).toHaveBeenCalledTimes(4)

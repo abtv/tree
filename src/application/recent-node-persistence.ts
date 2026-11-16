@@ -23,6 +23,10 @@ export class RecentNodePersistence {
     }, 30_000)
   }
 
+  public hasPendingChanges(): boolean {
+    return this.write !== undefined && this.saved !== this.revision
+  }
+
   public async flush(): Promise<void> {
     if (this.timer !== undefined) this.clock.clearTimeout(this.timer)
     this.timer = undefined

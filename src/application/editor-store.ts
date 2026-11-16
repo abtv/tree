@@ -84,6 +84,7 @@ import {
 } from './expansion-state'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
+import { AgendaFoldMemory } from './agenda-fold-memory'
 import {
   activeAgendaOccurrence,
   focusedAgendaDay,
@@ -121,6 +122,7 @@ export class EditorStore {
   public readonly recentNodes: Pick<RecentNodes, 'getIds' | 'getResults'> = this.recentNodesOwner
   private readonly tags = new Map<TagPrefix, TagCatalog>(TAG_PREFIXES.map((prefix) => [prefix, new TagCatalog(prefix)]))
   private readonly agendaRowsCache = new AgendaRowsCache()
+  private readonly agendaFoldMemory = new AgendaFoldMemory()
   private visibleRowsCache:
     { document: Document; parentId: NodeId | null; expansion: ExpansionState; rows: readonly VisibleRow[] } | undefined
   private readonly searchOwner = new EditorSearch(
@@ -184,8 +186,12 @@ export class EditorStore {
             this.selectedRowTop = Math.max(0, Math.round(measured))
           const expandedIds = state.expansion.expandedIds
           const selectedRowTop = this.selectedRowTop
-          // JSON persistence omits an undefined position even if the key is present.
-          const view = selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop }
+          const agendaFolds = this.agendaFoldMemory.persisted
+          const view = {
+            expandedIds,
+            ...(selectedRowTop === undefined ? {} : { selectedRowTop }),
+            ...(agendaFolds === undefined ? {} : { agendaFolds }),
+          }
           return { document: state.document, location: state.agenda?.origin.location ?? state.location, view }
         },
         referencedAttachmentIds: () => this.referencedAttachmentIds(),
@@ -242,7 +248,7 @@ export class EditorStore {
         day: date.getDate(),
       })
     this.endTextSession()
-    const agenda = openAgendaState(state.location, cursor ?? state.focus.cursor, today)
+    const agenda = openAgendaState(state.location, cursor ?? state.focus.cursor, today, this.agendaFoldMemory.collapsed)
     this.runtime.replaceReady({ ...state, agenda })
   }
 
@@ -278,6 +284,7 @@ export class EditorStore {
       this.searchOwner.manualAgendaFold(command)
     }
     const changed = applyAgendaCommand(state.agenda, command, rows)
+    if (this.agendaFoldMemory.remember(command, rows, changed)) this.markPersistedChange()
     const changedPresentation = command.kind === 'return-timeline' || command.kind === 'shift-week'
     const nextRows = changedPresentation ? this.agendaRowsCache.get(state.document, changed) : rows
     const agenda = changedPresentation ? reconcileAgendaSelection(changed, nextRows) : changed
@@ -419,8 +426,8 @@ export class EditorStore {
 
   /**
    * Registers a renderer-local pending-edit finisher. `flushPersistence` invokes registered
-   * finishers immediately before it captures state for each save and again after the save
-   * completes. A pending edit that lives outside the store — the Vim Replace buffer — is thereby
+   * finishers immediately before it captures state for each save and again after document and
+   * preference writes complete. A pending edit outside the store — the Vim Replace buffer — is thereby
    * committed into the document and captured by the same flush, and an edit completed while a save
    * is in flight is saved before the flush resolves. A finisher returns true only on the call that
    * committed a change, must be idempotent, and must no-op (returning false) when nothing is
@@ -444,12 +451,21 @@ export class EditorStore {
         this.finishPendingEdits()
         await Promise.all(this.pendingEdits)
         // requestImmediateSave returns early without pending changes, so this guard only avoids the call.
-        if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave()
+        if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave('flush')
+        await this.saveScheduler.flush()
+        await this.recentPersistence.flush()
+        await this.emojiHistory.flush()
+        // Metadata writes leave editing available. An immediate save started meanwhile has
+        // already cleared the dirty flag; drain it, including its failure, before another pass.
         await this.saveScheduler.flush()
         committed = this.finishPendingEdits()
-      } while (committed || this.pendingEdits.size > 0 || this.saveScheduler.hasPendingChanges())
-      await this.recentPersistence.flush()
-      await this.emojiHistory.flush()
+      } while (
+        committed ||
+        this.pendingEdits.size > 0 ||
+        this.saveScheduler.hasPendingChanges() ||
+        this.recentPersistence.hasPendingChanges() ||
+        this.emojiHistory.hasPendingChanges()
+      )
     } finally {
       resumeSummarization?.()
       resumeImageRecognition?.()
@@ -666,6 +682,7 @@ export class EditorStore {
       // fallback below are defenses for the optional type only; no supported input reaches them.
       this.selectedRowTop = parsed.view?.selectedRowTop
       this.restoredSelectedRowTop = parsed.view?.selectedRowTop
+      this.agendaFoldMemory.restore(parsed.view?.agendaFolds)
       const expansion = expansionFromIds(parsed.view?.expandedIds ?? [])
       const location = normalizeVisibleLocation(parsed.document, parsed.location, (id) => isNodeExpanded(expansion, id))
       this.runtime.snapshot = {
@@ -858,19 +875,20 @@ export class EditorStore {
     const expectedContent = nodeContent(requireNode(state.document, nodeId).node)
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
-      if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) return
+      const target = this.clipboardTarget(nodeId)
+      if (target === undefined) return
       // A selected node always exists in a ready document: every command and history restore
       // normalizes the location. Reaching this guard would need an inconsistent snapshot, so
       // it is an internal defense and no supported input exercises it.
-      const current = locateNode(this.runtime.snapshot.document, nodeId)?.node
+      const current = locateNode(target.document, nodeId)?.node
       if (current === undefined) return
       if (!sameNodeContent(current, expectedContent)) {
         this.reportError(new Error(CUT_CONFLICT_ERROR))
         return
       }
       this.applyStructural(
-        removeTextRange(this.runtime.snapshot.document, nodeId, transition.from, transition.to),
-        this.runtime.snapshot.location,
+        removeTextRange(target.document, nodeId, transition.from, transition.to),
+        target.location,
         this.runtime.newFocus(nodeId, transition.from),
       )
     })()
@@ -924,13 +942,20 @@ export class EditorStore {
 
   public enter(): void {
     const state = this.runtime.ready()
-    const transition = enterTransition(state.document, state.location)
+    const selected =
+      state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda?.selectedKey)
+    if (state.agenda !== undefined && selected?.kind !== 'node') return
+    const location =
+      selected?.kind === 'node' ? { currentParentId: null, selectedNodeId: selected.nodeId } : state.location
+    const transition = enterTransition(state.document, location)
     if (transition === undefined) return
-    this.recentNodesOwner.remember(state.location.selectedNodeId, state.document)
+    this.recentNodesOwner.remember(location.selectedNodeId, state.document)
     this.endTextSession()
+    const tree = { ...state }
+    delete tree.agenda
     this.runtime.replaceReady(
       {
-        ...state,
+        ...tree,
         location: transition.location,
         focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
       },
@@ -1496,6 +1521,19 @@ export class EditorStore {
     }
   }
 
+  private clipboardTarget(nodeId: NodeId): ReadySnapshot | undefined {
+    const state = this.runtime.snapshot
+    if (state.status !== 'ready' || state.location.selectedNodeId !== nodeId) return
+    const agenda = state.agenda
+    if (agenda !== undefined) {
+      // Synthetic Agenda rows retain the last real node in location; only the selected row
+      // determines whether an asynchronous edit still targets the user's selection.
+      const selected = this.agendaRowsCache.get(state.document, agenda).find((row) => row.key === agenda.selectedKey)
+      if (selected?.kind !== 'node' || selected.nodeId !== nodeId) return
+    }
+    return state
+  }
+
   private async pasteFromClipboard(
     nodeId: NodeId,
     cursor: number,
@@ -1504,29 +1542,27 @@ export class EditorStore {
     this.runtime.ready()
     this.endTextSession()
     await this.pendingClipboardOperation
+    if (this.isPersistenceLocked()) return
     const clipboard = await (readClipboard === undefined ? this.services.readClipboard() : readClipboard())
-    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
-      return
-    }
-    const current = this.runtime.ready()
+    const current = this.clipboardTarget(nodeId)
+    if (current === undefined || this.isPersistenceLocked()) return
     if (clipboard.kind === 'image') {
       if (current.agenda !== undefined && requireNode(current.document, nodeId).node.attachment !== undefined) return
       const attachment: AttachmentReference = { id: this.createId(), mimeType: 'image/png' }
       this.pendingAttachmentIds.add(attachment.id)
       try {
         await this.services.writeAttachment(attachment.id, clipboard.png)
-        if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.location.selectedNodeId !== nodeId) {
-          return
-        }
-        const latest = this.runtime.ready()
+        const latest = this.clipboardTarget(nodeId)
+        if (latest === undefined || this.isPersistenceLocked()) return
         // Another paste can attach an image while this write is pending.
         if (latest.agenda !== undefined && requireNode(latest.document, nodeId).node.attachment !== undefined) return
         const transition = imagePasteTransition(latest.document, latest.location, nodeId, attachment, this.createId)
-        this.applyStructural(
+        const applied = this.applyStructural(
           transition.document,
           transition.location,
           this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
         )
+        if (!applied) return
         this.requestImmediateSave()
         if (this.imageToTextAvailable && this.imageToTextQueue.enqueueIndex(transition.focus.nodeId, attachment.id)) {
           void this.runImageToTextQueue()
@@ -1556,12 +1592,12 @@ export class EditorStore {
     const position = Math.max(0, Math.min(cursor, node.text.length))
     // At position 0 the index -1 also reads as undefined, so the position guard only documents intent.
     const insertedWords = countPastedWords(clipboard.text, position > 0 ? node.text[position - 1] : undefined)
-    this.applyStructural(
+    const applied = this.applyStructural(
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
-    this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
+    if (applied) this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
   }
 
   public undo(): void {
@@ -1652,13 +1688,14 @@ export class EditorStore {
     location: Location,
     focus: FocusIntent,
     expansion: ExpansionState = this.runtime.ready().expansion,
-  ): void {
+  ): boolean {
     const state = this.runtime.ready()
-    if (this.isPersistenceLocked()) return
+    if (this.isPersistenceLocked()) return false
     this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
     if (this.history.begin(state.document)) this.queueAttachmentCleanup()
     this.runtime.replaceReady({ ...state, document, location, focus, expansion }, true)
     this.markPersistedChange()
+    return true
   }
 
   private markPersistedChange(): void {

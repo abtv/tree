@@ -94,6 +94,35 @@ test.describe('desktop Export Notes', () => {
   configureHiddenParallelTests()
 
   // @requirement PRODUCT.md §20.2.28
+  // @requirement PRODUCT.md §25.2
+  test('dismisses completed export feedback when colon opens the command panel', async ({ userDataDir }, testInfo) => {
+    seed(userDataDir)
+    const destination = join(userDataDir, 'Notes.zip')
+    const { app, window } = await launchTree(userDataDir, { vimPreference: true })
+    await window.clock.install()
+    await choosePath(app, destination)
+    await node(window, 1).focus()
+    await window.keyboard.press('Escape')
+    await startExport(app)
+    const panel = window.getByRole('complementary', { name: 'Notes activity' })
+
+    await expect(panel).toContainText('Exported “Notes.zip”.')
+
+    await window.keyboard.press(':')
+
+    await expect(window.getByRole('combobox', { name: 'Command' })).toBeFocused()
+    expect(await panel.count()).toBe(0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.screenshot({ path: testInfo.outputPath('command-after-export.png') })
+
+    await window.keyboard.press('Escape')
+
+    expect(await panel.count()).toBe(0)
+    await expect(node(window, 1)).toBeFocused()
+    expect(exportedText(destination)).toBe('Synthetic export notes')
+  })
+
+  // @requirement PRODUCT.md §20.2.28
   test('exports through the command panel and blocks data commands while running', async ({ userDataDir }) => {
     seed(userDataDir)
     const destination = join(userDataDir, 'Panel Notes.zip')

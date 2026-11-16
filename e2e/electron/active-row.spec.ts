@@ -7,6 +7,7 @@ import {
   seedDocument,
   setAgendaToday,
   setCursor,
+  setMainWindowContentSize,
   test,
   writeClipboardImageSized,
 } from './fixtures'
@@ -58,6 +59,111 @@ async function expectImageFrame(row: Locator): Promise<void> {
 }
 
 describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §2.1
+  test('aligns the last wrapped text line after deleting a newly created empty node', async ({
+    userDataDir,
+  }, testInfo) => {
+    const text = 'word '.repeat(44) + 'end.'
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'parent',
+            text: 'Synthetic notes',
+            children: [
+              { id: 'plain', text: '', children: [] },
+              { id: 'neighbor', text: 'Neighbor', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: 'parent', selectedNodeId: 'plain' },
+    })
+    const { window, app } = await launchTree(userDataDir, { initialMode: 'insert' })
+    await setMainWindowContentSize(app, { width: 1157, height: 500 })
+    const row = window.locator('.node-row[data-node-id="plain"]')
+    const input = row.locator('textarea.node-input')
+    const expectLastLine = async (): Promise<void> => {
+      await expect
+        .poll(async () => {
+          const inputBox = await input.boundingBox()
+          const rowBox = await row.boundingBox()
+          return (await highlight(row)).top - (inputBox!.y - rowBox!.y + inputBox!.height - 20)
+        })
+        .toBe(0)
+    }
+    await expect(input).toBeFocused()
+
+    await input.pressSequentially(text)
+    expect((await input.boundingBox())!.height).toBeGreaterThan(20)
+    await expectLastLine()
+
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.node-list .node-row')).toHaveCount(3)
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await window.keyboard.press('Backspace')
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue(text)
+    await expect(window.locator('.node-list .node-row')).toHaveCount(2)
+    await expectLastLine()
+
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await expect(input).toHaveJSProperty('selectionStart', text.length - 1)
+      await expectLastLine()
+    }
+    await window.screenshot({ path: testInfo.outputPath(`wrapped-line-${mode}.png`) })
+    expect((await highlight(window.locator('.node-row[data-node-id="neighbor"]'))).content).toBe('none')
+
+    // Native history must not supply the application's structural Undo/Redo.
+    await window.evaluate(() =>
+      document.addEventListener(
+        'beforeinput',
+        (event) => {
+          if (event instanceof InputEvent && ['historyUndo', 'historyRedo'].includes(event.inputType))
+            event.preventDefault()
+        },
+        true,
+      ),
+    )
+    await window.keyboard.press('Meta+z')
+    const restored = window.locator('.node-list .node-row').nth(1)
+
+    await expect(window.locator('.node-list .node-row')).toHaveCount(3)
+    await expect(restored.locator('.node-input')).toBeFocused()
+    await expect.poll(async () => (await highlight(restored)).top).toBe(0)
+    expect((await highlight(row)).content).toBe('none')
+
+    await window.keyboard.press('Meta+Shift+z')
+    const neighbor = window.locator('.node-row[data-node-id="neighbor"]')
+
+    await expect(window.locator('.node-list .node-row')).toHaveCount(2)
+    await expect(neighbor.locator('.node-input')).toBeFocused()
+    await expect.poll(async () => (await highlight(neighbor)).top).toBe(0)
+
+    await setCursor(input, mode === 'vim' ? text.length - 1 : text.length)
+    await expectLastLine()
+    for (const width of [780, 1157]) {
+      await setMainWindowContentSize(app, { width, height: 500 })
+
+      await expectLastLine()
+    }
+    if (mode === 'vim') {
+      await window.keyboard.press('0')
+      await expect.poll(async () => (await highlight(row)).top).toBe(0)
+      await window.keyboard.press('$')
+      await expectLastLine()
+    }
+
+    await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 150, 'backward'))
+    await expect.poll(async () => (await highlight(row)).top).toBe(0)
+    await input.evaluate((element) => (element as HTMLTextAreaElement).setSelectionRange(0, 150, 'forward'))
+    await expectLastLine()
+  })
+
   // @requirement PRODUCT.md §2.1
   test('highlights only the active full-width row through focus, wrapping and selection', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -256,7 +362,13 @@ describeForEachEditingMode('active row', ({ mode, screenshotName }) => {
           const style = getComputedStyle(element)
           const mirror = document.createElement('div')
           for (const property of [
-            'font',
+            'font-family',
+            'font-size',
+            'font-weight',
+            'font-style',
+            'font-variant',
+            'font-stretch',
+            'line-height',
             'letter-spacing',
             'word-spacing',
             'padding',

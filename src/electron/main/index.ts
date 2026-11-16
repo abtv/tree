@@ -225,6 +225,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
     minHeight: 480,
     title: 'Tree',
     titleBarStyle: 'hidden',
+    disableAutoHideCursor: true,
     backgroundColor: windowBackgroundColor(nativeTheme.shouldUseDarkColors, currentAppearance()),
     webPreferences: createWindowWebPreferences(join(__dirname, '../preload/index.js')),
   })

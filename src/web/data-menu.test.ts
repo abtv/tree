@@ -123,6 +123,66 @@ afterEach(() => {
 })
 
 describe('browser data operations', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it('dismisses a clean export notice without hiding a running export or its later replacement', async () => {
+    vi.useFakeTimers()
+    mockDownload()
+    const f = fixture()
+    f.button('data-export').click()
+    await vi.advanceTimersByTimeAsync(0)
+    const panel = document.getElementById('data-activity')!
+
+    f.dismissTransientStatus()
+
+    expect(panel.hidden).toBe(false)
+    expect(f.status()).toBe('Exporting Notes…')
+    expect(ArchiveWorker.instances[0]!.terminate).not.toHaveBeenCalled()
+
+    ArchiveWorker.instances[0]!.send({
+      type: 'done',
+      summary: { imageCount: 0, missingImageCount: 0, archiveBytes: 0 },
+    })
+
+    f.dismissTransientStatus()
+    f.dismissTransientStatus()
+
+    expect(panel.hidden).toBe(true)
+    expect(f.status()).toBe('')
+    expect(f.focus.restore).not.toHaveBeenCalled()
+
+    f.button('data-export').click()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(panel.hidden).toBe(false)
+    expect(f.status()).toBe('Exporting Notes…')
+    f.button('data-activity-action').click()
+  })
+
+  // @requirement PRODUCT.md §20.2.7
+  it.each(['failed', 'warning'] as const)(
+    'retains a %s export notice when transient feedback is dismissed',
+    async (kind) => {
+      vi.useFakeTimers()
+      mockDownload()
+      const f = fixture()
+      f.button('data-export').click()
+      await vi.advanceTimersByTimeAsync(0)
+      ArchiveWorker.instances[0]!.send(
+        kind === 'failed'
+          ? { type: 'error', message: 'Could not export.' }
+          : { type: 'done', summary: { imageCount: 0, missingImageCount: 1, archiveBytes: 0 } },
+      )
+      const message = f.status()
+
+      f.dismissTransientStatus()
+      await vi.advanceTimersByTimeAsync(6000)
+
+      expect(document.getElementById('data-activity')!.hidden).toBe(false)
+      expect(f.status()).toBe(message)
+      expect(f.button('data-activity-action').textContent).toBe('OK')
+    },
+  )
+
   it('does not suggest folder backup for an unrelated export failure', async () => {
     backup.supported = true
     const f = fixture()
@@ -617,6 +677,78 @@ describe('browser data operations', () => {
       expect(f.status()).toBe('')
       expect(f.focus.restore).toHaveBeenCalledOnce()
     }
+  })
+
+  describe.each(['onerror', 'onmessageerror', 'error'] as const)('worker %s during the replacement save', (failure) => {
+    // @requirement PRODUCT.md §24.4
+    it.each(['resolve', 'reject'] as const)('ignores stale save %s after retry', async (settlement) => {
+      const reload = vi.fn()
+      const href = location.href
+      vi.stubGlobal('location', { href, toString: () => href, reload })
+      const f = fixture()
+      f.choose()
+      await vi.waitFor(() => {
+        expect(f.status()).not.toContain('failed')
+        expect(ArchiveWorker.instances).toHaveLength(1)
+      })
+      const worker = ArchiveWorker.instances[0]!
+      const prepared = {
+        type: 'prepared',
+        incoming: { nodeCount: 1, imageCount: 0, missingImageCount: 0 },
+        current: 'none',
+      } as const
+      worker.send(prepared)
+      let finish!: () => void
+      let reject!: (error: Error) => void
+      f.flushPersistence.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve, fail) => {
+            finish = resolve
+            reject = fail
+          }),
+      )
+
+      f.button('import-confirm-replace').click()
+      if (failure === 'onerror') worker.onerror!(new Event('error', { cancelable: true }))
+      else if (failure === 'onmessageerror') worker.onmessageerror!()
+      else worker.send({ type: 'error', message: 'worker failed' })
+
+      expect(reload).not.toHaveBeenCalled()
+      expect(worker.terminate).toHaveBeenCalledOnce()
+      expect(f.isRunning()).toBe(false)
+      expect(f.session.suspendWrites).not.toHaveBeenCalled()
+      expect(f.session.discardStagedImages).toHaveBeenCalledOnce()
+      expect(f.status()).toBe(
+        failure === 'error' ? 'Import failed. worker failed' : 'Import failed. The import stopped unexpectedly.',
+      )
+
+      f.choose()
+      await vi.waitFor(() => expect(ArchiveWorker.instances).toHaveLength(2))
+      const retry = ArchiveWorker.instances[1]!
+      retry.send(prepared)
+      if (settlement === 'resolve') finish()
+      else reject(new Error('old save failed'))
+      await Promise.resolve()
+      await Promise.resolve()
+      worker.send({ type: 'committed' })
+      worker.onmessageerror!()
+
+      expect(reload).not.toHaveBeenCalled()
+      expect(f.session.suspendWrites).not.toHaveBeenCalled()
+      expect(worker.postMessage).not.toHaveBeenCalledWith({ type: 'commit-import' })
+      expect(retry.terminate).not.toHaveBeenCalled()
+      expect(f.isRunning()).toBe(true)
+      expect(f.dialog.open).toBe(true)
+      expect(f.button('import-confirm-replace').disabled).toBe(false)
+
+      f.button('import-confirm-replace').click()
+      await vi.waitFor(() => expect(retry.postMessage).toHaveBeenCalledWith({ type: 'commit-import' }))
+      retry.send({ type: 'committed' })
+      retry.onmessageerror!()
+
+      expect(reload).toHaveBeenCalledOnce()
+      expect(f.resume).not.toHaveBeenCalled()
+    })
   })
 
   it.each(['committed', 'onerror', 'onmessageerror'] as const)(

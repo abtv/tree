@@ -11,6 +11,7 @@ import {
   exactMessage,
   expect,
   fireIdleSave,
+  firePaste,
   idleSavePoll,
   launchTree,
   node,
@@ -21,6 +22,8 @@ import {
   startRowDrag,
   test,
   typeInto,
+  unlockSystemClipboard,
+  writeClipboardText,
 } from './fixtures'
 
 test.describe('save failure lock', () => {
@@ -152,6 +155,85 @@ test.describe('save failure lock', () => {
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(frozen)
+  })
+
+  // @requirement PRODUCT.md §16.2
+  test('keeps a delayed volume paste locked until the final quit save', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    allowRendererError(
+      exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+    )
+    allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+    await window.clock.install()
+    await blockSaves(app, { countAttempts: true })
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        clipboardStarted?: boolean
+        clipboardReturned?: boolean
+        releaseClipboard?: () => void
+      }
+      const gate = new Promise<void>((resolve) => {
+        control.releaseClipboard = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:read-clipboard', async (original, ...args) => {
+        control.clipboardStarted = true
+        await gate
+        const result = await original(...args)
+        control.clipboardReturned = true
+        return result
+      })
+    })
+    await writeClipboardText(app, 'one two three four five six seven eight nine ten ')
+    await typeInto(node(window, 1), 'pending')
+    await firePaste(node(window, 1))
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { clipboardStarted?: boolean }).clipboardStarted),
+      )
+      .toBe(true)
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await fireIdleSave(window)
+      await expect.poll(() => readSaveAttempts(app), idleSavePoll).toBe(attempt)
+      await window.evaluate(() =>
+        (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+      )
+    }
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible(idleSavePoll)
+    await restoreSaves(app)
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & { saveAttempts?: number; releaseClipboard?: () => void }
+      globalThis.__treeIpc.wrap('tree:save', (original, ...args) => {
+        control.saveAttempts = (control.saveAttempts ?? 0) + 1
+        return original(...args)
+      })
+      control.releaseClipboard?.()
+    })
+    await expect
+      .poll(() =>
+        app.evaluate(() => (globalThis as typeof globalThis & { clipboardReturned?: boolean }).clipboardReturned),
+      )
+      .toBe(true)
+    await fireIdleSave(window)
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+    unlockSystemClipboard()
+
+    expect(await readSaveAttempts(app)).toBe(3)
+    await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible()
+    await expect(node(window, 1)).not.toBeEditable()
+    await expect(node(window, 1)).toHaveValue('pending')
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('pending')
   })
 
   test('confirms quitting without saving while locked and opens the previous version on restart', async ({

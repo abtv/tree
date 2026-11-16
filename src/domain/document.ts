@@ -10,6 +10,7 @@ export type {
   NodeId,
   NodeIndex,
   PersistedEditorState,
+  PersistedAgendaFolds,
   PersistedView,
   TreeNode,
 } from './document-types'

@@ -1,7 +1,8 @@
 import { pinnedAgendaOccurrence, activeAgendaOccurrence } from './agenda-state'
 import { afterEach, expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
-import type { Location, TreeNode } from '../domain/document'
+import * as projection from '../domain/agenda-projection'
+import type { Location, PersistedView, TreeNode } from '../domain/document'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { AgendaRowsCache } from './agenda-rows'
@@ -20,11 +21,20 @@ export const roots: TreeNode[] = [
   { id: 'outside', text: '2026-10-08 Outside', children: [] },
 ]
 
-export async function agendaHarness(location: Location = { currentParentId: null, selectedNodeId: 'scope' }) {
+export async function agendaHarness(
+  location: Location = { currentParentId: null, selectedNodeId: 'scope' },
+  documentRoots: TreeNode[] = roots,
+  view: PersistedView = { expandedIds: [], selectedRowTop: 42 },
+) {
   const save = vi.fn<EditorServices['save']>(async () => undefined)
   const services: EditorServices = {
     today: () => today,
-    load: async () => ({ version: 4, document: { roots }, location, view: { expandedIds: [], selectedRowTop: 42 } }),
+    load: async () => ({
+      version: 4,
+      document: { roots: documentRoots },
+      location,
+      view,
+    }),
     save,
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
@@ -42,6 +52,245 @@ export function ready(store: EditorStore): ReadySnapshot {
 }
 
 afterEach(() => vi.useRealTimers())
+
+// @requirement PRODUCT.md §23.5
+it.each(['close', 'enter'] as const)('remembers folded days after leaving Agenda with %s', async (exit) => {
+  vi.useFakeTimers()
+  const { store } = await agendaHarness()
+  const document = ready(store).document
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+
+  if (exit === 'close') store.closeAgenda()
+  else {
+    store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+    store.enter()
+  }
+  store.openAgenda()
+
+  expect(ready(store).agenda!.collapsed.has(`day:${today + 1}`)).toBe(true)
+  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.day === today + 1)).toBe(false)
+  expect(ready(store).agenda!.selectedKey).toBe(`day:${today}`)
+  expect(ready(store).document).toBe(document)
+})
+
+// @requirement PRODUCT.md §16
+// @requirement PRODUCT.md §23.5
+it.each(['agenda', 'tree'] as const)('restores folded days after saving from %s and restarting', async (view) => {
+  vi.useFakeTimers()
+  const { store, services, save } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  if (view === 'tree') store.closeAgenda()
+
+  await store.flushPersistence()
+
+  const saved = save.mock.lastCall?.[0]
+  expect(saved).toBeDefined()
+  const restarted = new EditorStore({ ...services, load: async () => saved }, () => 'unused')
+  await restarted.initialize()
+
+  expect(ready(restarted).agenda).toBeUndefined()
+  expect(ready(restarted).location).toEqual({ currentParentId: null, selectedNodeId: 'scope' })
+  expect(restarted.getRestoredSelectedRowTop()).toBe(42)
+  restarted.openAgenda()
+  expect(ready(restarted).agenda!.collapsed.has(`day:${today + 1}`)).toBe(true)
+  expect(restarted.getAgendaRows().some((row) => row.kind === 'node' && row.day === today + 1)).toBe(false)
+})
+
+// @requirement PRODUCT.md §13.1
+// @requirement PRODUCT.md §23.9
+it.each(
+  (['cut', 'text-read', 'image-read', 'image-write'] as const).flatMap((operation) =>
+    (['day', 'path', 'separator'] as const).map((rowKind) => ({ operation, rowKind })),
+  ),
+)('ignores a pending $operation after selecting an Agenda $rowKind', async ({ operation, rowKind }) => {
+  const { store, services, save } = await agendaHarness()
+  let release!: () => void
+  const pause = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let started = false
+  services.writeClipboard = async () => {
+    started = true
+    await pause
+  }
+  services.readClipboard = async () => {
+    if (operation !== 'image-write') {
+      started = true
+      await pause
+    }
+    return operation === 'text-read' ? { kind: 'text', text: 'pasted' } : { kind: 'image', png: new Uint8Array([1]) }
+  }
+  services.writeAttachment = async () => {
+    started = true
+    await pause
+  }
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope`, cursor: 11 })
+  const document = ready(store).document
+  const pending = operation === 'cut' ? store.cut('scope', 11, 16) : store.paste('scope', 11)
+  await vi.waitFor(() => expect(started).toBe(true))
+
+  const row = store.getAgendaRows().find((row) => row.kind === rowKind)!
+  store.applyAgenda({ kind: 'select', key: row.key })
+  const focus = ready(store).focus
+  release()
+  await pending
+
+  expect(ready(store).document).toBe(document)
+  expect(ready(store).agenda!.selectedKey).toBe(row.key)
+  expect(ready(store).focus).toBe(focus)
+
+  store.undo()
+  await store.flushPersistence()
+
+  expect(ready(store).document).toBe(document)
+  expect(save).not.toHaveBeenCalled()
+})
+
+// @requirement PRODUCT.md §23.9
+it.each(
+  (['cut', 'paste'] as const).flatMap((operation) =>
+    (['active', 'inactive', 'mirrored', 'pinned'] as const).map((selection) => ({ operation, selection })),
+  ),
+)('finishes a pending $operation on the selected $selection Agenda node', async ({ operation, selection }) => {
+  const { store, services } = await agendaHarness(undefined, [
+    { id: 'scope', text: '2026-10-08 Scope 2026-10-09', children: [] },
+  ])
+  let release!: () => void
+  const pause = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  services.writeClipboard = () => pause
+  services.readClipboard = async () => {
+    await pause
+    return { kind: 'text', text: 'pasted' }
+  }
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope`, cursor: 11 })
+  if (selection === 'pinned') store.editText('scope', '           Scope')
+  const text = ready(store).document.roots[0]!.text
+  const pending = operation === 'cut' ? store.cut('scope', 11, 16) : store.paste('scope', 11)
+
+  if (selection === 'inactive') {
+    store.applyAgenda({ kind: 'focus-day', key: `day:${today + 1}`, scrollTop: 0 })
+    store.applyAgenda({ kind: 'return-timeline', key: `day:${today + 1}` })
+    expect(activeAgendaOccurrence(ready(store).agenda)).toBeUndefined()
+  }
+  if (selection === 'mirrored') store.applyAgenda({ kind: 'select', key: `node:${today + 1}:scope` })
+  release()
+  await pending
+
+  expect(ready(store).document.roots[0]!.text).toBe(
+    operation === 'cut' ? text.slice(0, 11) + text.slice(16) : text.slice(0, 11) + 'pasted' + text.slice(11),
+  )
+})
+
+// @requirement PRODUCT.md §23.4
+// @requirement PRODUCT.md §23.7
+// @requirement PRODUCT.md §6.1
+// @requirement PRODUCT.md §22.1
+it.each([
+  { focused: false, pinned: false },
+  { focused: true, pinned: false },
+  { focused: false, pinned: true },
+  { focused: true, pinned: true },
+])('enters an Agenda ancestor atomically (focused: $focused, pinned: $pinned)', async ({ focused, pinned }) => {
+  const { store, save } = await agendaHarness({ currentParentId: 'context', selectedNodeId: 'match' })
+  store.openAgenda(7)
+  if (focused) store.applyAgenda({ kind: 'focus-day', key: `day:${today}`, scrollTop: 60 })
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope`, cursor: 7 })
+  if (pinned) store.editText('scope', 'Scope')
+  const before = ready(store)
+  const seen: ReadySnapshot[] = []
+  const unsubscribe = store.subscribe(() => seen.push(ready(store)))
+
+  store.enter()
+  unsubscribe()
+
+  expect(seen).toHaveLength(1)
+  expect(seen[0]!.agenda).toBeUndefined()
+  expect(seen[0]!.location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+  expect(seen[0]!.focus).toMatchObject({ nodeId: 'context', cursor: 0 })
+  expect(seen[0]!.focus.token).not.toBe(before.focus.token)
+  expect(seen[0]!.document).toBe(before.document)
+  expect(store.recentNodes.getIds()[0]).toBe('scope')
+
+  await store.flushPersistence()
+  await store.flushPersistence()
+
+  expect(save).toHaveBeenCalledOnce()
+  expect(save.mock.calls[0]![0].location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+
+  store.openAgenda()
+
+  expect(ready(store).agenda!.origin.location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+})
+
+// @requirement PRODUCT.md §23.4
+it('enters the selected inactive occurrence after returning to the timeline', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'context', selectedNodeId: 'match' })
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  store.applyAgenda({ kind: 'focus-day', key: `day:${today + 1}`, scrollTop: 60 })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:match` })
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${today + 1}` })
+
+  expect(ready(store).agenda!.selectedKey).toBe(`node:${today}:scope`)
+  expect(activeAgendaOccurrence(ready(store).agenda)).toBeUndefined()
+
+  store.enter()
+
+  expect(ready(store).agenda).toBeUndefined()
+  expect(ready(store).location).toEqual({ currentParentId: 'scope', selectedNodeId: 'context' })
+  expect(ready(store).focus).toMatchObject({ nodeId: 'context', cursor: 0 })
+})
+
+// @requirement PRODUCT.md §23.4
+it.each(['day', 'path', 'separator'])('does not enter Tree from a selected Agenda %s', async (kind) => {
+  const { store, save } = await agendaHarness()
+  store.openAgenda()
+  const row = store.getAgendaRows().find((row) => row.kind === kind)!
+  store.applyAgenda({ kind: 'select', key: row.key })
+  const before = ready(store)
+
+  store.enter()
+
+  expect(ready(store)).toBe(before)
+
+  await store.flushPersistence()
+
+  expect(save).not.toHaveBeenCalled()
+})
+
+// @requirement PRODUCT.md §22.2
+it('enters a distant match in a wide Agenda without projecting the document again', async () => {
+  const { store, save } = await agendaHarness(
+    { currentParentId: '0', selectedNodeId: '0' },
+    Array.from({ length: 10000 }, (_, index) => ({ id: String(index), text: '2026-10-08 Item', children: [] })),
+  )
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:9999` })
+  const rows = store.getAgendaRows()
+  const project = vi.spyOn(projection, 'projectAgenda')
+  try {
+    store.enter()
+
+    expect(ready(store).location).toEqual({ currentParentId: '9999', selectedNodeId: '9999' })
+
+    store.openAgenda()
+
+    expect(store.getAgendaRows()).toBe(rows)
+    expect(project).not.toHaveBeenCalled()
+  } finally {
+    project.mockRestore()
+  }
+
+  await store.flushPersistence()
+
+  expect(save).toHaveBeenCalledOnce()
+})
 
 // @requirement PRODUCT.md §22.2
 it('reuses the unchanged Agenda projection and rows across repeated view switches', async () => {
@@ -735,7 +984,8 @@ it('publishes real-row selection and focus atomically, including reselection, an
   expect(ready(store)).toBe(snapshot)
 })
 
-it('keeps day folds runtime-only and returns hidden selection to its day', async () => {
+it('coalesces fold saves without changing notes or Tree folds and returns hidden selection to its day', async () => {
+  vi.useFakeTimers()
   const { store, save } = await agendaHarness()
   store.openAgenda()
   const original = ready(store)
@@ -755,18 +1005,19 @@ it('keeps day folds runtime-only and returns hidden selection to its day', async
 
   await store.flushPersistence()
 
-  expect(save).not.toHaveBeenCalled()
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(save.mock.lastCall![0].view).toEqual({ expandedIds: [], selectedRowTop: 42 })
   store.closeAgenda()
 })
 
-it('captures identical serialized Tree state during Agenda even when a save was already pending', async () => {
+it('preserves saved Tree state while adding Agenda folds to an already pending save', async () => {
   const { store, save } = await agendaHarness()
   let measurement = 42
 
   store.registerSelectedRowTopReader(() => measurement)
   store.noteViewportChange()
   await store.flushPersistence()
-  const before = JSON.stringify(save.mock.calls[0])
+  const before = save.mock.calls[0]![0]
   save.mockClear()
   measurement = 80
 
@@ -781,7 +1032,11 @@ it('captures identical serialized Tree state during Agenda even when a save was 
   store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
   await store.flushPersistence()
 
-  expect(JSON.stringify(save.mock.calls[0])).toBe(before.replace('42', '80'))
+  const expected = {
+    ...before,
+    view: { ...before.view, selectedRowTop: 80, agendaFolds: { days: [today + 1], overdueWeeks: [] } },
+  }
+  expect(save.mock.calls[0]![0]).toEqual(expected)
   expect(save).toHaveBeenCalledTimes(1)
 
   store.closeAgenda()
@@ -790,7 +1045,208 @@ it('captures identical serialized Tree state during Agenda even when a save was 
   store.noteViewportChange()
   await store.flushPersistence()
 
-  expect(JSON.stringify(save.mock.calls[1])).toBe(before.replace('42', '80'))
+  expect(save.mock.calls[1]![0]).toEqual(expected)
+})
+
+// @requirement PRODUCT.md §23.5
+it.each(['none', 'other-day', 'toggle', 'open', 'open-all'] as const)(
+  'remembers explicit choices independently of search reveals: %s',
+  async (action) => {
+    vi.useFakeTimers()
+    const { store, save } = await agendaHarness()
+    store.openAgenda()
+    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+    await store.flushPersistence()
+    save.mockClear()
+
+    store.search.begin(store.searchOrigin(0))
+    store.search.edit('Match')
+    store.search.confirm()
+    await vi.runAllTimersAsync()
+
+    expect(ready(store).agenda!.collapsed.has(`day:${today + 1}`)).toBe(false)
+    expect(save).not.toHaveBeenCalled()
+
+    if (action === 'other-day') store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 3}` })
+    else if (action !== 'none') store.applyAgenda({ kind: 'fold', key: `day:${today + 1}`, operation: action })
+    store.hideSearch()
+    store.closeAgenda()
+    store.openAgenda()
+
+    const remembered = action !== 'open' && action !== 'open-all'
+    expect(ready(store).agenda!.collapsed.has(`day:${today + 1}`)).toBe(remembered)
+    expect(ready(store).agenda!.collapsed.has(`day:${today + 3}`)).toBe(action === 'other-day')
+
+    await store.flushPersistence()
+
+    expect(save).toHaveBeenCalledTimes(action === 'none' || action === 'toggle' ? 0 : 1)
+  },
+)
+
+// @requirement PRODUCT.md §23.15
+it('keeps focused-day folds temporary without changing captured or remembered timeline folds', async () => {
+  vi.useFakeTimers()
+  const { store, save } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  await store.flushPersistence()
+  save.mockClear()
+  const timeline = ready(store).agenda!
+
+  store.applyAgenda({ kind: 'focus-day', key: `day:${today + 1}`, scrollTop: 20 })
+  store.applyAgenda({ kind: 'fold', key: `day:${today + 1}`, operation: 'open-all' })
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${today + 1}` })
+
+  expect(ready(store).agenda!.collapsed).toBe(timeline.collapsed)
+
+  store.applyAgenda({ kind: 'focus-day', key: `day:${today + 3}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 3}` })
+  store.closeAgenda()
+  store.openAgenda()
+  await store.flushPersistence()
+
+  expect(ready(store).agenda!.collapsed).toEqual(new Set([`day:${today + 1}`]))
+  expect(save).not.toHaveBeenCalled()
+})
+
+it('retains explicit folds when editing reveals a destination and Undo restores its former date', async () => {
+  vi.useFakeTimers()
+  const { store, save } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  store.applyAgenda({ kind: 'select', key: `node:${today + 3}:other` })
+  store.editText('other', '2026-10-09 Other')
+  store.endTextSession()
+
+  expect(ready(store).agenda!.collapsed.has(`day:${today + 1}`)).toBe(false)
+
+  store.undo()
+  store.closeAgenda()
+  store.openAgenda()
+  await store.flushPersistence()
+
+  expect(ready(store).agenda!.collapsed.has(`day:${today + 1}`)).toBe(true)
+  expect(save.mock.lastCall![0].view!.agendaFolds).toEqual({ days: [today + 1], overdueWeeks: [] })
+})
+
+it('remembers Overdue separately for each week and retains dates without current occurrences', async () => {
+  vi.useFakeTimers()
+  const { store, save, services } = await agendaHarness(undefined, [
+    ...roots,
+    { id: 'overdue', text: '2026-10-01 Overdue', children: [] },
+  ])
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  const week = ready(store).agenda!.weekStart
+  store.applyAgenda({ kind: 'toggle-fold', key: `overdue:${week}` })
+  store.closeAgenda()
+  services.today = () => today + 7
+  store.openAgenda()
+
+  expect(ready(store).agenda!.collapsed.has(`overdue:${week + 7}`)).toBe(false)
+
+  store.closeAgenda()
+  store.editText('match', 'Match')
+  store.endTextSession()
+  await store.flushPersistence()
+
+  expect(save.mock.lastCall![0].view!.agendaFolds).toEqual({ days: [today + 1], overdueWeeks: [week] })
+
+  store.undo()
+  services.today = () => today
+  store.openAgenda()
+
+  expect(store.getAgendaRows().some((row) => row.kind === 'node' && row.nodeId === 'match')).toBe(false)
+
+  await store.flushPersistence()
+})
+
+it('ignores empty days, node folds and invalid all-fold targets without scheduling a save', async () => {
+  vi.useFakeTimers()
+  const { store, save } = await agendaHarness()
+  store.openAgenda()
+
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 2}` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `node:${today}:scope` })
+  store.applyAgenda({ kind: 'fold', key: 'missing', operation: 'close-all' })
+  await vi.runAllTimersAsync()
+  await store.flushPersistence()
+
+  expect(ready(store).agenda!.collapsed.size).toBe(0)
+  expect(save).not.toHaveBeenCalled()
+})
+
+it('drains fold changes made while an earlier view save is in flight', async () => {
+  vi.useFakeTimers()
+  const { store, save } = await agendaHarness()
+  let release!: () => void
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  save.mockImplementationOnce(() => pending)
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  const flushing = store.flushPersistence()
+  await vi.advanceTimersByTimeAsync(0)
+
+  expect(save).toHaveBeenCalledTimes(1)
+
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 3}` })
+  release()
+  await flushing
+
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(save.mock.calls[0]![0].view!.agendaFolds!.days).toEqual([today + 1])
+  expect(save.mock.lastCall![0].view!.agendaFolds!.days).toEqual([today + 1, today + 3])
+})
+
+it('keeps locked fold changes pending until explicit final flush without restarting automatic saves', async () => {
+  vi.useFakeTimers()
+  const { store, save } = await agendaHarness()
+  save.mockRejectedValue(new Error('disk full'))
+  store.openAgenda()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  await vi.runAllTimersAsync()
+
+  expect(ready(store).persistenceLocked).toBe(true)
+  expect(save).toHaveBeenCalledTimes(3)
+
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 3}` })
+  await vi.runAllTimersAsync()
+
+  expect(save).toHaveBeenCalledTimes(3)
+
+  save.mockResolvedValue(undefined)
+  await store.flushPersistence()
+
+  expect(save).toHaveBeenCalledTimes(4)
+  expect(save.mock.lastCall![0].view!.agendaFolds!.days).toEqual([today + 1, today + 3])
+})
+
+// @requirement PRODUCT.md §22.1
+it('reuses thousands of remembered folds during opening and selection without traversing or saving them', async () => {
+  vi.useFakeTimers()
+  const days = Array.from({ length: 20_000 }, (_, index) => today - index - 1)
+  const { store, save } = await agendaHarness(undefined, undefined, {
+    expandedIds: [],
+    agendaFolds: { days, overdueWeeks: [] },
+  })
+  store.openAgenda()
+  const collapsed = ready(store).agenda!.collapsed
+  const iterate = vi.spyOn(collapsed, Symbol.iterator)
+
+  for (let index = 0; index < 50; index += 1) {
+    store.applyAgenda({ kind: 'select', key: `day:${today + 1}` })
+    store.closeAgenda()
+    store.openAgenda()
+
+    expect(ready(store).agenda!.collapsed).toBe(collapsed)
+  }
+  await store.flushPersistence()
+
+  expect(iterate).not.toHaveBeenCalled()
+  expect(save).not.toHaveBeenCalled()
+  iterate.mockRestore()
 })
 
 it('uses local system Today without a service override and captures the existing focus cursor', async () => {

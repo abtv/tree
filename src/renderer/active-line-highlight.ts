@@ -168,8 +168,16 @@ function textareaCaretRect(input: HTMLTextAreaElement, normal: boolean): DOMRect
   const bounds = input.getBoundingClientRect()
   const style = getComputedStyle(input)
   const mirror = input.ownerDocument.createElement('div')
+  // A computed font shorthand can be empty when the editor disables ligatures.
+  // Copy the longhands so the mirror never falls back to the body's text metrics.
   for (const property of [
-    'font',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'font-variant',
+    'font-stretch',
+    'line-height',
     'letter-spacing',
     'word-spacing',
     'padding',

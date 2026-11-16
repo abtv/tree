@@ -84,6 +84,74 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
 afterEach(() => vi.useRealTimers())
 
 describe('desktop notes operations', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it('dismisses only an auto-expiring export result and cancels its timer', async () => {
+    vi.useFakeTimers()
+    const h = harness()
+    await h.operations.exportNotes()
+    const notify = vi.fn()
+    h.operations.subscribe(notify)
+
+    h.operations.dismissTransientStatus()
+
+    expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
+    expect(notify).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+
+    h.operations.dismissTransientStatus()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(notify).toHaveBeenCalledOnce()
+    h.operations.dispose()
+  })
+
+  // @requirement PRODUCT.md §20.2.7
+  it.each(['failed', 'warning'] as const)(
+    'retains a %s export result when transient feedback is dismissed',
+    async (kind) => {
+      const h = harness()
+      h.api.startNotesExport.mockResolvedValueOnce(
+        kind === 'failed'
+          ? { ok: false, message: 'Could not export.' }
+          : { ...success, summary: { imageCount: 2, missingImageCount: 1, archiveBytes: 100 } },
+      )
+      await h.operations.exportNotes()
+      const before = h.operations.getSnapshot()
+
+      h.operations.dismissTransientStatus()
+
+      expect(h.operations.getSnapshot()).toBe(before)
+      expect(h.api.cancelNotesOperation).not.toHaveBeenCalled()
+      h.operations.dispose()
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.28
+  it('retains running exports and import confirmations when transient feedback is dismissed', async () => {
+    const h = harness()
+    const result = deferred<NotesExportResult>()
+    h.api.startNotesExport.mockReturnValueOnce(result.promise)
+    const job = h.operations.exportNotes()
+    await vi.waitFor(() => expect(h.api.startNotesExport).toHaveBeenCalledOnce())
+    const running = h.operations.getSnapshot()
+
+    h.operations.dismissTransientStatus()
+
+    expect(h.operations.getSnapshot()).toBe(running)
+    expect(h.api.cancelNotesOperation).not.toHaveBeenCalled()
+
+    result.resolve(success)
+    await job
+    await h.operations.importNotes()
+    const confirming = h.operations.getSnapshot()
+
+    h.operations.dismissTransientStatus()
+
+    expect(h.operations.getSnapshot()).toBe(confirming)
+    expect(h.operations.getConfirmation()).toBeDefined()
+    h.operations.dispose()
+  })
+
   // @requirement PRODUCT.md §25.1
   it('does not reopen native file panels after disposal while the editor is ready', async () => {
     const h = harness()

@@ -42,6 +42,74 @@ test.describe('Agenda concurrent clipboard writes', () => {
   test.use({ editingMode: 'standard' })
 
   // @requirement PRODUCT.md §23.9
+  test('keeps day selection when a clipboard read finishes after leaving the target', async ({
+    userDataDir,
+  }, testInfo) => {
+    seed(userDataDir)
+    const original = readPersisted(userDataDir).document
+    const { app, window } = await launchTree(userDataDir)
+    await window.clock.install()
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.locator('.agenda-row[data-node-id="first"]').first().click()
+    const input = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & {
+        agendaClipboardStarted?: boolean
+        agendaClipboardReturned?: boolean
+        releaseAgendaClipboard?: () => void
+      }
+      const gate = new Promise<void>((resolve) => {
+        control.releaseAgendaClipboard = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:read-clipboard', async (original, ...args) => {
+        control.agendaClipboardStarted = true
+        await gate
+        const result = await original(...args)
+        control.agendaClipboardReturned = true
+        return result
+      })
+    })
+    await writeClipboardText(app, 'ignored paste')
+    await firePaste(input)
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () => (globalThis as typeof globalThis & { agendaClipboardStarted?: boolean }).agendaClipboardStarted,
+        ),
+      )
+      .toBe(true)
+
+    const day = window.locator(`.agenda-row[data-agenda-key="${dayKey(10, 9)}"]`)
+    await day.click()
+    await app.evaluate(() => {
+      ;(globalThis as typeof globalThis & { releaseAgendaClipboard?: () => void }).releaseAgendaClipboard!()
+    })
+    await expect
+      .poll(() =>
+        app.evaluate(
+          () => (globalThis as typeof globalThis & { agendaClipboardReturned?: boolean }).agendaClipboardReturned,
+        ),
+      )
+      .toBe(true)
+    await fireIdleSave(window)
+    await window.evaluate(() =>
+      (globalThis as typeof globalThis & { treeApi: { load(): Promise<unknown> } }).treeApi.load(),
+    )
+    unlockSystemClipboard()
+
+    await expect(day).toBeFocused()
+    await expect(day).toHaveAttribute('aria-selected', 'true')
+    await expect(window.locator('.agenda-row[data-node-id="first"]').first()).toHaveText(
+      '2026-10-09 Prepare 2026-10-11',
+    )
+    await window.screenshot({ path: testInfo.outputPath('agenda-pending-paste.png') })
+    await closeApp(app)
+
+    expect(readPersisted(userDataDir).document).toEqual(original)
+  })
+
+  // @requirement PRODUCT.md §23.9
   // @requirement PRODUCT.md §16.1
   test('finishes two pending image pastes on quit without creating an Agenda sibling', async ({ userDataDir }) => {
     seed(userDataDir)

@@ -8,6 +8,7 @@ import {
   type Location,
   type NodeId,
   type PersistedEditorState,
+  type PersistedAgendaFolds,
   type PersistedView,
   type TreeNode,
 } from './document-types'
@@ -17,6 +18,7 @@ import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 import { deriveCompletion } from './node-completion'
 import { buildNodeIndex } from './document-index'
+import { dayNumberOf, weekdayOf } from './calendar-date'
 
 // Documents are immutable. Remember validation, without retaining an ID set for every history snapshot.
 const validatedDocuments = new WeakSet<Document>()
@@ -25,6 +27,7 @@ const validatedDocuments = new WeakSet<Document>()
 export interface ViewState {
   readonly expandedIds: Iterable<NodeId>
   readonly selectedRowTop?: number
+  readonly agendaFolds?: PersistedAgendaFolds
 }
 
 /**
@@ -46,11 +49,16 @@ export function serializeState(
   }
   const expandedIds: NodeId[] = []
   for (const id of view.expandedIds) if (buildNodeIndex(document).has(id)) expandedIds.push(id)
+  const agendaFolds = normalizeAgendaFolds(view.agendaFolds)
   return {
     version: 4,
     document,
     location: { ...location },
-    view: view.selectedRowTop === undefined ? { expandedIds } : { expandedIds, selectedRowTop: view.selectedRowTop },
+    view: {
+      expandedIds,
+      ...(view.selectedRowTop === undefined ? {} : { selectedRowTop: view.selectedRowTop }),
+      ...(agendaFolds === undefined ? {} : { agendaFolds }),
+    },
   }
 }
 
@@ -76,10 +84,33 @@ function assertView(value: Record<string, unknown>): void {
     !Array.isArray(view.expandedIds) ||
     !view.expandedIds.every((id) => typeof id === 'string' && id.length > 0) ||
     (view.selectedRowTop !== undefined &&
-      (typeof view.selectedRowTop !== 'number' || !Number.isFinite(view.selectedRowTop) || view.selectedRowTop < 0))
+      (typeof view.selectedRowTop !== 'number' || !Number.isFinite(view.selectedRowTop) || view.selectedRowTop < 0)) ||
+    (view.agendaFolds !== undefined && !isAgendaFolds(view.agendaFolds))
   ) {
     throw new Error('The saved view state is invalid.')
   }
+}
+
+const firstDay = dayNumberOf({ year: 0, month: 1, day: 1 })
+const lastDay = dayNumberOf({ year: 9999, month: 12, day: 31 })
+const firstWeek = firstDay - weekdayOf(firstDay)
+const lastWeek = lastDay - weekdayOf(lastDay)
+
+function isAgendaFolds(value: unknown): value is PersistedAgendaFolds {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.days) &&
+    value.days.every((day) => Number.isInteger(day) && day >= firstDay && day <= lastDay) &&
+    Array.isArray(value.overdueWeeks) &&
+    value.overdueWeeks.every(
+      (week) => Number.isInteger(week) && week >= firstWeek && week <= lastWeek && weekdayOf(week) === 0,
+    )
+  )
+}
+
+function normalizeAgendaFolds(value: PersistedAgendaFolds | undefined): PersistedAgendaFolds | undefined {
+  if (value === undefined || (value.days.length === 0 && value.overdueWeeks.length === 0)) return undefined
+  return { days: [...new Set(value.days)], overdueWeeks: [...new Set(value.overdueWeeks)] }
 }
 
 export function validatePersistedState(value: unknown): PersistedEditorState {
@@ -184,7 +215,12 @@ function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>)
   if (!hasView(value.version) || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
   const expandedIds = (value.view.expandedIds as string[]).filter((id) => nodeIds.has(id))
   const selectedRowTop = value.view.selectedRowTop
-  return typeof selectedRowTop === 'number' ? { expandedIds, selectedRowTop } : { expandedIds }
+  const agendaFolds = normalizeAgendaFolds(value.view.agendaFolds as PersistedAgendaFolds | undefined)
+  return {
+    expandedIds,
+    ...(typeof selectedRowTop === 'number' ? { selectedRowTop } : {}),
+    ...(agendaFolds === undefined ? {} : { agendaFolds }),
+  }
 }
 
 export function assertDocument(document: Document): void {

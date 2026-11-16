@@ -310,6 +310,113 @@ test('cancel, rejected archives and a failed replacement leave the notes unchang
 })
 
 // @requirement PRODUCT.md §24.4
+test('keeps the current session writable when the import worker fails during the replacement save', async ({
+  newContext,
+  baseURL,
+}) => {
+  const page = await (await newContext()).newPage()
+  await page.goto(baseURL!)
+  await ready(page)
+  await saved(page)
+  const original = await readStored(page, 'document', 'head')
+  const valid = await writeExportedArchive(test.info().outputPath('worker-failure.zip'), archiveHead, {
+    'new-a': onePixelPng,
+    'new-b': onePixelPng,
+  })
+  await chooseImportFile(page, valid)
+  await expect(confirmation(page)).toBeVisible()
+  await page.evaluate(() => {
+    const control = window as typeof window & { replacementSaveWaiting?: boolean; releaseReplacementSave?: () => void }
+    const flush = window.prototypeStore.flushPersistence.bind(window.prototypeStore)
+    window.prototypeStore.flushPersistence = async () => {
+      await flush()
+      window.prototypeStore.flushPersistence = flush
+      control.replacementSaveWaiting = true
+      await new Promise<void>((resolve) => {
+        control.releaseReplacementSave = resolve
+      })
+    }
+  })
+  let reloads = 0
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) reloads++
+  })
+
+  await confirmation(page).getByRole('button', { name: 'Replace Notes', exact: true }).click()
+  await page.waitForFunction(
+    () => (window as typeof window & { replacementSaveWaiting?: boolean }).replacementSaveWaiting,
+  )
+  const worker = page.workers().find((worker) => worker.url().includes('archive.worker'))
+  expect(worker).toBeDefined()
+  await worker!.evaluate(() => {
+    setTimeout(() => {
+      throw new Error('test import worker failure')
+    }, 0)
+  })
+
+  await expect(activityText(page)).toHaveText('Import failed. The import stopped unexpectedly.')
+  await expect(confirmation(page)).toBeHidden()
+  await expect.poll(() => blobKeys(page)).toEqual([])
+  expect(await readStored(page, 'preferences', 'import-staged:new-a')).toBeUndefined()
+  expect(await readStored(page, 'document', 'head')).toEqual(original)
+  expect(reloads).toBe(0)
+
+  await page.evaluate(() =>
+    (window as typeof window & { releaseReplacementSave?: () => void }).releaseReplacementSave?.(),
+  )
+  await activity(page).getByRole('button', { name: 'OK', exact: true }).click()
+  const editor = page.locator('[data-node-id="welcome"] .node-input')
+  await editor.click()
+  await editor.press('End')
+  await editor.pressSequentially(' still editing')
+  await page.evaluate(() => window.prototypeStore.flushPersistence())
+  await saved(page)
+
+  expect((await readStored(page, 'document', 'head')).document.roots[0]!.text).toMatch(/ still editing$/)
+  expect(reloads).toBe(0)
+})
+
+// @requirement PRODUCT.md §24.4
+test('reloads the committed import when its worker fails before acknowledging replacement', async ({
+  newContext,
+  baseURL,
+}) => {
+  const page = await (await newContext()).newPage()
+  await page.route(/archive\.worker/, async (route) => {
+    const response = await route.fetch()
+    const patch = `{
+      const post = self.postMessage.bind(self)
+      self.postMessage = (message, ...args) => {
+        if (message.type === 'committed') {
+          setTimeout(() => { throw new Error('test lost import acknowledgment') }, 0)
+          return
+        }
+        post(message, ...args)
+      }
+    }\n`
+    await route.fulfill({ response, body: patch + (await response.text()) })
+  })
+  await page.goto(baseURL!)
+  await ready(page)
+  const valid = await writeExportedArchive(test.info().outputPath('committed-worker-failure.zip'), archiveHead, {
+    'new-a': onePixelPng,
+    'new-b': onePixelPng,
+  })
+  await chooseImportFile(page, valid)
+  await expect(confirmation(page)).toBeVisible()
+  const reloaded = page.waitForEvent('load')
+
+  await confirmation(page).getByRole('button', { name: 'Replace Notes', exact: true }).click()
+  await reloaded
+  await ready(page)
+
+  expect(await readStored(page, 'document', 'head')).toEqual(archiveHead)
+  expect(await blobKeys(page)).toEqual(['new-a', 'new-b'])
+  expect(await readStored(page, 'preferences', 'import-staged:new-a')).toBeUndefined()
+  await expect(page.locator('[data-node-id="imported"] .node-input')).toHaveValue('Imported notes')
+})
+
+// @requirement PRODUCT.md §24.4
 test('replaces invalid stored notes with an imported archive', async ({ newContext, baseURL }) => {
   const page = await (await newContext()).newPage()
 

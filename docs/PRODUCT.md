@@ -1218,11 +1218,13 @@ A save is performed when:
 
 Editing the characters of an existing hyperlink is a text edit, not a new hyperlink insertion; it follows the word-volume, idle, and quit triggers rather than saving immediately for each changed URL.
 
-Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes, and changing the selected node or a node's expansion — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
+Changes that do not insert content — creating, splitting, deleting, reordering, or undoing/redoing nodes, changing the selected node or a node's expansion, and changing an Agenda timeline day fold (§23.5) — do not by themselves trigger a save. They remain pending and are saved by the next volume, idle, or quit trigger.
 
 Only inserted words count toward the volume threshold. Deletions and other changes still reset the idle timer and keep changes pending.
 
 Every pending change is flushed before a normal quit completes. A pending Replace-mode replacement counts as a pending change: it is completed as one edit before that flush, so quitting or closing the window saves it.
+
+Editing remains available while a normal quit waits for saves. Edits made while recent-node or emoji history is being saved also finish saving before quit completes. A failure saving those late edits keeps the application open under the same rules as any other save failure.
 
 If a save fails, the pending changes are retained and the failure is surfaced. The application retries at the next idle interval. After three consecutive failed save attempts, the application enters the locked save-failure state defined in §16.2. A later successful save clears the error.
 
@@ -1275,6 +1277,8 @@ After three consecutive failed save attempts, the application stops saving autom
 * navigation, selection, and copy remain available so the document can still be viewed;
 * no further automatic save attempts are made;
 * the save failure remains visible together with `Saving failed repeatedly. The last saved version is safe. Fix the problem and restart the application. Changes made since the last successful save are not saved.`
+
+A paste started before the lock must not change the document or restart automatic saving when its clipboard read or image write finishes after the lock. An image already being written is cleaned up if no document references it.
 
 Quitting and closing the window from the locked state still attempt a final save:
 
@@ -1390,6 +1394,8 @@ The user normally interacts with the application through:
 The tree hierarchy can be navigated by entering and leaving nodes or inspected and edited through inline expansion. Expansion does not change the current location.
 
 The pointer shows the text-editing cursor only over a node editor that has focus. Text the user cannot edit — the location path, the Vim mode indicator, tooltips, status and error messages, and dialog text — shows the default arrow cursor.
+
+The desktop app keeps the mouse pointer visible while typing and navigating with the keyboard, in both standard and Vim editing. This deliberately overrides automatic pointer hiding so users can locate the pointer without moving the mouse. It does not change the text caret or pointer shapes.
 
 ### 20.1 Very Wide Node Lists
 
@@ -1825,6 +1831,8 @@ outside this version.
 #### 20.2.28 Command Panel
 
 `Cmd+Shift+P` opens the command panel in Tree or Agenda in standard editing and every Vim mode. With Vim editing enabled, `:` also opens it in Normal mode; in other modes `:` retains its ordinary key behavior. Opening discards any pending count or unfinished command, preserving the editing mode, selection and edit session.
+
+Opening also dismisses the current five-second export-success notice (§24.3, §25.2). Closing the panel does not restore it. Archive progress and results that require acknowledgement, including errors and missing-image warnings, remain visible under §20.2.7. Image-recognition feedback follows §15.1.
 
 `Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-mode` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
 
@@ -2353,13 +2361,17 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 
 #### Opening Tree from Agenda
 
-`Cmd+.` on a direct match closes Agenda and opens Tree with that node as current parent. `Cmd+P` there reopens the entire document's Agenda at Today.
+`Cmd+.` or Vim Normal `gd` on a direct match closes Agenda and opens Tree with that exact node as current parent, regardless of the Tree location from which Agenda was opened. This includes a match in another branch, an ancestor, or the original current parent. Focus follows Tree entry (§6.1): select the first child at text offset zero, or focus the editable parent when it has no children. The same rule applies in the timeline and a focused day, including inactive and temporarily pinned occurrences. `Cmd+P` there reopens the entire document's Agenda at Today. Closing Agenda with `Cmd+P` still restores its captured Tree origin (§23.1).
 
 ### 23.5 Folding Days
 
 Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles a populated day. Folding hides all its entries; a folded day stays non-empty. Empty Today does not fold. Node and separator rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Mode and document content are unchanged.
 
-Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected populated day; recursive forms have the same effect because entries are flat. `zM`/`zR` close or open all populated days from any row. Folds are runtime state, independent of Tree expansion and never saved or added to Undo history.
+Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected populated day; recursive forms have the same effect because entries are flat. `zM`/`zR` close or open all populated days from any row.
+
+Explicit timeline fold choices are remembered by calendar day when leaving and reopening Agenda, including after an application restart. They are independent of Tree expansion, document content and Undo history. They use the existing pending-save policy (§16.1). Missing saved choices default to open. A choice remains remembered when its day temporarily has no entries. The Overdue container remembers its choice for the displayed current week; a new current week starts open unless that week's choice was already saved. Startup still opens Tree, and opening Agenda still selects Today under §23.1.
+
+Search and live editing may temporarily reveal a remembered folded day without changing its saved choice. An explicit open or close records the resulting choice even when a temporary reveal already made the day open. Folding a different day does not save temporary reveals elsewhere. Focused-day folds keep the temporary behavior of §23.15.
 
 ### 23.6 Large Timelines
 
@@ -2392,6 +2404,8 @@ After Undo or Redo, select the nearest visible occurrence of the change-site nod
 ### 23.9 Editing in Agenda
 
 Direct matches edit the same real nodes in standard editing and text-oriented Vim modes. Text commands, links, images, strikethrough (`Cmd+Enter`), and ordinary Cut/Paste follow Tree behavior. Path labels are passive context. Day containers are synthetic and never editable.
+
+Pending Cut/Paste operations apply only if their target node is still selected when the clipboard read/write or image write finishes. If a day, path, separator, or another node is selected instead, the document and new selection stay unchanged. The retained Tree location does not override the selected Agenda row.
 
 * Canonical dates are recognized immediately after typing or pasting. Date emphasis preserves every character, caret offset and text-selection operation; dates remain editable text.
 * A single-date node has one editor; a node appearing on several days has an editor only at its active occurrence. Other direct-match occurrences display the current text, hyperlinks and attached image.
@@ -2516,7 +2530,9 @@ The dialog's buttons are **Export Current Notes First**, **Replace Notes** and *
 
 **Replace Notes** shows `Replacing Notes…` in the dialog and disables its buttons and Escape. It saves pending edits, then replaces the stored document in one step and reloads the page, which opens the imported notes. The replaced document is not kept elsewhere; Export Current Notes First keeps a copy. Import does not change preferences.
 
-Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure shows `Import failed. <reason>` in the panel until **OK** and leaves the notes unchanged. In both cases the images that the import already stored are removed. When the tab closes or reloads before the notes are replaced, those images are removed the next time Tree opens. The reason names the first problem found, for example:
+If the background import stops while those pending edits are still being saved, the import fails without reloading and the current notes remain writable. Finishing that save later must not resume the failed import or affect a new attempt. If the background import stops after storage replacement has been requested, its result may be unknown; Tree reloads to open the document that storage contains.
+
+Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure known to occur before storage replacement shows `Import failed. <reason>` in the panel until **OK** and leaves the notes unchanged. In both cases the images that the import already stored are removed. When the tab closes or reloads before the notes are replaced, those images are removed the next time Tree opens. The reason names the first problem found, for example:
 
 * `The file is not a Tree notes archive, or it is damaged.` or `The import stopped unexpectedly.`
 * `The archive contains “__MACOSX/._document.json”, which a Tree notes archive cannot contain. Import the original file that Tree exported.`
@@ -2559,7 +2575,7 @@ Tree reads only `document.json` and the `attachments/<id>.png` files that it ref
 * The confirmation names the folder and the total size of the files read: `“Tree Backup” (2.5 MB) contains 1,234 nodes and 56 images.` It says `Restoring replaces them`, and missing images are reported as not in the folder.
 * A failure shows `Restore failed. <reason>` until **OK**. Besides the reasons of §24.4, a folder without `document.json` gives `“Tree Backup” does not contain document.json. Choose the folder that Tree backed up to.`; a folder that cannot be read gives `The folder could not be read: <reason>`; a browser storage failure gives `The notes could not be restored: <reason>`; a picker that fails gives `The folder could not be opened: <reason>`; and a stopped background check gives `The restore stopped unexpectedly.`
 
-Cancel and every failure keep the current notes unchanged and remove the images that the restore stored, as in §24.4. Restore does not change the backup choice. An active backup keeps running and, after the reload, copies the restored notes to its folder as its next version. An active backup trails the saved notes by seconds and keeps no earlier versions, so restoring from its own folder returns the latest saved notes, not an earlier state.
+Cancel and failures reported before storage replacement keep the current notes unchanged and remove the images that the restore stored, as in §24.4. An unknown result after replacement was requested reloads as in §24.4. Restore does not change the backup choice. An active backup keeps running and, after the reload, copies the restored notes to its folder as its next version. An active backup trails the saved notes by seconds and keeps no earlier versions, so restoring from its own folder returns the latest saved notes, not an earlier state.
 
 ### 24.7 Offline Access and App Updates
 

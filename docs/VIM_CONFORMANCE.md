@@ -8,6 +8,8 @@ Who decides a divergence is recorded in [AGENTS.md](../AGENTS.md) §5 (Vim diver
 
 ## Agenda
 
+Opening a direct match uses the selected Agenda occurrence regardless of the original Tree branch (PRODUCT §23.4). **Vim divergence:** Normal `gd` enters that node in Tree, matching `Cmd+.` and Tree's existing node-navigation model. `src/renderer/agenda-command-matrix.test.ts` covers origin/target hierarchy combinations; `src/renderer/App.agenda-entry.test.tsx` covers pending Insert/Replace, inactive occurrences, destination focus and image carets. `e2e/electron/agenda-view.spec.ts`: “opens the selected Agenda match outside the original Tree branch” retains native `gd` and `Cmd+.` dispatch in both editing modes. The existing childless-image cursor clarification M28 remains open; this fix reuses the unchanged Tree entry transition.
+
 Completion popup Escape behavior is shared by Tree and Agenda: the first Escape dismisses date or emoji suggestions while preserving the Insert session; Escape without a popup enters Normal (PRODUCT §20.2.4, §20.9, §20.12). **Vim divergence:** this explicit popup dismissal lets users continue typing without leaving Insert. `src/renderer/use-node-input-bindings.test.tsx` and `e2e/electron/agenda-completion.spec.ts` / `e2e/electron/emoji-completion.spec.ts` cover dismissal, caret retention and the subsequent Normal transition.
 
 Tag, people and event completion (PRODUCT §20.13) share these deliberate Escape

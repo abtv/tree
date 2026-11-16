@@ -119,6 +119,8 @@ it('counts only folded direct matches and serializes same-node and cross-day jum
   const { store, state, save, begin } = await setup()
 
   store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+  await store.flushPersistence()
+  save.mockClear()
   begin()
   await vi.runAllTimersAsync()
 

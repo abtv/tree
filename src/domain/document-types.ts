@@ -1,3 +1,5 @@
+import type { DayNumber } from './calendar-date'
+
 export type NodeId = string
 export type AttachmentId = string
 export type AttachmentSummary = ReadonlyMap<AttachmentId, number>
@@ -42,6 +44,13 @@ export interface Location {
 export interface PersistedView {
   readonly expandedIds: readonly NodeId[]
   readonly selectedRowTop?: number
+  readonly agendaFolds?: PersistedAgendaFolds
+}
+
+/** Explicit timeline choices, independent of current occurrences and temporary reveals. */
+export interface PersistedAgendaFolds {
+  readonly days: readonly DayNumber[]
+  readonly overdueWeeks: readonly DayNumber[]
 }
 
 export interface PersistedEditorState {

@@ -261,6 +261,43 @@ test.describe('persistence reliability regressions', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${initialText}${recoveryText}`)
   })
 
+  // @requirement PRODUCT.md §16.1
+  test('saves typing during recent-history persistence before menu quit and restart', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'root', text: '', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await window.clock.install()
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & { recentStarted?: boolean; releaseRecent?: () => void }
+      const gate = new Promise<void>((resolve) => {
+        control.releaseRecent = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:set-recent-nodes', async (original, ...args) => {
+        control.recentStarted = true
+        await gate
+        return original(...args)
+      })
+    })
+    await typeInto(node(window, 1), 'before')
+
+    await clickApplicationMenuQuit(app)
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { recentStarted?: boolean }).recentStarted))
+      .toBe(true)
+    await typeInto(node(window, 1), ' late')
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseRecent?: () => void }).releaseRecent?.())
+    await closed
+
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('before late')
+
+    const restarted = await launchTree(userDataDir)
+
+    await expect(node(restarted.window, 1)).toHaveValue('before late')
+  })
+
   test('waits for an image paste before menu quit and restores the image on restart', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
 

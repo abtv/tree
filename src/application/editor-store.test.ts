@@ -4208,6 +4208,212 @@ describe('EditorStore', () => {
     })
   })
 
+  describe.each(['recent', 'emoji'] as const)('late edits during %s persistence', (preference) => {
+    // @requirement PRODUCT.md §16.1
+    it.each(['text', 'buffered', 'pending-paste', 'immediate'] as const)(
+      'waits for a late %s edit and its document save',
+      async (edit) => {
+        const services = loadedState(
+          { roots: [{ id: 'root', text: 'initial', children: [] }] },
+          { currentParentId: null, selectedNodeId: 'root' },
+        )
+        const writePreference = vi.fn(async (): Promise<void> => undefined)
+        services.loadRecentNodes = async () => []
+        if (preference === 'recent') services.saveRecentNodes = writePreference
+        else services.saveEmojiHistory = writePreference
+        const store = new EditorStore(services, ids('new'), new FakeClock())
+        await store.initialize()
+        await store.flushPersistence()
+        services.saves.length = 0
+        let releasePreference!: () => void
+        writePreference.mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              releasePreference = resolve
+            }),
+        )
+        let releaseSave!: () => void
+        const pendingSave = new Promise<void>((resolve) => {
+          releaseSave = resolve
+        })
+        services.save = async (state) => {
+          services.saves.push(state)
+          if (services.saves.length > 1) await pendingSave
+        }
+        let releaseClipboard!: () => void
+        services.readClipboard = () =>
+          new Promise<ClipboardValue>((resolve) => {
+            releaseClipboard = () => resolve({ kind: 'text', text: 'late' })
+          })
+        let buffered = false
+        store.registerPendingEditFinisher(() => {
+          if (!buffered) return false
+          buffered = false
+          store.editText('root', 'buffered')
+          return true
+        })
+        store.editText('root', 'before')
+        if (preference === 'emoji') store.emojiHistory.remember('smile')
+        let flushed = false
+        const flush = store.flushPersistence().then(() => {
+          flushed = true
+        })
+        await vi.waitFor(() => {
+          expect(releasePreference).toBeTypeOf('function')
+          expect(services.saves).toHaveLength(1)
+        })
+        await tick()
+
+        let paste: Promise<void> | undefined
+        const immediateText = 'one two three four five six seven eight nine ten'
+        if (edit === 'text') store.editText('root', 'after')
+        else if (edit === 'buffered') buffered = true
+        else if (edit === 'immediate') store.editText('root', immediateText)
+        else paste = store.paste('root', 0)
+        if (edit === 'immediate') await vi.waitFor(() => expect(services.saves).toHaveLength(2))
+        releasePreference()
+        await tick()
+
+        expect(flushed).toBe(false)
+
+        if (paste !== undefined) {
+          releaseClipboard()
+          await paste
+        }
+        await vi.waitFor(() => expect(services.saves).toHaveLength(2))
+
+        expect(flushed).toBe(false)
+        expect(services.saves.at(-1)).toMatchObject({
+          document: {
+            roots: [
+              {
+                text:
+                  edit === 'text'
+                    ? 'after'
+                    : edit === 'buffered'
+                      ? 'buffered'
+                      : edit === 'immediate'
+                        ? immediateText
+                        : 'latebefore',
+              },
+            ],
+          },
+        })
+
+        releaseSave()
+        await flush
+        await store.flushPersistence()
+
+        expect(flushed).toBe(true)
+        expect(buffered).toBe(false)
+        expect(services.saves).toHaveLength(2)
+      },
+    )
+  })
+
+  it.each(['recent', 'emoji'] as const)('drains late %s changes after the final document save', async (preference) => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'root', text: 'initial', children: [] },
+          { id: 'other', text: '', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    let releaseSave!: () => void
+    const pendingSave = new Promise<void>((resolve) => {
+      releaseSave = resolve
+    })
+    let releasePreference!: () => void
+    const pendingPreference = new Promise<void>((resolve) => {
+      releasePreference = resolve
+    })
+    const words = 'one two three four five six seven eight nine ten'
+    services.save = async (state) => {
+      services.saves.push(state)
+      if (services.saves.length === 2) await pendingSave
+    }
+    let recentWrites = 0
+    const recent = vi.fn(async () => {
+      if (++recentWrites === 1) store.editText('root', words)
+      else await pendingPreference
+    })
+    const emoji = vi.fn(async () => pendingPreference)
+    services.saveRecentNodes = recent
+    services.saveEmojiHistory = emoji
+    const store = new EditorStore(services, ids('new'), new FakeClock())
+    await store.initialize()
+    store.editText('root', 'before')
+    let flushed = false
+    const flush = store.flushPersistence().then(() => {
+      flushed = true
+    })
+    await vi.waitFor(() => expect(services.saves).toHaveLength(2))
+    await tick()
+
+    if (preference === 'emoji') store.emojiHistory.remember('heart')
+    else {
+      store.selectNode('other', 0)
+      store.editText('other', words)
+    }
+    releaseSave()
+    await tick()
+
+    expect(flushed).toBe(false)
+    if (preference === 'emoji') expect(emoji).toHaveBeenCalledOnce()
+    else expect(recent).toHaveBeenCalledTimes(2)
+
+    releasePreference()
+    await flush
+
+    expect(flushed).toBe(true)
+    expect(services.saves).toHaveLength(preference === 'emoji' ? 2 : 3)
+  })
+
+  it('reports a late immediate-save failure before retrying after metadata persistence', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: 'initial', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    let releasePreference!: () => void
+    services.saveEmojiHistory = () =>
+      new Promise<void>((resolve) => {
+        releasePreference = resolve
+      })
+    const save = vi.spyOn(services, 'save')
+    const store = new EditorStore(services, ids('new'), new FakeClock())
+    await store.initialize()
+    store.editText('root', 'before')
+    store.emojiHistory.remember('smile')
+    const outcome = store.flushPersistence().then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    await vi.waitFor(() => {
+      expect(releasePreference).toBeTypeOf('function')
+      expect(save).toHaveBeenCalledOnce()
+    })
+    let rejectSave!: (error: Error) => void
+    save.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSave = reject
+        }),
+    )
+    const failure = new Error('late save failed')
+
+    store.editText('root', 'one two three four five six seven eight nine ten')
+    await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+    rejectSave(failure)
+    await tick()
+    releasePreference()
+
+    expect(await outcome).toBe(failure)
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(store.getSnapshot()).toMatchObject({ saveError: 'late save failed' })
+  })
+
   it('commits a registered pending edit before the flush captures a save', async () => {
     const services = createServices()
     const store = new EditorStore(services, ids('root'))
@@ -7048,31 +7254,61 @@ describe('EditorStore', () => {
       expect(rootText(store)).toBe('one two three')
     })
 
-    it('discards a text paste that finishes after persistence locked', async () => {
-      const clock = new FakeClock()
-      const services = textState('one two three')
-      const store = new EditorStore(services, ids('unused'), clock)
+    it.each(['short-text', 'ten-words', 'link', 'image-read', 'image-write'] as const)(
+      'discards a %s paste that finishes after persistence locked without restarting automatic saves',
+      async (kind) => {
+        const clock = new FakeClock()
+        const services = textState('one two three')
+        const store = new EditorStore(services, ids('unused'), clock)
 
-      await store.initialize()
-      let open!: () => void
-      const read = new Promise<void>((resolve) => {
-        open = resolve
-      })
-      services.readClipboard = async () => {
-        await read
-        return { kind: 'text', text: 'pasted ' }
-      }
-      services.save = async () => {
-        throw new Error('disk full')
-      }
-      const paste = store.paste('root', 0)
+        await store.initialize()
+        let open!: () => void
+        const read = new Promise<void>((resolve) => {
+          open = resolve
+        })
+        services.readClipboard = async () => {
+          if (kind !== 'image-write') await read
+          if (kind === 'image-read' || kind === 'image-write') return { kind: 'image', png: new Uint8Array([1]) }
+          if (kind === 'ten-words') return { kind: 'text', text: 'one two three four five six seven eight nine ten ' }
+          if (kind === 'link')
+            return { kind: 'text', text: 'link ', links: [{ start: 0, end: 4, url: 'https://example.com' }] }
+          return { kind: 'text', text: 'pasted ' }
+        }
+        const writeAttachment = vi.fn(async () => {
+          if (kind === 'image-write') await read
+        })
+        services.writeAttachment = writeAttachment
+        const save = vi.fn(async (): Promise<void> => {
+          throw new Error('disk full')
+        })
+        services.save = save
+        const paste = store.paste('root', 0)
 
-      await failSavesUntilLocked(store, clock)
-      open()
-      await paste
+        await failSavesUntilLocked(store, clock)
+        const before = store.getSnapshot() as ReadySnapshot
+        expect(save).toHaveBeenCalledTimes(3)
+        save.mockResolvedValue(undefined)
+        open()
+        await paste
+        clock.runAll()
+        await tick()
 
-      expect(rootText(store)).toBe('one two three')
-    })
+        expect(rootText(store)).toBe('one two three')
+        expect(store.getSnapshot()).toMatchObject({
+          document: before.document,
+          location: before.location,
+          focus: before.focus,
+          persistenceLocked: true,
+        })
+        expect(save).toHaveBeenCalledTimes(3)
+        expect(writeAttachment).toHaveBeenCalledTimes(kind === 'image-write' ? 1 : 0)
+
+        await store.flushPersistence()
+
+        expect(save).toHaveBeenCalledTimes(4)
+        expect((store.getSnapshot() as ReadySnapshot).persistenceLocked).not.toBe(true)
+      },
+    )
 
     it('cleans up attachments that only a redo branch discarded by a structural command held', async () => {
       const services = createServices({ kind: 'image', png: new Uint8Array([1]) })

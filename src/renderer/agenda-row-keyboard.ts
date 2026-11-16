@@ -343,8 +343,6 @@ export function createAgendaKeyDownHandler({
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
         if (row.kind === 'node') {
-          store.closeAgenda()
-          store.selectNode(row.nodeId, 0)
           store.enter()
         } else if (row.kind === 'day') {
           beforeSelect?.(false)
@@ -513,8 +511,6 @@ export function createAgendaKeyDownHandler({
         rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'focus-day', key: row.key, scrollTop: viewportScroller()?.scrollTop ?? 0 })
       } else if (row.kind === 'node') {
-        store.closeAgenda()
-        store.selectNode(row.nodeId, 0)
         store.enter()
       }
     } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()

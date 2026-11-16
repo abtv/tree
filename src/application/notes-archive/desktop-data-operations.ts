@@ -376,6 +376,10 @@ export class DesktopDataOperations {
     this.publish({ phase: 'idle' })
   }
 
+  dismissTransientStatus = (): void => {
+    if (this.operation.phase === 'done' && this.operation.autoDismiss) this.dismiss()
+  }
+
   cancel = async (): Promise<void> => {
     if (!['running', 'confirming'].includes(this.operation.phase)) return
     ++this.epoch

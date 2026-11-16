@@ -62,10 +62,14 @@ describe('notes archive round-trip properties', () => {
       fc.asyncProperty(
         deepForest,
         fc.func(fc.oneof(fc.constant(undefined), fc.uint8Array({ minLength: 1, maxLength: 64 }))),
-        async (forest, imageFor) => {
+        fc.array(fc.integer({ min: 0, max: 100_000 }), { maxLength: 50 }),
+        async (forest, imageFor, days) => {
           const document = materialize(forest)
 
-          const head = serializeState(document, firstLocation(document), { expandedIds: [] })
+          const head = serializeState(document, firstLocation(document), {
+            expandedIds: [],
+            agendaFolds: { days, overdueWeeks: [4] },
+          })
           const referenced = [...collectAttachmentIds(document)].sort()
           const stored = new Map(referenced.map((id) => [id, imageFor(id)]))
           const chunks: Uint8Array[] = []

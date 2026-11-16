@@ -41,12 +41,11 @@ try {
     about.show()
   }
   document.getElementById('app-about')!.onclick = showAbout
-  const { commands: menuCommands, isRunning: dataOperationRunning } = installDataMenu(
-    store,
-    menu,
-    bridge.data,
-    menuFocus,
-  )
+  const {
+    commands: menuCommands,
+    isRunning: dataOperationRunning,
+    dismissTransientStatus,
+  } = installDataMenu(store, menu, bridge.data, menuFocus)
   installAppUpdates(store, bridge.data, menuFocus, dataOperationRunning)
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
@@ -71,6 +70,7 @@ try {
     <ErrorBoundary>
       <App
         platformStatus={<BrowserStatus />}
+        dismissTransientStatus={dismissTransientStatus}
         showAbout={showAbout}
         registerViewCommands={registerViewCommands}
         registerSearchCommands={registerSearchCommands}

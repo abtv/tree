@@ -3,6 +3,7 @@ import { focusedAgendaDay } from '../application/agenda-state'
 import type { KeyboardEvent } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
+import type { Location } from '../domain/document'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -16,8 +17,9 @@ const platforms: ShortcutPlatform[] = ['apple', 'other']
 /** The profile under test; the matrix sends Cmd on Apple and Ctrl on the other profile (PRODUCT §1.5). */
 let platform: ShortcutPlatform = 'apple'
 
-async function fixture(element: AgendaElement, standard = false, children = true) {
+async function fixture(element: AgendaElement, standard = false, children = true, location?: Location) {
   const f = await createRealStoreHarness({
+    ...(location === undefined ? {} : { location }),
     services: { today: () => day(12) },
     document: {
       roots: [
@@ -75,6 +77,43 @@ async function fixture(element: AgendaElement, standard = false, children = true
   }
   return { ...f, selected, input, vim, commandState, press }
 }
+
+// @requirement PRODUCT.md §23.4
+// @requirement PRODUCT.md §6.1
+describe.each([
+  { command: 'Standard Cmd+.', standard: true, gd: false },
+  { command: 'Vim Cmd+.', standard: false, gd: false },
+  { command: 'Vim gd', standard: false, gd: true },
+])('Agenda target navigation through $command', ({ standard, gd }) => {
+  it.each(
+    [false, true].flatMap((children) =>
+      [
+        { origin: 'root', currentParentId: null, selectedNodeId: 'source' },
+        { origin: 'other branch', currentParentId: 'source', selectedNodeId: 'source' },
+        { origin: 'ancestor', currentParentId: 'context', selectedNodeId: 'context' },
+        { origin: 'target itself', currentParentId: 'match', selectedNodeId: 'match' },
+        ...(children ? [{ origin: 'descendant', currentParentId: 'child', selectedNodeId: 'child' }] : []),
+      ].map((origin) => ({ ...origin, children })),
+    ),
+  )(
+    'opens the exact match from $origin (children: $children)',
+    async ({ children, currentParentId, selectedNodeId }) => {
+      const f = await fixture('match', standard, children, { currentParentId, selectedNodeId })
+      const document = f.snapshot().document
+
+      if (gd) {
+        f.press('g')
+        f.press('d')
+      } else f.press('.', { metaKey: true })
+
+      const destination = children ? 'child' : 'match'
+      expect(f.snapshot().agenda).toBeUndefined()
+      expect(f.snapshot().location).toEqual({ currentParentId: 'match', selectedNodeId: destination })
+      expect(f.snapshot().focus).toMatchObject({ nodeId: destination, cursor: 0 })
+      expect(f.snapshot().document).toBe(document)
+    },
+  )
+})
 
 // @requirement PRODUCT.md §23.4
 // @requirement PRODUCT.md §23.5

@@ -22,6 +22,7 @@ export interface SaveSchedulerContext {
 }
 
 export type SaveSchedulerResult = { status: 'success' } | { status: 'failure'; error: unknown; lock: boolean }
+type SaveRequestReason = 'automatic' | 'flush'
 
 export class EditorSaveScheduler {
   private readonly persistence: PersistenceCoordinator
@@ -58,7 +59,7 @@ export class EditorSaveScheduler {
   }
 
   public requestSave(): void {
-    this.persistence.requestSave()
+    if (this.canRequestSave('automatic')) this.persistence.requestSave()
   }
 
   public requestAttachmentCleanup(): void {
@@ -93,6 +94,7 @@ export class EditorSaveScheduler {
   }
 
   public noteChange(insertedWords: number, saveImmediately: boolean): void {
+    if (!this.canRequestSave('automatic')) return
     if (insertedWords > 0) {
       this.insertedWordsWatermark += insertedWords
       if (this.insertedWordsWatermark - this.savedWordsWatermark >= SAVE_WORD_THRESHOLD) saveImmediately = true
@@ -101,12 +103,16 @@ export class EditorSaveScheduler {
     if (saveImmediately) this.requestImmediateSave()
   }
 
-  public requestImmediateSave(): void {
-    this.requestPolicySave()
+  public requestImmediateSave(reason: SaveRequestReason = 'automatic'): void {
+    this.requestPolicySave(reason)
   }
 
-  private requestPolicySave(): void {
-    if (!this.changesPending) return
+  private canRequestSave(reason: SaveRequestReason): boolean {
+    return reason === 'flush' || !this.context.isPersistenceLocked()
+  }
+
+  private requestPolicySave(reason: SaveRequestReason = 'automatic'): void {
+    if (!this.changesPending || !this.canRequestSave(reason)) return
     this.cancelSaveTimer()
     this.changesPending = false
     this.persistence.requestSave()

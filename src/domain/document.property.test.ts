@@ -1,6 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { propertyRuns } from '../test/property-runs'
+import { dayNumberOf, weekdayOf } from './calendar-date'
 import {
   assertDocument,
   attachImage,
@@ -313,6 +314,30 @@ describe('document invariants', () => {
         expect(validatePersistedState(state)).toBe(state)
         expect(parsePersistedState(JSON.parse(JSON.stringify(state)))).toEqual(state)
       }),
+    )
+  })
+
+  // @requirement PRODUCT.md §23.5
+  it('round-trips generated Agenda fold choices independently of document dates', () => {
+    const day = fc.integer({
+      min: dayNumberOf({ year: 0, month: 1, day: 1 }),
+      max: dayNumberOf({ year: 9999, month: 12, day: 31 }),
+    })
+    fc.assert(
+      fc.property(forest, fc.array(day), fc.array(day), (rawForest, days, weeks) => {
+        const document = materialize(rawForest)
+        const agendaFolds = { days, overdueWeeks: weeks.map((value) => value - weekdayOf(value)) }
+        const saved = serializeState(document, locationFor(document, pick(document, 0)), {
+          expandedIds: [],
+          agendaFolds,
+        })
+
+        expect(validatePersistedState(saved)).toBe(saved)
+        expect(parsePersistedState(JSON.parse(JSON.stringify(saved)))).toEqual(saved)
+        expect(saved.view?.agendaFolds?.days ?? []).toEqual([...new Set(days)])
+        expect(saved.view?.agendaFolds?.overdueWeeks ?? []).toEqual([...new Set(agendaFolds.overdueWeeks)])
+      }),
+      { numRuns: propertyRuns(100) },
     )
   })
 

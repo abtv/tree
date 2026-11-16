@@ -928,6 +928,7 @@ describe('desktop entry wiring', () => {
       minHeight: 480,
       title: 'Tree',
       titleBarStyle: 'hidden',
+      disableAutoHideCursor: true,
       backgroundColor: '#fff',
       webPreferences: { preload: expect.stringMatching(/preload\/index\.js$/), sandbox: true },
     })

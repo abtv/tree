@@ -23,6 +23,7 @@ const reason = (error: unknown) => (error instanceof Error ? error.message : Str
 interface ActivityPanel {
   show(text: string, action: 'Cancel' | 'OK' | undefined, onAction: () => void): void
   hide(): void
+  dismissTransient(): boolean
 }
 
 function activityPanel(restoreFocus: () => void): ActivityPanel {
@@ -43,6 +44,11 @@ function activityPanel(restoreFocus: () => void): ActivityPanel {
       text.textContent = ''
       button.onclick = null
       if (focused) restoreFocus()
+    },
+    dismissTransient() {
+      if (panel.hidden || !button.hidden) return false
+      this.hide()
+      return true
     },
   }
 }
@@ -138,6 +144,12 @@ interface ImportDialog {
   close(): void
 }
 
+type ImportOperation =
+  | { phase: 'initial-save' }
+  | { phase: 'preparing' | 'confirming' | 'flushing'; worker: Worker }
+  | { phase: 'committing'; worker: Worker; resumeWrites: () => void }
+  | { phase: 'stopped' | 'reloading' }
+
 /**
  * Wires the Data block of the browser menu (PRODUCT §24.3–§24.6). One export, import or restore
  * runs at a time, and none is available in the locked save-failure state.
@@ -147,7 +159,7 @@ export function installDataMenu(
   menu: HTMLElement,
   session: DataSession,
   focus: MenuFocus,
-): { commands: BrowserMenuCommands; isRunning(): boolean } {
+): { commands: BrowserMenuCommands; isRunning(): boolean; dismissTransientStatus(): void } {
   const commands = new BrowserMenuCommands()
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
@@ -276,57 +288,63 @@ export function installDataMenu(
     const progress = restoring ? restoreProgressText : importProgressText
     setRunning(true)
     clearTimeout(hideTimer)
-    let active = true
-    let committing = false
-    // Assigned once below, but `stop` may run before that when the worker cannot start.
-    let worker: Worker | undefined = undefined
+    let operation: ImportOperation = { phase: 'initial-save' }
     let cancelExport: (() => void) | undefined
-    let resumeWrites: (() => void) | undefined
+    const active = () => operation.phase !== 'stopped' && operation.phase !== 'reloading'
     const stop = () => {
-      active = false
+      const stopped = operation
+      operation = { phase: 'stopped' }
       setRunning(false)
       // A terminated worker's last image transaction was created before this one, so the
       // journal sweep also removes it.
-      worker?.terminate()
+      if ('worker' in stopped) stopped.worker.terminate()
       cancelExport?.()
-      resumeWrites?.()
+      if (stopped.phase === 'committing') stopped.resumeWrites()
       importDialog.close()
       void session.discardStagedImages().catch(() => {})
     }
     const cancel = () => {
-      if (!active || committing) return
+      if (!['initial-save', 'preparing', 'confirming'].includes(operation.phase)) return
       stop()
       panel.hide()
     }
     const fail = (message: string) => {
-      if (!active) return
+      if (!active()) return
       stop()
       panel.show(`${restoring ? 'Restore' : 'Import'} failed. ${message}`, 'OK', () => panel.hide())
     }
+    const reload = () => {
+      if (operation.phase !== 'committing') return
+      operation = { phase: 'reloading' }
+      location.reload()
+    }
     const replace = async () => {
-      if (!active) return
-      committing = true
+      if (operation.phase !== 'confirming') return
+      const attempt = { phase: 'flushing', worker: operation.worker } as const
+      operation = attempt
       cancelExport?.()
       for (const button of [dialogExport, dialogReplace, dialogCancel]) button.disabled = true
       dialogStatus.textContent = 'Replacing Notes…'
       try {
         await store.flushPersistence()
       } catch (error) {
-        committing = false
-        fail(`Your latest changes could not be saved: ${reason(error)}`)
+        if (operation === attempt) fail(`Your latest changes could not be saved: ${reason(error)}`)
         return
       }
+      if (operation !== attempt) return
       // No save may follow the replaced head, or it would restore the previous notes.
-      resumeWrites = session.suspendWrites()
-      worker?.postMessage({ type: 'commit-import' } satisfies ArchiveWorkerRequest)
+      operation = { phase: 'committing', worker: attempt.worker, resumeWrites: session.suspendWrites() }
+      attempt.worker.postMessage({ type: 'commit-import' } satisfies ArchiveWorkerRequest)
     }
     onDialogCancel = cancel
     dialogCancel.onclick = cancel
     dialogReplace.onclick = () => void replace()
     dialogExport.onclick = () => {
+      if (operation.phase !== 'confirming') return
       dialogExport.disabled = true
       dialogReplace.disabled = true
       cancelExport = startExport(store, (update) => {
+        if (operation.phase !== 'confirming') return
         dialogStatus.textContent = update.text
         if (update.state === 'running') return
         cancelExport = undefined
@@ -342,13 +360,14 @@ export function installDataMenu(
       fail(`Your latest changes could not be saved: ${reason(error)}`)
       return
     }
-    if (!active) return
-    worker = startArchiveWorker(
+    if (!active()) return
+    const worker = startArchiveWorker(
       (message) => {
-        if (!active) return
-        if (message.type === 'progress') {
+        if (!active()) return
+        if (message.type === 'progress' && operation.phase === 'preparing') {
           panel.show(progress(message.imagesDone, message.imageCount), 'Cancel', cancel)
-        } else if (message.type === 'prepared') {
+        } else if (message.type === 'prepared' && operation.phase === 'preparing') {
+          operation = { phase: 'confirming', worker: operation.worker }
           panel.hide()
           importDialog.open(
             importConfirmationText(
@@ -361,9 +380,8 @@ export function installDataMenu(
             typeof message.current === 'object',
           )
         } else if (message.type === 'committed') {
-          location.reload()
+          reload()
         } else if (message.type === 'error') {
-          committing = false
           fail(message.message)
         }
       },
@@ -371,17 +389,25 @@ export function installDataMenu(
         // A worker that stops during the commit may already have replaced the head; reloading
         // opens whichever head is stored, and the startup sweep removes the images only when
         // the commit did not end the journal.
-        if (committing) location.reload()
+        if (operation.phase === 'committing') reload()
         else fail(`The ${restoring ? 'restore' : 'import'} stopped unexpectedly.`)
       },
     )
-    worker?.postMessage(
+    if (worker === undefined) return
+    operation = { phase: 'preparing', worker }
+    worker.postMessage(
       file instanceof File
         ? ({ type: 'import', file } satisfies ArchiveWorkerRequest)
         : ({ type: 'restore', folder: file } satisfies ArchiveWorkerRequest),
     )
   }
-  return { commands, isRunning: () => running }
+  return {
+    commands,
+    isRunning: () => running,
+    dismissTransientStatus: () => {
+      if (panel.dismissTransient()) clearTimeout(hideTimer)
+    },
+  }
 }
 
 function download(archive: Blob, fileName: string): void {

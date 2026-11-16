@@ -86,14 +86,19 @@ export function agendaWeekDays(start: DayNumber): readonly DayNumber[] {
   return Array.from({ length: 7 }, (_, index) => start + index).filter((day) => day >= firstDay && day <= lastDay)
 }
 
-export function openAgendaState(location: Location, cursor: number, today: DayNumber): AgendaState {
+export function openAgendaState(
+  location: Location,
+  cursor: number,
+  today: DayNumber,
+  collapsed: ReadonlySet<string> = new Set(),
+): AgendaState {
   return {
     origin: { location, cursor },
     scopeParentId: null,
     today,
     weekStart: agendaWeekStart(today),
     selectedKey: dayKey(today),
-    collapsed: new Set(),
+    collapsed,
     presentation: { kind: 'timeline' },
     activity: { kind: 'inactive' },
   }
@@ -168,12 +173,10 @@ export function applyAgendaCommand(
   }
 
   const operation = command.kind === 'toggle-fold' ? 'toggle' : command.operation
-  const all = operation.endsWith('all')
-  if (!all && (row.kind !== 'day' || !row.content)) return state
+  const targets = agendaFoldTargets(command, rows)
+  if (targets.length === 0) return state
   const collapsed = new Set(state.collapsed)
-  const targets = all ? rows : [row]
   for (const target of targets) {
-    if (target.kind !== 'day' || !target.content) continue
     const close = operation === 'toggle' ? !collapsed.has(target.key) : operation.startsWith('close')
     if (close) collapsed.add(target.key)
     else collapsed.delete(target.key)
@@ -191,6 +194,18 @@ export function applyAgendaCommand(
     )
   }
   return next
+}
+
+export function agendaFoldTargets(
+  command: Extract<AgendaCommand, { kind: 'fold' | 'toggle-fold' }>,
+  rows: readonly AgendaRow[],
+): readonly Extract<AgendaRow, { kind: 'day' }>[] {
+  const row = rows.find((candidate) => candidate.key === command.key)
+  if (row === undefined) return []
+  const targets = command.kind === 'fold' && command.operation.endsWith('all') ? rows : [row]
+  return targets.filter(
+    (target): target is Extract<AgendaRow, { kind: 'day' }> => target.kind === 'day' && target.content,
+  )
 }
 
 /** Selecting another row leaves an invalid item; reselection does not. */

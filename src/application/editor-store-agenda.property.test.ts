@@ -2,7 +2,7 @@ import fc from 'fast-check'
 import { expect, it, vi } from 'vitest'
 import { propertyRuns } from '../test/property-runs'
 import { projectAgenda } from '../domain/agenda-projection'
-import { EditorStore } from './editor-store'
+import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import { calendarDateOf, formatCanonicalDate } from '../domain/calendar-date'
 import { agendaWeekDays } from './agenda-state'
@@ -74,7 +74,7 @@ it('generated Agenda text edits round-trip through history with valid selection 
   )
 })
 
-it('generated Agenda commands preserve document, Tree folds, save count, and a visible selection', async () => {
+it('generated Agenda commands preserve notes, Tree folds and visible selection while coalescing fold saves', async () => {
   await fc.assert(
     fc.asyncProperty(
       fc.array(fc.integer({ min: 1, max: 28 }), { minLength: 1, maxLength: 12 }),
@@ -86,7 +86,9 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
         { maxLength: 50 },
       ),
       async (dates, commands) => {
-        const save = vi.fn(async () => undefined)
+        const save = vi.fn<EditorServices['save']>(async () => undefined)
+        let foldChanged = false
+        const remembered = new Set<string>()
         const store = new EditorStore(
           {
             today: () => 100,
@@ -120,6 +122,11 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
           else {
             const rows = store.getAgendaRows()
             const row = rows[command.target % Math.max(rows.length, 1)]
+            if (command.kind === 'toggle-fold' && row?.kind === 'day' && row.content) {
+              foldChanged = true
+              if (remembered.has(row.key)) remembered.delete(row.key)
+              else remembered.add(row.key)
+            }
             store.applyAgenda({ kind: command.kind, key: row?.key ?? 'missing' })
           }
           const state = store.getSnapshot() as ReadySnapshot
@@ -131,6 +138,7 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
           if (state.agenda !== undefined) {
             const rows = store.getAgendaRows()
 
+            expect(state.agenda.collapsed).toEqual(remembered)
             expect(rows.some((row) => row.key === state.agenda!.selectedKey)).toBe(true)
 
             const projection = projectAgenda(state.document, state.agenda.scopeParentId)
@@ -158,7 +166,11 @@ it('generated Agenda commands preserve document, Tree folds, save count, and a v
 
         await store.flushPersistence()
 
-        expect(save).not.toHaveBeenCalled()
+        expect(save).toHaveBeenCalledTimes(foldChanged ? 1 : 0)
+        if (foldChanged) {
+          expect(save.mock.lastCall![0].document).toBe(original.document)
+          expect(save.mock.lastCall![0].location).toEqual(original.location)
+        }
       },
     ),
     { numRuns: propertyRuns(100) },
