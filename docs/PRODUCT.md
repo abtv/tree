@@ -276,7 +276,7 @@ Node text is always edited inline. A node must not have a persistent input borde
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
 
-Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping is visual only: a node's text contains no line breaks. Each visual line occupies at most 120 character cells of the editor's monospace font, wrapping earlier when the window or indentation leaves less room. This limits displayed width, not the stored text length. `Enter` does not insert a line break; it creates a node (see 5.1). Long unbroken strings are broken so that text never overflows horizontally.
+Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping adds no stored line breaks. Each visual line occupies at most 120 character cells of the editor's monospace font, wrapping earlier when the window or indentation leaves less room. This limits displayed width, not the stored text length. In standard editing and Vim Insert, `Enter` creates or splits a node in Tree (§5.1), and inserts a line break in Agenda (§23.9). Long unbroken strings are broken so that text never overflows horizontally.
 
 The editor uses the window width without a fixed centered page cap. Rows retain 28px of trailing space, and the text editor has its ordinary inner padding. The bullet remains aligned with the first text line, and an attached image remains beneath the full text. The editable current-parent heading wraps under the same character-cell limit.
 
@@ -517,7 +517,7 @@ At any other caret position, `←` and `→` retain their ordinary text-editing 
 
 ### 5.1 Enter
 
-In standard editing and Vim Insert, `Enter` creates a node or splits its text according to the caret position. Vim Normal `Enter` keeps its image-preview and hyperlink behavior (see §20.2).
+In Tree standard editing and Vim Insert, `Enter` creates a node or splits its text according to the caret position. Agenda uses the single-node editing rules in §23.9. Vim Normal `Enter` keeps its image-preview and hyperlink behavior (see §20.2).
 
 When a completion popup is open in standard editing or Vim Insert, plain `Enter` accepts its selected suggestion instead (§20.9, §20.12). Dismiss it with `Escape` before pressing `Enter` to keep the literal expression and create or split a node.
 
@@ -796,7 +796,7 @@ Closing the main window quits the application on macOS, including when the appli
 
 ### 9.3 Application Menu
 
-The Vim Normal-mode command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and the Appearance choices through the same application services as these menu items.
+The command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and the Appearance choices through the same application services as these menu items.
 
 The menu bar has five menus, laid out as macOS applications do (§1.3):
 
@@ -1015,7 +1015,7 @@ abcXYZdef
 
 ## 14. Multiline Text Paste
 
-Each pasted line becomes a separate node.
+In Tree, each pasted line becomes a separate node. Agenda inserts multiline text into the existing node instead (§23.9).
 
 The first line is inserted at the current cursor position.
 
@@ -1483,7 +1483,7 @@ Normal mode supports:
 * `h` and `l` to move by character, continuing across visible Tree nodes (§4.3) or Agenda rows (§23.4) at either end. When the node has an image, it acts as a final character after the text, and an image-only node's sole character is its image. **Vim divergence:** crossing row boundaries keeps navigation continuous.
 * **Vim divergence:** in Tree and Agenda Normal mode, `j` and `k` move down and up by visible text line, like Vim's `gj` and `gk`, so wrapped notes can be traversed without leaving the node. Counts consume visible text-line steps; an intervening image-bearing node retains its existing node-level step. At a text boundary they continue through the view's visible rows, including an expanded node's children in Tree; downward entry uses the first text line and upward entry the last.
 * In Tree and Agenda Normal mode, `ArrowDown` and `ArrowUp` use the same vertical navigation as `j` and `k`, including counts, wrapped lines, desired horizontal position, images, and node boundaries.
-* Consecutive vertical motions remember the desired horizontal position relative to the text column, temporarily clamping at the final character of a short line and restoring the position on a longer line. Another command, pointer placement, a new focus intent, changed text, or a changed window width starts a new desired position. Each motion uses the current wrapping, including after resizing and in windowed lists. Empty text has one position. This deliberately replaces logical-line `j`/`k` with display-line navigation because a node contains no text line breaks (§2).
+* Consecutive vertical motions remember the desired horizontal position relative to the text column, temporarily clamping at the final character of a short line and restoring the position on a longer line. Another command, pointer placement, a new focus intent, changed text, or a changed window width starts a new desired position. Each motion uses the current wrapping, including after resizing and in windowed lists. Empty text has one position. This deliberately replaces logical-line `j`/`k` with display-line navigation so wrapped text is traversed one visible line at a time (§2).
 * A node's attached image remains a separate vertical step after its final text line. `j` enters it after traversing the text; `k` returns to the saved text position. Upward entry from another node selects the image and saves a position on the final text line at the desired horizontal position.
 * A downward motion starting on an image starts the next node at text position zero. An image reached during a count keeps that count's existing carried offset when it continues to another node. After crossing from an image to text, the actual destination position becomes the desired horizontal position for subsequent vertical steps. `k` on an image-only node moves to the previous visible node. Agenda uses the same Normal text-line and image rules (§23.4). Whole-node Visual and vertical operators retain their sibling-range rules; Tree character Visual follows §20.2.20.
 * **Vim divergence:** `J` and `K` are fast vertical motions: they behave as `10j` and `10k` in Normal and Visual modes. A preceding count multiplies the distance (`2J` is `20j`). They preserve the corresponding motion's caret, image, range and boundary rules and never join nodes. Whole-node Visual extends its sibling range; Tree character Visual extends its text selection within the node. These aliases do not apply after operators or prefixes; `gJ` remains the join command. Awaited characters and Insert/Replace text remain literal. This deliberately replaces Vim's join/help bindings with faster navigation.
@@ -1706,7 +1706,7 @@ Normal mode also supports:
 * When the restored range is hidden by a collapsed fold or is not displayed at the current location, `gv` does nothing.
 * `gv` does nothing in a Visual mode.
 
-#### 20.2.26 Local Vim Register
+#### 20.2.26 Local Vim Register and Local Search
 
 * The local Vim register is held only for the running renderer session and does not persist across application restarts. It is separate from the system clipboard; character-wise Visual `y`, Normal `yy` and `dd`, and whole-node Visual `y` also copy content to the system clipboard under the rules above, while other register-producing Vim commands do not modify the system clipboard. It holds either one plain-text value, one structured node subtree, or an ordered set of sibling subtrees, with only the most recent register-producing action retained.
 * Named registers, macros, and marks are not supported.

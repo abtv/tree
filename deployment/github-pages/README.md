@@ -256,9 +256,13 @@ Missing credentials can be added without source edits. Use **Re-run failed jobs*
 but target deployment failed, follow the target-run link, rerun failed jobs there, then
 retry the source Web job. The App remains Contents-only; it cannot rerun target Actions.
 The source authenticates the existing transferred package and never retransfers the same
-version. When retrying validation itself, use **Re-run all jobs** to regenerate the tested
-artifact for its current attempt. After modifying
-trusted target workflow/scripts, copy and commit the reviewed files again. The
+version. When an E2E or other validation prerequisite fails in `Test and build app`,
+use **Re-run failed jobs**; the release gate verifies and reuses the successful
+browser job's immutable artifact for the same source SHA. If only publication dispatch
+fails after the gate succeeded, rerun all jobs. Missing or expired artifacts require
+rerunning their producer and dependent jobs, or all jobs. See the
+[validation retry procedure](../../docs/releasing.md#signing-and-packaging).
+After modifying trusted target workflow/scripts, copy and commit the reviewed files again. The
 setup commit itself does not publish a package; a later valid transfer does.
 
 Before calling activation secure, run a real signed source publication and hosted

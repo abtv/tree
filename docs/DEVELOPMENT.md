@@ -399,7 +399,7 @@ For process inspection in all three tools, run `ps -axo pid=,ppid=,command=` by 
 
 The diagnostic and changed-spec workflows are shared entry points for Codex, Claude Code, and OpenCode. Claude Code's existing `npm run test:e2e*` allowance and sandbox exclusion cover both; OpenCode's `develop` role explicitly allows both script names and their arguments. Configuration checks do not establish that a live tool has loaded these settings. In a fresh session of each tool, run `npm run test:e2e:changed -- --list`, a focused `npm run test:e2e:diagnose` invocation with JSON output, and the standalone process-inspection command. Record whether each ran without a prompt separately from its exit status. Do not save new personal approvals during this check or substitute another command after a denial. A successful check in one tool is not evidence for either of the others.
 
-Hidden mode still requires a macOS GUI session; it does not make the suite headless.
+Hidden mode still requires a display: a macOS GUI session on macOS, or the documented Xvfb display on Linux. It does not make Electron headless.
 
 Clipboard helpers acquire the machine-global clipboard lock automatically. Native Copy/Cut/Paste and context-menu interactions must acquire it explicitly through `lockSystemClipboard()` when no preceding helper already holds it. Acquire immediately before clipboard work, and release through `unlockSystemClipboard()` once assertions establish that all asynchronous clipboard reads/writes are finished and no subsequent interaction needs the contents. A completed paste or a pending attachment write that has already received the image bytes no longer needs the clipboard lock during persistence, quit-failure waits, screenshots, or restart checks. Reacquire and rewrite before a later independent paste; keep Copy/Cut-to-Paste sequences and clipboard assertions under one uninterrupted lock. Fixture teardown remains the release fallback. Full-suite diagnostics on 2026-10-11 found two quit-failure tests holding the lock for over five seconds each and other tests waiting up to seven seconds.
 
@@ -637,8 +637,9 @@ and macOS, and Linux Electron memory tests run in parallel when the main push ha
 unpublished release version. A failed smoke job prevents these release suites from starting.
 Browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
-job requires checks, audit, version detection and smoke to succeed, plus browser E2E
-and Electron E2E for a release. A non-release run requires both full E2E jobs to be skipped.
+job requires checks, audit, version detection and smoke to succeed, plus browser E2E,
+Electron E2E and Linux Electron memory tests for a release. A non-release run requires
+all three release suites to be skipped.
 PRs never dispatch publications or receive release credentials.
 
 A successful main run dispatches `Publish demo video and screenshots` and, only for
@@ -1032,7 +1033,7 @@ Use `npm run test:safari` for the maintained real-Safari smoke checks on macOS. 
 
 For unattended sessions, OpenCode's auto-approve mode (`opencode --auto`, or the TUI command palette) approves permission requests that are not explicitly denied; the deny rules above remain enforced.
 
-`AGENTS.md` §4 requires repository edits to go through the agent's own file-editing tool rather than shell scripting, and every tool's configuration enforces that the way its own permission model allows. OpenCode and Claude Code both deny interpreters and in-place stream editing; Claude Code's rules live in `.claude/settings.json`, and Codex relies on `sandbox_mode = "workspace-write"` in `.codex/config.toml` instead of command patterns. Read-only stream editing and search stay available in both pattern-based tools, because the requirement concerns writes. `npm run check:opencode` asserts that this one category stays denied in both configurations, so the gap that existed until 2026-09-27, when only OpenCode denied it, cannot reappear silently. The check deliberately covers that category alone, because each tool reaches unattended operation through its own mechanism. Keep the exact patterns in each tool's configuration rather than duplicating them here.
+`AGENTS.md` §4 requires repository edits to go through the agent's own file-editing tool rather than shell scripting. OpenCode and Claude Code enforce this category through interpreter and in-place stream-editing deny rules in their configurations. In Codex, the edit-tool requirement is instruction-enforced: `sandbox_mode = "workspace-write"` in `.codex/config.toml` restricts filesystem scope, not the choice of editing command. See `docs/AGENT_ROLES.md` for each role's mechanical and instruction-only boundaries. Read-only stream editing and search stay available in both pattern-based tools, because the requirement concerns writes. `npm run check:opencode` checks this deny category in both `opencode.json` and `.claude/settings.json`, guarding the configuration gap corrected on 2026-09-27. It does not establish Codex command restrictions or verify that a running tool loaded its configuration. Keep exact patterns in each tool's configuration rather than duplicating them here.
 
 Claude Code is configured in `.claude/settings.json` for sessions that run with few or no approval prompts:
 

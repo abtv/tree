@@ -24,7 +24,7 @@ The same outline, focused on “Plan the first meetup”: the node text and expa
 
 <img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing dated nodes grouped by day.">
 
-The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, with Today marked. Move between weeks with `Cmd+[` and `Cmd+]`. In the current week, an Overdue group collects unfinished nodes dated before Monday. Populated groups fold; entries remain a flat list without parent paths.
+The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, with Today marked. Move between weeks with `Cmd+[` and `Cmd+]`. In the current week, an Overdue group collects unfinished nodes dated before Monday. Populated groups fold. Consecutive entries with the same parent share a read-only path that you can select and copy.
 
 <img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
 
@@ -42,7 +42,7 @@ The command panel keeps application commands and their shortcuts within reach. P
 * **Image attachments.** Paste images into nodes and open them in a larger preview.
 * **Local storage.** Documents and images stay on your machine, with automatic saving. The desktop application can automatically recover from retained document versions.
 * **Notes export and import.** Export notes and their images to a ZIP archive, or import an archive from either the desktop or browser version. Import replaces the current notes after confirmation.
-* **Light and dark appearances.** Choose an appearance or follow the macOS setting.
+* **Appearances.** Choose Light, Dark, or Gray, or follow the system appearance.
 
 Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
 
