@@ -310,7 +310,8 @@ for (const shape of ['deep', 'long'] as const) {
     await window.keyboard.press('Enter')
 
     await expect(window.locator('[data-node-id="target"] .search-match-current')).toBeVisible()
-    await expect(prompt).toBeFocused()
+    await expect(prompt).toHaveCount(0)
+    await expect(window.locator('[data-node-id="target"] .node-input')).toBeFocused()
 
     const revealMs = performance.now() - start
 

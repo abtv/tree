@@ -1,5 +1,8 @@
-import { expect, launchTree, round, seedDocument, test, type Seed } from './fixtures'
+import { expect, launchTree, round, seedDocument, setCalendarDate, test, type Seed } from './fixtures'
 import { recordPerfResult } from '../results'
+
+// Monday keeps both dated occurrences in the displayed week on every test day.
+const today = new Date(2026, 10, 16, 12)
 
 interface Node {
   id: string
@@ -9,7 +12,6 @@ interface Node {
 
 /** Exactly 100,000 nodes; sparse dates retain undated ancestors in the projection. */
 function scaleSeed(shape: 'wide' | 'deep' | 'mixed', dense: boolean): Seed {
-  const today = new Date()
   const later = new Date(today)
   later.setDate(today.getDate() + 6)
   const canonical = (date: Date): string =>
@@ -51,6 +53,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
     test(`${scenario}: open, navigate, edit dates and undo`, async ({ userDataDir }, testInfo) => {
       seedDocument(userDataDir, scaleSeed(shape, dense))
       const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+      await setCalendarDate(window, today)
       const profiler = process.env.AGENDA_CPU_PROFILE === '1' ? await window.context().newCDPSession(window) : undefined
       if (profiler !== undefined) {
         await profiler.send('Profiler.enable')
@@ -196,8 +199,8 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
 
       recordPerfResult({ kind: 'state', scenario, samples: 86, metrics })
 
-      // Opening materializes every projected row (about 200,000 in these shapes, far fewer in the sparse wide
-      // and mixed ones), so it keeps its own ceiling; the Product Owner accepted this extreme case.
+      // Opening materializes both dated occurrences plus parent paths (up to 390,000 rows in deep dense
+      // trees), so it keeps its own ceiling; the Product Owner accepted this extreme case.
       expect.soft(metrics.openPaintMs).toBeLessThan(dense || shape === 'deep' ? 150 : 100)
       expect.soft(metrics.scrollPaintMs).toBeLessThan(100)
       expect.soft(metrics.motionP95Ms).toBeLessThan(50)

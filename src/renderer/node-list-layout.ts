@@ -65,7 +65,10 @@ type KeyedRow = VisibleRow | { readonly key: string }
 
 // Row arrays are immutable projections. Weak keys release indexes with the retired projection;
 // only identities and uniform estimates are cached, never DOM measurements or document content.
-const estimatedLayouts = new WeakMap<readonly KeyedRow[], { layout: ListLayout; indices: Map<string, number> }>()
+const estimatedLayouts = new WeakMap<
+  readonly KeyedRow[],
+  { layout: ListLayout; indices: Map<string, number>; indexedCount: number }
+>()
 
 function rowKey(row: KeyedRow): string {
   return 'key' in row ? row.key : row.node.id
@@ -77,11 +80,28 @@ export function buildLayout(rows: readonly KeyedRow[], heights: ReadonlyMap<stri
     const offsets = new Float64Array(rows.length + 1)
     const indices = new Map<string, number>()
     for (let index = 0; index < rows.length; index++) {
-      indices.set(rowKey(rows[index]!), index)
       offsets[index + 1] = (index + 1) * ROW_HEIGHT_ESTIMATE
     }
-    estimated = { layout: { offsets, total: rows.length * ROW_HEIGHT_ESTIMATE, count: rows.length }, indices }
+    estimated = {
+      layout: { offsets, total: rows.length * ROW_HEIGHT_ESTIMATE, count: rows.length },
+      indices,
+      indexedCount: 0,
+    }
     estimatedLayouts.set(rows, estimated)
+  }
+
+  // Only nonuniform measurements need an identity lookup. Opening a large projection
+  // must not hash every row key just to place its first mounted window.
+  const missing = new Set<string>()
+  for (const [key, height] of heights) {
+    if (height !== ROW_HEIGHT_ESTIMATE && !estimated.indices.has(key)) missing.add(key)
+  }
+  // Retain the scanned prefix so later measurements never rescan the same row identities.
+  while (estimated.indexedCount < rows.length && missing.size > 0) {
+    const index = estimated.indexedCount++
+    const key = rowKey(rows[index]!)
+    estimated.indices.set(key, index)
+    missing.delete(key)
   }
 
   const changes: { index: number; delta: number }[] = []

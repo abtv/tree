@@ -35,6 +35,29 @@ it('does not compensate an empty, unchanged or incompatible layout', () => {
 })
 
 // @requirement PRODUCT.md §22.1
+it('does not index unmeasured rows when opening a large list', () => {
+  let reads = 0
+  const rows = Array.from({ length: 100000 }, (_, index) => ({
+    get key() {
+      reads++
+      return `row-${index}`
+    },
+  }))
+
+  const initial = buildLayout(rows, new Map())
+  const confirmed = buildLayout(rows, new Map([['row-0', ROW_HEIGHT_ESTIMATE]]))
+
+  expect(reads).toBe(0)
+  expect(confirmed).toBe(initial)
+  expect(initial.total).toBe(100000 * ROW_HEIGHT_ESTIMATE)
+
+  const measured = buildLayout(rows, new Map([['row-1', 40]]))
+
+  expect(reads).toBe(2)
+  expect(measured.offsets[2]).toBe(ROW_HEIGHT_ESTIMATE + 40)
+})
+
+// @requirement PRODUCT.md §22.1
 it('bounds offset reads when anchoring measurements near the end of a large list', () => {
   const rows = Array.from({ length: 10000 }, (_, index) => ({ key: String(index) }))
   const before = buildLayout(rows, new Map())
@@ -78,8 +101,6 @@ it('reuses row identities for repeated layout while applying current sparse meas
     },
   }))
   const initial = buildLayout(rows, new Map())
-  reads = 0
-
   const measured = buildLayout(
     rows,
     new Map([
@@ -88,7 +109,11 @@ it('reuses row identities for repeated layout while applying current sparse meas
       ['removed', 80],
     ]),
   )
+  reads = 0
+
   const resized = buildLayout(rows, new Map([['row-1', 60]]))
+  const newlyMeasured = buildLayout(rows, new Map([['row-5000', 50]]))
+  const removed = buildLayout(rows, new Map([['removed', 80]]))
   const reset = buildLayout(rows, new Map())
 
   expect(reads).toBe(0)
@@ -96,6 +121,8 @@ it('reuses row identities for repeated layout while applying current sparse meas
   expect(measured.offsets[2]).toBe(ROW_HEIGHT_ESTIMATE + 40)
   expect(measured.total).toBe(9998 * ROW_HEIGHT_ESTIMATE + 50)
   expect(resized.total).toBe(9999 * ROW_HEIGHT_ESTIMATE + 60)
+  expect(newlyMeasured.total).toBe(9999 * ROW_HEIGHT_ESTIMATE + 50)
+  expect(removed).toBe(initial)
   expect(reset).toEqual(initial)
   expect(initial.total).toBe(10000 * ROW_HEIGHT_ESTIMATE)
 
