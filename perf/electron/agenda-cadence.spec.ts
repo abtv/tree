@@ -1,5 +1,6 @@
 import { expect, launchTree, seedDocument, test } from './fixtures'
 import { recordPerfResult } from '../results'
+import { writeFileSync } from 'node:fs'
 
 interface RepeatProbe {
   inputs: number
@@ -104,6 +105,7 @@ for (const vimEnabled of [true, false]) {
     const minFramesBetweenSwitches = Math.min(
       ...probe.commits.slice(1).map((commit, index) => commit.frame - probe.commits[index]!.frame),
     )
+    writeFileSync(test.info().outputPath('repeat-probe.json'), JSON.stringify({ sent, ...probe }, null, 2))
     recordPerfResult({
       kind: 'state',
       scenario: `agenda-repeat-cadence-${vimEnabled ? 'vim' : 'standard'}`,

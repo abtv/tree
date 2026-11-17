@@ -1,10 +1,11 @@
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from '../results'
 import catalog from '../../src/domain/emoji-catalog.json'
+import { writeFileSync } from 'node:fs'
 
 // @requirement PRODUCT.md §20.12
 // @requirement PRODUCT.md §22.1
-test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ userDataDir }) => {
+test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ userDataDir }, testInfo) => {
   const seed = wideSeed(10_000)
   const seededDocument = seed.document as { roots: { children: { text: string }[] }[] }
   seededDocument.roots[0]!.children[0]!.text = 'Plan '
@@ -71,6 +72,10 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
       paintMaxMs: round(sorted.at(-1)!),
     },
   })
+  writeFileSync(
+    testInfo.outputPath('interaction-samples.json'),
+    JSON.stringify({ scenario: 'emoji-catalog-10000-standard', samples }),
+  )
 
   expect(sorted[Math.floor(sorted.length * 0.95)]).toBeLessThan(50)
   expect(sorted.at(-1)).toBeLessThan(100)

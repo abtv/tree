@@ -2,7 +2,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { expect, launchTree, node, test, typeInto } from './fixtures'
+import { expect, launchTree, node, seedDocument, test, typeInto } from './fixtures'
 
 test.describe('content security policy', () => {
   test('is present and does not block application resources', async ({ userDataDir }) => {
@@ -87,6 +87,11 @@ test.describe('content security policy', () => {
   })
 
   test('blocks renderer reads of local files outside the application bundle', async ({ userDataDir }) => {
+    // This security probe needs an existing file, not completion of the asynchronous first save.
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'private', text: 'Private document', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'private' },
+    })
     const { window } = await launchTree(userDataDir)
 
     // From the app:// origin Chromium refuses file: fetches itself; the session filter is a second

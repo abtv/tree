@@ -11,7 +11,7 @@ import {
   test,
 } from './fixtures'
 
-describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
+describeForEachEditingMode('Backspace on empty nodes', () => {
   test('joins a linked row into a plain row and places the caret in the replacement rich editor', async ({
     userDataDir,
   }) => {
@@ -48,7 +48,6 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
         }),
       )
       .toBe(4)
-    await window.screenshot({ path: test.info().outputPath(`backspace-rich-join-${mode}.png`) })
 
     await window.keyboard.type('more ')
 
@@ -80,7 +79,6 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 0)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 0)
 
-    await window.screenshot({ path: test.info().outputPath(`remove-preceding-blank-${mode}.png`) })
     await window.keyboard.press('Meta+z')
 
     await expect.poll(() => nodeTexts(window)).toEqual(['', 'Bugfixes', 'Child'])
@@ -135,7 +133,6 @@ describeForEachEditingMode('Backspace on empty nodes', ({ mode }) => {
     await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveJSProperty('selectionStart', 8)
     await expect(node(window, 1)).toHaveJSProperty('selectionEnd', 8)
-    await window.screenshot({ path: test.info().outputPath(`backspace-join-${mode}.png`) })
 
     await window.keyboard.press('Meta+z')
 

@@ -1,5 +1,6 @@
 import { expect, launchTree, round, seedDocument, setCalendarDate, test, type Seed } from './fixtures'
 import { recordPerfResult } from '../results'
+import { writeFileSync } from 'node:fs'
 
 // Monday keeps both dated occurrences in the displayed week on every test day.
 const today = new Date(2026, 10, 16, 12)
@@ -198,6 +199,7 @@ for (const shape of ['wide', 'deep', 'mixed'] as const) {
       }
 
       recordPerfResult({ kind: 'state', scenario, samples: 86, metrics })
+      writeFileSync(testInfo.outputPath('interaction-samples.json'), JSON.stringify({ scenario, samples }))
 
       // Opening materializes both dated occurrences plus parent paths (up to 390,000 rows in deep dense
       // trees), so it keeps its own ceiling; the Product Owner accepted this extreme case.
