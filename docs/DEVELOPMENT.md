@@ -425,6 +425,8 @@ Breadcrumb drag coverage in `e2e/electron/drag-and-drop-hierarchy.spec.ts` check
 
 Window addressing in `e2e/electron/fixtures.ts` is focus-independent for the same reason: closing, resizing, or reading the main window through `closeMainWindow`, `setMainWindowBounds`, and `readMainWindowBounds` addresses the application's window directly instead of relying on the application being frontmost, so the window-close flush and quit path stays testable while the application is inactive.
 
+Playwright enables Chromium focus emulation, so a native window blur can leave `document.hasFocus()` true in an ordinary test. A test of actual application focus loss must use an isolated visible window, disable `Emulation.setFocusEmulationEnabled` through its page's CDP session, and assert both focus loss and return before testing the next edit or motion. Keep this exception local to the boundary test; do not disable focus emulation across the suite. `e2e/electron/selection-interruptions.spec.ts` covers the Visual continuation boundary on macOS; its modal cases also run on Linux.
+
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**` and the `test-results/**` scratch directory where finished diagnostic specs are parked. Each Playwright target reads only its own directory under `e2e/`.
 
 Native editor context-menu behavior is covered by renderer and IPC contract tests. The macOS popup itself must be product-verified on supported macOS hardware with a display because the Playwright Electron driver cannot reliably inspect or select native menu items; use a visible suite run (`TREE_E2E_VISIBLE=1 npm run test:e2e`) when the popup must be observed. The popup only captures a small selection snapshot and does not add persistence work, tree traversal, or retained state; disk writes, interactive CPU, and memory growth remain unchanged outside the selected editing command.
@@ -444,6 +446,8 @@ Navigation and caret behavior must be designed and reviewed as a state-transitio
 * expected destination caret state, including whether an image caret is active and which text position must be restored.
 
 Build the affected-path inventory before editing code. Start from the state being changed (selected node, text cursor, saved image-entry position, image-caret indicator, selection, or mode) and trace every relevant writer and caller, not only the command that exposed the defect. Include keyboard commands, counted and repeated commands, pointer/focus changes, node entry and exit, edits, undo/redo, and mode changes when they can affect that state. For each buffered or transient editing session (including Replace mode), explicitly inventory what happens when each relevant command arrives before the session's ordinary finish event: whether the edit is committed or discarded, whether the command acts before or after that resolution, and the resulting selection, cursor, active caret, and mode. Do not assume shortcut handlers follow the same path as ordinary mode-specific key handling. Include transitions where the selected node ID stays the same or a motion clamps at a boundary. For each affected path, record the starting state, action, expected selected node, text cursor, active caret, restored position when applicable, and mode. Map it to focused coverage and the representative Electron coverage of its distinct integration or rendering path; several rule variants may share that Electron case. Explain any inapplicable path. Update the inventory when a newly discovered path changes the affected state; avoid expanding it to unrelated commands.
+
+For a temporary interaction such as Find, verify the first edit or motion after cancellation as well as the restored mode and selection. For example, select text, enter a matching query, cancel Find, then type or extend a Visual selection and delete it; verify Undo when relevant. Choose data that triggers the affected rendering transition: matching highlights can replace a textarea with rich text or update rich-text nodes, while a no-match query misses that transition. Keep state/data combinations in focused App or hook tests, with representative Electron coverage for real focus and input dispatch.
 
 The current Vim requirement-to-test inventory is in [VIM_CONFORMANCE.md](VIM_CONFORMANCE.md), which also defines the divergence marker and what a row without it claims. The implementation review must check each affected row against both the behavior and its marker.
 
@@ -531,7 +535,17 @@ The repository must also provide the complete validation command:
 npm run check:full
 ```
 
-This local command runs `npm run check`, the serial timing guards, the end-to-end suite, the full Electron performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. It is an all-suites convenience command, not the default for every High Risk change. Use it when the full performance stage is required or explicitly requested; otherwise run the stages selected below. The normative validation policy is in `AGENTS.md` §10 and [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#10-validation).
+This local command runs `npm run check`, the serial timing guards, the Electron end-to-end suite, the full Electron performance suite, and finally the dependency audit (`npm audit`), so an advisory without an available fix reports after the suites rather than hiding their results. It is a local convenience command, not the default for every High Risk change. Use it when the full performance stage is required or explicitly requested; otherwise run the stages selected below. The normative validation policy is in `AGENTS.md` §10 and [Agent Workflow Procedures §10](AGENT_WORKFLOW.md#10-validation).
+
+Neither `check` nor `check:full` establishes parity with GitHub Actions. `check`
+does not run smoke or E2E tests; `check:full` adds local Electron E2E but not the
+browser E2E suite, smoke checks, or the Linux Electron container subset. For a
+changed shared UI flow, select its smoke and browser scenarios as well as its
+Electron coverage under procedure §9. Use `make test-smoke` for all smoke targets,
+`npm run test:web:chromium` for browser E2E and `npm run test:e2e:linux` for the
+Linux Electron subset when those targets are required. Record the source revision,
+uncommitted changes and actual targets checked; a green aggregate command alone
+does not establish that a changed scenario ran.
 
 ### Chromium container tests
 

@@ -9,6 +9,7 @@ playwright-report/
 blob-report/
 .tmp/
 /.scratch/
+/WORKING_PLAN.md
 reports/
 .stryker-tmp/
 
