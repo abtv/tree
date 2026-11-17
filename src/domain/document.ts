@@ -22,6 +22,7 @@ export {
   linkAtPosition,
   linksAfterTextEdit,
   normalizeLinks,
+  recognizeHttpLinks,
   reconcileLinkTextEdit,
   replaceLinkedText,
   replaceLinkedTextRanges,

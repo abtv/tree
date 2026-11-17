@@ -45,19 +45,19 @@ export function textPasteTransition(
   createIds: (count: number) => NodeId[],
   singleNode = false,
 ): StructuralTransition {
-  if (singleNode || (!clipboard.text.includes('\n') && !clipboard.text.includes('\r'))) {
-    const pasted = singleNode ? normalizePasteLines(clipboard) : clipboard
+  const pasted = normalizePasteLines(clipboard)
+  if (singleNode || !pasted.text.includes('\n')) {
     return {
       document: pasteText(document, nodeId, cursor, pasted.text, pasted.links),
       location,
       focus: { nodeId, cursor: cursor + pasted.text.length },
     }
   }
-  const lines = clipboard.text.replace(/\r\n?/g, '\n').split('\n')
+  const lines = pasted.text.split('\n')
   const ids = createIds(lines.length - 1)
   const finalNodeId = ids.at(-1) ?? nodeId
   return {
-    document: pasteMultilineText(document, nodeId, cursor, lines, ids, clipboard.links),
+    document: pasteMultilineText(document, nodeId, cursor, lines, ids, pasted.links),
     location: locationForSiblingOf(document, nodeId, finalNodeId, location),
     // `split` always returns at least one line, so the empty fallback only satisfies the type.
     focus: { nodeId: finalNodeId, cursor: (lines.at(-1) ?? '').length },

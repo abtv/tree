@@ -302,6 +302,17 @@ describe('document operation content and retention outcomes', () => {
   })
 
   // @requirement PRODUCT.md §14
+  it('recognizes URLs surrounded by text in every line of a plain multiline paste', () => {
+    const lines = [`See ${url}`, ` ${url} `, `Last ${url} end`]
+
+    const result = pasteMultilineText(createInitialDocument('root'), 'root', 0, lines, ['b', 'c'])
+
+    expect(result.roots.map((node) => node.links)).toEqual(
+      lines.map((text) => [{ start: text.indexOf(url), end: text.indexOf(url) + url.length, url }]),
+    )
+  })
+
+  // @requirement PRODUCT.md §14
   it('splits rich multiline paste into exact line ranges while moving the original suffix and image', () => {
     const lines = [url, 'https://b.test', 'https://c.test']
     const pastedLinks = lines.map((url, index) => ({
@@ -347,6 +358,36 @@ describe('document operation content and retention outcomes', () => {
     )
 
     expect(unlinked.roots.map((node) => node.links)).toEqual([undefined, undefined, undefined])
+  })
+
+  // @requirement PRODUCT.md §14
+  // @requirement PRODUCT.md §22.1
+  it('maps rich paste ranges without repeatedly reading preceding lines', () => {
+    const count = 256
+    let reads = 0
+    const lines = Array.from({ length: count }, () => url)
+    for (let index = 0; index < count; index += 1) {
+      Object.defineProperty(lines, index, {
+        get: () => {
+          reads += 1
+          return url
+        },
+      })
+    }
+    const lastStart = (count - 1) * (url.length + 1)
+
+    const result = pasteMultilineText(
+      createInitialDocument('root'),
+      'root',
+      0,
+      lines,
+      Array.from({ length: count - 1 }, (_, index) => `pasted-${index}`),
+      [{ start: lastStart, end: lastStart + url.length, url }],
+    )
+
+    expect(result.roots).toHaveLength(count)
+    expect(result.roots.at(-1)?.links).toEqual([link])
+    expect(reads).toBeLessThan(count * 4)
   })
 
   it('rejects multiline paste with too few lines or the wrong number of IDs', () => {

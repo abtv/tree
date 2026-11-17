@@ -81,6 +81,38 @@ describeForEachEditingMode('clipboard (paste at the cursor)', () => {
 // The tests below do not pass through an editing-mode divergence, so they run once.
 test.describe('clipboard (mode-independent)', () => {
   // @requirement PRODUCT.md §13.1
+  // @requirement PRODUCT.md §14
+  test('preserves later rich clipboard links when native text uses CRLF', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const first = 'https://one.example'
+    const second = 'https://two.example'
+    await window.clock.install()
+    await writeClipboardTextAndHtml(
+      app,
+      `First\r\nSee ${first} now\r\n${second}`,
+      `First<br>See <a href="${first}">${first}</a> now<br><a href="${second}">${second}</a>`,
+    )
+
+    await window.keyboard.press('Meta+v')
+
+    await expect.poll(() => nodeTexts(window)).toEqual(['First', `See ${first} now`, second])
+    await expect(window.getByRole('link', { name: first, exact: true })).toHaveAttribute('href', first)
+    await expect(window.getByRole('link', { name: second, exact: true })).toHaveAttribute('href', second)
+    await expect(node(window, 3)).toBeFocused()
+    unlockSystemClipboard()
+
+    await fireIdleSave(window)
+
+    await expect
+      .poll(() => readPersisted(userDataDir).document.roots.map((root) => root.links), idleSavePoll)
+      .toEqual([
+        undefined,
+        [{ start: 4, end: 4 + first.length, url: first }],
+        [{ start: 0, end: second.length, url: second }],
+      ])
+  })
+
+  // @requirement PRODUCT.md §13.1
   test('preserves a pasted hyperlink with quoted inline tag delimiters', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
     const editor = node(window, 1)

@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { joinSiblingRange } from '../domain/document-operations'
+import { insertLinks } from '../domain/document-links'
 import { findBrokenLinks } from '../../scripts/check-docs.mts'
 import { productOwnText } from '../../scripts/product-sections.mts'
 import { markdownLinks } from '../../scripts/markdown-links.mts'
@@ -23,6 +24,9 @@ it('bounds work for internal whitespace and malformed Markdown', () => {
   expect([...markdownLinks('['.repeat(80_000), true)]).toEqual([])
   expect([...markdownLinks(`${'[a]('.repeat(20_000)}bad)`, true)]).toEqual([])
   expect(productOwnText([{ number: 1, text: `${'\n'.repeat(80_000)}x` }])).toBe('x')
+  expect(insertLinks([], 0, `${'word '.repeat(80_000)}https://example.test end`)).toEqual([
+    { start: 400_000, end: 400_020, url: 'https://example.test' },
+  ])
 
   expect(performance.now() - start).toBeLessThan(500)
 })

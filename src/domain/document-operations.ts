@@ -708,16 +708,18 @@ export function pasteMultilineText(
       links.before,
       position,
       lines[0] ?? '',
-      richLinks === undefined ? undefined : linksForLine(richLinks, lines, 0),
+      richLinks === undefined ? undefined : linksForLine(richLinks, 0, (lines[0] ?? '').length),
     ),
     undefined,
   )
 
+  let lineStart = (lines[0] ?? '').length + 1
   const created: TreeNode[] = newNodeIds.map((id, index) => {
     const isFinal = index === newNodeIds.length - 1
     const line = lines[index + 1] ?? ''
-    const lineLinks = linksForLine(richLinks, lines, index + 1)
-    if (richLinks === undefined && isHttpUrl(line)) lineLinks.push({ start: 0, end: line.length, url: line })
+    const lineLinks =
+      richLinks === undefined ? insertLinks([], 0, line) : linksForLine(richLinks, lineStart, line.length)
+    lineStart += line.length + 1
     const finalLinks = isFinal
       ? [
           ...lineLinks,

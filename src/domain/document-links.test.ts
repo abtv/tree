@@ -361,7 +361,7 @@ describe('link normalization and edit outcomes', () => {
     })
   })
 
-  it('does not retain overwritten link metadata when a replacement repeats the same URL text', () => {
+  it('recognizes a URL in replacement text without losing the surrounding links', () => {
     const before = 'https://before.test'
     const after = 'https://after.test'
     const text = `${before} old ${url} end ${after}`
@@ -380,8 +380,8 @@ describe('link normalization and edit outcomes', () => {
 
     expect(result).toEqual({
       text: `${before} new ${url} fin ${after}`,
-      links: [firstLink, lastLink],
-      createsNewLink: false,
+      links: [firstLink, { start: middleStart, end: middleStart + url.length, url }, lastLink],
+      createsNewLink: true,
     })
   })
 
@@ -391,10 +391,10 @@ describe('link normalization and edit outcomes', () => {
     const last = { start, end: start + url.length, url: lines[2]! }
     const links = [link, last, { start: url.length - 1, end: start + 1, url }]
 
-    expect(linksForLine(links, lines, 0)).toEqual([link])
-    expect(linksForLine(links, lines, 1)).toEqual([])
-    expect(linksForLine(links, lines, 2)).toEqual([{ ...link, url: lines[2] }])
-    expect(linksForLine(undefined, lines, 2)).toEqual([])
+    expect(linksForLine(links, 0, url.length)).toEqual([link])
+    expect(linksForLine(links, url.length + 1, 0)).toEqual([])
+    expect(linksForLine(links, start, lines[2]!.length)).toEqual([{ ...link, url: lines[2] }])
+    expect(linksForLine(undefined, start, lines[2]!.length)).toEqual([])
   })
 
   it('applies disjoint replacements in document order and preserves links next to both edits', () => {
@@ -514,6 +514,27 @@ describe('replaceLinkedText', () => {
 describe('insertLinks', () => {
   const url = 'https://example.com'
   const link = { start: 0, end: url.length, url }
+
+  it('recognizes every whitespace-delimited URL in pasted text at its inserted offset', () => {
+    const other = 'http://other.test/path'
+    const text = ` See ${url}\nthen\t${other} `
+
+    expect(insertLinks([], 3, text)).toEqual([
+      { start: 3 + text.indexOf(url), end: 3 + text.indexOf(url) + url.length, url },
+      { start: 3 + text.indexOf(other), end: 3 + text.indexOf(other) + other.length, url: other },
+    ])
+    expect(insertLinks([], 0, text, [])).toEqual([])
+  })
+
+  it('recognizes links when Vim puts a line containing ordinary text and URLs', () => {
+    const inserted = `See ${url} now`
+
+    expect(replaceLinkedText('First line\n', [], 11, 11, inserted)).toEqual({
+      text: `First line\n${inserted}`,
+      links: [{ start: 15, end: 15 + url.length, url }],
+      createsNewLink: true,
+    })
+  })
 
   it('recomputes the URL and keeps a link a paste lands inside when the covered text stays valid', () => {
     expect(insertLinks([link], 15, 'x')).toEqual([{ start: 0, end: 20, url: 'https://examplex.com' }])

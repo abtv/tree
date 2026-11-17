@@ -36,8 +36,21 @@ for (const vimEnabled of [false, true]) {
     await expect(link).toHaveAttribute('href', url)
     await expect(input).toBeFocused()
 
+    await input.fill('')
+    const surrounded = `First line\nSee ${url} now`
+    await page.evaluate(async (text) => navigator.clipboard.writeText(text), surrounded)
+    await pressPaste(page)
+
+    const pastedInput = page.getByRole('textbox', { name: 'Node 2', exact: true })
+    const pastedLink = pastedInput.locator('a')
+    await expect(input).toHaveText('First line')
+    await expect(pastedInput).toHaveText(`See ${url} now`)
+    await expect(pastedLink).toHaveText(url)
+    await expect(pastedLink).toHaveAttribute('href', url)
+    await expect(pastedInput).toBeFocused()
+
     const opened = page.waitForEvent('popup')
-    await link.click({ modifiers: [primaryKey] })
+    await pastedLink.click({ modifiers: [primaryKey] })
     const popup = await opened
     await popup.close()
     await capture(page, `native-url-paste-${vimEnabled ? 'vim' : 'standard'}.png`)

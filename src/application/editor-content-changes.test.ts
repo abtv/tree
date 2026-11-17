@@ -76,7 +76,8 @@ describe('clipboardIntroducesLink', () => {
     expect(clipboardIntroducesLink({ kind: 'text', text: `first${separator}https://example.com` })).toBe(true)
   })
 
-  it('is false when a URL is only part of a line', () => {
-    expect(clipboardIntroducesLink({ kind: 'text', text: 'see https://example.com' })).toBe(false)
+  it('recognizes the links introduced by URLs within pasted lines', () => {
+    expect(clipboardIntroducesLink({ kind: 'text', text: 'see https://example.com' })).toBe(true)
+    expect(clipboardIntroducesLink({ kind: 'text', text: 'first\nsee https://example.com now' })).toBe(true)
   })
 })

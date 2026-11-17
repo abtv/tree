@@ -14,13 +14,16 @@ loadModule.extensions['.ts'] = (module, filename) => {
 
 const scenario = process.argv[2]
 if (scenario === 'links') {
-  const { reconcileLinkTextEdit } = loadModule(
+  const { insertLinks, reconcileLinkTextEdit } = loadModule(
     '../src/domain/document-links.ts',
   ) as typeof import('../src/domain/document-links')
   const text = 'https://example.test'
   const next = `https://${'x '.repeat(1_000_000)}example.test`
   const result = reconcileLinkTextEdit(text, [{ start: 0, end: text.length, url: text }], next)
   if (result.links.length !== 1 || result.links[0]?.url !== 'https://x') throw new Error('Wrong links')
+  const pasted = `${'word '.repeat(1_000_000)}https://example.test end`
+  const pastedLinks = insertLinks([], 0, pasted)
+  if (pastedLinks.length !== 1 || pastedLinks[0]?.start !== 5_000_000) throw new Error('Wrong pasted links')
 } else if (scenario === 'number') {
   const { changeVimNumber } = loadModule('../src/domain/vim-number.ts') as typeof import('../src/domain/vim-number')
   const text = `0x${'A'.repeat(8_000_000)}`

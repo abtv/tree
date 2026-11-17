@@ -6,6 +6,7 @@ import {
   firePaste,
   launchTree,
   node,
+  nodeTexts,
   readPersisted,
   seedDocument,
   setCursor,
@@ -15,6 +16,29 @@ import {
 } from './fixtures'
 
 describeForEachEditingMode('external hyperlinks', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §13
+  test('recognizes URLs within every line of a native plain-text paste', async ({ userDataDir }) => {
+    const url = 'https://example.com/path'
+    const lines = [`See ${url} now`, `Second ${url} end`]
+    const { app, window } = await launchTree(userDataDir)
+    await writeClipboardText(app, lines.join('\n'))
+
+    await window.keyboard.press('Meta+v')
+
+    await expect.poll(() => nodeTexts(window)).toEqual(lines)
+    for (const index of [1, 2]) {
+      const link = node(window, index).getByRole('link')
+      await expect(link).toHaveAttribute('href', url)
+      await expect(link).toHaveCSS('color', 'rgb(58, 110, 165)')
+    }
+    await expect(node(window, 2)).toBeFocused()
+    await closeApp(app)
+
+    expect(readPersisted(userDataDir).document.roots.map((node) => node.links)).toEqual(
+      lines.map((text) => [{ start: text.indexOf(url), end: text.indexOf(url) + url.length, url }]),
+    )
+  })
+
   test('edits linked characters with immediate styling and destination updates', async ({ userDataDir }, testInfo) => {
     const url = 'https://example.com'
     seedDocument(userDataDir, {
@@ -262,6 +286,52 @@ test.describe('external hyperlinks (mode-independent)', () => {
 })
 
 test.describe('external hyperlinks (Vim editing only)', () => {
+  // @requirement PRODUCT.md §13
+  test('retains a copied second-line URL through text-register put and history', async ({ userDataDir }) => {
+    const url = 'https://example.com/path'
+    const line = `See ${url} now`
+    const text = `First line\n${line}`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'source',
+            text,
+            links: [{ start: text.indexOf(url), end: text.indexOf(url) + url.length, url }],
+            children: [],
+          },
+          { id: 'target', text: 'Destination\nTarget', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'source' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', vimPreference: true })
+    await writeClipboardText(app, 'old clipboard')
+    await setCursor(node(window, 1), 'First line\n'.length)
+
+    await window.keyboard.press('y')
+    await window.keyboard.press('$')
+    await window.keyboard.press('j')
+    await expect(node(window, 2)).toBeFocused()
+    await window.keyboard.press('j')
+    await window.keyboard.press('$')
+    await window.keyboard.press('p')
+
+    await expect.poll(() => nodeTexts(window)).toEqual([text, `Destination\nTarget${line}`])
+    const link = node(window, 2).getByRole('link')
+    await expect(link).toHaveAttribute('href', url)
+    await expect(link).toHaveCSS('color', 'rgb(58, 110, 165)')
+
+    await window.keyboard.press('u')
+    await expect.poll(() => nodeTexts(window)).toEqual([text, 'Destination\nTarget'])
+    await window.keyboard.press('Control+r')
+    await expect(link).toHaveAttribute('href', url)
+    await node(window, 1).focus()
+    await expect(link).toHaveCSS('color', 'rgb(58, 110, 165)')
+    await window.emulateMedia({ colorScheme: 'dark' })
+    await expect(link).toHaveCSS('color', 'rgb(140, 208, 211)')
+  })
+
   // @requirement PRODUCT.md §20.2.12
   test('opens the hyperlink under the Normal-mode caret with Enter', async ({ userDataDir }) => {
     const url = 'https://example.com/page'

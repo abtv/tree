@@ -984,6 +984,7 @@ Plain text is inserted at the current cursor position.
 It does not replace the entire node.
 
 * Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range immediately, including browser native paste without HTML hyperlink metadata in standard editing and Vim Insert. No subsequent edit is required.
+* Plain-text paste recognizes complete whitespace-delimited HTTP(S) URLs within surrounding text, including later lines of a multiline node and text inserted from a Vim register. Surrounding text and whitespace remain unchanged. Explicit hyperlink ranges from rich clipboard content remain authoritative.
 * A URL typed by hand becomes a hyperlink in any node while it is being typed: as soon as the whitespace-delimited word under the edit is a valid HTTP(S) URL, that word is underlined, colored as a link, and clickable, and the caret and focus stay where they were so typing continues without interruption. Typing more characters at its end extends the link.
 * A word that is not (or no longer) a valid URL is ordinary text, so a prefix such as `http:/` is plain until the typed word becomes a valid URL.
 * Typing whitespace inside a link splits it into words, and each resulting word that is a valid URL stays a link.
@@ -1035,6 +1036,8 @@ abcXYZdef
 ## 14. Multiline Text Paste
 
 In Tree, each pasted line becomes a separate node. Agenda inserts multiline text into the existing node instead (§23.9).
+
+Paste accepts LF, CRLF, and CR line endings. Normalizing these line endings preserves the text covered by every clipboard hyperlink.
 
 The first line is inserted at the current cursor position.
 

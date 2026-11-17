@@ -1,6 +1,12 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { isHttpUrl, reconcileLinkTextEdit, replaceLinkedTextRanges, type LinkedTextEdit } from './document-links'
+import {
+  insertLinks,
+  isHttpUrl,
+  reconcileLinkTextEdit,
+  replaceLinkedTextRanges,
+  type LinkedTextEdit,
+} from './document-links'
 import type { LinkRange } from './document-types'
 import { propertyRuns } from '../test/property-runs'
 
@@ -38,6 +44,26 @@ const scenario = fc
   })
 
 describe('replaceLinkedTextRanges invariants', () => {
+  it('aligns all pasted URL ranges after arbitrary ordinary words and whitespace', () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.webUrl().filter(isHttpUrl), { minLength: 1, maxLength: 8 }),
+        fc.constantFrom(' ', '\t', '\r\n', '\n'),
+        fc.nat(30),
+        (urls, separator, offset) => {
+          const text = urls.map((url) => `plain${separator}${url}`).join(separator)
+          const links = insertLinks([], offset, text)
+
+          expect(links.map((link) => link.url)).toEqual(urls)
+          for (const link of links) {
+            expect(text.slice(link.start - offset, link.end - offset)).toBe(link.url)
+          }
+        },
+      ),
+      { numRuns: propertyRuns(100) },
+    )
+  })
+
   it('keeps drafts before deletions of repeated text and shifts the following URL exactly', () => {
     fc.assert(
       fc.property(

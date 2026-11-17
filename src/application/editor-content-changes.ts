@@ -1,4 +1,4 @@
-import { isHttpUrl, type LinkRange } from '../domain/document'
+import { recognizeHttpLinks, type LinkRange } from '../domain/document'
 import type { ClipboardPayload } from '../shared/ipc'
 
 interface NodeContent {
@@ -24,8 +24,5 @@ export function sameNodeContent(node: { text: string; links?: readonly LinkRange
 
 export function clipboardIntroducesLink(clipboard: Extract<ClipboardPayload, { kind: 'text' }>): boolean {
   if (clipboard.links !== undefined && clipboard.links.length > 0) return true
-  return clipboard.text
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .some((line) => isHttpUrl(line))
+  return !recognizeHttpLinks(clipboard.text).next().done
 }

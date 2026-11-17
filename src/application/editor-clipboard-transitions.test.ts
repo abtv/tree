@@ -3,6 +3,42 @@ import type { Document } from '../domain/document'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 
 describe('editor clipboard transitions', () => {
+  // @requirement PRODUCT.md §13.1
+  // @requirement PRODUCT.md §14
+  it.each(['\r\n', '\r', '\n'])('preserves rich links in Tree paste with %j line endings', (lineBreak) => {
+    const urls = ['https://one.example', 'https://two.example']
+    const text = `First${lineBreak}See ${urls[0]} now${lineBreak}${urls[1]}`
+    const result = textPasteTransition(
+      { roots: [{ id: 'root', text: 'prefix suffix', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+      'root',
+      7,
+      {
+        kind: 'text',
+        text,
+        links: urls.map((url) => ({ start: text.indexOf(url), end: text.indexOf(url) + url.length, url })),
+      },
+      () => ['second', 'third'],
+    )
+
+    expect(result.document.roots).toEqual([
+      { id: 'root', text: 'prefix First', children: [] },
+      {
+        id: 'second',
+        text: `See ${urls[0]} now`,
+        links: [{ start: 4, end: 4 + urls[0]!.length, url: urls[0] }],
+        children: [],
+      },
+      {
+        id: 'third',
+        text: `${urls[1]}suffix`,
+        links: [{ start: 0, end: urls[1]!.length, url: urls[1] }],
+        children: [],
+      },
+    ])
+    expect(result.focus).toEqual({ nodeId: 'third', cursor: urls[1]!.length })
+  })
+
   // @requirement PRODUCT.md §23.9
   it.each(['\r\n', '\r'])('normalizes plain multiline Agenda text with %j line endings', (lineBreak) => {
     const result = textPasteTransition(
