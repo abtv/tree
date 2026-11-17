@@ -2,7 +2,7 @@ import { appendFile, readFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 import { api, verifyValidation } from './web-release/github.mts'
 import { currentVersion, isNewWebVersion } from './web-release/version.mts'
-import { compareVersions, parseVersion } from './release-version.mts'
+import { releaseSourceState, reserveReleaseSource } from './release-source.mts'
 import type { Request, WorkflowRun } from './web-release/types.mts'
 
 const root = '/repos/abtv/tree'
@@ -38,28 +38,13 @@ export async function dispatchedSource(
   throw new Error('Validation did not finish; retry after its successful completion')
 }
 
-export async function newMacVersion(version: string, request: Request = api, token?: string) {
-  for (let page = 1; page <= 100; page++) {
-    const tags = (await request(`${root}/tags?per_page=100&page=${page}`, { token })) as { name: string }[]
-    if (!Array.isArray(tags)) throw new Error('Invalid release tags')
-    for (const tag of tags) {
-      if (!tag.name.startsWith('v')) continue
-      try {
-        parseVersion(tag.name.slice(1))
-      } catch {
-        continue
-      }
-      if (compareVersions(version, tag.name.slice(1)) <= 0) return false
-    }
-    if (tags.length < 100) return true
-  }
-  throw new Error('Too many release tags')
-}
-
-export async function releaseNeeded(version: string, request: Request = api, token?: string) {
-  const web = await isNewWebVersion(version, { request, token })
-  const mac = await newMacVersion(version, request, token)
-  return web || mac
+export async function releaseNeeded(version: string, sha: string, request: Request = api, token?: string) {
+  const state = await releaseSourceState(version, sha, request, token)
+  if (state === 'unavailable') return false
+  // Rerunning validation of the reserved source must regenerate expired artifacts,
+  // including when Web finished but the desktop branch still needs recovery.
+  if (state === 'reserved') return true
+  return isNewWebVersion(version, { request, token, sourceSha: sha })
 }
 
 export async function dispatchPublications(
@@ -85,17 +70,18 @@ export async function dispatchPublications(
 if (import.meta.main) {
   try {
     const [command] = process.argv.slice(2)
-    if (command === 'verify') {
+    if (command === 'verify' || command === 'reserve') {
       const run = await dispatchedSource()
       const version = await currentVersion()
       if (version !== process.env.RELEASE_VERSION) throw new Error('Dispatch version differs from checked source')
+      if (command === 'reserve') await reserveReleaseSource(version, run.head_sha, api, process.env.GH_TOKEN)
       await appendFile(
         process.env.GITHUB_OUTPUT!,
         `sha=${run.head_sha}\nrun_id=${run.id}\nrun_attempt=${run.run_attempt}\n`,
       )
     } else if (command === 'version') {
       const version = await currentVersion()
-      const ready = await releaseNeeded(version, api, process.env.GH_TOKEN)
+      const ready = await releaseNeeded(version, process.env.GITHUB_SHA!, api, process.env.GH_TOKEN)
       await appendFile(process.env.GITHUB_OUTPUT!, `ready=${ready}\nversion=${version}\n`)
       await appendFile(
         process.env.GITHUB_STEP_SUMMARY!,
@@ -126,7 +112,7 @@ if (import.meta.main) {
         api,
         process.env.GH_TOKEN,
       )
-    } else throw new Error('Usage: publication.mts verify|version|dispatch')
+    } else throw new Error('Usage: publication.mts verify|reserve|version|dispatch')
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

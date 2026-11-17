@@ -272,6 +272,14 @@ browser job's immutable artifact for the same source SHA. If only publication di
 fails after the gate succeeded, rerun all jobs. Missing or expired artifacts require
 rerunning their producer and dependent jobs, or all jobs. See the
 [validation retry procedure](../../docs/releasing.md#signing-and-packaging).
+
+Both platforms share the immutable `v<version>` tag reserved before either publishes.
+Web candidate checks, preflight and transfer require that tag to match the validated
+source. Later same-version commits do not start release suites or publication merely
+because Web is behind. Retries retain the original source and artifacts; current-main
+checks still reject an old source after main advances. In that case, recover with a
+new version rather than reusing the old number for different code.
+
 After modifying trusted target workflow/scripts, copy and commit the reviewed files again. The
 setup commit itself does not publish a package; a later valid transfer does.
 

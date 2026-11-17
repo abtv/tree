@@ -37,6 +37,9 @@ jobs:
     name: Verify checked release source
     runs-on: ubuntu-24.04
     timeout-minutes: 2
+    permissions:
+      contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -45,10 +48,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - name: Require all applicable checks of this commit
+      - name: Require checked source and reserve the shared version tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/publication.mts verify
+        run: node scripts/publication.mts reserve
 
   candidate:
     name: Check web release version

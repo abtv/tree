@@ -199,9 +199,12 @@ describe('atomic package transfer', () => {
     workflow: workflowPath = '.github/workflows/deploy-web-app.yml',
     source = sourceRequest(),
     previousVersion = '0.1.1',
+    tagSha = identity.sourceSha,
   } = {}) {
     const f = await fixture()
     const request = vi.fn(async (path: string, options: ApiOptions = {}) => {
+      if (path.includes('/tags?')) return [{ name: 'v0.1.2', commit: { sha: tagSha } }]
+      if (path.includes('/releases?')) return []
       if (path.includes('/contents/package.json?ref=')) {
         const version = path.endsWith(identity.sourceSha) ? '0.1.2' : previousVersion
         return { encoding: 'base64', size: 20, content: Buffer.from(JSON.stringify({ version })).toString('base64') }
@@ -248,6 +251,15 @@ describe('atomic package transfer', () => {
     await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).resolves.toBe(
       'c'.repeat(40),
     )
+  })
+  it('refuses a different source under the desktop version before any target write', async () => {
+    const { dir, manifest, request, ...auth } = await targetFixture({ tagSha: 'e'.repeat(40) })
+
+    await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow(
+      'not reserved for this source',
+    )
+
+    expect(request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
   })
   it('returns the transferred commit after GitHub applied the update but lost its response', async () => {
     const { dir, manifest, request, ...auth } = await targetFixture()

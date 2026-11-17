@@ -4,6 +4,7 @@ import { api } from './github.mts'
 import { verifyAttestation } from './attestation.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
 import { dispatchedSource } from '../publication.mts'
+import { requireReleaseSource } from '../release-source.mts'
 import type { Blob, Reference, Request, WorkflowRun } from './types.mts'
 
 const root = '/repos/tree-editor/tree-editor.github.io'
@@ -53,7 +54,9 @@ if (import.meta.main) {
     await dispatchedSource()
     const [command] = process.argv.slice(2)
     if (command === 'candidate') {
-      const ready = await isNewWebVersion(await currentVersion(), { token: process.env.GH_TOKEN })
+      const version = await currentVersion()
+      await requireReleaseSource(version, process.env.GITHUB_SHA!, api, process.env.GH_TOKEN)
+      const ready = await isNewWebVersion(version, { token: process.env.GH_TOKEN })
       await appendFile(process.env.GITHUB_OUTPUT!, `ready=${ready}\n`)
     } else if (command === 'verify') {
       const { verifyHosted } = await import('./verify-target.mts')

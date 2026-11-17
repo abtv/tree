@@ -164,6 +164,13 @@ Browser keyboard paste uses the clipboard data supplied by the native paste even
 without requesting separate clipboard-read confirmation. Tree handles that data
 through its existing text/image paste, size-limit, undo and save rules.
 
+#### 1.4.1 Release publication
+
+One version identifies one source commit on both Web and macOS. Before either
+platform publishes, the release reserves an immutable `v<version>` tag at the
+validated commit. Later commits with that version do not run release suites or
+publish another package, even if one platform's publication failed.
+
 A push to source `main` publishes to `https://tree-editor.github.io` only after
 the same commit passes standard validation, dependency audit, Chromium checks
 of the built package, and smoke checks in Electron on Linux/macOS, Chromium on Linux,
@@ -171,11 +178,15 @@ and Safari on macOS. New releases also require full Linux/macOS Electron E2E and
 Electron E2E and memory suites retain weekly/manual runs; timing suites remain local.
 Demo publication also waits for successful validation.
 
-Web and macOS releases run independently. Either failure fails the release without
+After the shared version reservation, Web and macOS releases run independently. Either failure fails the release without
 undoing the other branch. macOS publishes automatically after
 verifying the complete uploaded artifact set against signer hashes. Publication
 transfers the tested package without rebuilding it. Failed checks, transfer or
 pre-deployment verification leave the active release intact.
+
+Retries use only the original source and tested artifacts. Existing current-main
+and validation-attempt checks still apply: after main advances, recovery requires
+a new version rather than substituting new code under the reserved version.
 
 Scheduled or manual check runs must not cancel checks belonging to a publication.
 

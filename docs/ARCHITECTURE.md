@@ -59,7 +59,11 @@ Linux/macOS Electron E2E and Linux memory checks follow successful smoke in para
 main run dispatches demo publication and, only for a new version, the combined
 Web/macOS release. Dispatch consumers authenticate the exact successful validation
 run and attempt through GitHub; signed provenance retains that validation identity
-across release retries. A gated, short-lived GitHub
+across release retries. The shared release gate reserves an immutable version tag
+before either platform starts; source/version checks reject another commit under
+that tag. Web preflight and transfer recheck the reservation. Current-main checks
+remain in force, so an older source is not made eligible by its tag alone.
+A gated, short-lived GitHub
 App token writes package/provenance paths to the separate hosting
 repository. After the gate, a separate OIDC signing job attests the complete
 manifest, including independently authenticated retained assets. The publisher

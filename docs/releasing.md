@@ -32,6 +32,7 @@ make release major
 
 The `Test and build app` main workflow runs code checks, audit, browser and Linux/macOS Electron E2E, Linux Electron memory measurements, and
 Linux/macOS smoke once. After success it dispatches the versioned release, whose
+shared gate reserves the immutable `v<version>` tag at the checked commit before
 Web and macOS branches run independently. The macOS branch calls
 `create-macos-release-draft.yml`.
 Desktop preflight rechecks the upstream repository, workflow path, push event,
@@ -40,16 +41,22 @@ the GitHub API. Failed, canceled, forked or superseded runs cannot reserve a
 release. No upstream artifacts or default-branch checkout supply release bytes:
 every downstream desktop job checks out the exact validated source SHA.
 
-A lightweight `v<version>` tag and owned draft are created only for a version
+A new lightweight `v<version>` tag is reserved by the shared gate only for a version
 higher than all existing valid SemVer tags and releases, or the first version.
-Drafts reserve their numbers too. Same-version commits and older versions skip
-the expensive macOS job. New reservations require the source still to be current
-main. One global desktop concurrency group serializes reservations and uploads.
+It must also exceed the latest transferred Web version, including legacy Web-only
+releases without a tag.
+The macOS branch creates its owned draft using that same tag and source SHA.
+Drafts reserve their numbers too. Later same-version commits and older versions skip
+all release suites and publication, even if Web is behind. New reservations require the source still to be current
+main. The combined release concurrency group serializes shared tag reservation and
+both platforms; the desktop group also serializes draft reservations and uploads.
 Arbitrary external tag pushes and manual draft publication are outside that lock.
 
 After a failed build, select **Re-run failed jobs** in `Release new app version`. It reuses only
 the same tag/SHA and its own draft; no deletion or version increment is
-needed. Dispatch verification rejects stale source main and changed validation attempts;
+needed while the original source remains current main. Once main advances, recovery
+requires a new version; retry never substitutes the latest source for the tagged commit.
+Dispatch verification rejects stale source main and changed validation attempts;
 a newer reserved version also prevents uploading the older one. Published releases and
 complete uploaded artifact sets are skipped during candidate planning. Unknown drafts or partial/unknown assets
 stop for inspection. Existing tags and assets are never replaced. No automated

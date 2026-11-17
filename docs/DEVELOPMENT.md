@@ -635,6 +635,8 @@ alongside one dependency audit. After both succeed, Linux/macOS smoke runs on ev
 After both platform smoke jobs succeed, browser E2E, full Electron coverage across Linux
 and macOS, and Linux Electron memory tests run in parallel when the main push has an
 unpublished release version. A failed smoke job prevents these release suites from starting.
+An existing version tag on another commit makes the push ineligible, even when Web
+is behind macOS; ordinary checks and smoke still run.
 Browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
 job requires checks, audit, version detection and smoke to succeed, plus browser E2E,
@@ -645,7 +647,8 @@ PRs never dispatch publications or receive release credentials.
 A successful main run dispatches `Publish demo video and screenshots` and, only for
 a new version, `Release new app version`. Both consumers verify the exact successful
 main validation run, attempt and source SHA before publication. Browser bytes come
-from that validation run's artifact, without rebuilding. Web and macOS release branches
+from that validation run's artifact, without rebuilding. A shared gate reserves the
+immutable version tag at the validated SHA before Web and macOS release branches
 run independently; either failure makes the release red while preserving the other result.
 The source Web job waits for target deployment and checks every hosted byte.
 
@@ -1255,14 +1258,17 @@ It runs no tests, accesses no remote, creates no tags and pushes nothing. A reje
 Push or merge the version commit to main normally. `Test and build app` runs checks,
 audit and platform smoke, plus browser E2E, Linux/macOS Electron E2E and Linux Electron
 memory measurements for a new release version. After success, publication is dispatched only
-when either platform has a new version. Eligibility compares the checked package version
-with platform release state, not the previous push. If a version-bump push fails validation,
-a later successful push can release that same version without another bump. Existing macOS
-tags and transferred web versions still prevent duplicate releases.
+when the version is eligible for that source commit. Eligibility compares the checked
+package version and SHA with the shared version tag and platform release state, not
+the previous push. If a version-bump push fails validation before tag reservation,
+a later successful push can release that same version without another bump. Once
+reserved, only the tagged source can be retried; later same-version pushes skip release
+suites and publication. Current-main checks still apply, so recovery after main advances
+requires a new version. Tags and transferred web versions prevent duplicate releases.
 Web transfer still requires a version greater than
 the last transferred release and rechecks it against the exact hosting parent before writing.
 The combined `Release new app version` verifies the completed main validation run, SHA and
-attempt, then runs independent Web and macOS branches. The Web job waits for deployment
+attempt, reserves the common immutable tag, then runs independent Web and macOS branches. The Web job waits for deployment
 and verifies hosted bytes. The macOS branch reserves an owned draft, signs its installer,
 checks the application copied from that DMG on a fresh runner without signing secrets,
 and uploads the original signer artifact from a separate runner after SHA-256 verification.

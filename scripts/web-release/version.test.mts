@@ -55,6 +55,18 @@ it('fails closed on missing or malformed previous release metadata', async () =>
   await expect(isNewWebVersion('0.1.3', { request, targetSha: sha })).rejects.toThrow()
 })
 
+it('rejects reuse of a legacy web version by a different source commit', async () => {
+  const request = vi.fn(async (path: string) => {
+    if (path.endsWith('/git/ref/heads/main')) return { object: { sha } }
+    if (path.includes('/contents/provenance.json?')) return blob(provenance)
+    if (path.includes('/contents/package.json?')) return blob({ version: '0.1.2' })
+    throw new Error(`Unexpected request ${path}`)
+  })
+
+  await expect(isNewWebVersion('0.1.2', { request, sourceSha: 'b'.repeat(40) })).rejects.toThrow('another source')
+  await expect(isNewWebVersion('0.1.2', { request, sourceSha: sha })).resolves.toBe(false)
+})
+
 it.each([
   ['0.1.3', true],
   ['0.1.2', false],

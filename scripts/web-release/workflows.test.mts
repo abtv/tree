@@ -31,7 +31,7 @@ type Workflow = {
 const text = (name: string) => readFileSync(`.github/workflows/${name}.yml`, 'utf8')
 const workflow = (name: string) => load(text(name))
 
-// @requirement PRODUCT.md §1.4
+// @requirement PRODUCT.md §1.4.1
 describe('automatic publication wiring', () => {
   it('runs code and audit in parallel, gates release suites on smoke, and gates dispatch on every result', () => {
     const ci = workflow('test-and-build-app')
@@ -135,7 +135,9 @@ describe('automatic publication wiring', () => {
     for (const name of ['publish-demo-video-and-screenshots', 'release-new-app-version']) {
       const value = workflow(name)
       expect(Object.keys(value.on)).toEqual(['workflow_dispatch'])
-      expect(text(name)).toContain('node scripts/publication.mts verify')
+      expect(text(name)).toContain(
+        `node scripts/publication.mts ${name === 'release-new-app-version' ? 'reserve' : 'verify'}`,
+      )
       expect(text(name)).toContain('VALIDATION_RUN_ID: ${{ inputs.run_id }}')
       expect(text(name)).not.toContain('pull_request_target')
     }
@@ -147,6 +149,11 @@ describe('automatic publication wiring', () => {
 
   it('keeps macOS independent of web failure and preserves narrowly scoped publishing credentials', () => {
     const release = workflow('release-new-app-version')
+    expect(release.jobs.gate!.permissions).toEqual({ contents: 'write', actions: 'read' })
+    expect(release.jobs.gate!.steps).toContainEqual(
+      expect.objectContaining({ run: 'node scripts/publication.mts reserve' }),
+    )
+    expect(JSON.stringify(release.jobs.gate)).not.toMatch(/npm ci|secrets\./)
     expect(release.jobs.macos!.needs).toBe('gate')
     expect(release.jobs.candidate!.needs).toEqual(['gate'])
     expect(release.jobs.sign!.needs).toEqual(['gate', 'candidate'])

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dispatchedSource, dispatchPublications, newMacVersion, releaseNeeded } from './publication.mts'
+import { dispatchedSource, dispatchPublications, releaseNeeded } from './publication.mts'
 import { isNewWebVersion } from './web-release/version.mts'
 import { waitForDeployment } from './web-release/status.mts'
 import type { Request } from './web-release/types.mts'
@@ -36,33 +36,43 @@ function fixture(overrides = {}) {
 }
 
 describe('verified publication dispatch', () => {
+  it('does not release later same-version commits when web publication is behind macOS', async () => {
+    vi.mocked(isNewWebVersion).mockResolvedValue(true)
+    const request = vi.fn<Request>(async (path) =>
+      path.includes('/tags?') ? [{ name: 'v1.2.3', commit: { sha: 'b'.repeat(40) } }] : [],
+    )
+
+    expect(await releaseNeeded('1.2.3', sha, request)).toBe(false)
+  })
+
   it('starts a macOS release after the version-bump push failed validation', async () => {
-    vi.mocked(isNewWebVersion).mockResolvedValue(false)
+    vi.mocked(isNewWebVersion).mockResolvedValue(true)
     const request = vi.fn<Request>(async (path) => {
       if (path.includes('/tags?')) return [{ name: 'v1.2.2' }]
+      if (path.includes('/releases?')) return []
       throw new Error(`Unexpected request ${path}`)
     })
 
-    expect(await releaseNeeded('1.2.3', request)).toBe(true)
+    expect(await releaseNeeded('1.2.3', sha, request)).toBe(true)
   })
 
   it.each([
-    [false, 'v1.2.3', false],
+    [false, 'v1.2.3', true],
     [false, 'v1.2.4', false],
     [true, 'v1.2.3', true],
     [true, 'v1.2.2', true],
+    [false, 'v1.2.2', false],
   ])('checks both platform release states (web=%s, mac=%s)', async (web, tag, expected) => {
     vi.mocked(isNewWebVersion).mockResolvedValue(web)
-    const request = vi.fn<Request>().mockResolvedValue([{ name: tag }])
+    const request = vi.fn<Request>(async (path) => (path.includes('/tags?') ? [{ name: tag, commit: { sha } }] : []))
 
-    expect(await releaseNeeded('1.2.3', request)).toBe(expected)
-    expect(isNewWebVersion).toHaveBeenLastCalledWith('1.2.3', { request, token: undefined })
+    expect(await releaseNeeded('1.2.3', sha, request)).toBe(expected)
   })
 
   it('fails closed when release state cannot be read', async () => {
     vi.mocked(isNewWebVersion).mockRejectedValueOnce(new Error('unavailable'))
 
-    await expect(releaseNeeded('1.2.3', vi.fn())).rejects.toThrow('unavailable')
+    await expect(releaseNeeded('1.2.3', sha, vi.fn().mockResolvedValue([]))).rejects.toThrow('unavailable')
   })
   it('uses immutable successful validation identity independently of release attempts', async () => {
     const request = fixture()
@@ -122,14 +132,6 @@ describe('verified publication dispatch', () => {
       dispatchPublications({ run_id: '42', run_attempt: '1', sha, version: '1.2.3' }, true, request),
     ).rejects.toThrow('publish-demo')
     expect(request).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not create another macOS release for a reserved or older version', async () => {
-    const request = vi.fn<Request>().mockResolvedValue([{ name: 'v1.2.3' }])
-
-    expect(await newMacVersion('1.2.3', request)).toBe(false)
-    expect(await newMacVersion('1.2.2', request)).toBe(false)
-    expect(await newMacVersion('1.2.4', request)).toBe(true)
   })
 
   it('reports the exact failed target run without requesting write access', async () => {

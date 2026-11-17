@@ -17,7 +17,12 @@ async function readJSON(path: string, request: Request, token?: string) {
 // web packages already record that SHA, so migration needs no new manifest schema.
 export async function isNewWebVersion(
   version: string,
-  { request = api, token, targetSha }: { request?: Request; token?: string | undefined; targetSha?: string } = {},
+  {
+    request = api,
+    token,
+    targetSha,
+    sourceSha,
+  }: { request?: Request; token?: string | undefined; targetSha?: string; sourceSha?: string } = {},
 ) {
   parseVersion(version)
   const root = '/repos/tree-editor/tree-editor.github.io'
@@ -25,7 +30,11 @@ export async function isNewWebVersion(
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid hosting commit')
   const previous = validateManifest(await readJSON(`${root}/contents/provenance.json?ref=${sha}`, request))
   const manifest = await readJSON(`/repos/abtv/tree/contents/package.json?ref=${previous.sourceSha}`, request, token)
-  return compareVersions(version, manifest.version) > 0
+  const order = compareVersions(version, manifest.version)
+  if (order === 0 && sourceSha && previous.sourceSha !== sourceSha) {
+    throw new Error('Web release version belongs to another source commit')
+  }
+  return order > 0
 }
 
 export async function currentVersion() {

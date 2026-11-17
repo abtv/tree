@@ -9,6 +9,7 @@ import { assertWorkflowWriteDenied } from './permission-check.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
 import { dispatchedSource } from '../publication.mts'
 import { advanceReference } from './retry.mts'
+import { requireReleaseSource } from '../release-source.mts'
 
 export async function transferPackage(
   directory: string,
@@ -47,6 +48,7 @@ export async function transferPackage(
   })) as { encoding: string; content: string }
   if (sourcePackage.encoding !== 'base64') throw new Error('Invalid source package')
   const { version } = JSON.parse(Buffer.from(sourcePackage.content, 'base64').toString('utf8'))
+  await requireReleaseSource(version, manifest.sourceSha, request, token)
   if (!(await isNewWebVersion(version, { request, token, targetSha: base.object.sha }))) {
     throw new Error('Web release version is already transferred or obsolete')
   }
@@ -140,7 +142,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     verifyIdentity(manifest, process.env)
     if (command === 'preflight') {
       await verifySource(manifest, { token: process.env.GH_TOKEN })
-      if (!(await isNewWebVersion(await currentVersion(), { token: process.env.GH_TOKEN }))) {
+      const version = await currentVersion()
+      await requireReleaseSource(version, manifest.sourceSha, api, process.env.GH_TOKEN)
+      if (!(await isNewWebVersion(version, { token: process.env.GH_TOKEN }))) {
         throw new Error('Web release version is already transferred or obsolete')
       }
     } else {
