@@ -600,13 +600,13 @@ describe('browser editing service contracts', () => {
     },
   )
 
-  it.each(['system', 'light', 'dark', 'invalid'])(
+  it.each(['system', 'light', 'dark', 'gray', 'white', 'invalid'] as const)(
     'restores saved appearance %s and persists changes before notifying',
     async (savedAppearance) => {
       const f = fixture()
       f.values.set('preferences:appearance', savedAppearance)
       await installBrowserPrototype()
-      const expected = savedAppearance === 'light' || savedAppearance === 'dark' ? savedAppearance : 'system'
+      const expected = savedAppearance === 'invalid' ? 'system' : savedAppearance
       expect(await window.treeApi.getAppearance()).toBe(expected)
       expect(applyAppearance).toHaveBeenLastCalledWith(expected)
       const changed = vi.fn()

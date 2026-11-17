@@ -11,13 +11,18 @@ import {
   test,
 } from './fixtures'
 
-async function setAppearance(window: Page, appearance: 'light' | 'dark' | 'gray'): Promise<void> {
+async function setAppearance(window: Page, appearance: 'light' | 'dark' | 'gray' | 'white'): Promise<void> {
   await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
   await window.emulateMedia({ colorScheme: appearance === 'dark' ? 'dark' : 'light' })
   await expect(window.locator('html')).toHaveAttribute('data-appearance', appearance)
   await expect(window.locator('html')).toHaveCSS(
     'background-color',
-    { light: 'rgb(251, 248, 241)', dark: 'rgb(63, 63, 63)', gray: 'rgb(221, 221, 221)' }[appearance],
+    {
+      light: 'rgb(251, 248, 241)',
+      dark: 'rgb(63, 63, 63)',
+      gray: 'rgb(221, 221, 221)',
+      white: 'rgb(255, 255, 255)',
+    }[appearance],
   )
 }
 
@@ -43,7 +48,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
     const link = editor.locator('a')
     const neighbor = window.getByRole('textbox', { name: 'Node 2', exact: true }).locator('a')
 
-    for (const appearance of ['light', 'dark', 'gray'] as const) {
+    for (const appearance of ['light', 'dark', 'gray', 'white'] as const) {
       await setAppearance(window, appearance)
       await editor.focus()
       await window.keyboard.press('Meta+a')
@@ -56,7 +61,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
       await expect(link).toHaveCSS('color', highlight.color)
       await expect(link).toHaveCSS('background-color', highlight.background)
       await expect(neighbor).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-      if (mode === 'standard') {
+      if (mode === 'standard' && appearance !== 'white') {
         await expect(editor).toHaveScreenshot(`selected-link-${appearance}.png`)
       }
 
@@ -122,7 +127,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
 
-    for (const appearance of ['light', 'dark', 'gray'] as const) {
+    for (const appearance of ['light', 'dark', 'gray', 'white'] as const) {
       await setAppearance(window, appearance)
       for (const editor of [input, heading]) {
         await expect(editor).toHaveCSS('text-decoration-line', 'line-through')
@@ -156,7 +161,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
       'line-through',
     )
     await window.getByRole('searchbox').fill('example')
-    for (const appearance of ['light', 'dark', 'gray'] as const) {
+    for (const appearance of ['light', 'dark', 'gray', 'white'] as const) {
       await setAppearance(window, appearance)
       await expect(window.locator('[data-result-id="done"] .recent-node-text')).toHaveCSS(
         'text-decoration-line',
@@ -185,7 +190,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
     await expect(occurrences).toHaveCount(2)
     await expect(window.locator('.agenda-role-context a')).toHaveCount(0)
 
-    for (const appearance of ['light', 'dark', 'gray'] as const) {
+    for (const appearance of ['light', 'dark', 'gray', 'white'] as const) {
       await setAppearance(window, appearance)
       for (const row of await occurrences.all()) {
         await expect(row.locator('.agenda-text, .node-input')).toHaveCSS('text-decoration-line', 'line-through')
@@ -236,7 +241,7 @@ test.describe('Completed links: Vim editing only', () => {
     const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
     const neighbor = window.getByRole('textbox', { name: 'Node 2', exact: true })
 
-    for (const appearance of ['light', 'dark', 'gray'] as const) {
+    for (const appearance of ['light', 'dark', 'gray', 'white'] as const) {
       await setAppearance(window, appearance)
       await window.screenshot({ path: testInfo.outputPath(`links-whole-node-${appearance}.png`) })
       await expect(input.locator('a')).toHaveCSS('color', await input.evaluate((el) => getComputedStyle(el).color))

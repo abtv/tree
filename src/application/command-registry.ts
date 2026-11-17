@@ -5,6 +5,7 @@ export const appearanceCommands = [
   ['light', 'light', 'Use the light appearance'],
   ['dark', 'dark', 'Use the dark appearance'],
   ['gray', 'gray', 'Use the gray appearance'],
+  ['white', 'white', 'Use the white appearance'],
 ] as const
 
 export type CommandAppearance = (typeof appearanceCommands)[number][1]

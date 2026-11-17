@@ -28,12 +28,12 @@ import {
   createAppearancePreferenceStore,
   createBooleanPreferenceStore,
   createWindowBoundsStore,
-  type AppearancePreference,
   type AppearancePreferenceStore,
   type BooleanPreferenceStore,
   type WindowBounds,
 } from '../../infrastructure/main/window-state'
 import { ipcEvents, type NotesMenuState } from '../../shared/ipc'
+import { appearanceThemeSource, type AppearancePreference } from '../../shared/appearance'
 import { applicationMenuTemplate } from './application-menu'
 import { createMenuIcons, type MenuIcons } from './menu-icons'
 import { registerIpcHandlers } from './ipc-handlers'
@@ -110,7 +110,7 @@ function currentAppearance(): AppearancePreference {
 function setAppearance(value: AppearancePreference): void {
   appearanceStore?.save(value)
   selectedAppearance = value
-  nativeTheme.themeSource = value === 'gray' ? 'light' : value
+  nativeTheme.themeSource = appearanceThemeSource(value)
   mainWindow?.setBackgroundColor(windowBackgroundColor(nativeTheme.shouldUseDarkColors, value))
   mainWindow?.webContents.send(ipcEvents.appearanceChanged, value)
   rebuildApplicationMenu()
@@ -440,7 +440,7 @@ bootstrapApplication({
     const savedAppearance = appearanceStore.load()
     selectedAppearance = savedAppearance
     if (savedAppearance !== 'system') {
-      nativeTheme.themeSource = savedAppearance === 'gray' ? 'light' : savedAppearance
+      nativeTheme.themeSource = appearanceThemeSource(savedAppearance)
     }
     registerIpcHandlers({
       ...(summarization === undefined ? {} : { summarization }),

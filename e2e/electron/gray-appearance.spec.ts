@@ -130,9 +130,66 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
 
   await window.keyboard.press('Meta+Shift+p')
   await window.getByRole('combobox', { name: 'Command', exact: true }).fill('theme')
-  await expect(window.locator('.command-row')).toHaveCount(4)
+  await expect(window.locator('.command-row')).toHaveCount(5)
   await expect(window.locator('.command-panel')).toHaveScreenshot('gray-commands.png')
   await closeApp(app)
+})
+
+// @requirement PRODUCT.md §20.5
+// @requirement PRODUCT.md §20.2.28
+test('switches to White, keeps its native background through close and restores it at startup', async ({
+  userDataDir,
+}) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'one', text: '#design Plan the next review', children: [] },
+        { id: 'two', text: '@alex Review the outline', children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', appearance: 'dark' })
+  const html = window.locator('html')
+
+  await clickApplicationSubmenuItem(app, { ...appearanceMenu, label: 'White' })
+  await expect(html).toHaveAttribute('data-appearance', 'white')
+  await expect(html).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(window.locator('.title-bar')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  expect(await checkedApplicationSubmenuItems(app, appearanceMenu)).toEqual(['White'])
+  expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('light')
+  await expect(window).toHaveScreenshot('white-tree.png')
+
+  await clickApplicationSubmenuItem(app, { ...appearanceMenu, label: 'Gray' })
+  await expect(html).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await window.keyboard.press('Meta+Shift+p')
+  const command = window.getByRole('combobox', { name: 'Command', exact: true })
+  await command.fill('set-theme-white')
+  await command.press('Enter')
+  await expect(html).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  expect(await checkedApplicationSubmenuItems(app, appearanceMenu)).toEqual(['White'])
+
+  await window.reload()
+  await expect(window.locator('.node-input').first()).toHaveText('#design Plan the next review')
+  await expect(html).toHaveAttribute('data-appearance', 'white')
+  await expect(html).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+
+  let output = ''
+  app.process().stdout!.on('data', (chunk: Buffer) => {
+    output += chunk.toString()
+  })
+  await closeApp(app)
+  expect(output).toContain('[tree-test-close-background] #ffffff')
+
+  const restarted = await launchTree(userDataDir, { initialMode: 'normal', appearance: 'dark' })
+  await expect(restarted.window.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  expect(await checkedApplicationSubmenuItems(restarted.app, appearanceMenu)).toEqual(['White'])
+  expect(
+    await restarted.app.evaluate(
+      () => (globalThis as typeof globalThis & { __treeWindowBackgrounds: unknown }).__treeWindowBackgrounds,
+    ),
+  ).toEqual([{ phase: 'created', color: '#ffffff' }])
+  await closeApp(restarted.app)
 })
 
 // @requirement PRODUCT.md §20.12

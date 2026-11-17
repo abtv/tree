@@ -106,7 +106,7 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 23 : 21
+    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 24 : 22
     await expect(window.locator('.command-count')).toHaveText(`${commandCount} of ${commandCount}`)
 
     await window.keyboard.press('ArrowUp')
@@ -124,7 +124,13 @@ test.describe('Normal command panel', () => {
 
     await window.getByRole('combobox').pressSequentially('theme')
 
-    expect(await names(window)).toEqual(['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light'])
+    expect(await names(window)).toEqual([
+      'set-theme-auto',
+      'set-theme-dark',
+      'set-theme-gray',
+      'set-theme-light',
+      'set-theme-white',
+    ])
 
     await window.keyboard.press('Escape')
 
@@ -251,6 +257,7 @@ test.describe('Normal command panel', () => {
       ...(process.platform === 'darwin' && process.arch === 'arm64' ? ['reindex-all-images'] : []),
       'search-all-nodes',
       'set-theme-gray',
+      'set-theme-white',
       'show-agenda',
       'show-tree',
       'summarize',

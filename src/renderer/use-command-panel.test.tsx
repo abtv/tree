@@ -7,6 +7,7 @@ import type { VimMode } from './vim-editing'
 import { useCommandPanel } from './use-command-panel'
 import { APPLE_SHORTCUTS, OTHER_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import { MenuCommands, type MenuCommandSource } from '../application/menu-commands'
+import type { TreeApi } from '../shared/ipc'
 
 afterEach(() => {
   cleanup()
@@ -22,7 +23,7 @@ async function setup(
   menuCommands?: MenuCommandSource,
 ) {
   const historyWrite = vi.fn(async () => undefined)
-  const appearanceWrite = vi.fn<(value: 'system' | 'light' | 'dark' | 'gray') => Promise<void>>(async () => undefined)
+  const appearanceWrite = vi.fn<TreeApi['setAppearance']>(async () => undefined)
   window.treeApi = {
     getAppearance: async () => 'system',
     setAppearance: appearanceWrite,

@@ -42,6 +42,14 @@ it('switches the dark palette and browser chrome and restores their original med
     expect(light.content).toBe('#dddddd')
     expect([light.media, dark.media]).toEqual(['all', 'not all'])
 
+    applyAppearance('white')
+
+    expect(document.documentElement.dataset.appearance).toBe('white')
+    expect(document.documentElement.style.colorScheme).toBe('light')
+    expect(palette.media.mediaText).toBe('not all')
+    expect(light.content).toBe('#ffffff')
+    expect([light.media, dark.media]).toEqual(['all', 'not all'])
+
     applyAppearance('system')
 
     expect(document.documentElement.dataset.appearance).toBe('system')

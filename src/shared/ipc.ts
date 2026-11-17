@@ -2,6 +2,7 @@ import type { PersistedEditorState } from '../domain/document'
 import type { LinkRange } from '../domain/document'
 import type { NotesArchiveProgress, NotesArchiveSummary } from '../application/notes-archive/export-notes'
 import type { IncomingNotes, NotesCounts } from '../application/notes-archive/import-notes'
+import type { AppearancePreference } from './appearance'
 
 /** Rejects saves and image writes after the notes were replaced, until the window reloads them. */
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
@@ -169,13 +170,13 @@ export interface TreeApi {
   onAppUpdateFinished?: (listener: (message: string | null) => void) => () => void
   getRecentNodes?: () => Promise<string[]>
   setRecentNodes?: (value: readonly string[]) => Promise<void>
-  getAppearance: () => Promise<'system' | 'light' | 'dark' | 'gray'>
-  setAppearance: (value: 'system' | 'light' | 'dark' | 'gray') => Promise<void>
+  getAppearance: () => Promise<AppearancePreference>
+  setAppearance: (value: AppearancePreference) => Promise<void>
   getCommandHistory: () => Promise<string[]>
   getEmojiHistory?: () => Promise<string[]>
   setEmojiHistory?: (value: readonly string[]) => Promise<void>
   setCommandHistory: (value: string[]) => Promise<void>
-  onAppearanceChanged?: (listener: (value: 'system' | 'light' | 'dark' | 'gray') => void) => () => void
+  onAppearanceChanged?: (listener: (value: AppearancePreference) => void) => () => void
   quit(requestId?: string): Promise<void>
   quitWithoutSaving(): Promise<void>
   onQuitRequested(listener: (requestId: string) => void): () => void

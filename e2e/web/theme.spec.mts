@@ -1,7 +1,7 @@
 // @editing-modes: independent
 import { test, expect, capture, primaryKey } from './fixtures.mts'
 
-test('selects Gray from the menu and keeps ordinary clicks out of appearance handling', async ({
+test('selects White from the menu and restores it after reload under a dark system appearance', async ({
   newContext,
   baseURL,
 }) => {
@@ -12,15 +12,20 @@ test('selects Gray from the menu and keeps ordinary clicks out of appearance han
 
   await page.getByRole('button', { name: 'Tree menu' }).click()
   await expect(page.locator('#tree-menu')).toBeVisible()
-  await page.getByRole('button', { name: 'Gray', exact: true }).click()
+  await page.getByRole('button', { name: 'White', exact: true }).click()
 
-  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'gray')
-  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'white')
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  await expect(page.locator('meta[name="theme-color"][media="all"]')).toHaveAttribute('content', '#ffffff')
   await page.locator('.node-input').first().click()
-  expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('gray')
+  expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('white')
+
+  await page.reload()
+  await page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
 
   await page.getByRole('button', { name: 'Tree menu' }).click()
-  await expect(page.getByRole('button', { name: 'Gray', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'White', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'Automatic', exact: true }).click()
 
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(63, 63, 63)')

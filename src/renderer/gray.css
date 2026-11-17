@@ -1,4 +1,4 @@
-/*! Gray palette adapted from Dayfox (nightfox.nvim), via iTerm2-Color-Schemes.
+/*! Gray and White palettes adapted from Dayfox (nightfox.nvim), via iTerm2-Color-Schemes.
  * https://github.com/EdenEast/nightfox.nvim
  * https://github.com/mbadolato/iTerm2-Color-Schemes/blob/master/ghostty/Dayfox
  *
@@ -25,12 +25,19 @@
  * SOFTWARE.
  */
 :root[data-appearance='gray'] {
+  --color-background: #dddddd;
+}
+
+:root[data-appearance='white'] {
+  --color-background: #ffffff;
+}
+
+:root:is([data-appearance='gray'], [data-appearance='white']) {
   --color-search-selection-background: color-mix(in srgb, var(--color-text) 8%, transparent);
   --color-search-selection-border: transparent;
   --color-search-divider: color-mix(in srgb, var(--color-location-border) 60%, transparent);
   --color-grid-dot: transparent;
   --color-text: #3d2b5a;
-  --color-background: #dddddd;
   --color-shell-text: #706b77;
   --color-secondary: #706b77;
   --color-location-separator: #b5b1ba;
@@ -66,40 +73,40 @@
   --highlight-foreground: var(--color-text);
 }
 
-:root[data-appearance='gray'] .command-row-selected {
+:root:is([data-appearance='gray'], [data-appearance='white']) .command-row-selected {
   background: var(--color-search-selection-background);
   color: var(--color-text);
 }
 
-:root[data-appearance='gray'] .recent-nodes-popup {
+:root:is([data-appearance='gray'], [data-appearance='white']) .recent-nodes-popup {
   color: var(--color-text);
 }
 
-:root[data-appearance='gray'] .node-search-input:focus {
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-input:focus {
   outline: none;
   border-color: var(--color-secondary);
 }
 
-:root[data-appearance='gray'] .node-search-input::placeholder {
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-input::placeholder {
   color: var(--color-secondary);
   opacity: 1;
 }
 
-:root[data-appearance='gray'] .node-search-results-heading,
-:root[data-appearance='gray'] .node-search-tags-heading,
-:root[data-appearance='gray'] .recent-node-row[data-result-divider]::after,
-:root[data-appearance='gray'] .node-search-tag[data-result-divider]::after {
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-results-heading,
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-tags-heading,
+:root:is([data-appearance='gray'], [data-appearance='white']) .recent-node-row[data-result-divider]::after,
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-tag[data-result-divider]::after {
   border-bottom-color: var(--color-search-divider);
 }
 
-:root[data-appearance='gray'] .node-search-footer {
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-footer {
   border-top-color: var(--color-search-divider);
 }
 
-:root[data-appearance='gray'] .node-search-section-title,
-:root[data-appearance='gray'] .node-search-footer,
-:root[data-appearance='gray'] .recent-nodes-title,
-:root[data-appearance='gray'] .recent-node-path {
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-section-title,
+:root:is([data-appearance='gray'], [data-appearance='white']) .node-search-footer,
+:root:is([data-appearance='gray'], [data-appearance='white']) .recent-nodes-title,
+:root:is([data-appearance='gray'], [data-appearance='white']) .recent-node-path {
   color: var(--color-secondary);
   opacity: 1;
 }

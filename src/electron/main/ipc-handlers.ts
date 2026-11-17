@@ -1,5 +1,5 @@
 import type { QuitHandshake } from './quit-handshake'
-import { isAppearancePreference, type AppearancePreference } from '../../infrastructure/main/window-state'
+import { isAppearancePreference, type AppearancePreference } from '../../shared/appearance'
 import {
   validateAttachmentBytes,
   validateAttachmentId,

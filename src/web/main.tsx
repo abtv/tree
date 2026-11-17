@@ -8,6 +8,7 @@ import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
 import { installMenuFocus } from './menu-focus'
 import type { CommandServices } from '../application/command-registry'
+import { isAppearancePreference } from '../shared/appearance'
 import { requestPersistentStorage, storageProtectionText } from './storage-persistence'
 import { createAttachmentImageCache, decodeAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import '../renderer/styles.css'
@@ -114,9 +115,8 @@ try {
   updateAppearance(await window.treeApi.getAppearance())
   window.treeApi.onAppearanceChanged?.(updateAppearance)
   for (const button of document.querySelectorAll<HTMLButtonElement>('button[data-appearance]')) {
-    button.onclick = run(() =>
-      window.treeApi.setAppearance(button.dataset.appearance as 'system' | 'light' | 'dark' | 'gray'),
-    )
+    const appearance = button.dataset.appearance
+    if (isAppearancePreference(appearance)) button.onclick = run(() => window.treeApi.setAppearance(appearance))
   }
   Object.assign(window, { prototypeStore: store })
   void requestPersistentStorage(navigator.storage).then((protection) => {

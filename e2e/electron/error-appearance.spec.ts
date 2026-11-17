@@ -54,7 +54,7 @@ test('keeps save and inline image errors readable in every appearance', async ({
   const imageError = window.locator('.attachment-error')
   await expect(saveError).toContainText('Synthetic appearance failure')
 
-  for (const appearance of ['dark', 'light', 'gray'] as const) {
+  for (const appearance of ['dark', 'light', 'gray', 'white'] as const) {
     await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
     await window.emulateMedia({ colorScheme: appearance === 'dark' ? 'dark' : 'light' })
     await expect(window.locator('html')).toHaveAttribute('data-appearance', appearance)
@@ -66,7 +66,9 @@ test('keeps save and inline image errors readable in every appearance', async ({
 
     const description = `${appearance}: ${JSON.stringify(contrast)}`
     expect(Math.min(contrast.save, contrast.image), description).toBeGreaterThanOrEqual(4.5)
-    await expect(saveError).toHaveScreenshot(`save-error-${appearance}.png`)
-    await expect(imageError).toHaveScreenshot(`image-error-${appearance}.png`)
+    if (appearance !== 'white') {
+      await expect(saveError).toHaveScreenshot(`save-error-${appearance}.png`)
+      await expect(imageError).toHaveScreenshot(`image-error-${appearance}.png`)
+    }
   }
 })

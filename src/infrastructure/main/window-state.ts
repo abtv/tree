@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { isAppearancePreference, type AppearancePreference } from '../../shared/appearance'
 
 export interface WindowBounds {
   x: number
@@ -106,16 +107,9 @@ export function createWindowBoundsStore(path: string): WindowBoundsStore {
   }
 }
 
-/** The appearance the user chose; `system` follows the operating system and is the default. */
-export type AppearancePreference = 'system' | 'light' | 'dark' | 'gray'
-
 export interface AppearancePreferenceStore {
   load(): AppearancePreference
   save(value: AppearancePreference): void
-}
-
-export function isAppearancePreference(value: unknown): value is AppearancePreference {
-  return value === 'system' || value === 'light' || value === 'dark' || value === 'gray'
 }
 
 export function createAppearancePreferenceStore(path: string): AppearancePreferenceStore {

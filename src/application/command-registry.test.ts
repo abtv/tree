@@ -60,10 +60,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 17],
-    [false, true, 16],
-    [false, false, 15],
-    [true, false, 16],
+    [true, true, 18],
+    [false, true, 17],
+    [false, false, 16],
+    [true, false, 17],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -88,6 +88,7 @@ describe('command registry', () => {
       'set-theme-auto',
       'set-theme-gray',
       'set-theme-light',
+      'set-theme-white',
       'show-agenda',
       'show-tree',
       'summarize',
@@ -113,9 +114,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    ['theme', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light']],
-    ['set-th', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light']],
+    ['theme', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light', 'set-theme-white']],
+    ['set-th', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light', 'set-theme-white']],
     ['gray', ['set-theme-gray']],
+    ['white', ['set-theme-white']],
     ['dark', ['set-theme-dark']],
     ['vim', ['toggle-vim-mode']],
     ['mode', ['toggle-vim-mode']],
@@ -151,6 +153,7 @@ describe('command registry', () => {
       'search-all-nodes',
       'set-theme-auto',
       'set-theme-gray',
+      'set-theme-white',
       'show-agenda',
       'show-tree',
       'summarize',
@@ -160,7 +163,13 @@ describe('command registry', () => {
       'toggle-vim-mode',
     ])
     expect(names('set-theme-dark', history)).toEqual(['set-theme-dark'])
-    expect(names('theme', history)).toEqual(['set-theme-light', 'set-theme-dark', 'set-theme-auto', 'set-theme-gray'])
+    expect(names('theme', history)).toEqual([
+      'set-theme-light',
+      'set-theme-dark',
+      'set-theme-auto',
+      'set-theme-gray',
+      'set-theme-white',
+    ])
   })
 
   it('normalizes malformed history and remembers successful non-quit commands once', () => {
@@ -230,7 +239,7 @@ describe('command registry', () => {
     })
 
     expect(services.setVimEnabled).toHaveBeenLastCalledWith(true)
-    expect(services.setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark'], ['gray']])
+    expect(services.setAppearance.mock.calls).toEqual([['system'], ['light'], ['dark'], ['gray'], ['white']])
     expect(
       commandRegistry
         .filter((command) =>
@@ -244,7 +253,7 @@ describe('command registry', () => {
         .active({ alwaysOnTop: false, appearance: 'system', vimEnabled: false, lineNumbers: false, view: 'agenda' }),
     ).toBe(true)
     expect(commandRegistry.flatMap((command) => command.aliases)).toEqual(['q'])
-    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(19)
+    expect(new Set(commandRegistry.map((command) => command.name)).size).toBe(commandRegistry.length)
   })
 
   it('keeps optional actions unchecked and tolerates unavailable services', async () => {

@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from 'electron'
-import type { AppearancePreference } from '../../infrastructure/main/window-state'
+import type { AppearancePreference } from '../../shared/appearance'
 import type { FindMenuCommand, NotesMenuCommand, NotesMenuState, ViewMenuCommand } from '../../shared/ipc'
 import type { MenuIcons } from './menu-icons'
 
@@ -35,6 +35,7 @@ const appearanceItems: ReadonlyArray<{ label: string; value: AppearancePreferenc
   { label: 'Light', value: 'light' },
   { label: 'Dark', value: 'dark' },
   { label: 'Gray', value: 'gray' },
+  { label: 'White', value: 'white' },
 ]
 
 // Commands follow the macOS menu conventions (docs/PRODUCT.md §1.3): the window command lives in Window,

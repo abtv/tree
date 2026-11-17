@@ -1,14 +1,13 @@
-type Appearance = 'system' | 'light' | 'dark' | 'gray'
+import { appearanceBackgroundColor, appearanceColorScheme, type AppearancePreference } from '../shared/appearance'
 
 const originalMedia = new WeakMap<CSSMediaRule, string>()
 const originalThemeMedia = new WeakMap<HTMLMetaElement, string>()
 
 // Reuse the complete shared palette, including depth colors and selection rules.
 // Electron overrides nativeTheme; this browser-only prototype overrides its CSS media rule.
-export function applyAppearance(appearance: Appearance): void {
+export function applyAppearance(appearance: AppearancePreference): void {
   document.documentElement.dataset.appearance = appearance
-  document.documentElement.style.colorScheme =
-    appearance === 'gray' ? 'light' : appearance === 'system' ? 'light dark' : appearance
+  document.documentElement.style.colorScheme = appearanceColorScheme(appearance)
   for (const sheet of document.styleSheets) {
     for (const rule of sheet.cssRules) {
       if (!(rule instanceof CSSMediaRule)) continue
@@ -25,7 +24,7 @@ export function applyAppearance(appearance: Appearance): void {
     if (!originalThemeMedia.has(meta)) originalThemeMedia.set(meta, meta.media)
     const original = originalThemeMedia.get(meta)!
     const dark = original.includes('dark')
-    meta.content = dark ? '#3f3f3f' : appearance === 'gray' ? '#dddddd' : '#fbf8f1'
+    meta.content = appearanceBackgroundColor(dark, dark ? 'dark' : appearance)
     meta.media = appearance === 'system' ? original : (appearance === 'dark') === dark ? 'all' : 'not all'
   }
 }

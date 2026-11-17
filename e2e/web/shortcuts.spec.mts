@@ -142,6 +142,7 @@ for (const [profile, modifier, otherModifier, label] of [
       'set-theme-dark',
       'set-theme-gray',
       'set-theme-light',
+      'set-theme-white',
       'show-agenda',
       'show-tree',
       'summarize',
@@ -149,7 +150,7 @@ for (const [profile, modifier, otherModifier, label] of [
       'toggle-star-node',
       'toggle-vim-mode',
     ])
-    await expect(page.locator('.command-count')).toHaveText('20 of 20')
+    await expect(page.locator('.command-count')).toHaveText('21 of 21')
 
     await capture(page, `${profile}-available-commands.png`)
     const selected = () => panel.locator('[aria-selected="true"]').getAttribute('id')
@@ -186,7 +187,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await page.keyboard.press('Escape')
     await page.keyboard.press(':')
 
-    await expect(panel.locator('.command-name')).toHaveCount(20)
+    await expect(panel.locator('.command-name')).toHaveCount(21)
 
     const commandInput = page.getByRole('combobox', { name: 'Command', exact: true })
     await expect(commandInput).toBeVisible()
@@ -200,7 +201,7 @@ for (const [profile, modifier, otherModifier, label] of [
     await capture(page, `${profile}-narrow-command-input.png`)
 
     await expect(panel.getByRole('option')).toHaveCount(0)
-    await expect(page.locator('.command-count')).toHaveText('0 of 20')
+    await expect(page.locator('.command-count')).toHaveText('0 of 21')
 
     await page.keyboard.press('Enter')
 

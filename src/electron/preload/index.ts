@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { AppearancePreference } from '../../shared/appearance'
 import {
   ipcChannels,
   ipcEvents,
@@ -98,8 +99,7 @@ export const treeApi: TreeApi = {
   setRecentNodes: (value) => ipcRenderer.invoke(ipcChannels.setRecentNodes, value),
   setCommandHistory: (value) => ipcRenderer.invoke(ipcChannels.setCommandHistory, value),
   onAppearanceChanged: (listener) => {
-    const handler = (_event: Electron.IpcRendererEvent, value: 'system' | 'light' | 'dark' | 'gray'): void =>
-      listener(value)
+    const handler = (_event: Electron.IpcRendererEvent, value: AppearancePreference): void => listener(value)
     ipcRenderer.on(ipcEvents.appearanceChanged, handler)
     return () => ipcRenderer.removeListener(ipcEvents.appearanceChanged, handler)
   },

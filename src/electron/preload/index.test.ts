@@ -445,23 +445,26 @@ describe('preload bridge', () => {
   })
 })
 
-it.each(['dark', 'gray'])('delivers %s appearance notifications and removes the listener', async (appearance) => {
-  const { treeApi } = await import('./index')
-  const listener = vi.fn()
-  mocks.on.mockClear()
-  const remove = treeApi.onAppearanceChanged?.(listener)
-  const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
+it.each(['dark', 'gray', 'white'])(
+  'delivers %s appearance notifications and removes the listener',
+  async (appearance) => {
+    const { treeApi } = await import('./index')
+    const listener = vi.fn()
+    mocks.on.mockClear()
+    const remove = treeApi.onAppearanceChanged?.(listener)
+    const handler = mocks.on.mock.calls[0]?.[1] as (event: unknown, value: string) => void
 
-  expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.appearanceChanged)
+    expect(mocks.on.mock.calls[0]?.[0]).toBe(ipcEvents.appearanceChanged)
 
-  handler({}, appearance)
+    handler({}, appearance)
 
-  expect(listener).toHaveBeenCalledExactlyOnceWith(appearance)
+    expect(listener).toHaveBeenCalledExactlyOnceWith(appearance)
 
-  remove?.()
+    remove?.()
 
-  expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appearanceChanged, handler)
-})
+    expect(mocks.removeListener).toHaveBeenCalledWith(ipcEvents.appearanceChanged, handler)
+  },
+)
 
 it('delivers notes progress and removes the listener', async () => {
   const { treeApi } = await import('./index')

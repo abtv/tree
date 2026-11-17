@@ -1,6 +1,7 @@
 import type { EditorServices } from '../application/editor-store-types'
 import type { EditorStore } from '../application/editor-store'
 import type { TreeApi } from '../shared/ipc'
+import { isAppearancePreference, type AppearancePreference } from '../shared/appearance'
 import { requireNode, serializeState, validatePersistedState } from '../domain/document'
 import { readEditableContent } from '../renderer/editor-dom'
 import { extractClipboardLinks } from '../shared/clipboard-links'
@@ -120,11 +121,10 @@ export async function installBrowserPrototype(): Promise<{
   let vimEnabled = vimAvailable && ((await read<boolean>('preferences', 'vim')) ?? false)
   let lineNumbers = (await read<unknown>('preferences', 'line-numbers')) === true
   document.getElementById('prototype-vim-controls')!.hidden = !vimAvailable
-  const savedAppearance = await read<string>('preferences', 'appearance')
-  let appearance: 'system' | 'light' | 'dark' | 'gray' =
-    savedAppearance === 'light' || savedAppearance === 'dark' || savedAppearance === 'gray' ? savedAppearance : 'system'
+  const savedAppearance = await read<unknown>('preferences', 'appearance')
+  let appearance: AppearancePreference = isAppearancePreference(savedAppearance) ? savedAppearance : 'system'
   applyAppearance(appearance)
-  const appearanceListeners = new Set<(value: 'system' | 'light' | 'dark' | 'gray') => void>()
+  const appearanceListeners = new Set<(value: AppearancePreference) => void>()
   const vimListeners = new Set<(value: boolean) => void>()
   const updateVim = () => document.getElementById('prototype-vim')!.setAttribute('aria-pressed', String(vimEnabled))
   updateVim()

@@ -1,10 +1,9 @@
 import type { App, BrowserWindow, NativeTheme, Session, WebContents, WebPreferences } from 'electron'
-import type { AppearancePreference } from '../../infrastructure/main/window-state'
+import { appearanceBackgroundColor, type AppearancePreference } from '../../shared/appearance'
 
 // Match the document surface in styles.css before the renderer exists and after it is torn down.
 export function windowBackgroundColor(dark: boolean, appearance: AppearancePreference = 'system'): string {
-  if (appearance === 'gray') return '#dddddd'
-  return dark ? '#3f3f3f' : '#fbf8f1'
+  return appearanceBackgroundColor(dark, appearance)
 }
 
 export function followWindowAppearance(

@@ -37,6 +37,8 @@ describe('window appearance', () => {
     expect(windowBackgroundColor(false)).toBe('#fbf8f1')
     expect(windowBackgroundColor(false, 'gray')).toBe('#dddddd')
     expect(windowBackgroundColor(true, 'gray')).toBe('#dddddd')
+    expect(windowBackgroundColor(false, 'white')).toBe('#ffffff')
+    expect(windowBackgroundColor(true, 'white')).toBe('#ffffff')
   })
 
   it('updates the native background and removes its listener when the window closes', () => {

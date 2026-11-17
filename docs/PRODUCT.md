@@ -426,7 +426,7 @@ Dragging visible descendants moves a sibling subtree as one unit. Gaps are resol
 
 ### 2.5 Struck-Through Nodes
 
-A node can be struck through, for example to mark a task as done. A struck-through node draws a line through its text and shows the text in a muted color in Light, Dark and Gray. Hyperlinks inherit that muted color without an underline and remain operable. Recognized dates in Tree and Agenda inherit the surrounding struck-through text color instead of their date color; their font weight stays unchanged. Inside a selection highlight (§20.2) its text takes the highlight colors and keeps the line. Its circular indicator, disclosure chevron, and attached image are drawn as usual, and its text stays editable.
+A node can be struck through, for example to mark a task as done. A struck-through node draws a line through its text and shows the text in a muted color in every appearance. Hyperlinks inherit that muted color without an underline and remain operable. Recognized dates in Tree and Agenda inherit the surrounding struck-through text color instead of their date color; their font weight stays unchanged. Inside a selection highlight (§20.2) its text takes the highlight colors and keeps the line. Its circular indicator, disclosure chevron, and attached image are drawn as usual, and its text stays editable.
 
 This presentation applies to Tree, Agenda, location breadcrumbs, recent nodes, global search results, and each node label in their parent paths; path separators remain unstruck. Search-match emphasis remains visible under the line.
 
@@ -822,7 +822,7 @@ The menu bar has five menus, laid out as macOS applications do (§1.3):
 * **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
 * **File** holds **Export Notes…** and **Import Notes…** (§25).
 * **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
-* **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with four mutually exclusive items: **Automatic**, **Light**, **Dark**, and **Gray**. The item for the current appearance choice is checked (§20.5).
+* **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with five mutually exclusive items: **Automatic**, **Light**, **Dark**, **Gray**, and **White**. The item for the current appearance choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
 
 The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup.
@@ -1920,6 +1920,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
 | `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
 | `set-theme-gray` | — | Use the gray appearance | Gray | — | Same as View > Appearance > Gray |
+| `set-theme-white` | — | Use the white appearance | White | — | Same as View > Appearance > White |
 | `export-notes` | — | Export Notes… | — | — | Same as Export Notes in the desktop File menu or browser Data block (§24–25) |
 | `import-notes` | — | Import Notes… | — | — | Same as Import Notes in the desktop File menu or browser Data block (§24–25) |
 | `back-up-to-folder` | — | Back Up to Folder… | — | — | Same as the browser Data action when folder backup is off (§24.5) |
@@ -1961,15 +1962,15 @@ This does not govern motion the application does not itself decide to add: nativ
 
 ### 20.5 Appearance
 
-The command panel (§20.2.28) exposes the same four choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, and `set-theme-gray`.
+The command panel (§20.2.28) exposes the same five choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, `set-theme-gray`, and `set-theme-white`.
 
-The application has an appearance choice with four values, set in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, **Dark**, and **Gray**. Automatic follows the operating system's light or dark appearance and never selects Gray; switching the system appearance restyles the open window immediately. Light, Dark and Gray keep that appearance whatever the system uses. Gray uses light native controls. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
+The application has five appearance choices in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, **Dark**, **Gray**, and **White**. Automatic follows the operating system's light or dark appearance and restyles the open window immediately when the system appearance changes. Each explicit choice keeps its appearance whatever the system uses. Gray and White use light native controls. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
 
 Every current and future appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. Existing palette-specific choices below remain limited to their stated surfaces. Adding an appearance requires checking these shared rules in that appearance; the owner must not have to discover and request separate fixes for each surface.
 
 Selected hyperlinks use the same foreground and background as the surrounding text selection in every appearance and editing mode. Any link highlight retained when focus moves to another control keeps that appearance's selection colors.
 
-Save-error and inline image-error messages remain legible against the document surface in every appearance. Dark uses a lighter muted red for these messages; Light and Gray retain their darker error colors.
+Save-error and inline image-error messages remain legible against the document surface in every appearance. Dark uses a lighter muted red for these messages. Light, Gray, and White use darker error colors.
 
 The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
 
@@ -1988,6 +1989,8 @@ The dark appearance uses a palette adapted from the Emacs port of the Zenburn co
 * The content area of the light appearance carries a faint dot grid with a 20px pitch, like dotted notebook paper; the grid scrolls with the content, stays beneath the toolbar and status bar, and is absent from the dark appearance.
 
 The Gray appearance adapts Dayfox from [Nightfox](https://github.com/EdenEast/nightfox.nvim), via its [Ghostty palette](https://github.com/mbadolato/iTerm2-Color-Schemes/blob/master/ghostty/Dayfox), with a custom `#dddddd` background, dark violet text, muted gray-violet controls and no dot grid or depth coloring.
+
+White uses the Gray palette and styling with a pure white (`#ffffff`) document and window background. Tints derived from the background use the white surface.
 
 Tags use muted violet `#5b496c` and the shared subtle background; people and event markers retain their semantic colors. Search and command results use the current Tree row's muted selection fill. Search focus uses a visible secondary-color border; paths, labels and hints use the secondary text color, and separators are subdued. Visual selections, text selections and the Visual badge share a stronger gray-violet highlight with the ordinary text color. Light and Dark retain their original palettes. The palette's MIT attribution is retained in the distributed stylesheet.
 
@@ -2102,7 +2105,7 @@ Pressing a modifier key alone, including Command, does not dismiss suggestions. 
 
 ### 20.10 Date-Like Text Indicator
 
-Text that strongly resembles an attempted date but is not a valid canonical date (§23.2) is marked with a 1px wavy underline in a muted red (`#b4554b` in the light appearance, `#cc9393` in the dark appearance, `#b3434e` in Gray), in Tree and Agenda alike. Text resembles a date only when it has a four-digit year, a hyphen, a one- or two-digit month, a hyphen and a one- or two-digit day, with no digit touching either end, and is not a valid `YYYY-MM-DD` date. Impossible dates such as `2026-02-31` and incomplete forms such as `2026-10-1` qualify; arbitrary text, hyperlink text and valid dates never do. The mark changes no text, caret position or Agenda membership.
+Text that strongly resembles an attempted date but is not a valid canonical date (§23.2) is marked with a 1px wavy underline in a muted red (`#b4554b` in the light appearance, `#cc9393` in the dark appearance, `#b3434e` in Gray and White), in Tree and Agenda alike. Text resembles a date only when it has a four-digit year, a hyphen, a one- or two-digit month, a hyphen and a one- or two-digit day, with no digit touching either end, and is not a valid `YYYY-MM-DD` date. Impossible dates such as `2026-02-31` and incomplete forms such as `2026-10-1` qualify; arbitrary text, hyperlink text and valid dates never do. The mark changes no text, caret position or Agenda membership.
 
 While a node is being edited, a token is not underlined when the caret or selection is inside it or directly adjacent to it, so intermediate typing states such as `2026-10-1` are never flagged; the underline appears when the caret leaves the token or the node is no longer being edited. The rule is the same in standard editing and in every Vim mode. Occurrences that are not being edited, including live mirrors in Agenda, always show the underline.
 
@@ -2110,7 +2113,7 @@ While a node is being edited, a token is not underlined when the caret or select
 
 ### 20.11 Date Visualization in Tree
 
-Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, is semibold and colored relative to the local calendar's Today: past dates are red, today's dates use a yellow or amber accent, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface; the dark appearance uses muted lighter variants. Gray uses Dayfox red, amber and green accents. Tree evaluates Today when rendering date decorations; Agenda uses the Today captured when it opens (§23.1).
+Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, is semibold and colored relative to the local calendar's Today: past dates are red, today's dates use a yellow or amber accent, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface; the dark appearance uses muted lighter variants. Gray and White use Dayfox red, amber and green accents. Tree evaluates Today when rendering date decorations; Agenda uses the Today captured when it opens (§23.1).
 
 Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text, caret offsets or selection direction, including when Today changes between renders. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
 
@@ -2242,7 +2245,7 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 * Top-level nodes show a small muted tree icon beside the title, with the accessible label `Top level`; they have no path line.
 * Titles align to the top of each row, use the same 15 px font size as tree text, and path headings use 12 px with sufficient contrast. Space and a thin divider separate a new path group from preceding results. The section heading supplies the divider at the start of the list. Separators between node rows appear only inside the same group. Selection frames cover only the node, not the path heading.
 * Single-line recent entries, search results, and tag suggestions use the same 25 px height as single-line rows in Tree and Agenda. Wrapped rows grow with the text and keep equal vertical padding. A node without a parent path reserves no empty path line. Thin separators span the same width as selection and appear only between items, not after the final item. The selected row's frame replaces its adjacent separators, avoiding doubled boundaries or lines extending beyond its rounded corners. Tag suggestions use the same row padding and separators.
-* Selected nodes and tag suggestions use a distinct fill with 4 px rounded corners. Light and Dark include a complete inset frame; Gray uses the same muted gray-violet fill as the current Tree row, without a frame. Selection does not change row geometry or text alignment.
+* Selected nodes and tag suggestions use a distinct fill with 4 px rounded corners. Light and Dark include a complete inset frame. Gray and White use the same muted gray-violet fill as the current Tree row, without a frame. Selection does not change row geometry or text alignment.
 * Trailing scroll space is reserved only for overflowing node results. A list that fits has no extra trailing space. Tags and node results use the same gap before the footer.
 * Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in every node title also have a visible underline, including unselected nodes and short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.
 * Each query term highlights its matches independently in node text and displayed parent paths, using the same per-term smart case as result matching. Marker terms highlight only complete recognized names, excluding hyperlink ranges. Ordinary terms highlight literal substrings. Overlapping highlights merge without repeating text; repeated terms add no duplicate highlights. Matches beyond the displayed ancestor preview remain undisplayed.
@@ -2486,7 +2489,7 @@ Nothing in this section sends notes over the network. Notes leave browser storag
 
 The browser version provides a web app manifest, so browsers that offer installation, such as Chrome on macOS, can install it as **Tree** in its own window. The installed app uses the same origin, storage and notes as the browser tab. It has a 192- and 512-pixel icon and an Apple touch icon taken from the Tree icon artwork, with transparent corners. Offline access and app updates follow §24.7 in both the installed app and an ordinary browser tab; installation is optional.
 
-The browser's window color follows the Appearance choice (§20.5): the selected document surface color, including after the choice changes. An installed window launched in Dark or Gray can briefly show the light surface color from the manifest before the page applies its appearance. Browsers do not offer a per-appearance manifest color.
+The browser's window color follows the Appearance choice (§20.5), including when the choice changes. An installed window launched in Dark, Gray, or White can briefly show the Light surface color from the manifest before the page applies its appearance. The browser manifest has a single startup color.
 
 After the editor opens, Tree asks the browser once per page load to keep its storage when space runs low, unless the browser already reports persistent storage. The request never delays startup and shows no prompt of Tree's own. A refusal or an error changes nothing else. Persistent storage does not protect against clearing site data or deleting the profile, so export and folder backup remain the independent copies.
 
