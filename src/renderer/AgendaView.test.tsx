@@ -44,8 +44,6 @@ it('groups adjacent siblings by path and lets navigation stop on a read-only pat
   const paths = container.querySelectorAll<HTMLElement>('.agenda-row-path')
 
   expect([...paths].map((path) => path.textContent)).toEqual(['Work', 'Work › 2026-10-08 B', 'Work'])
-  expect(paths[0]!.closest('.agenda-entry')).toHaveClass('agenda-entry-leading-path')
-  expect(paths[1]!.closest('.agenda-entry')).not.toHaveClass('agenda-entry-leading-path')
   expect([...paths[1]!.querySelectorAll('.node-text-struck')].map((part) => part.textContent)).toEqual([
     'Work',
     '2026-10-08 B',

@@ -38,7 +38,6 @@ export type AgendaRow =
       readonly key: string
       readonly day: DayNumber
       readonly parentId: NodeId
-      readonly leading: boolean
       readonly groupKey?: string
     }
   | {
@@ -118,7 +117,6 @@ function withParentPaths(rows: readonly AgendaRow[], document?: Document): reado
         key: `path:${row.day}:${row.nodeId}`,
         day: row.day,
         parentId,
-        leading: grouped.length === 0,
         ...(row.groupKey === undefined ? {} : { groupKey: row.groupKey }),
       })
     }
@@ -337,7 +335,7 @@ export class AgendaRowsCache {
             return row.content === old.content && row.isToday === old.isToday && row.overdue === old.overdue
           if (row.kind === 'node' && old.kind === 'node') return row.groupKey === old.groupKey
           if (row.kind === 'path' && old.kind === 'path')
-            return row.parentId === old.parentId && row.leading === old.leading && row.groupKey === old.groupKey
+            return row.parentId === old.parentId && row.groupKey === old.groupKey
           return true
         })
       if (changed || !same) this.rows = rows

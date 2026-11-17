@@ -49,7 +49,6 @@ describe('Agenda rows', () => {
     const paths = rows.filter((row) => row.kind === 'path')
 
     expect(paths.map((row) => row.parentId)).toEqual(['parent', 'parent', 'parent'])
-    expect(paths.every((row) => row.leading)).toBe(true)
     expect(paths[0]!.groupKey).toBe(overdueKey(state.weekStart))
     expect(rows.filter((row) => row.kind === 'node').map((row) => row.nodeId)).toEqual(['a', 'b', 'a', 'b', 'a'])
 

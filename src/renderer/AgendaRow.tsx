@@ -85,7 +85,7 @@ export const AgendaRow = memo(function AgendaRow({
   const ref = useCallback((element: HTMLDivElement | null) => rowRef(row.key, element), [row.key, rowRef])
   return (
     <div
-      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${row.kind === 'path' && row.leading ? ' agenda-entry-leading-path' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
+      className={`agenda-entry agenda-entry-${row.kind}${row.kind === 'day' && row.content ? ' agenda-entry-content' : ''}${pinned ? ' agenda-row-pinned' : ''}`}
       data-agenda-measure-key={row.key}
       style={pinned ? { top: pinnedOffset } : undefined}
     >
