@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { StrictMode, useSyncExternalStore } from 'react'
+import { Profiler, StrictMode, useSyncExternalStore } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import './test/setup'
 import { createRealStoreHarness } from './test/real-store-harness'
@@ -192,6 +192,200 @@ it('measures attached entries after all sibling editors project their content', 
     expect(projectedCounts).toEqual(Array(8).fill(8))
   } finally {
     rect.mockRestore()
+  }
+})
+
+// @requirement PRODUCT.md §22.1
+// @requirement PRODUCT.md §23.6
+it.each([false, true])('settles late row measurements and releases detached rows (StrictMode: %s)', async (strict) => {
+  const day = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const harness = await createRealStoreHarness({
+    document: {
+      roots: Array.from({ length: 200 }, (_, index) => ({
+        id: `n${index}`,
+        text: '2026-10-08 Task',
+        children: [],
+      })),
+    },
+    services: { today: () => day },
+  })
+  harness.store.openAgenda()
+  harness.store.applyAgenda({ kind: 'select', key: `node:${day}:n0` })
+  const rows = harness.store.getAgendaRows()
+  const estimatedHeight = rows.length * 25
+  const observed = new Set<Element>()
+  // Register targets without delivering notifications: late mounts must be measured before
+  // ResizeObserver's first delivery, not repaired by it after an incomplete layout commit.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe(element: Element): void {
+        observed.add(element)
+      }
+      unobserve(element: Element): void {
+        observed.delete(element)
+      }
+      disconnect(): void {
+        observed.clear()
+      }
+    },
+  )
+  vi.stubGlobal('innerHeight', 400)
+  vi.stubGlobal('innerWidth', 800)
+  let scrollTop = 0
+  let lateHeight = 80
+  const measured: Element[] = []
+  const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    if (this.matches('.agenda-list')) return new DOMRect(0, -scrollTop, 800, estimatedHeight)
+    if (this.matches('.agenda-entry')) measured.push(this)
+    return new DOMRect(0, 0, 800, this.querySelector('[data-node-id="n100"]') === null ? 25 : lateHeight)
+  })
+  const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation((_x, delta) => {
+    scrollTop += delta
+  })
+  const createReveal = revealModule.createViewportReveal
+  const factory = vi.spyOn(revealModule, 'createViewportReveal').mockImplementation(() => ({
+    ...createReveal(),
+    begin: vi.fn(),
+    beginRegion: vi.fn(),
+  }))
+  const committed = vi.fn()
+  const view = () => {
+    const content = (
+      <Profiler id="agenda" onRender={committed}>
+        <View store={harness.store} />
+      </Profiler>
+    )
+    return strict ? <StrictMode>{content}</StrictMode> : content
+  }
+  try {
+    const result = render(view())
+    const list = result.container.querySelector<HTMLElement>('.agenda-list')!
+    const selected = result.container.querySelector('[data-node-id="n0"]')!
+
+    expect(list.style.height).toBe(`${estimatedHeight}px`)
+    expect(result.container.querySelector('[data-node-id="n100"]')).toBeNull()
+
+    committed.mockClear()
+    scrollTop = 2500
+    fireEvent.scroll(window)
+
+    const late = result.container.querySelector('[data-node-id="n100"]')!
+    expect(late).not.toBeNull()
+    expect(list.style.height).toBe(`${estimatedHeight + 55}px`)
+    const lateEntry = late.closest('.agenda-entry')!
+    expect(measured).toContain(lateEntry)
+    expect(harness.store.getAgendaRows()).toBe(rows)
+    expect(committed.mock.calls.length).toBeLessThanOrEqual(4)
+    expect(result.container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
+    expect(result.container.querySelector('[data-node-id="n0"]')).toBe(selected)
+    expect(selected).toHaveFocus()
+    expect(selected.closest('.agenda-entry')).toHaveClass('agenda-row-pinned')
+    expect([...observed].every((element) => element.isConnected)).toBe(true)
+
+    committed.mockClear()
+    measured.length = 0
+    result.rerender(view())
+    result.rerender(view())
+    result.rerender(view())
+
+    expect(committed).toHaveBeenCalledTimes(3)
+    expect(measured).toHaveLength(0)
+    expect(scrollTop).toBe(2500)
+
+    scrollTop = 0
+    fireEvent.scroll(window)
+
+    expect(late.isConnected).toBe(false)
+    expect(observed.has(lateEntry)).toBe(false)
+
+    lateHeight = 100
+    measured.length = 0
+    scrollTop = 2500
+    fireEvent.scroll(window)
+
+    expect(list.style.height).toBe(`${estimatedHeight + 75}px`)
+    expect(measured).not.toContain(lateEntry)
+    expect([...observed].every((element) => element.isConnected)).toBe(true)
+
+    lateHeight = 40
+    vi.stubGlobal('innerWidth', 1000)
+    fireEvent.resize(window)
+
+    expect(list.style.height).toBe(`${estimatedHeight + 15}px`)
+    expect(selected).toHaveFocus()
+    expect(scrollTop).toBe(2500)
+    expect(result.container.querySelectorAll('.agenda-row').length).toBeLessThan(100)
+
+    measured.length = 0
+    fireEvent.resize(window)
+
+    expect(measured).toHaveLength(0)
+
+    result.unmount()
+
+    expect(observed.size).toBe(0)
+  } finally {
+    cleanup()
+    factory.mockRestore()
+    bounds.mockRestore()
+    scroll.mockRestore()
+    vi.unstubAllGlobals()
+  }
+})
+
+// @requirement PRODUCT.md §23.15
+it('settles an unchanged focused heading even though its inline ref reattaches on each commit', async () => {
+  const day = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const harness = await createRealStoreHarness({
+    document: { roots: [{ id: 'n0', text: '2026-10-08 Task', children: [] }] },
+    services: { today: () => day },
+  })
+  harness.store.openAgenda()
+  harness.store.applyAgenda({ kind: 'focus-day', key: `day:${day}`, scrollTop: 0 })
+  vi.stubGlobal('ResizeObserver', undefined)
+  const headingReads = vi.fn()
+  const scroll = vi.spyOn(globalThis, 'scrollBy').mockImplementation(() => undefined)
+  const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    if (this.matches('.agenda-focused-heading')) {
+      headingReads()
+      return new DOMRect(0, 0, 800, 50)
+    }
+    return new DOMRect(0, 0, 800, 25)
+  })
+  const committed = vi.fn()
+  const view = () => (
+    <StrictMode>
+      <Profiler id="agenda" onRender={committed}>
+        <View store={harness.store} />
+      </Profiler>
+    </StrictMode>
+  )
+  try {
+    const result = render(view())
+    const heading = result.container.querySelector('.agenda-focused-heading')!
+
+    expect(heading).toHaveFocus()
+    expect(committed.mock.calls.length).toBeLessThanOrEqual(4)
+
+    committed.mockClear()
+    headingReads.mockClear()
+    result.rerender(view())
+    result.rerender(view())
+    result.rerender(view())
+
+    expect(headingReads).toHaveBeenCalledTimes(3)
+    expect(committed).toHaveBeenCalledTimes(3)
+    expect(heading).toHaveFocus()
+  } finally {
+    cleanup()
+    bounds.mockRestore()
+    scroll.mockRestore()
+    vi.unstubAllGlobals()
   }
 })
 

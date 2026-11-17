@@ -90,6 +90,16 @@ it('records an estimated row height without invalidating unchanged layout, then 
 
   expect(heights.get('row')).toBe(ROW_HEIGHT_ESTIMATE * 2)
   expect(revise).toHaveBeenCalledOnce()
+
+  measureElement('row', element, heights, revise)
+
+  expect(revise).toHaveBeenCalledOnce()
+
+  bounds.mockReturnValue(new DOMRect(0, 0, 100, 0))
+  measureElement('row', element, heights, revise)
+
+  expect(heights.get('row')).toBe(ROW_HEIGHT_ESTIMATE * 2)
+  expect(revise).toHaveBeenCalledOnce()
 })
 
 it('reuses row identities for repeated layout while applying current sparse measurements', () => {

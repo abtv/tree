@@ -236,6 +236,11 @@ export function AgendaView({
   }, [])
   // Sibling editor refs can still change rich content. Measure their complete entries together,
   // before rebuilding offsets or consuming Agenda's opening, restoration and anchor intents.
+  // Drain after every commit: scrolling can attach rows without changing the row projection.
+  // Only refs enqueue entries; this pass clears them, and measureElement updates revision only
+  // for a positive height different from its cached height (or the initial estimate). Stable
+  // heights therefore settle even when StrictMode or the focused heading reattaches a ref.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (pendingMeasurements.current.size === 0) return
 
