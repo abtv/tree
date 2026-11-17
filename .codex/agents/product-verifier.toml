@@ -1,6 +1,6 @@
 name = "product_verifier"
 description = "Checks changed behavior as a careful user and reports meaningful product issues."
-model = "gpt-6.1-sol"
+model = "gpt-6.2-sol"
 model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 developer_instructions = """
