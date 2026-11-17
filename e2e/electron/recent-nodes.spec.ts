@@ -16,6 +16,7 @@ import { controlPostedTasksWithClock } from './search-clock'
 
 describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
+  // @requirement PRODUCT.md §20.14.2
   test('uses the enlarged viewport limits while keeping short result lists compact', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: Array.from({ length: 80 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
@@ -26,11 +27,17 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await window.reload()
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeVisible()
     await setMainWindowBounds(app, { width: 1156, height: 1000 })
+    const treeRowHeight = (await window.locator('.node-row').first().boundingBox())!.height
     await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
     const input = popup.getByRole('searchbox')
+
+    await expect(popup.getByRole('option')).toHaveCount(8)
+    expect((await popup.getByRole('option').first().boundingBox())!.height).toBe(treeRowHeight)
+
     await input.fill('Node')
     await expect(popup.getByLabel('Result position')).toHaveText('1 / 80')
+    expect((await popup.getByRole('option').first().boundingBox())!.height).toBe(treeRowHeight)
     const geometry = await popup.evaluate((element) => {
       const box = element.getBoundingClientRect()
       return {
@@ -56,6 +63,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
   })
 
   // @requirement PRODUCT.md §20.14
+  // @requirement PRODUCT.md §20.14.2
   // @requirement PRODUCT.md §20.14.4
   test('completes marker terms at the caret throughout a multi-term query', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -63,13 +71,16 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
       location: { currentParentId: null, selectedNodeId: 'task' },
     })
     const { window } = await launchTree(userDataDir)
+    const treeRowHeight = (await window.locator('.node-row').first().boundingBox())!.height
     await window.keyboard.press('Meta+;')
     const input = window.getByRole('searchbox', { name: 'Search query' })
 
     await input.fill('task @al later')
     await input.press('Home')
     for (let index = 0; index < 7; index++) await input.press('ArrowRight')
-    await expect(window.getByRole('listbox', { name: 'People' }).getByRole('option')).toHaveText(['@alex'])
+    const person = window.getByRole('listbox', { name: 'People' }).getByRole('option')
+    await expect(person).toHaveText('@alex')
+    expect((await person.boundingBox())!.height).toBe(treeRowHeight)
     await input.press('Tab')
 
     await expect(input).toHaveValue('task @alex later')
@@ -527,6 +538,52 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await expect(popup).toHaveCount(0)
     })
   }
+
+  // @requirement PRODUCT.md §20.14.2
+  test('shows the first starred group heading when opening Search and wrapping back to the first result @linux', async ({
+    userDataDir,
+  }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 18 }, (_, index) => ({
+          id: `parent-${index}`,
+          text: `Project ${String(index).padStart(2, '0')}`,
+          children: [{ id: `star-${index}`, text: `Starred item ${index}`, starred: true, children: [] }],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'parent-0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 1156, height: 860 })
+    await window.evaluate(() => globalThis.window.treeApi.setAppearance('gray'))
+    await expect(window.locator('html')).toHaveAttribute('data-appearance', 'gray')
+    await window.keyboard.press('Meta+;')
+    const list = window.getByRole('listbox', { name: 'Recent nodes' })
+    const selected = list.locator('[aria-selected="true"]')
+
+    await expect(selected).toHaveText('★Starred item 0')
+    await expect(list).toHaveAttribute('data-scroll-after', '')
+    expect(await list.evaluate((element) => element.scrollTop), 'initial scroll').toBe(0)
+
+    await window.keyboard.press('ArrowUp')
+    await expect(selected).toHaveText('★Starred item 17')
+    await window.keyboard.press('ArrowDown')
+    await expect(selected).toHaveText('★Starred item 0')
+
+    const atStart = await list.evaluate((element) => {
+      const heading = element.querySelector('.recent-node-group-path')!.getBoundingClientRect()
+      return { scrollTop: element.scrollTop, headingInset: heading.top - element.getBoundingClientRect().top }
+    })
+    await window.screenshot({ path: testInfo.outputPath('first-starred-group.png') })
+    expect(atStart.scrollTop).toBe(0)
+    expect(atStart.headingInset).toBeGreaterThanOrEqual(0)
+    await expect(list).not.toHaveAttribute('data-scroll-before')
+    const headings = list.locator('.recent-node-group-path')
+    await expect(headings.first()).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
+    await expect(headings.nth(1)).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
+    const sectionHeading = window.getByRole('dialog', { name: 'Search' }).locator('.node-search-results-heading')
+    await expect(sectionHeading).toHaveCSS('border-bottom-width', '1px')
+  })
 
   // @requirement PRODUCT.md §20.14.2
   test('groups consecutive recent paths and remeasures grouped results through scroll and resize @linux', async ({

@@ -17,23 +17,33 @@ import { GlobalSearchSession } from './global-search-session'
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
-import { computeListWindow, computeOffsets } from './list-window'
+import { computeListWindow, computeOffsets, ROW_HEIGHT_ESTIMATE } from './list-window'
 import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
 
 const RESULT_EDGE_INSET = 12
+const RESULT_GROUP_HEADING_ESTIMATE = 39
 
 function updateResultEdges(element: HTMLElement): void {
   element.toggleAttribute('data-scroll-before', element.scrollTop > 1)
   element.toggleAttribute('data-scroll-after', element.scrollHeight - element.clientHeight - element.scrollTop > 1)
 }
 
-function revealResult(row: HTMLElement): void {
+function revealResult(row: HTMLElement, first: boolean): void {
   const list = row.closest<HTMLElement>('.node-search-results')
   if (list === null) return
   const viewport = list.getBoundingClientRect()
   const rowBox = row.getBoundingClientRect()
+  if (
+    first &&
+    rowBox.bottom - row.parentElement!.getBoundingClientRect().top <= list.clientHeight - RESULT_EDGE_INSET
+  ) {
+    list.scrollTop = 0
+    updateResultEdges(list)
+    return
+  }
+
   const target =
     rowBox.height > list.clientHeight - RESULT_EDGE_INSET * 2
       ? (row.querySelector('.node-search-match')?.getBoundingClientRect() ?? rowBox)
@@ -149,10 +159,10 @@ export function GlobalSearchPopup({
   const layout = useMemo(
     () =>
       computeOffsets(
-        items?.map(
-          (item, index) =>
-            heights.get(item.id) ?? (item.path !== null && item.path !== items?.[index - 1]?.path ? 73 : 34),
-        ) ?? [],
+        items?.map((item, index) => {
+          const startsGroup = item.path !== null && item.path !== items[index - 1]?.path
+          return heights.get(item.id) ?? ROW_HEIGHT_ESTIMATE + (startsGroup ? RESULT_GROUP_HEADING_ESTIMATE : 0)
+        }) ?? [],
       ),
     [items, heights],
   )
@@ -438,7 +448,7 @@ export function GlobalSearchPopup({
     if (!revealPending.current) return
     const row = panel.current?.querySelector<HTMLElement>('[aria-selected="true"]')
     if (row && !pending) {
-      revealResult(row)
+      revealResult(row, selected === 0)
       const top = panel.current!.scrollTop
       if (top !== windowTop) setWindowTop(top)
       else revealPending.current = false
@@ -595,7 +605,10 @@ export function GlobalSearchPopup({
                     }}
                   >
                     {startsGroup && item.path !== null && (
-                      <div className="recent-node-group-path recent-node-path">
+                      <div
+                        className="recent-node-group-path recent-node-path"
+                        data-leading={index === 0 ? '' : undefined}
+                      >
                         <SearchResultText
                           text={item.path}
                           query={displayedQuery}

@@ -1930,7 +1930,7 @@ body.node-drag-invalid * {
 
 .node-search-tags {
   overflow-y: auto;
-  max-height: 204px;
+  max-height: calc(6 * var(--node-row-min-height));
   flex: 0 1 auto;
   min-height: 0;
 }
@@ -1943,11 +1943,15 @@ body.node-drag-invalid * {
   flex: 0;
 }
 
+.node-search-tag,
+.recent-node-row {
+  padding: calc((var(--node-row-min-height) - 20px) / 2) 10px;
+  border-radius: 4px;
+}
+
 .node-search-tag {
   position: relative;
-  padding: 7px 10px;
   line-height: 20px;
-  border-radius: 4px;
 }
 
 .node-search-section-title,
@@ -2003,8 +2007,6 @@ body.node-drag-invalid * {
   flex-direction: column;
   justify-content: flex-start;
   gap: 2px;
-  padding: 7px 10px;
-  border-radius: 4px;
   cursor: default;
 }
 
@@ -2072,6 +2074,10 @@ body.node-drag-invalid * {
   margin-top: 10px;
   padding: 8px 10px 4px;
   border-top: 1px solid var(--color-location-border);
+}
+
+.recent-node-group-path[data-leading] {
+  border-top-color: transparent;
 }
 
 .recent-node-root {
