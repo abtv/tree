@@ -116,9 +116,14 @@ describeForEachEditingMode('Measured scroll continuity', ({ mode }) => {
       await window.locator('.scroll-viewport').evaluate((element) => {
         element.scrollTop = (element.scrollHeight - element.clientHeight) * 0.7
       })
-      await window.evaluate(
-        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-      )
+      // Fixed-clock animation callbacks do not acknowledge native scroll delivery. The sticky
+      // window can still show the old rows, so start measuring only after its range catches up.
+      await window.waitForFunction(() => {
+        const viewport = document.querySelector('.scroll-viewport')!
+        const list = document.querySelector<HTMLElement>('[data-window-start]')!
+        const start = Math.max(0, viewport.getBoundingClientRect().top - list.getBoundingClientRect().top)
+        return Math.abs(Number(list.dataset.windowStart) - start) < 1
+      })
       // Normal mode projects a one-character selection after the native selection event.
       const initialSelection = await selection()
 
