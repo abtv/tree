@@ -622,7 +622,7 @@ export function App({
         shortcuts={shortcuts}
         blocked={commandPanel.open}
         beforeOpen={() => {
-          clearCommandAssembly(vimTextCommandState.commandState)
+          prepareVimCommand(vimTextCommandState, 'focus-borrow')
           store.search.interruptNavigation()
           if (store.search.session.getSnapshot().draft !== undefined) {
             store.search.cancelDraft()

@@ -204,6 +204,20 @@ describe('command interruption policy', () => {
     return { ...f, element, vim, previous, nodeVisual: () => nodeVisual }
   }
 
+  it.each(['search-open', 'focus-borrow'] as const)(
+    'retains live Visual endpoints when %s borrows focus',
+    async (reason) => {
+      const f = await commandFixture('visual')
+
+      prepareVimCommand(f.vim, reason, f.element)
+
+      expect(f.commandState.pending).toBeUndefined()
+      expect(f.commandState.visualAnchor).toBe(1)
+      expect(f.commandState.visualFocus).toBe(3)
+      expect(f.vim.mode).toBe('visual')
+    },
+  )
+
   it.each([
     { reason: 'text-edit', normal: true, preserve: true, cursor: 1, clear: true },
     { reason: 'navigation', normal: true, preserve: false, cursor: 1, clear: true },

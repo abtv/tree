@@ -165,6 +165,55 @@ function mouse(currentTarget: HTMLElement, extra: Record<string, unknown> = {}) 
 }
 
 describe('blur', () => {
+  it.each([
+    { focused: false, destination: false, preserve: true },
+    { focused: true, destination: false, preserve: false },
+    { focused: false, destination: true, preserve: false },
+  ])('retains Visual endpoints only when the window loses focus: %j', async ({ focused, destination, preserve }) => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(focused)
+    const f = await fixture({ mode: 'visual' })
+    f.commandState.visualAnchor = 3
+    f.commandState.visualFocus = 1
+    f.commandState.pending = { count: '2', motionCount: '' }
+
+    f.handlers().onBlur({ relatedTarget: destination ? document.createElement('button') : null } as never)
+
+    expect(f.commandState.visualAnchor).toBe(preserve ? 3 : undefined)
+    expect(f.commandState.visualFocus).toBe(preserve ? 1 : undefined)
+    expect(f.commandState.pending).toBeUndefined()
+  })
+
+  it.each([false, true])('preserves live Visual endpoints only for a returning modal (%s)', async (returns) => {
+    const f = await fixture({ mode: 'visual' })
+    const destination = document.createElement('button')
+    const container = document.createElement('div')
+    if (returns) container.setAttribute('data-editor-selection-return', '')
+    container.append(destination)
+    f.commandState.visualAnchor = 3
+    f.commandState.visualFocus = 1
+    f.commandState.pending = { count: '2', motionCount: '' }
+
+    f.handlers().onBlur({ relatedTarget: destination } as never)
+
+    expect(f.commandState.visualAnchor).toBe(returns ? 3 : undefined)
+    expect(f.commandState.visualFocus).toBe(returns ? 1 : undefined)
+    expect(f.commandState.pending).toBeUndefined()
+    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+  })
+
+  it('finishes Replace normally when a returning modal takes focus', async () => {
+    const f = await fixture({ mode: 'replace' })
+    const input = textarea('hello')
+    f.inputs.set('node', input)
+    const destination = document.createElement('button')
+    destination.setAttribute('data-editor-selection-return', '')
+
+    f.handlers().onBlur({ relatedTarget: destination } as never)
+
+    expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith()
+    expect(f.deps.changeVimMode).toHaveBeenCalledExactlyOnceWith('normal')
+  })
+
   it.each(['arrival', 'same-node', 'different-selection', 'stale-focus', 'no-goal', 'control', 'loading'] as const)(
     'retains the desired vertical column only for its verified destination: %s',
     async (context) => {

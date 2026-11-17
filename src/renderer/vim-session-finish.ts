@@ -4,6 +4,7 @@ import { getCaret, hasMultiCharacterSelection, readEditableContent, setEditableT
 import { editCaretTransition, type VimCaretState } from './vim-caret-transition'
 import {
   clearCommandAssembly,
+  clearPending,
   recordRepeatChange,
   structuralRepeatChange,
   takeStructuralInsert,
@@ -51,6 +52,7 @@ type VimCommandInterruption =
   | 'navigation'
   | 'view-change'
   | 'search-open'
+  | 'focus-borrow'
   | 'search-jump'
   | 'history'
   | 'selection-command'
@@ -110,8 +112,10 @@ export function prepareVimCommand(
       }
       return
     case 'search-open':
-      if (mode === 'replace') vim.finishReplace?.(input, false, true)
-      clearCommandAssembly(vim.commandState)
+    case 'focus-borrow':
+      if (reason === 'search-open' && mode === 'replace') vim.finishReplace?.(input, false, true)
+      if (mode === 'visual') clearPending(vim.commandState)
+      else clearCommandAssembly(vim.commandState)
       return
     case 'search-jump':
       if (input !== undefined) {
@@ -152,11 +156,14 @@ export function finishVimBlur(
   deps: PointerSession,
   nodeId: string,
   input: HTMLElement | undefined,
-  focus: { verticalArrival: boolean; windowFocused: boolean },
+  focus: { verticalArrival: boolean; windowFocused: boolean; returnsToSelection?: boolean },
 ): void {
   const { commandState, session } = deps
   const goal = commandState.verticalGoal
-  clearCommandAssembly(commandState)
+  if (focus.returnsToSelection && deps.getMode() === 'visual') {
+    clearPending(commandState)
+    commandState.verticalGoal = undefined
+  } else clearCommandAssembly(commandState)
   if (focus.verticalArrival) commandState.verticalGoal = goal
 
   // Creating a structural Insert session blurs its origin before the new input receives focus.

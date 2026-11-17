@@ -54,3 +54,32 @@ it('discards obsolete intent after manual focus, projection or a newer destinati
 
   expect(controller.takeRestoration(focus, 'b')).toBeUndefined()
 })
+
+it.each([
+  { anchor: 0, focus: 0 },
+  { anchor: 1, focus: 3 },
+  { anchor: 3, focus: 1 },
+  { anchor: 8, focus: 8 },
+])('restores borrowed selection offsets once without depending on a DOM element ($anchor, $focus)', (selection) => {
+  const controller = new SearchFocusController(() => ({ draft: false, searchFocused: false }))
+  const focus = { nodeId: 'a', cursor: 2, token: 1 }
+
+  controller.borrowSelection(focus, selection)
+
+  expect(controller.takeSelection(focus, 'a')).toEqual(selection)
+  expect(controller.takeSelection(focus, 'a')).toBeUndefined()
+})
+
+it.each(['focus', 'projection', 'token', 'node'] as const)('rejects borrowed selection superseded by %s', (change) => {
+  const controller = new SearchFocusController(() => ({ draft: false, searchFocused: false }))
+  const focus = { nodeId: 'a', cursor: 2, token: 1 }
+  controller.borrowSelection(focus, { anchor: 3, focus: 1 })
+
+  if (change === 'focus') controller.editorFocused()
+  if (change === 'projection') controller.completeFocusProjection(focus, false)
+
+  expect(
+    controller.takeSelection(change === 'token' ? { ...focus, token: 2 } : focus, change === 'node' ? 'b' : 'a'),
+  ).toBeUndefined()
+  expect(controller.takeSelection(focus, 'a')).toBeUndefined()
+})

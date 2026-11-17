@@ -9,6 +9,7 @@ import { attachmentImageCache } from '../infrastructure/renderer/electron-servic
 import './test/setup'
 import { App } from './App'
 import { HOLD_ACTIVATION_MS } from './node-drag'
+import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
 
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 
@@ -123,6 +124,151 @@ async function createLockedStore(): Promise<EditorStore> {
   }
   return store
 }
+
+// @requirement PRODUCT.md §16.2
+it('continues Visual motions after canceling quit confirmation', async () => {
+  const store = await createLockedStore()
+  renderReact(<App store={store} initialVimEnabled />)
+  const editor = screen.getByRole('textbox', { name: 'Node 1' })
+  act(() => editor.focus())
+  act(() => setSelectionRange(editor, 1, 2))
+  fireEvent.keyDown(editor, { key: 'v' })
+  fireEvent.keyDown(editor, { key: 'l' })
+
+  act(() => store.requestQuitWithoutSavingPrompt())
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  fireEvent.keyDown(editor, { key: 'l' })
+
+  expect(editor).toHaveFocus()
+  expect(getSelectionEndpoints(editor)).toEqual({ anchor: 1, focus: 4 })
+})
+
+// @requirement PRODUCT.md §17.1
+it('continues Visual motions after closing an image preview', async () => {
+  const text = 'alpha\nbeta https://example.com'
+  const store = await createSeededStore(
+    {
+      roots: [
+        {
+          id: 'one',
+          text,
+          attachment: { id: 'preview-image', mimeType: 'image/png' },
+          children: [],
+        },
+      ],
+    },
+    { currentParentId: null, selectedNodeId: 'one' },
+  )
+  renderReact(<App store={store} initialVimEnabled />)
+  const editor = screen.getByRole('textbox', { name: 'Node 1' })
+  await screen.findByRole('button', { name: 'Open image preview' })
+  act(() => editor.focus())
+  act(() => setSelectionRange(editor, 7, 8))
+  fireEvent.keyDown(editor, { key: 'v' })
+  fireEvent.keyDown(editor, { key: 'l' })
+  const before = getSelectionEndpoints(editor)
+
+  fireEvent.keyDown(editor, { key: 'y', metaKey: true })
+
+  expect(screen.getByRole('button', { name: 'Close image preview' })).toHaveFocus()
+
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+
+  expect(editor).toHaveFocus()
+  expect(getSelectionEndpoints(editor)).toEqual(before)
+
+  fireEvent.keyDown(editor, { key: 'l' })
+
+  expect(getSelectionEndpoints(editor)).toEqual({ anchor: 7, focus: 10 })
+})
+
+// @requirement PRODUCT.md §20.2.26
+// @requirement PRODUCT.md §20.14
+it.each(
+  ['standard', 'insert', 'visual'].flatMap((mode) =>
+    [false, true].flatMap((rich) => [false, true].map((global) => ({ mode, rich, global }))),
+  ),
+)('restores search selection ($mode, rich=$rich, global=$global)', async ({ mode, rich, global }) => {
+  const text = 'alpha apple https://example.com'
+  const store = await createSeededStore(
+    {
+      roots: [
+        {
+          id: 'one',
+          text,
+          children: [],
+          ...(rich ? { links: [{ start: 12, end: text.length, url: 'https://example.com' }] } : {}),
+        },
+      ],
+    },
+    { currentParentId: null, selectedNodeId: 'one' },
+  )
+  renderReact(<App store={store} initialVimEnabled={mode !== 'standard'} />)
+  const editor = screen.getByRole('textbox', { name: 'Node 1' })
+  act(() => editor.focus())
+  if (mode === 'insert') fireEvent.keyDown(editor, { key: 'i' })
+  if (mode === 'visual') {
+    act(() => setSelectionRange(editor, 1, 2))
+    fireEvent.keyDown(editor, { key: 'v' })
+    fireEvent.keyDown(editor, { key: 'l' })
+  } else act(() => setSelectionRange(editor, 3, 1))
+  const selection = getSelectionEndpoints(editor)
+
+  fireEvent.keyDown(editor, { key: 'f', metaKey: true })
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), { target: { value: 'apple' } })
+  expect(document.querySelector('.search-match')).not.toBeNull()
+  if (global) fireEvent.keyDown(document.activeElement!, { key: ';', metaKey: true })
+  fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+
+  const restored = screen.getByRole('textbox', { name: 'Node 1' })
+  expect(restored).toHaveFocus()
+  expect(getSelectionEndpoints(restored)).toEqual(selection)
+  if (mode === 'visual') {
+    fireEvent.keyDown(restored, { key: 'l' })
+
+    expect(getSelectionEndpoints(restored)).toEqual({ anchor: 1, focus: 4 })
+  }
+})
+
+// @requirement PRODUCT.md §20.2.26
+it.each([
+  { query: 'apple', key: 'Escape' },
+  { query: 'absent', key: 'Escape' },
+  { query: 'absent', key: 'Enter' },
+])('continues Replace after search $key with $query and preserves separate Undo edits', async ({ query, key }) => {
+  const store = await createSeededStore(
+    { roots: [{ id: 'one', text: 'alpha apple', children: [] }] },
+    { currentParentId: null, selectedNodeId: 'one' },
+  )
+  renderReact(<App store={store} initialVimEnabled />)
+  const editor = screen.getByRole('textbox', { name: 'Node 1' })
+  act(() => editor.focus())
+  act(() => setSelectionRange(editor, 1, 2))
+  fireEvent.keyDown(editor, { key: 'R' })
+  fireEvent.keyDown(editor, { key: 'Z' })
+
+  fireEvent.keyDown(editor, { key: 'f', metaKey: true })
+  const prompt = screen.getByRole('textbox', { name: 'Search' })
+  fireEvent.change(prompt, { target: { value: query } })
+  fireEvent.keyDown(prompt, { key })
+  const restored = screen.getByRole('textbox', { name: 'Node 1' })
+  fireEvent.keyDown(restored, { key: 'Q' })
+  fireEvent.keyDown(restored, { key: 'Escape' })
+
+  const text = () => {
+    const state = store.getSnapshot()
+    return state.status === 'ready' ? state.document.roots[0]!.text : undefined
+  }
+  expect(text()).toBe('aZQha apple')
+
+  act(() => store.undo())
+
+  expect(text()).toBe('aZpha apple')
+
+  act(() => store.undo())
+
+  expect(text()).toBe('alpha apple')
+})
 
 // @requirement PRODUCT.md §15.2
 // @requirement PRODUCT.md §20.2.7

@@ -93,6 +93,7 @@ export function createPointerHandlers(
       // another node, so the command assembly that belongs to this node must clear with it.
       const goal = commandState.verticalGoal
       const snapshot = store.getSnapshot()
+      const windowFocused = document.hasFocus()
       const verticalArrival =
         event?.relatedTarget instanceof Element &&
         event.relatedTarget.matches('.node-input,.agenda-row') &&
@@ -108,7 +109,15 @@ export function createPointerHandlers(
               goal,
             )) &&
         snapshot.focus.token === goal.focusToken
-      finishVimBlur(deps, node.id, input, { verticalArrival, windowFocused: document.hasFocus() })
+      finishVimBlur(deps, node.id, input, {
+        verticalArrival,
+        windowFocused,
+        // Temporary window/modal interruptions keep Visual endpoints, but still finish edit sessions.
+        returnsToSelection:
+          (event?.relatedTarget === null && !windowFocused) ||
+          (event?.relatedTarget instanceof Element &&
+            event.relatedTarget.closest('[data-editor-selection-return]') !== null),
+      })
       store.endTextSession()
     },
     onContextMenu: (event: MouseEvent<HTMLElement>) => {

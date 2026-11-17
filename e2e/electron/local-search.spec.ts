@@ -169,7 +169,8 @@ describeForEachEditingMode('Local search', ({ mode }) => {
     for (let index = 0; index < 3; index++) await window.keyboard.press('Shift+ArrowRight')
 
     await window.keyboard.press('Meta+f')
-    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('discard')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+    await expect(window.locator('.search-match')).toHaveCount(2)
     await window.keyboard.press('Escape')
 
     await expect(editor).toBeFocused()
@@ -350,6 +351,59 @@ describeForEachEditingMode('Local search', ({ mode }) => {
 
 test.describe('Local search Vim modes', () => {
   test.use({ editingMode: 'vim' })
+
+  // @requirement PRODUCT.md §20.2.26
+  // @requirement PRODUCT.md §20.14
+  test('keeps Visual motions after switching searches', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'one', text: 'alpha apple\nbeta apple', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.press('l')
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+    await expect(window.locator('.search-match')).toHaveCount(2)
+    await window.keyboard.press('Meta+;')
+    await expect(window.getByRole('searchbox')).toBeFocused()
+    await window.keyboard.press('Escape')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    expect(await window.evaluate(() => getSelection()?.toString())).toBe('lp')
+    await window.keyboard.press('l')
+    await window.keyboard.press('d')
+
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveText('aa apple\nbeta apple')
+  })
+
+  // @requirement PRODUCT.md §20.2.26
+  test('resumes Replace after canceling Find and preserves Undo', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'one', text: 'alpha apple', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.press('l')
+    await window.keyboard.press('R')
+    await window.keyboard.type('Z')
+
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+    await window.keyboard.press('Escape')
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.type('Q')
+    await window.keyboard.press('Escape')
+
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await expect(editor).toHaveText('aZQha apple')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveText('aZpha apple')
+    await window.keyboard.press('u')
+    await expect(editor).toHaveText('alpha apple')
+  })
 
   test('commits pending Replace when reopening Find after a text click', async ({ userDataDir }) => {
     seedDocument(userDataDir, {

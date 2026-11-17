@@ -8,6 +8,7 @@ interface SearchFocusContext {
 /** Owns borrowed search focus without depending on DOM elements or React commits. */
 export class SearchFocusController {
   private deferred: CaretFocus | undefined
+  private borrowed: { focus: CaretFocus; selection: { anchor: number; focus: number } } | undefined
 
   public constructor(private readonly readContext: () => SearchFocusContext) {}
 
@@ -26,10 +27,24 @@ export class SearchFocusController {
 
   public completeFocusProjection(focus: CaretFocus, searchKeptFocus: boolean): void {
     this.deferred = searchKeptFocus ? focus : undefined
+    if (!searchKeptFocus) this.borrowed = undefined
   }
 
   public editorFocused(): void {
     this.deferred = undefined
+    this.borrowed = undefined
+  }
+
+  public borrowSelection(focus: CaretFocus, selection: { anchor: number; focus: number }): void {
+    this.borrowed = { focus, selection }
+  }
+
+  public takeSelection(focus: CaretFocus, selectedNodeId: string): { anchor: number; focus: number } | undefined {
+    const borrowed = this.borrowed
+    this.borrowed = undefined
+    return borrowed?.focus.token === focus.token && borrowed.focus.nodeId === selectedNodeId
+      ? borrowed.selection
+      : undefined
   }
 
   public canReadNativeCaret(): boolean {

@@ -696,6 +696,22 @@ export function useNodeInputBindings({
   })
 
   useEffect(() => {
+    let drafting = store.search.session.getSnapshot().draft !== undefined
+    return store.search.subscribe(() => {
+      const draft = store.search.session.getSnapshot().draft !== undefined
+      const opening = draft && !drafting
+      drafting = draft
+      if (!opening) return
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') return
+      const input = inputs.current.get(state.location.selectedNodeId)
+      // Capture before query decoration can replace the editor or its text nodes.
+      if (input !== undefined && document.activeElement === input)
+        searchFocus.borrowSelection(state.focus, getSelectionEndpoints(input))
+    })
+  }, [store, searchFocus])
+
+  useEffect(() => {
     const releaseSearchFocus = (event: FocusEvent): void => {
       if (event.target instanceof Element && event.target.matches('.node-input, .agenda-row'))
         searchFocus.editorFocused()
@@ -1031,16 +1047,19 @@ export function useNodeInputBindings({
       const input = inputs.current.get(id)
       if (input === undefined) return
       const deferred = searchFocus.takeRestoration(state.focus, id)
+      const selection = searchFocus.takeSelection(state.focus, id)
       input.focus({ preventScroll: true })
       if (deferred !== undefined) {
         if (caretProjection.current.mode === 'normal') applyCaretState(id, caretProjection.current.authority.caret)
         else setCaret(input, deferred.cursor)
-        return
+      } else if (selection !== undefined) setSelectionRange(input, selection.anchor, selection.focus)
+      else if (caretProjection.current.mode !== 'insert') {
+        const authority = caretProjection.current.authority
+        if (authority.nodeId === id) applyCaretState(id, authority.caret)
       }
-      // Native editing retains its selection while the search textbox borrows focus.
-      if (caretProjection.current.mode === 'insert') return
-      const authority = caretProjection.current.authority
-      if (authority.nodeId === id) applyCaretState(id, authority.caret)
+      if (caretProjection.current.mode === 'replace' && vimSession.current.replace === undefined) {
+        beginReplaceSession(vimSession.current, { nodeId: id, baseline: nodeText(input), position: getCaret(input) })
+      }
     },
     bindings,
     dragFreeze,
