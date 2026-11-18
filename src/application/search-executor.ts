@@ -1,6 +1,12 @@
 import type { Document } from '../domain/document'
 import type { DayNumber } from '../domain/calendar-date'
-import { sameOccurrence, searchScope, type SearchOccurrence, type SearchScope } from '../domain/search-scope'
+import {
+  sameOccurrence,
+  searchScope,
+  type SearchOccurrence,
+  type SearchScope,
+  type SearchText,
+} from '../domain/search-scope'
 import { prepareSearch, searchText, type TextMatch } from '../domain/text-search'
 
 export interface SearchContext {
@@ -18,9 +24,25 @@ export interface SearchDestination extends SearchOccurrence, TextMatch {
   readonly caret: number
 }
 
-export type SearchOperation =
-  | { readonly kind: 'count' }
-  | { readonly kind: 'navigate'; readonly origin: SearchPosition; readonly direction: -1 | 1; readonly count: number }
+interface RankedMatch extends TextMatch {
+  occurrence: SearchText
+  row: number
+}
+
+interface ExactMatches {
+  matches: RankedMatch[]
+  reference?: { occurrence: SearchOccurrence; row: number }
+}
+
+type Navigation = {
+  readonly kind: 'navigate'
+  readonly origin: SearchPosition
+  readonly direction: -1 | 1
+  readonly count: number
+  readonly exact?: ExactMatches
+}
+
+export type SearchOperation = { readonly kind: 'count'; readonly collect?: { origin?: SearchPosition } } | Navigation
 
 export interface SearchRequest extends SearchContext {
   readonly id: number
@@ -29,7 +51,7 @@ export interface SearchRequest extends SearchContext {
 }
 
 export type SearchResult =
-  | { readonly kind: 'count'; readonly total: number; readonly capped: boolean }
+  | { readonly kind: 'count'; readonly total: number; readonly capped: boolean; readonly exact?: ExactMatches }
   | {
       readonly kind: 'navigate'
       readonly destination?: SearchDestination
@@ -75,10 +97,87 @@ export function searchCaret(text: string, offset: number): number {
   return segmenter.segment(text).containing(offset)?.index ?? text.length
 }
 
+function targetOrdinal(operation: Navigation, total: number, before: number, through: number) {
+  const count = Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(operation.count) || 1))
+  // Reduce before adding so huge valid prefixes cannot lose integer precision.
+  const index =
+    operation.direction === 1
+      ? (through + ((count - 1) % total)) % total
+      : (((before - (count % total)) % total) + total) % total
+  const wrapped = operation.direction === 1 ? count > total - through : count > before
+  return { index, wrapped }
+}
+
+function destination(occurrence: SearchText, match: TextMatch): SearchDestination {
+  return {
+    nodeId: occurrence.nodeId,
+    ...(occurrence.day === undefined ? {} : { day: occurrence.day }),
+    start: match.start,
+    end: match.end,
+    caret: searchCaret(occurrence.text, match.start),
+  }
+}
+
+function* originRow(
+  request: SearchRequest,
+  exact: ExactMatches,
+  origin: SearchOccurrence,
+): Generator<undefined, number> {
+  if (exact.reference && sameOccurrence(exact.reference.occurrence, origin)) return exact.reference.row
+  const hit = exact.matches.find((match) => sameOccurrence(match.occurrence, origin))
+  if (hit) return hit.row
+
+  // A manual move can start a repeat on a previously unrecorded row.
+  // Walk occurrence identities up to that row without matching any text again.
+  let row = 0
+  for (const occurrence of searchScope(request.document, request.scope)) {
+    yield undefined
+    if (occurrence === undefined) continue
+    if (sameOccurrence(occurrence, origin)) return row
+    row++
+  }
+  return -1
+}
+
+function* navigateExact(
+  request: SearchRequest,
+  operation: Navigation,
+  exact: ExactMatches,
+): Generator<undefined, SearchResult> {
+  const { origin } = operation
+  const row = origin.nodeId === undefined ? undefined : yield* originRow(request, exact, origin)
+  const total = exact.matches.length
+  const missingOrigin = row === -1 || (row === undefined && request.scope.kind !== 'agenda')
+  if (missingOrigin || !total) return { kind: 'navigate', total, wrapped: false, missingOrigin }
+
+  let before = 0
+  let through = 0
+  for (const match of exact.matches) {
+    const earlier = row === undefined ? match.occurrence.day! < origin.beforeDay! : match.row < row
+    if (earlier || (match.row === row && match.start < origin.offset)) before++
+    if (earlier || (match.row === row && match.start <= origin.offset)) through++
+  }
+  const { index, wrapped } = targetOrdinal(operation, total, before, through)
+  const match = exact.matches[index]!
+  return {
+    kind: 'navigate',
+    destination: destination(match.occurrence, match),
+    total,
+    ordinal: index + 1,
+    wrapped,
+    missingOrigin: false,
+  }
+}
+
 function* executeSearch(request: SearchRequest): Generator<undefined, SearchResult> {
-  const pattern = yield* prepareSearch(request.query)
   const operation = request.operation
+  if (operation.kind === 'navigate' && operation.exact) return yield* navigateExact(request, operation, operation.exact)
+  const pattern = yield* prepareSearch(request.query)
   if (operation.kind === 'count' && pattern.characters.length === 0) return { kind: 'count', total: 0, capped: false }
+  const collect = operation.kind === 'count' ? operation.collect : undefined
+  const exact: ExactMatches | undefined = collect && { matches: [] }
+  const reference = collect?.origin
+  let row = -1
   let total = 0
   let before = 0
   let through = 0
@@ -87,6 +186,10 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
   for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
     if (occurrence === undefined) continue
+    row++
+    if (exact && reference?.nodeId !== undefined && sameOccurrence(occurrence, reference)) {
+      exact.reference = { occurrence: reference, row }
+    }
     const atOrigin =
       operation.kind === 'navigate' &&
       // Stryker disable next-line ConditionalExpression: real occurrences always have an ID, so sameOccurrence also rejects synthetic origins.
@@ -99,6 +202,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       total++
       if (operation.kind === 'count') {
         if (total === 101) return { kind: 'count', total: 100, capped: true }
+        exact?.matches.push({ occurrence, row, ...match })
       } else if (boundary !== undefined) {
         // Stryker disable next-line ConditionalExpression: the undefined-day check is defensive; undefined < boundary is already false.
         if (occurrence.day !== undefined && occurrence.day < boundary) {
@@ -114,17 +218,11 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       }
     }
   }
-  if (operation.kind === 'count') return { kind: 'count', total, capped: false }
+  if (operation.kind === 'count') return { kind: 'count', total, capped: false, ...(exact && { exact }) }
   if (!foundOrigin || total === 0) {
     return { kind: 'navigate', total, wrapped: false, missingOrigin: !foundOrigin }
   }
-  const count = Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(operation.count) || 1))
-  // Reduce before adding so huge valid prefixes cannot lose integer precision.
-  const target =
-    operation.direction === 1
-      ? (through + ((count - 1) % total)) % total
-      : (((before - (count % total)) % total) + total) % total
-  const wrapped = operation.direction === 1 ? count > total - through : count > before
+  const { index: target, wrapped } = targetOrdinal(operation, total, before, through)
   let ordinal = 0
   for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
@@ -135,13 +233,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       if (ordinal++ === target) {
         return {
           kind: 'navigate',
-          destination: {
-            nodeId: occurrence.nodeId,
-            // Stryker disable next-line ConditionalExpression: an omitted day and day: undefined have identical search and serialized semantics.
-            ...(occurrence.day === undefined ? {} : { day: occurrence.day }),
-            ...match,
-            caret: searchCaret(occurrence.text, match.start),
-          },
+          destination: destination(occurrence, match),
           ordinal,
           total,
           wrapped,

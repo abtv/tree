@@ -160,8 +160,14 @@ It builds a temporary node-reference map incrementally; it neither copies node t
 retains a text index. Projection derivation remains the Agenda owner's responsibility.
 
 `search-executor.ts` schedules bounded work slices through an injected macrotask scheduler.
-Count stops at match 101. Navigation uses a full rank pass and a second destination pass,
-including modular count prefixes, rather than storing all matches. Only the selected
+Count stops at match 101. A completed exact local count retains up to 100 ordered
+match spans with occurrence identities, row ranks and references to the existing
+text, plus the captured origin's row if present. The search session releases them
+when its count is invalidated or hidden. Confirmation reuses a completed count for
+the same query. Jumps from the captured origin, a match or a day heading resolve
+from the saved positions. A manual move to another row may require an incremental
+occurrence walk to locate its rank. Pending or capped results retain the full rank
+pass and second destination pass. Both paths use the same modular count rules. Only the selected
 destination invokes native grapheme segmentation. JavaScript matching and traversal have
 explicit checkpoints; a native ICU segmentation call is indivisible, so oversized ordinary,
 combining and emoji text have measured performance guards rather than a claimed universal
@@ -171,8 +177,8 @@ where supported, with zero-delay timers as the fallback. This avoids nested time
 without changing the fixed checkpoint limit. Integrated Electron measurements on large
 documents confirmed lower completed-search CPU time and elapsed time; rapid cancellation
 can consume more CPU because more work runs before cancellation. These measurements do not
-establish improved input latency or power consumption. No search index or extra persistence
-work is introduced. `perf/electron/node-search.spec.ts` guards complete scans of large ASCII
+establish improved input latency or power consumption. Search adds no persistence
+work. `perf/electron/node-search.spec.ts` guards complete scans of large ASCII
 and Cyrillic documents. `perf/electron/search.spec.ts` guards repeated navigation, deep and
 wide scopes, long mounted text, cancellation retention and current-result latency separately
 from animation-frame scheduling latency. Its task probe includes native posted tasks and
@@ -220,8 +226,10 @@ work without changing the view. This keeps fold policy with its ownership set an
 publication effects in the store. The transition adds only a short-lived result;
 ancestor walks, projection-cache calls, retained state, writes and syncs are unchanged.
 Query entry suppresses document focus projection while keeping
-ordinary selection authority current underneath. Mounted inputs scan their own text in
-bounded asynchronous slices and compose highlights with link/date/caret intervals.
+ordinary selection authority current underneath. For local search, mounted inputs
+compute ordinary highlights with the query during render. A bounded text-plus-query
+length keeps oversized work on the cancellable incremental path. The renderer
+composes these ranges with link, date and caret intervals.
 Agenda reuses the store-owned direct-match projection cache before day-fold filtering. Scope keys
 include the Agenda root and focused day and displayed week. Projection changes, including leaving a pinned
 item without a document edit, invalidate results. Origins and anchors retain occurrence

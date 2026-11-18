@@ -11,6 +11,34 @@ const context: SearchContext = {
 }
 const origin = { nodeId: 'a', offset: 0 }
 
+it('reuses an exact draft count for confirmation and repeats across folded text', () => {
+  const harness = searchHarness(64)
+  const session = new SearchSession(harness.executor)
+  session.replaceContext({
+    ...context,
+    document: {
+      roots: [
+        { id: 'start', text: 'meeting', children: [] },
+        { id: 'a', text: 'projection twice: projection', children: [] },
+        { id: 'fold', text: '', children: [{ id: 'archive', text: 'ordinary '.repeat(3000), children: [] }] },
+      ],
+    },
+  })
+  session.begin({ nodeId: 'start', offset: 0 })
+  session.edit('projection')
+  harness.flush()
+  const initialSlices = harness.slices()
+  const publish = vi.fn()
+
+  session.confirm(publish)
+  harness.flush()
+  session.navigate(origin, -1, 1, publish)
+  harness.flush()
+
+  expect(publish.mock.calls.map(([result]) => result.ordinal)).toEqual([1, 2])
+  expect(harness.slices() - initialSlices).toBeLessThanOrEqual(2)
+})
+
 function controlledSession() {
   const jobs: { request: SearchRequest; publish: (result: SearchResult) => void; cancel: ReturnType<typeof vi.fn> }[] =
     []

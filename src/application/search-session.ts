@@ -21,6 +21,7 @@ type SearchMode =
   | { kind: 'editing'; confirmed: string; draft: string; origin: SearchPosition; previousVisible: boolean }
 
 type SearchJob = { kind: 'idle' } | { kind: 'running'; cancel: () => void }
+type CompletedCount = Extract<SearchResult, { kind: 'count' }>
 
 /** Memory-only foundation. The editor must replace context before publishing a changed document. */
 export class SearchSession {
@@ -32,6 +33,7 @@ export class SearchSession {
   private navigationId = 0
   private countJob: SearchJob = { kind: 'idle' }
   private navigationJob: SearchJob = { kind: 'idle' }
+  private completedCount: CompletedCount | undefined
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly executor: SearchExecutor = createSearchExecutor()) {}
@@ -97,10 +99,15 @@ export class SearchSession {
   public confirm(publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void, direction: -1 | 1 = 1): void {
     const origin = this.mode.kind === 'editing' ? this.mode.origin : undefined
     const query = (this.mode.kind === 'editing' ? this.mode.draft : '') || this.mode.confirmed
+    const completed = query === (this.snapshot.draft ?? this.snapshot.confirmed) ? this.completedCount : undefined
     this.invalidate()
-    this.set({ kind: query.length > 0 ? 'confirmed' : 'hidden', confirmed: query }, query.length > 0)
+    this.set(
+      { kind: query.length > 0 ? 'confirmed' : 'hidden', confirmed: query },
+      query.length > 0 && !completed,
+      query ? completed : undefined,
+    )
     if (query.length === 0) return
-    this.recount()
+    if (!completed) this.recount()
     if (origin !== undefined) this.navigate(origin, direction, 1, publish)
   }
 
@@ -135,7 +142,13 @@ export class SearchSession {
       ...context,
       id,
       query: this.snapshot.confirmed,
-      operation: { kind: 'navigate', origin, direction, count },
+      operation: {
+        kind: 'navigate',
+        origin,
+        direction,
+        count,
+        ...(this.completedCount?.exact && { exact: this.completedCount.exact }),
+      },
     }
     const cancel = this.executor.execute(request, (result) => {
       if (generation !== this.generation || id !== this.navigationId || context !== this.context) return
@@ -148,6 +161,7 @@ export class SearchSession {
   public dispose(): void {
     this.invalidate()
     this.context = undefined
+    this.completedCount = undefined
     this.mode = { kind: 'hidden', confirmed: '' }
     this.listeners.clear()
     this.snapshot = { confirmed: '', visible: false, pending: false }
@@ -160,7 +174,15 @@ export class SearchSession {
     const id = ++this.countId
     const generation = this.generation
     const cancel = this.executor.execute(
-      { ...context, id, query: this.snapshot.draft ?? this.snapshot.confirmed, operation: { kind: 'count' } },
+      {
+        ...context,
+        id,
+        query: this.snapshot.draft ?? this.snapshot.confirmed,
+        operation: {
+          kind: 'count',
+          collect: this.mode.kind === 'editing' ? { origin: this.mode.origin } : {},
+        },
+      },
       (result) => {
         if (generation !== this.generation || id !== this.countId || context !== this.context) return
         this.countJob = { kind: 'idle' }
@@ -178,14 +200,15 @@ export class SearchSession {
     this.navigationJob = { kind: 'idle' }
   }
 
-  private set(mode: SearchMode, pending: boolean, count?: Extract<SearchResult, { kind: 'count' }>): void {
+  private set(mode: SearchMode, pending: boolean, count?: CompletedCount): void {
     this.mode = mode
+    this.completedCount = count
     this.snapshot = {
       confirmed: mode.confirmed,
       ...(mode.kind === 'editing' ? { draft: mode.draft } : {}),
       visible: mode.kind !== 'hidden',
       pending,
-      ...(count === undefined ? {} : { count }),
+      ...(count === undefined ? {} : { count: { kind: count.kind, total: count.total, capped: count.capped } }),
     }
     this.listeners.forEach((listener) => listener())
   }

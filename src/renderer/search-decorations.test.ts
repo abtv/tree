@@ -1,11 +1,29 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { useLayoutEffect } from 'react'
 import { useSearchDecorations } from './search-decorations'
 
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
+})
+
+it('commits a refined local highlight with the query on ordinary rows', () => {
+  const commits: { query: string; lengths: number[] }[] = []
+  const hook = renderHook(
+    ({ query }) => {
+      const ranges = useSearchDecorations('meeting projection', query)
+      useLayoutEffect(() => {
+        commits.push({ query, lengths: ranges.map(({ end, start }) => end - start) })
+      })
+    },
+    { initialProps: { query: 'pro' } },
+  )
+
+  hook.rerender({ query: 'proj' })
+
+  expect(commits.find((commit) => commit.query === 'proj')?.lengths).toEqual([4])
 })
 
 it.each([undefined, []])('yields on oversized mounted text and cancels obsolete query work (%j)', async (tags) => {
@@ -36,6 +54,22 @@ it('updates a short mounted row independently of global counting and removes sta
   hook.rerender({ text: 'apple pear' })
 
   expect(hook.result.current).toEqual([{ start: 0, end: 5, className: 'search-match' }])
+})
+
+it('releases completed oversized ranges when a row moves to immediate highlighting', async () => {
+  vi.useFakeTimers()
+  const long = 'ordinary '.repeat(1000) + 'target'
+  const hook = renderHook(({ text }) => useSearchDecorations(text, 'target'), { initialProps: { text: long } })
+  await act(async () => {
+    await vi.runAllTimersAsync()
+  })
+  expect(hook.result.current).toHaveLength(1)
+
+  hook.rerender({ text: 'target' })
+  expect(hook.result.current).toEqual([{ start: 0, end: 6, className: 'search-match' }])
+  hook.rerender({ text: long })
+
+  expect(hook.result.current).toEqual([])
 })
 
 // @requirement PRODUCT.md §20.14.2

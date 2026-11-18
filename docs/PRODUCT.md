@@ -2306,6 +2306,8 @@ Text recognition must avoid quadratic retries over whitespace when joining nodes
 
 ### 22.2 Perceived Vim Editing Responsiveness
 
+Local search (§20.2.26) updates matching prefixes in ordinary mounted rows without a blank frame. Oversized rows and queries keep yielding to input. Once an exact count is ready, confirmation and repeat navigation from a match reuse its positions while the document, scope and query stay current.
+
 An idle Vim Normal editor must not continuously mutate its selection or generate a self-sustaining selection-change event loop in Tree or Agenda.
 
 Vertical Vim navigation through long wrapped text must remain responsive in Tree and Agenda, including near the beginning, middle and end of a node. Repeated character-position lookups must not rescan every character boundary for each measured position. This does not impose a node or clipboard text-length limit.
