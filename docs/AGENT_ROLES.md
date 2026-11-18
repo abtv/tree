@@ -69,7 +69,7 @@ The only per-tool detail that should ever need updating on its own — everythin
 
 | Tool | Provider | Primary role | Planner | Reviewer | Product verifier | Product researcher |
 | --- | --- | --- | --- | --- | --- | --- |
-| Codex CLI | OpenAI | `gpt-6.2-sol`, medium effort (`.codex/config.toml`) | `gpt-6.2-sol`, high effort | `gpt-6.2-astra`, high effort | `gpt-6.2-sol`, low effort | `gpt-6.2-sol`, low effort |
+| Codex CLI | OpenAI | `gpt-6.2-sol`, medium effort (`.codex/config.toml`) | `gpt-6.2-sol`, high effort | `gpt-6.2-astra`, high effort | `gpt-6.2-sol`, medium effort | `gpt-6.2-sol`, medium effort |
 | OpenCode | DeepSeek | `deepseek/deepseek-flash` (`opencode.json`) | same model, `reasoningEffort: max` | same model, `reasoningEffort: high` | same model, `reasoningEffort: high` | same model, `reasoningEffort: high` |
 | Claude Code | Anthropic | `sonnet` (`.claude/settings.json` `model`) | `claude-opus-5-5`, `effort: high` | `sonnet`, `effort: high` | `sonnet`, `effort: high` | `sonnet`, `effort: high` |
 
