@@ -12,6 +12,7 @@ import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import { startAppUpdates } from './app-updates'
 import { createRendererInputLock } from './renderer-input-lock'
+import { BooleanPreference } from './editing-preferences'
 import { installUpdateCommands } from './update-commands'
 import type { CommandServices } from '../application/command-registry'
 import { appearanceColorScheme, type AppearancePreference } from '../shared/appearance'
@@ -42,6 +43,21 @@ if (!rootElement) {
 }
 
 const store = new EditorStore(createElectronEditorServices(), () => crypto.randomUUID())
+const preferences = { vim: new BooleanPreference(false), alwaysOnTop: new BooleanPreference(false) }
+const vim = preferences.vim.observe(window.treeApi.getVimEnabled, window.treeApi.onVimEnabledChanged)
+const pin = preferences.alwaysOnTop.observe(
+  window.treeApi.getAlwaysOnTop,
+  window.treeApi.onAlwaysOnTopChanged,
+  (error) => store.reportError(error),
+)
+window.addEventListener(
+  'pagehide',
+  () => {
+    vim.dispose()
+    pin.dispose()
+  },
+  { once: true },
+)
 let confirmingQuit = false
 const syncModal = (): void => {
   const open =
@@ -104,10 +120,10 @@ const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'show
 
 // An unreadable preference falls back to the first-run default, standard (non-Vim) editing.
 void Promise.all([
-  window.treeApi.getVimEnabled().catch(() => false),
+  vim.ready,
   window.treeApi.getLineNumbers().catch(() => false),
   window.treeApi.getAppearance().catch((): AppearancePreference => 'system'),
-]).then(([initialVimEnabled, initialLineNumbers, initialAppearance]) => {
+]).then(([, initialLineNumbers, initialAppearance]) => {
   if (!appearanceChanged) applyAppearance(initialAppearance)
 
   createRoot(rootElement).render(
@@ -116,7 +132,7 @@ void Promise.all([
         <App
           showAbout={about.show}
           onQuitDialogChange={syncModal}
-          initialVimEnabled={initialVimEnabled}
+          startupPreferences={preferences}
           initialLineNumbers={initialLineNumbers}
           store={store}
           dataOperations={dataOperations}

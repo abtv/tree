@@ -19,6 +19,52 @@ const seed = {
 }
 
 test.describe('Vim editing toggle', () => {
+  for (const preference of ['Vim Editing', 'Always on Top'] as const) {
+    test(`keeps a newer native ${preference} choice after a delayed startup reply`, async ({
+      userDataDir,
+    }, testInfo) => {
+      seedDocument(userDataDir, seed)
+      const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+      const vim = preference === 'Vim Editing'
+      const menu = vim ? 'Edit' : 'Window'
+      const channel = vim ? 'tree:get-vim-enabled' : 'tree:get-always-on-top'
+      const gate = await app.evaluateHandle((_electron, name) => {
+        const control = { waiting: false, release() {} }
+        const pending = new Promise<void>((resolve) => {
+          control.release = resolve
+        })
+        globalThis.__treeIpc.wrap(name, async (read, ...args) => {
+          const captured = await read(...args)
+          control.waiting = true
+          await pending
+          return captured
+        })
+        return control
+      }, channel)
+      await window.reload({ waitUntil: 'domcontentloaded' })
+      await expect.poll(() => gate.evaluate((c) => c.waiting)).toBe(true)
+
+      await clickApplicationMenuItem(app, menu, preference)
+      await gate.evaluate((c) => c.release())
+
+      const editor = node(window, 1)
+      await expect(editor).toBeFocused()
+      expect(await applicationMenuItemChecked(app, menu, preference)).toBe(true)
+      if (vim) {
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        await window.keyboard.press('0')
+        await window.keyboard.press('x')
+        await expect(editor).toHaveValue('bc')
+      } else {
+        await expect(window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
+        expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isAlwaysOnTop())).toBe(true)
+        await window.keyboard.type('x')
+        await expect(editor).toHaveValue('xabc')
+      }
+      await window.screenshot({ path: testInfo.outputPath(vim ? 'startup-vim.png' : 'startup-pin.png') })
+    })
+  }
+
   // @requirement PRODUCT.md §20.2.1
   // @requirement PRODUCT.md §20.2.2
   test('starts a first run with standard editing and no Vim mode indicator', async ({ userDataDir }) => {

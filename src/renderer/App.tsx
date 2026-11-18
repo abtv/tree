@@ -43,6 +43,7 @@ import type { DesktopDataOperations } from '../application/notes-archive/desktop
 import { DesktopDataActivity } from './DataActivityPanel'
 import { usePopupNavigation } from './use-popup-navigation'
 import { useLineNumbers } from './use-line-numbers'
+import { BooleanPreference, type EditingPreferences } from './editing-preferences'
 import { UpdateStatus } from './UpdateStatus'
 import { useActiveLineHighlight } from './use-active-line-highlight'
 import { getCaret } from './editor-dom'
@@ -50,6 +51,7 @@ import { useAgendaRepeat } from './use-agenda-repeat'
 import { StatusBar } from './StatusBar'
 
 interface AppProps {
+  startupPreferences?: EditingPreferences
   onQuitDialogChange?: () => void
   platformStatus?: React.ReactNode
   dismissTransientStatus?: () => void
@@ -59,7 +61,7 @@ interface AppProps {
   menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
   /** The saved Vim editing preference, read before the first render so no frame shows the wrong mode. */
-  initialVimEnabled: boolean
+  initialVimEnabled?: boolean
   initialLineNumbers?: boolean
   /** Platforms that do not offer Vim also omit its command-panel entry. */
   vimAvailable?: boolean
@@ -81,7 +83,8 @@ export function App({
   showAbout,
   registerSearchCommands,
   store,
-  initialVimEnabled,
+  initialVimEnabled = false,
+  startupPreferences,
   initialLineNumbers = false,
   vimAvailable = true,
   alwaysOnTopAvailable = true,
@@ -126,19 +129,35 @@ export function App({
     [readyDocument, readyParentId],
   )
   const [imageCaretNodeId, setImageCaretNodeId] = useState<string>()
-  const [alwaysOnTop, setAlwaysOnTop] = useState(false)
-  const [vimEnabled, setVimEnabled] = useState(initialVimEnabled)
+  const [preferences] = useState(
+    () =>
+      startupPreferences ?? {
+        vim: new BooleanPreference(initialVimEnabled),
+        alwaysOnTop: new BooleanPreference(false),
+      },
+  )
+  const alwaysOnTop = useSyncExternalStore(preferences.alwaysOnTop.subscribe, preferences.alwaysOnTop.getSnapshot)
+  const setAlwaysOnTop = preferences.alwaysOnTop.set
+  const vimEnabled = useSyncExternalStore(preferences.vim.subscribe, preferences.vim.getSnapshot)
+  const appliedVim = useRef(vimEnabled)
   usePopupNavigation(vimEnabled)
-  const [vimMode, setVimMode] = useState<VimMode>(initialVimEnabled ? 'normal' : 'insert')
+  const [vimMode, setVimMode] = useState<VimMode>(vimEnabled ? 'normal' : 'insert')
   const richEditingEnabled = !deferRichEditing || !vimEnabled || vimMode === 'insert' || vimMode === 'replace'
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   const leftCommandKeyPressed = useLeftCommandKey(shortcuts)
-  useEffect(() => {
-    void window.treeApi
-      .getAlwaysOnTop()
-      .then(setAlwaysOnTop)
-      .catch((error: unknown) => store.reportError(error))
-  }, [store])
+  useLayoutEffect(() => {
+    if (startupPreferences) return
+    const pin = preferences.alwaysOnTop.observe(
+      window.treeApi.getAlwaysOnTop,
+      window.treeApi.onAlwaysOnTopChanged,
+      (error) => store.reportError(error),
+    )
+    const stopVim = window.treeApi.onVimEnabledChanged?.(preferences.vim.set)
+    return () => {
+      pin.dispose()
+      stopVim?.()
+    }
+  }, [preferences, startupPreferences, store])
   const agenda = state.status === 'ready' ? state.agenda : undefined
   const statusMessage = agendaStatusMessage(agenda)
   const focus =
@@ -168,7 +187,7 @@ export function App({
       setAlwaysOnTop(!nextValue)
       store.reportError(error)
     })
-  }, [alwaysOnTop, store])
+  }, [alwaysOnTop, setAlwaysOnTop, store])
   const applyFoldCommand = useCallback(
     (command: VimFoldCommand, nodeId: string): void => store.applyFold(command, nodeId),
     [store],
@@ -200,13 +219,11 @@ export function App({
   })
   const applyVimEnabled = useCallback(
     async (nextValue: boolean): Promise<void> => {
-      if (!nextValue) store.hideSearch()
-      setVimEditing(nextValue)
-      setVimEnabled(nextValue)
+      preferences.vim.set(nextValue)
       // The editing mode already changed for this session; a failed write only loses the saved choice.
       await window.treeApi.setVimEnabled(nextValue)
     },
-    [setVimEditing, store],
+    [preferences],
   )
   const beforeViewChange = useCallback(() => {
     const active = document.activeElement
@@ -323,19 +340,18 @@ export function App({
     () => registerViewCommands?.(commandPanel.menuViewCommands),
     [registerViewCommands, commandPanel.menuViewCommands],
   )
-  // The application menu owns its own check marks and persists the value; the renderer only follows it.
-  useEffect(() => {
-    const stopAlwaysOnTop = window.treeApi.onAlwaysOnTopChanged?.(setAlwaysOnTop)
-    const stopVimEnabled = window.treeApi.onVimEnabledChanged?.((nextValue) => {
+  useLayoutEffect(() => {
+    const apply = (): void => {
+      const nextValue = preferences.vim.getSnapshot()
+      if (appliedVim.current === nextValue) return
+      appliedVim.current = nextValue
       if (!nextValue) store.hideSearch()
       setVimEditing(nextValue)
-      setVimEnabled(nextValue)
-    })
-    return () => {
-      stopAlwaysOnTop?.()
-      stopVimEnabled?.()
     }
-  }, [setVimEditing, store])
+    const remove = preferences.vim.subscribe(apply)
+    apply()
+    return remove
+  }, [preferences, setVimEditing, store])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
   useScrollRestoration(store, state.status === 'ready' && agenda === undefined)
   const enterNode = useCallback(
