@@ -86,8 +86,10 @@ export function SearchPrompt({
           } else if (event.key === 'Enter') {
             event.preventDefault()
             if (navigate !== undefined) navigate(event.shiftKey ? -1 : 1)
-            else store.search.confirm(event.shiftKey ? -1 : 1)
-            if (vim) restoreEditor()
+            else {
+              store.search.confirm(event.shiftKey ? -1 : 1)
+              if (vim) restoreEditor()
+            }
           }
         }}
       />

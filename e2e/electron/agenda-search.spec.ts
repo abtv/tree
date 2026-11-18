@@ -207,6 +207,37 @@ test('keeps the invalid-date hint beside search and updates matches across mirro
   await expect(window.locator('.search-count')).toHaveText('6')
 })
 
+// @requirement PRODUCT.md §23.7
+test('continues the first Replace click when leaving an occurrence removes its row', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'one', text: 'alpha 2026-10-09', children: [] },
+        { id: 'two', text: 'needle 2026-10-11', children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  await setAgendaToday(window)
+  await window.keyboard.press('Meta+p')
+  await window.locator(`${row(day, 'one')} .node-input`).click()
+  await window.keyboard.type('0wD')
+  await expect(window.locator('.status-bar')).toContainText('Add a date')
+  await window.keyboard.type('0lR')
+  const next = window.locator(`${row(later, 'two')} .node-input`)
+
+  await next.click({ position: { x: 12, y: 8 } })
+
+  await expect(next).toBeFocused()
+  await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+  const caret = await caretOffset(next)
+  await window.keyboard.type('Q')
+  await window.keyboard.press('Escape')
+  const previous = 'needle 2026-10-11'
+  await expect(next).toHaveText(previous.slice(0, caret) + 'Q' + previous.slice(caret + 1))
+})
+
 // @requirement PRODUCT.md §20.2.26
 test('uses the day origin for search and cancels a pending jump on a newer day selection', async ({ userDataDir }) => {
   seed(userDataDir)

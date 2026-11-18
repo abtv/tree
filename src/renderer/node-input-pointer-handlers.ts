@@ -141,7 +141,9 @@ export function createPointerHandlers(
       if (window.treeApi.showEditorContextMenu === undefined) return
       void window.treeApi
         .showEditorContextMenu(request)
-        .then((command) => executeEditorContextMenuCommand(command, store, node, input, vimTextCommandState))
+        .then((command) =>
+          executeEditorContextMenuCommand(command, store, node, input, vimTextCommandState, setSelectAllNodeId),
+        )
         .catch((error: unknown) => store.reportError(error))
     },
     onClick: (event: MouseEvent<HTMLElement>) => {
@@ -239,6 +241,7 @@ export function createPointerHandlers(
       )
     },
     onPaste: (event: ClipboardEvent<HTMLElement>) => {
+      store.search.interruptNavigation()
       setSelectAllNodeId(undefined)
       event.preventDefault()
       prepareVimCommand(vimTextCommandState, 'text-edit', event.currentTarget)

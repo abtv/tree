@@ -106,6 +106,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
         const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
         beginReplaceSession(session, { nodeId: node.id, baseline, position: getCaret(input) })
       }
+      if (session.replace?.nodeId !== node.id) return false
       const result = applyReplaceKey(session.replace, key)
       if (result === undefined) return false
       setEditableText(input, result.workingText)

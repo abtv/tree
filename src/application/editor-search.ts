@@ -29,15 +29,21 @@ export class EditorSearch {
   private anchor: SearchDestination | undefined
   private result: Navigation | undefined
   private readonly listeners = new Set<() => void>()
+  private readonly jumpListeners = new Set<() => void>()
 
   public constructor(
-    private readonly apply: (destination: SearchDestination) => void,
+    private readonly apply: (destination: SearchDestination) => boolean,
     private readonly agendaRows: AgendaRowsCache,
   ) {
     this.session.subscribe(() => this.listeners.forEach((listener) => listener()))
   }
 
   public getResult = (): Navigation | undefined => this.result
+  public onJump(listener: () => void): () => void {
+    this.jumpListeners.add(listener)
+    return () => this.jumpListeners.delete(listener)
+  }
+
   public subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
@@ -193,6 +199,7 @@ export class EditorSearch {
 
   /** Newer user input takes authority without hiding the confirmed search. */
   public interruptNavigation(): void {
+    if (!this.busy && this.anchor === undefined) return
     this.generation++
     this.busy = false
     this.queued = []
@@ -265,7 +272,9 @@ export class EditorSearch {
       this.anchor = result.destination
       this.applying = true
       try {
-        this.apply(result.destination)
+        // Moving away from a pinned Agenda occurrence can invalidate the ordinal during apply.
+        // The editor still needs the actual arrival to finish its Visual or Replace session.
+        if (this.apply(result.destination)) this.jumpListeners.forEach((listener) => listener())
       } finally {
         this.applying = false
       }

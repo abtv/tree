@@ -6,7 +6,7 @@ import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
 import { clearCommandAssembly, clearPending } from './vim-command-state'
 import { getCaret, getSelectionRange, nodeTextLength, readEditableContent, selectAll } from './editor-dom'
-import { handleVimKey, handleVimNumberKey } from './vim-keyboard-handler'
+import { handleVimKey, handleVimNumberKey, isNeutralKeydown } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
 import { agendaWeekDirection } from './agenda-week-shortcut'
@@ -40,17 +40,32 @@ function discardsUnfinishedCommand(vim: VimKeyboardState): boolean {
   return true
 }
 
+function selectEditorText(
+  input: HTMLElement,
+  nodeId: string,
+  vim?: VimTextCommandState,
+  setSelectAllNodeId?: (nodeId: string) => void,
+): void {
+  if (vim?.mode === 'insert') vim.finishInsert?.(input)
+  prepareVimCommand(vim, 'selection-command', input)
+  selectAll(input)
+  globalThis.queueMicrotask(() => {
+    setSelectAllNodeId?.(nodeId)
+    input.classList.add('select-all')
+  })
+}
+
 export function executeEditorContextMenuCommand(
   command: EditorContextMenuCommand,
   store: EditorStore,
   node: TreeNode,
   input: HTMLElement,
   vim?: VimTextCommandState,
+  setSelectAllNodeId?: (nodeId: string) => void,
 ): void {
   const selection = getSelectionRange(input)
   if (command === 'selectAll') {
-    if (vim?.mode === 'insert') vim.finishInsert?.(input)
-    selectAll(input)
+    selectEditorText(input, node.id, vim, setSelectAllNodeId)
     return
   }
   if (command === 'copy' && selection.start !== selection.end) {
@@ -102,7 +117,12 @@ export function createEditorKeyDownHandler({
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
     if (isComposing() || event.nativeEvent?.isComposing) return
     const primary = shortcuts.isPrimary(event)
-    if ((primary || event.ctrlKey) && !['Control', 'Meta', 'Shift', 'Alt'].includes(event.key))
+    const editing = vim === undefined || vim.mode === 'insert' || vim.mode === 'replace'
+    if (
+      (editing || primary || event.ctrlKey) &&
+      !['Control', 'Meta', 'Alt'].includes(event.key) &&
+      !isNeutralKeydown(event.key)
+    )
       store.search.interruptNavigation()
     // Meta is only ever the primary modifier (Cmd); where it is not, the combination has no command.
     if (event.metaKey && !primary) return
@@ -263,7 +283,6 @@ export function createEditorKeyDownHandler({
       return
     }
     const selectingAll = primary && event.key.toLowerCase() === 'a'
-    if (selectingAll && vim?.mode === 'insert') vim.finishInsert(event.currentTarget)
     const copying = primary && event.key.toLowerCase() === 'c'
     const pasting = primary && event.key.toLowerCase() === 'v'
     // Browser paste supplies clipboard data without a second permission request. The paste handler
@@ -384,17 +403,7 @@ export function createEditorKeyDownHandler({
     }
     if (selectingAll) {
       event.preventDefault()
-      // Select-all replaces the selection, so it ends whole-node Visual and clears a pending command
-      // or character Visual endpoints. A pending Replace edit commits first without rewriting the
-      // DOM, because the select-all feedback render would otherwise rewind the visible replacement
-      // to the stored text.
-      prepareVimCommand(vim, 'selection-command', event.currentTarget)
-      const input = event.currentTarget
-      selectAll(input)
-      globalThis.queueMicrotask(() => {
-        setSelectAllNodeId(node.id)
-        input.classList.add('select-all')
-      })
+      selectEditorText(event.currentTarget, node.id, vim, setSelectAllNodeId)
     } else if (primary && event.key.toLowerCase() === 'c') {
       const selection = getSelectionRange(event.currentTarget)
       if (selection.start !== selection.end) {

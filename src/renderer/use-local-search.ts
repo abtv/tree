@@ -62,16 +62,20 @@ export function useLocalSearch({
       if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')) return
       const snapshot = store.search.session.getSnapshot()
       if (snapshot.draft !== undefined) {
-        if (!snapshot.draft && !snapshot.confirmed) return
+        if (!snapshot.draft && !snapshot.confirmed) {
+          if (vimEnabled) restoreEditor()
+          return
+        }
         beforeJump()
         store.search.confirm(direction)
       } else if (snapshot.confirmed) {
         const position = origin()
         beforeJump()
         store.search.navigate(position, direction, 1)
-      }
+      } else return
+      if (vimEnabled) restoreEditor()
     },
-    [blocked, store, beforeJump, origin],
+    [blocked, store, beforeJump, origin, vimEnabled, restoreEditor],
   )
 
   useEffect(() => {

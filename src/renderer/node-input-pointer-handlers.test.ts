@@ -384,15 +384,28 @@ describe('mouse down', () => {
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(input, false, true)
   })
 
-  it('leaves a pending replacement of another node to that node’s blur', async () => {
+  it('commits the original node without moving focus or writing into the pressed editor', async () => {
     const f = await fixture({ mode: 'replace' })
 
     beginReplaceSession(f.session, { nodeId: 'other', baseline: 'other', position: 0 })
     f.handlers().onMouseDown(mouse(textarea('hello')))
 
-    expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
+    expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(undefined, false, true)
     expect(f.session.replaceGesture.kind).toBe('pressed')
   })
+
+  it.each([{ button: 2 }, { button: 0, ctrlKey: true }])(
+    'keeps a different node’s Replace buffer on a context press %o',
+    async (press) => {
+      const f = await fixture({ mode: 'replace' })
+      beginReplaceSession(f.session, { nodeId: 'other', baseline: 'other', position: 0 })
+
+      f.handlers().onMouseDown(mouse(textarea('hello'), press))
+
+      expect(f.deps.finishVimReplace).not.toHaveBeenCalled()
+      expect(f.session.replaceGesture.kind).toBe('idle')
+    },
+  )
 
   it.each([
     ['a primary click in Replace', 'replace', { button: 0 }, true],

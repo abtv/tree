@@ -184,6 +184,7 @@ export function prepareVimPointerPress(
   const replacement = deps.session.replace
   if (replacement === undefined || replacement.nodeId === nodeId)
     deps.finishVimReplace(input, false, press.button === 2 || press.detail >= 2)
+  else if (press.button === 0 && !press.contextMenu) deps.finishVimReplace(undefined, false, true)
 
   takeReplaceClick(deps.session)
   if (deps.getMode() === 'replace' && press.button === 0 && !press.contextMenu) beginReplaceClick(deps.session)

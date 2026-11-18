@@ -300,12 +300,7 @@ export function App({
     },
   })
   useEffect(() => {
-    let previous = store.search.getResult()
-    return store.search.subscribe(() => {
-      const result = store.search.getResult()
-      if (result === previous) return
-      previous = result
-      if (result?.destination === undefined) return
+    return store.search.onJump(() => {
       const mode = vimTextCommandState.mode
       if (mode === 'visual' || mode === 'visual-node' || mode === 'replace') {
         setNodeVisualSelection(undefined)

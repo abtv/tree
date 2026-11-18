@@ -1812,7 +1812,7 @@ and Search All Nodes. Search opening borrows editing focus; cancellation preserv
 the original mode and selection, including its direction, even when match highlighting
 replaces the text editor or its contents. Pending Replace text is committed before searching,
 without leaving Replace on opening; cancellation or confirmation without a match permits
-replacement typing to continue at the retained caret. A confirmed jump ends Visual/Replace in Normal.
+replacement typing to continue at the retained caret. This applies to the Edit menu, command panel and shortcuts. A confirmed jump ends Visual/Replace in Normal, including when leaving the current Agenda occurrence removes it from the results.
 
 Destinations place the text caret at a grapheme boundary. Exact totals show the current
 ordinal after navigation; wrapping updates the ordinal without a separate notice. Reveal only the destination's
@@ -1823,7 +1823,7 @@ pre-existing expansion and explicit manual fold choices. Repeat commands restore
 
 Agenda reveals only the selected occurrence's day; its folds remain independent of other days and Tree expansion. A search destination becomes the active occurrence.
 
-A newer manual selection, non-search command or command-panel opening cancels
+A newer manual selection, text input, native composition, non-search command or command-panel opening cancels
 pending search jumps and queued repeats. A delayed result must not replace the
 newer caret or focus choice. Search feedback remains available.
 

@@ -137,6 +137,7 @@ export function createTextEditHandlers(
       }
     },
     onCompositionStart: () => {
+      store.search.interruptNavigation()
       clearPending(commandState)
       finishVimReplace(undefined, false, true)
       setComposing(true)

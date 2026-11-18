@@ -119,6 +119,27 @@ describeForEachEditingMode('editable node context menu', () => {
 // The menu label does not pass through an editing-mode divergence, so this test runs once.
 // @requirement PRODUCT.md §13.2
 test.describe('editable node context menu (mode-independent)', () => {
+  test('ends Replace when the native menu selects all text', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'a', text: 'alpha', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = node(window, 1)
+    await window.keyboard.type('0lRZ')
+    await chooseEditorMenuItem(app, 'Select All')
+
+    await editor.click({ button: 'right' })
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toBeFocused()
+    await expect(editor).toHaveValue('aZpha')
+    await expect(editor).toHaveJSProperty('selectionStart', 0)
+    await expect(editor).toHaveJSProperty('selectionEnd', 5)
+    await window.keyboard.press('Meta+z')
+    await expect(editor).toHaveValue('alpha')
+  })
+
   // @requirement PRODUCT.md §20.2.19
   for (const command of ['Select All', 'Cut', 'Paste']) {
     test(`keeps the prior dot change after menu ${command} interrupts Insert`, async ({ userDataDir }) => {

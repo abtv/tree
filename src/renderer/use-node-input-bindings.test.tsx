@@ -648,6 +648,45 @@ describe('useNodeInputBindings', () => {
     },
   )
 
+  it.each(['stationary', 'drag', 'different pointer', 'selection', 'one character', 'focus moved'] as const)(
+    'settles a retargeted text release with its pressed editor (%s)',
+    async (release) => {
+      const f = await fixture({ document: { roots: [node('node', 'first'), node('peer', 'second')] } })
+      const source = f.input('node')
+      const destination = f.input('peer')
+      destination.classList.add('node-input')
+      destination.parentElement!.classList.add('agenda-row')
+      destination.parentElement!.dataset.agendaKey = 'occurrence:peer'
+      source.focus()
+      f.press('R')
+
+      act(() => {
+        destination.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientX: 12 }))
+        f.bindings('peer').onMouseDown({ currentTarget: destination, button: 0, detail: 1 } as never)
+        destination.focus()
+        f.bindings('node').onBlur()
+        if (release === 'selection') destination.setSelectionRange(0, 3)
+        else if (release === 'one character') destination.setSelectionRange(0, 1)
+        else setCaret(destination, 1)
+        if (release === 'focus moved') source.focus()
+        document.body.dispatchEvent(
+          new PointerEvent('pointerup', {
+            bubbles: true,
+            pointerId: release === 'different pointer' ? 2 : 1,
+            clientX: release === 'drag' ? 50 : 12,
+          }),
+        )
+        vi.advanceTimersByTime(1)
+      })
+
+      expect(f.result.current.vimMode).toBe(release === 'stationary' ? 'replace' : 'normal')
+      if (release === 'stationary') {
+        f.press('Q', {}, 'peer')
+        expect(destination.value).toBe('sQcond')
+      }
+    },
+  )
+
   it('keeps a newer Agenda press cancellable after the previous release timer runs', async () => {
     const f = await fixture({ mode: 'replace' })
     const source = f.input()

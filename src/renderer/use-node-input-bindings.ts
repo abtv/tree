@@ -17,6 +17,7 @@ import {
   nodeText,
   getCaret,
   getSelectionEndpoints,
+  getSelectionRange,
   readEditableContent,
   hasAttachmentCharacter,
   setCaret,
@@ -756,6 +757,7 @@ export function useNodeInputBindings({
     // block mid-press would replace the selection being extended, so the block is drawn again only
     // when the press ends.
     let pointerPhase: 'held' | 'released' = 'released'
+    let textPress: { key: string; down: PointerEvent } | undefined
     const gestureSession = vimSession.current
     let settlementTimer: ReturnType<typeof globalThis.setTimeout> | undefined
     const onPress = (event: PointerEvent): void => {
@@ -763,6 +765,11 @@ export function useNodeInputBindings({
       pointerPhase = 'held'
       const target = event.target instanceof Element ? event.target : undefined
       const row = target?.closest<HTMLElement>('.agenda-row')
+      const key = row?.dataset.agendaKey
+      textPress =
+        caretProjection.current.mode === 'replace' && key && target?.closest('.node-input')
+          ? { key, down: event }
+          : undefined
       // A read-only row has no input blur handler. Leaving its row surface must still end
       // Replace, just as blur to an outside control does when an editor owns focus.
       if (
@@ -806,6 +813,36 @@ export function useNodeInputBindings({
       }
       const target = event.target instanceof Element ? event.target : undefined
       const agendaPressedKey = replaceClickAgendaKey(vimSession.current)
+      // A disappearing pinned row can move the pressed editor out from under a stationary
+      // pointer. Its release still belongs to that editor if it retained focus and selection.
+      const press = textPress
+      textPress = undefined
+      const focused = document.activeElement
+      const focusedRow = focused?.closest<HTMLElement>('.agenda-row')
+      if (
+        event.type === 'pointerup' &&
+        press !== undefined &&
+        event instanceof PointerEvent &&
+        event.pointerId === press.down.pointerId &&
+        event.clientX === press.down.clientX &&
+        event.clientY === press.down.clientY &&
+        focused instanceof HTMLElement &&
+        focused.matches('.node-input') &&
+        focusedRow?.dataset.agendaKey === press.key &&
+        focusedRow.dataset.nodeId &&
+        !focused.contains(target ?? null) &&
+        caretProjection.current.mode === 'replace'
+      ) {
+        const selection = getSelectionRange(focused)
+        if (selection.start === selection.end && takeReplaceClick(vimSession.current)) {
+          const baseline = focused instanceof HTMLTextAreaElement ? focused.value : readEditableContent(focused).text
+          beginReplaceSession(vimSession.current, {
+            nodeId: focusedRow.dataset.nodeId,
+            baseline,
+            position: selection.start,
+          })
+        }
+      }
       const agendaClick =
         event.type === 'pointerup' &&
         agendaPressedKey !== undefined &&

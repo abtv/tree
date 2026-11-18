@@ -9,6 +9,7 @@ import {
   clickApplicationMenuItem,
   describeForEachEditingMode,
 } from './fixtures'
+import { controlPostedTasksWithClock } from './search-clock'
 
 describeForEachEditingMode('Local search', ({ mode }) => {
   test('keeps Find geometry and focus stable while typing and counting', async ({ userDataDir }) => {
@@ -349,8 +350,130 @@ describeForEachEditingMode('Local search', ({ mode }) => {
   })
 })
 
+test.describe('Manual selection during a Find repeat', () => {
+  test.use({ editingMode: 'standard' })
+  for (const input of ['selection', 'composition'] as const) {
+    test(`retains a newer native ${input} in its original editor`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'one', text: 'aにb', children: [] },
+            { id: 'two', text: 'needle', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'one' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await window.keyboard.press('Meta+f')
+      await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+      await window.keyboard.press('Enter')
+      await expect(window.locator('.search-count')).toHaveText('1 / 1')
+      await window.keyboard.press('Escape')
+      const origin = window.getByRole('textbox', { name: 'Node 1', exact: true })
+      await origin.click()
+      await setCursor(origin, 1)
+      if (input === 'composition') await window.keyboard.press('Shift+ArrowRight')
+      await window.clock.install()
+      await window.clock.pauseAt(new Date(Date.now() + 1000))
+      await controlPostedTasksWithClock(window)
+
+      await window.keyboard.press('Meta+g')
+      if (input === 'selection') {
+        await window.keyboard.press('Shift+ArrowRight')
+        await window.clock.runFor(1000)
+        await expect(origin).toHaveJSProperty('selectionStart', 1)
+        await expect(origin).toHaveJSProperty('selectionEnd', 2)
+      } else {
+        const session = await window.context().newCDPSession(window)
+        await session.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 })
+        await window.clock.runFor(1000)
+        await session.send('Input.insertText', { text: '日本' })
+        await session.detach()
+        await expect(origin).toHaveValue('a日本b')
+      }
+      await expect(origin).toBeFocused()
+    })
+  }
+})
+
 test.describe('Local search Vim modes', () => {
   test.use({ editingMode: 'vim' })
+
+  test('keeps newer Replace input when a confirmed Find is still pending', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'one', text: 'alpha needle', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.type('lRZ')
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await expect(window.locator('.search-count')).toHaveText('1')
+    await window.clock.install()
+    await window.clock.pauseAt(new Date(Date.now() + 1000))
+    await controlPostedTasksWithClock(window)
+
+    await window.keyboard.press('Enter')
+    await window.keyboard.type('Q')
+    await window.clock.runFor(1000)
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await window.keyboard.press('Escape')
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveText('aZQha needle')
+  })
+
+  test('returns a no-match menu repeat to the Replace caret', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'one', text: 'alpha apple', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await window.keyboard.type('lRZ')
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('missing')
+    await expect(window.locator('.search-count')).toHaveText('0')
+
+    await clickApplicationMenuItem(app, 'Edit', 'Find Next')
+    await expect(editor).toBeFocused()
+    await window.keyboard.press('Meta+Shift+g')
+    await window.keyboard.type('Q')
+    await window.keyboard.press('Escape')
+
+    await expect(editor).toHaveValue('aZQha apple')
+    await window.keyboard.press('Meta+z')
+    await expect(editor).toHaveValue('aZpha apple')
+  })
+
+  test('ends Replace when moving away from a pinned Agenda search result', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'one', text: 'alpha 2026-10-09', children: [] },
+          { id: 'two', text: 'needle 2026-10-10', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'one' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    await window.getByRole('textbox', { name: 'Agenda node one', exact: true }).click()
+    await window.keyboard.type('0wD')
+    await expect(window.locator('.status-bar')).toContainText('Add a date')
+    await window.keyboard.type('0lRZ')
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await expect(window.locator('.search-count')).toHaveText('1')
+
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('textbox', { name: 'Agenda node two', exact: true })).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await window.keyboard.type('Q')
+    await window.keyboard.press('Meta+p')
+
+    await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveValue('aZpha ')
+  })
 
   // @requirement PRODUCT.md §20.2.26
   // @requirement PRODUCT.md §20.14

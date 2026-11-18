@@ -191,6 +191,10 @@ describe('session and command ports', () => {
 
     expect(f.vim.handleReplaceKey(element, 'X')).toBe(false)
 
+    f.vim.beginReplace('previous', element, 'old note', 0)
+    expect(f.vim.handleReplaceKey(element, 'Q')).toBe(false)
+    expect(element.value).toBe('hello')
+
     f.vim.beginReplace('node', element, 'hello', 1)
 
     expect(f.session.replace).toMatchObject({ nodeId: 'node', baseline: 'hello', position: 1 })

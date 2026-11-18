@@ -3446,6 +3446,18 @@ describe('editor keyboard handler', () => {
     expect(vim.setMode).not.toHaveBeenCalled()
   })
 
+  it('commits Replace before the context menu selects the visible text', async () => {
+    const { node, store, input, vim } = await pendingReplaceFixture()
+
+    executeEditorContextMenuCommand('selectAll', store, node(), input, textCommandState(vim))
+
+    expect(vim.mode).toBe('normal')
+    expect(node().text).toBe('abXd')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 4])
+    store.undo()
+    expect(node().text).toBe('abcd')
+  })
+
   it('commits and ends a pending Replace session before the context-menu Paste', async () => {
     const { node, store, input, clipboard, vim } = await pendingReplaceFixture()
     clipboard.current = { kind: 'text', text: 'YZ' }

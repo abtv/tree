@@ -133,7 +133,15 @@ export class EditorStore {
   )
   public readonly search: Pick<
     EditorSearch,
-    'subscribe' | 'getResult' | 'begin' | 'edit' | 'cancelDraft' | 'confirm' | 'interruptNavigation' | 'navigate'
+    | 'subscribe'
+    | 'onJump'
+    | 'getResult'
+    | 'begin'
+    | 'edit'
+    | 'cancelDraft'
+    | 'confirm'
+    | 'interruptNavigation'
+    | 'navigate'
   > & { readonly session: Pick<EditorSearch['session'], 'getSnapshot'> } = this.searchOwner
   private readonly runtime = new EditorRuntimeState(undefined, this.agendaRowsCache, (state) => {
     if (state.agenda === undefined) this.agendaRowsCache.releaseIfStale(state.document)
@@ -749,27 +757,20 @@ export class EditorStore {
     }
   }
 
-  private revealSearchDestination(destination: SearchDestination): void {
+  private revealSearchDestination(destination: SearchDestination): boolean {
     const state = this.runtime.ready()
     const view = this.searchOwner.revealView(state, destination)
-    if (view === undefined) return
-    if (view.kind === 'agenda') {
-      this.endTextSession()
-      this.runtime.replaceReady({
-        ...state,
-        agenda: view.agenda,
-        location: view.location,
-        focus: { ...view.focus, ...this.runtime.newFocus(view.focus.nodeId, view.focus.cursor) },
-      })
-      return
-    }
+    if (view === undefined) return false
+    const focus = { ...view.focus, ...this.runtime.newFocus(view.focus.nodeId, view.focus.cursor) }
+    if (view.kind === 'agenda') this.endTextSession()
     this.runtime.replaceReady({
       ...state,
-      expansion: view.expansion,
+      ...(view.kind === 'tree' ? { expansion: view.expansion } : { agenda: view.agenda }),
       location: view.location,
-      focus: this.runtime.newFocus(view.focus.nodeId, view.focus.cursor),
+      focus,
     })
-    this.markPersistedChange()
+    if (view.kind === 'tree') this.markPersistedChange()
+    return this.runtime.ready().focus.token === focus.token
   }
 
   public selectNode(nodeId: NodeId, cursor: number): void {

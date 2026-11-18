@@ -232,7 +232,10 @@ length keeps oversized work on the cancellable incremental path. The renderer
 composes these ranges with link, date and caret intervals.
 Agenda reuses the store-owned direct-match projection cache before day-fold filtering. Scope keys
 include the Agenda root and focused day and displayed week. Projection changes, including leaving a pinned
-item without a document edit, invalidate results. Origins and anchors retain occurrence
+item without a document edit, invalidate results. The editor store reports a committed focus
+token to the search owner. Its jump notification lets the renderer finish the active editing
+session even when the same move starts a recount. Manual input interrupts the pending navigation
+before native selection or composition changes, with constant work on an idle search. Origins and anchors retain occurrence
 day; synthetic headers use a position before their day. Read-only rows consume the
 existing focus token for same-row caret arrivals and its optional line-reveal hint
 to reveal a search destination within wrapped text. Agenda reveal/cleanup uses day-fold keys

@@ -192,6 +192,8 @@ it('retains manual folds and draft origin, closes feedback on focused-day change
 
 it('recounts after leaving a pinned occurrence and does not publish its obsolete ordinal', async () => {
   const { store, state, begin } = await setup()
+  const jumped = vi.fn()
+  const unsubscribe = store.search.onJump(jumped)
 
   store.applyAgenda({ kind: 'select', key: key(second, 'c') })
   store.editText('c', 'apple')
@@ -207,6 +209,8 @@ it('recounts after leaving a pinned occurrence and does not publish its obsolete
   await vi.runAllTimersAsync()
 
   expect(pinnedAgendaOccurrence(state().agenda!)).toBeUndefined()
+  expect(jumped).toHaveBeenCalledOnce()
+  unsubscribe()
   expect(store.search.getResult()).toBeUndefined()
   expect(store.search.session.getSnapshot().count?.total).toBe(4)
 })

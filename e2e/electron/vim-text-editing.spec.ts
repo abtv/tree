@@ -971,6 +971,34 @@ test.describe('Vim editing: text editing', () => {
       })
     }
 
+    test('moves buffered Replace from a linked editor to the clicked text in another node', async ({ userDataDir }) => {
+      const url = 'https://example.org'
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'one', text: 'alpha ' + url, links: [{ start: 6, end: 6 + url.length, url }], children: [] },
+            { id: 'two', text: 'needle', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'one' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await window.keyboard.type('0lRZ')
+      const next = node(window, 2)
+
+      await next.click({ position: { x: 12, y: 8 } })
+
+      await expect(next).toBeFocused()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      const caret = await next.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)
+      await window.keyboard.type('Q')
+      await window.keyboard.press('Escape')
+      await expect(next).toHaveValue('needle'.slice(0, caret) + 'Q' + 'needle'.slice(caret + 1))
+      await window.keyboard.press('Meta+z')
+      await expect(next).toHaveValue('needle')
+      await expect(node(window, 1)).toHaveText('aZpha ' + url)
+    })
+
     test('leaves an image caret on replacement text after Escape', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {

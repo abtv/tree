@@ -9,6 +9,7 @@ it('keeps context and ownership mutations outside the consumer interfaces', () =
   expectTypeOf<keyof EditorStore['search']['session']>().toEqualTypeOf<'getSnapshot'>()
   expectTypeOf<keyof EditorStore['search']>().toEqualTypeOf<
     | 'subscribe'
+    | 'onJump'
     | 'getResult'
     | 'begin'
     | 'edit'

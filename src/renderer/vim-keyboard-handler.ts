@@ -82,7 +82,7 @@ const CASE_OPERATOR_MODES = { u: 'lower', U: 'upper', '~': 'toggle' } as const
  * state, so the next key ran as an unrelated command. The Ctrl, Meta, and Alt keydowns never reach
  * here because their own events carry the matching modifier flag and the caller excludes it.
  */
-function isNeutralKeydown(key: string): boolean {
+export function isNeutralKeydown(key: string): boolean {
   return (
     key === 'Shift' ||
     key === 'CapsLock' ||
