@@ -28,13 +28,14 @@ export class RecentNodes {
   private ids: readonly string[] = []
   private document: Document | undefined
   private results: readonly RecentNode[] = []
+  private hideFinishedTasks = false
   private readonly paths = new Map<string, readonly { id: string; index: number }[]>()
 
   public constructor(private readonly changed: () => void = () => undefined) {}
 
-  public load(value: unknown, document: Document): void {
+  public load(value: unknown, document: Document, hideFinishedTasks = false): void {
     this.ids = normalizeRecentNodes(value)
-    this.update(document)
+    this.update(document, hideFinishedTasks)
   }
 
   public getIds = (): readonly string[] => this.ids
@@ -98,9 +99,11 @@ export class RecentNodes {
     this.update(document)
   }
 
-  public update(document: Document): void {
-    if (this.document === document) return
+  public update(document: Document, hideFinishedTasks = this.hideFinishedTasks): void {
+    if (this.document === document && this.hideFinishedTasks === hideFinishedTasks) return
     this.document = document
+    this.hideFinishedTasks = hideFinishedTasks
+
     const results: RecentNode[] = []
     const missing = new Set<string>()
     for (const id of this.ids) {
@@ -109,12 +112,13 @@ export class RecentNodes {
         missing.add(id)
         continue
       }
-      if (found.at(-1)!.starred) continue
+      const node = found.at(-1)!
+      if (node.starred || (hideFinishedTasks && node.struckThrough)) continue
       results.push({
         id,
-        text: resultText(found.at(-1)!),
+        text: resultText(node),
         path: found.length === 1 ? null : found.slice(0, -1).map(label).join(' › '),
-        ...completionPresentation(found.at(-1)!, found.slice(0, -1)),
+        ...completionPresentation(node, found.slice(0, -1)),
       })
       if (results.length === RECENT_NODE_RESULTS) break
     }

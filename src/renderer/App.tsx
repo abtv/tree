@@ -159,13 +159,24 @@ export function App({
     }
   }, [preferences, startupPreferences, store])
   const agenda = state.status === 'ready' ? state.agenda : undefined
+  const treeSelectionHidden = store.treeSelectionHidden
+  useLayoutEffect(() => {
+    if (vimMode !== 'visual-node' || nodeVisualSelection === undefined) return
+    return store.subscribe(() => {
+      if (store.isTaskHidden(nodeVisualSelection.anchorId) || store.isTaskHidden(nodeVisualSelection.focusId)) {
+        setNodeVisualSelection(undefined)
+        setVimMode('normal')
+      }
+    })
+  }, [vimMode, nodeVisualSelection, store])
   const statusMessage = agendaStatusMessage(agenda)
   const focus =
     state.status === 'ready' &&
+    !treeSelectionHidden &&
     (agenda === undefined || activeAgendaOccurrence(agenda)?.nodeId === state.location.selectedNodeId)
       ? state.focus
       : undefined
-  const selectedNodeId = state.status === 'ready' ? state.location.selectedNodeId : undefined
+  const selectedNodeId = state.status === 'ready' && !treeSelectionHidden ? state.location.selectedNodeId : undefined
   const persistenceLocked = state.status === 'ready' && state.persistenceLocked === true
   const isExpanded = useCallback(
     (nodeId: string): boolean =>
@@ -282,6 +293,10 @@ export function App({
   })
   const searchCaret = useRef<(() => number | undefined) | undefined>(undefined)
   const activeLineRoot = useRef<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (treeSelectionHidden && document.activeElement === document.body)
+      activeLineRoot.current?.focus({ preventScroll: true })
+  }, [treeSelectionHidden])
   const refreshActiveLine = useActiveLineHighlight(activeLineRoot)
   const openGlobalSearch = useRef<(() => void) | undefined>(undefined)
   const readAgendaCaret = useCallback(() => {
@@ -595,6 +610,7 @@ export function App({
   return (
     <main
       ref={activeLineRoot}
+      tabIndex={treeSelectionHidden ? -1 : undefined}
       className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}
       onKeyDown={(event) => {
         const target = event.target
@@ -613,6 +629,19 @@ export function App({
             setVimMode('normal')
           }
           store.openAgenda()
+        } else if (treeSelectionHidden && !event.altKey && !event.nativeEvent.isComposing) {
+          const key = event.key.toLowerCase()
+          if (shortcuts.isPrimary(event) && !shortcuts.hasNonPrimaryCtrl(event) && key === 'z') {
+            event.preventDefault()
+            if (event.shiftKey) store.redo()
+            else store.undo()
+          } else if (vimEnabled && vimMode === 'normal' && !event.metaKey && !event.shiftKey) {
+            if (key === 'u' && !event.ctrlKey) store.undo()
+            if (key === 'r' && event.ctrlKey) {
+              event.preventDefault()
+              store.redo()
+            }
+          }
         }
       }}
     >

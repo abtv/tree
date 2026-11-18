@@ -13,6 +13,29 @@ const document = {
 }
 
 describe('recent nodes', () => {
+  it('applies the visibility filter before the result limit and keeps hidden IDs in history', () => {
+    const roots = Array.from({ length: 16 }, (_, index) => ({
+      id: String(index),
+      text: `Task ${index}`,
+      ...(index < 8 ? { struckThrough: true as const } : {}),
+      children: [],
+    }))
+    const source = { roots }
+    const ids = roots.map((node) => node.id)
+    const changed = vi.fn()
+    const recent = new RecentNodes(changed)
+    recent.load(ids, source)
+
+    recent.update(source, true)
+
+    expect(recent.getResults().map((node) => node.id)).toEqual(ids.slice(8))
+    expect(recent.getIds()).toEqual(ids)
+    expect(changed).not.toHaveBeenCalled()
+
+    recent.update(source, false)
+    expect(recent.getResults().map((node) => node.id)).toEqual(ids.slice(0, 8))
+  })
+
   it('preserves completion in recent and searched titles and compact ancestor labels', () => {
     const leaf: TreeNode = { id: 'leaf', text: 'Finished task', struckThrough: true, children: [] }
     const source = {

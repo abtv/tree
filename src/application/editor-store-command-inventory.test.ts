@@ -24,6 +24,9 @@ it('keeps context and ownership mutations outside the consumer interfaces', () =
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
   initialSearchResults: 'Read-only starred/recent projection has focused ordering and exclusion tests.',
+  treeSelectionHidden: 'Read-only effective selection guard covered by finished-task visibility tests.',
+  isTaskHidden: 'Read-only task visibility guard covered by finished-task visibility tests.',
+  setHideFinishedTasks: 'Preference and cross-view transitions have focused tests and platform relaunch coverage.',
   starTarget: 'Read-only active node guard covered by star command tests.',
   toggleStarNode: 'Star toggle and history have dedicated property and store tests.',
   canSummarize: 'Read-only capability and active Agenda node guard covered by summarization tests.',

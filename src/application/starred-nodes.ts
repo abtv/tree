@@ -13,7 +13,12 @@ function hasStar(node: TreeNode): boolean {
 }
 
 /** Prepared only when opening/clearing Search; unchanged branches reuse their summaries. */
-export function starredNodes(document: Document): readonly RecentNode[] {
+export function starredNodes(document: Document, hideFinishedTasks = false): readonly RecentNode[] {
+  const all = allStarredNodes(document)
+  return hideFinishedTasks ? all.filter((node) => !node.struckThrough) : all
+}
+
+function allStarredNodes(document: Document): readonly RecentNode[] {
   const cached = results.get(document)
   if (cached !== undefined) return cached
   const entries: { key: string; result: RecentNode }[] = []

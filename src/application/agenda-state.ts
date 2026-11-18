@@ -3,6 +3,7 @@ import type { Location, NodeId } from '../domain/document'
 import type { AgendaRow } from './agenda-rows'
 
 export interface AgendaState {
+  readonly hideFinishedTasks?: boolean
   /** Explicit arrival offset for the selected row; runtime only, never persisted. */
   readonly selectionCursor?: number
   readonly origin: { readonly location: Location; readonly cursor: number }

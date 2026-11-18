@@ -448,6 +448,10 @@ The state belongs to the node and travels with it:
 * The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
 * Saving and reopening the application keeps completion. Existing documents preserve every leaf's state and recalculate parents from children when loaded, even if their old independent parent states disagree. A document saved before struck-through nodes existed opens with every node normal.
 
+`toggle-finished-tasks` in the command panel shows or hides struck-through nodes throughout Tree, the Agenda timeline and focused days, local Find, and global Search, including starred and recent results and marker suggestions. Find and Search include unfinished nodes in folded branches. Finished tasks are visible by default. The desktop and browser each remember the choice in their local application preferences across restarts. The choice is independent of notes and Undo history.
+
+If the selected Tree row is hidden, select the next visible row, or the preceding row if there is no next row. In an open branch with no visible child, select its heading. If the open branch itself is finished, first move to its nearest unfinished parent or the root. If the root has no visible rows, keep it empty with no selected task. The command remains available there. In Agenda, a hidden selected occurrence moves to the next visible occurrence in its day or Overdue group, then the preceding occurrence, then the ordinary nearest day heading. A selection that remains visible keeps focus and its caret.
+
 ---
 
 ### 2.6 Starred Nodes
@@ -1922,6 +1926,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
 | `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
+| `toggle-finished-tasks` | — | Show finished tasks | Finished tasks visible | — | Toggle finished-task visibility across views and search (§2.5) |
 | `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
 | `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
 | `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
@@ -2209,7 +2214,7 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 * The input receives focus and starts empty on every opening. Empty input shows recent nodes as below.
 * Valid `#tag`, `@person` and `&event` terms in the query use the same color, bold weight and transparent background as search suggestion and result matches. Ordinary terms and invalid marker terms stay plain. Native text editing, selection, horizontal scrolling, clearing and composition remain available. Result highlighting still marks query matches independently of query-term styling and retains its match underline.
 * Every nonempty query searches required terms using the ancestor-context and per-term smart-case rules in §20.14.3. Results update as the input changes.
-* Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once in depth-first tree order with its text and parent path.
+* Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope, subject to finished-task visibility (§2.5). Each matching node appears once in depth-first tree order with its text and parent path.
 * All results are reachable by scrolling and keyboard selection. Pending work lasting more than 200ms displays `Searching…` once in the footer; no matches displays `No results`. Typing does not navigate or edit the document.
 * While tag suggestions are visible, an empty node-result list does not display `No results`.
 * Pending searches retain rows, empty-state text and list height; stale rows cannot be activated or navigated. Without tag suggestions, the footer keeps its hint for 200ms, then shows `Searching…`. Results replace the list atomically, including short queries and queries with no matches. Clearing restores recent nodes. Completion, clearing and closing cancel the indicator timer.
@@ -2328,7 +2333,7 @@ Performance guards must exercise representative sequences in the running applica
 
 * `Cmd+P` opens Agenda for the entire document, including all roots, folded descendants, the current parent and its ancestors, regardless of Tree location or selection. Today is captured from the local calendar when Agenda opens; its Monday–Sunday week is displayed and its day container is initially selected. Closing and reopening always returns to the current week and Today.
 * Opening makes a best effort to center the complete Today block, including its heading and entries, within the content viewport. A block taller than the viewport starts at its heading with the ordinary context margin. Natural scroll limits apply; no blank padding is added just to center it. Alignment follows measured layout changes until explicit user scrolling or a subsequent command takes over.
-* `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, revealing the selected row. A pending Insert or Replace edit finishes before opening or closing; Replace returns to Normal, and whole-node Visual ends.
+* `Cmd+P` closes Agenda and restores the originating Tree location, selection, and text cursor, subject to finished-task visibility (§2.5). It reveals the selected row. A pending Insert or Replace edit finishes before opening or closing. Replace returns to Normal, and whole-node Visual ends.
 
 Holding `Cmd+P` repeatedly switches views at a pace that allows consistent rendering. The first press and separate presses respond immediately. Excess autorepeat events may merge into one pending switch; they must not create a growing queue. Repeated switches leave a rendering opportunity between view replacements. Releasing the shortcut, losing window focus, or starting another interaction cancels an unperformed repeat. On an unchanged document, repeated opening must reuse derived work where possible (§22.2). Each opening still captures the current origin and Today and starts with the normal initial Agenda presentation.
 

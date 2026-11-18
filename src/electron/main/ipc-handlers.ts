@@ -42,6 +42,8 @@ export interface IpcHandlerDependencies {
   getEmojiHistory?: () => Promise<string[]>
   setEmojiHistory?: (names: readonly string[]) => Promise<void>
   getRecentNodes?: () => Promise<string[]>
+  getHideFinishedTasks?: () => Promise<boolean>
+  setHideFinishedTasks?: (value: boolean) => Promise<void>
   setRecentNodes?: (ids: readonly string[]) => Promise<void>
   getAppearance: () => AppearancePreference
   setAppearance: (value: AppearancePreference) => void
@@ -76,6 +78,8 @@ export function registerIpcHandlers({
   getEmojiHistory,
   setEmojiHistory,
   getRecentNodes,
+  getHideFinishedTasks,
+  setHideFinishedTasks,
   setRecentNodes,
   getAppearance,
   setAppearance,
@@ -392,6 +396,17 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     requireNoArguments(args)
     return getLineNumbers()
+  })
+  ipcMain.handle(ipcChannels.getHideFinishedTasks, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return getHideFinishedTasks?.() ?? false
+  })
+  ipcMain.handle(ipcChannels.setHideFinishedTasks, (event, value, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof value !== 'boolean') throw new Error('Invalid finished tasks setting.')
+    return setHideFinishedTasks?.(value)
   })
   ipcMain.handle(ipcChannels.setLineNumbers, (event, value, ...args) => {
     requireTrustedRenderer(event)

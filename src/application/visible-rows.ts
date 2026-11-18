@@ -29,13 +29,15 @@ export function buildVisibleRows(
   isExpanded: (nodeId: string) => boolean,
   parentId: string | null = null,
   depth = 0,
+  hideFinishedTasks = false,
 ): VisibleRow[] {
   const rows: VisibleRow[] = []
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index]!
+    if (hideFinishedTasks && node.struckThrough) continue
     rows.push({ node, depth, parentId, siblingIndex: index, siblingCount: nodes.length })
     if (node.children.length > 0 && isExpanded(node.id))
-      rows.push(...buildVisibleRows(node.children, isExpanded, node.id, depth + 1))
+      rows.push(...buildVisibleRows(node.children, isExpanded, node.id, depth + 1, hideFinishedTasks))
   }
   return rows
 }

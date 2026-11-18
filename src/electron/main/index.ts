@@ -23,6 +23,7 @@ import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { createFileServices } from '../../infrastructure/main/file-services'
 import { createCommandHistoryStore } from '../../infrastructure/main/command-history'
 import { createEmojiHistoryStore } from '../../infrastructure/main/emoji-history'
+import { createJsonPreferenceStore } from '../../infrastructure/main/json-preference'
 import {
   createDebouncedWindowBoundsSaver,
   createAppearancePreferenceStore,
@@ -432,6 +433,10 @@ bootstrapApplication({
     })
     const commandHistory = createCommandHistoryStore(join(app.getPath('userData'), 'data', 'command-history.json'))
     const emojiHistory = createEmojiHistoryStore(join(app.getPath('userData'), 'data', 'emoji-history.json'))
+    const finishedTasks = createJsonPreferenceStore(
+      join(app.getPath('userData'), 'data', 'hide-finished-tasks.json'),
+      (value) => value === true,
+    )
     alwaysOnTopStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'window-always-on-top.json'))
     vimEnabledStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'vim-enabled.json'))
     lineNumbersStore = createBooleanPreferenceStore(join(app.getPath('userData'), 'data', 'line-numbers.json'))
@@ -463,6 +468,8 @@ bootstrapApplication({
       setAppearance,
       getCommandHistory: commandHistory.load,
       getEmojiHistory: emojiHistory.load,
+      getHideFinishedTasks: finishedTasks.load,
+      setHideFinishedTasks: finishedTasks.save,
       setEmojiHistory: emojiHistory.save,
       getRecentNodes: () => fileServices.loadRecentNodes!(),
       setRecentNodes: (ids) => fileServices.saveRecentNodes!(ids),

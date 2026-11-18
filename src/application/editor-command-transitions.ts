@@ -1,7 +1,6 @@
 import {
   createFirstChild,
   deleteNode,
-  displayedNodes,
   ensureRoot,
   insertSiblingAfter,
   insertSiblingBefore,
@@ -329,8 +328,7 @@ export function moveSelectionBoundaryTransition(
     const targetCursor = target.attachment !== undefined ? target.text.length : cursor
     return { nodeId: target.id, cursor: Math.min(targetCursor, target.text.length) }
   }
-  const nodes = displayedNodes(document, location.currentParentId)
-  const target = nodes[0]
+  const target = visibleRows[0]?.node
   if (target === undefined) return undefined
   return { nodeId: target.id, cursor: Math.min(cursor, target.text.length) }
 }
@@ -344,7 +342,7 @@ export function moveHorizontalTransition(
 ): FocusTarget | undefined {
   if (location.currentParentId === location.selectedNodeId) {
     const parent = requireNode(document, location.currentParentId).node
-    const child = parent.children[0]
+    const child = visibleRows[0]?.node
     return direction === 'right' && cursor === parent.text.length && child !== undefined
       ? { nodeId: child.id, cursor: 0 }
       : undefined

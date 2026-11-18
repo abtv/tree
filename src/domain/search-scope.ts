@@ -13,7 +13,7 @@ export interface SearchText extends SearchOccurrence {
 }
 
 export type SearchScope =
-  | { readonly kind: 'tree'; readonly parentId: NodeId | null }
+  | { readonly kind: 'tree'; readonly parentId: NodeId | null; readonly hideFinishedTasks?: boolean }
   | {
       readonly kind: 'agenda'
       readonly projection: readonly AgendaProjectionDay[]
@@ -21,13 +21,15 @@ export type SearchScope =
     }
 
 /** Stack memory scales with depth, not sibling count. No cold whole-document index. */
-function* forest(roots: readonly TreeNode[]): Generator<TreeNode, void> {
+function* forest(roots: readonly TreeNode[], hideFinishedTasks = false): Generator<TreeNode | undefined, void> {
   const stack = [{ nodes: roots, index: 0 }]
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
     const node = frame.nodes[frame.index++]
     if (node === undefined) {
       stack.pop()
+    } else if (hideFinishedTasks && node.struckThrough) {
+      yield undefined
     } else {
       yield node
       if (node.children.length > 0) stack.push({ nodes: node.children, index: 0 })
@@ -39,12 +41,14 @@ function* forest(roots: readonly TreeNode[]): Generator<TreeNode, void> {
 export function* searchScope(document: Document, scope: SearchScope): SearchWork<SearchText> {
   if (scope.kind === 'tree') {
     if (scope.parentId === null) {
-      for (const node of forest(document.roots)) yield { nodeId: node.id, text: node.text }
+      for (const node of forest(document.roots, scope.hideFinishedTasks))
+        yield node === undefined ? undefined : { nodeId: node.id, text: node.text }
       return
     }
-    for (const node of forest(document.roots)) {
-      if (node.id === scope.parentId) {
-        for (const descendant of forest([node])) yield { nodeId: descendant.id, text: descendant.text }
+    for (const node of forest(document.roots, scope.hideFinishedTasks)) {
+      if (node?.id === scope.parentId) {
+        for (const descendant of forest([node], scope.hideFinishedTasks))
+          yield descendant === undefined ? undefined : { nodeId: descendant.id, text: descendant.text }
         return
       }
       yield undefined
@@ -54,7 +58,7 @@ export function* searchScope(document: Document, scope: SearchScope): SearchWork
   // Build references incrementally, once per execution. Never copy text or flattened rows.
   const nodes = new Map<NodeId, TreeNode>()
   for (const node of forest(document.roots)) {
-    nodes.set(node.id, node)
+    if (node !== undefined) nodes.set(node.id, node)
     yield undefined
   }
   for (const day of scope.projection) {

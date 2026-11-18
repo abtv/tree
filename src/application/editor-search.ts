@@ -55,8 +55,8 @@ export class EditorSearch {
     const agenda = state.agenda
     const key =
       agenda === undefined
-        ? `tree:${state.location.currentParentId ?? ''}`
-        : `agenda:${agenda.scopeParentId ?? ''}:${agenda.weekStart}:${focusedAgendaDay(agenda) ?? 'timeline'}`
+        ? `tree:${state.location.currentParentId ?? ''}:${Boolean(state.hideFinishedTasks)}`
+        : `agenda:${agenda.scopeParentId ?? ''}:${agenda.weekStart}:${focusedAgendaDay(agenda) ?? 'timeline'}:${Boolean(state.hideFinishedTasks)}`
     const projection = agenda === undefined ? undefined : this.agendaRows.getProjection(state.document, agenda)
     const changedProjection = this.scope.kind === 'agenda' && this.scope.projection !== projection
     const changedScope = key !== this.scopeKey
@@ -76,7 +76,11 @@ export class EditorSearch {
     }
     this.scope =
       agenda === undefined
-        ? { kind: 'tree', parentId: state.location.currentParentId }
+        ? {
+            kind: 'tree',
+            parentId: state.location.currentParentId,
+            hideFinishedTasks: Boolean(state.hideFinishedTasks),
+          }
         : {
             kind: 'agenda',
             projection: projection!,
