@@ -75,7 +75,7 @@ describe('date-like decorations', () => {
 
 // @requirement PRODUCT.md §20.11
 describe('Tree date visualization', () => {
-  it('uses semibold temporal styling for every recognized date and orders all decorations', () => {
+  it('assigns a temporal color to every recognized date and orders all decorations', () => {
     expect(
       treeDecorations(node('2026-02-31 a 2026-10-14 b 2026-11-20'), dayNumberOf({ year: 2026, month: 10, day: 14 })),
     ).toEqual([

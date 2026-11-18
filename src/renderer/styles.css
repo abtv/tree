@@ -531,7 +531,7 @@ body:not(.node-drag-active) .location-link:hover {
   margin: 0 0 6px calc(24px - var(--line-number-digits) * 1ch * 11 / 24);
   padding: 0 6px 2px;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 30px;
   letter-spacing: -0.45px;
 }
@@ -597,10 +597,13 @@ body:not(.node-drag-active) .location-link:hover {
 .agenda-row-day .agenda-label {
   color: var(--color-text);
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 400;
   line-height: 20px;
   letter-spacing: -0.02em;
   text-transform: none;
+}
+.agenda-row-day .agenda-label-overdue {
+  font-weight: 650;
 }
 .agenda-row-day .agenda-label-empty {
   color: var(--color-secondary);
@@ -677,8 +680,8 @@ body:not(.node-drag-active) .location-link:hover {
   text-decoration: line-through;
   color: var(--color-struck-text);
 }
-.agenda-date-active {
-  font-weight: 600;
+:is(.agenda-date-active, .agenda-date-secondary) {
+  font-weight: 400;
 }
 .tag-text {
   color: var(--marker-color, var(--color-tag));
@@ -702,10 +705,6 @@ body:not(.node-drag-active) .location-link:hover {
 }
 .agenda-row-node :is(.agenda-date-active, .agenda-date-secondary) {
   font-size: 14px;
-  font-weight: 400;
-}
-.agenda-row-node .agenda-date-active {
-  font-weight: 500;
 }
 .agenda-row-node .date-past {
   color: color-mix(in srgb, var(--color-date-past) 50%, var(--color-secondary));

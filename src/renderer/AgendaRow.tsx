@@ -159,7 +159,7 @@ export const AgendaRow = memo(function AgendaRow({
           </>
         ) : (
           <>
-            <span className="agenda-label">
+            <span className={row.overdue ? 'agenda-label agenda-label-overdue' : 'agenda-label'}>
               {markedNodes(agendaRowLabel(row, today), 0, agendaRowLabel(row, today).length, marks, true)}
             </span>
             {row.kind === 'day' && row.isToday ? (

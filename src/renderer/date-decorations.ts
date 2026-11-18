@@ -24,7 +24,7 @@ function dateColor(day: number, today: number): string {
   return day < today ? 'date-past' : day > today ? 'date-future' : 'date-today'
 }
 
-/** Date color expresses time; font weight identifies the displayed day's date. */
+/** Date color expresses time relative to the captured Today. */
 export function agendaDecorations(node: TreeNode, day: number, today = localToday()): TextDecoration[] {
   return [
     ...findCanonicalDates(node.text, node.links).map((date) => ({
@@ -37,7 +37,7 @@ export function agendaDecorations(node: TreeNode, day: number, today = localToda
   ].sort((left, right) => left.start - right.start)
 }
 
-/** Tree dates are semibold; undecorated rows keep the plain textarea. */
+/** Undecorated Tree rows keep the plain textarea. */
 export function treeDecorations(node: TreeNode, today = localToday()): TextDecoration[] | undefined {
   const decorations = [
     ...findCanonicalDates(node.text, node.links).map((date) => ({

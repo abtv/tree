@@ -2124,7 +2124,7 @@ While a node is being edited, a token is not underlined when the caret or select
 
 ### 20.11 Date Visualization in Tree
 
-Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, is semibold and colored relative to the local calendar's Today: past dates are red, today's dates use a yellow or amber accent, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface; the dark appearance uses muted lighter variants. Gray and White use Dayfox red, amber and green accents. Tree evaluates Today when rendering date decorations; Agenda uses the Today captured when it opens (§23.1).
+Every recognized canonical date (§23.2) in Tree node text, including the current-parent heading, uses regular font weight. Color indicates its relation to the local calendar's Today. Past dates are red, today's dates use a yellow or amber accent, and future dates are green. The light appearance uses dark red, dark yellow and dark green for legibility on its light surface. The dark appearance uses muted lighter variants. Gray and White use Dayfox red, amber and green accents. Tree evaluates Today when rendering date decorations. Agenda uses the Today captured when it opens (§23.1).
 
 Date colors yield to struck-through text color (§2.5). Recognition and hyperlink exclusions are identical in both presentations. Styling updates while editing in standard editing and every Vim mode, without changing text, caret offsets or selection direction, including when Today changes between renders. Whole-node Visual selection uses the shared selection foreground for dates, as in Agenda.
 
@@ -2349,7 +2349,7 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 * Consecutive direct matches with the same parent share one ancestor-path heading, using Search's compact ancestor labels (§20.14.2). A different parent starts a new group; a path that recurs after another group appears again. Grouping preserves node order within each day and Overdue. Top-level nodes have no path heading. Ancestors are not editable node rows.
 * Path headings use 12px secondary text, wrap when needed and align with node text. A new parent group starts with its heading on the next row. Each path is a selectable, read-only Agenda row; keyboard navigation and clicks can stop on it, and text selection and copying work as on day headings. Editing, folding and opening a path do nothing. Global Search path headings remain nonselectable.
 * Full text is shown and wraps as in Tree.
-* Every recognized date uses a quieter variant of the temporal color of §20.11, independent of the displayed day. Dates are slightly smaller than node text; the displayed day's date has medium weight. Date colors yield to struck-through text color (§2.5). Direct matches retain Tree text colors, including depth colors in dark appearance.
+* Every recognized date uses regular font weight and a quieter variant of the temporal color of §20.11, independent of the displayed day. Dates are slightly smaller than node text. Date colors yield to struck-through text color (§2.5). Direct matches retain Tree text colors, including depth colors in dark appearance.
 * An outer bullet ring reflects real children. Node rows have no disclosure chevron.
 
 ### 23.3 Timeline
@@ -2362,7 +2362,7 @@ Show one Monday–Sunday week at a time, with all seven dated day headings in ch
 * The group uses the ordinary heading, flat rows and folding appearance; its fold is independent of dated days. It is hidden when empty and is not a dated day that can be opened separately.
 * Past and future weeks and focused-day views do not show it. Dates within the current week remain in their ordinary day groups.
 
-* Day headings use the same 15px text size as nodes, with a heavier weight and ordinary case. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. The badge is vertically centered on the heading's text line rather than the full row.
+* Day headings use the same 15px text size as nodes, with regular weight and ordinary case. The `Overdue` heading uses a heavier weight. Today uses the normal heading color with a small neutral `Today` badge and an accessible current-date indication. The badge is vertically centered on the heading's text line rather than the full row.
 * A thin neutral separator spans the scrolling content from its leading to trailing edge between groups (Overdue and dated days), with none before the first group. Each separator occupies one 25px row.
 * Headings and node rows use Tree's 25px minimum height and 20px text line height, without extra gaps after day headings or between nodes within a path group. Agenda starts with the same 10px top inset as Tree inside a parent. Day headings and node text share one left alignment axis; disclosure and bullet markers occupy the gutter.
 
@@ -2484,7 +2484,7 @@ Vim `dd`, including counted forms, does nothing in Agenda: it neither deletes no
 
 ### 23.15 Focused Days
 
-`Cmd+.` on a day container opens that day's flat entries. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Wed Oct 14`; its date label matches the non-editable heading, including the weekday and the year when it differs from the current year. The heading occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports day folding but no creation. If the focused day becomes empty, retain its heading and show the passive message `No entries for this day`.
+`Cmd+.` on a day container opens that day's flat entries. In Vim Normal, `gd` does the same. The location path displays the calendar glyph followed by `› Wed Oct 14`; its date label matches the non-editable heading, including the weekday and the year when it differs from the current year. The heading uses regular font weight and occupies the current-parent heading position, with no timeline day header. Navigation and scrolling stay within that day. `gg` selects the heading, which supports day folding but no creation. If the focused day becomes empty, retain its heading and show the passive message `No entries for this day`.
 
 `Cmd+,` returns to the timeline; Vim Normal also supports `Ctrl+o`. Returning restores the timeline's selection, scroll position and folds instead of selecting Today. If edits removed the saved row, selection falls back to the nearest visible day, choosing the earlier day on a tie. Focused folds are independent of that saved timeline state. Presentation changes retain the ordinary text-session completion rules. `Cmd+.` or `gd` on a real node still opens Tree at that node.
 

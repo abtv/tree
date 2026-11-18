@@ -217,10 +217,12 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+p')
     await window.locator(`[data-agenda-key="day:${day}"]`).click()
     await window.keyboard.press('Meta+.')
-    const focusedHeading = await window.locator('.agenda-focused-heading').boundingBox()
+    const heading = window.locator('.agenda-focused-heading')
+    const focusedHeading = await heading.boundingBox()
 
     expect(Math.abs(focusedHeading!.x - treeHeading!.x)).toBeLessThan(1)
     expect(Math.abs(focusedHeading!.y - treeHeading!.y)).toBeLessThan(1)
+    await expect(heading).toHaveCSS('font-weight', '400')
 
     for (const appearance of ['light', 'dark'] as const) {
       await window.emulateMedia({ colorScheme: appearance })

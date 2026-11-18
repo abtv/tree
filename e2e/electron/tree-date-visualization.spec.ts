@@ -36,7 +36,7 @@ async function blockCaretAt(input: Locator, offset: number): Promise<boolean> {
 describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName }) => {
   // @requirement PRODUCT.md §20.11
   // @requirement PRODUCT.md §23.2
-  test('uses temporal date colors in Tree and quieter variants in Agenda', async ({ userDataDir }) => {
+  test('uses regular weight and temporal colors in Tree and Agenda', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'dates', text: 'Dates 2026-10-07 2026-10-08 2026-10-09', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'dates' },
@@ -50,7 +50,11 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
     await window.keyboard.press('Meta+Enter')
     await window.keyboard.press('Meta+Enter')
     for (const view of ['tree', 'agenda'] as const) {
-      if (view === 'agenda') await window.keyboard.press('Meta+p')
+      if (view === 'agenda') {
+        await window.keyboard.press('Meta+p')
+        const todayHeading = window.locator('.agenda-row-day[aria-current="date"] .agenda-label')
+        await expect(todayHeading).toHaveCSS('font-weight', '400')
+      }
       for (const appearance of ['light', 'dark'] as const) {
         await window.emulateMedia({ colorScheme: appearance })
         for (const [kind, text] of [
@@ -63,6 +67,7 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
           await expect.poll(() => dates.count()).toBeGreaterThan(0)
           for (const date of await dates.all()) {
             await expect(date).toHaveText(text)
+            await expect(date).toHaveCSS('font-weight', '400')
             await expect(date).toHaveCSS(
               'color',
               await date.evaluate(
@@ -176,6 +181,7 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
     await window.keyboard.press('Meta+Enter')
 
     await expect(heading.locator('.agenda-date-active')).toHaveText('2026-10-08')
+    await expect(heading.locator('.agenda-date-active')).toHaveCSS('font-weight', '400')
     await expect(first.locator('.agenda-date-active')).toHaveCount(2)
     await expect(
       window.getByRole('textbox', { name: 'Node 3', exact: true }).locator('.agenda-date-active'),
@@ -194,7 +200,6 @@ describeForEachEditingMode('Tree date visualization', ({ mode, screenshotName })
         await setCursor(first, 0)
       }
 
-      await expect(first.locator('.agenda-date-active').first()).toHaveCSS('font-weight', '600')
       if (mode === 'vim') await expect.poll(() => blockCaretAt(first, 0)).toBe(true)
 
       await window.mouse.move(600, 20)
