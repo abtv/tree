@@ -49,7 +49,7 @@ export async function transferPackage(
   if (sourcePackage.encoding !== 'base64') throw new Error('Invalid source package')
   const { version } = JSON.parse(Buffer.from(sourcePackage.content, 'base64').toString('utf8'))
   await requireReleaseSource(version, manifest.sourceSha, request, token)
-  if (!(await isNewWebVersion(version, { request, token, targetSha: base.object.sha }))) {
+  if (!(await isNewWebVersion(version, { request, token, targetSha: base.object.sha, targetToken }))) {
     throw new Error('Web release version is already transferred or obsolete')
   }
   const commit = (await request(`${root}/git/commits/${base.object.sha}`, options)) as Commit
