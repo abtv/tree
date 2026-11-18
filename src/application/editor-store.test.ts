@@ -4605,6 +4605,8 @@ describe('EditorStore', () => {
     'waits for a pending %s and its resulting save during flush',
     async (stage) => {
       const services = createServices({ kind: 'image', png: new Uint8Array([1]) })
+      const pending = vi.fn()
+      services.onPendingEditsChanged = pending
       const store = new EditorStore(services, ids('root', 'image'))
 
       await store.initialize()
@@ -4625,6 +4627,7 @@ describe('EditorStore', () => {
       else services.writeClipboard = blocked
 
       const operation = stage === 'cut' ? store.cut('root', 0, 4) : store.paste('root', 0)
+      expect(pending.mock.calls).toEqual([[true]])
       await vi.waitFor(() => expect(blocked).toHaveBeenCalledOnce())
       let flushed = false
       const flush = store.flushPersistence().then(() => {
@@ -4645,6 +4648,7 @@ describe('EditorStore', () => {
           : { text: stage === 'cut' ? '' : 'pastedtext' }
 
       expect(services.saves.at(-1)).toMatchObject({ document: { roots: [expected] } })
+      expect(pending.mock.calls).toEqual([[true], [false]])
     },
   )
 

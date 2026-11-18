@@ -81,7 +81,8 @@ export async function installBrowserPrototype(): Promise<{
       tx.onerror = () => {}
     })
   let store: EditorStore | undefined
-  let dirty = false
+  let pendingEdit = false
+  let pendingDocumentWrites = 0
   let savedDocument: unknown
   let saveFailed = false
   let lastInput: HTMLElement | undefined
@@ -102,17 +103,22 @@ export async function installBrowserPrototype(): Promise<{
       return false
     }
   }
-  const updateStatus = () => {
+  const hasUnsavedEdits = (buffered = hasBufferedEdit()) => {
     const state = store?.getSnapshot()
-    if (state?.status !== 'ready') return
+    return (
+      state?.status === 'ready' &&
+      (buffered || pendingEdit || pendingDocumentWrites > 0 || state.document !== savedDocument)
+    )
+  }
+  const updateStatus = () => {
+    if (store?.getSnapshot().status !== 'ready') return
     const buffered = hasBufferedEdit()
-    dirty = buffered || state.document !== savedDocument
     status(
       saveFailed
         ? 'Save failed — keep this tab open'
         : buffered
           ? 'Editing — not saved yet'
-          : dirty
+          : hasUnsavedEdits(buffered)
             ? 'Saving…'
             : 'Saved locally in this browser',
     )
@@ -139,6 +145,10 @@ export async function installBrowserPrototype(): Promise<{
     }
   }
   const services: EditorServices = {
+    onPendingEditsChanged(pending) {
+      pendingEdit = pending
+      updateStatus()
+    },
     loadEmojiHistory: async () => (await read<unknown>('preferences', 'emoji-history')) ?? [],
     saveEmojiHistory: (names) => write('preferences', 'emoji-history', names),
     loadRecentNodes: async () => (await read<unknown>('preferences', 'recent-nodes')) ?? [],
@@ -175,17 +185,22 @@ export async function installBrowserPrototype(): Promise<{
       return initial
     },
     async save(value) {
+      // A previous transaction can replace the durable document after Undo restores it on screen.
+      const changesDocument = value.document !== savedDocument || pendingDocumentWrites > 0
+      if (changesDocument) pendingDocumentWrites++
       status('Saving…')
       try {
         await write('document', 'head', value)
         for (const listener of savedListeners) listener()
         savedDocument = value.document
         saveFailed = false
-        updateStatus()
       } catch (error) {
         saveFailed = true
         status('Save failed — keep this tab open')
         throw error
+      } finally {
+        if (changesDocument) pendingDocumentWrites--
+        updateStatus()
       }
     },
     async readClipboard() {
@@ -293,7 +308,7 @@ export async function installBrowserPrototype(): Promise<{
     },
     setCommandHistory: (value) => write('preferences', 'commands', value),
     async quit() {
-      if ((await flush()) && !dirty) window.close()
+      if ((await flush()) && !hasUnsavedEdits()) window.close()
     },
     async quitWithoutSaving() {
       throw new Error('Close the browser tab to leave the prototype.')
@@ -319,8 +334,7 @@ export async function installBrowserPrototype(): Promise<{
   window.addEventListener('beforeunload', (event) => {
     // An import flushed this session before suspending it, then replaced the notes and reloads.
     if (suspended) return
-    const pending = dirty || hasBufferedEdit()
-    if (pending) {
+    if (hasUnsavedEdits()) {
       event.preventDefault()
       event.returnValue = ''
       if (active) void flush()

@@ -254,6 +254,34 @@ describe('browser editing service contracts', () => {
     expect(store.flush).not.toHaveBeenCalled()
   })
 
+  it('protects Undo back to the saved document while an intervening head write is in flight', async () => {
+    const f = fixture()
+    const installed = await installBrowserPrototype()
+    const store = connectStore(installed)
+    const changed = { ...store.saved, document: { roots: [{ id: 'root', text: 'changed', children: [] }] } }
+    store.getSnapshot.mockReturnValue({ status: 'ready', ...changed })
+    store.notify()
+    const writing = installed.services.save(changed)
+
+    store.getSnapshot.mockReturnValue({ status: 'ready', ...store.saved })
+    store.notify()
+    const unload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unload)
+
+    expect(f.status()).toBe('Saving…')
+    expect(unload.defaultPrevented).toBe(true)
+    expect(store.flush).toHaveBeenCalledOnce()
+
+    f.transactions[0]!.oncomplete!()
+    await writing
+    expect(f.status()).toBe('Saving…')
+
+    const restored = installed.services.save(store.saved)
+    f.transactions[1]!.oncomplete!()
+    await restored
+    expect(f.status()).toBe('Saved locally in this browser')
+  })
+
   it('protects a newly buffered edit before a status notification has run', async () => {
     fixture()
     const installed = await installBrowserPrototype()

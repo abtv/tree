@@ -27,6 +27,54 @@ const readHead = (page: Page) =>
     }
   })
 
+test('protects an Undo while the previous document write awaits acknowledgement', async ({ newContext, baseURL }) => {
+  const context = await newContext()
+  const page = await context.newPage()
+  await page.goto(baseURL!)
+  await ready(page)
+  await input(page).click()
+  await page.evaluate(() => window.prototypeStore.flushPersistence())
+  const original = await input(page).inputValue()
+
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      const request = put.apply(this, args)
+      if (this.name === 'document' && args[1] === 'head') {
+        IDBObjectStore.prototype.put = put
+        const tx = this.transaction
+        tx.addEventListener(
+          'complete',
+          (event) => {
+            event.stopImmediatePropagation()
+            window.finishHeadWrite = () => tx.oncomplete?.call(tx, event)
+          },
+          { once: true, capture: true },
+        )
+      }
+      return request
+    }
+  })
+  await input(page).fill('Edited one two three four five six seven eight nine ten')
+  await page.waitForFunction(() => window.finishHeadWrite !== undefined)
+  await page.keyboard.press(`${primaryKey}+z`)
+
+  await expect(input(page)).toHaveValue(original)
+  await expect(page.locator('#prototype-save-status')).toHaveText('Saving…')
+  const warning = page.waitForEvent('dialog')
+  await page.close({ runBeforeUnload: true })
+  const dialog = await warning
+  expect(dialog.type()).toBe('beforeunload')
+  await dialog.dismiss()
+  await page.evaluate(() => window.finishHeadWrite!())
+  await saved(page)
+
+  await Promise.all([page.waitForEvent('close'), page.close({ runBeforeUnload: true })])
+  const reopened = await context.newPage()
+  await reopened.goto(baseURL!)
+  await expect(input(reopened)).toHaveValue(original)
+})
+
 test('explains storage startup failure and recovers editing after the failed tab closes', async ({
   newContext,
   baseURL,

@@ -1540,10 +1540,12 @@ export class EditorStore {
 
   private async trackEdit(operation: Promise<void>): Promise<void> {
     this.pendingEdits.add(operation)
+    if (this.pendingEdits.size === 1) this.services.onPendingEditsChanged?.(true)
     try {
       await operation
     } finally {
       this.pendingEdits.delete(operation)
+      if (this.pendingEdits.size === 0) this.services.onPendingEditsChanged?.(false)
     }
   }
 

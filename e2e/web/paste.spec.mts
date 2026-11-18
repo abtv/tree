@@ -134,6 +134,17 @@ test('pastes an external image from the native event without requesting clipboar
     canvas.getContext('2d')!.fillRect(0, 0, 24, 24)
     const image = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': image! })])
+    const read = File.prototype.arrayBuffer
+    const gate = new Promise<void>((resolve) => {
+      window.finishPastedFileRead = resolve
+    })
+    File.prototype.arrayBuffer = async function () {
+      if (this.type === 'image/png') {
+        File.prototype.arrayBuffer = read
+        await gate
+      }
+      return read.call(this)
+    }
     window.programmaticReads = 0
     navigator.clipboard.read = async () => {
       window.programmaticReads++
@@ -146,9 +157,25 @@ test('pastes an external image from the native event without requesting clipboar
   const input = page.locator('.node-row[data-node-id="welcome"] .node-input')
 
   await input.fill('')
+  await page.evaluate(() => window.prototypeStore.flushPersistence())
   await pressPaste(page)
 
+  await expect(page.locator('#prototype-save-status')).toHaveText('Saving…')
+  const warning = page.waitForEvent('dialog')
+  await page.close({ runBeforeUnload: true })
+  const dialog = await warning
+  expect(dialog.type()).toBe('beforeunload')
+  await dialog.dismiss()
+  await page.evaluate(() => window.finishPastedFileRead())
+
   await expect(page.locator('.node-row[data-node-id="welcome"] img')).toHaveCount(1)
+  await expect(page.locator('#prototype-save-status')).toHaveText('Saved locally in this browser')
+  const persisted = await page.evaluate(() => window.treeApi.load())
+  expect(persisted).toMatchObject({
+    document: {
+      roots: expect.arrayContaining([expect.objectContaining({ id: 'welcome', attachment: expect.anything() })]),
+    },
+  })
   expect(await page.evaluate(() => window.programmaticReads)).toBe(0)
   expect(await page.evaluate(() => window.nativePastes)).toBe(1)
 

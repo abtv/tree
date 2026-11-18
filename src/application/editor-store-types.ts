@@ -8,6 +8,8 @@ import type { SummarizationPort } from '../shared/summarize'
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
+  /** A cut or paste can still change the document after its platform I/O finishes. */
+  onPendingEditsChanged?(pending: boolean): void
   summarization?: SummarizationPort
   imageToText?(attachmentId: AttachmentId): Promise<string[]>
   loadEmojiHistory?(): Promise<unknown>

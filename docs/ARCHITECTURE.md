@@ -870,6 +870,8 @@ Persistence must support future schema evolution.
 
 The application must flush queued saves before a normal quit completes. A persistence failure must not silently discard the in-memory document; it is surfaced to the user and a later successful save clears the error state. In the locked save-failure state, quitting offers an explicit confirmation that bypasses the flush; it is the only path that discards changes without saving.
 
+The browser adapter derives its save status and native close warning from the acknowledged document, pending document writes, unfinished cut/paste operations, and buffered editor text. The editor store reports transitions into and out of its existing set of pending edits. This adds constant-size bookkeeping and no storage operations.
+
 `EditorStore` passes explicit `SaveTiming` to `EditorSaveScheduler`. Desktop uses
 the default idle and cleanup-retry intervals; browser composition supplies its
 existing shorter intervals. `Clock` only schedules time and never infers an

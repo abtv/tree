@@ -21,6 +21,8 @@ declare global {
     nativeEditingField: HTMLElement
     programmaticReads: number
     nativePastes: number
+    finishPastedFileRead: () => void
+    finishHeadWrite?: () => void
     persistCalls: number
     restoreQuitFlush: () => void
     quitCloseCalls: number

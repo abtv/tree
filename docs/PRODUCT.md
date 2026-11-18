@@ -152,7 +152,9 @@ after saving succeeds. It does not show a successful-save dialog. If the browser
 refuses scripted closure, the saved editor stays open and the user can close it
 with the browser's window controls. A failed flush keeps the editor open and
 shows the save failure. Native browser closing retains the existing warning for
-pending edits.
+pending edits. An accepted cut or paste counts as pending while it waits for clipboard or image data.
+Undoing to the previously saved text also remains pending while an older write can replace it.
+The save status and close warning cover both cases. Dismissing the warning lets Tree finish saving.
 
 Copying a stored image starts the browser clipboard request during the user's
 command while its image data loads asynchronously. A missing image or denied
