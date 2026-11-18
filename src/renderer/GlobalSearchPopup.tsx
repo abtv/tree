@@ -254,7 +254,7 @@ export function GlobalSearchPopup({
     }
     if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
-      if (event.isComposing) return
+      if (event.isComposing || blocked) return
       if (items !== undefined) {
         if (
           shortcuts.isPrimary(event) &&
@@ -313,7 +313,11 @@ export function GlobalSearchPopup({
       show()
     }
     const outside = (event: PointerEvent): void => {
-      if (items === undefined || (event.target instanceof Element && event.target.closest('.recent-nodes-popup')))
+      if (
+        blocked ||
+        items === undefined ||
+        (event.target instanceof Element && event.target.closest('.recent-nodes-popup'))
+      )
         return
       event.preventDefault()
       event.stopImmediatePropagation()

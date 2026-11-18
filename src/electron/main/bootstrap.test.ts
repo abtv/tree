@@ -392,6 +392,7 @@ describe('bootstrapApplication', () => {
       expect(app.quit).not.toHaveBeenCalled()
       expect(window.webContents.send).toHaveBeenLastCalledWith(
         'tree:quit-failed',
+        vi.mocked(window.webContents.send).mock.calls[0]![1],
         'The application could not finish saving before quit.',
       )
     } finally {

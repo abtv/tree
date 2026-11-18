@@ -210,12 +210,12 @@ describe('preload bridge', () => {
   it('forwards About state and propagates errors', async () => {
     const { treeApi } = await import('./index')
 
-    await expect(treeApi.setAboutOpen!(true)).resolves.toBeUndefined()
+    await expect(treeApi.setRendererModalOpen!(true)).resolves.toBeUndefined()
 
-    expect(mocks.invoke).toHaveBeenCalledWith('tree:set-about-open', true)
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:set-renderer-modal-open', true)
     mocks.invoke.mockRejectedValueOnce(new Error('unavailable'))
 
-    await expect(treeApi.setAboutOpen!(false)).rejects.toThrow('unavailable')
+    await expect(treeApi.setRendererModalOpen!(false)).rejects.toThrow('unavailable')
   })
   it('subscribes to argument-free About menu requests and releases its listener', async () => {
     const { treeApi } = await import('./index')
@@ -377,15 +377,17 @@ describe('preload bridge', () => {
     const removeFailed = treeApi.onQuitFailed(failed)
     expect(mocks.on.mock.calls.map(([channel]) => channel)).toEqual(['tree:quit-requested', 'tree:quit-failed'])
     const requestedHandler = mocks.on.mock.calls[0]?.[1] as (event: unknown, requestId: string) => void
-    const failedHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, message: string) => void
+    const failedHandler = mocks.on.mock.calls[1]?.[1] as (event: unknown, requestId: string, message: string) => void
 
     requestedHandler({}, 'request-1')
-    failedHandler({}, 'quit failed')
+    failedHandler({}, 'request-1', 'quit failed')
     removeRequested()
     removeFailed()
 
     expect(requested).toHaveBeenCalledWith('request-1')
-    expect(failed).toHaveBeenCalledWith('quit failed')
+    expect(failed).toHaveBeenCalledWith('request-1', 'quit failed')
+    await treeApi.cancelQuit!('request-2')
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:cancel-quit', 'request-2')
     expect(mocks.removeListener).toHaveBeenCalledWith('tree:quit-requested', requestedHandler)
     expect(mocks.removeListener).toHaveBeenCalledWith('tree:quit-failed', failedHandler)
   })

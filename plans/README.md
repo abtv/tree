@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Editing transitions](editing-transitions.md) | In progress | T3. Seal completed desktop saves and retain modal focus |
+| [Editing transitions](editing-transitions.md) | In progress | T4. Keep native startup preferences current |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

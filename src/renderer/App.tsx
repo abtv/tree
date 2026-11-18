@@ -50,6 +50,7 @@ import { useAgendaRepeat } from './use-agenda-repeat'
 import { StatusBar } from './StatusBar'
 
 interface AppProps {
+  onQuitDialogChange?: () => void
   platformStatus?: React.ReactNode
   dismissTransientStatus?: () => void
   showAbout?: () => void
@@ -91,6 +92,7 @@ export function App({
   dataOperations,
   menuCommands,
   registerViewCommands,
+  onQuitDialogChange,
 }: AppProps): React.JSX.Element {
   const shortcuts = shortcutProfile(shortcutPlatform)
   const { lineNumbers, applyLineNumbers } = useLineNumbers(initialLineNumbers, store)
@@ -582,7 +584,7 @@ export function App({
         const target = event.target
         if (
           !(target instanceof Element) ||
-          target.closest('.node-input, .agenda-list, .command-input-line, .search-controls, [role="dialog"]')
+          target.closest('.node-input, .agenda-list, .command-input-line, .search-controls, dialog, [role="dialog"]')
         )
           return
         if (agenda !== undefined) {
@@ -615,7 +617,7 @@ export function App({
         openRef={openGlobalSearch}
         store={store}
         shortcuts={shortcuts}
-        blocked={commandPanel.open}
+        blocked={commandPanel.open || state.quitWithoutSavingPrompt === true}
         beforeOpen={() => {
           prepareVimCommand(vimTextCommandState, 'focus-borrow')
           store.search.interruptNavigation()
@@ -878,7 +880,11 @@ export function App({
         </div>
       </StatusBar>
       {state.quitWithoutSavingPrompt === true ? (
-        <QuitWithoutSavingPrompt onCancel={dismissQuitWithoutSaving} onQuit={quitWithoutSaving} />
+        <QuitWithoutSavingPrompt
+          onCancel={dismissQuitWithoutSaving}
+          onQuit={quitWithoutSaving}
+          onChange={onQuitDialogChange}
+        />
       ) : null}
       {previewAttachmentId === undefined ? null : (
         <ImagePreview

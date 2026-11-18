@@ -159,6 +159,7 @@ export class EditorStore {
   private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
+  private quitSeal: AbortSignal | undefined
   // Where the selected row sits in the window lives outside the snapshot: it changes on every scroll
   // frame and no rendered state depends on it. The renderer measures it; the store reads it when it
   // captures state for a save, so every save carries the live value.
@@ -476,7 +477,9 @@ export class EditorStore {
     return () => this.pendingEditFinishers.delete(finish)
   }
 
-  public async flushPersistence(options: { cancelImageRecognition?: boolean } = {}): Promise<void> {
+  public async flushPersistence(
+    options: { cancelImageRecognition?: boolean; sealEditsUntil?: AbortSignal } = {},
+  ): Promise<void> {
     const resumeSummarization = options.cancelImageRecognition ? this.summarization.suspend() : undefined
     const resumeImageRecognition = options.cancelImageRecognition ? this.imageToTextQueue.suspend() : undefined
     try {
@@ -500,6 +503,7 @@ export class EditorStore {
         this.recentPersistence.hasPendingChanges() ||
         this.emojiHistory.hasPendingChanges()
       )
+      if (options.sealEditsUntil && !options.sealEditsUntil.aborted) this.quitSeal = options.sealEditsUntil
     } finally {
       resumeSummarization?.()
       resumeImageRecognition?.()
@@ -1784,7 +1788,10 @@ export class EditorStore {
 
   private isPersistenceLocked(): boolean {
     // Only a ready snapshot has persistenceLocked, so the status check is redundant.
-    return this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true
+    return (
+      this.quitSeal?.aborted === false ||
+      (this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true)
+    )
   }
 }
 

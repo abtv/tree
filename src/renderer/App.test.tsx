@@ -26,6 +26,12 @@ let notifyVimPreference: (enabled: boolean) => void = () => undefined
 const changeVimEditingFromMenu = (enabled: boolean): void => act(() => notifyVimPreference(enabled))
 
 beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () {
+    this.open = true
+  }
+  HTMLDialogElement.prototype.close = function () {
+    this.open = false
+  }
   // jsdom has no layout scrolling; real panel scrolling is exercised by Electron coverage.
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() })
   attachmentImageCache.clear()

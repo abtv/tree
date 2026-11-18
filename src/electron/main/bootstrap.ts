@@ -71,8 +71,8 @@ export function bootstrapApplication({
     (requestId) => {
       getMainWindow()?.webContents.send('tree:quit-requested', requestId)
     },
-    () => {
-      getMainWindow()?.webContents.send('tree:quit-failed', QUIT_SAVE_ERROR)
+    (requestId) => {
+      getMainWindow()?.webContents.send('tree:quit-failed', requestId, QUIT_SAVE_ERROR)
     },
     () => app.quit(),
   )

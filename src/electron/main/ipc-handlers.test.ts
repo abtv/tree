@@ -17,7 +17,7 @@ const validState = {
 }
 
 function createHarness(configure?: (dependencies: IpcHandlerDependencies) => void) {
-  const setAboutOpen = vi.fn()
+  const setRendererModalOpen = vi.fn()
   const handlers = new Map<string, (event: IpcInvokeEvent, ...args: unknown[]) => unknown>()
   const ipcMain = {
     handle: (channel: string, listener: (event: IpcInvokeEvent, ...args: unknown[]) => unknown) =>
@@ -37,7 +37,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
     writeImage: vi.fn<(png: Uint8Array) => Promise<void>>(async () => undefined),
     writeRichText: vi.fn<(text: string, html: string) => Promise<void>>(async () => undefined),
   }
-  const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), force: vi.fn() }
+  const quitHandshake = { request: vi.fn(), confirm: vi.fn(() => true), cancel: vi.fn(), force: vi.fn() }
   const onQuitConfirmed = vi.fn()
   const showEditorContextMenu = vi.fn(async () => 'copy' as const)
   const getAlwaysOnTop = vi.fn(() => false)
@@ -78,7 +78,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   const dependencies: IpcHandlerDependencies = {
     getUpdateCommands,
     runUpdateCommand,
-    setAboutOpen,
+    setRendererModalOpen,
     setAppUpdateBlocked,
     appUpdates,
     getEmojiHistory,
@@ -111,7 +111,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   return {
     getUpdateCommands,
     runUpdateCommand,
-    setAboutOpen,
+    setRendererModalOpen,
     setAppUpdateBlocked,
     appUpdates,
     getEmojiHistory,
@@ -504,7 +504,7 @@ describe('main IPC handlers', () => {
     const { handlers, runUpdateCommand, showEditorContextMenu } = createHarness((dependencies) => {
       delete dependencies.getUpdateCommands
       delete dependencies.appUpdates
-      delete dependencies.setAboutOpen
+      delete dependencies.setRendererModalOpen
       delete dependencies.setAppUpdateBlocked
       delete dependencies.getEmojiHistory
       delete dependencies.setEmojiHistory
@@ -522,7 +522,7 @@ describe('main IPC handlers', () => {
     expect(handlers.get(ipcChannels.getRecentNodes)!(event)).toEqual([])
     expect(handlers.get(ipcChannels.checkAppUpdate)!(event)).toBeUndefined()
     expect(handlers.get(ipcChannels.confirmAppUpdate)!(event, 'id', true)).toBeUndefined()
-    expect(handlers.get(ipcChannels.setAboutOpen)!(event, true)).toBeUndefined()
+    expect(handlers.get(ipcChannels.setRendererModalOpen)!(event, true)).toBeUndefined()
     expect(handlers.get(ipcChannels.setAppUpdateBlocked)!(event, false)).toBeUndefined()
     expect(handlers.get(ipcChannels.setEmojiHistory)!(event, ['cat'])).toBeUndefined()
     expect(handlers.get(ipcChannels.setRecentNodes)!(event, ['node'])).toBeUndefined()
@@ -604,6 +604,19 @@ describe('main IPC handlers', () => {
 
     expect(() => set(event, false)).toThrow('Disk full')
   })
+  it('cancels only a named quit request from the trusted renderer', () => {
+    const { handlers, quitHandshake } = createHarness()
+    const cancel = handlers.get(ipcChannels.cancelQuit)!
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(() => cancel(event, null)).toThrow('Invalid quit request.')
+    expect(() => cancel(event, 'id', 1)).toThrow()
+    expect(() => cancel({ senderFrame: { url: 'about:blank' } }, 'id')).toThrow()
+    cancel(event, 'id')
+
+    expect(quitHandshake.cancel).toHaveBeenCalledExactlyOnceWith('id')
+  })
+
   it.each([null, 0, {}, 'stale-request'])(
     'rejects invalid quit acknowledgment %j without beginning or confirming a quit',
     (id) => {
@@ -737,20 +750,20 @@ describe('main IPC handlers', () => {
     expect(() => run(event, 'update-app')).toThrow('unavailable')
   })
   it('accepts only trusted boolean About state and propagates errors', () => {
-    const { handlers, setAboutOpen } = createHarness()
-    const show = handlers.get('tree:set-about-open')!
+    const { handlers, setRendererModalOpen } = createHarness()
+    const show = handlers.get('tree:set-renderer-modal-open')!
     const event = { senderFrame: { url: rendererUrl } }
 
     expect(show(event, true)).toBeUndefined()
-    expect(setAboutOpen).toHaveBeenCalledWith(true)
+    expect(setRendererModalOpen).toHaveBeenCalledWith(true)
     show(event, false)
-    expect(setAboutOpen).toHaveBeenLastCalledWith(false)
+    expect(setRendererModalOpen).toHaveBeenLastCalledWith(false)
 
-    expect(() => show(event, 'extra')).toThrow('Invalid About state.')
+    expect(() => show(event, 'extra')).toThrow('Invalid renderer modal state.')
     expect(() => show(event)).toThrow()
     expect(() => show(event, true, 'extra')).toThrow()
     expect(() => show({ senderFrame: { url: 'https://example.com' } }, true)).toThrow()
-    setAboutOpen.mockImplementationOnce(() => {
+    setRendererModalOpen.mockImplementationOnce(() => {
       throw new Error('unavailable')
     })
     expect(() => show(event, true)).toThrow('unavailable')

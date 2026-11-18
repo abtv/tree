@@ -16,12 +16,13 @@ export const ipcChannels = {
   imageToText: 'tree:image-to-text',
   getUpdateCommands: 'tree:get-update-commands',
   runUpdateCommand: 'tree:run-update-command',
-  setAboutOpen: 'tree:set-about-open',
+  setRendererModalOpen: 'tree:set-renderer-modal-open',
   setAppUpdateBlocked: 'tree:set-app-update-blocked',
   checkAppUpdate: 'tree:check-app-update',
   confirmAppUpdate: 'tree:confirm-app-update',
   quit: 'tree:quit',
   quitWithoutSaving: 'tree:quit-without-saving',
+  cancelQuit: 'tree:cancel-quit',
   load: 'tree:load',
   save: 'tree:save',
   readClipboard: 'tree:read-clipboard',
@@ -161,7 +162,7 @@ export interface TreeApi {
   getUpdateCommands?: () => Promise<UpdateCommandsState>
   runUpdateCommand?: (command: UpdateCommand) => Promise<void>
   onUpdateCommandsChanged?: (listener: (state: UpdateCommandsState) => void) => () => void
-  setAboutOpen?: (open: boolean) => Promise<void>
+  setRendererModalOpen?: (open: boolean) => Promise<void>
   onAboutRequested?: (listener: () => void) => () => void
   setAppUpdateBlocked?: (blocked: boolean) => Promise<void>
   checkAppUpdate?: () => Promise<void>
@@ -179,8 +180,9 @@ export interface TreeApi {
   onAppearanceChanged?: (listener: (value: AppearancePreference) => void) => () => void
   quit(requestId?: string): Promise<void>
   quitWithoutSaving(): Promise<void>
+  cancelQuit?(requestId: string): Promise<void>
   onQuitRequested(listener: (requestId: string) => void): () => void
-  onQuitFailed(listener: (message: string) => void): () => void
+  onQuitFailed(listener: (requestId: string, message: string) => void): () => void
   load(): Promise<unknown | null>
   /** Electron services send encoded JSON to avoid copying a large object graph through contextBridge. */
   save(state: PersistedEditorState | string): Promise<void>

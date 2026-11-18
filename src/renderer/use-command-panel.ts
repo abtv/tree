@@ -220,6 +220,7 @@ export function useCommandPanel(options: {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent): void => {
+      if (event.target instanceof Element && event.target.closest('dialog[open]')) return
       if (message !== undefined) setMessage(undefined)
       if (open) {
         if (event.key === 'Escape' || (event.key === 'Backspace' && input === '')) {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { startAppUpdates } from './app-updates'
+import { createRendererInputLock } from './renderer-input-lock'
 import type { TreeApi } from '../shared/ipc'
 
 afterEach(() => {
@@ -49,6 +50,26 @@ it.each([false, true])('flushes before acknowledging an update and restores inpu
   finished(null)
   expect(document.getElementById('root')!.inert).toBe(false)
   cleanup()
+})
+
+it('keeps input sealed until overlapping quit and update requests both release it', () => {
+  document.body.innerHTML = '<div id="root"><input></div>'
+  const root = document.getElementById('root')!
+  const input = root.querySelector('input')!
+  input.focus()
+  const acquire = createRendererInputLock(root)
+
+  const quit = acquire()
+  const update = acquire()
+  quit()
+  quit()
+
+  expect(root.inert).toBe(true)
+  expect(window.dispatchEvent(new Event('paste', { cancelable: true }))).toBe(false)
+  update()
+  expect(root.inert).toBe(false)
+  expect(input).toBe(document.activeElement)
+  expect(window.dispatchEvent(new Event('paste', { cancelable: true }))).toBe(true)
 })
 
 function deferred(): { promise: Promise<void>; resolve(): void; reject(error: Error): void } {

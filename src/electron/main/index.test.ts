@@ -547,7 +547,7 @@ describe('packaged desktop update wiring', () => {
 
   it.each(['about', 'data'] as const)('blocks the manual update action while %s is active', async (reason) => {
     const f = await packagedSetup()
-    if (reason === 'about') f.ipc.setAboutOpen!(true)
+    if (reason === 'about') f.ipc.setRendererModalOpen!(true)
     else f.ipc.setAppUpdateBlocked!(true)
 
     f.actions().checkForUpdates!()
@@ -603,7 +603,7 @@ describe('packaged desktop update wiring', () => {
     async (reason) => {
       const f = await packagedSetup()
       f.downloaded()
-      if (reason === 'about') f.ipc.setAboutOpen!(true)
+      if (reason === 'about') f.ipc.setRendererModalOpen!(true)
       if (reason === 'data') f.ipc.setAppUpdateBlocked!(true)
       if (reason === 'archive') mocks.archive.isIdle.mockReturnValueOnce(false)
       if (reason === 'export') f.ipc.setNotesMenuState!({ canExport: false, canImport: true })
@@ -1183,7 +1183,7 @@ describe('desktop entry wiring', () => {
   it('blocks main-window actions while About is modal and still permits appearance and quit', async () => {
     const { ipc, window, actions, quit, electron } = await setup()
     ipc.setNotesMenuState!({ canExport: true, canImport: true })
-    ipc.setAboutOpen!(true)
+    ipc.setRendererModalOpen!(true)
     expect((mocks.menu.mock.lastCall![0] as ApplicationMenuState).modalOpen).toBe(true)
     vi.mocked(window.webContents.send).mockClear()
     const rebuilds = mocks.menu.mock.calls.length
@@ -1244,7 +1244,7 @@ describe('desktop entry wiring', () => {
     'clears stale modal and update blocking state after a renderer %s',
     async (event) => {
       const f = await setup()
-      f.ipc.setAboutOpen!(true)
+      f.ipc.setRendererModalOpen!(true)
       f.ipc.setAppUpdateBlocked!(true)
       expect(f.state()).toMatchObject({ modalOpen: true, updateBlocked: true })
 
@@ -1260,7 +1260,7 @@ describe('desktop entry wiring', () => {
 
   it('saves bounds on move, resize and close and releases the closed window', async () => {
     const { lifecycle, window, ipc, state } = await setup()
-    ipc.setAboutOpen!(true)
+    ipc.setRendererModalOpen!(true)
     window.emit('move')
     window.emit('resize')
     window.emit('close')

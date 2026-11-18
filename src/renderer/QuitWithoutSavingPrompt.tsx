@@ -1,22 +1,29 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { QUIT_WITHOUT_SAVING_PROMPT } from '../domain/product-messages'
 
 interface QuitWithoutSavingPromptProps {
+  onChange?: (() => void) | undefined
   onCancel: () => void
   onQuit: () => void
 }
 
-export function QuitWithoutSavingPrompt({ onCancel, onQuit }: QuitWithoutSavingPromptProps): React.JSX.Element {
-  const dialog = useRef<HTMLDivElement>(null)
+export function QuitWithoutSavingPrompt({
+  onCancel,
+  onQuit,
+  onChange,
+}: QuitWithoutSavingPromptProps): React.JSX.Element {
+  const dialog = useRef<HTMLDialogElement>(null)
   const cancelButton = useRef<HTMLButtonElement>(null)
-  const previouslyFocused = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    previouslyFocused.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  useLayoutEffect(() => {
+    const surface = dialog.current!
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    surface.showModal()
+    onChange?.()
     cancelButton.current?.focus()
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        event.stopImmediatePropagation()
         onCancel()
         return
       }
@@ -36,20 +43,27 @@ export function QuitWithoutSavingPrompt({ onCancel, onQuit }: QuitWithoutSavingP
     document.addEventListener('keydown', onKeyDown, true)
     return () => {
       document.removeEventListener('keydown', onKeyDown, true)
-      previouslyFocused.current?.focus()
+      surface.close()
+      onChange?.()
+      if (previous?.isConnected) previous.focus({ preventScroll: true })
     }
-  }, [onCancel])
+  }, [onCancel, onChange])
 
   return (
-    <section
+    <dialog
+      ref={dialog}
       aria-label="Quit without saving"
       aria-modal="true"
       className="quit-without-saving-overlay"
       role="alertdialog"
       data-popup-navigation="horizontal"
       data-editor-selection-return
+      onCancel={(event) => {
+        event.preventDefault()
+        onCancel()
+      }}
     >
-      <div className="quit-without-saving" ref={dialog}>
+      <div className="quit-without-saving">
         <p>{QUIT_WITHOUT_SAVING_PROMPT}</p>
         <div className="quit-without-saving-actions">
           <button ref={cancelButton} type="button" onClick={onCancel}>
@@ -60,6 +74,6 @@ export function QuitWithoutSavingPrompt({ onCancel, onQuit }: QuitWithoutSavingP
           </button>
         </div>
       </div>
-    </section>
+    </dialog>
   )
 }

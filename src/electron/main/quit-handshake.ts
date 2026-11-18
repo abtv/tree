@@ -16,7 +16,7 @@ export class QuitHandshake {
 
   public constructor(
     private readonly sendRequest: (requestId: string) => void,
-    private readonly onTimeout: () => void,
+    private readonly onTimeout: (requestId: string) => void,
     private readonly quit: () => void,
     private readonly createRequestId: () => string = () => crypto.randomUUID(),
     private readonly clock: QuitHandshakeClock = systemClock,
@@ -28,8 +28,9 @@ export class QuitHandshake {
     const requestId = this.createRequestId()
     this.state = { kind: 'waiting', requestId, timeoutHandle: undefined }
     this.state.timeoutHandle = this.clock.setTimeout(() => {
+      if (this.state.kind !== 'waiting' || this.state.requestId !== requestId) return
       this.state = { kind: 'idle' }
-      this.onTimeout()
+      this.onTimeout(requestId)
     }, this.timeoutMilliseconds)
     this.sendRequest(requestId)
   }
@@ -40,6 +41,12 @@ export class QuitHandshake {
     this.state = { kind: 'quitting' }
     queueMicrotask(this.quit)
     return true
+  }
+
+  public cancel(requestId: string): void {
+    if (this.state.kind !== 'waiting' || this.state.requestId !== requestId) return
+    this.clearTimeout()
+    this.state = { kind: 'idle' }
   }
 
   public force(): void {

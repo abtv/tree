@@ -19,7 +19,6 @@ import {
   setCursor,
   test,
 } from './fixtures'
-import { captureQuitTimer } from './quit-timer'
 
 test.use({ editingMode: 'vim' })
 
@@ -151,7 +150,6 @@ test('continues Visual motions after canceling quit confirmation @linux', async 
   const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
   allowRendererError(/^Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked$/)
   allowRendererError(/^Operation failed: Error invoking remote method 'tree:save': Error: save blocked$/)
-  allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
   allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
   await window.clock.install()
   await blockSaves(app, { countAttempts: true })
@@ -169,7 +167,6 @@ test('continues Visual motions after canceling quit confirmation @linux', async 
     await setCursor(editor, 1)
     await window.keyboard.press('v')
     await window.keyboard.press('l')
-    const expireQuitTimer = await captureQuitTimer(app, 'native')
     await clickApplicationMenuQuit(app)
 
     await expect(window.getByRole('alertdialog', { name: 'Quit without saving' })).toBeVisible()
@@ -187,11 +184,6 @@ test('continues Visual motions after canceling quit confirmation @linux', async 
     ).toBe('lph')
 
     await window.keyboard.press('Escape')
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible()
   }
 
   await restoreSaves(app)

@@ -6,6 +6,7 @@ import { captureQuitTimer } from './quit-timer'
 import {
   allowRendererError,
   blockSaves,
+  clickApplicationMenuItem,
   clickApplicationMenuQuit,
   closeMainWindow,
   configureHiddenParallelTests,
@@ -17,6 +18,7 @@ import {
   launchTree,
   node,
   readPersisted,
+  readSaveAttempts,
   restoreSaves,
   setCursor,
   test,
@@ -26,6 +28,118 @@ import {
 
 test.describe('shutdown failure handling', () => {
   configureHiddenParallelTests()
+
+  test('seals editing between the final save and the main-process quit acknowledgement', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const editor = node(window, 1)
+    await typeInto(editor, 'before')
+    const gate = await app.evaluateHandle(() => {
+      const control = { started: false, release() {} }
+      const pending = new Promise<void>((resolve) => {
+        control.release = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:quit', async (original, ...args) => {
+        if (typeof args[1] === 'string') {
+          control.started = true
+          await pending
+        }
+        return original(...args)
+      })
+      return control
+    })
+
+    await clickApplicationMenuQuit(app)
+    await expect.poll(() => gate.evaluate((control) => control.started)).toBe(true)
+    await window.keyboard.type('!')
+
+    await expect(editor).toHaveValue('before')
+    const closed = app.waitForEvent('close')
+    await gate.evaluate((control) => control.release())
+    await closed
+    const reopened = await launchTree(userDataDir)
+    await expect(node(reopened.window, 1)).toHaveValue('before')
+  })
+
+  for (const surface of ['About', 'Search', 'Find'] as const) {
+    test(`keeps the failed-save alert above ${surface} and returns focus on Cancel`, async ({
+      userDataDir,
+    }, testInfo) => {
+      const { app, window } = await launchTree(userDataDir, surface === 'Find' ? { vimPreference: false } : {})
+      allowRendererError(
+        exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
+      )
+      allowRendererError(
+        exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"),
+      )
+      allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
+      await window.clock.install()
+      await blockSaves(app, { countAttempts: true })
+      await typeInto(node(window, 1), 'pending')
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        await fireIdleSave(window)
+        await expect.poll(() => readSaveAttempts(app), idleSavePoll).toBe(attempt)
+      }
+      await expect(window.getByText(SAVE_LOCKED_MESSAGE, { exact: true })).toBeVisible()
+      const previous =
+        surface === 'About'
+          ? window.locator('#about-close')
+          : surface === 'Find'
+            ? window.getByRole('textbox', { name: 'Search', exact: true })
+            : window.getByRole('searchbox')
+      if (surface === 'About') await clickApplicationMenuItem(app, 'Tree', 'About Tree')
+      else {
+        await window.keyboard.press(surface === 'Find' ? 'Meta+f' : 'Meta+;')
+        await previous.fill('unfinished')
+      }
+      await expect(previous).toBeFocused()
+
+      await clickApplicationMenuQuit(app)
+
+      const alert = window.getByRole('alertdialog')
+      const cancel = alert.getByRole('button', { name: 'Cancel' })
+      await expect(cancel).toBeFocused()
+      await expect
+        .poll(() =>
+          cancel.evaluate((button) => {
+            const box = button.getBoundingClientRect()
+            return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === button
+          }),
+        )
+        .toBe(true)
+      await window.keyboard.press('Tab')
+      await expect(alert.getByRole('button', { name: 'Quit without saving' })).toBeFocused()
+      await window.keyboard.press('Shift+Tab')
+      await expect(cancel).toBeFocused()
+      await window.keyboard.press('Meta+;')
+      await window.keyboard.press('Meta+Shift+p')
+      if (surface === 'Search') {
+        await expect
+          .poll(() =>
+            app.evaluate(
+              ({ Menu }) =>
+                Menu.getApplicationMenu()
+                  ?.items.find((item) => item.label === 'View')
+                  ?.submenu?.items.find((item) => item.label === 'Agenda')?.enabled,
+            ),
+          )
+          .toBe(false)
+        await clickApplicationMenuItem(app, 'Tree', 'About Tree')
+        await expect(window.locator('#app-about-dialog[open], .agenda-list')).toHaveCount(0)
+      }
+      await expect(cancel).toBeFocused()
+      for (const appearance of ['light', 'dark'] as const) {
+        await window.emulateMedia({ colorScheme: appearance })
+        await window.screenshot({ path: testInfo.outputPath(`quit-over-${surface}-${appearance}.png`) })
+      }
+      if (surface === 'Search') await window.keyboard.press('Escape')
+      else await cancel.click()
+
+      await expect(alert).toHaveCount(0)
+      await expect(previous).toBeFocused()
+      if (surface !== 'About') await expect(previous).toHaveValue('unfinished')
+      await restoreSaves(app)
+    })
+  }
 
   test('keeps the app open after a save failure and quits after a successful retry', async ({ userDataDir }) => {
     const { app, window } = await launchTree(userDataDir)
@@ -38,7 +152,6 @@ test.describe('shutdown failure handling', () => {
     allowRendererError(
       /^Operation failed: Error invoking remote method 'tree:(?:save|cleanup-attachments)': Error: (?:EEXIST|EISDIR|ENOTDIR): /,
     )
-    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
 
     const dataDirectory = join(userDataDir, 'data')
     const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
@@ -54,8 +167,6 @@ test.describe('shutdown failure handling', () => {
 
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
-    const expireQuitTimer = await captureQuitTimer(app, 'ipc')
-
     await node(window, 1).press('Meta+q')
 
     await expect(window.getByText(/Operation failed:/)).toBeVisible()
@@ -63,12 +174,6 @@ test.describe('shutdown failure handling', () => {
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
-
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible({ timeout: 7_000 })
 
     rmSync(temporaryDocumentPath, { recursive: true, force: true })
     await typeInto(node(window, 1), recoveryText)
@@ -92,7 +197,6 @@ test.describe('shutdown failure handling', () => {
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
 
     allowRendererError(/Operation failed: The application could not finish saving before quit\./)
-    allowRendererError(/Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request\./)
     const save = await app.evaluateHandle(() => {
       const control = { started: false, release: () => {} }
       const gate = new Promise<void>((resolve) => {
@@ -143,10 +247,10 @@ test.describe('shutdown failure handling', () => {
 
     await save.evaluate((control) => control.release())
 
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text).toBe('delayed save')
     await expect(
-      window.getByText("Operation failed: Error invoking remote method 'tree:quit': Error: Invalid quit request."),
+      window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toBeVisible()
-    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('delayed save')
 
     await save.dispose()
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
@@ -308,7 +412,6 @@ test.describe('shutdown failure handling', () => {
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
     allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
-    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
     await blockSaves(app)
 
     const editor = node(window, 1)
@@ -321,8 +424,6 @@ test.describe('shutdown failure handling', () => {
 
     await expect(editor).toHaveValue('aXYd')
 
-    const expireQuitTimer = await captureQuitTimer(app, 'native')
-
     await closeMainWindow(app)
 
     expect(app.process().exitCode).toBeNull()
@@ -331,11 +432,6 @@ test.describe('shutdown failure handling', () => {
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
 
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible({ timeout: 7_000 })
     expect(app.process().exitCode).toBeNull()
 
     await restoreSaves(app)
@@ -405,7 +501,7 @@ test.describe('shutdown failure handling', () => {
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('abcY')
   })
 
-  test('keeps the app open after a window-close save failure, reports the timeout, and quits after a retry', async ({
+  test('keeps the app open after a window-close save failure and quits on an immediate retry', async ({
     userDataDir,
   }) => {
     const { app, window } = await launchTree(userDataDir)
@@ -416,7 +512,6 @@ test.describe('shutdown failure handling', () => {
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
     allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
-    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
     await blockSaves(app)
 
     // Exactly ten words trigger one volume save attempt before the window close.
@@ -426,8 +521,6 @@ test.describe('shutdown failure handling', () => {
 
     await expect(window.getByText(/Changes could not be saved:/)).toBeVisible()
 
-    const expireQuitTimer = await captureQuitTimer(app, 'native')
-
     await closeMainWindow(app)
 
     expect(app.process().exitCode).toBeNull()
@@ -435,12 +528,6 @@ test.describe('shutdown failure handling', () => {
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
-
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible({ timeout: 7_000 })
 
     await restoreSaves(app)
     const recoveryText = ' recovered one two three four five six seven eight nine ten'
@@ -465,7 +552,6 @@ test.describe('shutdown failure handling', () => {
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
     allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
-    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
     allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
     await blockSaves(app)
 
@@ -474,8 +560,6 @@ test.describe('shutdown failure handling', () => {
     await typeInto(node(window, 1), text)
 
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
-
-    const expireQuitTimer = await captureQuitTimer(app, 'native')
 
     await closeMainWindow(app)
 
@@ -490,12 +574,6 @@ test.describe('shutdown failure handling', () => {
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
-
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible({ timeout: 7_000 })
 
     await closeMainWindow(app)
 

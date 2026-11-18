@@ -85,6 +85,20 @@ describe('QuitHandshake', () => {
     expect(handshake.confirm('request-1')).toBe(false)
   })
 
+  it('accepts a retry immediately after the renderer reports a failed save', () => {
+    const sent = vi.fn()
+    const { clock } = createClock()
+    let id = 0
+    const handshake = new QuitHandshake(sent, vi.fn(), vi.fn(), () => String(++id), clock)
+    handshake.request()
+    handshake.cancel('1')
+    handshake.request()
+    handshake.cancel('1')
+
+    expect(sent.mock.calls).toEqual([['1'], ['2']])
+    expect(handshake.confirm('2')).toBe(true)
+  })
+
   it('reports a timeout and permits a later request', () => {
     const sent: string[] = []
     const onTimeout = vi.fn()
@@ -102,7 +116,7 @@ describe('QuitHandshake', () => {
     fire()
 
     expect(handshake.isQuitting()).toBe(false)
-    expect(onTimeout).toHaveBeenCalledOnce()
+    expect(onTimeout).toHaveBeenCalledExactlyOnceWith(sent[0])
 
     handshake.request()
 

@@ -103,7 +103,7 @@ export const treeApi: TreeApi = {
     ipcRenderer.on(ipcEvents.appearanceChanged, handler)
     return () => ipcRenderer.removeListener(ipcEvents.appearanceChanged, handler)
   },
-  setAboutOpen: (open) => ipcRenderer.invoke(ipcChannels.setAboutOpen, open),
+  setRendererModalOpen: (open) => ipcRenderer.invoke(ipcChannels.setRendererModalOpen, open),
   onAboutRequested: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, ...args: unknown[]): void => {
       if (args.length === 0) listener()
@@ -113,13 +113,15 @@ export const treeApi: TreeApi = {
   },
   quit: (requestId) => ipcRenderer.invoke(ipcChannels.quit, requestId),
   quitWithoutSaving: () => ipcRenderer.invoke(ipcChannels.quitWithoutSaving),
+  cancelQuit: (requestId) => ipcRenderer.invoke(ipcChannels.cancelQuit, requestId),
   onQuitRequested: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, requestId: string): void => listener(requestId)
     ipcRenderer.on('tree:quit-requested', handler)
     return () => ipcRenderer.removeListener('tree:quit-requested', handler)
   },
   onQuitFailed: (listener) => {
-    const handler = (_event: Electron.IpcRendererEvent, message: string): void => listener(message)
+    const handler = (_event: Electron.IpcRendererEvent, requestId: string, message: string): void =>
+      listener(requestId, message)
     ipcRenderer.on('tree:quit-failed', handler)
     return () => ipcRenderer.removeListener('tree:quit-failed', handler)
   },

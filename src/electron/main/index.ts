@@ -72,7 +72,7 @@ let notesArchive: NotesArchiveController | null = null
 let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
-let aboutOpen = false
+let rendererModalOpen = false
 let appUpdates: AppUpdates | undefined
 let appUpdateBlocked = false
 let prepareUpdateQuit: (() => () => void) | undefined
@@ -139,7 +139,7 @@ function rebuildApplicationMenu(): void {
           alwaysOnTop: isAlwaysOnTop(),
           appearance: currentAppearance(),
           notes: notesMenuState,
-          modalOpen: aboutOpen || (appUpdates?.isApplying() ?? false) || (appUpdates?.isNotifying() ?? false),
+          modalOpen: rendererModalOpen || (appUpdates?.isApplying() ?? false) || (appUpdates?.isNotifying() ?? false),
           updatesSupported: appUpdates !== undefined,
           updateChecking: appUpdates?.isChecking() ?? false,
           updateReady: appUpdates?.isReady() ?? false,
@@ -154,25 +154,25 @@ function rebuildApplicationMenu(): void {
           },
           updateApp: () => appUpdates?.request(),
           checkForUpdates: () => {
-            if (aboutOpen || appUpdateBlocked) return
+            if (rendererModalOpen || appUpdateBlocked) return
             void appUpdates
               ?.checkManually()
               .catch((error: unknown) => reportMainProcessError('Could not show update status', error))
           },
           findCommand: (command) => {
-            if (aboutOpen) return
+            if (rendererModalOpen) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.findMenuCommand, command)
             }
           },
           viewCommand: (command) => {
-            if (aboutOpen) return
+            if (rendererModalOpen) return
             if (mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
               mainWindow.webContents.send(ipcEvents.viewMenuCommand, command)
             }
           },
           notesCommand: (command) => {
-            if (aboutOpen) return
+            if (rendererModalOpen) return
             if (command === 'export' ? notesMenuState.canExport : notesMenuState.canImport) {
               mainWindow?.webContents.send(ipcEvents.notesMenuCommand, command)
             }
@@ -184,7 +184,7 @@ function rebuildApplicationMenu(): void {
             }
           },
           setVimEnabled: (value) => {
-            if (aboutOpen) {
+            if (rendererModalOpen) {
               rebuildApplicationMenu()
               return
             }
@@ -192,7 +192,7 @@ function rebuildApplicationMenu(): void {
             mainWindow?.webContents.send(ipcEvents.vimEnabledChanged, value)
           },
           setAlwaysOnTop: (value) => {
-            if (aboutOpen) {
+            if (rendererModalOpen) {
               rebuildApplicationMenu()
               return
             }
@@ -233,7 +233,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
   followWindowAppearance(window, nativeTheme, currentAppearance)
   mainWindow = window
   const resetNotesMenu = (): void => {
-    aboutOpen = false
+    rendererModalOpen = false
     appUpdateBlocked = false
     appUpdates?.cancelSaving()
     notesMenuState = { canExport: false, canImport: false }
@@ -258,7 +258,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
     windowBounds.flush()
   })
   window.on('closed', () => {
-    aboutOpen = false
+    rendererModalOpen = false
     if (mainWindow === window) mainWindow = null
   })
   void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
@@ -312,7 +312,7 @@ bootstrapApplication({
           !!mainWindow &&
           !mainWindow.isDestroyed() &&
           !mainWindow.webContents.isLoadingMainFrame() &&
-          !aboutOpen &&
+          !rendererModalOpen &&
           !appUpdateBlocked &&
           notesArchive?.isIdle?.() === true &&
           notesMenuState.canExport &&
@@ -450,8 +450,8 @@ bootstrapApplication({
         const item = Menu.getApplicationMenu()?.getMenuItemById(command)
         if (item?.enabled) item.click(item, mainWindow ?? undefined, { triggeredByAccelerator: false })
       },
-      setAboutOpen: (open) => {
-        aboutOpen = open
+      setRendererModalOpen: (open) => {
+        rendererModalOpen = open
         rebuildApplicationMenu()
       },
       setAppUpdateBlocked: (blocked) => {

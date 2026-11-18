@@ -62,6 +62,7 @@ export function installAboutDialog(version: string, changed: (open: boolean) => 
 
   return {
     show() {
+      if (document.getElementById('root')?.inert || document.querySelector('dialog[open][role="alertdialog"]')) return
       if (open) {
         button.focus()
         return

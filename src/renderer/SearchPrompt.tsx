@@ -65,7 +65,11 @@ export function SearchPrompt({
           composing.current = false
         }}
         onBlur={(event) => {
-          if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.search-controls')) return
+          if (
+            event.relatedTarget instanceof Element &&
+            event.relatedTarget.closest('.search-controls, dialog[role="alertdialog"]')
+          )
+            return
           store.search.cancelDraft()
         }}
         onKeyDown={(event) => {

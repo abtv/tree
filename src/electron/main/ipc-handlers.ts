@@ -36,7 +36,7 @@ export interface IpcHandlerDependencies {
   imageToText?: { recognize(read: () => Promise<Uint8Array | null>): Promise<string[]>; cancel(): void }
   getUpdateCommands?: () => UpdateCommandsState
   runUpdateCommand?: (command: UpdateCommand) => void
-  setAboutOpen?: (open: boolean) => void
+  setRendererModalOpen?: (open: boolean) => void
   setAppUpdateBlocked?: (blocked: boolean) => void
   appUpdates?: { check(): Promise<void>; confirm(id: string, saved: boolean): void; isApplying?(): boolean }
   getEmojiHistory?: () => Promise<string[]>
@@ -51,7 +51,7 @@ export interface IpcHandlerDependencies {
   rendererUrl: string
   fileServices: FileServices
   nativeClipboard: NativeClipboard
-  quitHandshake: Pick<QuitHandshake, 'request' | 'confirm' | 'force'>
+  quitHandshake: Pick<QuitHandshake, 'request' | 'confirm' | 'cancel' | 'force'>
   decodePng: PngDecoder
   onQuitConfirmed: () => void
   showEditorContextMenu?: (sender: WebContents, request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
@@ -70,7 +70,7 @@ export function registerIpcHandlers({
   imageToText,
   getUpdateCommands,
   runUpdateCommand,
-  setAboutOpen,
+  setRendererModalOpen,
   setAppUpdateBlocked,
   appUpdates,
   getEmojiHistory,
@@ -204,11 +204,11 @@ export function registerIpcHandlers({
     }
   })
 
-  ipcMain.handle(ipcChannels.setAboutOpen, (event, open, ...args) => {
+  ipcMain.handle(ipcChannels.setRendererModalOpen, (event, open, ...args) => {
     requireTrustedRenderer(event)
     requireNoArguments(args)
-    if (typeof open !== 'boolean') throw new Error('Invalid About state.')
-    setAboutOpen?.(open)
+    if (typeof open !== 'boolean') throw new Error('Invalid renderer modal state.')
+    setRendererModalOpen?.(open)
   })
 
   ipcMain.handle(ipcChannels.checkAppUpdate, (event, ...args) => {
@@ -314,6 +314,12 @@ export function registerIpcHandlers({
     }
     if (requestId !== undefined) throw new Error('Invalid quit request.')
     quitHandshake.request()
+  })
+  ipcMain.handle(ipcChannels.cancelQuit, (event, requestId: unknown, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    if (typeof requestId !== 'string') throw new Error('Invalid quit request.')
+    quitHandshake.cancel(requestId)
   })
   ipcMain.handle(ipcChannels.quitWithoutSaving, (event) => {
     requireTrustedRenderer(event)

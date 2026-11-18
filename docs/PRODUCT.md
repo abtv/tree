@@ -1250,6 +1250,8 @@ Every pending change is flushed before a normal quit completes. A pending Replac
 
 Editing remains available while a normal quit waits for saves. Edits made while recent-node or emoji history is being saved also finish saving before quit completes. A failure saving those late edits keeps the application open under the same rules as any other save failure.
 
+After the final save, the desktop editor stops accepting edits before confirming quit to the main process. It stays closed to input while archive cleanup finishes. If the current quit request fails or times out, its input lock is released.
+
 If a save fails, the pending changes are retained and the failure is surfaced. The application retries at the next idle interval. After three consecutive failed save attempts, the application enters the locked save-failure state defined in §16.2. A later successful save clears the error.
 
 The document must persist between application restarts.
@@ -1308,6 +1310,8 @@ Quitting and closing the window from the locked state still attempt a final save
 
 * if the save succeeds, the application exits with every pending change persisted;
 * if the save fails, the application asks `Quit without saving? Changes made since the last successful save will be lost.` Confirming quits without saving, and the next launch opens the newest stored version that can be parsed and validated. Cancelling keeps the application open.
+
+The quit confirmation takes focus above other open surfaces, including About, Search and a Find draft. Cancel restores the previous surface and its input. The user can immediately retry a reported save failure.
 
 A failed save, including when the storage is full, must never destroy or damage the previously saved document. The next launch opens the newest stored version that can be parsed and validated, whether it is the primary file, a retained generation, or an interrupted save.
 

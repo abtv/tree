@@ -1,7 +1,6 @@
 // @editing-modes: independent
 import { existsSync } from 'node:fs'
 import { QUIT_WITHOUT_SAVING_PROMPT, SAVE_LOCKED_MESSAGE } from '../../src/domain/product-messages'
-import { captureQuitTimer } from './quit-timer'
 import {
   allowRendererError,
   blockSaves,
@@ -248,7 +247,6 @@ test.describe('save failure lock', () => {
       exactMessage("Changes could not be saved: Error invoking remote method 'tree:save': Error: save blocked"),
     )
     allowRendererError(exactMessage("Operation failed: Error invoking remote method 'tree:save': Error: save blocked"))
-    allowRendererError(/^Operation failed: The application could not finish saving before quit\.$/)
     allowRendererError(exactMessage(SAVE_LOCKED_MESSAGE))
     await blockSaves(app)
 
@@ -257,8 +255,6 @@ test.describe('save failure lock', () => {
     await typeInto(node(window, 1), text)
 
     await expect(window.getByText(SAVE_LOCKED_MESSAGE)).toBeVisible({ timeout: 15_000 })
-
-    const expireQuitTimer = await captureQuitTimer(app, 'native')
 
     await clickApplicationMenuQuit(app)
 
@@ -279,12 +275,6 @@ test.describe('save failure lock', () => {
     await expect(
       window.getByText('Operation failed: The application could not finish saving before quit.'),
     ).toHaveCount(0)
-
-    await expireQuitTimer()
-
-    await expect(
-      window.getByText('Operation failed: The application could not finish saving before quit.'),
-    ).toBeVisible()
 
     await clickApplicationMenuQuit(app)
 

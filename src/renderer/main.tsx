@@ -11,6 +11,7 @@ import { App } from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { startRendererLifecycle } from './lifecycle'
 import { startAppUpdates } from './app-updates'
+import { createRendererInputLock } from './renderer-input-lock'
 import { installUpdateCommands } from './update-commands'
 import type { CommandServices } from '../application/command-registry'
 import { appearanceColorScheme, type AppearancePreference } from '../shared/appearance'
@@ -41,9 +42,13 @@ if (!rootElement) {
 }
 
 const store = new EditorStore(createElectronEditorServices(), () => crypto.randomUUID())
-const about = installAboutDialog(`Version ${__TREE_APP_VERSION__} · ${__TREE_BUILD_DATE__}`, (open) => {
-  void window.treeApi.setAboutOpen!(open).catch((error: unknown) => store.reportError(error))
-})
+let confirmingQuit = false
+const syncModal = (): void => {
+  const open =
+    confirmingQuit || document.querySelector('#app-about-dialog[open], dialog[open][role="alertdialog"]') !== null
+  void window.treeApi.setRendererModalOpen!(open).catch((error: unknown) => store.reportError(error))
+}
+const about = installAboutDialog(`Version ${__TREE_APP_VERSION__} · ${__TREE_BUILD_DATE__}`, syncModal)
 const stopAboutRequests = window.treeApi.onAboutRequested!(() => about.show())
 window.addEventListener(
   'pagehide',
@@ -78,8 +83,18 @@ const menuCommands = installUpdateCommands(window.treeApi, dataOperations.menuCo
 )
 window.addEventListener('pagehide', () => menuCommands.dispose(), { once: true })
 window.addEventListener('pagehide', () => dataOperations.dispose(), { once: true })
-startRendererLifecycle(store, window.treeApi)
-startAppUpdates(store, window.treeApi)
+const lockInput = createRendererInputLock(rootElement)
+startRendererLifecycle(store, window.treeApi, () => {
+  const release = lockInput()
+  confirmingQuit = true
+  syncModal()
+  return () => {
+    confirmingQuit = false
+    release()
+    syncModal()
+  }
+})
+startAppUpdates(store, window.treeApi, lockInput)
 
 const registerViewCommands = (commands: Pick<CommandServices, 'showTree' | 'showAgenda'>) =>
   window.treeApi.onViewMenuCommand!((command) => {
@@ -100,6 +115,7 @@ void Promise.all([
       <ErrorBoundary>
         <App
           showAbout={about.show}
+          onQuitDialogChange={syncModal}
           initialVimEnabled={initialVimEnabled}
           initialLineNumbers={initialLineNumbers}
           store={store}

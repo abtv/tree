@@ -441,6 +441,8 @@ Before application shutdown is allowed to complete, the main process asks the re
 
 The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
 
+Once the final flush has drained the editor and metadata queues, the store seals document edits for that request. The renderer locks native input before acknowledging it. Closing and update installation share a reference-counted input lock. A failure or timeout releases only the matching request. A native modal dialog places the locked-save confirmation above other renderer surfaces and restores their focus on cancellation. These transitions add constant state per active request and no disk writes.
+
 `quit-handshake.ts` owns a local idle/waiting/quitting union. Only waiting carries
 the request ID and timeout handle; confirmation or force enters the terminal
 quitting state before queuing the quit microtask. Timeout restores idle for retry.
@@ -1167,7 +1169,7 @@ About Tree uses `src/renderer/about-dialog.ts` in both platform entry points.
 One eagerly mounted HTML dialog shares the editor's renderer and palette; opening
 does not create a BrowserWindow or load another document. The command panel opens
 it locally. The native menu sends an argument-free `aboutRequested` notification;
-the renderer reports open state through trusted, boolean-validated `setAboutOpen` IPC.
+the renderer reports open state through trusted, boolean-validated `setRendererModalOpen` IPC.
 Navigation and renderer loss reset the main-process state. This adds fixed DOM and
 listeners, no document traversal, and no persistence beyond existing command history.
 Escape, Close and a backdrop click close the dialog synchronously and restore focus

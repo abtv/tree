@@ -4,14 +4,15 @@ import { EditorStore, type EditorServices } from '../application/editor-store'
 
 function createHarness() {
   let quitRequested: ((requestId: string) => void) | undefined
-  let quitFailed: ((message: string) => void) | undefined
+  let quitFailed: ((requestId: string, message: string) => void) | undefined
   const treeApi = {
     quit: vi.fn(async () => undefined),
+    cancelQuit: vi.fn(async () => undefined),
     onQuitRequested: vi.fn((listener: (requestId: string) => void) => {
       quitRequested = listener
       return vi.fn()
     }),
-    onQuitFailed: vi.fn((listener: (message: string) => void) => {
+    onQuitFailed: vi.fn((listener: (requestId: string, message: string) => void) => {
       quitFailed = listener
       return vi.fn()
     }),
@@ -26,7 +27,7 @@ function createHarness() {
     treeApi,
     store,
     fireQuit: (id: string) => quitRequested?.(id),
-    fireQuitFailed: (message: string) => quitFailed?.(message),
+    fireQuitFailed: (id: string, message: string) => quitFailed?.(id, message),
   }
 }
 
@@ -42,7 +43,10 @@ describe('renderer lifecycle', () => {
 
     expect(store.initialize).toHaveBeenCalledOnce()
     expect(store.flushPersistence).toHaveBeenCalledOnce()
-    expect(store.flushPersistence).toHaveBeenCalledWith({ cancelImageRecognition: true })
+    expect(store.flushPersistence).toHaveBeenCalledWith({
+      cancelImageRecognition: true,
+      sealEditsUntil: expect.any(AbortSignal),
+    })
     expect(treeApi.quit).toHaveBeenCalledWith('request-1')
 
     cleanup()
@@ -60,15 +64,85 @@ describe('renderer lifecycle', () => {
     expect(store.reportError).toHaveBeenCalledWith(new Error('save failed'))
     expect(store.requestQuitWithoutSavingPrompt).toHaveBeenCalledOnce()
     expect(treeApi.quit).not.toHaveBeenCalled()
+    expect(treeApi.cancelQuit).toHaveBeenCalledExactlyOnceWith('request-1')
   })
 
   it('reports a main-process shutdown failure', () => {
-    const { store, treeApi, fireQuitFailed } = createHarness()
+    const { store, treeApi, fireQuit, fireQuitFailed } = createHarness()
 
     startRendererLifecycle(store, treeApi)
-    fireQuitFailed('quit failed')
+    fireQuit('current')
+    fireQuitFailed('current', 'quit failed')
 
     expect(store.reportError).toHaveBeenCalledWith(new Error('quit failed'))
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'keeps the retry sealed when an obsolete acknowledgement later %ss',
+    async (outcome) => {
+      const h = createHarness()
+      const release = vi.fn()
+      const lock = vi.fn(() => release)
+      let resolve!: () => void
+      let reject!: (error: Error) => void
+      h.treeApi.quit.mockImplementationOnce(
+        () =>
+          new Promise<undefined>((yes, no) => {
+            resolve = () => yes(undefined)
+            reject = no
+          }),
+      )
+      const dispose = startRendererLifecycle(h.store, h.treeApi, lock)
+
+      h.fireQuit('old')
+      expect(lock).not.toHaveBeenCalled()
+      await vi.waitFor(() => expect(h.treeApi.quit).toHaveBeenCalledWith('old'))
+      const signal = vi.mocked(h.store.flushPersistence).mock.calls[0]![0]!.sealEditsUntil!
+      h.fireQuitFailed('old', 'timeout')
+      expect(signal.aborted).toBe(true)
+      expect(release).toHaveBeenCalledOnce()
+      h.fireQuit('new')
+      await vi.waitFor(() => expect(h.treeApi.quit).toHaveBeenCalledWith('new'))
+      h.fireQuitFailed('old', 'stale failure')
+      if (outcome === 'resolve') resolve()
+      else reject(new Error('stale acknowledgement'))
+      await new Promise<void>((done) => setTimeout(done, 0))
+
+      expect(lock).toHaveBeenCalledTimes(2)
+      expect(release).toHaveBeenCalledOnce()
+      expect(h.store.reportError).toHaveBeenCalledExactlyOnceWith(new Error('timeout'))
+      expect(h.store.requestQuitWithoutSavingPrompt).not.toHaveBeenCalled()
+      dispose()
+      expect(release).toHaveBeenCalledTimes(2)
+    },
+  )
+
+  it('rejects document edits only after a drained quit flush and accepts them again after cancellation', async () => {
+    const noop = async () => undefined
+    const store = new EditorStore(
+      {
+        load: async () => null,
+        save: noop,
+        cleanupAttachments: noop,
+        readClipboard: async () => ({ kind: 'text', text: 'P' }),
+        writeAttachment: noop,
+      },
+      () => 'one',
+    )
+    await store.initialize()
+    const attempt = new AbortController()
+    const flushed = store.flushPersistence({ sealEditsUntil: attempt.signal })
+    store.editText('one', 'before')
+    await flushed
+
+    store.editText('one', 'late')
+    await store.paste('one', 0)
+    store.undo()
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'before' }] } })
+
+    attempt.abort()
+    store.editText('one', 'resumed')
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'resumed' }] } })
   })
 
   it.each([false, true])(
