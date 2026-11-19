@@ -63,10 +63,20 @@ describeForEachEditingMode('Focused Agenda day', ({ mode, screenshotName }) => {
 
     await window.keyboard.press(mode === 'vim' ? 'j' : 'ArrowDown')
 
-    await expect(window.locator(`[data-agenda-key="node:${day}:item-0"] .node-input`)).toBeFocused()
+    const editor = window.locator(`[data-agenda-key="node:${day}:item-0"] .node-input`)
+    await expect(editor).toBeFocused()
 
-    await window.keyboard.press('Meta+,')
+    if (mode === 'vim') {
+      await window.keyboard.press('3')
+      await window.keyboard.press('Control+o')
 
+      await expect(heading).toBeVisible()
+      await expect(editor).toBeFocused()
+    }
+
+    await window.keyboard.press(mode === 'vim' ? 'Control+o' : 'Meta+,')
+
+    await expect(heading).toHaveCount(0)
     await expect(window.locator(`[data-agenda-key="day:${day}"]`)).toHaveAttribute('aria-selected', 'true')
   })
 

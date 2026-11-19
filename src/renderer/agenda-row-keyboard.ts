@@ -492,6 +492,7 @@ export function createAgendaKeyDownHandler({
     if (event.ctrlKey) {
       if (!normal || pending?.prefix !== undefined) return
       if (event.key === 'o') {
+        if (pending !== undefined) return
         beforeSelect?.(true)
         rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })

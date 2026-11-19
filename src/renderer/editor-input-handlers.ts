@@ -218,6 +218,7 @@ export function createEditorKeyDownHandler({
         event.key.toLowerCase() === 'o'
       ) {
         event.preventDefault()
+        if (discardsUnfinishedCommand(vim)) return
         prepareVimCommand(vim, 'navigation', event.currentTarget)
         store.applyAgenda({ kind: 'return-timeline', key: agenda.selectedKey })
         return

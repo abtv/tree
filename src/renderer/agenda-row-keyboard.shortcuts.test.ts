@@ -189,13 +189,19 @@ describe('Agenda keyboard Meta combinations on the other profile', () => {
 })
 
 describe('Agenda keyboard Ctrl commands in Vim Normal on a non-Apple profile', () => {
-  it('keeps Ctrl+O returning to the timeline from a focused day', async () => {
+  it('discards a count before Ctrl+O and lets the next Ctrl+O return to the timeline', async () => {
     const f = await fixture('other')
 
     f.selectRow(isDay)
     f.press('.', { ctrl: true })
 
     expect(focusedAgendaDay(f.snapshot().agenda)).toBeDefined()
+
+    f.press('3')
+    f.press('o', { ctrl: true })
+
+    expect(focusedAgendaDay(f.snapshot().agenda)).toBeDefined()
+    expect(f.vim!.commandState.pending).toBeUndefined()
 
     f.press('o', { ctrl: true })
 
