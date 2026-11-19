@@ -1,20 +1,24 @@
 import type { EditorStore } from '../application/editor-store'
+import { createRendererInputLock } from '../renderer/renderer-input-lock'
 import type { DataSession } from './services'
 import type { MenuFocus } from './menu-focus'
+import { otherWindowsMessage, pageAdmissionLock, reopenUpdateMessage, updateResponseTimeout } from './page-admission'
 
 const runtimeAssets = () => [
   import.meta.url,
   ...Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'), (link) => link.href),
 ]
 
-async function runtimeIsCached(worker: ServiceWorker): Promise<boolean> {
+async function readOfflineStatus(worker: ServiceWorker, checkWindows = false) {
   const channel = new MessageChannel()
   try {
     return await bounded(
-      new Promise<boolean>((resolve) => {
-        channel.port1.onmessage = (event: MessageEvent<{ ready?: unknown } | null>) =>
-          resolve(event.data?.ready === true)
-        worker.postMessage({ type: 'tree-offline-status', assets: runtimeAssets() }, [channel.port2])
+      new Promise<{ ready?: unknown; onlyWindow?: unknown } | null>((resolve) => {
+        channel.port1.onmessage = (event) => resolve(event.data)
+        worker.postMessage(
+          { type: 'tree-offline-status', assets: runtimeAssets(), ...(checkWindows && { checkWindows }) },
+          [channel.port2],
+        )
       }),
       'Offline access could not be verified',
     )
@@ -26,52 +30,67 @@ async function runtimeIsCached(worker: ServiceWorker): Promise<boolean> {
 
 function bounded<T>(promise: Promise<T>, message: string): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), 15_000)
+    const timer = setTimeout(() => reject(new Error(message)), updateResponseTimeout)
     promise.then(resolve, reject).finally(() => clearTimeout(timer))
   })
 }
+
+const requestedUpdateMessage = 'The update was requested. You can keep editing here and retry Update App to reload.'
 
 async function waitForController(worker: ServiceWorker) {
   const container = navigator.serviceWorker
   let changed: (() => void) | undefined
   try {
     await bounded(
-      new Promise<void>((resolve) => {
+      new Promise<void>((resolve, reject) => {
         changed = () => {
-          if (container.controller === worker) resolve()
+          if (worker.state === 'redundant')
+            reject(new Error('This update was replaced. Reconnect and try Update App again.'))
+          else if (container.controller === worker && worker.state === 'activated') resolve()
         }
         container.addEventListener('controllerchange', changed)
+        worker.addEventListener('statechange', changed)
         changed()
       }),
-      'The new version did not take control. Try Update App again.',
+      requestedUpdateMessage,
     )
   } finally {
-    if (changed) container.removeEventListener('controllerchange', changed)
+    if (changed) {
+      container.removeEventListener('controllerchange', changed)
+      worker.removeEventListener('statechange', changed)
+    }
   }
 }
 
 export async function activateUpdate(worker: ServiceWorker): Promise<void> {
   const channel = new MessageChannel()
   let changed: (() => void) | undefined
-  try {
-    await bounded(
+  const exchange = (expected: 'prepared' | 'activating', send: () => void, timeout: string) =>
+    bounded(
       new Promise<void>((resolve, reject) => {
         channel.port1.onmessage = (event: MessageEvent<unknown>) => {
-          if (event.data === 'activating') resolve()
-          else if (event.data === 'other-windows')
-            reject(new Error('Close other Tree tabs and windows, then try Update App again.'))
+          if (event.data === expected) resolve()
+          else if (event.data === 'other-windows') reject(new Error(otherWindowsMessage))
+          else if (event.data === 'activation-failed')
+            reject(new Error('The update did not finish. Try Update App again.'))
+          else if (event.data && typeof event.data === 'object' && 'ready' in event.data)
+            reject(new Error(reopenUpdateMessage))
           else reject(new Error('This update was replaced. Reconnect and try Update App again.'))
         }
-        worker.postMessage(
-          {
-            type: 'tree-activate-update',
-            assets: runtimeAssets(),
-          },
-          [channel.port2],
-        )
+        send()
       }),
+      timeout,
+    )
+  try {
+    await exchange(
+      'prepared',
+      () =>
+        worker.postMessage({ type: 'tree-offline-status', prepareUpdate: true, assets: runtimeAssets() }, [
+          channel.port2,
+        ]),
       'The update did not respond. Try Update App again.',
     )
+    await exchange('activating', () => channel.port1.postMessage('commit'), requestedUpdateMessage)
     if (worker.state === 'activated') return
     await bounded(
       new Promise<void>((resolve, reject) => {
@@ -84,10 +103,14 @@ export async function activateUpdate(worker: ServiceWorker): Promise<void> {
         worker.addEventListener('statechange', changed)
         changed()
       }),
-      'The update did not finish. Try Update App again.',
+      requestedUpdateMessage,
     )
+  } catch (error) {
+    channel.port1.postMessage('cancel')
+    throw error
   } finally {
     if (changed) worker.removeEventListener('statechange', changed)
+    channel.port1.onmessage = null
     channel.port1.close()
     channel.port2.close()
   }
@@ -98,118 +121,164 @@ export function installAppUpdates(
   store: EditorStore,
   session: DataSession,
   focus: Pick<MenuFocus, 'close'>,
-  dataOperationRunning: () => boolean,
+  tryBeginUpdate: () => (() => void) | undefined,
 ) {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
   const button = document.getElementById('app-update') as HTMLButtonElement
   const trigger = document.getElementById('tree-menu-button')!
   const status = document.getElementById('offline-status')!
-  const root = document.getElementById('root')!
+  const lockInput = createRendererInputLock(document.getElementById('root')!)
   let registration: ServiceWorkerRegistration | undefined
-  let applying = false
-  let checking = false
+  let application: 'idle' | 'applying' | 'retry' = 'idle'
+  let checkInFlight: { reconnected: boolean } | undefined
+  let recheckAfterApply = false
+  let assessment = 0
+  let mismatchedWorker: ServiceWorker | undefined
   let requestedWorker: ServiceWorker | undefined
-  const updateWorker = () =>
-    requestedWorker && ['activating', 'activated'].includes(requestedWorker.state)
-      ? requestedWorker
-      : registration?.waiting
+  const observedWorkers = new WeakSet<ServiceWorker>()
+  const updateWorker = () => {
+    // A mismatched first page needs the active offline package before it can retain its runtime across an upgrade.
+    if (mismatchedWorker && mismatchedWorker !== requestedWorker && registration?.active === mismatchedWorker)
+      return mismatchedWorker
+    return (
+      registration?.waiting ??
+      (requestedWorker && ['activating', 'activated'].includes(requestedWorker.state) ? requestedWorker : undefined)
+    )
+  }
   const show = (text: string) => {
     status.hidden = false
     status.textContent = text
   }
   const render = () => {
-    const waiting = updateWorker() !== undefined && updateWorker() !== null
+    const waiting = updateWorker() !== undefined
     button.hidden = !waiting
-    button.disabled = applying
+    button.disabled = application === 'applying'
     trigger.classList.toggle('update-attention', waiting)
     trigger.setAttribute('aria-description', waiting ? 'An app update is ready' : '')
   }
   const assessOffline = async (worker: ServiceWorker) => {
+    const id = ++assessment
+    const current = () => id === assessment && registration?.active === worker
     try {
-      const ready = await runtimeIsCached(worker)
-      if (applying) return
-      if (ready) show('Ready to work offline')
-      else {
-        requestedWorker = worker
-        show('Update App to enable offline access')
-        render()
-      }
+      const ready = (await readOfflineStatus(worker))?.ready === true
+      if (!current()) return
+      mismatchedWorker = ready ? undefined : worker
+      if (application === 'idle') show(ready ? 'Ready to work offline' : 'Update App to enable offline access')
+      render()
     } catch {
-      if (!applying) show('Offline setup incomplete — reconnect to try again')
+      if (current() && application === 'idle') show('Offline setup incomplete — reconnect to try again')
     }
   }
   const observe = (worker: ServiceWorker) => {
+    if (observedWorkers.has(worker)) return
+    observedWorkers.add(worker)
     worker.addEventListener('statechange', () => {
       render()
       if (worker.state === 'activated') void assessOffline(worker)
-      if (worker.state === 'redundant' && !registration?.active) {
+      if (worker.state === 'redundant' && !registration?.active && application === 'idle') {
         show('Offline setup incomplete — reconnect to try again')
       }
     })
   }
   const check = async () => {
-    if (checking || applying) return
-    checking = true
+    if (application === 'applying') {
+      recheckAfterApply = true
+      return
+    }
+    if (checkInFlight) {
+      checkInFlight.reconnected = true
+      return
+    }
+    const request = { reconnected: false }
+    checkInFlight = request
+    let failed = false
     try {
       if (!registration || (!registration.active && !registration.installing && !registration.waiting)) {
-        registration = await navigator.serviceWorker.register(new URL('sw.js', document.baseURI), {
+        const next = await navigator.serviceWorker.register(new URL('sw.js', document.baseURI), {
           updateViaCache: 'none',
         })
-        registration.addEventListener('updatefound', () => {
-          if (registration?.installing) observe(registration.installing)
-        })
+        if (next !== registration) {
+          registration = next
+          next.addEventListener('updatefound', () => {
+            if (registration === next && next.installing) observe(next.installing)
+          })
+        }
         if (registration.installing) observe(registration.installing)
         if (registration.active) void assessOffline(registration.active)
-        else show('Preparing offline access…')
+        else if (application === 'idle') show('Preparing offline access…')
       } else {
         await registration.update()
         if (registration.active) void assessOffline(registration.active)
       }
       render()
     } catch {
-      if (!registration?.active) show('Offline setup incomplete — reconnect to try again')
+      failed = true
+      if (!registration?.active && application === 'idle') show('Offline setup incomplete — reconnect to try again')
     } finally {
-      checking = false
+      checkInFlight = undefined
+      if (failed && request.reconnected) void check()
     }
   }
   button.onclick = async () => {
     const worker = updateWorker()
-    if (!worker || applying) return
+    if (!worker || application === 'applying') return
     // Archive/import work owns the saved head while these actions are disabled.
-    if (dataOperationRunning()) {
+    const releaseOperation = tryBeginUpdate()
+    if (!releaseOperation) {
       show('Finish the current data operation before updating')
       return
     }
-    applying = true
+    application = 'applying'
+    const edits = new AbortController()
     focus.close()
-    root.inert = true
-    const block = (event: Event) => {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-    }
-    const events = ['keydown', 'beforeinput', 'paste', 'cut', 'drop', 'pointerdown', 'click']
-    for (const event of events) window.addEventListener(event, block, true)
+    const releaseInput = lockInput()
     let resume: (() => void) | undefined
     render()
     show('Saving before updating…')
     try {
-      await bounded(store.flushPersistence(), 'Saving took too long. Keep this tab open and try again.')
-      resume = session.suspendWrites()
-      requestedWorker = worker
-      if (worker.state !== 'activated' && worker.state !== 'activating') await activateUpdate(worker)
-      await waitForController(worker)
+      await bounded(
+        store.flushPersistence({ sealEditsUntil: edits.signal }),
+        'Saving took too long. Keep this tab open and try again.',
+      )
+      if (
+        worker.state === 'redundant' ||
+        (worker !== updateWorker() && worker !== registration?.active && worker !== registration?.waiting)
+      )
+        throw new Error('This update was replaced. Reconnect and try Update App again.')
+      const admission = pageAdmissionLock(registration!.scope)
+      await navigator.locks.request(admission, { ifAvailable: true }, async (lock) => {
+        if (!lock) throw new Error(otherWindowsMessage)
+        if (worker === mismatchedWorker && worker === registration?.active) {
+          const status = await readOfflineStatus(worker, true)
+          if (status?.onlyWindow === false) throw new Error(otherWindowsMessage)
+          if (status?.onlyWindow !== true) throw new Error(reopenUpdateMessage)
+        }
+        resume = session.suspendWrites()
+        requestedWorker = worker
+        if (worker.state !== 'activated' && worker.state !== 'activating') await activateUpdate(worker)
+        await waitForController(worker)
+      })
       location.reload()
     } catch (error) {
+      edits.abort()
       resume?.()
-      root.inert = false
-      applying = false
-      for (const event of events) window.removeEventListener(event, block, true)
+      releaseOperation()
+      releaseInput()
+      application = 'retry'
       show(error instanceof Error ? error.message : 'Update failed. Keep this tab open and try again.')
       render()
       document.getElementById('tree-menu')!.showPopover()
-      button.focus()
+      if (button.hidden) trigger.focus()
+      else button.focus()
+      if (recheckAfterApply) {
+        recheckAfterApply = false
+        void check()
+      }
     }
   }
-  window.addEventListener('online', () => void check())
+  window.addEventListener('online', () => {
+    if (application === 'retry') application = 'idle'
+    void check()
+  })
   void check()
 }

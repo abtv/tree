@@ -39,7 +39,10 @@ if (process.argv.includes('--tree-test-app-updates')) {
     if (probe.fail) native.emit('error', new Error('test install failure'))
     else native.emit('update-downloaded')
   }
-  native.quitAndInstall = () => app.quit()
+  native.quitAndInstall = () => {
+    for (const window of require('electron').BrowserWindow.getAllWindows()) window.close()
+    app.quit()
+  }
   probe.downloaded = (version = '1.2.4') => updater.emit('update-downloaded', { version })
   probe.available = () => updater.emit('update-available')
   probe.progress = (percent) => updater.emit('download-progress', { percent })

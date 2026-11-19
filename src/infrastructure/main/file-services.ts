@@ -3,6 +3,7 @@ import { copyFile, link, mkdir, open, readFile, readdir, rename, stat, unlink, u
 import { basename, join } from 'node:path'
 import {
   collectAttachmentIds,
+  hasNewerDocumentVersion,
   isValidAttachmentId,
   parsePersistedState,
   validatePersistedState,
@@ -479,10 +480,11 @@ export async function findNewestValidDocument(directory: string): Promise<Newest
     return result
   }
   const primary = await readCandidate(documentPath)
-  if ('value' in primary && primary.value === null) {
-    // Only missing files may produce the first-launch null sentinel.
+  if ('value' in primary && (primary.value === null || hasNewerDocumentVersion(primary.value))) {
+    // A stored null cannot start a new document. A newer primary must survive recovery promotion.
     return { error: new Error('The saved document has an unsupported format.') }
   }
+  const temporary = candidates.find((candidate) => candidate.path === temporaryDocumentPath)
   let firstError: unknown
   for (const candidate of candidates) {
     const read = await readCandidate(candidate.path)
@@ -497,6 +499,12 @@ export async function findNewestValidDocument(directory: string): Promise<Newest
         firstError = error
       }
       continue
+    }
+    if (temporary && temporary.modifiedMs >= candidate.modifiedMs && candidate.path !== temporary.path) {
+      const interrupted = await readCandidate(temporary.path)
+      if ('value' in interrupted && hasNewerDocumentVersion(interrupted.value)) {
+        return { error: new Error('The saved document has an unsupported format.') }
+      }
     }
     return { path: candidate.path, value: read.value }
   }

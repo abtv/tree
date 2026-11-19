@@ -1,10 +1,14 @@
 // @editing-modes: independent
 import type { ElectronApplication } from '@playwright/test'
-import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
+import { historicalNotes } from '../document-formats'
+import { controlPostedTasksWithClock } from '../search-clock'
+import { onePixelPng } from '../../src/shared/png-test-utils'
 import { join } from 'node:path'
 import {
   allowRendererError,
   attachmentFiles,
+  attachmentPath,
   clickApplicationMenuQuit,
   closeApp,
   configureHiddenParallelTests,
@@ -15,6 +19,7 @@ import {
   node,
   readPersisted,
   seedDocument,
+  setCursor,
   test,
   tryReadPersisted,
   typeInto,
@@ -44,6 +49,48 @@ async function holdAttachmentWrite(app: ElectronApplication, rejectFirst = false
 
 test.describe('persistence reliability regressions', () => {
   configureHiddenParallelTests()
+
+  for (const version of [1, 2, 3, 4, 5]) {
+    test(`opens format ${version} directly and preserves the notes on save`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, historicalNotes(version))
+      mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+      const image = attachmentPath(userDataDir, 'diagram')
+      writeFileSync(image, onePixelPng)
+      const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+      const entry = window.locator('[data-node-id="entry"] .node-input')
+      await expect(entry).toBeFocused()
+      await expect(entry).toHaveValue('Notes\n第二行')
+      await expect(window.getByAltText('Attached image')).toBeVisible()
+
+      await setCursor(entry, 'Notes\n第二行'.length)
+      await window.keyboard.type('!')
+      const closed = app.waitForEvent('close')
+      await clickApplicationMenuQuit(app)
+      await closed
+
+      const expected = historicalNotes(version, '!')
+      expect(readPersisted(userDataDir)).toMatchObject({
+        version: 5,
+        location: expected.location,
+        view: expected.view ?? { expandedIds: [] },
+      })
+      expect(readPersisted(userDataDir).document).toEqual(expected.document)
+      expect(readFileSync(image)).toEqual(Buffer.from(onePixelPng))
+      if (version === 1) {
+        const reopened = await launchTree(userDataDir, { vimPreference: false })
+        await expect(reopened.window.locator('[data-node-id="entry"] .node-input')).toHaveValue('Notes\n第二行!')
+        await expect(reopened.window.getByAltText('Attached image')).toBeVisible()
+        await reopened.window.locator('[data-node-id="entry"] .node-input').fill('Notes\n第二行!!')
+        const done = reopened.app.waitForEvent('close')
+        await clickApplicationMenuQuit(reopened.app)
+        await done
+        const saved = readPersisted(userDataDir)
+        expect(saved.document).toEqual(historicalNotes(1, '!!').document)
+        expect(saved.location).toEqual(expected.location)
+        expect(readFileSync(image)).toEqual(Buffer.from(onePixelPng))
+      }
+    })
+  }
 
   test('rejects a null primary and preserves recovery documents through quit', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
@@ -86,7 +133,7 @@ test.describe('persistence reliability regressions', () => {
     for (const [path, bytes] of files) expect(readFileSync(path, 'utf8')).toBe(bytes)
   })
 
-  test('recovers a valid backup after rejecting an unsupported temporary document', async ({ userDataDir }) => {
+  test('recovers a valid backup newer than an unsupported temporary document', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: 'Recovered backup', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
@@ -96,6 +143,8 @@ test.describe('persistence reliability regressions', () => {
     writeFileSync(`${documentPath(userDataDir)}.bak`, backup)
     writeFileSync(documentPath(userDataDir), '{ damaged')
     writeFileSync(`${documentPath(userDataDir)}.tmp`, '{"version":999}')
+    const past = new Date(Date.now() - 60_000)
+    utimesSync(`${documentPath(userDataDir)}.tmp`, past, past)
 
     const { window } = await launchTree(userDataDir)
 
@@ -287,6 +336,67 @@ test.describe('persistence reliability regressions', () => {
     const restarted = await launchTree(userDataDir)
 
     await expect(node(restarted.window, 1)).toHaveValue('before late')
+  })
+
+  test('keeps the saved selection when a Find repeat starts during the final quit save', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'a', text: 'Origin', children: [] },
+          { id: 'b', text: 'Target', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'a' },
+    })
+    const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+    const origin = window.locator('[data-node-id="a"] .node-input')
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('Target')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('[data-node-id="b"] .node-focus-marker')).toHaveCount(1)
+    await window.keyboard.press('Escape')
+    await origin.click()
+    await window.clock.install()
+    await window.clock.pauseAt(new Date(Date.now() + 1000))
+    await controlPostedTasksWithClock(window)
+    const gate = await app.evaluateHandle(() => {
+      const state = { saving: false, confirming: false, finishSave() {}, finishQuit() {} }
+      const save = new Promise<void>((resolve) => {
+        state.finishSave = resolve
+      })
+      const quit = new Promise<void>((resolve) => {
+        state.finishQuit = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        state.saving = true
+        await save
+        return original(...args)
+      })
+      globalThis.__treeIpc.wrap('tree:quit', async (original, ...args) => {
+        state.confirming = true
+        await quit
+        return original(...args)
+      })
+      return state
+    })
+    await origin.fill('Origin edited')
+    await clickApplicationMenuQuit(app)
+    await expect.poll(() => gate.evaluate((state) => state.saving)).toBe(true)
+
+    await window.keyboard.press('Meta+g')
+    await gate.evaluate((state) => state.finishSave())
+    await expect.poll(() => gate.evaluate((state) => state.confirming)).toBe(true)
+    await window.clock.runFor(100)
+    await expect(window.locator('[data-node-id="a"] .node-focus-marker')).toHaveCount(1)
+    const closed = app.waitForEvent('close')
+    await gate.evaluate((state) => state.finishQuit())
+    await closed
+
+    expect(readPersisted(userDataDir).location.selectedNodeId).toBe('a')
+    const reopened = await launchTree(userDataDir, { vimPreference: false })
+    const restored = reopened.window.locator('[data-node-id="a"] .node-input')
+    await expect(restored).toBeFocused()
+    await expect(restored).toHaveValue('Origin edited')
   })
 
   test('waits for an image paste before menu quit and restores the image on restart', async ({ userDataDir }) => {

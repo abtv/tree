@@ -1265,6 +1265,7 @@ Every Tree release must open valid notes saved in any document format used by an
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
 
 When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2.
+If a Find jump completes during saving, the final save includes its destination and any opened branches. A jump still pending when the final save completes cannot move the selection afterward.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
 
@@ -1277,6 +1278,9 @@ A document opens even when an attachment file it references is missing; the affe
 If stored document files exist but none can be loaded, loading fails without changing those files. If no document files exist, the normal first-launch behavior applies.
 
 A primary file containing JSON `null` is invalid stored data, not a first launch. Loading shows an error and preserves the stored document files.
+
+If the primary file declares a newer document format, Tree shows the load error and preserves the primary and its recovery files through an update attempt.
+Tree also preserves a newer-format interrupted save whose modification time is equal to or later than the newest readable candidate. It keeps all attachments until a compatible version can open the notes. A strictly newer readable candidate can still recover an older interrupted save.
 
 The following state must be persisted:
 
@@ -2651,12 +2655,18 @@ focus or reloads an open editor. Applying a waiting update requires no network c
 Update App saves pending work, including buffered Vim edits, before activating the new package
 and reloading this window. Interaction is temporarily unavailable during this operation.
 A save error or timeout keeps the editor open and displays a retryable message in the menu.
+After dismissing that menu, typing continues at the selected Find result and its text position.
 Repeated requests do not start concurrent updates. A running data operation must finish first.
+An update can also run from the document-load error screen. It preserves the unopened document.
 
 If other Tree tabs or windows are open, Tree asks the user to close them and retry, without
 activating the update. This edge follows the durability principle (§1.1) and the existing single
 writer restriction: an update must not switch another window's runtime underneath its work.
 These controls and the offline package apply only to the browser version, not Electron.
+
+If a new tab arrives during the final switch, it displays a message asking the user to reload before opening the editor. The same other-window check applies when the first page needs to reload an already installed package. If an older worker cannot check open tabs or confirm activation, Tree saves the notes and asks the user to close all Tree tabs and reopen the app.
+
+A preparation timeout cancels that attempt's permission to switch. If the browser has already been asked to activate the package, a timeout explains that the request was sent. The open editor can continue saving. A late controller change leaves the current page open. An explicit retry saves any further edits before reloading it.
 
 ## 25. Desktop Notes Export and Import
 
@@ -2749,11 +2759,14 @@ Applying the update blocks editing, saves pending work including Vim buffers and
 asks the macOS installer to verify, install and restart Tree. A failed or timed-out
 save leaves the application open and editable; it never offers to discard notes
 to install an update. Repeated requests do not start concurrent installations.
-When the user retries after a failure, completion of the earlier attempt does not
-restore editing or interrupt the new attempt's save acknowledgment.
+When the user retries after a failure, a late response from the earlier attempt cannot
+restore editing during the retry's save or installation. If the previous native operation
+is still running, the saved retry waits for it before starting another installation.
 
-An installation error or preparation timeout restores editing and allows another attempt. Ordinary Quit
-does not initiate installation of an update the user has not requested.
+An installation error or preparation timeout restores editing and allows another attempt. The timeout
+message also offers quitting and reopening Tree to recover from an unresponsive macOS installer.
+Ordinary Quit does not initiate installation of an update the user has not requested.
+Closing the window or choosing Quit while macOS is still preparing the package uses the ordinary save-and-quit path. The installer takes over closing windows when Tree calls it to quit and install. If installation fails while the document cannot open, both errors remain visible.
 
 Update checks add no document writes or document traversal. Explicit installation
 uses the existing persistence flush. Download/cache storage is proportional to the

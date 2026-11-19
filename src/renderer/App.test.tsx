@@ -2964,7 +2964,7 @@ describe('App', () => {
     expect(screen.getByText('Loading document…')).toBeInTheDocument()
   })
 
-  it('shows an error state when the document cannot be loaded', async () => {
+  it('keeps the load failure visible when a later installer error supplies recovery instructions', async () => {
     const services: EditorServices = {
       load: async () => {
         throw new Error('boom')
@@ -2983,6 +2983,11 @@ describe('App', () => {
     render(<App initialVimEnabled store={store} />)
 
     expect(screen.getByRole('alert')).toHaveTextContent('boom')
+
+    act(() => store.reportError(new Error('Retry Restart and Install, or quit and reopen Tree.')))
+
+    expect(screen.getByText('boom')).toBeVisible()
+    expect(screen.getByText(/Retry Restart and Install, or quit and reopen Tree/)).toBeVisible()
   })
 
   it('shows operation failures in the visible red error message', async () => {

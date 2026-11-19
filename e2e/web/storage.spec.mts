@@ -1,6 +1,9 @@
 // @editing-modes: independent
 import { test, expect, capture, primaryKey } from './fixtures.mts'
 import type { Page } from '@playwright/test'
+import { historicalNotes } from '../document-formats.ts'
+import { onePixelPng } from '../../src/shared/png-test-utils.ts'
+import { holdHeadAcknowledgement, readStored, writeStored } from './data-helpers.mts'
 
 const ready = (page: Page) => page.waitForFunction(() => window.prototypeStore?.getSnapshot().status === 'ready')
 const saved = (page: Page) =>
@@ -27,6 +30,49 @@ const readHead = (page: Page) =>
     }
   })
 
+for (const version of [1, 2, 3, 4, 5]) {
+  test(`opens stored format ${version} directly and saves its notes in the current format`, async ({
+    newContext,
+    baseURL,
+  }) => {
+    const context = await newContext()
+    let page = await context.newPage()
+    await page.goto(baseURL!)
+    await ready(page)
+    await page.evaluate(() => window.prototypeStore.flushPersistence())
+    await page.evaluate((bytes) => window.treeApi.writeAttachment('diagram', new Uint8Array(bytes)), [...onePixelPng])
+    await writeStored(page, 'document', 'head', historicalNotes(version))
+    await page.reload()
+    const entry = page.locator('[data-node-id="entry"] .node-input')
+    await expect(entry).toHaveValue('Notes\n第二行')
+    await expect(page.getByAltText('Attached image')).toBeVisible()
+    await entry.fill('Notes\n第二行!')
+    await saved(page)
+
+    const expected = historicalNotes(version, '!')
+    const head = await readStored(page, 'document', 'head')
+    expect(head).toMatchObject({
+      version: 5,
+      location: expected.location,
+      view: expected.view ?? { expandedIds: [] },
+    })
+    expect(head.document).toEqual(expected.document)
+    expect(await readStored(page, 'blobs', 'diagram')).toEqual([...onePixelPng])
+    if (version === 1) {
+      await page.close()
+      page = await context.newPage()
+      await page.goto(baseURL!)
+      await expect(page.locator('[data-node-id="entry"] .node-input')).toHaveValue('Notes\n第二行!')
+      await expect(page.getByAltText('Attached image')).toBeVisible()
+      const restored = await page.evaluate(() => {
+        const { document, location } = window.prototypeStore.getSnapshot() as ReadyEditorSnapshot
+        return { document, location }
+      })
+      expect(restored).toEqual({ document: expected.document, location: expected.location })
+    }
+  })
+}
+
 test('protects an Undo while the previous document write awaits acknowledgement', async ({ newContext, baseURL }) => {
   const context = await newContext()
   const page = await context.newPage()
@@ -36,25 +82,7 @@ test('protects an Undo while the previous document write awaits acknowledgement'
   await page.evaluate(() => window.prototypeStore.flushPersistence())
   const original = await input(page).inputValue()
 
-  await page.evaluate(() => {
-    const put = IDBObjectStore.prototype.put
-    IDBObjectStore.prototype.put = function (...args) {
-      const request = put.apply(this, args)
-      if (this.name === 'document' && args[1] === 'head') {
-        IDBObjectStore.prototype.put = put
-        const tx = this.transaction
-        tx.addEventListener(
-          'complete',
-          (event) => {
-            event.stopImmediatePropagation()
-            window.finishHeadWrite = () => tx.oncomplete?.call(tx, event)
-          },
-          { once: true, capture: true },
-        )
-      }
-      return request
-    }
-  })
+  await holdHeadAcknowledgement(page)
   await input(page).fill('Edited one two three four five six seven eight nine ten')
   await page.waitForFunction(() => window.finishHeadWrite !== undefined)
   await page.keyboard.press(`${primaryKey}+z`)

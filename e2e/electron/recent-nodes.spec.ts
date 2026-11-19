@@ -12,7 +12,7 @@ import {
   describeForEachEditingMode,
   setMainWindowBounds,
 } from './fixtures'
-import { controlPostedTasksWithClock } from './search-clock'
+import { controlPostedTasksWithClock } from '../search-clock'
 
 describeForEachEditingMode('Recent nodes @linux', (mode) => {
   // @requirement PRODUCT.md §20.14

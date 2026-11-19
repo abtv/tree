@@ -20,7 +20,8 @@ function fixture(rich = false) {
   const item = document.createElement('button')
   menu.append(item)
   document.body.append(editor, trigger, menu)
-  const focus = installMenuFocus(menu, trigger)
+  const restoreFind = vi.fn()
+  const focus = installMenuFocus(menu, trigger, restoreFind)
   menu.hidePopover = vi.fn(() => {
     menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'closed' }))
     if (menu.contains(document.activeElement)) trigger.focus()
@@ -31,8 +32,25 @@ function fixture(rich = false) {
     menu.dispatchEvent(Object.assign(new Event('beforetoggle'), { newState: 'open' }))
     item.focus()
   }
-  return { editor, trigger, menu, item, focus, open }
+  return { editor, trigger, menu, item, focus, open, restoreFind }
 }
+
+it('returns from Find to its current result when the menu closes', () => {
+  const f = fixture()
+  const controls = document.createElement('div')
+  controls.className = 'search-input-line'
+  const find = document.createElement('input')
+  controls.append(find)
+  document.body.append(controls)
+  f.editor.focus()
+  find.focus()
+  f.open()
+
+  f.focus.close()
+
+  expect(f.restoreFind).toHaveBeenCalledOnce()
+  expect(document.activeElement).not.toBe(f.editor)
+})
 
 it('preserves a new caret when an explicit command focuses the original editor', async () => {
   const f = fixture()

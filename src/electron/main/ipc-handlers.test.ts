@@ -819,6 +819,7 @@ describe('main IPC handlers', () => {
     const check = handlers.get(ipcChannels.checkAppUpdate)!
     const confirm = handlers.get(ipcChannels.confirmAppUpdate)!
     await check(event)
+    expect(appUpdates.check).toHaveBeenCalledWith('online')
     confirm(event, 'id', true)
     expect(appUpdates.confirm).toHaveBeenCalledWith('id', true)
     expect(() => check(event, 'https://example.com')).toThrow()

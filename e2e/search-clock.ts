@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 
-/** Playwright's clock pauses timers, not postTask. Call after installing the clock. */
+/** Run posted search tasks under the installed Playwright page clock. */
 export async function controlPostedTasksWithClock(window: Page): Promise<void> {
   await window.evaluate(() => {
     if (typeof globalThis.scheduler?.postTask !== 'function') return

@@ -16,7 +16,7 @@ import {
   screenshotContentSize,
   test,
 } from './fixtures'
-import { controlPostedTasksWithClock } from './search-clock'
+import { controlPostedTasksWithClock } from '../search-clock'
 
 test('keeps a long confirmed query inside the bottom status bar', async ({ userDataDir }) => {
   seedDocument(userDataDir, {

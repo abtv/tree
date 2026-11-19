@@ -50,13 +50,15 @@ import { getCaret } from './editor-dom'
 import { useAgendaRepeat } from './use-agenda-repeat'
 import { StatusBar } from './StatusBar'
 
+export type EditorFindCommand = import('../shared/ipc').FindMenuCommand | 'restore-editor'
+
 interface AppProps {
   startupPreferences?: EditingPreferences
   onQuitDialogChange?: () => void
   platformStatus?: React.ReactNode
   dismissTransientStatus?: () => void
   showAbout?: () => void
-  registerSearchCommands?: (run: (command: import('../shared/ipc').FindMenuCommand) => void) => () => void
+  registerSearchCommands?: (run: (command: EditorFindCommand) => void) => () => void
   registerViewCommands?: (commands: Pick<CommandServices, 'showAgenda' | 'showTree'>) => () => void
   menuCommands?: import('../application/menu-commands').MenuCommandSource
   store: EditorStore
@@ -259,7 +261,7 @@ export function App({
       }
     },
   })
-  const searchAction = useRef<(command: 'find' | 'next' | 'previous' | 'all') => void>(() => undefined)
+  const searchAction = useRef<(command: EditorFindCommand) => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
     summarySelection: vimMode === 'visual-node' ? nodeVisualSelection : undefined,
     showAbout,
@@ -346,9 +348,10 @@ export function App({
     searchAction.current = (command) => {
       if (command === 'find') localSearch.open()
       else if (command === 'all') openGlobalSearch.current?.()
+      else if (command === 'restore-editor') restoreSearchFocus()
       else localSearch.navigate(command === 'next' ? 1 : -1)
     }
-  }, [localSearch])
+  }, [localSearch, restoreSearchFocus])
   useEffect(() => window.treeApi.onFindMenuCommand?.((command) => searchAction.current(command)), [])
   useEffect(() => registerSearchCommands?.((command) => searchAction.current(command)), [registerSearchCommands])
   useLayoutEffect(
@@ -572,6 +575,12 @@ export function App({
         <p>Loading document…</p>
       </main>
     )
+  const operationError =
+    state.operationError === undefined ? null : (
+      <span className="save-error" role="alert">
+        {OPERATION_ERROR_PREFIX} {state.operationError}
+      </span>
+    )
   if (state.status === 'error') {
     return (
       <div className="tree-app">
@@ -583,6 +592,7 @@ export function App({
         {commandList}
         <StatusBar>
           <div className="status-notifications">
+            {operationError}
             {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
             {platformStatus}
           </div>
@@ -843,11 +853,7 @@ export function App({
               {SAVE_ERROR_PREFIX} {state.saveError}
             </span>
           )}
-          {state.operationError === undefined ? null : (
-            <span className="save-error" role="alert">
-              {OPERATION_ERROR_PREFIX} {state.operationError}
-            </span>
-          )}
+          {operationError}
           {persistenceLocked ? (
             <span className="save-error persistence-locked" role="alert">
               {SAVE_LOCKED_MESSAGE}

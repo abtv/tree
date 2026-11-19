@@ -401,6 +401,23 @@ describe('file services', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(previous)
   })
 
+  it('protects a future primary even when a readable interrupted save has a later timestamp', async () => {
+    const { directory, services } = await servicesForTest()
+    const primary = join(directory, 'document.json')
+    const temporary = join(directory, 'document.json.tmp')
+    const future = JSON.stringify({ ...stateWithoutImage('Future notes'), version: 6 })
+    const previous = JSON.stringify(stateWithoutImage('Earlier notes'))
+    await writeFile(primary, future)
+    const past = new Date(Date.now() - 60_000)
+    await utimes(primary, past, past)
+    await writeFile(temporary, previous)
+
+    await expect(services.load()).rejects.toThrow('unsupported format')
+
+    expect(await readFile(primary, 'utf8')).toBe(future)
+    expect(await readFile(temporary, 'utf8')).toBe(previous)
+  })
+
   it('loads and promotes a newer interrupted save over an older primary', async () => {
     const { directory, services } = await servicesForTest()
     const committed = stateWithoutImage('Committed')
@@ -413,6 +430,25 @@ describe('file services', () => {
     await expect(services.load()).resolves.toEqual(interrupted)
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(interrupted)
     await expect(readFile(join(directory, 'document.json.tmp'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it.each([0, 60])('preserves a future interrupted save when the primary is %s seconds older', async (age) => {
+    const { directory, services } = await servicesForTest()
+    const primary = join(directory, 'document.json')
+    const temporary = join(directory, 'document.json.tmp')
+    const previous = JSON.stringify(stateWithoutImage('Previous'))
+    const future = JSON.stringify({ ...stateWithoutImage('Latest'), version: 6 })
+    const now = new Date()
+    const earlier = new Date(+now - age * 1000)
+    await writeFile(primary, previous)
+    await writeFile(temporary, future)
+    await utimes(primary, earlier, earlier)
+    await utimes(temporary, now, now)
+
+    await expect(services.load()).rejects.toThrow('unsupported format')
+
+    expect(await readFile(primary, 'utf8')).toBe(previous)
+    expect(await readFile(temporary, 'utf8')).toBe(future)
   })
 
   it('recovers a valid generation when the primary is structurally invalid', async () => {
@@ -742,7 +778,7 @@ describe('file services', () => {
     },
   )
 
-  it('skips an unsupported temporary document and recovers a valid backup', async () => {
+  it('opens a readable backup newer than an unsupported temporary document', async () => {
     const { directory, services } = await servicesForTest()
     const backup = {
       version: 1,
@@ -752,6 +788,7 @@ describe('file services', () => {
 
     await writeFile(join(directory, 'document.json'), '{ damaged')
     await writeFile(join(directory, 'document.json.tmp'), '{"version":999}')
+    await ageFile(join(directory, 'document.json.tmp'), 60)
     await writeFile(join(directory, 'document.json.bak'), JSON.stringify(backup))
 
     await expect(services.load()).resolves.toEqual(backup)

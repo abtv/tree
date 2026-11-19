@@ -4,6 +4,7 @@ import { createRendererInputLock } from './renderer-input-lock'
 
 interface UpdateAttempt {
   id: string
+  edits: AbortController
   releaseInput(): void
 }
 
@@ -17,17 +18,19 @@ export function startAppUpdates(
   const unlock = (current = attempt) => {
     if (current === undefined || attempt !== current) return
     attempt = undefined
+    current.edits.abort()
     current.releaseInput()
   }
   const removeRequest = api.onAppUpdateRequested?.((id) => {
     if (attempt !== undefined) return
     const current: UpdateAttempt = {
       id,
+      edits: new AbortController(),
       releaseInput: lockInput(),
     }
     attempt = current
     void store
-      .flushPersistence({ cancelImageRecognition: true })
+      .flushPersistence({ cancelImageRecognition: true, sealEditsUntil: current.edits.signal })
       .then(async () => {
         if (attempt === current) await api.confirmAppUpdate?.(current.id, true)
       })

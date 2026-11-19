@@ -7,14 +7,17 @@ export interface MenuFocus {
   dispose(): void
 }
 
-export function installMenuFocus(menu: HTMLElement, trigger: HTMLElement): MenuFocus {
+export function installMenuFocus(menu: HTMLElement, trigger: HTMLElement, restoreFind: () => void): MenuFocus {
   let previous: { element: HTMLElement; restore(): void } | undefined
   let open = false
   let outside = false
   let disposed = false
   const remember = (element: EventTarget | null) => {
-    if (!(element instanceof HTMLElement) || !element.matches('.node-input, .agenda-row')) return
-    previous = { element, restore: captureFocusRestoration(element) }
+    if (!(element instanceof HTMLElement)) return
+    if (element.matches('.search-input-line input, .search-controls button'))
+      previous = { element, restore: restoreFind }
+    else if (element.matches('.node-input, .agenda-row'))
+      previous = { element, restore: captureFocusRestoration(element) }
   }
   const restore = () => {
     if (!disposed) previous?.restore()

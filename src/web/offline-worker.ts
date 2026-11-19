@@ -1,3 +1,5 @@
+import { pageAdmissionLock, updatingPageMessage, updateResponseTimeout } from './page-admission'
+
 export interface OfflineFile {
   path: string
   integrity: string
@@ -30,6 +32,19 @@ export interface OfflineScope {
   addEventListener(type: 'fetch', handler: (event: WorkerFetchEvent) => void): void
 }
 
+function confirmWithPage(port: MessagePort): Promise<boolean> {
+  return new Promise((resolve) => {
+    const finish = (confirmed: boolean) => {
+      clearTimeout(timer)
+      port.onmessage = null
+      resolve(confirmed)
+    }
+    const timer = setTimeout(() => finish(false), updateResponseTimeout)
+    port.onmessage = (event) => finish(event.data === 'commit')
+    port.postMessage('prepared')
+  })
+}
+
 /** Only app files enter these caches. Notes and images remain in IndexedDB. */
 export function installOfflineWorker(scope: OfflineScope, version: string, files: readonly OfflineFile[]) {
   const base = scope.registration.scope
@@ -44,6 +59,7 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
     runtime?: string | undefined
     waiting?: string | undefined
     installing?: string | undefined
+    requested?: string | undefined
   }
   const readState = async (): Promise<State> => {
     const response = await (await scope.caches.open(metadataName)).match(metadataKey)
@@ -58,6 +74,32 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
     }
   }
   const exclusive = (run: () => Promise<void>) => scope.locks.request(`${prefix}lifecycle`, run)
+  const admission = pageAdmissionLock(base)
+  const onlyWindow = async (requester: string) => {
+    const clients = (await scope.clients.matchAll({ type: 'window', includeUncontrolled: true })).filter((client) =>
+      client.url.startsWith(base),
+    )
+    return clients.length === 1 && clients[0]!.id === requester
+  }
+  const activationRefusal = async (requester: string, reply: MessagePort, confirm: boolean, received: number) => {
+    if (!(await onlyWindow(requester))) return 'other-windows'
+    if (!confirm) return performance.now() - received >= updateResponseTimeout ? 'activation-failed' : undefined
+    const confirmationStarted = performance.now()
+    if (!(await confirmWithPage(reply))) return 'activation-failed'
+
+    // A tab can open while the confirmation is in transit. The page can retire its request while clients are listed.
+    let canceled = false
+    reply.onmessage = (event) => {
+      if (event.data === 'cancel') canceled = true
+    }
+    try {
+      if (!(await onlyWindow(requester))) return 'other-windows'
+      if (canceled || performance.now() - confirmationStarted >= updateResponseTimeout) return 'activation-failed'
+    } finally {
+      reply.onmessage = null
+    }
+    return undefined
+  }
 
   scope.addEventListener('install', (event) => {
     event.waitUntil(
@@ -77,6 +119,7 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
           }
           await exclusive(async () => {
             const state = await readState()
+            if (state.installing !== cacheName) throw new Error('Offline package superseded')
             // Also retain the previous waiting worker: it can be entering automatic activation
             // while this installation completes. The next transition removes that extra package.
             await prune([state.active, state.runtime, state.waiting, cacheName])
@@ -84,8 +127,9 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
           })
         } catch (error) {
           await exclusive(async () => {
-            await scope.caches.delete(cacheName)
             const state = await readState()
+            // A redeployed version can share its content-addressed cache with the running page.
+            if (![state.active, state.runtime, state.waiting].includes(cacheName)) await scope.caches.delete(cacheName)
             if (state.installing === cacheName) await writeState({ ...state, installing: undefined })
           })
           throw error
@@ -99,7 +143,8 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
       exclusive(async () => {
         const state = await readState()
         const first = state.active === undefined
-        const next = state.active === cacheName ? state : { ...state, active: cacheName, runtime: state.active }
+        const runtime = state.requested === cacheName || state.active === cacheName ? state.runtime : state.active
+        const next = { ...state, active: cacheName, runtime, requested: undefined }
         await writeState(next)
         await prune([next.active, next.runtime, next.waiting, next.installing])
         // Initial setup must control the open page so unused workers can also load offline.
@@ -110,7 +155,12 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
   })
 
   scope.addEventListener('message', (event) => {
-    const message = event.data as { type?: unknown; assets?: unknown } | null
+    const message = event.data as {
+      type?: unknown
+      assets?: unknown
+      checkWindows?: unknown
+      prepareUpdate?: unknown
+    } | null
     if (
       (message?.type !== 'tree-activate-update' && message?.type !== 'tree-offline-status') ||
       !Array.isArray(message.assets) ||
@@ -123,28 +173,31 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
       return
     const assets = message.assets as string[]
     const requester = event.source.id
+    const confirm = message.type === 'tree-offline-status' && message.prepareUpdate === true
     const reply = event.ports[0]
-    if (message.type === 'tree-offline-status') {
+    if (message.type === 'tree-offline-status' && !confirm) {
       event.waitUntil(
         (async () => {
           const cache = await scope.caches.open(cacheName)
-          reply.postMessage({ ready: (await Promise.all(assets.map((asset) => cache.match(asset)))).every(Boolean) })
+          const ready = (await Promise.all(assets.map((asset) => cache.match(asset)))).every(Boolean)
+          reply.postMessage(
+            message.checkWindows === true ? { ready, onlyWindow: await onlyWindow(requester) } : { ready },
+          )
         })(),
       )
       return
     }
-    let activate = false
-    event.waitUntil(
-      exclusive(async () => {
-        const clients = (await scope.clients.matchAll({ type: 'window', includeUncontrolled: true })).filter((client) =>
-          client.url.startsWith(base),
-        )
-        if (clients.length !== 1 || clients[0]!.id !== requester) {
+    const received = performance.now()
+    const apply = async () => {
+      let activation: Promise<void> | undefined
+      await exclusive(async () => {
+        if (!(await onlyWindow(requester))) {
           reply.postMessage('other-windows')
           return
         }
         const names = await scope.caches.keys()
-        if (!names.includes(cacheName)) {
+        const state = await readState()
+        if (state.waiting !== cacheName || !names.includes(cacheName)) {
           reply.postMessage('superseded')
           return
         }
@@ -162,15 +215,28 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
           reply.postMessage('superseded')
           return
         }
-        await writeState({ ...(await readState()), active: cacheName, runtime })
-        activate = true
-      }).then(async () => {
-        // Activation acquires this lock too; never await it while holding the lock.
-        if (activate) {
-          await scope.skipWaiting()
-          reply.postMessage('activating')
+        // Pin the requesting page now. Only the browser's activate event changes the active package.
+        await writeState({ ...state, requested: cacheName, runtime })
+        const refusal = await activationRefusal(requester, reply, confirm, received)
+        if (refusal !== undefined) {
+          await writeState(state)
+          reply.postMessage(refusal)
+          return
         }
-      }),
+        // The activate event needs the lifecycle lock, so start the handoff here and await it outside.
+        activation = scope.skipWaiting().then(
+          () => reply.postMessage('activating'),
+          () => reply.postMessage('activation-failed'),
+        )
+      })
+      await activation
+    }
+    event.waitUntil(
+      confirm
+        ? apply()
+        : scope.locks.request(admission, { ifAvailable: true }, (lock) =>
+            lock ? apply() : reply.postMessage('other-windows'),
+          ),
     )
   })
 
@@ -182,20 +248,25 @@ export function installOfflineWorker(scope: OfflineScope, version: string, files
       request.mode === 'navigate' &&
       (requested.pathname === new URL(base).pathname || requested.pathname === new URL('index.html', base).pathname)
     if (!navigation && !paths.has(request.url) && !request.url.startsWith(url('assets/'))) return
+    const serve = async () => {
+      const key = navigation ? url('index.html') : request.url
+      const current = await scope.caches.open(cacheName)
+      const cached = await current.match(key)
+      if (cached) return cached
+      // A page from the previous release can still request its hashed worker or lazy chunk.
+      for (const name of await scope.caches.keys()) {
+        if (!name.startsWith(prefix) || name === cacheName) continue
+        const old = await (await scope.caches.open(name)).match(key)
+        if (old) return old
+      }
+      return scope.fetch(request)
+    }
     event.respondWith(
-      (async () => {
-        const key = navigation ? url('index.html') : request.url
-        const current = await scope.caches.open(cacheName)
-        const cached = await current.match(key)
-        if (cached) return cached
-        // A page from the previous release can still request its hashed worker or lazy chunk.
-        for (const name of await scope.caches.keys()) {
-          if (!name.startsWith(prefix) || name === cacheName) continue
-          const old = await (await scope.caches.open(name)).match(key)
-          if (old) return old
-        }
-        return scope.fetch(request)
-      })(),
+      navigation
+        ? scope.locks.request(admission, { mode: 'shared', ifAvailable: true }, (lock) =>
+            lock ? serve() : new Response(updatingPageMessage, { headers: { 'Cache-Control': 'no-store' } }),
+          )
+        : serve(),
     )
   })
 }

@@ -52,7 +52,7 @@ vi.mock('../infrastructure/renderer/attachment-image-cache', () => ({
 
 const store = { initialize: mocks.initialize, reportError: mocks.reportError }
 const data = {}
-const isRunning = vi.fn(() => false)
+const tryBeginUpdate = vi.fn(() => () => {})
 const commands = {}
 
 beforeEach(() => {
@@ -66,7 +66,7 @@ beforeEach(() => {
   mocks.createRoot.mockReturnValue({ render: mocks.render })
   mocks.focus.mockReturnValue({ close: mocks.close })
   mocks.installAbout.mockReturnValue({ show: mocks.about })
-  mocks.menu.mockReturnValue({ commands, isRunning })
+  mocks.menu.mockReturnValue({ commands, tryBeginUpdate })
   mocks.apple.mockReturnValue(false)
   mocks.getVim.mockResolvedValue(false)
   mocks.protectionText.mockReturnValue('Protected storage')
@@ -115,6 +115,7 @@ describe('browser entry wiring', () => {
     expect(mocks.focus).toHaveBeenCalledExactlyOnceWith(
       document.getElementById('tree-menu'),
       document.getElementById('tree-menu-button'),
+      expect.any(Function),
     )
     expect(window).toHaveProperty('prototypeStore', store)
     expect(mocks.store).toHaveBeenCalledWith({}, expect.any(Function), undefined, {
@@ -135,7 +136,7 @@ describe('browser entry wiring', () => {
       shortcutPlatform: apple ? 'apple' : 'other',
       deferRichEditing: true,
     })
-    expect(mocks.updates).toHaveBeenCalledWith(store, data, { close: mocks.close }, isRunning)
+    expect(mocks.updates).toHaveBeenCalledWith(store, data, { close: mocks.close }, tryBeginUpdate)
     expect(mocks.menu).toHaveBeenCalledExactlyOnceWith(store, document.getElementById('tree-menu'), data, {
       close: mocks.close,
     })
@@ -174,15 +175,18 @@ describe('browser entry wiring', () => {
     const props = await setup()
     const search = vi.fn()
     const unregister = props.registerSearchCommands!(search)
+    const restoreFind = mocks.focus.mock.lastCall![2] as () => void
 
     button('local-find').click()
     button('global-search').click()
+    restoreFind()
     unregister()
     button('local-find').click()
     button('global-search').click()
+    restoreFind()
     await Promise.resolve()
 
-    expect(search.mock.calls).toEqual([['find'], ['all']])
+    expect(search.mock.calls).toEqual([['find'], ['all'], ['restore-editor']])
     expect(mocks.reportError).not.toHaveBeenCalled()
   })
 

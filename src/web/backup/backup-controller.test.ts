@@ -96,7 +96,7 @@ async function fixture(stored?: ReturnType<typeof folder>, supported = true) {
     flush: vi.fn<() => Promise<void>>(async () => undefined),
     restore: vi.fn(async () => undefined),
   }
-  const refresh = installFolderBackup(
+  const controls = installFolderBackup(
     session,
     document.getElementById('tree-menu')!,
     new BrowserMenuCommands(),
@@ -111,7 +111,7 @@ async function fixture(stored?: ReturnType<typeof folder>, supported = true) {
     unsubscribe,
     actions,
     dialog,
-    refresh,
+    ...controls,
     button,
     status: () => document.getElementById('backup-status')!.textContent,
   }
@@ -176,13 +176,16 @@ describe('folder backup controller', () => {
     stored.requestPermission.mockImplementationOnce(() => new Promise((resolve) => (grant = resolve)))
     const f = await fixture(stored)
     f.button('data-backup').click()
+    expect(f.isConfiguring()).toBe(true)
     f.button('backup-confirm-resume').click()
+    expect(f.isConfiguring()).toBe(true)
 
     window.dispatchEvent(new Event('pagehide'))
     grant('granted')
     await vi.waitFor(() => expect(f.button('data-backup').disabled).toBe(false))
 
     expect(BackupWorker.instances).toEqual([])
+    expect(f.isConfiguring()).toBe(false)
     expect(f.unsubscribe).toHaveBeenCalledOnce()
   })
 

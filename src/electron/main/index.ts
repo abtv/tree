@@ -143,14 +143,14 @@ function rebuildApplicationMenu(): void {
           modalOpen: rendererModalOpen || (appUpdates?.isApplying() ?? false) || (appUpdates?.isNotifying() ?? false),
           updatesSupported: appUpdates !== undefined,
           updateChecking: appUpdates?.isChecking() ?? false,
-          updateReady: appUpdates?.isReady() ?? false,
+          updateReady: appUpdates?.canRequest() ?? false,
           updateVersion: appUpdates?.getVersion(),
           updateBlocked: appUpdateBlocked,
           updateApplying: appUpdates?.isApplying() ?? false,
         },
         {
           requestQuit: () => {
-            appUpdates?.cancelSaving()
+            appUpdates?.cancelBeforeNativeQuit()
             requestQuitFromMenu()
           },
           updateApp: () => appUpdates?.request(),
@@ -233,20 +233,25 @@ function createMainWindow(quitWithoutSave: () => void): void {
   window.setAlwaysOnTop(windowAlwaysOnTopStore.load())
   followWindowAppearance(window, nativeTheme, currentAppearance)
   mainWindow = window
+  const refreshUpdateMenu = (): void => {
+    if (window === mainWindow && appUpdates?.isReady()) rebuildApplicationMenu()
+  }
   const resetNotesMenu = (): void => {
     rendererModalOpen = false
     appUpdateBlocked = false
-    appUpdates?.cancelSaving()
+    appUpdates?.cancelBeforeNativeQuit()
     notesMenuState = { canExport: false, canImport: false }
     rebuildApplicationMenu()
     void notesArchive
       ?.cancel()
+      .then(refreshUpdateMenu)
       .catch((error: unknown) => reportMainProcessError('Could not cancel notes operation', error))
   }
   window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
     if (isMainFrame && !isInPlace) resetNotesMenu()
   })
   window.webContents.on('render-process-gone', resetNotesMenu)
+  window.webContents.on('did-stop-loading', refreshUpdateMenu)
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()
     const bounds: WindowBounds = { x, y, width, height }
@@ -260,7 +265,10 @@ function createMainWindow(quitWithoutSave: () => void): void {
   })
   window.on('closed', () => {
     rendererModalOpen = false
-    if (mainWindow === window) mainWindow = null
+    if (mainWindow === window) {
+      mainWindow = null
+      if (appUpdates?.isReady()) rebuildApplicationMenu()
+    }
   })
   void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
     reportMainProcessError('Could not load the renderer', error)
@@ -282,20 +290,26 @@ bootstrapApplication({
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
     if (app.isPackaged && process.platform === 'darwin') {
-      let nativeStagedVersion: string | undefined
-      let stagingVersion: string | undefined
+      let nativePackage:
+        | { phase: 'idle' }
+        | { phase: 'staging' | 'installing'; version: string; retryWaiting: boolean }
+        | { phase: 'staged'; version: string } = { phase: 'idle' }
       const install = () => {
         const version = appUpdates?.getVersion()
         if (!version) throw new Error('No downloaded update version.')
-        if (nativeStagedVersion === version) nativeUpdater.quitAndInstall()
-        else if (stagingVersion === undefined) {
-          stagingVersion = version
-          try {
-            nativeUpdater.checkForUpdates()
-          } catch (error) {
-            stagingVersion = undefined
-            throw error
-          }
+        // Native callbacks carry no request ID. Keep at most one outstanding operation across timeouts.
+        if (nativePackage.phase === 'staging' || nativePackage.phase === 'installing') {
+          nativePackage.retryWaiting = true
+          return
+        }
+        const staged = nativePackage.phase === 'staged' && nativePackage.version === version
+        nativePackage = { phase: staged ? 'installing' : 'staging', version, retryWaiting: false }
+        try {
+          if (staged) appUpdates!.handOffToInstaller(() => nativeUpdater.quitAndInstall())
+          else nativeUpdater.checkForUpdates()
+        } catch (error) {
+          nativePackage = staged ? { phase: 'staged', version } : { phase: 'idle' }
+          throw error
         }
       }
       autoUpdater.autoInstallOnAppQuit = false
@@ -360,22 +374,38 @@ bootstrapApplication({
       autoUpdater.on('update-downloaded', (info) => appUpdates?.downloaded(info.version))
       autoUpdater.on('update-available', () => appUpdates?.available())
       autoUpdater.on('download-progress', (progress) => appUpdates?.downloading(progress.percent))
-      nativeUpdater.on('update-downloaded', () => {
-        nativeStagedVersion = stagingVersion
-        stagingVersion = undefined
+      const finishNativeOperation = (downloaded: boolean) => {
+        if (nativePackage.phase !== 'staging' && nativePackage.phase !== 'installing') return
+        const { phase, version, retryWaiting } = nativePackage
+        nativePackage = downloaded || phase === 'installing' ? { phase: 'staged', version } : { phase: 'idle' }
         if (appUpdates?.isInstalling()) {
+          if (!downloaded && !retryWaiting) {
+            appUpdates.fail('Update failed. Try Restart and Install again.')
+            return
+          }
           try {
             install()
           } catch {
             appUpdates.fail('Update failed. Try Restart and Install again.')
           }
         }
+      }
+      nativeUpdater.on('update-downloaded', () => {
+        if (nativePackage.phase === 'staging') finishNativeOperation(true)
       })
-      nativeUpdater.on('error', () => {
-        stagingVersion = undefined
+      nativeUpdater.on('update-not-available', () => {
+        if (nativePackage.phase === 'staging') finishNativeOperation(false)
       })
-      autoUpdater.on('error', () => appUpdates?.fail('Update failed. Try Restart and Install again.'))
-      app.on('before-quit', () => appUpdates?.cancelSaving())
+      // MacUpdater forwards this same Error to the provider emitter synchronously.
+      const nativeErrors = new WeakSet<Error>()
+      nativeUpdater.prependListener('error', (error: Error) => {
+        nativeErrors.add(error)
+        finishNativeOperation(false)
+      })
+      autoUpdater.on('error', (error) => {
+        if (!nativeErrors.delete(error)) appUpdates?.fail('Update failed. Try Restart and Install again.')
+      })
+      app.on('before-quit', () => appUpdates?.cancelBeforeNativeQuit())
       void appUpdates.check()
     }
     const resolvedRenderer = resolveRendererUrl(

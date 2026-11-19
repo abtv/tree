@@ -19,6 +19,14 @@ class Channel {
     this.port2.peer = this.port1
   }
 }
+function prepare(port: Port, onCommit?: () => void) {
+  port.onmessage = ({ data }) => {
+    if (data !== 'commit') return
+    onCommit?.()
+    port.postMessage('activating')
+  }
+  port.postMessage('prepared')
+}
 class Worker extends EventTarget {
   state: ServiceWorkerState = 'installed'
   postMessage = vi.fn<(data: unknown, ports: Port[]) => void>()
@@ -42,10 +50,11 @@ describe('update activation contract', () => {
     vi.useFakeTimers()
     vi.stubGlobal('MessageChannel', Channel)
     const worker = new Worker()
-    worker.postMessage.mockImplementation((_, ports) => {
-      worker.state = 'redundant'
-      ports[0]!.postMessage('activating')
-    })
+    worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        worker.state = 'redundant'
+      }),
+    )
 
     await expect(activateUpdate(worker as unknown as ServiceWorker)).rejects.toThrow(
       'This update is no longer available. Try again when connected.',
@@ -60,7 +69,7 @@ describe('update activation contract', () => {
     vi.stubGlobal('MessageChannel', Channel)
     const worker = new Worker()
     worker.state = 'activated'
-    worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage('activating'))
+    worker.postMessage.mockImplementation((_, ports) => prepare(ports[0]!))
 
     await activateUpdate(worker as unknown as ServiceWorker)
 
@@ -97,7 +106,7 @@ describe('update activation contract', () => {
       await rejected
 
       expect(worker.postMessage).toHaveBeenCalledWith(
-        { type: 'tree-activate-update', assets: [expect.any(String), link.href] },
+        { type: 'tree-offline-status', prepareUpdate: true, assets: [expect.any(String), link.href] },
         [expect.any(Port)],
       )
       const port = worker.postMessage.mock.calls[0]![1][0]!
@@ -112,7 +121,7 @@ describe('update activation contract', () => {
     vi.stubGlobal('MessageChannel', Channel)
     const worker = new Worker()
     worker.state = 'activating'
-    worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage('activating'))
+    worker.postMessage.mockImplementation((_, ports) => prepare(ports[0]!))
     const add = vi.spyOn(worker, 'addEventListener')
     const remove = vi.spyOn(worker, 'removeEventListener')
     const result = activateUpdate(worker as unknown as ServiceWorker)
@@ -134,18 +143,19 @@ describe('update activation contract', () => {
     vi.useFakeTimers()
     vi.stubGlobal('MessageChannel', Channel)
     const worker = new Worker()
-    worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage('activating'))
+    worker.postMessage.mockImplementation((_, ports) => prepare(ports[0]!))
     const remove = vi.spyOn(worker, 'removeEventListener')
     const result = activateUpdate(worker as unknown as ServiceWorker)
-    const rejected = expect(result).rejects.toThrow('did not finish')
+    const rejected = expect(result).rejects.toThrow('update was requested')
 
     await vi.advanceTimersByTimeAsync(15_000)
     await rejected
 
     expect(remove).toHaveBeenCalledWith('statechange', expect.any(Function))
-    expect(worker.postMessage).toHaveBeenCalledWith({ type: 'tree-activate-update', assets: [expect.any(String)] }, [
-      expect.any(Port),
-    ])
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      { type: 'tree-offline-status', prepareUpdate: true, assets: [expect.any(String)] },
+      [expect.any(Port)],
+    )
     expect(worker.postMessage.mock.calls[0]![1][0]!.close).toHaveBeenCalledOnce()
   })
 
@@ -156,10 +166,11 @@ describe('update activation contract', () => {
 
     await expect(activateUpdate(worker as unknown as ServiceWorker)).rejects.toThrow('Close other Tree')
 
-    worker.postMessage.mockImplementation((_, ports) => {
-      worker.state = 'activated'
-      ports[0]!.postMessage('activating')
-    })
+    worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        worker.state = 'activated'
+      }),
+    )
 
     await expect(activateUpdate(worker as unknown as ServiceWorker)).resolves.toBeUndefined()
   })
@@ -179,6 +190,7 @@ async function controller(
   vi.stubGlobal('MessageChannel', Channel)
   const worker = new Worker()
   const registration = Object.assign(new EventTarget(), {
+    scope: new URL('.', document.baseURI).href,
     waiting: options.waiting === undefined ? worker : options.waiting,
     installing: options.installing ?? null,
     active: options.active ?? null,
@@ -191,7 +203,13 @@ async function controller(
     }),
     controller: null as Worker | null,
   })
-  vi.stubGlobal('navigator', { serviceWorker: container })
+  type RunLock = (lock: object | null) => Promise<void>
+  const locks = {
+    request: vi.fn(async (_name: string, options: LockOptions | RunLock, run?: RunLock) =>
+      typeof options === 'function' ? options({}) : run!({}),
+    ),
+  }
+  vi.stubGlobal('navigator', { serviceWorker: container, locks })
   document.body.innerHTML =
     '<div id="root"></div><button id="tree-menu-button"></button><div id="tree-menu"></div><button id="app-update"></button><button id="data-export"></button><span id="offline-status"></span>'
   Object.assign(document.getElementById('tree-menu')!, { showPopover: vi.fn() })
@@ -202,7 +220,7 @@ async function controller(
     { flushPersistence: flush } as EditorStore,
     { suspendWrites, onSaved: () => () => {}, discardStagedImages: async () => {} },
     { close },
-    () => options.busy ?? false,
+    () => (options.busy ? undefined : () => {}),
   )
   await Promise.resolve()
   return {
@@ -211,12 +229,115 @@ async function controller(
     suspendWrites,
     close,
     registration,
+    locks,
     container,
     button: document.getElementById('app-update') as HTMLButtonElement,
   }
 }
 
 describe('update save boundary', () => {
+  it('lets an old waiting worker finish on reopen without giving it a one-way activation request', async () => {
+    const f = await controller(async () => undefined)
+    f.worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+
+    f.button.click()
+
+    await vi.waitFor(() => expect(document.getElementById('offline-status')!.textContent).toContain('reopen Tree'))
+    expect(f.worker.postMessage).toHaveBeenCalledExactlyOnceWith(
+      { type: 'tree-offline-status', prepareUpdate: true, assets: [expect.any(String)] },
+      [expect.any(Port)],
+    )
+    expect(document.getElementById('root')!.inert).toBe(false)
+    expect(f.resume).toHaveBeenCalledOnce()
+  })
+  it('retries the newest waiting package after controller transfer timed out', async () => {
+    vi.useFakeTimers()
+    const f = await controller(async () => undefined)
+    f.worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        f.worker.state = 'activated'
+        f.registration.waiting = null
+        f.registration.active = f.worker
+      }),
+    )
+    f.button.click()
+    await vi.advanceTimersByTimeAsync(15_000)
+    f.worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    const newer = new Worker()
+    newer.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage('other-windows'))
+    f.registration.waiting = newer
+
+    f.button.click()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(newer.postMessage).toHaveBeenCalledOnce()
+    expect(document.getElementById('offline-status')!.textContent).toContain('Close other Tree')
+  })
+
+  it('retains a late first-page mismatch for a retry after a newer worker refuses activation', async () => {
+    const active = new Worker()
+    active.state = 'activated'
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const f = await controller(async () => undefined, { active })
+    f.container.controller = active
+    const probe = active.postMessage.mock.calls[0]![1][0]!
+    f.button.click()
+    await vi.waitFor(() => expect(f.worker.postMessage).toHaveBeenCalledOnce())
+
+    probe.postMessage({ ready: false })
+    f.worker.postMessage.mock.calls[0]![1][0]!.postMessage('superseded')
+    await vi.waitFor(() => expect(f.button.disabled).toBe(false))
+    expect(document.getElementById('offline-status')!.textContent).toContain('replaced')
+    active.postMessage.mockImplementationOnce((_, ports) => ports[0]!.postMessage({ ready: false, onlyWindow: true }))
+    f.button.click()
+
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledOnce())
+    expect(f.worker.postMessage).toHaveBeenCalledOnce()
+  })
+
+  it('rechecks the waiting package after saving before sending an activation request', async () => {
+    let finish!: () => void
+    const f = await controller(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        }),
+    )
+    f.button.click()
+    f.registration.waiting = new Worker()
+    f.worker.state = 'redundant'
+
+    finish()
+    await vi.waitFor(() => expect(f.button.disabled).toBe(false))
+
+    expect(f.worker.postMessage).not.toHaveBeenCalled()
+    expect(f.registration.waiting.postMessage).not.toHaveBeenCalled()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+    expect(document.getElementById('offline-status')!.textContent).toContain('replaced')
+  })
+
+  it('clears a recovered offline mismatch and ignores an older assessment arriving last', async () => {
+    const active = new Worker()
+    active.state = 'activated'
+    const f = await controller(async () => undefined, { active, waiting: null })
+    const first = active.postMessage.mock.calls[0]![1][0]!
+    active.postMessage.mockImplementationOnce((_, ports) => ports[0]!.postMessage({ ready: false }))
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => expect(f.button.hidden).toBe(false))
+    active.postMessage.mockImplementationOnce((_, ports) => ports[0]!.postMessage({ ready: true }))
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => expect(document.getElementById('offline-status')!.textContent).toBe('Ready to work offline'))
+
+    first.postMessage({ ready: false })
+    await vi.waitFor(() => expect(first.close).toHaveBeenCalledOnce())
+
+    expect(f.button.hidden).toBe(true)
+    expect(document.getElementById('offline-status')!.textContent).toBe('Ready to work offline')
+  })
+
   it('rechecks that the waiting worker still exists before saving', async () => {
     const flush = vi.fn(async () => undefined)
     const f = await controller(flush)
@@ -323,7 +444,7 @@ describe('update save boundary', () => {
     f.registration.waiting = null
     const active = f.worker
     f.registration.active = active
-    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false, onlyWindow: true }))
     window.dispatchEvent(new Event('online'))
     await vi.advanceTimersByTimeAsync(0)
     expect(f.button.hidden).toBe(false)
@@ -332,10 +453,13 @@ describe('update save boundary', () => {
     f.button.click()
     await vi.advanceTimersByTimeAsync(15_000)
 
-    expect(active.postMessage).not.toHaveBeenCalled()
+    expect(active.postMessage).toHaveBeenCalledExactlyOnceWith(
+      { type: 'tree-offline-status', assets: [expect.any(String)], checkWindows: true },
+      [expect.any(Port)],
+    )
     expect(f.resume).toHaveBeenCalledOnce()
     expect(document.getElementById('offline-status')!.textContent).toBe(
-      'The new version did not take control. Try Update App again.',
+      'The update was requested. You can keep editing here and retry Update App to reload.',
     )
     expect(f.button.hidden).toBe(false)
   })
@@ -379,7 +503,7 @@ describe('update save boundary', () => {
         { flushPersistence } as unknown as EditorStore,
         { suspendWrites, onSaved: () => () => {}, discardStagedImages: async () => {} },
         { close: vi.fn() },
-        () => false,
+        () => () => {},
       )
       await Promise.resolve()
 
@@ -469,6 +593,44 @@ describe('update save boundary', () => {
 
     expect(f.registration.update).toHaveBeenCalledTimes(2)
     expect(f.container.register).toHaveBeenCalledOnce()
+  })
+
+  it('retries a failed check once when the network returns during that check', async () => {
+    const f = await controller(async () => undefined)
+    let fail!: (error: Error) => void
+    f.registration.update.mockReturnValueOnce(
+      new Promise<void>((_, reject) => {
+        fail = reject
+      }),
+    )
+    window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('online'))
+    expect(f.registration.update).toHaveBeenCalledOnce()
+
+    fail(new Error('previous connection lost'))
+
+    await vi.waitFor(() => expect(f.registration.update).toHaveBeenCalledTimes(2))
+  })
+
+  it('restores editing immediately if the activated worker is replaced before it takes control', async () => {
+    const f = await controller(async () => undefined)
+    const listening = vi.spyOn(f.container, 'addEventListener')
+    f.worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        f.worker.state = 'activated'
+      }),
+    )
+    f.button.click()
+    await vi.waitFor(() => expect(listening).toHaveBeenCalledWith('controllerchange', expect.any(Function)))
+
+    f.worker.state = 'redundant'
+    f.registration.waiting = new Worker()
+    f.worker.dispatchEvent(new Event('statechange'))
+
+    await vi.waitFor(() => expect(f.resume).toHaveBeenCalledOnce())
+    expect(f.button.disabled).toBe(false)
+    expect(document.getElementById('offline-status')!.textContent).toContain('replaced')
   })
 
   it('preserves verified offline availability when a later network update check fails', async () => {
@@ -596,10 +758,11 @@ describe('update save boundary', () => {
     const f = await controller(async () => undefined)
     const add = vi.spyOn(f.container, 'addEventListener')
     const remove = vi.spyOn(f.container, 'removeEventListener')
-    f.worker.postMessage.mockImplementation((_, ports) => {
-      f.worker.state = 'activated'
-      ports[0]!.postMessage('activating')
-    })
+    f.worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        f.worker.state = 'activated'
+      }),
+    )
 
     f.button.click()
     await vi.waitFor(() => expect(add).toHaveBeenCalledWith('controllerchange', expect.any(Function)))
@@ -624,16 +787,17 @@ describe('update save boundary', () => {
     vi.stubGlobal('location', { reload })
     const f = await controller(async () => undefined)
     const remove = vi.spyOn(f.container, 'removeEventListener')
-    f.worker.postMessage.mockImplementation((_, ports) => {
-      f.worker.state = 'activated'
-      ports[0]!.postMessage('activating')
-    })
+    f.worker.postMessage.mockImplementation((_, ports) =>
+      prepare(ports[0]!, () => {
+        f.worker.state = 'activated'
+      }),
+    )
 
     f.button.click()
     await vi.advanceTimersByTimeAsync(15_000)
 
     expect(document.getElementById('offline-status')!.textContent).toBe(
-      'The new version did not take control. Try Update App again.',
+      'The update was requested. You can keep editing here and retry Update App to reload.',
     )
     expect(remove).toHaveBeenCalledWith('controllerchange', expect.any(Function))
     expect(f.resume).toHaveBeenCalledOnce()
@@ -660,12 +824,14 @@ describe('update save boundary', () => {
       expect(window.dispatchEvent(new Event(type, { cancelable: true }))).toBe(false)
     }
     window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('online'))
+    expect(f.registration.update).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(15_000)
 
     expect(document.getElementById('offline-status')!.textContent).toBe(
       'Saving took too long. Keep this tab open and try again.',
     )
-    expect(f.registration.update).not.toHaveBeenCalled()
+    expect(f.registration.update).toHaveBeenCalledOnce()
     expect(f.suspendWrites).not.toHaveBeenCalled()
     expect(f.worker.postMessage).not.toHaveBeenCalled()
     for (const type of events) {
@@ -685,6 +851,22 @@ describe('update save boundary', () => {
     expect(flush).not.toHaveBeenCalled()
     expect(f.suspendWrites).not.toHaveBeenCalled()
     expect(f.worker.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps a mismatched page editable when an earlier active worker cannot count windows', async () => {
+    const active = new Worker()
+    active.state = 'activated'
+    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+    const f = await controller(async () => undefined, { active, waiting: null })
+    f.container.controller = active
+    await vi.waitFor(() => expect(f.button.hidden).toBe(false))
+
+    f.button.click()
+
+    await vi.waitFor(() => expect(document.getElementById('offline-status')!.textContent).toContain('reopen Tree'))
+    expect(document.getElementById('root')!.inert).toBe(false)
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+    expect(f.button.hidden).toBe(false)
   })
 
   it.each([true, false])('assesses offline readiness of the active worker (cached=%s)', async (ready) => {

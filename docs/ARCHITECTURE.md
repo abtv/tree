@@ -217,6 +217,9 @@ later restoration cannot replace a newer manual selection.
 its monotonic document revision, including Undo/Redo, before notifying subscribers.
 Scope identity stays stable across ordinary selection and folds. The controller serializes
 navigation and retains the raw match anchor separately from the grapheme caret.
+Repeated jumps belong to the active navigation queue. An interruption or a jump
+without a destination discards its remaining repeats. If a subscriber starts a
+new jump while search becomes visible, only the new jump can move the caret.
 `EditorSearch` resolves origins, reveals ancestors and restores search-owned folds,
 including manual Tree/Agenda fold ownership transfers. It returns explicit Tree or
 Agenda view changes with a target location and token-free focus for a reveal.
@@ -359,8 +362,8 @@ packaged GitHub configuration. `AppUpdates` owns a separate bounded save acknowl
 and rollback of the bootstrap quit permission; the ordinary QuitHandshake is unchanged.
 Its independent state models own package readiness, download/failure feedback,
 the shared background-check Promise, manual check/dialog lifetime, and installation.
-Installation is `idle`, `awaiting-save` (request ID and deadline), or
-`preparing-install` (quit-permission rollback and deadline). Public status and
+Installation moves through `idle`, `awaiting-save` (request ID and deadline),
+`preparing-install` (native staging deadline) and `native-quit` (same deadline and quit-permission rollback). Public status and
 availability are derived from these states. A failed recheck can coexist with a
 ready package; failure feedback takes precedence without discarding that package.
 The native Tree menu requests a renderer flush through trusted IPC. Renderer input is
@@ -371,7 +374,12 @@ completion of an earlier attempt cannot release a retry or a replacement owner.
 Automatic installation on quit is disabled.
 The ZIP-download notification enables Restart and Install; only after successful saving does
 the main process ask Squirrel.Mac to stage and verify it, then quit and install.
-One persistent native listener avoids accumulating deferred installation callbacks on retry.
+Window close and ordinary quit can cancel the request during staging. Main grants the installer permission to close the windows immediately before calling its native quit method. The load-error screen shares the operation-error notification with the editor.
+Main registers the native listeners once. It tracks one package as idle, staging, staged or
+installing. The preparation timeout releases editing. It cannot cancel an outstanding native operation,
+whose callbacks carry no request ID. If a saved retry is waiting when the old operation fails,
+main continues with the requested version. An error received before that save completes leaves
+the retry in control of its own save and deadline.
 The permanent Check for Updates command shares an in-flight background request and
 shows one native result dialog without authorizing installation. Its check/dialog state
 disables duplicate commands; Restart and Install remains a separate explicit save-and-install action.
@@ -385,7 +393,11 @@ on unmount. Its bounded state adds no document work, persistence or editor reren
 Checks continue querying the provider after download. A new available package revokes
 previous readiness before downloading. Native staging is associated with its package
 version; late completion of an older staging attempt cannot install that version in
-response to a newer request. At most one native staging attempt runs at a time.
+response to a newer request. An unavailable package or staging error ends the native
+attempt. A retry that already completed its save can then start fresh staging,
+including for the same version. Reconnection schedules one check after a result
+dialog closes or an installation rolls back. If the connection returns during a
+failed provider request, the follow-up uses the new connection.
 
 `command-registry.ts` owns the application command panel's base registry: command names, aliases, descriptions, shortcut data (a key and a Shift flag; the renderer formats the label), state queries and run actions. `menu-commands.ts` defines data-menu command metadata and an observable source of supported actions and their enabled state. The desktop data coordinator publishes its existing menu availability. The browser Data and backup controllers publish explicit command identities and availability through `BrowserMenuCommands`, which projects that state into the buttons and the panel. Both call the same stable handlers synchronously, retaining picker user activation and rechecking current availability. Labels and DOM mutation observation do not determine command identity. The panel merges these entries with the base registry and rechecks current availability before execution. Actions invoke the same existing services as application menus and toggles, including the quit handshake. Matching, ordering, history normalization and history updates are pure functions independent of React, DOM and Electron. Alphabetical order is prepared when the available entries change; each input change scans registry entries and bounded history without document traversal.
 
@@ -403,6 +415,7 @@ This adds one bounded capture per existing focus owner, no document traversal or
 writes; it does not replace the editor's caret authority.
 
 The browser's `menu-focus.ts` owns the ellipsis menu's temporary focus transfer. It remembers one connected editing surface and directional selection, restores it synchronously before menu actions open dialogs, and defers native-dismissal restoration until the browser finishes restoring its trigger. Explicit pointer/Tab destinations and action-owned view changes retain focus. Menu surfaces declare `data-editor-focus-borrow`, which shares the input owner's temporary-blur exemption with the command panel. Data dialogs and activity messages return through the same focus owner on dismissal. The shared renderer registers its existing view commands with the browser menu so both menu and panel finish buffered edits before changing Tree/Agenda, without adding a save. Registration is released on unmount; menu view controls remain disabled until the renderer supplies its handlers. This adds bounded session-only DOM state, no document-scale work or writes beyond the existing edit-commit behavior.
+When a Find field or control lends focus to the browser menu, dismissal calls the renderer's Find restoration handler. That handler resolves the current result, Agenda row and saved caret or selection even when focus originally left another row.
 
 The desktop renderer registers the same view commands through `App.registerViewCommands`. Native View menu actions send the `tree:view-menu-command` main-to-renderer event; preload accepts only `tree` and `agenda` and returns a listener disposer. Registration follows the existing effect lifecycle, including Strict Mode and renderer reload. The main process caches the four native menu symbols once and reuses them across menu rebuilds. Browser menu icons are decorative CSS masks, so labels, picker activation and menu-command discovery retain their existing text and event paths.
 
@@ -441,7 +454,8 @@ Before application shutdown is allowed to complete, the main process asks the re
 
 The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
 
-Once the final flush has drained the editor and metadata queues, the store seals document edits for that request. The renderer locks native input before acknowledging it. Closing and update installation share a reference-counted input lock. A failure or timeout releases only the matching request. A native modal dialog places the locked-save confirmation above other renderer surfaces and restores their focus on cancellation. These transitions add constant state per active request and no disk writes.
+Once the final flush has drained the editor and metadata queues, the store seals document edits for each active quit or update request. Canceling one request releases only its seal. The renderer locks native input before acknowledging quit. Closing and update installation share a reference-counted input lock. A native modal dialog places the locked-save confirmation above other renderer surfaces and restores their focus on cancellation. These transitions add constant state per active request and no disk writes.
+The store interrupts pending Find jumps at entry and again when it seals edits. Jumps completed while the queues drain contribute their location and expansion to the final save. The destination handler rejects later jumps while a seal is held.
 
 `quit-handshake.ts` owns a local idle/waiting/quitting union. Only waiting carries
 the request ID and timeout handle; confirmation or force enters the terminal
@@ -941,6 +955,9 @@ Generation retention keeps the newest generations up to a fixed cap and always r
 
 The file-service `null` load result is reserved for missing document files. A primary file containing JSON `null` is rejected as unsupported at the file boundary, preserving the stored document files instead of triggering first-launch initialization.
 
+Before recovery selects a generation, it checks the version of the primary it already read. A primary with a newer integer version stops loading so an older generation cannot replace it. This check adds no file operations or document traversal.
+The selector also compares the interrupted save's modification time with the newest readable candidate, including ties. It reads the interrupted save once when needed and preserves every file and attachment if that version is newer than the reader. Loading adds at most one read in a primary/temporary tie and no writes on refusal.
+
 Absolute filesystem paths must not be stored in the document.
 
 ### Desktop notes replacement
@@ -1004,22 +1021,31 @@ automatic activation. Failed installation leaves the previous waiting package in
 Activation preserves the package containing the requester's entry script and stylesheets, including after
 repeated activation timeouts; it does not infer the running version from cache creation order.
 Only initial activation claims uncontrolled pages. Other caches and IndexedDB are untouched.
-The waiting worker accepts activation only from the sole Tree window client. A new window
-that opens during activation still encounters the existing single-writer Web Lock.
+The waiting worker checks for a sole Tree window before cache work and again after pinning the runtime. It then sends `prepared` on the request's MessagePort. On receipt of `commit` on that same port, the worker checks windows once more to catch arrivals while the message was in transit. It observes cancellation and its deadline through that last check before calling `skipWaiting()`. A retired page attempt sends `cancel` and closes its port. A refusal restores the previous pin. The worker releases the cache lifecycle lock before awaiting activation.
+
+A scoped Web Lock excludes page startup from the final switch. Both serving an entry navigation and opening the browser session use shared admission. A competing navigation immediately receives the reload message. The requester holds exclusive admission through its bounded wait for the selected controller. On timeout after sending `commit`, it releases input and writes and keeps running its pinned package. A late change of controller cannot reload the page. Retry saves again, waits for activation and controller ownership, then releases admission before reloading.
+
+The preparation request extends the read-only offline-status message. An older waiting worker replies with ordinary asset readiness, and the new page offers close and reopen so the browser can activate it normally. An already active first-visit package uses an optional read-only window check with the same fallback. Older pages send one-way `tree-activate-update` consent. The waiting worker takes admission itself, checks windows and limits preparation to the original response budget from receipt. An old sender cannot confirm again or revoke its consent on the new protocol. The browser can change the controller of a navigation before its document starts executing. Previously shipped entry scripts and workers cannot enforce the new admission check.
 
 `src/web/app-updates.ts` registers only in the production browser entry, checks at startup
 and reconnection, and publishes readiness through the browser menu. Download never reloads
-the page. An explicit update blocks input, flushes the existing store (including pending
-asynchronous edits), suspends session writes and requests activation through a MessageChannel.
-Only this requester reloads after activation. Failure or timeout restores interaction and
-writes; no global controller-change reload listener is installed. Data operations keep their
-existing ownership and must finish before an update can apply.
+the page. An explicit update can start after user-initiated folder backup configuration
+finishes. Ordinary background backup remains available. The update reserves the same operation slot as archive import and export,
+blocks input, and flushes the store, including buffered and asynchronous edits. The flush
+seals further edits before the controller suspends writes and requests activation through
+a MessageChannel. Only the requester reloads, after the selected worker takes control.
+Failure or timeout releases the operation slot and restores editing and writes. Cache
+assessments apply only to their active worker and latest request. The worker records the
+requested package and retains the open page's runtime until the browser confirms activation.
+Only the current waiting package accepts an activation request. An interrupted download
+preserves caches still used by the active worker, the waiting worker or the open page.
 
 Performance assessment (PRODUCT §22.1): package writes occur only during installation, off
 the main thread, with temporary response memory bounded by one file. The controller retains
 no document snapshots, and typing performs no update checks or cache writes. Activation uses
 the existing save flush, adding no new persistence policy. Unit guards bound retained cache
 generations and test ownership; browser tests exercise offline startup and real update failures.
+Page admission adds a bounded lock operation on entry. The explicit update checks open clients and locks and may undo its single cache metadata write. This adds no work during typing and no writes to notes.
 
 ### Browser notes archive
 

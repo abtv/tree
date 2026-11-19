@@ -9,7 +9,7 @@ import {
   clickApplicationMenuItem,
   describeForEachEditingMode,
 } from './fixtures'
-import { controlPostedTasksWithClock } from './search-clock'
+import { controlPostedTasksWithClock } from '../search-clock'
 
 describeForEachEditingMode('Local search', ({ mode }) => {
   test('keeps Find geometry and focus stable while typing and counting', async ({ userDataDir }) => {

@@ -27,6 +27,29 @@ export async function chooseMenuItem(page: Page, name: string) {
   await menu.getByRole('button', { name, exact: true }).click()
 }
 
+/** Delay the acknowledgement of one committed notes write until the test releases it. */
+export async function holdHeadAcknowledgement(page: Page) {
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args) {
+      const request = put.apply(this, args)
+      if (this.name === 'document' && args[1] === 'head') {
+        IDBObjectStore.prototype.put = put
+        const tx = this.transaction
+        tx.addEventListener(
+          'complete',
+          (event) => {
+            event.stopImmediatePropagation()
+            window.finishHeadWrite = () => tx.oncomplete?.call(tx, event)
+          },
+          { once: true, capture: true },
+        )
+      }
+      return request
+    }
+  })
+}
+
 /** Reads one IndexedDB value; `Uint8Array` values are returned as plain arrays. */
 export function readStored(page: Page, store: 'document', key: 'head'): Promise<PersistedEditorState>
 export function readStored(page: Page, store: 'blobs', key: string): Promise<number[] | undefined>

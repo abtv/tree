@@ -43,7 +43,7 @@ export interface FocusIntent {
 
 export type EditorSnapshot =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; operationError?: string }
   | {
       status: 'ready'
       document: Document

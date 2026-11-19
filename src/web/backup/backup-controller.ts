@@ -68,7 +68,7 @@ export function installFolderBackup(
   menu: HTMLElement,
   commands: BrowserMenuCommands,
   actions: BackupActions,
-): () => void {
+): { refresh(): void; isConfiguring(): boolean } {
   const button = document.getElementById('data-backup') as HTMLButtonElement
   const status = document.getElementById('backup-status')!
   const menuButton = document.getElementById('tree-menu-button')!
@@ -81,10 +81,10 @@ export function installFolderBackup(
   const stop = document.getElementById('backup-confirm-stop') as HTMLButtonElement
   const choose = document.getElementById('backup-confirm-choose') as HTMLButtonElement
   const cancel = document.getElementById('backup-confirm-cancel') as HTMLButtonElement
-  if (!supportsFolderBackup()) return () => undefined
+  if (!supportsFolderBackup()) return { refresh: () => {}, isConfiguring: () => false }
   status.hidden = false
   let lifecycle: BackupLifecycle = { phase: 'loading' }
-  let operation: 'idle' | 'running' = 'running'
+  let operation: 'idle' | 'initializing' | 'running' = 'initializing'
   let confirmation: BackupConfirmation = { phase: 'closed' }
   const configuredFolder = () => ('folder' in lifecycle ? lifecycle.folder : undefined)
   const disposed = () => lifecycle.phase === 'disposed'
@@ -195,8 +195,8 @@ export function installFolderBackup(
     lifecycle = { phase: 'starting', folder: next }
     startWorker()
   }
-  const run = async (action: () => Promise<void>) => {
-    operation = 'running'
+  const run = async (action: () => Promise<void>, phase: 'running' | 'initializing' = 'running') => {
+    operation = phase
     refresh()
     try {
       await action()
@@ -282,7 +282,7 @@ export function installFolderBackup(
   }
   menu.addEventListener('beforetoggle', refresh)
   const updateCommand = commands.bind(button, () => {
-    if (operation === 'running' || !actions.available()) return
+    if (operation !== 'idle' || !actions.available()) return
     actions.closeMenu()
     if (lifecycle.phase === 'paused') {
       showDialog({ phase: 'resume', folder: lifecycle.folder })
@@ -328,6 +328,6 @@ export function installFolderBackup(
       if (!disposed()) lifecycle = { phase: 'paused', folder }
       update('Backup paused — permission needed. Choose Resume Backing Up…', true)
     }
-  })
-  return refresh
+  }, 'initializing')
+  return { refresh, isConfiguring: () => operation === 'running' || confirmation.phase !== 'closed' }
 }

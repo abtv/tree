@@ -3,6 +3,7 @@ import { afterEach, expect, it, onTestFinished, vi } from 'vitest'
 import { startAppUpdates } from './app-updates'
 import { createRendererInputLock } from './renderer-input-lock'
 import type { TreeApi } from '../shared/ipc'
+import type { RendererLifecycleStore } from './lifecycle'
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -20,7 +21,7 @@ it.each([false, true])('flushes before acknowledging an update and restores inpu
     initialize: vi.fn(),
     requestQuitWithoutSavingPrompt: vi.fn(),
     reportError: vi.fn(),
-    flushPersistence: vi.fn(async () => {
+    flushPersistence: vi.fn<RendererLifecycleStore['flushPersistence']>(async () => {
       await gate
       if (fail) throw new Error('save failed')
     }),
@@ -38,9 +39,14 @@ it.each([false, true])('flushes before acknowledging an update and restores inpu
     confirmAppUpdate: confirm,
   } as unknown as TreeApi
   const cleanup = startAppUpdates(store, api)
+  onTestFinished(cleanup)
 
   request('update-1')
-  expect(store.flushPersistence).toHaveBeenCalledWith({ cancelImageRecognition: true })
+  expect(store.flushPersistence).toHaveBeenCalledWith({
+    cancelImageRecognition: true,
+    sealEditsUntil: expect.any(AbortSignal),
+  })
+  const seal = store.flushPersistence.mock.lastCall![0]!.sealEditsUntil!
   expect(document.getElementById('root')!.inert).toBe(true)
   expect(confirm).not.toHaveBeenCalled()
   resolve()
@@ -48,6 +54,7 @@ it.each([false, true])('flushes before acknowledging an update and restores inpu
   expect(store.requestQuitWithoutSavingPrompt).not.toHaveBeenCalled()
 
   finished(null)
+  expect(seal.aborted).toBe(true)
   expect(document.getElementById('root')!.inert).toBe(false)
   cleanup()
 })

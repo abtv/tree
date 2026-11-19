@@ -168,7 +168,7 @@ export class EditorStore {
   private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
   private readonly pendingEdits = new Set<Promise<void>>()
-  private quitSeal: AbortSignal | undefined
+  private readonly editSeals = new Set<AbortSignal>()
   // Where the selected row sits in the window lives outside the snapshot: it changes on every scroll
   // frame and no rendered state depends on it. The renderer measures it; the store reads it when it
   // captures state for a save, so every save carries the live value.
@@ -530,6 +530,8 @@ export class EditorStore {
   public async flushPersistence(
     options: { cancelImageRecognition?: boolean; sealEditsUntil?: AbortSignal } = {},
   ): Promise<void> {
+    // Quit or update takes focus authority even if its first save later fails.
+    if (options.sealEditsUntil && !options.sealEditsUntil.aborted) this.search.interruptNavigation()
     const resumeSummarization = options.cancelImageRecognition ? this.summarization.suspend() : undefined
     const resumeImageRecognition = options.cancelImageRecognition ? this.imageToTextQueue.suspend() : undefined
     try {
@@ -554,7 +556,12 @@ export class EditorStore {
         this.recentPersistence.hasPendingChanges() ||
         this.emojiHistory.hasPendingChanges()
       )
-      if (options.sealEditsUntil && !options.sealEditsUntil.aborted) this.quitSeal = options.sealEditsUntil
+      const seal = options.sealEditsUntil
+      if (seal && !seal.aborted && !this.editSeals.has(seal)) {
+        this.editSeals.add(seal)
+        this.search.interruptNavigation()
+        seal.addEventListener('abort', () => this.editSeals.delete(seal), { once: true })
+      }
     } finally {
       resumeSummarization?.()
       resumeImageRecognition?.()
@@ -569,7 +576,7 @@ export class EditorStore {
   }
 
   public reportError(error: unknown): void {
-    if (this.runtime.snapshot.status !== 'ready') return
+    if (this.runtime.snapshot.status === 'loading') return
     this.runtime.snapshot = { ...this.runtime.snapshot, operationError: messageOf(error) }
     this.runtime.emit()
   }
@@ -818,6 +825,7 @@ export class EditorStore {
   }
 
   private revealSearchDestination(destination: SearchDestination): boolean {
+    if (this.editSeals.size > 0) return false
     const state = this.runtime.ready()
     const view = this.searchOwner.revealView(state, destination)
     if (view === undefined) return false
@@ -1854,7 +1862,7 @@ export class EditorStore {
   private isPersistenceLocked(): boolean {
     // Only a ready snapshot has persistenceLocked, so the status check is redundant.
     return (
-      this.quitSeal?.aborted === false ||
+      this.editSeals.size > 0 ||
       (this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true)
     )
   }

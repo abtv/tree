@@ -9,6 +9,7 @@ import { expandNode, isNodeExpanded, type ExpansionState } from './expansion-sta
 import type { FocusIntent } from './editor-store-types'
 
 type Navigation = Extract<SearchResult, { kind: 'navigate' }>
+type NavigationQueue = { direction: -1 | 1; count: number; repeats: number }[]
 
 type SearchView = { kind: 'tree'; expansion: ExpansionState } | { kind: 'agenda'; agenda: AgendaState }
 
@@ -22,10 +23,8 @@ export class EditorSearch {
   private revision = 0
   private scope: SearchScope = { kind: 'tree', parentId: null }
   private scopeKey = ''
-  private generation = 0
-  private busy = false
+  private navigation: NavigationQueue | undefined
   private applying = false
-  private queued: { direction: -1 | 1; count: number; repeats: number }[] = []
   private anchor: SearchDestination | undefined
   private result: Navigation | undefined
   private readonly listeners = new Set<() => void>()
@@ -106,11 +105,12 @@ export class EditorSearch {
   }
 
   public confirm(direction: -1 | 1 = 1): void {
+    if (this.session.getSnapshot().draft === undefined) return
     this.cancelNavigation()
-    this.busy = true
-    const generation = this.generation
-    this.session.confirm((result) => this.publish(result, generation), direction)
-    if (!this.session.getSnapshot().visible) this.busy = false
+    const queue: NavigationQueue = []
+    this.navigation = queue
+    this.session.confirm((result) => this.publish(result, queue), direction)
+    if (!this.session.getSnapshot().visible && this.navigation === queue) this.navigation = undefined
   }
 
   public hide(): void {
@@ -203,22 +203,27 @@ export class EditorSearch {
 
   /** Newer user input takes authority without hiding the confirmed search. */
   public interruptNavigation(): void {
-    if (!this.busy && this.anchor === undefined) return
-    this.generation++
-    this.busy = false
-    this.queued = []
+    if (!this.navigation && this.anchor === undefined) return
+    this.navigation = undefined
     this.anchor = undefined
     this.session.interruptNavigation()
   }
 
   public navigate(origin: SearchPosition, direction: -1 | 1, count: number): void {
-    if (!this.session.getSnapshot().confirmed) return
-    if (this.busy) {
-      const last = this.queued.at(-1)
+    const snapshot = this.session.getSnapshot()
+    if (!snapshot.confirmed || snapshot.draft !== undefined) return
+    if (this.navigation) {
+      const last = this.navigation.at(-1)
       if (last?.direction === direction && last.count === count) last.repeats++
-      else this.queued.push({ direction, count, repeats: 1 })
+      else this.navigation.push({ direction, count, repeats: 1 })
       return
     }
+    const queue: NavigationQueue = []
+    this.navigation = queue
+    this.startJump(origin, direction, count, queue)
+  }
+
+  private startJump(origin: SearchPosition, direction: -1 | 1, count: number, queue: NavigationQueue): void {
     const anchor = this.anchor
     const position =
       anchor !== undefined &&
@@ -227,9 +232,7 @@ export class EditorSearch {
       anchor.caret === origin.offset
         ? { ...anchor, offset: anchor.start }
         : origin
-    this.busy = true
-    const generation = this.generation
-    this.session.navigate(position, direction, count, (result) => this.publish(result, generation))
+    this.session.navigate(position, direction, count, (result) => this.publish(result, queue))
   }
 
   public recordOpenedFold(key: string): void {
@@ -263,15 +266,13 @@ export class EditorSearch {
   }
 
   private cancelNavigation(): void {
-    this.generation++
-    this.busy = false
-    this.queued = []
+    this.navigation = undefined
     this.anchor = undefined
     this.result = undefined
   }
 
-  private publish(result: Navigation, generation: number): void {
-    if (generation !== this.generation) return
+  private publish(result: Navigation, queue: NavigationQueue): void {
+    if (queue !== this.navigation) return
     if (result.destination !== undefined) {
       this.anchor = result.destination
       this.applying = true
@@ -283,15 +284,14 @@ export class EditorSearch {
         this.applying = false
       }
     }
-    if (generation !== this.generation) return
+    if (queue !== this.navigation) return
     this.result = result
-    this.busy = false
+    const next = result.destination && queue[0]
+    if (next === undefined) this.navigation = undefined
     this.listeners.forEach((listener) => listener())
-    const next = this.queued[0]
-    if (next !== undefined && --next.repeats === 0) this.queued.shift()
-    const state = this.state
-    if (next !== undefined && state !== undefined && result.destination !== undefined) {
-      this.navigate({ ...result.destination, offset: result.destination.caret }, next.direction, next.count)
+    if (next && result.destination && queue === this.navigation) {
+      if (--next.repeats === 0) queue.shift()
+      this.startJump({ ...result.destination, offset: result.destination.caret }, next.direction, next.count, queue)
     }
   }
 }

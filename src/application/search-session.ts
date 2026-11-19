@@ -101,14 +101,17 @@ export class SearchSession {
     const query = (this.mode.kind === 'editing' ? this.mode.draft : '') || this.mode.confirmed
     const completed = query === (this.snapshot.draft ?? this.snapshot.confirmed) ? this.completedCount : undefined
     this.invalidate()
+    const generation = this.generation
+    const navigationId = this.navigationId
     this.set(
       { kind: query.length > 0 ? 'confirmed' : 'hidden', confirmed: query },
       query.length > 0 && !completed,
       query ? completed : undefined,
     )
-    if (query.length === 0) return
+    if (query.length === 0 || generation !== this.generation) return
     if (!completed) this.recount()
-    if (origin !== undefined) this.navigate(origin, direction, 1, publish)
+    if (origin !== undefined && generation === this.generation && navigationId === this.navigationId)
+      this.navigate(origin, direction, 1, publish)
   }
 
   public hide(): void {
@@ -130,13 +133,15 @@ export class SearchSession {
     publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void,
   ): void {
     if (this.context === undefined || this.mode.confirmed.length === 0 || this.mode.kind === 'editing') return
+    const generation = this.generation
+    const id = ++this.navigationId
     if (this.mode.kind === 'hidden') {
       this.set({ kind: 'confirmed', confirmed: this.mode.confirmed }, true)
+      if (generation !== this.generation) return
       this.recount()
+      if (generation !== this.generation || id !== this.navigationId) return
     }
     if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
-    const id = ++this.navigationId
-    const generation = this.generation
     const context = this.context
     const request: SearchRequest = {
       ...context,

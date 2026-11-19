@@ -9,7 +9,7 @@ import {
   screenshotContentSize,
   test,
 } from './fixtures'
-import { controlPostedTasksWithClock } from './search-clock'
+import { controlPostedTasksWithClock } from '../search-clock'
 
 const day = dayNumberOf({ year: 2026, month: 10, day: 9 })
 const later = dayNumberOf({ year: 2026, month: 10, day: 11 })

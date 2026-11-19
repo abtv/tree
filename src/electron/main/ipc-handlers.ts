@@ -38,7 +38,11 @@ export interface IpcHandlerDependencies {
   runUpdateCommand?: (command: UpdateCommand) => void
   setRendererModalOpen?: (open: boolean) => void
   setAppUpdateBlocked?: (blocked: boolean) => void
-  appUpdates?: { check(): Promise<void>; confirm(id: string, saved: boolean): void; isApplying?(): boolean }
+  appUpdates?: {
+    check(origin?: 'online'): Promise<void>
+    confirm(id: string, saved: boolean): void
+    isApplying?(): boolean
+  }
   getEmojiHistory?: () => Promise<string[]>
   setEmojiHistory?: (names: readonly string[]) => Promise<void>
   getRecentNodes?: () => Promise<string[]>
@@ -218,7 +222,7 @@ export function registerIpcHandlers({
   ipcMain.handle(ipcChannels.checkAppUpdate, (event, ...args) => {
     requireTrustedRenderer(event)
     requireNoArguments(args)
-    return appUpdates?.check()
+    return appUpdates?.check('online')
   })
   ipcMain.handle(ipcChannels.getUpdateCommands, (event, ...args) => {
     requireTrustedRenderer(event)

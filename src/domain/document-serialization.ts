@@ -22,6 +22,16 @@ import { dayNumberOf, weekdayOf } from './calendar-date'
 
 // Documents are immutable. Remember validation, without retaining an ID set for every history snapshot.
 const validatedDocuments = new WeakSet<Document>()
+const currentVersion = 5
+
+export function hasNewerDocumentVersion(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.version === 'number' &&
+    Number.isInteger(value.version) &&
+    value.version > currentVersion
+  )
+}
 
 /** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
 export interface ViewState {
@@ -51,7 +61,7 @@ export function serializeState(
   for (const id of view.expandedIds) if (buildNodeIndex(document).has(id)) expandedIds.push(id)
   const agendaFolds = normalizeAgendaFolds(view.agendaFolds)
   return {
-    version: 5,
+    version: currentVersion,
     document,
     location: { ...location },
     view: {
@@ -62,13 +72,13 @@ export function serializeState(
   }
 }
 
-function isSupportedVersion(version: unknown): version is 1 | 2 | 3 | 4 | 5 {
-  return version === 1 || version === 2 || version === 3 || version === 4 || version === 5
+function isSupportedVersion(version: unknown): version is PersistedEditorState['version'] {
+  return typeof version === 'number' && Number.isInteger(version) && version >= 1 && version <= currentVersion
 }
 
 /** Version 3 added the view block; subsequent content schema versions retain it. */
 function hasView(version: unknown): boolean {
-  return version === 3 || version === 4 || version === 5
+  return isSupportedVersion(version) && version >= 3
 }
 
 /**
@@ -208,7 +218,7 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
     throw new Error('The saved document location does not match its tree.')
   }
   validatedDocuments.add(document)
-  return { version: 5, document, location, view: parseView(value, nodeIds) }
+  return { version: currentVersion, document, location, view: parseView(value, nodeIds) }
 }
 
 function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {

@@ -71,5 +71,11 @@ export {
 } from './document-operations'
 export type { SiblingRangeJoin, SiblingRangeShift, SubtreeMove } from './document-operations'
 
-export { assertDocument, parsePersistedState, serializeState, validatePersistedState } from './document-serialization'
+export {
+  assertDocument,
+  hasNewerDocumentVersion,
+  parsePersistedState,
+  serializeState,
+  validatePersistedState,
+} from './document-serialization'
 export type { ViewState } from './document-serialization'

@@ -199,6 +199,7 @@ beforeEach(async () => {
   electron.app.removeAllListeners()
   electron.autoUpdater.removeAllListeners()
   autoUpdater.removeAllListeners()
+  electron.autoUpdater.on('error', (error) => autoUpdater.emit('error', error))
   vi.mocked(autoUpdater.checkForUpdates).mockReset().mockResolvedValue(null)
   vi.mocked(electron.autoUpdater.quitAndInstall).mockReset()
   vi.mocked(electron.Menu.getApplicationMenu).mockReturnValue(null)
@@ -304,33 +305,36 @@ async function packagedSetup() {
   return { ...f, updater: autoUpdater, updates, downloaded, prepare, release }
 }
 
-it('does not install an older late-staged package after a newer package is downloaded', async () => {
-  const f = await packagedSetup()
-  f.downloaded()
-  f.updates.request()
-  f.updates.confirm(requestedUpdateId(f.window), true)
-  await vi.advanceTimersByTimeAsync(60_000)
+it.each(['update-downloaded', 'update-not-available', 'error'])(
+  'stages the newer package after a late %s',
+  async (event) => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    await vi.advanceTimersByTimeAsync(60_000)
 
-  f.updater.emit('update-available', {
-    version: '1.2.5',
-    files: [],
-    path: '/update.zip',
-    sha512: 'test-digest',
-    releaseDate: '2026-11-05',
-  })
-  f.downloaded('1.2.5')
-  vi.mocked(f.window.webContents.send).mockClear()
-  f.updates.request()
-  f.updates.confirm(requestedUpdateId(f.window), true)
-  expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+    f.updater.emit('update-available', {
+      version: '1.2.5',
+      files: [],
+      path: '/update.zip',
+      sha512: 'test-digest',
+      releaseDate: '2026-11-05',
+    })
+    f.downloaded('1.2.5')
+    vi.mocked(f.window.webContents.send).mockClear()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
 
-  f.electron.autoUpdater.emit('update-downloaded')
-  expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
-  expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
-  f.electron.autoUpdater.emit('update-downloaded')
-  expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
-  f.updates.fail(null)
-})
+    f.electron.autoUpdater.emit(event, new Error('old staging failed'))
+    expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    f.electron.autoUpdater.emit('update-downloaded')
+    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    f.updates.fail(null)
+  },
+)
 
 function requestedUpdateId(window: Awaited<ReturnType<typeof setup>>['window']): string {
   const call = vi
@@ -341,6 +345,149 @@ function requestedUpdateId(window: Awaited<ReturnType<typeof setup>>['window']):
 }
 
 describe('packaged desktop update wiring', () => {
+  it('offers the package after the previous renderer releases its archive operation', async () => {
+    const f = await packagedSetup()
+    let finishCancellation!: () => void
+    const cancellation = new Promise<undefined>((resolve) => {
+      finishCancellation = () => resolve(undefined)
+    })
+    mocks.archive.cancel.mockReturnValueOnce(cancellation)
+    mocks.archive.isIdle.mockReturnValue(false)
+    f.downloaded()
+    f.window.webContents.emit('did-start-navigation', {}, 'url', false, true)
+    f.ipc.setNotesMenuState!({ canImport: true, canExport: false })
+    f.window.webContents.emit('did-stop-loading')
+    expect(f.state().updateReady).toBe(false)
+
+    mocks.archive.isIdle.mockReturnValue(true)
+    finishCancellation()
+    await cancellation
+
+    expect(f.state().updateReady).toBe(true)
+  })
+
+  it('withdraws the install command when the last editor window closes', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    expect(f.state().updateReady).toBe(true)
+
+    f.window.emit('closed')
+
+    expect(f.state().updateReady).toBe(false)
+  })
+
+  it('offers the downloaded package when the error screen finishes loading', async () => {
+    const f = await packagedSetup()
+    vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
+    f.ipc.setNotesMenuState!({ canImport: true, canExport: false })
+    f.downloaded()
+
+    expect(f.state().updateReady).toBe(false)
+    expect(f.updates.getVersion()).toBe('1.2.4')
+    vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(false)
+    f.window.webContents.emit('did-stop-loading')
+
+    expect(f.state().updateReady).toBe(true)
+    f.actions().updateApp!()
+    expect(requestedUpdateId(f.window)).toBeTruthy()
+    f.updates.cancelBeforeNativeQuit()
+  })
+
+  it('starts fresh native staging after a late failure for the same version', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    await vi.advanceTimersByTimeAsync(60_000)
+    vi.mocked(f.window.webContents.send).mockClear()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+
+    f.electron.autoUpdater.emit('update-not-available')
+
+    expect(f.updates.isInstalling()).toBe(true)
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    f.electron.autoUpdater.emit('update-downloaded')
+    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    f.updates.fail(null)
+  })
+
+  it.each(['staging', 'handed off'])('keeps a retry saving after a late native error (%s)', async (phase) => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    if (phase === 'handed off') f.electron.autoUpdater.emit('update-downloaded')
+    await vi.advanceTimersByTimeAsync(60_000)
+    vi.mocked(f.window.webContents.send).mockClear()
+    f.updates.request()
+    const retry = requestedUpdateId(f.window)
+
+    f.electron.autoUpdater.emit('error', new Error('old staging failed'))
+
+    expect(f.updates.isApplying()).toBe(true)
+    f.updates.confirm(retry, true)
+    if (phase === 'staging') {
+      expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+      f.electron.autoUpdater.emit('update-downloaded')
+      expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    } else {
+      expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledOnce()
+      expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledTimes(2)
+    }
+    f.updates.fail(null)
+  })
+
+  it.each(['1.2.4', '1.2.5'])(
+    'waits for the previous native handoff before installing %s on retry',
+    async (version) => {
+      const f = await packagedSetup()
+      f.downloaded()
+      f.actions().updateApp!()
+      f.updates.confirm(requestedUpdateId(f.window), true)
+      f.electron.autoUpdater.emit('update-downloaded')
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      f.downloaded(version)
+      vi.mocked(f.window.webContents.send).mockClear()
+      f.actions().updateApp!()
+      f.updates.confirm(requestedUpdateId(f.window), true)
+      const startsBeforeError = vi.mocked(f.electron.autoUpdater.quitAndInstall).mock.calls.length
+      f.electron.autoUpdater.emit('error', new Error('Previous native installation failed'))
+
+      expect(f.updates.isInstalling()).toBe(true)
+      expect(startsBeforeError).toBe(1)
+      if (version === '1.2.5') {
+        expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+        f.electron.autoUpdater.emit('update-downloaded')
+      }
+      expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledTimes(2)
+      f.electron.autoUpdater.emit('error', new Error('Current native installation failed'))
+      expect(f.updates.canRequest()).toBe(true)
+    },
+  )
+
+  it('releases editing and retries when native staging reports no update', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+
+    f.electron.autoUpdater.emit('update-not-available')
+
+    expect(f.release).not.toHaveBeenCalled()
+    expect(f.updates.isApplying()).toBe(false)
+    expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+
+    vi.mocked(f.window.webContents.send).mockClear()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    f.electron.autoUpdater.emit('update-downloaded')
+    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    f.updates.fail(null)
+  })
+
   it('cancels an update save safely after its window has closed', async () => {
     const f = await packagedSetup()
     f.downloaded()
@@ -446,15 +593,16 @@ describe('packaged desktop update wiring', () => {
     })
     f.updates.request()
     f.updates.confirm(requestedUpdateId(f.window), true)
-    expect(f.release).toHaveBeenCalledOnce()
+    expect(f.prepare).not.toHaveBeenCalled()
     vi.mocked(f.window.webContents.send).mockClear()
 
     f.updates.request()
     f.updates.confirm(requestedUpdateId(f.window), true)
     const count = f.lifecycle.getWindowCount()
+    f.electron.autoUpdater.emit('update-downloaded')
     f.lifecycle.createMainWindow(vi.fn())
     expect(f.lifecycle.getWindowCount()).toBe(count)
-    f.electron.autoUpdater.emit('error', new Error('native staging failed'))
+    f.electron.autoUpdater.emit('error', new Error('native installation failed'))
     f.updates.fail(null)
     f.lifecycle.createMainWindow(vi.fn())
     expect(f.lifecycle.getWindowCount()).toBe(count + 1)
@@ -463,7 +611,8 @@ describe('packaged desktop update wiring', () => {
     const current = f.lifecycle.getMainWindow()!
     f.updates.confirm(requestedUpdateId(current as typeof f.window), true)
 
-    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(3)
+    expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledTimes(2)
     f.updates.fail(null)
   })
 
@@ -478,7 +627,7 @@ describe('packaged desktop update wiring', () => {
     f.downloaded()
     f.actions().updateApp!()
     f.ipc.appUpdates!.confirm(requestedUpdateId(f.window), true)
-    expect(f.prepare).toHaveBeenCalledOnce()
+    expect(f.prepare).not.toHaveBeenCalled()
     expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
     expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledOnce()
     f.updates.fail(null)
@@ -598,12 +747,28 @@ describe('packaged desktop update wiring', () => {
 
     f.ipc.appUpdates!.confirm(requestedUpdateId(f.window), true)
 
-    expect(f.prepare).toHaveBeenCalledOnce()
+    expect(f.prepare).not.toHaveBeenCalled()
     expect(f.electron.autoUpdater.checkForUpdates).toHaveBeenCalledOnce()
     expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
     f.electron.autoUpdater.emit('update-downloaded')
+    expect(f.prepare).toHaveBeenCalledOnce()
     expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
     f.updates.fail(null)
+  })
+
+  it('ordinary quit during native staging retires the update before its late download arrives', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.actions().updateApp!()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+
+    f.electron.app.emit('before-quit', {} as never)
+    f.electron.autoUpdater.emit('update-downloaded')
+
+    expect(f.updates.isApplying()).toBe(false)
+    expect(f.prepare).not.toHaveBeenCalled()
+    expect(f.electron.autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).toHaveBeenCalledWith(ipcEvents.appUpdateFinished, null)
   })
 
   it.each(['about', 'data', 'archive', 'import', 'loading', 'destroyed', 'missing'] as const)(

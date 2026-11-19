@@ -22,10 +22,16 @@ function fixture() {
       }
     },
   }
+  type RunLock = (lock: { name: string; mode: LockMode } | null) => unknown
   const scope = {
     registration: { scope: base },
     caches,
-    locks: { request: async (_name: string, run: () => Promise<void>) => run() },
+    locks: {
+      request: async (name: string, options: LockOptions | RunLock, run?: RunLock) =>
+        typeof options === 'function'
+          ? options({ name, mode: 'exclusive' })
+          : run!({ name, mode: options.mode ?? 'exclusive' }),
+    },
     clients: { matchAll: vi.fn(async () => [{ id: 'writer', url: base }]), claim: vi.fn(async () => {}) },
     skipWaiting: vi.fn(async () => {}),
     fetch: vi.fn<(request: Request) => Promise<Response>>(async () => new Response('file')),
@@ -52,6 +58,215 @@ function fixture() {
 }
 
 describe('offline package lifecycle', () => {
+  it('refuses a second window that opens while the requesting runtime is being pinned', async () => {
+    const f = fixture()
+    f.install('running')
+    await f.emit('install')
+    await f.emit('activate')
+    f.install('waiting')
+    await f.emit('install')
+    const original = f.scope.caches.open
+    vi.spyOn(f.scope.caches, 'open').mockImplementation(async (name) => {
+      const cache = await original(name)
+      if (name === `tree-offline-state:${base}`) {
+        const put = cache.put
+        cache.put = async (key, value) => {
+          await put(key, value)
+          f.scope.clients.matchAll.mockResolvedValue([
+            { id: 'writer', url: base },
+            { id: 'second', url: base },
+          ])
+        }
+      }
+      return cache
+    })
+    const reply = { postMessage: vi.fn() }
+
+    await f.emit('message', {
+      data: { type: 'tree-activate-update', assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('other-windows')
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+    expect(f.scope.clients.claim).toHaveBeenCalledOnce()
+    const metadata = f.entries.get(`tree-offline-state:${base}`)!.get(`${base}__offline_state__`)!
+    expect((await metadata.clone().json()).requested).toBeUndefined()
+  })
+
+  it('checks other windows for a mismatched first page without activating a worker', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    f.scope.clients.matchAll.mockResolvedValue([
+      { id: 'writer', url: base },
+      { id: 'second', url: base },
+    ])
+    const reply = { postMessage: vi.fn() }
+
+    await f.emit('message', {
+      data: { type: 'tree-offline-status', checkWindows: true, assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith({ ready: true, onlyWindow: false })
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])(
+    'only activates after the requesting page confirms on its own port (live=%s)',
+    async (live) => {
+      const f = fixture()
+      f.install()
+      await f.emit('install')
+      const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
+      reply.postMessage.mockImplementation((message) => {
+        if (message === 'prepared') reply.onmessage!({ data: live ? 'commit' : 'cancel' })
+      })
+
+      await f.emit('message', {
+        data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
+        source: { id: 'writer' },
+        ports: [reply],
+      })
+
+      expect(reply.postMessage.mock.calls).toEqual([['prepared'], [live ? 'activating' : 'activation-failed']])
+      expect(f.scope.skipWaiting).toHaveBeenCalledTimes(live ? 1 : 0)
+    },
+  )
+
+  it('refuses a legacy one-way request that spent its response budget in the final window check', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(0)
+    f.scope.clients.matchAll.mockResolvedValueOnce([{ id: 'writer', url: base }]).mockImplementationOnce(async () => {
+      clock.mockReturnValue(15_000)
+      return [{ id: 'writer', url: base }]
+    })
+    const reply = { postMessage: vi.fn() }
+    try {
+      await f.emit('message', {
+        data: { type: 'tree-activate-update', assets: [`${base}assets/app.js`] },
+        source: { id: 'writer' },
+        ports: [reply],
+      })
+
+      expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('activation-failed')
+      expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it('counts delayed commit delivery against the final window check deadline even before cancel arrives', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(0)
+    const writer = [{ id: 'writer', url: base }]
+    f.scope.clients.matchAll
+      .mockResolvedValueOnce(writer)
+      .mockResolvedValueOnce(writer)
+      .mockImplementationOnce(async () => {
+        clock.mockReturnValue(15_001)
+        return writer
+      })
+    const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
+    reply.postMessage.mockImplementation((message) => {
+      if (message === 'prepared') {
+        clock.mockReturnValue(14_000)
+        reply.onmessage!({ data: 'commit' })
+      }
+    })
+    try {
+      await f.emit('message', {
+        data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
+        source: { id: 'writer' },
+        ports: [reply],
+      })
+
+      expect(reply.postMessage.mock.calls).toEqual([['prepared'], ['activation-failed']])
+      expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it('keeps the actual active package and the open page runtime when activation fails', async () => {
+    const f = fixture()
+    f.install('old-page')
+    await f.emit('install')
+    await f.emit('activate')
+    f.entries.get(`${prefix}old-page`)!.set(`${base}assets/old.js`, new Response('old'))
+    f.install('running')
+    await f.emit('install')
+    await f.emit('activate')
+    f.install('candidate')
+    await f.emit('install')
+    f.scope.skipWaiting.mockRejectedValueOnce(new Error('activation interrupted'))
+    const reply = { postMessage: vi.fn() }
+
+    await f.emit('message', {
+      data: { type: 'tree-activate-update', assets: [`${base}assets/old.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+    f.install('newer')
+    await f.emit('install')
+
+    const metadata = f.entries.get(`tree-offline-state:${base}`)!.get(`${base}__offline_state__`)!
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('activation-failed')
+    expect(await metadata.clone().json()).toMatchObject({ active: `${prefix}running`, runtime: `${prefix}old-page` })
+    expect(f.entries.get(`${prefix}running`)?.has(`${base}index.html`)).toBe(true)
+    expect(f.entries.get(`${prefix}old-page`)?.has(`${base}assets/old.js`)).toBe(true)
+  })
+
+  it('preserves the running offline package when reinstallation of the same version fails', async () => {
+    const f = fixture()
+    f.install('v1')
+    await f.emit('install')
+    await f.emit('activate')
+    f.install('v2')
+    await f.emit('install')
+    f.install('v1')
+    f.scope.fetch.mockRejectedValue(new Error('interrupted rollback'))
+
+    await expect(f.emit('install')).rejects.toThrow('interrupted rollback')
+
+    expect(f.entries.get(`${prefix}v1`)?.has(`${base}index.html`)).toBe(true)
+    expect(f.entries.get(`${prefix}v2`)?.has(`${base}index.html`)).toBe(true)
+  })
+
+  it('refuses activation from a retained worker superseded by a newer waiting package', async () => {
+    const f = fixture()
+    f.install('v1')
+    await f.emit('install')
+    await f.emit('activate')
+    f.install('v2')
+    await f.emit('install')
+    const stale = f.handlers.get('message')!
+    f.install('v3')
+    await f.emit('install')
+    const reply = { postMessage: vi.fn() }
+    let done: Promise<unknown> | undefined
+
+    stale({
+      data: { type: 'tree-activate-update', assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+      waitUntil: (pending: Promise<unknown>) => {
+        done = pending
+      },
+    })
+    await done
+
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('superseded')
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+  })
+
   it('keeps active metadata and serves navigation offline after an update download fails', async () => {
     const f = fixture()
     f.install('v1')
@@ -156,7 +371,7 @@ describe('offline package lifecycle', () => {
       ports: [reply],
     })
 
-    expect(f.scope.clients.matchAll).toHaveBeenCalledExactlyOnceWith({ type: 'window', includeUncontrolled: true })
+    expect(f.scope.clients.matchAll).toHaveBeenCalledWith({ type: 'window', includeUncontrolled: true })
     expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('activating')
     expect(f.scope.skipWaiting).toHaveBeenCalledOnce()
   })
@@ -215,24 +430,25 @@ describe('offline package lifecycle', () => {
     expect(f.entries.get(`${prefix}v3`)!.has(`${base}assets/app.js`)).toBe(true)
   })
 
-  it('accepts sixteen runtime assets and releases the lifecycle lock before activating', async () => {
+  it('accepts sixteen runtime assets and releases the lifecycle lock before awaiting activation', async () => {
     const f = fixture()
     f.install()
     await f.emit('install')
     const assets = Array.from({ length: 16 }, (_, i) => `${base}assets/chunk-${i}.js`)
     for (const asset of assets) f.entries.get(`${prefix}v1`)!.set(asset, new Response('asset'))
-    let locked = false
-    vi.spyOn(f.scope.locks, 'request').mockImplementation(async (_name, run) => {
-      locked = true
+    let unlock!: () => void
+    const unlocked = new Promise<void>((resolve) => {
+      unlock = resolve
+    })
+    const request = f.scope.locks.request
+    vi.spyOn(f.scope.locks, 'request').mockImplementation(async (name, options, run) => {
       try {
-        await run()
+        return await request(name, options, run)
       } finally {
-        locked = false
+        if (name === `${prefix}lifecycle`) unlock()
       }
     })
-    f.scope.skipWaiting.mockImplementation(async () => {
-      expect(locked).toBe(false)
-    })
+    f.scope.skipWaiting.mockImplementation(() => unlocked)
     const reply = { postMessage: vi.fn() }
 
     await f.emit('message', {
@@ -241,7 +457,7 @@ describe('offline package lifecycle', () => {
       ports: [reply],
     })
 
-    expect(f.scope.locks.request).toHaveBeenCalledExactlyOnceWith(`${prefix}lifecycle`, expect.any(Function))
+    expect(f.scope.locks.request).toHaveBeenCalledWith(`${prefix}lifecycle`, expect.any(Function))
     expect(f.scope.skipWaiting).toHaveBeenCalledOnce()
     expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('activating')
   })

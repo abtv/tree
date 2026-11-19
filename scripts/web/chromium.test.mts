@@ -221,7 +221,9 @@ it('passes current source over stdin to the fixed container and propagates test 
       'assets/icons/tree-icon-source.png',
       'src/web/index.html',
       'e2e/web/fixtures.mts',
+      'e2e/document-formats.ts',
       'e2e/external-drop.ts',
+      'e2e/search-clock.ts',
     ]),
   )
   expect(args!.some((path) => /^(\.git|\.scratch|node_modules)(\/|$)/.test(path))).toBe(false)

@@ -159,7 +159,12 @@ export function installDataMenu(
   menu: HTMLElement,
   session: DataSession,
   focus: MenuFocus,
-): { commands: BrowserMenuCommands; isRunning(): boolean; dismissTransientStatus(): void } {
+): {
+  commands: BrowserMenuCommands
+  isRunning(): boolean
+  tryBeginUpdate(): (() => void) | undefined
+  dismissTransientStatus(): void
+} {
   const commands = new BrowserMenuCommands()
   const exportButton = document.getElementById('data-export') as HTMLButtonElement
   const importButton = document.getElementById('data-import') as HTMLButtonElement
@@ -177,13 +182,12 @@ export function installDataMenu(
     const state = store.getSnapshot()
     return state.status === 'ready' && state.persistenceLocked === true
   }
-  let refreshBackup = () => {}
   const refresh = () => {
     const enabled = !running && !locked()
     updateExport('export-notes', enabled)
     updateImport('import-notes', enabled)
     updateRestore(supportsFolderBackup() ? 'restore-from-folder' : undefined, enabled)
-    refreshBackup()
+    backup.refresh()
   }
   const setRunning = (value: boolean) => {
     running = value
@@ -238,7 +242,7 @@ export function installDataMenu(
     )
   })
 
-  refreshBackup = installFolderBackup(session, menu, commands, {
+  const backup = installFolderBackup(session, menu, commands, {
     closeMenu: focus.close,
     restoreFocus: focus.restore,
     available: () => !running && !locked(),
@@ -404,6 +408,11 @@ export function installDataMenu(
   return {
     commands,
     isRunning: () => running,
+    tryBeginUpdate() {
+      if (running || backup.isConfiguring()) return undefined
+      setRunning(true)
+      return () => setRunning(false)
+    },
     dismissTransientStatus: () => {
       if (panel.dismissTransient()) clearTimeout(hideTimer)
     },

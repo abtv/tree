@@ -1,8 +1,9 @@
 import { createRoot } from 'react-dom/client'
-import { App } from '../renderer/App'
+import { App, type EditorFindCommand } from '../renderer/App'
 import { ErrorBoundary } from '../renderer/ErrorBoundary'
 import { EditorStore } from '../application/editor-store'
 import { installBrowserPrototype } from './services'
+import { enterBrowserPage } from './page-admission'
 import { capturePasteClipboard } from './paste'
 import { isApplePlatform } from './device'
 import { installDataMenu } from './data-menu'
@@ -24,7 +25,7 @@ blockExternalDrops(window)
 const WEB_ATTACHMENT_IMAGE_CACHE_LIMIT = 128 * 1024 * 1024
 
 try {
-  const bridge = await installBrowserPrototype()
+  const bridge = await enterBrowserPage(installBrowserPrototype)
   const store = new EditorStore(bridge.services, () => crypto.randomUUID(), undefined, {
     idleMilliseconds: 300,
     cleanupRetryMilliseconds: 300,
@@ -32,7 +33,10 @@ try {
   bridge.connect(store)
   await store.initialize()
   const menu = document.getElementById('tree-menu')!
-  const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!)
+  let searchCommand: ((command: EditorFindCommand) => void) | undefined
+  const menuFocus = installMenuFocus(menu, document.getElementById('tree-menu-button')!, () =>
+    searchCommand?.('restore-editor'),
+  )
   const version = document.getElementById('app-version')!
   const versionLabel = version.textContent!
   version.remove()
@@ -44,14 +48,13 @@ try {
   document.getElementById('app-about')!.onclick = showAbout
   const {
     commands: menuCommands,
-    isRunning: dataOperationRunning,
+    tryBeginUpdate,
     dismissTransientStatus,
   } = installDataMenu(store, menu, bridge.data, menuFocus)
-  installAppUpdates(store, bridge.data, menuFocus, dataOperationRunning)
+  installAppUpdates(store, bridge.data, menuFocus, tryBeginUpdate)
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
   let viewCommands: Pick<CommandServices, 'showAgenda' | 'showTree'> | undefined
-  let searchCommand: ((command: import('../shared/ipc').FindMenuCommand) => void) | undefined
   const registerSearchCommands = (run: NonNullable<typeof searchCommand>) => {
     searchCommand = run
     return () => {

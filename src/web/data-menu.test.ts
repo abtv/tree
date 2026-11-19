@@ -111,7 +111,7 @@ function fixture() {
 
 beforeEach(() => {
   backup.supported = false
-  backup.install.mockReset().mockReturnValue(() => undefined)
+  backup.install.mockReset().mockReturnValue({ refresh: vi.fn(), isConfiguring: () => false })
   ArchiveWorker.instances = []
   vi.stubGlobal('Worker', ArchiveWorker)
 })
@@ -123,6 +123,34 @@ afterEach(() => {
 })
 
 describe('browser data operations', () => {
+  it('reserves an update only after an explicit folder backup operation finishes', () => {
+    const busy = vi.fn(() => true)
+    backup.install.mockReturnValueOnce({ isConfiguring: busy, refresh: vi.fn() })
+    const f = fixture()
+
+    expect(f.tryBeginUpdate()).toBeUndefined()
+    busy.mockReturnValue(false)
+    const release = f.tryBeginUpdate()
+    expect(release).toBeDefined()
+    release!()
+  })
+
+  it('ignores a late file picker result while an update owns the data operation', async () => {
+    const f = fixture()
+    const release = f.tryBeginUpdate()
+    expect(release).toBeDefined()
+
+    f.choose()
+    await Promise.resolve()
+
+    expect(f.flushPersistence).not.toHaveBeenCalled()
+    expect(ArchiveWorker.instances).toHaveLength(0)
+    release!()
+    f.choose()
+    expect(f.flushPersistence).toHaveBeenCalledOnce()
+    expect(f.tryBeginUpdate()).toBeUndefined()
+  })
+
   // @requirement PRODUCT.md §20.2.28
   it('dismisses a clean export notice without hiding a running export or its later replacement', async () => {
     vi.useFakeTimers()
@@ -310,7 +338,7 @@ describe('browser data operations', () => {
   it('publishes the three available data commands and refreshes backup when opening the menu', () => {
     backup.supported = true
     const refreshBackup = vi.fn()
-    backup.install.mockReturnValueOnce(refreshBackup)
+    backup.install.mockReturnValueOnce({ refresh: refreshBackup, isConfiguring: () => false })
     const f = fixture()
 
     expect(f.commands.getSnapshot().map(({ name, enabled }) => ({ name, enabled }))).toEqual([

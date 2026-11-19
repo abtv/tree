@@ -102,7 +102,7 @@ describe('desktop app updates', () => {
     expect(updates.getStatus()).toBeNull()
   })
 
-  it('ignores direct background checks while saving and staging installation', async () => {
+  it('coalesces background checks while saving and staging and runs one if installation stops', async () => {
     vi.useFakeTimers()
     const { updates, ports, request } = harness()
     const id = request()
@@ -114,6 +114,8 @@ describe('desktop app updates', () => {
     expect(ports.check).not.toHaveBeenCalled()
     expect(updates.isInstalling()).toBe(true)
     updates.fail(null)
+    await Promise.resolve()
+    expect(ports.check).toHaveBeenCalledOnce()
   })
 
   it('replaces readiness before downloading another package and exposes its version only on completion', () => {
@@ -159,7 +161,7 @@ describe('desktop app updates', () => {
     await checking
     updates.request()
     expect(updates.getStatus()).toBe('installing')
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
   })
   it('checks the server again even when a package is already ready', async () => {
     const { updates, ports } = harness()
@@ -295,7 +297,7 @@ describe('desktop app updates', () => {
     })
 
     updates.request()
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
 
     expect(applying).toEqual([true, false])
     expect(ports.install).not.toHaveBeenCalled()
@@ -333,27 +335,32 @@ describe('desktop app updates', () => {
     expect(updates.isNotifying()).toBe(true)
     updates.request()
     await updates.checkManually()
+    await updates.check()
+    await updates.check()
+    expect(ports.check).toHaveBeenCalledOnce()
     expect(ports.requestSave).not.toHaveBeenCalled()
     expect(ports.notifyCheck).toHaveBeenCalledOnce()
 
     close()
     await pending
+    await vi.waitFor(() => expect(updates.isChecking()).toBe(false))
 
+    expect(ports.check).toHaveBeenCalledTimes(2)
     expect(updates.isChecking()).toBe(false)
     expect(updates.isNotifying()).toBe(false)
     updates.request()
     expect(ports.requestSave).toHaveBeenCalledOnce()
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
   })
 
   it('clears save timers on cancellation and reports only the active request', () => {
     vi.useFakeTimers()
     const { updates, ports, request } = harness()
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
     expect(ports.finished).not.toHaveBeenCalled()
     const stale = request()
 
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
 
     expect(ports.finished).toHaveBeenCalledExactlyOnceWith(null)
     expect(vi.getTimerCount()).toBe(0)
@@ -376,8 +383,10 @@ describe('desktop app updates', () => {
     expect(updates.isInstalling()).toBe(true)
     vi.advanceTimersByTime(1)
 
-    expect(ports.finished).toHaveBeenLastCalledWith('Update preparation took too long. Try Restart and Install again.')
-    expect(release).toHaveBeenCalledOnce()
+    expect(ports.finished).toHaveBeenLastCalledWith(
+      'Update preparation took too long. Retry Restart and Install, or quit and reopen Tree.',
+    )
+    expect(release).not.toHaveBeenCalled()
     expect(updates.isApplying()).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
   })
@@ -388,19 +397,21 @@ describe('desktop app updates', () => {
     await updates.checkManually()
     updates.confirm(id, true)
     await updates.checkManually()
-    updates.cancelSaving()
 
     expect(ports.notifyCheck).not.toHaveBeenCalled()
     expect(ports.check).not.toHaveBeenCalled()
     expect(updates.isInstalling()).toBe(true)
-    updates.fail(null)
+    updates.cancelBeforeNativeQuit()
+    expect(updates.isApplying()).toBe(false)
   })
 
   it('releases quit permission and reports a native install error once', () => {
     vi.useFakeTimers()
     const { updates, ports, release, request } = harness()
     ports.install.mockImplementationOnce(() => {
-      throw new Error('native failure')
+      updates.handOffToInstaller(() => {
+        throw new Error('native failure')
+      })
     })
 
     updates.confirm(request(), true)
@@ -423,8 +434,16 @@ describe('desktop app updates', () => {
     expect(() => updates.confirm('stale', true)).toThrow('Invalid update request')
 
     updates.confirm(id, true)
-    expect(ports.prepareQuit).toHaveBeenCalledOnce()
+    expect(ports.prepareQuit).not.toHaveBeenCalled()
     expect(ports.install).toHaveBeenCalledOnce()
+    const quit = vi.fn()
+    updates.handOffToInstaller(quit)
+    updates.handOffToInstaller(quit)
+    updates.cancelBeforeNativeQuit()
+    expect(quit).toHaveBeenCalledOnce()
+    expect(ports.prepareQuit).toHaveBeenCalledOnce()
+    expect(updates.isInstalling()).toBe(true)
+    updates.fail(null)
   })
 
   it('keeps editing and normal quit safe after a save failure, timeout, or install error', () => {
@@ -441,7 +460,7 @@ describe('desktop app updates', () => {
       throw new Error('native failure')
     })
     updates.confirm(request(), true)
-    expect(release).toHaveBeenCalledOnce()
+    expect(release).not.toHaveBeenCalled()
     expect(updates.isApplying()).toBe(false)
 
     updates.confirm(request(), true)
@@ -457,7 +476,7 @@ describe('desktop app updates', () => {
 
     ports.canInstall.mockReturnValue(true)
     request()
-    updates.cancelSaving()
+    updates.cancelBeforeNativeQuit()
     expect(updates.isApplying()).toBe(false)
   })
 
@@ -489,10 +508,31 @@ describe('desktop app updates', () => {
     expect(ports.check).toHaveBeenCalledTimes(4)
   })
 
-  it('revokes quit permission if native staging never responds', () => {
+  it('performs one reconnect check after an overlapping offline request fails', async () => {
+    const { updates, ports } = harness()
+    let fail!: (error: Error) => void
+    ports.check.mockReturnValueOnce(
+      new Promise<void>((_, reject) => {
+        fail = reject
+      }),
+    )
+    const first = updates.check()
+    const duplicate = updates.check('online')
+    updates.check('online')
+    expect(duplicate).toBe(first)
+
+    fail(new Error('previous connection lost'))
+    await first
+
+    await vi.waitFor(() => expect(ports.check).toHaveBeenCalledTimes(2))
+    expect(ports.notifyCheck).not.toHaveBeenCalled()
+  })
+
+  it('revokes quit permission if the native quit never completes', () => {
     vi.useFakeTimers()
     const { updates, request, release } = harness()
     updates.confirm(request(), true)
+    updates.handOffToInstaller(vi.fn())
     expect(updates.isInstalling()).toBe(true)
     vi.advanceTimersByTime(60_000)
     expect(updates.isInstalling()).toBe(false)

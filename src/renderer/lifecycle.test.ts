@@ -139,6 +139,10 @@ describe('renderer lifecycle', () => {
     obsolete.abort()
     await store.flushPersistence({ sealEditsUntil: obsolete.signal })
 
+    const overlapping = new AbortController()
+    await store.flushPersistence({ sealEditsUntil: overlapping.signal })
+    overlapping.abort()
+
     store.editText('one', 'late')
     await store.paste('one', 0)
     store.undo()

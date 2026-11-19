@@ -5,12 +5,13 @@ type UpdateFeedback =
 
 type UpdateCheck =
   | { phase: 'idle'; result: 'success' | 'failed' }
-  | { phase: 'checking'; result: 'success' | 'failed'; pending: Promise<void> }
+  | { phase: 'checking'; result: 'success' | 'failed'; pending: Promise<void>; reconnected: boolean }
 
 type UpdateInstallation =
   | { phase: 'idle' }
   | { phase: 'awaiting-save'; requestId: string; timer: ReturnType<typeof setTimeout> }
-  | { phase: 'preparing-install'; releaseQuit: () => void; timer: ReturnType<typeof setTimeout> }
+  | { phase: 'preparing-install'; timer: ReturnType<typeof setTimeout> }
+  | { phase: 'native-quit'; releaseQuit: () => void; timer: ReturnType<typeof setTimeout> }
 
 /** Coordinates installation separately from ordinary quit: a failed save never permits installation. */
 export class AppUpdates {
@@ -19,6 +20,7 @@ export class AppUpdates {
   private feedback: UpdateFeedback = { phase: 'idle' }
   private backgroundCheck: UpdateCheck = { phase: 'idle', result: 'success' }
   private manualCheck: 'idle' | 'waiting' | 'notifying' = 'idle'
+  private recheckRequested = false
   private installation: UpdateInstallation = { phase: 'idle' }
 
   public constructor(
@@ -70,10 +72,16 @@ export class AppUpdates {
     return this.installation.phase !== 'idle'
   }
   public isInstalling(): boolean {
-    return this.installation.phase === 'preparing-install'
+    return this.installation.phase === 'preparing-install' || this.installation.phase === 'native-quit'
   }
-  public cancelSaving(): void {
-    if (this.installation.phase === 'awaiting-save') this.fail(null)
+  public cancelBeforeNativeQuit(): void {
+    if (this.installation.phase === 'awaiting-save' || this.installation.phase === 'preparing-install') this.fail(null)
+  }
+
+  public handOffToInstaller(quitAndInstall: () => void): void {
+    if (this.installation.phase !== 'preparing-install') return
+    this.installation = { phase: 'native-quit', timer: this.installation.timer, releaseQuit: this.ports.prepareQuit() }
+    quitAndInstall()
   }
 
   public downloaded(version?: string): void {
@@ -82,9 +90,16 @@ export class AppUpdates {
     this.ports.changed()
   }
 
-  public check(): Promise<void> {
-    if (this.backgroundCheck.phase === 'checking') return this.backgroundCheck.pending
-    if (this.isApplying()) return Promise.resolve()
+  public check(origin?: 'online'): Promise<void> {
+    if (this.backgroundCheck.phase === 'checking') {
+      if (origin === 'online') this.backgroundCheck.reconnected = true
+      return this.backgroundCheck.pending
+    }
+    if (this.isNotifying() || this.isApplying()) {
+      this.recheckRequested = true
+      return Promise.resolve()
+    }
+    this.recheckRequested = false
     this.feedback = { phase: 'idle' }
     const pending = Promise.resolve()
       .then(() => this.ports.check())
@@ -97,10 +112,12 @@ export class AppUpdates {
       )
       .finally(() => {
         this.clearProgress()
-        this.backgroundCheck = { phase: 'idle', result: this.backgroundCheck.result }
-        this.ports.changed()
+        const check = this.backgroundCheck
+        if (check.phase === 'checking' && check.reconnected && check.result === 'failed') this.recheckRequested = true
+        this.backgroundCheck = { phase: 'idle', result: check.result }
+        this.publishOrRecheck()
       })
-    this.backgroundCheck = { phase: 'checking', result: 'success', pending }
+    this.backgroundCheck = { phase: 'checking', result: 'success', pending, reconnected: false }
     this.ports.changed()
     return pending
   }
@@ -118,12 +135,21 @@ export class AppUpdates {
       )
     } finally {
       this.manualCheck = 'idle'
-      this.ports.changed()
+      this.publishOrRecheck()
     }
   }
 
+  private publishOrRecheck(): void {
+    if (this.recheckRequested && !this.isChecking() && !this.isApplying()) void this.check()
+    else this.ports.changed()
+  }
+
+  public canRequest(): boolean {
+    return this.isReady() && !this.isChecking() && !this.isApplying() && this.ports.canInstall()
+  }
+
   public request(): void {
-    if (!this.isReady() || this.isChecking() || this.isApplying() || !this.ports.canInstall()) return
+    if (!this.canRequest()) return
     this.clearFailure()
     const requestId = crypto.randomUUID()
     this.installation = {
@@ -144,12 +170,12 @@ export class AppUpdates {
       return
     }
     clearTimeout(installation.timer)
-    this.installation = { phase: 'idle' }
-    const releaseQuit = this.ports.prepareQuit()
     this.installation = {
       phase: 'preparing-install',
-      releaseQuit,
-      timer: setTimeout(() => this.fail('Update preparation took too long. Try Restart and Install again.'), 60_000),
+      timer: setTimeout(
+        () => this.fail('Update preparation took too long. Retry Restart and Install, or quit and reopen Tree.'),
+        60_000,
+      ),
     }
     try {
       this.ports.install()
@@ -163,10 +189,10 @@ export class AppUpdates {
     if (message !== null) this.feedback = { phase: 'failed', percent: null }
     const installation = this.installation
     if (installation.phase !== 'idle') clearTimeout(installation.timer)
-    if (installation.phase === 'preparing-install') installation.releaseQuit()
+    if (installation.phase === 'native-quit') installation.releaseQuit()
     this.installation = { phase: 'idle' }
     if (installation.phase !== 'idle') this.ports.finished(message)
-    this.ports.changed()
+    this.publishOrRecheck()
   }
 
   private percent(): number | null {
