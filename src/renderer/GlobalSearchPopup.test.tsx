@@ -205,6 +205,42 @@ it('keeps title and scrollbar interaction inside the popup and reveals arrow-sel
   expect(list.scrollTop).toBeGreaterThan(0)
 })
 
+it('mounts newly visible results before the resize notification returns', () => {
+  let notify: () => void
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: () => void) {}
+      observe(element: Element) {
+        if (element.classList.contains('recent-node-entry')) notify = this.callback
+      }
+      disconnect() {}
+    },
+  )
+  try {
+    const { store } = setup()
+    const results = Array.from({ length: 100 }, (_, i) => ({ id: String(i), text: `Result ${i}`, path: null }))
+    vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+      publish(results)
+      return vi.fn()
+    })
+    const list = screen.getByRole('listbox')
+    let height = 100
+    Object.defineProperty(list, 'clientHeight', { get: () => height })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Result' } })
+    expect(list.querySelector('[data-result-id="10"]')).toBeNull()
+
+    act(() => {
+      height = 500
+      notify()
+
+      expect(list.querySelector('[data-result-id="10"]')).toBeInTheDocument()
+    })
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 it('reveals an already highlighted selection without scheduling a second layout update', () => {
   const { store } = setup()
   vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {

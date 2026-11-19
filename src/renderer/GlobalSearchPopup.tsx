@@ -397,8 +397,9 @@ export function GlobalSearchPopup({
       scrollAnchor.current = undefined
       return
     }
-    const measure = (): void => {
+    const measure = (fromObserver: boolean): void => {
       const size = { width: element.clientWidth, height: element.clientHeight }
+      const viewportGrew = size.height > panelSize.current.height
       const widthChanged = panelSize.current.width !== size.width
       let changed = widthChanged || panelSize.current.height !== size.height
       if (widthChanged) revealPending.current = true
@@ -428,12 +429,15 @@ export function GlobalSearchPopup({
               inset: element.scrollTop - (layout.offsets[anchor] ?? 0),
               heights: next,
             }
-        setMeasurement({ epoch: measurementEpoch, heights: next, viewportHeight: size.height })
+        const publish = () => setMeasurement({ epoch: measurementEpoch, heights: next, viewportHeight: size.height })
+        // Recentering can expose more rows in the next paint. Mount them during resize delivery.
+        if (fromObserver && viewportGrew) flushSync(publish)
+        else publish()
       }
       updateResultEdges(element)
     }
-    measure()
-    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    measure(false)
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => measure(true))
     observer?.observe(element)
     element.querySelectorAll('.recent-node-entry').forEach((row) => observer?.observe(row))
     return () => observer?.disconnect()
