@@ -404,11 +404,24 @@ export function createEditorKeyDownHandler({
     if (selectingAll) {
       event.preventDefault()
       selectEditorText(event.currentTarget, node.id, vim, setSelectAllNodeId)
-    } else if (primary && event.key.toLowerCase() === 'c') {
-      const selection = getSelectionRange(event.currentTarget)
+    } else if (copying) {
+      const input = event.currentTarget
+      const selection = getSelectionRange(input)
       if (selection.start !== selection.end) {
         event.preventDefault()
         void store.copy(node.id, selection.start, selection.end).catch((error: unknown) => store.reportError(error))
+      } else if (
+        vim?.mode === 'normal' &&
+        node.attachment !== undefined &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !shortcuts.hasNonPrimaryCtrl(event) &&
+        vim.getCaretState(node.id, cursor, input.classList.contains('node-input-image-caret')).imageActive
+      ) {
+        event.preventDefault()
+        void store
+          .copyVimContent({ kind: 'image', attachmentId: node.attachment.id })
+          .catch((error: unknown) => store.reportError(error))
       }
     } else if (primary && event.key.toLowerCase() === 'v') {
       event.preventDefault()

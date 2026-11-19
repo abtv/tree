@@ -1137,6 +1137,8 @@ Vim external yanks and Normal `dd` use a separate `writeClipboardContent` servic
 
 ### Editing commands
 
+`Cmd+C` on the Vim Normal image caret uses the same attachment clipboard service as Vim yanks.
+
 In the browser adapter, keyboard paste reaches the native paste event. Browser
 infrastructure captures the event's text, HTML and PNG file synchronously and
 supplies a clipboard reader to the existing store paste operation. The renderer

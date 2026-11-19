@@ -14,6 +14,7 @@ import {
   parent,
   seedDocument,
   test,
+  unlockSystemClipboard,
   writeClipboardText,
   writeClipboardTextAndHtml,
 } from './fixtures'
@@ -267,6 +268,41 @@ test('copies yy text and character Visual y as plain text while retaining local 
 
   await expect.poll(() => content(app)).toMatchObject({ text: 'see', html: false, image: null })
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+})
+
+// @requirement PRODUCT.md §13.1
+test('copies the selected image with Cmd+C without moving the image caret', async ({ userDataDir }) => {
+  seed(userDataDir)
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const editor = node(window, 1)
+  await editor.focus()
+  await window.keyboard.press('j')
+  await expect(editor).toHaveClass(/node-input-image-caret/)
+  await window.evaluate(() => document.addEventListener('copy', (event) => event.preventDefault()))
+  const expectedBitmap = await app.evaluate(
+    ({ nativeImage }, bytes) => [...nativeImage.createFromBuffer(Buffer.from(bytes)).toBitmap()],
+    [...onePixelPng],
+  )
+  await writeClipboardText(app, 'old')
+
+  await window.keyboard.press('Meta+c')
+
+  await expect
+    .poll(() => content(app))
+    .toEqual({
+      text: '',
+      html: false,
+      image: { size: { width: 1, height: 1 }, bitmap: expectedBitmap },
+    })
+  await expect(editor).toBeFocused()
+  await expect(editor).toHaveClass(/node-input-image-caret/)
+  await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+  await window.keyboard.press('Meta+a')
+  await window.keyboard.press('Meta+c')
+
+  await expect.poll(() => content(app)).toEqual({ text: 'see https://example.com', html: true, image: null })
+  unlockSystemClipboard()
 })
 
 test('copies an image with yy on the image caret and uses text priority for a single Visual node', async ({

@@ -1752,6 +1752,37 @@ describe('editor keyboard handler', () => {
     expect(f.vim.register.current.kind).toBe('node')
   })
 
+  it('copies the image at the Normal caret without changing the Vim register or document', async () => {
+    const node: TreeNode = {
+      id: 'node',
+      text: 'a',
+      attachment: { id: 'image', mimeType: 'image/png' },
+      children: [],
+    }
+    const f = await textFixture(node)
+    const row = document.createElement('div')
+    row.className = 'node-row'
+    row.dataset.hasAttachment = 'true'
+    row.append(f.input)
+    setNormalCaret(f.input, 0)
+    f.press('l')
+
+    const event = f.dispatch('c', { metaKey: true })
+
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(f.clipboard.content).toEqual({ kind: 'image', attachmentId: 'image' })
+    expect(f.vim.register.current).toEqual({ kind: 'empty' })
+    expect(f.caret().imageActive).toBe(true)
+    expect(f.node()).toEqual(node)
+
+    f.dispatch('a', { metaKey: true })
+    f.dispatch('c', { metaKey: true })
+
+    expect(f.clipboard.written?.text).toBe('a')
+    expect(f.input.selectionStart).toBe(0)
+    expect(f.input.selectionEnd).toBe(1)
+  })
+
   it('keeps the clipboard on empty and multi-node dd but exports a clamped single deletion', async () => {
     const first: TreeNode = { id: 'first', text: 'first', children: [] }
     const last: TreeNode = { id: 'last', text: 'last', children: [] }

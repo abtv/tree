@@ -1005,6 +1005,8 @@ When an edit changes linked text into a valid HTTP(S) URL, its clickable destina
 
 `Cmd+C` copies the selected text. When the selection contains hyperlinks, the clipboard content preserves both the text and the clickable hyperlink ranges.
 
+In Vim Normal, `Cmd+C` copies the attached image to the system clipboard when the block caret is on the image and there is no text selection. It leaves the caret and the Vim register in place.
+
 Copying does not clear or otherwise change the visible text selection.
 
 `Cmd+X` cuts the selected text. When the selection contains hyperlinks, the cut clipboard content preserves both the text and the clickable hyperlink ranges.
