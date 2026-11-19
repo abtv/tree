@@ -41,6 +41,21 @@ it('offers no global tag suggestions in a document without tags or after the las
   expect(catalog.searchSuggestions('#')).toEqual([])
 })
 
+it('releases marker counts and character buckets after the last completed tags are removed', () => {
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [{ ...node('done', '#archived #other'), struckThrough: true }] })
+  const finished = Reflect.get(catalog, 'finishedCounts') as ReadonlyMap<string, number>
+  const characters = Reflect.get(catalog, 'characters') as ReadonlyMap<string, ReadonlySet<string>>
+  expect(finished.size).toBe(2)
+  expect(characters.size).toBeGreaterThan(0)
+
+  catalog.update({ roots: [node('next', 'No tags')] })
+
+  expect(finished.size).toBe(0)
+  expect(characters.size).toBe(0)
+  expect(catalog.searchSuggestions('#', true)).toEqual([])
+})
+
 it('restricts global suggestions to continuous matches while retaining inline fuzzy completion and ranking', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [node('source', '#tag #tagged #new_tag #newtag #ai-automation-meeting')] })
@@ -80,6 +95,28 @@ it('uses the current text of a node moved and edited in a replacement snapshot',
 
   expect(catalog.suggest('a', '#', 1)?.suggestions).toEqual(['beta'])
   expect(catalog.suggest('a', '#alpha #a', 9)?.suggestions).toEqual(['alpha', 'beta'])
+})
+
+it.each([false, true])('reuses intact subtrees when siblings swap (stationary root: %s)', (stationary) => {
+  let childReads = 0
+  const children = [node('child', '#child')]
+  const branch: TreeNode = {
+    ...node('branch', '#branch'),
+    get children() {
+      childReads += 1
+      return children
+    },
+  }
+  const other = node('other', '#other')
+  const stationaryRoots = stationary ? [node('fixed', 'No markers')] : []
+  const catalog = new TagCatalog()
+  catalog.update({ roots: [...stationaryRoots, branch, other] })
+  childReads = 0
+
+  catalog.update({ roots: [...stationaryRoots, other, branch] })
+
+  expect(catalog.searchSuggestions('#')).toEqual(['branch', 'child', 'other'])
+  expect(childReads).toBe(0)
 })
 
 it('discards removed node contributions before previewing text for that id', () => {

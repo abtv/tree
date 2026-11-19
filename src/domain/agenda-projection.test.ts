@@ -24,6 +24,69 @@ describe('Agenda projection', () => {
     )
   })
 
+  it('refreshes a retained date when a branch is completed or reopened', () => {
+    const task = node('task', '2026-10-14 Task')
+    const project = node('project', 'Project', [task])
+    const peer = node('peer', '2026-10-14 Peer')
+    const open = { roots: [project, peer] }
+    let hiddenChildrenReads = 0
+    const completedTask: TreeNode = {
+      ...task,
+      struckThrough: true,
+      get children() {
+        hiddenChildrenReads += 1
+        return task.children
+      },
+    }
+    const complete = {
+      roots: [{ ...project, struckThrough: true as const, children: [completedTask] }, peer],
+    }
+    const initial = projectAgenda(open, null, undefined, true)
+
+    const hidden = projectAgenda(complete, null, { document: open, projection: initial }, true)
+    const reopened = projectAgenda(open, null, { document: complete, projection: hidden }, true)
+
+    expect(hidden).toEqual([{ day: day(14), rows: [{ nodeId: 'peer', depth: 0, role: 'match' }] }])
+    expect(reopened).toEqual(initial)
+    expect(reopened[0]?.rows.map(({ nodeId }) => nodeId)).toEqual(['project', 'task', 'peer'])
+    expect(hiddenChildrenReads).toBe(0)
+  })
+
+  it('reuses visible day rows when only already hidden descendants are replaced', () => {
+    const hiddenTask = (id: string): TreeNode => ({ ...node(id, '2026-10-14 Hidden'), struckThrough: true })
+    const archive = { ...node('archive', '', [hiddenTask('old')]), struckThrough: true as const }
+    const visibleTask = node('open', '2026-10-14 Open')
+    const document = { roots: [archive, visibleTask] }
+    const projection = projectAgenda(document, null, undefined, true)
+    const edited = { roots: [{ ...archive, children: [hiddenTask('replacement')] }, visibleTask] }
+
+    const result = projectAgenda(edited, null, { document, projection }, true)
+
+    expect(result).toEqual([{ day: day(14), rows: [{ nodeId: 'open', depth: 0, role: 'match' }] }])
+    expect(result[0]).toBe(projection[0])
+  })
+
+  it('avoids comparing an unchanged root again for each retained day', () => {
+    const dates = Array.from({ length: 20 }, (_, index) => `2026-10-${String(index + 1).padStart(2, '0')}`).join(' ')
+    const unaffected = node('unaffected', '2026-10-01 Other task')
+    const document = { roots: [node('edited', dates), unaffected] }
+    const projection = projectAgenda(document, null)
+    const roots = [node('edited', `${dates} Edited title`), unaffected]
+    let rootReads = 0
+    Object.defineProperty(roots, 1, {
+      get() {
+        rootReads += 1
+        return unaffected
+      },
+    })
+
+    const result = projectAgenda({ roots }, null, { document, projection })
+
+    expect(result).toHaveLength(20)
+    expect(result).toEqual(projection)
+    expect(rootReads).toBeLessThanOrEqual(3)
+  })
+
   // @requirement PRODUCT.md §23.6
   it('does not revisit unchanged subtrees belonging only to reused days', () => {
     let childrenReads = 0

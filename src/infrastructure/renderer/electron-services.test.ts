@@ -100,6 +100,25 @@ describe('renderer Electron services', () => {
     await expect(services.imageToText!('image-2')).rejects.toBe(failure)
   })
 
+  it('forwards finished-task preferences and preserves write failures from the bridge', async () => {
+    const getHideFinishedTasks = vi.fn(async () => true)
+    const setHideFinishedTasks = vi.fn<NonNullable<TreeApi['setHideFinishedTasks']>>(async () => undefined)
+    window.treeApi = { ...window.treeApi, getHideFinishedTasks, setHideFinishedTasks }
+    const services = createElectronEditorServices()
+
+    await expect(services.loadHideFinishedTasks!()).resolves.toBe(true)
+    await services.saveHideFinishedTasks!(false)
+
+    expect(getHideFinishedTasks).toHaveBeenCalledExactlyOnceWith()
+    expect(setHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(false)
+    const failure = new Error('Preference storage unavailable')
+    const rejected = Promise.reject(failure)
+    void rejected.catch(() => undefined)
+    setHideFinishedTasks.mockReturnValueOnce(rejected)
+
+    await expect(services.saveHideFinishedTasks!(true)).rejects.toBe(failure)
+  })
+
   it('propagates recent-node save failures from the bridge', async () => {
     const failure = new Error('history storage unavailable')
     window.treeApi = {
@@ -139,8 +158,10 @@ describe('renderer Electron services', () => {
     }
   })
 
-  it('supports bridges without optional history or rich clipboard methods', async () => {
+  it('supports bridges without optional preferences, history or rich clipboard methods', async () => {
     const bridge = { ...window.treeApi }
+    delete bridge.getHideFinishedTasks
+    delete bridge.setHideFinishedTasks
     delete bridge.getEmojiHistory
     delete bridge.setEmojiHistory
     delete bridge.getRecentNodes
@@ -149,6 +170,8 @@ describe('renderer Electron services', () => {
     window.treeApi = bridge
     const services = createElectronEditorServices()
 
+    await expect(services.loadHideFinishedTasks!()).resolves.toBe(false)
+    await expect(services.saveHideFinishedTasks!(true)).resolves.toBeUndefined()
     await expect(services.loadEmojiHistory!()).resolves.toEqual([])
     await expect(services.loadRecentNodes!()).resolves.toEqual([])
     await expect(services.saveEmojiHistory!(['smile'])).resolves.toBeUndefined()

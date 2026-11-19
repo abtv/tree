@@ -5,34 +5,43 @@ import { findTags } from './tags'
 import type { Document, TreeNode } from './document-types'
 
 // @requirement PRODUCT.md §20.13
-it('keeps derived membership equal to literal document tags across edits and undo/redo snapshots', () => {
+it('keeps full and unfinished marker membership correct across edits and undo/redo snapshots', () => {
   fc.assert(
     fc.property(
-      fc.array(fc.array(fc.constantFrom('Work', 'work', 'a-b', '週_2'), { maxLength: 6 }), {
-        minLength: 1,
-        maxLength: 25,
-      }),
+      fc.array(
+        fc.record({
+          tags: fc.array(fc.constantFrom('Work', 'work', 'a-b', '週_2'), { maxLength: 6 }),
+          finished: fc.boolean(),
+        }),
+        { minLength: 1, maxLength: 25 },
+      ),
       fc.constantFrom('#', '@', '&'),
       (edits, prefix) => {
         const catalog = new TagCatalog(prefix)
-        let roots: readonly TreeNode[] = [
-          { id: 'a', text: '', children: [] },
-          { id: 'b', text: `${prefix}fixed`, children: [] },
-        ]
+        const fixed: TreeNode = { id: 'b', text: `${prefix}fixed ${prefix}work`, children: [] }
         const history: Document[] = []
+        const namesOf = (roots: readonly TreeNode[]) =>
+          [...new Set(roots.flatMap((node) => findTags(node.text, [], prefix).map((tag) => tag.name)))].sort()
         const check = (document: Document): void => {
           catalog.update(document)
-          const expected = [
-            ...new Set(document.roots.flatMap((node) => findTags(node.text, [], prefix).map((tag) => tag.name))),
-          ].sort()
+          const expected = namesOf(document.roots)
           expect(catalog.suggest('draft', prefix, 1)?.suggestions ?? []).toEqual(expected)
+          expect(catalog.searchSuggestions(prefix)).toEqual(expected)
+          expect(catalog.searchSuggestions(prefix, true)).toEqual(
+            namesOf(document.roots.filter((node) => !node.struckThrough)),
+          )
           expect(catalog.searchSuggestions(`${prefix}WORK`)).toEqual(
             expected.filter((name) => name.toLowerCase() === 'work'),
           )
         }
-        for (const tags of edits) {
-          roots = [{ ...roots[0]!, text: tags.map((tag) => `${prefix}${tag}`).join(' ') }, roots[1]!]
-          const document = { roots }
+        for (const { tags, finished } of edits) {
+          const edited: TreeNode = {
+            id: 'a',
+            text: tags.map((tag) => `${prefix}${tag}`).join(' '),
+            children: [],
+            ...(finished ? { struckThrough: true } : {}),
+          }
+          const document = { roots: [edited, fixed] }
           history.push(document)
           check(document)
         }

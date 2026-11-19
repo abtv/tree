@@ -73,6 +73,29 @@ describe('recent nodes', () => {
 
     expect(recent.getResults()).toEqual([{ id: 'leaf', text: 'Finished task', path: null }])
   })
+
+  it('marks starred search results and omits them from recent results without dropping their history', () => {
+    const source = {
+      roots: [
+        { id: 'star', text: 'Project plan', starred: true as const, children: [] },
+        { id: 'recent', text: 'Project notes', children: [] },
+      ],
+    }
+    const recent = new RecentNodes()
+    recent.load(['star', 'recent'], source)
+
+    const work = searchNodes(source, 'Project')
+    let result = work.next()
+    while (!result.done) result = work.next()
+
+    expect(result.value).toEqual([
+      { id: 'star', text: 'Project plan', path: null, starred: true },
+      { id: 'recent', text: 'Project notes', path: null },
+    ])
+    expect(recent.getResults()).toEqual([{ id: 'recent', text: 'Project notes', path: null }])
+    expect(recent.getIds()).toEqual(['star', 'recent'])
+  })
+
   // @requirement PRODUCT.md §20.14.1
   it('reuses retained paths without traversing unrelated roots on a new document snapshot', () => {
     let childrenReads = 0

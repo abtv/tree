@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { QuitHandshake, type QuitHandshakeClock } from './quit-handshake'
 
 function createClock() {
-  let callback: (() => void) | undefined
+  const callbacks: Array<() => void> = []
   const clock: QuitHandshakeClock = {
     setTimeout: (next) => {
-      callback = next
-      return 'timeout'
+      callbacks.push(next)
+      return callbacks.length
     },
     clearTimeout: vi.fn(),
   }
-  return { clock, fire: () => callback?.() }
+  return { clock, callbacks, fire: () => callbacks.at(-1)?.() }
 }
 
 describe('QuitHandshake', () => {
@@ -46,6 +46,7 @@ describe('QuitHandshake', () => {
 
       handshake.request()
       expect(handshake.confirm('confirmed')).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
       await Promise.resolve()
       handshake.request()
       vi.advanceTimersByTime(5000)
@@ -121,6 +122,33 @@ describe('QuitHandshake', () => {
     handshake.request()
 
     expect(sent).toEqual(['request-1', 'request-2'])
+  })
+
+  it('ignores the callback from a cancelled deadline during a later quit request', async () => {
+    const send = vi.fn()
+    const timeout = vi.fn()
+    const quit = vi.fn()
+    const { clock, callbacks } = createClock()
+    let id = 0
+    const handshake = new QuitHandshake(send, timeout, quit, () => String(++id), clock)
+    handshake.request()
+    const staleDeadline = callbacks[0]!
+
+    handshake.cancel('1')
+    staleDeadline()
+
+    expect(clock.clearTimeout).toHaveBeenCalledExactlyOnceWith(1)
+    expect(timeout).not.toHaveBeenCalled()
+
+    handshake.request()
+    staleDeadline()
+
+    expect(send.mock.calls).toEqual([['1'], ['2']])
+    expect(timeout).not.toHaveBeenCalled()
+    expect(handshake.confirm('2')).toBe(true)
+    expect(clock.clearTimeout).toHaveBeenLastCalledWith(2)
+    await Promise.resolve()
+    expect(quit).toHaveBeenCalledOnce()
   })
 
   it('forces an immediate quit, clears the pending timeout, and ignores later requests', async () => {

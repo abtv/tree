@@ -626,6 +626,15 @@ describe('main IPC handlers', () => {
     save.mockRejectedValueOnce(new Error('Disk full'))
     await expect(set(event, true)).rejects.toThrow('Disk full')
   })
+
+  it('defaults finished tasks to visible when no preference adapter is installed', () => {
+    const { handlers } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+
+    expect(handlers.get(ipcChannels.getHideFinishedTasks)!(event)).toBe(false)
+    expect(handlers.get(ipcChannels.setHideFinishedTasks)!(event, true)).toBeUndefined()
+  })
+
   it('cancels only a named quit request from the trusted renderer', () => {
     const { handlers, quitHandshake } = createHarness()
     const cancel = handlers.get(ipcChannels.cancelQuit)!

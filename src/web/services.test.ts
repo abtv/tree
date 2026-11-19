@@ -124,7 +124,7 @@ describe('browser editing service contracts', () => {
     expect(storage.open).not.toHaveBeenCalled()
   })
 
-  it('handles unload and background flushing before an editor store is connected', async () => {
+  it('handles input, unload and background flushing before an editor store is connected', async () => {
     const f = fixture()
     await installBrowserPrototype()
     const initialStatus = f.status()
@@ -138,6 +138,7 @@ describe('browser editing service contracts', () => {
 
     window.dispatchEvent(unload)
     document.dispatchEvent(new Event('visibilitychange'))
+    document.dispatchEvent(new Event('keydown'))
     await Promise.resolve()
 
     expect(unload.defaultPrevented).toBe(false)
@@ -258,6 +259,17 @@ describe('browser editing service contracts', () => {
     const f = fixture()
     const installed = await installBrowserPrototype()
     const store = connectStore(installed)
+    const scrolled = { ...store.saved, view: { ...store.saved.view!, selectedRowTop: 20 } }
+    const savingView = installed.services.save(scrolled)
+    const viewUnload = new Event('beforeunload', { cancelable: true })
+
+    window.dispatchEvent(viewUnload)
+
+    expect(viewUnload.defaultPrevented).toBe(false)
+    expect(store.flush).not.toHaveBeenCalled()
+    f.transactions[0]!.oncomplete!()
+    await savingView
+
     const changed = { ...store.saved, document: { roots: [{ id: 'root', text: 'changed', children: [] }] } }
     store.getSnapshot.mockReturnValue({ status: 'ready', ...changed })
     store.notify()
@@ -272,14 +284,39 @@ describe('browser editing service contracts', () => {
     expect(unload.defaultPrevented).toBe(true)
     expect(store.flush).toHaveBeenCalledOnce()
 
-    f.transactions[0]!.oncomplete!()
+    f.transactions[1]!.oncomplete!()
     await writing
     expect(f.status()).toBe('Saving…')
 
     const restored = installed.services.save(store.saved)
-    f.transactions[1]!.oncomplete!()
+    f.transactions[2]!.oncomplete!()
     await restored
     expect(f.status()).toBe('Saved locally in this browser')
+  })
+
+  it('protects a pending cut or paste even before the document changes', async () => {
+    const f = fixture()
+    const installed = await installBrowserPrototype()
+    const store = connectStore(installed)
+    const close = vi.spyOn(window, 'close').mockImplementation(() => {})
+    const pendingUnload = new Event('beforeunload', { cancelable: true })
+    const settledUnload = new Event('beforeunload', { cancelable: true })
+
+    installed.services.onPendingEditsChanged!(true)
+    window.dispatchEvent(pendingUnload)
+    await window.treeApi.quit()
+
+    expect(f.status()).toBe('Saving…')
+    expect(pendingUnload.defaultPrevented).toBe(true)
+    expect(store.flush).toHaveBeenCalledTimes(2)
+    expect(close).not.toHaveBeenCalled()
+
+    installed.services.onPendingEditsChanged!(false)
+    window.dispatchEvent(settledUnload)
+
+    expect(f.status()).toBe('Saved locally in this browser')
+    expect(settledUnload.defaultPrevented).toBe(false)
+    expect(store.flush).toHaveBeenCalledTimes(2)
   })
 
   it('protects a newly buffered edit before a status notification has run', async () => {
@@ -704,6 +741,25 @@ describe('browser editing service contracts', () => {
       await pending
 
       expect(await window.treeApi.getLineNumbers()).toBe(true)
+    },
+  )
+
+  it.each([undefined, 'true', true, false])(
+    'loads finished-task visibility from the profile and writes it separately from notes (%j)',
+    async (saved) => {
+      const f = fixture()
+      f.values.set('preferences:hide-finished-tasks', saved)
+      const { services } = await installBrowserPrototype()
+      const wasHidden = saved === true
+
+      expect(await services.loadHideFinishedTasks!()).toBe(wasHidden)
+
+      const write = services.saveHideFinishedTasks!(!wasHidden)
+
+      expect(f.db.transaction).toHaveBeenCalledExactlyOnceWith('preferences', 'readwrite', { durability: 'strict' })
+      expect(f.put).toHaveBeenCalledExactlyOnceWith(!wasHidden, 'hide-finished-tasks')
+      f.transactions[0]!.oncomplete!()
+      await write
     },
   )
 

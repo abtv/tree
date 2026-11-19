@@ -264,6 +264,36 @@ describe('Agenda rows', () => {
     expect(cache.getProjection(edited, reconciled).map((day) => day.day)).toEqual([row.day])
   })
 
+  it('keeps remaining overdue matches when the old active date only matches a descendant', () => {
+    const source: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: '2026-10-04 Parent',
+          children: [{ id: 'child', text: '2026-10-04 Child', children: [] }],
+        },
+      ],
+    }
+    const cache = new AgendaRowsCache()
+    const open = openAgendaState(location, 0, today)
+    const originalDay = dayNumberOf({ year: 2026, month: 10, day: 4 })
+    const remainingDay = dayNumberOf({ year: 2026, month: 9, day: 1 })
+    const selected = applyAgendaCommand(
+      open,
+      { kind: 'select', key: `node:${originalDay}:parent` },
+      cache.get(source, open),
+    )
+    expect(selected.selectedKey).toBe(`node:${originalDay}:parent`)
+    const edited = editNodeText(source, 'parent', '2026-09-01 Parent')
+
+    const projection = cache.getProjection(edited, selected)
+
+    expect(projection.map(({ day, rows }) => [day, rows.map(({ nodeId }) => nodeId)])).toEqual([
+      [remainingDay, ['parent']],
+      [originalDay, ['child']],
+    ])
+  })
+
   it('shows distinct unfinished overdue nodes only in the current week and updates after strikethrough', () => {
     const state = openAgendaState(location, 0, today)
     const source: Document = {
@@ -364,6 +394,9 @@ describe('Agenda rows', () => {
     const state = openAgendaState(location, 0, today)
     cache.releaseIfStale(document)
     const before = cache.get(document, state)
+    // Document replacement must release the old row fragments before the cache is used again.
+    const retainedDays = Reflect.get(cache, 'dayRows') as ReadonlyMap<number, unknown>
+    expect(retainedDays.size).toBeGreaterThan(0)
 
     cache.releaseIfStale(document)
 
@@ -373,6 +406,7 @@ describe('Agenda rows', () => {
     cache.releaseIfStale({ roots: [] })
 
     expect(clear).toHaveBeenCalledOnce()
+    expect(retainedDays.size).toBe(0)
     expect(cache.get(document, state)).not.toBe(before)
   })
 
@@ -448,6 +482,20 @@ describe('Agenda rows', () => {
 
     expect(focused.filter((row) => row.kind === 'day').map((row) => row.day)).toEqual([today + 1])
     expect(cache.get(document, state).filter((row) => row.kind === 'day').length).toBeGreaterThan(1)
+  })
+
+  it('drops Overdue from the search projection on day focus even when no occurrence is active', () => {
+    const source: Document = { roots: [{ id: 'old', text: '2026-10-04 Task', children: [] }] }
+    const state = openAgendaState({ currentParentId: null, selectedNodeId: 'old' }, 0, today)
+    const cache = new AgendaRowsCache()
+    const timeline = cache.getProjection(source, state)
+    const oldDay = dayNumberOf({ year: 2026, month: 10, day: 4 })
+    expect(timeline.map(({ day }) => day)).toEqual([oldDay])
+
+    const focused = cache.getProjection(source, focusAgendaState(state, today, 0))
+
+    expect(focused).toEqual([])
+    expect(cache.getProjection(source, state)).toEqual(timeline)
   })
 
   it('does not traverse unchanged subtrees when an edit preserves day membership', () => {

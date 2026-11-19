@@ -60,6 +60,37 @@ it('publishes a zero-result search without applying an absent destination', asyn
   expect(search.getResult()?.destination).toBeUndefined()
 })
 
+it('notifies a jump listener only for applied destinations until it unsubscribes', async () => {
+  const { state } = await setup()
+  const apply = vi.fn(() => true).mockReturnValueOnce(false)
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  const onJump = vi.fn()
+  const stop = search.onJump(onJump)
+  const origin = { nodeId: 'a', offset: 0 }
+  search.update(state())
+  search.begin(origin)
+  search.edit('apple')
+
+  search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(apply).toHaveBeenCalledOnce()
+  expect(onJump).not.toHaveBeenCalled()
+
+  search.navigate(origin, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(apply).toHaveBeenCalledTimes(2)
+  expect(onJump).toHaveBeenCalledOnce()
+
+  stop()
+  search.navigate(origin, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(apply).toHaveBeenCalledTimes(3)
+  expect(onJump).toHaveBeenCalledOnce()
+})
+
 // @requirement PRODUCT.md §20.2.26
 it.each(['toggle', 'close', 'open', 'close-recursive', 'open-recursive'] as const)(
   'transfers only the manually chosen Agenda day for %s',
@@ -263,6 +294,13 @@ it('advances from the actual match when its caret snaps to the start of a combin
 
   expect(store.search.getResult()?.destination).toMatchObject({ nodeId: 'a', start: 3, caret: 2 })
   expect(state().focus.cursor).toBe(2)
+
+  // A manual caret selection starts before the accent again.
+  store.selectNode('a', 2)
+  store.search.navigate({ nodeId: 'a', offset: state().focus.cursor }, 1, 1)
+  await vi.runAllTimersAsync()
+
+  expect(store.search.getResult()?.destination).toMatchObject({ nodeId: 'a', start: 3, caret: 2 })
 })
 
 it('applies every identical queued repeat and then accepts another jump', async () => {

@@ -289,6 +289,8 @@ describe('command registry', () => {
     } as const
 
     for (const name of [
+      'toggle-star-node',
+      'reindex-all-images',
       'summarize',
       'image-to-text',
       'about-tree',
@@ -302,6 +304,9 @@ describe('command registry', () => {
       expect(command.active(state)).toBe(false)
       await expect(command.run(services, state)).resolves.toBeUndefined()
     }
+
+    const star = commandRegistry.find((command) => command.name === 'toggle-star-node')!
+    expect(star.active({ ...state, starred: true })).toBe(true)
 
     const finished = commandRegistry.find((command) => command.name === 'toggle-finished-tasks')!
 

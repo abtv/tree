@@ -4601,6 +4601,41 @@ describe('EditorStore', () => {
     expect(finish).not.toHaveBeenCalled()
   })
 
+  it('keeps pending edits reported until the last overlapping clipboard read settles', async () => {
+    const services = loadedState(
+      { roots: [{ id: 'root', text: '', children: [] }] },
+      { currentParentId: null, selectedNodeId: 'root' },
+    )
+    const pending = vi.fn()
+    services.onPendingEditsChanged = pending
+    const store = new EditorStore(services, ids('new'), new FakeClock())
+    await store.initialize()
+    let failFirst!: (error: Error) => void
+    let completeSecond!: (value: ClipboardValue) => void
+    const firstRead = new Promise<ClipboardValue>((_resolve, reject) => {
+      failFirst = reject
+    })
+    const secondRead = new Promise<ClipboardValue>((resolve) => {
+      completeSecond = resolve
+    })
+    const read = vi.fn<EditorServices['readClipboard']>().mockReturnValueOnce(firstRead).mockReturnValueOnce(secondRead)
+
+    const first = store.paste('root', 0, read)
+    const second = store.paste('root', 0, read)
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2))
+    const failure = new Error('Clipboard read failed')
+    failFirst(failure)
+    await expect(first).rejects.toThrow(failure)
+
+    expect(pending.mock.calls).toEqual([[true]])
+
+    completeSecond({ kind: 'text', text: 'Second paste' })
+    await second
+
+    expect(pending.mock.calls).toEqual([[true], [false]])
+    expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: 'Second paste' }] } })
+  })
+
   it.each(['clipboard read', 'attachment write', 'cut'] as const)(
     'waits for a pending %s and its resulting save during flush',
     async (stage) => {

@@ -187,10 +187,13 @@ it('still finds unfinished descendants in folded branches and rejects hidden des
     selectedNodeId: 'parent',
   })
   await store.setHideFinishedTasks(true)
+  const before = store.getSnapshot()
 
   store.selectNode('missing', 0)
   store.selectNode('done', 0)
   store.visitRecentNode('done')
+
+  expect(store.getSnapshot()).toBe(before)
   expect(store.isTaskHidden('missing')).toBe(false)
   expect(store.getSnapshot()).toMatchObject({ location: { currentParentId: null, selectedNodeId: 'parent' } })
   expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['parent'])
@@ -234,10 +237,13 @@ it('keeps completion navigation within Overdue before falling back to a day head
   })
   await store.setHideFinishedTasks(true)
   store.openAgenda()
-  store.applyAgenda({ kind: 'select', key: `node:${today - 7}:old` })
+  store.applyAgenda({ kind: 'select', key: `node:${today - 7}:old`, cursor: 4 })
 
   store.toggleStrikethrough('old', 'old')
-  expect(store.getSnapshot()).toMatchObject({ agenda: { selectedKey: `node:${today - 7}:next` } })
+  expect(store.getSnapshot()).toMatchObject({
+    agenda: { selectedKey: `node:${today - 7}:next` },
+    focus: { nodeId: 'next', cursor: 4 },
+  })
   store.toggleStrikethrough('next', 'next')
 
   expect(store.getSnapshot()).toMatchObject({ agenda: { selectedKey: `day:${today - 3}` } })
@@ -281,8 +287,11 @@ it('writes a changed preference once and finishes pending editing before hiding 
   await store.setHideFinishedTasks(false)
   await Promise.all([store.setHideFinishedTasks(true), store.setHideFinishedTasks(true)])
   unregister()
+  const hidden = store.getSnapshot()
+
   store.enter()
 
+  expect(store.getSnapshot()).toBe(hidden)
   expect(saveHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(true)
   expect(finish).toHaveBeenCalledOnce()
   expect(store.getSnapshot()).toMatchObject({
@@ -293,17 +302,42 @@ it('writes a changed preference once and finishes pending editing before hiding 
   await store.flushPersistence()
 })
 
-it('applies the saved visibility when a profile starts with an empty document', async () => {
-  const { store, load, start } = await harness([task('old')], { currentParentId: null, selectedNodeId: 'old' })
+it('updates cached rows when visibility changes and opens search results from the current filter', async () => {
+  const { store } = await harness([task('done', true), task('next'), task('start')], {
+    currentParentId: null,
+    selectedNodeId: 'start',
+  })
+  expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['done', 'next', 'start'])
+
   await store.setHideFinishedTasks(true)
-  load.mockResolvedValueOnce(null)
-  const restarted = await start()
 
-  restarted.toggleStrikethrough('new-root', 'new-root')
+  expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['next', 'start'])
+  store.visitRecentNode('next')
+  expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'next' } })
 
-  expect(restarted.getVisibleRows()).toEqual([])
-  await restarted.flushPersistence()
+  await store.setHideFinishedTasks(false)
+
+  expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['done', 'next', 'start'])
+  expect(store.isTaskHidden('done')).toBe(false)
+  store.visitRecentNode('done')
+  expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'done' } })
+  await store.flushPersistence()
 })
+
+it.each([false, true])(
+  'uses the profile visibility setting %s when starting an empty document',
+  async (hideFinishedTasks) => {
+    const { store, load, start } = await harness([task('old')], { currentParentId: null, selectedNodeId: 'old' })
+    await store.setHideFinishedTasks(hideFinishedTasks)
+    load.mockResolvedValueOnce(null)
+    const restarted = await start()
+
+    restarted.toggleStrikethrough('new-root', 'new-root')
+
+    expect(restarted.getVisibleRows().map(({ node }) => node.id)).toEqual(hideFinishedTasks ? [] : ['new-root'])
+    await restarted.flushPersistence()
+  },
+)
 
 it('closes unused search reveals when changing the finished-task filter', async () => {
   const { store } = await harness(

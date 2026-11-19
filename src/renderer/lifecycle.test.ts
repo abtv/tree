@@ -135,6 +135,10 @@ describe('renderer lifecycle', () => {
     store.editText('one', 'before')
     await flushed
 
+    const obsolete = new AbortController()
+    obsolete.abort()
+    await store.flushPersistence({ sealEditsUntil: obsolete.signal })
+
     store.editText('one', 'late')
     await store.paste('one', 0)
     store.undo()
