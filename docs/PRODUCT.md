@@ -1260,6 +1260,8 @@ If a save fails, the pending changes are retained and the failure is surfaced. T
 
 The document must persist between application restarts.
 
+Every Tree release must open valid notes saved in any document format used by an earlier release. Users can upgrade directly from any earlier release, skipping any number of application releases and document format versions. Tree must preserve the notes when it migrates them and use the current document format on the next save.
+
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
 
 When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2.
