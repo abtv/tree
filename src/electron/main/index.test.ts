@@ -606,7 +606,7 @@ describe('packaged desktop update wiring', () => {
     f.updates.fail(null)
   })
 
-  it.each(['about', 'data', 'archive', 'export', 'import', 'loading', 'destroyed', 'missing'] as const)(
+  it.each(['about', 'data', 'archive', 'import', 'loading', 'destroyed', 'missing'] as const)(
     'does not start update saving while blocked by %s',
     async (reason) => {
       const f = await packagedSetup()
@@ -614,7 +614,6 @@ describe('packaged desktop update wiring', () => {
       if (reason === 'about') f.ipc.setRendererModalOpen!(true)
       if (reason === 'data') f.ipc.setAppUpdateBlocked!(true)
       if (reason === 'archive') mocks.archive.isIdle.mockReturnValueOnce(false)
-      if (reason === 'export') f.ipc.setNotesMenuState!({ canExport: false, canImport: true })
       if (reason === 'import') f.ipc.setNotesMenuState!({ canExport: true, canImport: false })
       if (reason === 'loading') vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
       if (reason === 'destroyed') vi.mocked(f.window.isDestroyed).mockReturnValue(true)

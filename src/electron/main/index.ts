@@ -316,7 +316,6 @@ bootstrapApplication({
           !rendererModalOpen &&
           !appUpdateBlocked &&
           notesArchive?.isIdle?.() === true &&
-          notesMenuState.canExport &&
           notesMenuState.canImport,
         prepareQuit: () => {
           appQuitting = true

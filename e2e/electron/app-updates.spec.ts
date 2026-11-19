@@ -13,7 +13,7 @@ import {
   seedDocument,
   test,
 } from './fixtures'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { onePixelPng } from '../../src/electron/main/png-test-utils'
 
@@ -23,6 +23,27 @@ interface UpdateRetryProbe {
   releaseConfirmation(): void
   releaseSave(): void
 }
+
+// @requirement PRODUCT.md §26
+test('installs a ready update after a document load error and preserves the file', async ({ userDataDir }) => {
+  const original = '{"version":99999}'
+  mkdirSync(join(userDataDir, 'data'), { recursive: true })
+  writeFileSync(documentPath(userDataDir), original)
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, expectReady: false })
+  await expect(window.getByText('Tree could not open this document')).toBeVisible()
+  await app.evaluate(() => {
+    ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
+  })
+  await expect
+    .poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()!.getMenuItemById('update-app')!.enabled))
+    .toBe(true)
+
+  const closed = app.waitForEvent('close')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
+  await closed
+
+  expect(readFileSync(documentPath(userDataDir), 'utf8')).toBe(original)
+})
 
 // @requirement PRODUCT.md §26
 test('keeps a retry locked when an earlier failed-save acknowledgment arrives late', async ({ userDataDir }) => {

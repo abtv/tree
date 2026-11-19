@@ -132,7 +132,7 @@ describe('application menu template', () => {
     [{ updateApplying: true }, false, false],
     [{ updateBlocked: true }, false, false],
     [{ modalOpen: true }, false, false],
-    [{ notes: { canExport: false, canImport: true } }, true, false],
+    [{ notes: { canExport: false, canImport: true } }, true, true],
     [{ notes: { canExport: true, canImport: false } }, true, false],
   ] as const)('applies independent update availability guards for %j', (overrides, canCheck, canUpdate) => {
     const actions = createActions()

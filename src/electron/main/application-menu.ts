@@ -71,7 +71,6 @@ export function applicationMenuTemplate(
             !state.modalOpen &&
             !state.updateApplying &&
             !state.updateBlocked &&
-            state.notes.canExport &&
             state.notes.canImport,
           click: () => actions.updateApp?.(),
         },

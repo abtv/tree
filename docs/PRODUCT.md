@@ -2740,8 +2740,10 @@ through Check for Updates. Checks and installation cannot run concurrently.
 
 Restart and Install stays disabled until the package is downloaded, following the native
 menu convention of keeping unavailable commands visible. It is also unavailable
-during a notes operation. Applying
-it blocks editing, saves pending work including Vim buffers and attachments, and
+during a notes operation. A document load error allows installation of a downloaded
+update and preserves the unopened document.
+
+Applying the update blocks editing, saves pending work including Vim buffers and attachments, and
 asks the macOS installer to verify, install and restart Tree. A failed or timed-out
 save leaves the application open and editable; it never offers to discard notes
 to install an update. Repeated requests do not start concurrent installations.
