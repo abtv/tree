@@ -563,18 +563,18 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const list = window.getByRole('listbox', { name: 'Recent nodes' })
     const selected = list.locator('[aria-selected="true"]')
 
-    await expect(selected).toHaveText('Starred item 0★')
+    await expect(selected).toHaveText('★Starred item 0')
     await expect(list).toHaveAttribute('data-scroll-after', '')
     expect(await list.evaluate((element) => element.scrollTop), 'initial scroll').toBe(0)
 
     await window.keyboard.press('ArrowUp')
     await expect(selected).toHaveText('Project 00')
     await window.keyboard.press('ArrowUp')
-    await expect(selected).toHaveText('Starred item 17★')
+    await expect(selected).toHaveText('★Starred item 17')
     await window.keyboard.press('ArrowDown')
     await expect(selected).toHaveText('Project 00')
     await window.keyboard.press('ArrowDown')
-    await expect(selected).toHaveText('Starred item 0★')
+    await expect(selected).toHaveText('★Starred item 0')
 
     const atStart = await list.evaluate((element) => {
       const heading = element.querySelector('.recent-node-group-path')!.getBoundingClientRect()
@@ -646,7 +646,8 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     // Earlier query prefixes have the same count; wait until the final query permits navigation.
     await expect(list).toHaveAttribute('aria-busy', 'false')
     await window.keyboard.press('ArrowUp')
-    await expect(window.getByLabel('Result position')).toHaveText('90 results')
+    await expect(list.locator('.recent-node-group-path[aria-selected="true"]')).toBeVisible()
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 90')
     await window.keyboard.press('ArrowUp')
     await expect(window.getByLabel('Result position')).toHaveText('90 / 90')
     await setMainWindowBounds(app, { width: 520, height: 520 })
@@ -928,7 +929,9 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await popup.screenshot({ path: testInfo.outputPath(`search-counter-${direction}.png`) })
       await window.keyboard.up(direction)
 
-      expect(samples.map(({ label }) => label)).toEqual(expect.arrayContaining(['144 results', '10 / 144']))
+      const labels = samples.map(({ label }) => label)
+      expect(labels).toContain('10 / 144')
+      expect(labels.filter((label) => label === '5 / 144')).toHaveLength(2)
       expect.soft(samples.filter(({ bounds }) => JSON.stringify(bounds) !== JSON.stringify(initial.bounds))).toEqual([])
       expect.soft(samples.filter(({ separator }) => separator !== null && separator !== initial.separator)).toEqual([])
       if (direction === 'ArrowDown') expect(await list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)

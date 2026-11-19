@@ -163,6 +163,55 @@ describe('global Search session', () => {
     expect(session.getSnapshot()).toMatchObject({ query: '', items: recent, pending: false, selected: 0 })
   })
 
+  it('makes cleared results selectable in one transition and keeps a resulting dismissal closed', () => {
+    const { session, requests } = fixture()
+    session.edit('second')
+    requests[0]!.publish([recent[1]!])
+    const visited: string[] = []
+    session.subscribe(() => {
+      const state = session.getSnapshot()
+      if (state.items && state.query === '' && !state.pending && visited.length === 0) {
+        visited.push(session.takeResult()!)
+      }
+    })
+
+    session.edit('')
+
+    expect(visited).toEqual(['first'])
+    expect(session.getSnapshot().items).toBeUndefined()
+  })
+
+  it('starts only the current search when a pending-state subscriber replaces the query', () => {
+    const { session, requests } = fixture()
+    session.subscribe(() => {
+      if (session.getSnapshot().query === 'old') session.edit('new')
+    })
+
+    session.edit('old')
+    session.close()
+
+    expect(requests.map(({ query }) => query)).toEqual(['new'])
+    expect(requests[0]!.cancel).toHaveBeenCalledOnce()
+  })
+
+  it('retains the newer cancellation handle when a search completes during startup', () => {
+    const { session, source, requests } = fixture()
+    const cancelOld = vi.fn()
+    source.search.mockImplementationOnce((_query, publish) => {
+      publish([])
+      return cancelOld
+    })
+    session.subscribe(() => {
+      if (session.getSnapshot().completedQuery === 'old' && !session.getSnapshot().pending) session.edit('new')
+    })
+
+    session.edit('old')
+    session.close()
+
+    expect(cancelOld).toHaveBeenCalledOnce()
+    expect(requests[0]!.cancel).toHaveBeenCalledOnce()
+  })
+
   it.each([undefined, 1])('closes before a buffered edit can refresh the document (index=%s)', (index) => {
     const { session, source } = fixture()
     session.moveResult(-1)

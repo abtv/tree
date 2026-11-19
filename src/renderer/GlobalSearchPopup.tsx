@@ -494,8 +494,6 @@ export function GlobalSearchPopup({
   if (items === undefined) return null
   const displayedQuery = pending ? completedQuery : query
   const resultTotal = String(items.length)
-  const groupResultCount = `${resultTotal} ${items.length === 1 ? 'result' : 'results'}`
-  const counterWidth = Math.max(resultTotal.length * 2 + ' / '.length, groupResultCount.length)
 
   return (
     <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
@@ -573,19 +571,12 @@ export function GlobalSearchPopup({
             <output
               className="node-search-position"
               aria-label="Result position"
-              style={{ inlineSize: `${counterWidth}ch` }}
-              title={selectedPart === 'heading' ? 'Parent group' : `Result ${selected + 1} of ${items.length}`}
+              title={`Result ${selected + 1} of ${items.length}`}
             >
-              {selectedPart === 'heading' ? (
-                groupResultCount
-              ) : (
-                <>
-                  <span className="node-search-position-index" style={{ inlineSize: `${resultTotal.length}ch` }}>
-                    {selected + 1}
-                  </span>
-                  {` / ${resultTotal}`}
-                </>
-              )}
+              <span className="node-search-position-index" style={{ inlineSize: `${resultTotal.length}ch` }}>
+                {selected + 1}
+              </span>
+              {` / ${resultTotal}`}
             </output>
           )}
         </div>
@@ -665,6 +656,11 @@ export function GlobalSearchPopup({
                       onClick={() => visit(index, 'node')}
                     >
                       <span className="recent-node-title-line">
+                        {item.starred && (
+                          <span className="node-star" role="img" aria-label="Starred">
+                            ★
+                          </span>
+                        )}
                         <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
                           <SearchResultText
                             text={item.text}
@@ -682,11 +678,6 @@ export function GlobalSearchPopup({
                             title="Top level"
                           >
                             <OutlineRootIcon />
-                          </span>
-                        )}
-                        {item.starred && (
-                          <span className="node-star" role="img" aria-label="Starred">
-                            ★
                           </span>
                         )}
                       </span>

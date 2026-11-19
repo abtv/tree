@@ -83,6 +83,30 @@ it('restores ancestor paths after leaving nested branches and separates breadcru
   ])
 })
 
+// @requirement PRODUCT.md §20.14.3
+it('puts matching stars first and preserves traversal order within each group', () => {
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Note',
+          children: [{ id: 'star-child', text: 'Zulu note', starred: true, children: [] }],
+        },
+        { id: 'other', text: 'Another note', children: [] },
+        { id: 'star-root', text: 'Alpha note', starred: true, children: [] },
+        { id: 'unmatched', text: 'Meeting', starred: true, children: [] },
+      ],
+    },
+    'note',
+  )
+
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value.map(({ id }) => id)).toEqual(['star-child', 'star-root', 'parent', 'other'])
+})
+
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {
   const callbacks: (() => void)[] = []
   const cancelled = vi.fn()

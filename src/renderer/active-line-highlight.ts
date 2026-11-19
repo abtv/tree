@@ -35,7 +35,8 @@ export function createActiveLineHighlight() {
 
   const update = (root: HTMLElement | null = readRoot()): void => {
     const active = root?.ownerDocument.activeElement
-    const row = active instanceof HTMLElement ? active.closest<HTMLElement>('.node-row,.agenda-row') : null
+    const row =
+      active instanceof HTMLElement ? active.closest<HTMLElement>('.node-row,.agenda-row,.current-parent') : null
     if (row !== previous) clear()
     if (root === null || row === null || !root.contains(row)) {
       observe(undefined)

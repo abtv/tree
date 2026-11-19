@@ -33,6 +33,7 @@ export function* searchNodes(
   const tagTerms = terms.filter((term) => term.prefix !== undefined)
   const counts = terms.map(() => 0)
   let covered = 0
+  const starredResults: RecentNode[] = []
   const results: RecentNode[] = []
   const ancestors: TreeNode[] = []
   const stack = [{ nodes: document.roots, index: 0, inherited: [] as number[] }]
@@ -74,7 +75,8 @@ export function* searchNodes(
         tagMatches = yield* mergeSearchMatches(tagMatches, matches)
         pathMatches = yield* mergeSearchMatches(pathMatches, yield* pathTagMatches(ancestors, term))
       }
-      results.push({
+      const matches = node.starred ? starredResults : results
+      matches.push({
         id: node.id,
         text: resultText(node),
         path: ancestors.length ? ancestors.map(label).join(' › ') : null,
@@ -97,7 +99,7 @@ export function* searchNodes(
       }
     }
   }
-  return results
+  return starredResults.length === 0 ? results : starredResults.concat(results)
 }
 
 /** Release obsolete snapshots immediately and yield between bounded batches of search work. */

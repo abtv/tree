@@ -49,8 +49,7 @@ export class GlobalSearchSession {
   private completionAccepted = false
   private selectionStart = 0
   private selectionEnd = 0
-  private generation = 0
-  private cancelSearch: (() => void) | undefined
+  private request: { cancel?: () => void } | undefined
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly source: SearchSource) {}
@@ -82,11 +81,17 @@ export class GlobalSearchSession {
   public edit(query: string, completedTag = false, selectionStart = query.length, selectionEnd = selectionStart): void {
     if (this.snapshot.items === undefined) return
     this.cancel()
-    const generation = this.generation
     this.completionAccepted = completedTag
     this.selectionStart = selectionStart
     this.selectionEnd = selectionEnd
+    if (query === '') {
+      this.set({ ...closed, items: this.source.recent() })
+      return
+    }
+
     const completion = selectionStart === selectionEnd ? nodeSearchCompletionTerm(query, selectionStart) : undefined
+    const request: NonNullable<typeof this.request> = {}
+    this.request = request
     this.set({
       ...this.snapshot,
       query,
@@ -96,16 +101,16 @@ export class GlobalSearchSession {
       completionQuery: completion?.text ?? '',
       suggestions:
         completedTag || this.composing || completion === undefined ? [] : this.source.suggestions(completion.text),
-      pending: query !== '',
+      pending: true,
     })
-    if (query === '') {
-      this.set({ ...this.snapshot, items: this.source.recent(), completedQuery: query, pending: false })
-      return
-    }
-    this.cancelSearch = this.source.search(query, (items) => {
-      if (generation !== this.generation || this.snapshot.items === undefined) return
+    // Snapshot subscribers can close or replace the request during either publication.
+    if (this.request !== request) return
+    const cancel = this.source.search(query, (items) => {
+      if (this.request !== request) return
       this.set({ ...this.snapshot, items, completedQuery: query, pending: false })
     })
+    if (this.request === request) request.cancel = cancel
+    else cancel()
   }
 
   public refresh(): void {
@@ -192,9 +197,9 @@ export class GlobalSearchSession {
   }
 
   private cancel(): void {
-    this.generation++
-    this.cancelSearch?.()
-    this.cancelSearch = undefined
+    const request = this.request
+    this.request = undefined
+    request?.cancel?.()
   }
 
   private set(snapshot: GlobalSearchSnapshot): void {

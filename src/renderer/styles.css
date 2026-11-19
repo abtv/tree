@@ -450,6 +450,11 @@ body:not(.node-drag-active) .location-link:hover {
   margin: 0 0 6px 24px;
 }
 
+.editor-shell > .current-parent {
+  position: relative;
+  --active-line-left: -28px;
+}
+
 .node-list {
   position: relative;
 }
@@ -813,26 +818,26 @@ body:not(.node-drag-active) .location-link:hover {
   content: '';
 }
 
-.node-enter-control[data-starred='true']::before {
-  width: 13px;
-  height: 13px;
-  border-radius: 0;
+.node-enter-control[data-starred='true']::before,
+.current-parent[data-starred='true']::before {
   background: var(--color-gutter-mark);
   clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 94%, 50% 72%, 21% 94%, 32% 57%, 2% 35%, 39% 35%);
 }
 
-.current-parent[data-starred='true']::before {
-  content: '★';
-  position: absolute;
-  left: -22px;
-  top: 2px;
-  font-size: 13px;
-  color: var(--color-gutter-mark);
-  pointer-events: none;
+.node-enter-control[data-starred='true']::before {
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
 }
 
-.current-parent[data-starred='true'] {
-  position: relative;
+.current-parent[data-starred='true']::before {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 5px;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
 }
 
 .node-star {
@@ -926,27 +931,31 @@ body:not(.node-drag-active) .location-link:hover {
 /* Extend active-line feedback through indentation without moving content or dimming other rows. */
 body:not(.node-drag-active)
   .tree-app:not(.vim-state-visual-node)
-  :is(.node-list, .agenda-list):focus-within
-  :is(.node-row:has(> .node-focus-marker), .agenda-row[aria-selected='true']) {
+  :is(
+    .node-list:focus-within .node-row:has(> .node-focus-marker),
+    .agenda-list:focus-within .agenda-row[aria-selected='true'],
+    .editor-shell > .current-parent[data-active-line]:has(> .current-parent-input:focus)
+  ) {
   isolation: isolate;
-}
 
-body:not(.node-drag-active)
-  .tree-app:not(.vim-state-visual-node)
-  :is(.node-list, .agenda-list):focus-within
-  :is(.node-row:has(> .node-focus-marker), .agenda-row[aria-selected='true'])::after {
-  content: '';
-  position: absolute;
-  /* Use the number font so ch measures the same column as the hidden sizer. */
-  font-size: 11px;
-  inset: var(--active-line-top, 0px) -28px 0
-    calc(
-      0px - var(--row-leading-space, 20px) - var(--line-number-digits) * 1ch - var(--row-depth, 0) * var(--row-indent)
-    );
-  z-index: -1;
-  height: var(--active-line-height, auto);
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-  pointer-events: none;
+  &::after {
+    content: '';
+    position: absolute;
+    /* Use the number font so ch measures the same column as the hidden sizer. */
+    font-size: 11px;
+    inset: var(--active-line-top, 0px) -28px 0
+      var(
+        --active-line-left,
+        calc(
+          0px - var(--row-leading-space, 20px) - var(--line-number-digits) * 1ch - var(--row-depth, 0) *
+            var(--row-indent)
+        )
+      );
+    z-index: -1;
+    height: var(--active-line-height, auto);
+    background: color-mix(in srgb, var(--color-text) 8%, transparent);
+    pointer-events: none;
+  }
 }
 
 body.node-drag-active,
@@ -1852,7 +1861,7 @@ body.node-drag-invalid * {
   box-shadow:
     0 8px 28px var(--color-popup-shadow),
     0 0 0 100vmax var(--color-search-backdrop);
-  padding: 14px 14px 0;
+  padding: 22px 14px 0;
   font-size: 15px;
 }
 
@@ -1987,6 +1996,10 @@ body.node-drag-invalid * {
   gap: 16px;
 }
 
+.node-search-results-heading {
+  min-height: calc(var(--node-row-min-height) + 8px);
+}
+
 .node-search-footer {
   min-height: calc(var(--node-row-min-height) + 2px);
   border-top: 1px solid var(--color-location-border);
@@ -2043,10 +2056,6 @@ body.node-drag-invalid * {
   gap: 8px;
   min-width: 0;
   line-height: 20px;
-}
-
-.recent-node-title-line > .node-star {
-  margin-inline-start: auto;
 }
 
 .recent-node-text,
