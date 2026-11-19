@@ -17,6 +17,20 @@ function document(workStarred = true): { roots: TreeNode[] } {
   }
 }
 
+function finished(node: TreeNode): TreeNode {
+  return { ...node, struckThrough: true }
+}
+
+// project (starred) > done, phase > step, all finished; home
+function finishedProjectDocument(): { roots: TreeNode[] } {
+  return {
+    roots: [
+      finished(node('project', [finished(node('done')), finished(node('phase', [finished(node('step'))]))], true)),
+      node('home'),
+    ],
+  }
+}
+
 function persistence(initial: PersistedEditorState): EditorServices & { saved(): PersistedEditorState } {
   let saved = initial
   return {
@@ -225,6 +239,80 @@ describe('expansion views of starred nodes', () => {
     expect(snapshot(store).location).toEqual({ currentParentId: 'work', selectedNodeId: 'project' })
     expect(snapshot(store).focus).toMatchObject({ nodeId: 'project', cursor: 0 })
     expect(rows(store)).toEqual(['project', 'notes'])
+  })
+
+  it('keeps the selected task and its caret when Agenda closes into a view that shows it', async () => {
+    const store = await open(
+      persistence({
+        version: 5,
+        document: document(false),
+        location: { currentParentId: 'work', selectedNodeId: 'work' },
+        view: { expandedIds: ['work', 'project'] },
+      }),
+    )
+    store.toggleStarNode()
+    store.selectNode('task', 0)
+    expect(store.shiftNodeVisual('out', 'task', 'task')).toBe(true)
+    store.toggleExpansion('project')
+    store.selectNode('task', 3)
+
+    store.openAgenda()
+    store.undo()
+    store.undo()
+    store.closeAgenda()
+
+    expect(snapshot(store).document.roots[0]).not.toHaveProperty('starred')
+    expect(snapshot(store).expansion.viewOwnerId).toBeNull()
+    expect(snapshot(store).location).toEqual({ currentParentId: 'work', selectedNodeId: 'task' })
+    expect(snapshot(store).focus).toMatchObject({ nodeId: 'task', cursor: 3 })
+    expect(rows(store)).toEqual(['project', 'task', 'notes'])
+  })
+
+  it('creates no view for a starred location that hidden finished tasks leave after undo', async () => {
+    const store = await open(
+      persistence({
+        version: 5,
+        document: finishedProjectDocument(),
+        location: { currentParentId: null, selectedNodeId: 'home' },
+        view: { expandedIds: ['project'] },
+      }),
+    )
+    store.selectNode('done', 4)
+    store.editText('done', 'done!')
+    store.toggleExpansion('project')
+    await store.setHideFinishedTasks(true)
+
+    store.undo()
+
+    expect(snapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'home' })
+
+    await store.setHideFinishedTasks(false)
+    store.toggleExpansion('project')
+    store.toggleExpansion('phase')
+    enter(store, 'project')
+
+    expect(rows(store)).toEqual(['done', 'phase', 'step'])
+  })
+
+  it('creates no view for a saved starred location that hidden finished tasks leave at launch', async () => {
+    const store = await open({
+      ...persistence({
+        version: 5,
+        document: finishedProjectDocument(),
+        location: { currentParentId: 'project', selectedNodeId: 'done' },
+        view: { expandedIds: [] },
+      }),
+      loadHideFinishedTasks: async () => true,
+    })
+
+    expect(snapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'home' })
+
+    await store.setHideFinishedTasks(false)
+    store.toggleExpansion('project')
+    store.toggleExpansion('phase')
+    enter(store, 'project')
+
+    expect(rows(store)).toEqual(['done', 'phase', 'step'])
   })
 
   it('shows the root view when finishing the last task of a starred location hides it', async () => {

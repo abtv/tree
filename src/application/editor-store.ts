@@ -74,7 +74,6 @@ import { starredNodes } from './starred-nodes'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
-  activateExpansionView,
   applyNodeFold,
   collapseActiveView,
   collapseForest,
@@ -342,9 +341,9 @@ export class EditorStore {
     if (state.agenda === undefined) return
     this.endTextSession()
     const { agenda, ...tree } = state
-    const location = normalizeVisibleLocation(state.document, agendaOriginLocation(state.document, agenda), (id) =>
-      isNodeExpanded(state.expansion, id),
-    )
+    // Publication checks the selection against the view that governs this location, which can differ
+    // from the view Agenda opened over when Undo changed a star.
+    const location = agendaOriginLocation(state.document, agenda)
     this.runtime.replaceReady({
       ...tree,
       location,
@@ -788,20 +787,18 @@ export class EditorStore {
       this.selectedRowTop = parsed.view?.selectedRowTop
       this.restoredSelectedRowTop = parsed.view?.selectedRowTop
       this.agendaFoldMemory.restore(parsed.view?.agendaFolds)
-      const expansion = activateExpansionView(
-        expansionFromViews(parsed.view?.expandedIds ?? [], Object.entries(parsed.view?.starredExpandedIds ?? {})),
-        parsed.document,
-        parsed.location.currentParentId,
-      )
-      const location = normalizeVisibleLocation(parsed.document, parsed.location, (id) => isNodeExpanded(expansion, id))
       this.recentNodesOwner.load(recent, parsed.document, hideFinishedTasks === true)
+      // Publication activates the view of the displayed location and checks the selection against it.
       this.runtime.replaceReady({
         status: 'ready',
         document: parsed.document,
-        location,
-        focus: this.runtime.newFocus(location.selectedNodeId, 0),
+        location: parsed.location,
+        focus: this.runtime.newFocus(parsed.location.selectedNodeId, 0),
         structuralVersion: this.runtime.getStructuralVersion(),
-        expansion,
+        expansion: expansionFromViews(
+          parsed.view?.expandedIds ?? [],
+          Object.entries(parsed.view?.starredExpandedIds ?? {}),
+        ),
         hideFinishedTasks: hideFinishedTasks === true,
       })
       this.queueAttachmentCleanup()

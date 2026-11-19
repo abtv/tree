@@ -10,7 +10,7 @@ import type { EditorSnapshot, FocusIntent } from './editor-store-types'
 import { agendaOriginLocation, reconcileAgenda } from './agenda-reconcile'
 import { activateExpansionView, isNodeExpanded } from './expansion-state'
 import type { AgendaRowsCache } from './agenda-rows'
-import { unfinishedTreeLocation } from './finished-task-location'
+import { unfinishedParentId, unfinishedTreeLocation } from './finished-task-location'
 
 export type ReadySnapshot = Extract<EditorSnapshot, { status: 'ready' }>
 
@@ -69,14 +69,11 @@ export class EditorRuntimeState {
       )
       if (agenda === undefined) {
         delete next.agenda
-        next.location = normalizeVisibleLocation(
+        // Returning to Tree checks the selection against the view of this location below.
+        next.location = agendaOriginLocation(
           state.document,
-          agendaOriginLocation(
-            state.document,
-            state.agenda,
-            previous.status === 'ready' ? previous.document : state.document,
-          ),
-          (id) => isNodeExpanded(state.expansion, id),
+          state.agenda,
+          previous.status === 'ready' ? previous.document : state.document,
         )
         next.focus = this.newFocus(next.location.selectedNodeId, 0)
       } else {
@@ -98,29 +95,7 @@ export class EditorRuntimeState {
         }
       }
     }
-    if (next.agenda === undefined) this.showGoverningView(next, previous)
-    if (
-      next.agenda === undefined &&
-      next.hideFinishedTasks &&
-      (previous.status !== 'ready' ||
-        previous.document !== next.document ||
-        previous.location !== next.location ||
-        previous.hideFinishedTasks !== next.hideFinishedTasks ||
-        previous.agenda !== undefined)
-    ) {
-      let location = unfinishedTreeLocation(next.document, next.location, next.expansion)
-      if (location.currentParentId !== next.location.currentParentId) {
-        // Leaving a finished parent can leave its starred view too. The parent the function selects
-        // depends only on completion, so a second pass picks the row with the destination's view.
-        next.expansion = activateExpansionView(next.expansion, next.document, location.currentParentId)
-        location = unfinishedTreeLocation(next.document, next.location, next.expansion)
-      }
-      if (location !== next.location) {
-        const node = locateNode(next.document, location.selectedNodeId)!.node
-        next.location = location
-        next.focus = this.newFocus(node.id, Math.min(next.focus.cursor, node.text.length))
-      }
-    }
+    if (next.agenda === undefined) this.showTreeLocation(next, previous)
     // Both branches install the same snapshot; the delete only drops an explicit `operationError: undefined` key.
     if (next.operationError === undefined) {
       this.snapshot = next
@@ -137,27 +112,52 @@ export class EditorRuntimeState {
   }
 
   /**
-   * Tree shows the view of the starred node that governs its location (`docs/PRODUCT.md` §2.4). A
-   * location change, a star change, or undo can switch that view; a selection the new view hides moves
-   * to its nearest displayed ancestor, with the caret at the beginning. While Agenda is open the Tree
-   * view stays as it was.
+   * Settles the displayed Tree location and the view of the starred node that governs it
+   * (`docs/PRODUCT.md` §2.4). With finished tasks hidden, a hidden selection moves to the next
+   * unfinished row (§2.5). That relocation can leave the current parent; its destination depends only on
+   * completion, so the view is activated for the final location, and a location Tree never displays
+   * creates no view. On a return to Tree, or when the view changes, a selection the view hides moves to
+   * its nearest displayed ancestor with the caret at the beginning. While Agenda is open the Tree view
+   * stays as it was.
    */
-  private showGoverningView(next: ReadySnapshot, previous: EditorSnapshot): void {
+  private showTreeLocation(next: ReadySnapshot, previous: EditorSnapshot): void {
+    // Undefined when Tree was not displayed: the editor was loading or Agenda was open.
+    const previousTree = previous.status === 'ready' && previous.agenda === undefined ? previous : undefined
+    const relocates =
+      next.hideFinishedTasks === true &&
+      (previousTree === undefined ||
+        previousTree.document !== next.document ||
+        previousTree.location !== next.location ||
+        previousTree.hideFinishedTasks !== next.hideFinishedTasks)
     if (
-      previous.status === 'ready' &&
-      previous.agenda === undefined &&
-      previous.document === next.document &&
-      previous.location.currentParentId === next.location.currentParentId &&
-      previous.expansion.viewOwnerId === next.expansion.viewOwnerId
+      previousTree !== undefined &&
+      !relocates &&
+      previousTree.document === next.document &&
+      previousTree.location.currentParentId === next.location.currentParentId &&
+      previousTree.expansion.viewOwnerId === next.expansion.viewOwnerId
     )
       return
-    const expansion = activateExpansionView(next.expansion, next.document, next.location.currentParentId)
-    if (expansion === next.expansion) return
+
+    const parentId = relocates ? unfinishedParentId(next.document, next.location) : next.location.currentParentId
+    const expansion = activateExpansionView(next.expansion, next.document, parentId)
+    const switched = expansion !== next.expansion
     next.expansion = expansion
-    const location = normalizeVisibleLocation(next.document, next.location, (id) => isNodeExpanded(expansion, id))
+
+    // A relocation that leaves the current parent chooses its row in the destination below.
+    if ((previousTree === undefined || switched) && parentId === next.location.currentParentId) {
+      const location = normalizeVisibleLocation(next.document, next.location, (id) => isNodeExpanded(expansion, id))
+      if (location !== next.location) {
+        next.location = location
+        next.focus = this.newFocus(location.selectedNodeId, 0)
+      }
+    }
+
+    if (!relocates) return
+    const location = unfinishedTreeLocation(next.document, next.location, expansion)
     if (location === next.location) return
+    const node = locateNode(next.document, location.selectedNodeId)!.node
     next.location = location
-    next.focus = this.newFocus(location.selectedNodeId, 0)
+    next.focus = this.newFocus(node.id, Math.min(next.focus.cursor, node.text.length))
   }
 
   public emit(): void {
