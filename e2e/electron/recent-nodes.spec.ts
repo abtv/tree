@@ -871,6 +871,75 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
+  test('keeps the result counter in place while repeating arrows through grouped results @linux', async ({
+    userDataDir,
+  }, testInfo) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 36 }, (_, group) => ({
+          id: `p${group}`,
+          text: `Project ${group}`,
+          children: Array.from({ length: 4 }, (_, index) => ({
+            id: `p${group}-${index}`,
+            text: `Needle ${group}-${index}\n${'Wrapped detail '.repeat(index % 2 === 0 ? 12 : 1)}`,
+            children: [],
+          })),
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'p0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 700, height: 740 })
+    await window.evaluate(() => globalThis.window.treeApi.setAppearance('gray'))
+    await expect(window.locator('html')).toHaveAttribute('data-appearance', 'gray')
+    await window.keyboard.press('Meta+;')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const input = popup.getByRole('searchbox')
+    const list = popup.getByRole('listbox', { name: 'Search results' })
+    const position = popup.getByLabel('Result position')
+    await input.fill('Needle')
+    await expect(position).toHaveText('1 / 144')
+    const counterGeometry = () =>
+      position.evaluate((counter) => {
+        const { x, y, width, height } = counter.getBoundingClientRect()
+        const firstCharacter = document.createRange()
+        firstCharacter.setStart(counter.firstElementChild?.firstChild ?? counter.firstChild!, 0)
+        firstCharacter.setEnd(firstCharacter.startContainer, 1)
+        const separator = document.createRange()
+        const trailingText = counter.lastChild!
+        if (trailingText.textContent?.startsWith(' / ')) {
+          separator.setStart(trailingText, 1)
+          separator.setEnd(trailingText, 2)
+        }
+        return {
+          label: counter.textContent,
+          bounds: { x, y, width, height, textStart: firstCharacter.getBoundingClientRect().x },
+          separator: separator.collapsed ? null : separator.getBoundingClientRect().x,
+        }
+      })
+    const initial = await counterGeometry()
+
+    for (const direction of ['ArrowDown', 'ArrowUp']) {
+      const samples = []
+      for (let step = 0; step < 24; step++) {
+        await window.keyboard.down(direction)
+        samples.push(await counterGeometry())
+      }
+      await popup.screenshot({ path: testInfo.outputPath(`search-counter-${direction}.png`) })
+      await window.keyboard.up(direction)
+
+      expect(samples.map(({ label }) => label)).toEqual(expect.arrayContaining(['144 results', '10 / 144']))
+      expect.soft(samples.filter(({ bounds }) => JSON.stringify(bounds) !== JSON.stringify(initial.bounds))).toEqual([])
+      expect.soft(samples.filter(({ separator }) => separator !== null && separator !== initial.separator)).toEqual([])
+      if (direction === 'ArrowDown') expect(await list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    }
+
+    await expect(position).toHaveText('1 / 144')
+    await expect(input).toBeFocused()
+    expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
+  })
+
+  // @requirement PRODUCT.md §20.14
   test('separates the heading from partially scrolled results and fades only overflow edges @linux', async ({
     userDataDir,
   }) => {

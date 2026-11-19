@@ -493,6 +493,10 @@ export function GlobalSearchPopup({
 
   if (items === undefined) return null
   const displayedQuery = pending ? completedQuery : query
+  const resultTotal = String(items.length)
+  const groupResultCount = `${resultTotal} ${items.length === 1 ? 'result' : 'results'}`
+  const counterWidth = Math.max(resultTotal.length * 2 + ' / '.length, groupResultCount.length)
+
   return (
     <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
       <SearchQueryInput
@@ -569,11 +573,19 @@ export function GlobalSearchPopup({
             <output
               className="node-search-position"
               aria-label="Result position"
+              style={{ inlineSize: `${counterWidth}ch` }}
               title={selectedPart === 'heading' ? 'Parent group' : `Result ${selected + 1} of ${items.length}`}
             >
-              {selectedPart === 'heading'
-                ? `${items.length} ${items.length === 1 ? 'result' : 'results'}`
-                : `${selected + 1} / ${items.length}`}
+              {selectedPart === 'heading' ? (
+                groupResultCount
+              ) : (
+                <>
+                  <span className="node-search-position-index" style={{ inlineSize: `${resultTotal.length}ch` }}>
+                    {selected + 1}
+                  </span>
+                  {` / ${resultTotal}`}
+                </>
+              )}
             </output>
           )}
         </div>

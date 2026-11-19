@@ -1997,6 +1997,10 @@ body.node-drag-invalid * {
   font-variant-numeric: tabular-nums;
 }
 
+.node-search-position-index {
+  display: inline-block;
+}
+
 .recent-node-empty {
   line-height: 20px;
   padding: calc((var(--node-row-min-height) - 20px) / 2) var(--search-text-inset);
