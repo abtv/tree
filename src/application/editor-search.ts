@@ -150,7 +150,7 @@ export class EditorSearch {
     this.hide()
     return expandedIds.size === state.expansion.expandedIds.size
       ? undefined
-      : { kind: 'tree', expansion: { expandedIds } }
+      : { kind: 'tree', expansion: { ...state.expansion, expandedIds } }
   }
 
   /** Resolve a destination and retain ownership only of folds opened to reveal it. */

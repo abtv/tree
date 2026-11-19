@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import type { TreeNode } from '../domain/document'
+import { buildNodeIndex, toggleStarNode, type Document, type TreeNode } from '../domain/document'
 import {
   COLLAPSED_EXPANSION_STATE,
+  activateExpansionView,
   applyNodeFold,
+  collapseActiveView,
   collapseForest,
   collapseNode,
   collapseSubtree,
   expandForest,
   expandNode,
   expansionFromIds,
+  expansionFromViews,
   expandSubtree,
+  governingViewOwner,
   isNodeExpanded,
+  savedExpansionViews,
   toggleNodeExpansion,
+  type ExpansionState,
 } from './expansion-state'
 
 function tree(id: string, children: TreeNode[] = []): TreeNode {
@@ -186,5 +192,154 @@ describe('expansionFromIds', () => {
   it('builds a state from ids and shares the collapsed state when there are none', () => {
     expect([...expansionFromIds(['a', 'b', 'a']).expandedIds]).toEqual(['a', 'b'])
     expect(expansionFromIds([])).toBe(COLLAPSED_EXPANSION_STATE)
+  })
+})
+
+// @requirement PRODUCT.md §2.4
+describe('expansion views', () => {
+  function starred(id: string, children: TreeNode[] = []): TreeNode {
+    return { id, text: id, starred: true, children }
+  }
+
+  // work (starred) > project > task > step; work > notes > note; home > garden (starred) > bed > plant
+  const document: Document = {
+    roots: [
+      starred('work', [tree('project', [tree('task', [tree('step')])]), tree('notes', [tree('note')])]),
+      tree('home', [starred('garden', [tree('bed', [tree('plant')])]), tree('chores', [tree('chore')])]),
+    ],
+  }
+
+  function ids(state: ExpansionState): string[] {
+    return [...state.expandedIds].sort()
+  }
+
+  it('selects the nearest starred node among the current parent and its ancestors', () => {
+    expect(governingViewOwner(document, null)).toBeNull()
+    expect(governingViewOwner(document, 'work')).toBe('work')
+    expect(governingViewOwner(document, 'task')).toBe('work')
+    expect(governingViewOwner(document, 'home')).toBeNull()
+    expect(governingViewOwner(document, 'bed')).toBe('garden')
+  })
+
+  it('creates a starred view as a copy of the inherited view limited to the node’s descendants', () => {
+    const root = expansionFromIds(['work', 'project', 'task', 'home', 'garden', 'bed'])
+
+    const work = activateExpansionView(root, document, 'project')
+
+    expect(work.viewOwnerId).toBe('work')
+    expect(ids(work)).toEqual(['project', 'task'])
+    expect(work.otherViews.get(null)).toBe(root.expandedIds)
+  })
+
+  it('returns the same state while the active view governs the location', () => {
+    const work = activateExpansionView(expansionFromIds(['project']), document, 'work')
+
+    expect(activateExpansionView(work, document, 'task')).toBe(work)
+  })
+
+  it('keeps each view’s fold changes separate when the location moves between views', () => {
+    const root = expansionFromIds(['work', 'project'])
+    const work = collapseNode(activateExpansionView(root, document, 'work'), 'project')
+
+    const backAtRoot = activateExpansionView(work, document, null)
+
+    expect(backAtRoot.viewOwnerId).toBeNull()
+    expect(ids(backAtRoot)).toEqual(['project', 'work'])
+
+    const workAgain = activateExpansionView(collapseNode(backAtRoot, 'work'), document, 'notes')
+
+    expect(ids(workAgain)).toEqual([])
+    expect(ids(activateExpansionView(workAgain, document, null))).toEqual(['project'])
+  })
+
+  it('inherits a nested view from the nearest starred ancestor with a view, otherwise from the root view', () => {
+    const nested: Document = {
+      roots: [starred('outer', [starred('inner', [tree('task', [tree('step')])])])],
+    }
+    const root = expansionFromIds(['outer', 'inner', 'task'])
+
+    expect(ids(activateExpansionView(root, nested, 'inner'))).toEqual(['task'])
+
+    const outer = collapseNode(activateExpansionView(root, nested, 'outer'), 'task')
+    const inner = activateExpansionView(outer, nested, 'inner')
+
+    expect(inner.viewOwnerId).toBe('inner')
+    expect(ids(inner)).toEqual([])
+  })
+
+  it('keeps the view of a node whose star is removed and uses it again when the star returns', () => {
+    const work = expandNode(activateExpansionView(COLLAPSED_EXPANSION_STATE, document, 'work'), 'notes')
+    const unstarred = toggleStarNode(document, 'work')
+
+    const root = activateExpansionView(work, unstarred, 'work')
+
+    expect(root.viewOwnerId).toBeNull()
+    expect(ids(root)).toEqual([])
+    expect([...root.otherViews.get('work')!]).toEqual(['notes'])
+
+    const restored = activateExpansionView(root, document, 'work')
+
+    expect(restored.viewOwnerId).toBe('work')
+    expect(ids(restored)).toEqual(['notes'])
+  })
+
+  it('saves the root view and every starred view, whichever view is active', () => {
+    const atRoot = expansionFromViews(['work'], [['garden', ['bed']]])
+    const inWork = expandNode(activateExpansionView(atRoot, document, 'work'), 'project')
+
+    const saved = savedExpansionViews(inWork)
+
+    expect([...saved.expandedIds]).toEqual(['work'])
+    expect(new Map([...saved.starredExpandedIds].map(([owner, view]) => [owner, [...view]]))).toEqual(
+      new Map([
+        ['garden', ['bed']],
+        ['work', ['project']],
+      ]),
+    )
+  })
+
+  it('closes every fold of the active view only', () => {
+    const atRoot = expansionFromViews(['work', 'home'], [['garden', ['bed']]])
+
+    const closed = collapseActiveView(atRoot)
+
+    expect(ids(closed)).toEqual([])
+    expect([...closed.otherViews.get('garden')!]).toEqual(['bed'])
+    expect(collapseActiveView(closed)).toBe(closed)
+  })
+
+  // @requirement PRODUCT.md §22.1
+  it('creates a starred view from remembered ids without walking a 10000-node subtree', () => {
+    let reads = 0
+    const leaves: TreeNode[] = Array.from({ length: 10_000 }, (_, index) => {
+      const children: TreeNode[] = index % 100 === 0 ? [tree(`${index}-child`)] : []
+      return {
+        id: `${index}`,
+        text: `Node ${index}`,
+        get children() {
+          reads++
+          return children
+        },
+      }
+    })
+    const large: Document = { roots: [starred('large', leaves)] }
+    const root = expansionFromIds(['large', ...Array.from({ length: 100 }, (_, index) => `${index * 100}`)])
+    // The editor has already indexed a displayed document; count only the reads activation adds.
+    buildNodeIndex(large)
+    reads = 0
+
+    const view = activateExpansionView(root, large, 'large')
+
+    expect(view.expandedIds.size).toBe(100)
+    expect(reads).toBe(0)
+  })
+
+  it('restores saved views with the root view active and shares the collapsed state when all are empty', () => {
+    const restored = expansionFromViews(['home'], [['garden', []]])
+
+    expect(restored.viewOwnerId).toBeNull()
+    expect(ids(restored)).toEqual(['home'])
+    expect([...restored.otherViews.get('garden')!]).toEqual([])
+    expect(expansionFromViews([], [])).toBe(COLLAPSED_EXPANSION_STATE)
   })
 })

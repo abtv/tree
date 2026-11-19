@@ -40,10 +40,12 @@ export interface Location {
 
 /**
  * Persisted view state: remembered expansion choices and where the selected row sits in the window,
- * as its distance in CSS pixels from the top of the viewport.
+ * as its distance in CSS pixels from the top of the viewport. `expandedIds` is the root view;
+ * `starredExpandedIds` holds the own view of each starred node that has one, keyed by its id.
  */
 export interface PersistedView {
   readonly expandedIds: readonly NodeId[]
+  readonly starredExpandedIds?: Readonly<Record<NodeId, readonly NodeId[]>>
   readonly selectedRowTop?: number
   readonly agendaFolds?: PersistedAgendaFolds
 }

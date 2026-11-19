@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { buildNodeIndex, createInitialDocument } from '../domain/document'
-import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
+import { buildNodeIndex, createInitialDocument, toggleStarNode } from '../domain/document'
+import { COLLAPSED_EXPANSION_STATE, expansionFromViews } from './expansion-state'
 import { EditorRuntimeState } from './editor-runtime-state'
 
 describe('EditorRuntimeState', () => {
@@ -37,6 +37,61 @@ describe('EditorRuntimeState', () => {
     state.emit()
 
     expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  // @requirement PRODUCT.md §2.4
+  describe('showing the view that governs the location', () => {
+    const starredWork = {
+      roots: [
+        {
+          id: 'work',
+          text: 'Work',
+          starred: true as const,
+          children: [{ id: 'project', text: 'Project', children: [{ id: 'task', text: 'Task', children: [] }] }],
+        },
+      ],
+    }
+
+    it('switches to the inherited view when a star disappears and moves a selection it hides', () => {
+      const state = new EditorRuntimeState()
+      state.replaceReady({
+        status: 'ready',
+        document: starredWork,
+        location: { currentParentId: 'work', selectedNodeId: 'task' },
+        focus: state.newFocus('task', 2),
+        structuralVersion: 0,
+        expansion: expansionFromViews([], [['work', ['project']]]),
+      })
+
+      expect(state.ready().expansion.viewOwnerId).toBe('work')
+      expect(state.ready().location.selectedNodeId).toBe('task')
+
+      const unstarred = toggleStarNode(starredWork, 'work')
+      state.replaceReady({ ...state.ready(), document: unstarred })
+
+      expect(state.ready().expansion.viewOwnerId).toBeNull()
+      expect(state.ready().location).toEqual({ currentParentId: 'work', selectedNodeId: 'project' })
+      expect(state.ready().focus).toMatchObject({ nodeId: 'project', cursor: 0, token: 2 })
+    })
+
+    it('keeps the snapshot’s view and selection when the governing view is unchanged', () => {
+      const state = new EditorRuntimeState()
+      const expansion = expansionFromViews([], [['work', ['project']]])
+      state.replaceReady({
+        status: 'ready',
+        document: starredWork,
+        location: { currentParentId: 'work', selectedNodeId: 'task' },
+        focus: state.newFocus('task', 2),
+        structuralVersion: 0,
+        expansion,
+      })
+      const shown = state.ready().expansion
+
+      state.replaceReady({ ...state.ready(), location: { currentParentId: 'project', selectedNodeId: 'task' } })
+
+      expect(state.ready().expansion).toBe(shown)
+      expect(state.ready().focus).toMatchObject({ nodeId: 'task', cursor: 2, token: 1 })
+    })
   })
 
   describe('releasing the node index of a replaced document', () => {

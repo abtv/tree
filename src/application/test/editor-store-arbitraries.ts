@@ -94,6 +94,7 @@ export type CommandAction = {
     | 'join'
     | 'moveToParent'
     | 'strike'
+    | 'star'
   a: number
   b: number
   text: string
@@ -319,6 +320,9 @@ export async function applyCommand(
       store.toggleStrikethrough(anchor?.id ?? state.location.selectedNodeId, state.location.selectedNodeId)
       break
     }
+    case 'star':
+      store.toggleStarNode()
+      break
   }
 
   return true

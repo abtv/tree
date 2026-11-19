@@ -17,7 +17,7 @@ import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 import { deriveCompletion } from './node-completion'
-import { buildNodeIndex } from './document-index'
+import { buildNodeIndex, locateNode } from './document-index'
 import { dayNumberOf, weekdayOf } from './calendar-date'
 
 // Documents are immutable. Remember validation, without retaining an ID set for every history snapshot.
@@ -33,17 +33,34 @@ export function hasNewerDocumentVersion(value: unknown): boolean {
   )
 }
 
-/** The view state to persist; `expandedIds` may hold ids of nodes the document no longer contains. */
+/**
+ * The view state to persist. `expandedIds` is the root view and `starredExpandedIds` the views of
+ * starred nodes; either may hold ids of nodes the document no longer contains, and the second may hold
+ * views of nodes that are missing or no longer starred.
+ */
 export interface ViewState {
   readonly expandedIds: Iterable<NodeId>
+  readonly starredExpandedIds?: StarredViews
   readonly selectedRowTop?: number
   readonly agendaFolds?: PersistedAgendaFolds
 }
 
+/** Starred views as the running session keeps them, or as a parsed file holds them. */
+type StarredViews = ReadonlyMap<NodeId, Iterable<NodeId>> | Readonly<Record<NodeId, readonly NodeId[]>>
+
+function starredViewEntries(views: StarredViews | undefined): Iterable<readonly [NodeId, Iterable<NodeId>]> {
+  if (views === undefined) return []
+  return isViewMap(views) ? views : Object.entries(views)
+}
+
+function isViewMap(views: StarredViews): views is ReadonlyMap<NodeId, Iterable<NodeId>> {
+  return views instanceof Map
+}
+
 /**
- * Serializes the current schema. Expansion choices are remembered per node for the running session,
- * including for nodes an undo could restore, but only ids of nodes the saved document contains are
- * written, so the file never accumulates choices for deleted nodes.
+ * Serializes the current schema. Expansion choices are remembered for the running session, including
+ * for nodes an undo could restore, but only ids of nodes the saved document contains are written, and
+ * only starred nodes' views, so the file never accumulates choices for deleted nodes or removed stars.
  */
 export function serializeState(
   document: Document,
@@ -57,8 +74,11 @@ export function serializeState(
   if (!isValidLocation(document, location)) {
     throw new Error('The selected node is not valid for the persisted location.')
   }
+  const nodeIndex = buildNodeIndex(document)
+  const exists = (id: NodeId): boolean => nodeIndex.has(id)
   const expandedIds: NodeId[] = []
-  for (const id of view.expandedIds) if (buildNodeIndex(document).has(id)) expandedIds.push(id)
+  for (const id of view.expandedIds) if (exists(id)) expandedIds.push(id)
+  const starredExpandedIds = starredViews(document, starredViewEntries(view.starredExpandedIds), exists)
   const agendaFolds = normalizeAgendaFolds(view.agendaFolds)
   return {
     version: currentVersion,
@@ -66,10 +86,29 @@ export function serializeState(
     location: { ...location },
     view: {
       expandedIds,
+      ...(starredExpandedIds === undefined ? {} : { starredExpandedIds }),
       ...(view.selectedRowTop === undefined ? {} : { selectedRowTop: view.selectedRowTop }),
       ...(agendaFolds === undefined ? {} : { agendaFolds }),
     },
   }
+}
+
+/**
+ * Keeps the views of starred nodes the document contains and, within them, ids of existing nodes. An
+ * empty view is kept: it records that every fold is closed, unlike a missing view, which is inherited.
+ * `Object.fromEntries` defines each id as an own property, so no id can reach the object prototype.
+ */
+function starredViews(
+  document: Document,
+  views: Iterable<readonly [NodeId, Iterable<NodeId>]>,
+  exists: (id: NodeId) => boolean,
+): Readonly<Record<NodeId, readonly NodeId[]>> | undefined {
+  const entries: Array<[NodeId, NodeId[]]> = []
+  for (const [ownerId, ids] of views) {
+    if (locateNode(document, ownerId)?.node.starred !== true) continue
+    entries.push([ownerId, [...ids].filter(exists)])
+  }
+  return entries.length === 0 ? undefined : Object.fromEntries(entries)
 }
 
 function isSupportedVersion(version: unknown): version is PersistedEditorState['version'] {
@@ -82,8 +121,9 @@ function hasView(version: unknown): boolean {
 }
 
 /**
- * Checks the view shape of a version 3–5 state. An expanded id that names no node is tolerated,
- * since it cannot display anything; a malformed view is rejected like any other malformed field.
+ * Checks the view shape of a version 3–5 state. An expanded id or a starred view that names no node is
+ * tolerated, since it cannot display anything; a malformed view is rejected like any other malformed
+ * field.
  */
 function assertView(value: Record<string, unknown>): void {
   if (!hasView(value.version)) return
@@ -91,14 +131,22 @@ function assertView(value: Record<string, unknown>): void {
   // Number.isFinite already rejects non-numbers; removing only typeof is equivalent.
   if (
     !isRecord(view) ||
-    !Array.isArray(view.expandedIds) ||
-    !view.expandedIds.every((id) => typeof id === 'string' && id.length > 0) ||
+    !isIdList(view.expandedIds) ||
+    (view.starredExpandedIds !== undefined && !isStarredViews(view.starredExpandedIds)) ||
     (view.selectedRowTop !== undefined &&
       (typeof view.selectedRowTop !== 'number' || !Number.isFinite(view.selectedRowTop) || view.selectedRowTop < 0)) ||
     (view.agendaFolds !== undefined && !isAgendaFolds(view.agendaFolds))
   ) {
     throw new Error('The saved view state is invalid.')
   }
+}
+
+function isIdList(value: unknown): value is NodeId[] {
+  return Array.isArray(value) && value.every((id) => typeof id === 'string' && id.length > 0)
+}
+
+function isStarredViews(value: unknown): value is Record<NodeId, NodeId[]> {
+  return isRecord(value) && Object.entries(value).every(([ownerId, ids]) => ownerId.length > 0 && isIdList(ids))
 }
 
 const firstDay = dayNumberOf({ year: 0, month: 1, day: 1 })
@@ -218,16 +266,20 @@ export function parsePersistedState(value: unknown): PersistedEditorState {
     throw new Error('The saved document location does not match its tree.')
   }
   validatedDocuments.add(document)
-  return { version: currentVersion, document, location, view: parseView(value, nodeIds) }
+  return { version: currentVersion, document, location, view: parseView(value, nodeIds, document) }
 }
 
-function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>): PersistedView {
+function parseView(value: Record<string, unknown>, nodeIds: ReadonlySet<NodeId>, document: Document): PersistedView {
   if (!hasView(value.version) || !isRecord(value.view)) return EMPTY_PERSISTED_VIEW
-  const expandedIds = (value.view.expandedIds as string[]).filter((id) => nodeIds.has(id))
+  const exists = (id: NodeId): boolean => nodeIds.has(id)
+  const expandedIds = (value.view.expandedIds as string[]).filter(exists)
+  const savedStarredViews = value.view.starredExpandedIds as Record<NodeId, NodeId[]> | undefined
+  const starredExpandedIds = starredViews(document, starredViewEntries(savedStarredViews), exists)
   const selectedRowTop = value.view.selectedRowTop
   const agendaFolds = normalizeAgendaFolds(value.view.agendaFolds as PersistedAgendaFolds | undefined)
   return {
     expandedIds,
+    ...(starredExpandedIds === undefined ? {} : { starredExpandedIds }),
     ...(typeof selectedRowTop === 'number' ? { selectedRowTop } : {}),
     ...(agendaFolds === undefined ? {} : { agendaFolds }),
   }

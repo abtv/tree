@@ -74,13 +74,16 @@ import { starredNodes } from './starred-nodes'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
+  activateExpansionView,
   applyNodeFold,
+  collapseActiveView,
   collapseForest,
   COLLAPSED_EXPANSION_STATE,
   expandForest,
   expandNode,
-  expansionFromIds,
+  expansionFromViews,
   isNodeExpanded,
+  savedExpansionViews,
   toggleNodeExpansion,
   type ExpansionState,
   type NodeFoldCommand,
@@ -204,11 +207,12 @@ export class EditorStore {
           // Number.isFinite(undefined) is false too; the explicit check narrows the type.
           if (measured !== undefined && Number.isFinite(measured))
             this.selectedRowTop = Math.max(0, Math.round(measured))
-          const expandedIds = state.expansion.expandedIds
+          const { expandedIds, starredExpandedIds } = savedExpansionViews(state.expansion)
           const selectedRowTop = this.selectedRowTop
           const agendaFolds = this.agendaFoldMemory.persisted
           const view = {
             expandedIds,
+            starredExpandedIds,
             ...(selectedRowTop === undefined ? {} : { selectedRowTop }),
             ...(agendaFolds === undefined ? {} : { agendaFolds }),
           }
@@ -475,11 +479,11 @@ export class EditorStore {
     this.searchOwner.manualFold(command.endsWith('-all') ? undefined : nodeId, command.endsWith('-recursive'))
     const state = this.runtime.ready()
     if (command === 'close-all') {
-      // At the root level the location holds every node, so closing its folds forgets every choice
-      // without walking the document.
+      // At the root level the location holds every node, so closing its folds forgets every choice of
+      // the root view without walking the document. Starred views keep theirs.
       const expansion =
         state.location.currentParentId === null
-          ? COLLAPSED_EXPANSION_STATE
+          ? collapseActiveView(state.expansion)
           : collapseForest(state.expansion, displayedNodes(state.document, state.location.currentParentId))
       if (expansion === state.expansion) return
       // Every fold in this location is now closed. Returning false for every
@@ -784,7 +788,11 @@ export class EditorStore {
       this.selectedRowTop = parsed.view?.selectedRowTop
       this.restoredSelectedRowTop = parsed.view?.selectedRowTop
       this.agendaFoldMemory.restore(parsed.view?.agendaFolds)
-      const expansion = expansionFromIds(parsed.view?.expandedIds ?? [])
+      const expansion = activateExpansionView(
+        expansionFromViews(parsed.view?.expandedIds ?? [], Object.entries(parsed.view?.starredExpandedIds ?? {})),
+        parsed.document,
+        parsed.location.currentParentId,
+      )
       const location = normalizeVisibleLocation(parsed.document, parsed.location, (id) => isNodeExpanded(expansion, id))
       this.recentNodesOwner.load(recent, parsed.document, hideFinishedTasks === true)
       this.runtime.replaceReady({

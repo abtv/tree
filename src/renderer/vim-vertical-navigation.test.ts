@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ReadySnapshot } from '../application/editor-runtime-state'
 import type { EditorSnapshot } from '../application/editor-store-types'
 import { displayedNodes, type Document, type TreeNode } from '../domain/document'
-import { COLLAPSED_EXPANSION_STATE } from '../application/expansion-state'
+import { COLLAPSED_EXPANSION_STATE, expansionFromIds } from '../application/expansion-state'
 import { buildVisibleRows } from '../application/visible-rows'
 import { navigateVertically, type VimVerticalNavigationStore } from './vim-vertical-navigation'
 
@@ -26,7 +26,7 @@ function store(
       location: { currentParentId, selectedNodeId },
       focus: { nodeId: selectedNodeId, cursor: 0, token },
       structuralVersion: 0,
-      expansion: expandedIds.length === 0 ? COLLAPSED_EXPANSION_STATE : { expandedIds: new Set(expandedIds) },
+      expansion: expansionFromIds(expandedIds),
     },
   }
   return {

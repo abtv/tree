@@ -216,6 +216,29 @@ const cases: PersistedStateCase[] = [
     error: 'The saved view state is invalid.',
   },
   {
+    name: 'accepts starred views, including an empty view and views naming no node',
+    state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: { root: [], gone: ['x'] } } },
+    decision: 'accept',
+  },
+  {
+    name: 'rejects starred views stored as an array',
+    state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: [['root', []]] } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects a starred view that is not a list of non-empty strings',
+    state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: { root: ['a', ''] } } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects a starred view that is not a list',
+    state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: { root: 'a' } } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
     name: 'rejects a non-record document',
     state: { ...validState, document: 'roots' },
     decision: 'reject',
@@ -562,5 +585,82 @@ describe('persisted state validator conformance', () => {
   it('keeps the intended normalization difference: validate preserves a denormalized link that parse drops', () => {
     expect(validatePersistedState(denormalizedLinkState)).toBe(denormalizedLinkState)
     expect(parsePersistedState(denormalizedLinkState).document.roots[0]!.links).toBeUndefined()
+  })
+})
+
+// @requirement PRODUCT.md §2.4
+describe('starred expansion views', () => {
+  const document = {
+    roots: [
+      {
+        id: 'work',
+        text: 'Work',
+        starred: true as const,
+        children: [{ id: 'project', text: 'Project', children: [{ id: 'task', text: 'Task', children: [] }] }],
+      },
+      { id: 'home', text: 'Home', children: [{ id: 'garden', text: 'Garden', starred: true as const, children: [] }] },
+    ],
+  }
+  const location = { currentParentId: null, selectedNodeId: 'work' }
+
+  it('saves the views of existing starred nodes with existing ids, keeping an empty view', () => {
+    const saved = serializeState(document, location, {
+      expandedIds: ['work'],
+      starredExpandedIds: new Map([
+        ['work', ['project', 'deleted']],
+        ['garden', []],
+        ['home', ['garden']],
+        ['missing', ['work']],
+      ]),
+    })
+
+    expect(saved.view).toEqual({ expandedIds: ['work'], starredExpandedIds: { work: ['project'], garden: [] } })
+  })
+
+  it('omits starred views when no starred node has one', () => {
+    const saved = serializeState(document, location, {
+      expandedIds: [],
+      starredExpandedIds: new Map([['home', ['garden']]]),
+    })
+
+    expect(saved.view).toEqual({ expandedIds: [] })
+  })
+
+  it('loads the views of starred nodes and drops views of missing or unstarred nodes', () => {
+    const parsed = parsePersistedState({
+      version: 5,
+      document,
+      location,
+      view: { expandedIds: [], starredExpandedIds: { work: ['project', 'deleted'], home: [], missing: [] } },
+    })
+
+    expect(parsed.view).toEqual({ expandedIds: [], starredExpandedIds: { work: ['project'] } })
+  })
+
+  it('round-trips a parsed view unchanged through saving', () => {
+    const parsed = parsePersistedState({
+      version: 5,
+      document,
+      location,
+      view: { expandedIds: ['work'], starredExpandedIds: { work: ['project'], garden: [] } },
+    })
+
+    const saved = serializeState(parsed.document, parsed.location, parsed.view)
+
+    expect(saved.view).toEqual(parsed.view)
+  })
+
+  it('keeps an id named like an object prototype key as an ordinary own view', () => {
+    const prototypeDocument = { roots: [{ id: '__proto__', text: 'Odd', starred: true as const, children: [] }] }
+    const prototypeLocation = { currentParentId: null, selectedNodeId: '__proto__' }
+
+    const saved = serializeState(prototypeDocument, prototypeLocation, {
+      expandedIds: [],
+      starredExpandedIds: new Map([['__proto__', []]]),
+    })
+    const reloaded = parsePersistedState(JSON.parse(JSON.stringify(saved)))
+
+    expect(Object.entries(reloaded.view!.starredExpandedIds!)).toEqual([['__proto__', []]])
+    expect(Object.getPrototypeOf(reloaded.view!.starredExpandedIds)).toBe(Object.prototype)
   })
 })

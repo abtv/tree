@@ -8,7 +8,7 @@ import {
 } from '../domain/document'
 import type { EditorSnapshot, FocusIntent } from './editor-store-types'
 import { agendaOriginLocation, reconcileAgenda } from './agenda-reconcile'
-import { isNodeExpanded } from './expansion-state'
+import { activateExpansionView, isNodeExpanded } from './expansion-state'
 import type { AgendaRowsCache } from './agenda-rows'
 import { unfinishedTreeLocation } from './finished-task-location'
 
@@ -98,6 +98,7 @@ export class EditorRuntimeState {
         }
       }
     }
+    if (next.agenda === undefined) this.showGoverningView(next, previous)
     if (
       next.agenda === undefined &&
       next.hideFinishedTasks &&
@@ -107,7 +108,13 @@ export class EditorRuntimeState {
         previous.hideFinishedTasks !== next.hideFinishedTasks ||
         previous.agenda !== undefined)
     ) {
-      const location = unfinishedTreeLocation(next.document, next.location, next.expansion)
+      let location = unfinishedTreeLocation(next.document, next.location, next.expansion)
+      if (location.currentParentId !== next.location.currentParentId) {
+        // Leaving a finished parent can leave its starred view too. The parent the function selects
+        // depends only on completion, so a second pass picks the row with the destination's view.
+        next.expansion = activateExpansionView(next.expansion, next.document, location.currentParentId)
+        location = unfinishedTreeLocation(next.document, next.location, next.expansion)
+      }
       if (location !== next.location) {
         const node = locateNode(next.document, location.selectedNodeId)!.node
         next.location = location
@@ -127,6 +134,30 @@ export class EditorRuntimeState {
     }
     if (previous.status === 'ready' && previous.agenda !== undefined && next.agenda === undefined) this.onAgendaClosed()
     this.emit()
+  }
+
+  /**
+   * Tree shows the view of the starred node that governs its location (`docs/PRODUCT.md` §2.4). A
+   * location change, a star change, or undo can switch that view; a selection the new view hides moves
+   * to its nearest displayed ancestor, with the caret at the beginning. While Agenda is open the Tree
+   * view stays as it was.
+   */
+  private showGoverningView(next: ReadySnapshot, previous: EditorSnapshot): void {
+    if (
+      previous.status === 'ready' &&
+      previous.agenda === undefined &&
+      previous.document === next.document &&
+      previous.location.currentParentId === next.location.currentParentId &&
+      previous.expansion.viewOwnerId === next.expansion.viewOwnerId
+    )
+      return
+    const expansion = activateExpansionView(next.expansion, next.document, next.location.currentParentId)
+    if (expansion === next.expansion) return
+    next.expansion = expansion
+    const location = normalizeVisibleLocation(next.document, next.location, (id) => isNodeExpanded(expansion, id))
+    if (location === next.location) return
+    next.location = location
+    next.focus = this.newFocus(location.selectedNodeId, 0)
   }
 
   public emit(): void {

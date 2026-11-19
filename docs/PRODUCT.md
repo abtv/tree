@@ -401,7 +401,7 @@ A persisted document containing a node below level 20 is invalid. Loading such a
 
 ### 2.4 Inline Expansion
 
-Every node remembers whether it is expanded. A node that has never been expanded is collapsed. Clicking a node's disclosure chevron shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores the nested expansion choices beneath it.
+Expansion choices belong to a view. Tree has one root view and one view for each starred node (§2.6). A location uses the view of the nearest starred node among its current parent and that parent's ancestors; without one, it uses the root view. Within a view, every node remembers whether it is expanded, and a node never expanded there is collapsed. Clicking a node's disclosure chevron shows its direct children immediately beneath it, indented to reflect their depth. An expanded child can be expanded in the same way, and collapsing an ancestor hides every visible descendant beneath it. Expanding that ancestor again restores the nested expansion choices beneath it.
 
 * Visible descendants are ordinary editable nodes: the user can click their text, place the caret, edit them, use their circular indicator to enter them, and expand or collapse their children.
 * The location path and current-parent heading continue to represent the current location, even when a visible descendant has the caret.
@@ -416,7 +416,12 @@ Expansion is view state, not a document edit. It creates no undo entry and never
 
 An expansion change is a pending change like a selection change: the idle, volume, and quit triggers in §16.1 save it together with the document.
 
-Expansion choices are kept when the location changes: entering a node shows its children with their own remembered expansion, and leaving it or using the location path shows the destination with the choices made there before. Reopening the application restores every remembered choice.
+Expansion choices are kept when the location changes: entering a node shows its children with the choices its view remembers, and leaving it or using the location path shows the destination with the choices made in its view before. Reopening the application restores every remembered choice of the root view and of each starred node's view.
+
+* Every fold change in a location — the disclosure chevron, `Cmd+E`, the Vim fold commands, and the folds that Find, a drop, a shift, `o` or a put opens — changes only that location's view. At the root level, `zM` closes every fold of the root view and leaves the starred nodes' views unchanged.
+* A starred node receives its own view the first time it governs the displayed location: a copy of the view its locations would use without the star — the nearest starred ancestor's view, or the root view — limited to the node's descendants. Its rows therefore look as they would without the star.
+* When a star is removed, the node's locations use the view of its nearest starred ancestor, or the root view. If that view hides the selected node, its nearest displayed ancestor becomes selected with the caret at the beginning of its text. Undo restores the star and its view; starring the node again in the same session also restores the view. A view is saved only while its node is starred.
+* Opening and closing Agenda changes no fold choice. A star added or removed while Agenda is open, directly or by undo, selects the governing view under these rules when Agenda closes.
 
 If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged.
 
@@ -457,6 +462,8 @@ If the selected Tree row is hidden, select the next visible row, or the precedin
 ### 2.6 Starred Nodes
 
 `toggle-star-node` in the command panel adds or removes a star on the current real node. It changes only that node, including the editable Tree parent heading and real Agenda nodes; synthetic Agenda rows cannot be starred. It has no default keyboard shortcut. The command shows its active state when the current node is starred.
+
+A starred node also has its own expansion view for the locations below it (§2.4).
 
 A small star replaces the node's circular marker in Tree and Agenda. For the current node, the star itself takes the focused marker's text color; no circular focus dot is drawn over it. The editable parent heading shows a larger star to the left of its text, centered vertically on the first line. Starred Search results also show the star to the left of their text. The indicator is outside editable text and does not change text, caret offsets or the marker's navigation action.
 

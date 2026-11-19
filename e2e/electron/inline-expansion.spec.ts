@@ -623,6 +623,54 @@ test.describe('inline node expansion (mode-independent)', () => {
     await expect.poll(() => nodeTexts(second.window)).toEqual(['Alpha', 'Bravo'])
   })
 
+  test('keeps a starred node’s own view apart from the root view across a relaunch', async ({ userDataDir }) => {
+    const seed = nestedSeed()
+    const alpha = (seed.document as { roots: Array<Record<string, unknown>> }).roots[0]!
+    const starredSeed = {
+      ...seed,
+      version: 5,
+      document: { roots: [{ ...alpha, starred: true }, ...(seed.document as { roots: unknown[] }).roots.slice(1)] },
+      view: { expandedIds: ['a', 'a1'] },
+    }
+    seedDocument(userDataDir, starredSeed)
+    const first = await launchTree(userDataDir, { initialMode: 'normal' })
+    const rootRows = ['Alpha', 'Alpha child one', 'Alpha grandchild', 'Alpha child two', 'Bravo']
+
+    await expect.poll(() => nodeTexts(first.window)).toEqual(rootRows)
+
+    await node(first.window, 1).click()
+    await first.window.keyboard.press('Meta+.')
+
+    // The starred node's first view copies the folds the root view shows below it.
+    await expect(parent(first.window)).toHaveValue('Alpha')
+    await expect.poll(() => nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha grandchild', 'Alpha child two'])
+
+    await first.window.getByRole('button', { name: 'Collapse node 1' }).click()
+
+    await expect.poll(() => nodeTexts(first.window)).toEqual(['Alpha child one', 'Alpha child two'])
+
+    await first.window.getByRole('button', { name: 'Top level' }).click()
+
+    await expect.poll(() => nodeTexts(first.window)).toEqual(rootRows)
+
+    await closeApp(first.app)
+    const persisted = readPersisted(userDataDir)
+
+    expect(persisted.version).toBe(5)
+    expect(new Set(persisted.view?.expandedIds)).toEqual(new Set(['a', 'a1']))
+    expect(persisted.view?.starredExpandedIds).toEqual({ a: [] })
+
+    const second = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    await expect.poll(() => nodeTexts(second.window)).toEqual(rootRows)
+
+    await node(second.window, 1).click()
+    await second.window.keyboard.press('Meta+.')
+
+    await expect(parent(second.window)).toHaveValue('Alpha')
+    await expect.poll(() => nodeTexts(second.window)).toEqual(['Alpha child one', 'Alpha child two'])
+  })
+
   test('windows on the flattened visible row count once inline descendants push past the threshold', async ({
     userDataDir,
   }) => {
