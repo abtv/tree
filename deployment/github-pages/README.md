@@ -217,6 +217,26 @@ branch creation, Contents writes or cleanup. Their failures still stop publicati
 Authorization errors, conflicts and trust/verification failures are
 not retried or treated as permission-denial evidence.
 
+Source release jobs read the public hosting repository over Git, not the REST
+API. GitHub-hosted runners share outbound addresses, so another tenant can
+exhaust the anonymous REST budget of 60 requests per hour before a release job
+starts. Version detection, retained-asset preparation and hosted verification
+resolve the hosting branch with `git ls-remote` and read files from a temporary
+shallow fetch of that exact commit. Git transport needs no credential and does
+not count against REST limits. The reader ignores user and system Git
+configuration and accepts only fixed read paths. Like the Contents API, it
+returns file contents only for regular files. Branch resolution and fetches
+retry timeouts and Git failures twice, after one and two seconds; a missing
+branch fails immediately. Failures are reported without Git diagnostics, and
+the existing entry, size and digest checks then apply. The authenticated
+transfer still uses the target-only token.
+Deployment polling reads the hosting repository's public Actions runs with the
+source `GITHUB_TOKEN`, which has its own per-repository quota. GitHub does not
+document that token for another owner's public Actions data. If GitHub refuses
+it with HTTP 401, 403 or 404, that poll is repeated anonymously and the
+remaining polls stay anonymous, still at most 20 polls. Rate limits and other
+failures stop polling instead.
+
 After a transient branch-update error, transfer reads main before repeating the
 same non-forced update. The expected new SHA means the write already succeeded;
 the original parent permits retry; another SHA stops publication. If that read

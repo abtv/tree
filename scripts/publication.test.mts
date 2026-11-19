@@ -160,4 +160,45 @@ describe('verified publication dispatch', () => {
     expect(wait).toHaveBeenCalledTimes(20)
     expect(wait).toHaveBeenCalledWith(30000)
   })
+
+  describe('with the source token', () => {
+    const target = {
+      ...run,
+      repository: { full_name: 'tree-editor/tree-editor.github.io' },
+      path: '.github/workflows/deploy-web-app.yml',
+    }
+    const denial = (status: number, rateLimited = false) => Object.assign(new Error('denied'), { status, rateLimited })
+
+    it('polls deployments outside the anonymous budget shared by runner addresses', async () => {
+      const request = vi.fn<Request>().mockResolvedValue({ workflow_runs: [target] })
+
+      expect(await waitForDeployment(sha, request, vi.fn(), 'source')).toContain('/42')
+
+      expect(request).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(`head_sha=${sha}`), { token: 'source' })
+    })
+
+    it.each([401, 403, 404])('continues anonymously when GitHub refuses the token with %s', async (status) => {
+      const request = vi
+        .fn<Request>()
+        .mockRejectedValueOnce(denial(status))
+        .mockResolvedValueOnce({ workflow_runs: [] })
+        .mockResolvedValue({ workflow_runs: [target] })
+      const wait = vi.fn().mockResolvedValue(undefined)
+
+      expect(await waitForDeployment(sha, request, wait, 'source')).toContain('/42')
+
+      expect(request.mock.calls.map(([, options]) => options)).toEqual([{ token: 'source' }, undefined, undefined])
+    })
+
+    it.each([
+      ['a rate limit', denial(403, true)],
+      ['a server failure', denial(502)],
+    ])('does not hide %s behind anonymous reads', async (_name, error) => {
+      const request = vi.fn<Request>().mockRejectedValue(error)
+
+      await expect(waitForDeployment(sha, request, vi.fn(), 'source')).rejects.toBe(error)
+
+      expect(request).toHaveBeenCalledOnce()
+    })
+  })
 })

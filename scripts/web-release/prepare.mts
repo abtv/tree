@@ -2,7 +2,7 @@ import type { Blob, Commit, Reference, Request, Tree, TreeEntry, CurrentManifest
 import { createHash } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { api } from './github.mts'
+import { withHostingRepository } from './hosting.mts'
 import { readMetadata, verifyRetainedAttestation, MAX_METADATA_BYTES } from './attestation.mts'
 import { verifyPackage } from './package.mts'
 import { assetPaths, MAX_ASSET_GENERATIONS, MAX_FILE_BYTES, validateManifest } from './policy.mts'
@@ -29,9 +29,24 @@ export async function preparePackage(
   directory: string,
   manifestFile: string,
   {
-    request = api,
+    request,
     attest = verifyRetainedAttestation,
-  }: { request?: Request; attest?: typeof verifyRetainedAttestation } = {},
+    remote,
+  }: { request?: Request; attest?: typeof verifyRetainedAttestation; remote?: string } = {},
+): Promise<CurrentManifest> {
+  // Without an injected reader, read the previous release over Git rather than
+  // the anonymous REST API. The signing job has no hosting credential.
+  if (!request) {
+    return withHostingRepository((hosting) => mergePrevious(directory, manifestFile, hosting, attest), remote)
+  }
+  return mergePrevious(directory, manifestFile, request, attest)
+}
+
+async function mergePrevious(
+  directory: string,
+  manifestFile: string,
+  request: Request,
+  attest: typeof verifyRetainedAttestation,
 ): Promise<CurrentManifest> {
   const current = validateManifest(await readMetadata(manifestFile))
   if (current.schema !== 2 || current.assetGenerations.length !== 1) {

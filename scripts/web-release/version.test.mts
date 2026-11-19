@@ -1,12 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { hostingRemote } from './hosting-remote.fixture.mts'
 import { isNewWebVersion } from './version.mts'
-
-vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }))
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  vi.resetAllMocks()
 })
 
 const sha = 'a'.repeat(40)
@@ -44,7 +41,6 @@ it.each([
   })
 
   await expect(isNewWebVersion(version, { request, targetSha: sha, targetToken: 'target' })).resolves.toBe(expected)
-  expect(execFileSync).not.toHaveBeenCalled()
   expect(request).toHaveBeenNthCalledWith(
     1,
     `/repos/tree-editor/tree-editor.github.io/contents/provenance.json?ref=${sha}`,
@@ -80,11 +76,8 @@ it.each([
   ['0.1.3', true],
   ['0.1.2', false],
 ] as const)('compares %s even when the anonymous GitHub REST budget is exhausted', async (version, expected) => {
-  vi.mocked(execFileSync).mockReturnValue(`${sha}\trefs/heads/main\n`)
+  const remote = await hostingRemote({ 'provenance.json': JSON.stringify(provenance) })
   const fetch = vi.fn(async (url: string) => {
-    if (url === `https://raw.githubusercontent.com/tree-editor/tree-editor.github.io/${sha}/provenance.json`) {
-      return Response.json(provenance)
-    }
     if (url === `https://api.github.com/repos/abtv/tree/contents/package.json?ref=${sha}`) {
       return Response.json(blob({ version: '0.1.2' }))
     }
@@ -92,38 +85,19 @@ it.each([
   })
   vi.stubGlobal('fetch', fetch)
 
-  await expect(isNewWebVersion(version, { token: 'source' })).resolves.toBe(expected)
-  expect(execFileSync).toHaveBeenCalledExactlyOnceWith(
-    'git',
-    ['ls-remote', '--exit-code', 'https://github.com/tree-editor/tree-editor.github.io.git', 'refs/heads/main'],
-    expect.objectContaining({ timeout: 15000 }),
-  )
-  expect(fetch).toHaveBeenCalledTimes(2)
-  expect(fetch).toHaveBeenNthCalledWith(1, expect.stringContaining(`/${sha}/provenance.json`), {
-    redirect: 'error',
-    signal: expect.any(AbortSignal),
-  })
-  expect(fetch).toHaveBeenNthCalledWith(
-    2,
+  await expect(isNewWebVersion(version, { token: 'source', hostingRemote: remote.url })).resolves.toBe(expected)
+  expect(fetch).toHaveBeenCalledExactlyOnceWith(
     expect.stringContaining(`/contents/package.json?ref=${sha}`),
     expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer source' }) }),
   )
 })
 
-it('rejects an invalid public hosting ref before making HTTP requests', async () => {
-  vi.mocked(execFileSync).mockReturnValue(`${sha}\trefs/heads/other\n`)
-  const fetch = vi.fn()
-  vi.stubGlobal('fetch', fetch)
-
-  await expect(isNewWebVersion('0.1.3')).rejects.toThrow('Invalid hosting commit')
-  expect(fetch).not.toHaveBeenCalled()
-})
-
 it('fails closed if the hosting commit has no public provenance file', async () => {
-  vi.mocked(execFileSync).mockReturnValue(`${sha}\trefs/heads/main\n`)
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })))
+  const remote = await hostingRemote({ 'README.md': 'hosting' })
   const request = vi.fn()
 
-  await expect(isNewWebVersion('0.1.3', { request })).rejects.toThrow('Could not read public hosting metadata (404)')
+  await expect(isNewWebVersion('0.1.3', { request, hostingRemote: remote.url })).rejects.toThrow(
+    'Could not read the public hosting repository',
+  )
   expect(request).not.toHaveBeenCalled()
 })
