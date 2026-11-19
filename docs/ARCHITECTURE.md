@@ -221,7 +221,9 @@ Repeated jumps belong to the active navigation queue. An interruption or a jump
 without a destination discards its remaining repeats. If a subscriber starts a
 new jump while search becomes visible, only the new jump can move the caret.
 `EditorSearch` resolves origins, reveals ancestors and restores search-owned folds,
-including manual Tree/Agenda fold ownership transfers. It returns explicit Tree or
+including manual Tree/Agenda fold ownership transfers. Search-owned Tree folds belong
+to the active expansion view; when a star change switches the view, search releases
+their ownership, so closing Find never closes a fold of another view. It returns explicit Tree or
 Agenda view changes with a target location and token-free focus for a reveal.
 `EditorStore` publishes those changes, creates focus tokens, ends the text session
 before Agenda reveal, and schedules Tree view persistence. Search disposal cancels

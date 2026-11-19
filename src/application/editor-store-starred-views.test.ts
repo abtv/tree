@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
 import type { PersistedEditorState, TreeNode } from '../domain/document'
@@ -63,6 +63,8 @@ function enter(store: EditorStore, nodeId: string): void {
   store.selectNode(nodeId, 0)
   store.enter()
 }
+
+afterEach(() => vi.useRealTimers())
 
 // @requirement PRODUCT.md §2.4
 describe('expansion views of starred nodes', () => {
@@ -313,6 +315,32 @@ describe('expansion views of starred nodes', () => {
     enter(store, 'project')
 
     expect(rows(store)).toEqual(['done', 'phase', 'step'])
+  })
+
+  it('keeps a fold of the root view when Find closes after a removed star switched to it', async () => {
+    vi.useFakeTimers()
+    const store = await open(
+      persistence({
+        version: 5,
+        document: document(),
+        location: { currentParentId: 'work', selectedNodeId: 'project' },
+        view: { expandedIds: ['work', 'project'], starredExpandedIds: { work: [] } },
+      }),
+    )
+    store.search.begin(store.searchOrigin(0))
+    store.search.edit('task')
+    store.search.confirm()
+    await vi.runAllTimersAsync()
+
+    expect(snapshot(store).location.selectedNodeId).toBe('task')
+    expect(rows(store)).toEqual(['project', 'task', 'notes'])
+
+    store.selectNode('work', 0)
+    store.toggleStarNode()
+    store.hideSearch()
+
+    expect(snapshot(store).expansion.viewOwnerId).toBeNull()
+    expect(rows(store)).toEqual(['project', 'task', 'notes'])
   })
 
   it('shows the root view when finishing the last task of a starred location hides it', async () => {

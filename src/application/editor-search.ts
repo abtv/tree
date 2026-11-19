@@ -60,6 +60,9 @@ export class EditorSearch {
     const changedProjection = this.scope.kind === 'agenda' && this.scope.projection !== projection
     const changedScope = key !== this.scopeKey
     const changedDocument = previous?.document !== state.document
+    // Opened folds belong to the view Find changed. After a star change switches the active view, the
+    // same ids in the new view are the user's choices, so Find no longer closes them.
+    if (previous !== undefined && previous.expansion.viewOwnerId !== state.expansion.viewOwnerId) this.opened.clear()
     if (
       !this.applying &&
       (previous?.focus !== state.focus || previous?.agenda?.selectedKey !== agenda?.selectedKey) &&

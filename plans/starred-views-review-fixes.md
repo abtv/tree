@@ -15,8 +15,8 @@ The list below is the complete list the review provided. No unverified remainder
 | ID | Review item | Outcome | Status |
 | --- | --- | --- | --- |
 | R1 | 2, 3 | Tree activates a starred view only for the final displayed location, then checks the selection against that view | Done |
-| R2 | 1 | Find releases its fold ownership when the active view changes | Ready |
-| R3 | 4 | Views of nodes that neither the document nor undo history contains are dropped | Planned |
+| R2 | 1 | Find releases its fold ownership when the active view changes | Done |
+| R3 | 4 | Views of nodes that neither the document nor undo history contains are dropped | Ready |
 | R4 | 5 | The starred-view property test always exercises a starred view | Planned |
 
 ### R1: Activate the view of the final location
@@ -35,6 +35,7 @@ The list below is the complete list the review provided. No unverified remainder
 - Acceptance: the review scenario keeps the manually opened fold of the root view after Find closes; Find still closes its own folds when the view does not change.
 - Validation: Moderate Risk: `npm run check`, focused Find E2E.
 - Review: independent review (shared interaction state).
+- Result: `EditorSearch.update` clears its fold ownership when the active view owner changes, as it already did on a location change. Folds Find opened stay open in the view it left. Validation and independent review passed; the primary agent verified the contained Find flow.
 
 ### R3: Bound dormant views
 
@@ -58,7 +59,7 @@ Four working tasks. No manual check before a commit. After R4, the owner confirm
 
 ## Next task
 
-R2.
+R3.
 
 ## Resume prompt
 
