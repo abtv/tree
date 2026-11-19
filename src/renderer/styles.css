@@ -682,6 +682,8 @@ body:not(.node-drag-active) .location-link:hover {
 }
 :is(.agenda-date-active, .agenda-date-secondary) {
   font-weight: 400;
+  /* Keep date spans in separate shaping runs while typing in long monospaced rows. */
+  font-kerning: none;
 }
 .tag-text {
   color: var(--marker-color, var(--color-tag));
