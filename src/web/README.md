@@ -261,7 +261,7 @@ Safari uses isolated WebDriver sessions and a fresh origin; Electron uses
 synthetic profiles under `.scratch/safari-perf/`.
 
 For functional Safari smoke checks without performance measurements, use
-`npm run test:safari`; see [Development Guide](../../docs/DEVELOPMENT.md#shared-agent-instructions).
+`npm run test:safari`; see [Development Guide](../../docs/DEVELOPMENT.md#task-capability-check).
 
 Results are written to `test-results/safari-perf-results.json`. They measure the
 time from a captured input/keyboard event to two animation frames, using the same

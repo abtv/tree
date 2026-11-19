@@ -42,7 +42,7 @@ The command panel keeps application commands and their shortcuts within reach. P
 * **Image attachments.** Paste images into nodes and open them in a larger preview.
 * **Local storage.** Documents and images stay on your machine, with automatic saving. The desktop application can automatically recover from retained document versions.
 * **Notes export and import.** Export notes and their images to a ZIP archive, or import an archive from either the desktop or browser version. Import replaces the current notes after confirmation.
-* **Appearances.** Choose Light, Dark, or Gray, or follow the system appearance.
+* **Appearances.** Choose Light, Dark, Gray, or White, or follow the system appearance.
 
 Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
 
