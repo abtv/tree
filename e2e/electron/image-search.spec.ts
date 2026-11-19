@@ -10,7 +10,7 @@ import {
   firePaste,
   node,
   fireIdleSave,
-  readPersisted,
+  tryReadPersisted,
   writeClipboardImageSized,
   typeInto,
 } from './fixtures'
@@ -84,7 +84,7 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
     await expect(window.locator('.node-input')).toHaveCount(1)
     await fireIdleSave(window)
     await expect
-      .poll(() => readPersisted(userDataDir).document.roots[0]?.attachment?.searchText)
+      .poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.attachment?.searchText)
       .toContain('Secret Zebra')
     await closeApp(app)
 

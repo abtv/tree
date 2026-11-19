@@ -287,7 +287,13 @@ export async function happyPath(driver: SmokeDriver) {
     ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
     ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
 
-  // Search outside the current parent. The child also matches: "Smoke" is in its text,
+  // Start at the root so a no-op cannot pass as entry into the matching parent.
+  await restored.click('button[aria-label="Top level"]')
+  await restored.waitFor(
+    `return !document.querySelector('.current-parent') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
+  )
+
+  // The child also matches: "Smoke" is in its text,
   // while "parent" is supplied by its ancestor under the required-term search rules.
   const query = 'input[aria-label="Search query"]'
   await restored.press(focused, 'Primary+;')
@@ -297,9 +303,9 @@ export async function happyPath(driver: SmokeDriver) {
     document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`)
   await restored.press(query, 'Enter')
 
-  await restored.waitFor(`return !document.querySelector('${recent}') && !document.querySelector('.current-parent') &&
-    document.querySelectorAll('.node-row').length === ${initialRows + 1} &&
-    ${textAt(focused)} === ${JSON.stringify(parentText)}`)
+  await restored.waitFor(`return !document.querySelector('${recent}') &&
+    ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
+    ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
   return restored
 }

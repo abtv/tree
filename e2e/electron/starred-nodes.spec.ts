@@ -65,7 +65,7 @@ test.describe('Star presentation', () => {
 
       await window.keyboard.press('Meta+;')
       const popup = window.getByRole('dialog', { name: 'Search' })
-      await expect(popup.getByRole('option')).toHaveCount(3)
+      await expect(popup.locator('.recent-node-row')).toHaveCount(3)
       const alignment = await popup.locator('.recent-node-title-line').evaluateAll((rows) =>
         rows.map((row) => {
           const star = row.querySelector('.node-star')!.getBoundingClientRect()

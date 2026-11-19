@@ -77,8 +77,8 @@ it('restores ancestor paths after leaving nested branches and separates breadcru
 
   expect(next.value).toEqual([
     { id: 'root', text: 'needle root', path: null },
-    { id: 'deep', text: 'needle deep', path: 'needle root › Branch' },
-    { id: 'sibling', text: 'needle sibling', path: 'needle root' },
+    { id: 'deep', text: 'needle deep', path: 'needle root › Branch', parentId: 'branch' },
+    { id: 'sibling', text: 'needle sibling', path: 'needle root', parentId: 'root' },
     { id: 'outside', text: 'needle outside', path: null },
   ])
 })

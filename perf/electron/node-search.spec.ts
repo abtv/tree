@@ -72,11 +72,14 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
   await expect(input).toBeFocused()
   const start = performance.now()
   await input.fill('Needle')
-  await expect(window.getByRole('option').first()).toContainText('Needle 0')
+  await expect(window.locator('.recent-node-row[aria-selected="true"]')).toContainText('Needle 0')
   const completeMs = performance.now() - start
   expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
   await window.keyboard.press('ArrowUp')
+  await expect(window.locator('.recent-node-group-path[aria-selected="true"]')).toHaveText('Parent')
+  await window.keyboard.press('ArrowUp')
   await expect(window.locator('[role="option"][aria-selected="true"]')).toContainText('Needle 9999')
+  await window.keyboard.press('ArrowDown')
   await window.keyboard.press('ArrowDown')
   const arrowPaint = await input.evaluate(async (element) => {
     const samples: number[] = []
@@ -122,7 +125,7 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
     await input.fill(query)
     await expect(window.getByRole('listbox', { name: 'Search results' })).toHaveAttribute('aria-busy', 'false')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 10000')
-    await expect(window.getByRole('option').first()).toContainText('Needle 0')
+    await expect(window.locator('.recent-node-row[aria-selected="true"]')).toContainText('Needle 0')
     shortCompleteMs.push(performance.now() - start)
     expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
     await expect(input).toBeFocused()

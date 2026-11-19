@@ -120,6 +120,21 @@ it('records successful edits, creation and entry, excluding ordinary navigation,
   expect(saveRecentNodes).toHaveBeenLastCalledWith(['a', 'b', 'child'])
 })
 
+it('enters a branch from Agenda, focuses its first child and records the branch as visited', async () => {
+  const { store } = await setup()
+  store.openAgenda()
+
+  store.visitRecentNode('a')
+
+  expect(store.getSnapshot()).toMatchObject({
+    document,
+    location: { currentParentId: 'a', selectedNodeId: 'child' },
+    focus: { nodeId: 'child', cursor: 0 },
+  })
+  expect(store.getSnapshot()).not.toHaveProperty('agenda')
+  expect(store.recentNodes.getIds()).toEqual(['a', 'child'])
+})
+
 it('reveals the real parent from Agenda, resets caret even on repeated visits and never edits content', async () => {
   const { store } = await setup()
   store.openAgenda()

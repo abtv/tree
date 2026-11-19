@@ -61,6 +61,7 @@ describe('recent nodes', () => {
         id: 'leaf',
         text: 'Finished task',
         path: 'Open › Done branch',
+        parentId: 'done',
         struckThrough: true,
         pathStruckMatches: [{ start: 7, end: 18 }],
       },
@@ -167,7 +168,7 @@ describe('recent nodes', () => {
 
     recent.load(['c199'], branches)
 
-    expect(recent.getResults()).toEqual([{ id: 'c199', text: 'Child', path: 'Parent' }])
+    expect(recent.getResults()).toEqual([{ id: 'c199', text: 'Child', path: 'Parent', parentId: 'p199' }])
     // Retained path memory must scale with ancestor depth, not previously visited branches.
     const paths = Reflect.get(recent, 'paths') as Map<string, readonly unknown[]>
     expect([...paths.values()].reduce((total, path) => total + path.length, 0)).toBeLessThanOrEqual(2)
@@ -188,14 +189,14 @@ describe('recent nodes', () => {
     recent.load(['leaf', 'a'], deep)
 
     expect(recent.getResults()).toEqual([
-      { id: 'leaf', text: 'Leaf', path: 'Parent › Branch' },
+      { id: 'leaf', text: 'Leaf', path: 'Parent › Branch', parentId: 'q' },
       { id: 'a', text: 'Alpha', path: null },
     ])
 
     const edited = editNodeContent(deep, 'leaf', 'Edited', [])
     recent.recordChange(deep, edited, 'leaf')
 
-    expect(recent.getResults()[0]).toEqual({ id: 'leaf', text: 'Edited', path: 'Parent › Branch' })
+    expect(recent.getResults()[0]).toEqual({ id: 'leaf', text: 'Edited', path: 'Parent › Branch', parentId: 'q' })
   })
 
   it('bounds remembered IDs and cached paths across repeated new visits', () => {

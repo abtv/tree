@@ -49,7 +49,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
       }
     })
 
-    expect(geometry.width).toBeCloseTo(geometry.viewportWidth * 0.8, 0)
+    expect(geometry.width).toBeCloseTo(960, 0)
     expect(geometry.height).toBeGreaterThan(560)
     expect(geometry.height).toBeCloseTo(
       Math.min(geometry.viewportHeight * 0.8, geometry.viewportHeight - geometry.top - 40),
@@ -177,7 +177,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
       '#K8s',
       '&Meeting',
     ])
-    await expect(results.getByRole('option').nth(1).locator('.node-search-match')).toHaveText([
+    await expect(results.locator('.recent-node-row').nth(1).locator('.node-search-match')).toHaveText([
       '@Alex',
       '#K8s',
       '&Meeting',
@@ -188,23 +188,23 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await input.fill('tect image')
 
     await expect(results.locator('.recent-node-group-path .node-search-match')).toHaveText(['Image'])
-    await expect(results.getByRole('option').first().locator('.node-search-match')).toHaveText([
+    await expect(results.locator('.recent-node-row').first().locator('.node-search-match')).toHaveText([
       'image',
       'tect',
       'image',
     ])
-    await expect(results.getByRole('option').nth(1).locator('.node-search-match')).toHaveText(['tect'])
+    await expect(results.locator('.recent-node-row').nth(1).locator('.node-search-match')).toHaveText(['tect'])
     await window.screenshot({ path: `test-results/search-multi-terms-${mode.mode}.png` })
     await window.keyboard.press('ArrowDown')
-    await expect(results.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
-    await expect(results.getByRole('option').first().locator('.node-search-match')).toHaveCount(3)
+    await expect(results.locator('.recent-node-row').nth(1)).toHaveAttribute('aria-selected', 'true')
+    await expect(results.locator('.recent-node-row').first().locator('.node-search-match')).toHaveCount(3)
 
     await input.fill('opensearch infrastructure @Alex #k8s &meeting')
-    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
     await input.fill('@ALEX #k8s opensearch')
     await expect(window.getByText('No results', { exact: true })).toBeVisible()
     await input.fill('@alex #k8s opensearch')
-    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
     await window.keyboard.press('Enter')
 
     await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
@@ -235,10 +235,10 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await input.fill('#p1')
 
     await expect(tags).toHaveCount(0)
-    await expect(results.getByRole('option')).toHaveCount(2)
-    await expect(results.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
-    await expect(results.getByRole('option').last()).toHaveAttribute('aria-selected', 'false')
-    await expect(popup.getByText('↑ ↓ select · Enter open · Esc close')).toBeVisible()
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row').first()).toHaveAttribute('aria-selected', 'true')
+    await expect(results.locator('.recent-node-row').last()).toHaveAttribute('aria-selected', 'false')
+    await expect(popup.getByText('↑↓ Select ↵ Open Esc Close')).toBeVisible()
     await expect(popup.getByLabel('Result position')).toHaveText('1 / 2')
     await expect(input).toBeFocused()
     await window.screenshot({ path: `test-results/search-exact-tag-${mode.mode}.png` })
@@ -249,7 +249,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
 
     await window.keyboard.press('Meta+;')
     await input.fill('#p1')
-    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
     await window.keyboard.press('Backspace')
 
     await expect(input).toHaveValue('#p')
@@ -258,9 +258,9 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await expect(tags).toHaveCount(0)
     await expect(input).toHaveValue('#p1')
     await expect(results).toHaveAttribute('aria-busy', 'false')
-    await expect(results.getByRole('option').first()).toHaveAttribute('aria-selected', 'true')
+    await expect(results.locator('.recent-node-row').first()).toHaveAttribute('aria-selected', 'true')
     await window.keyboard.press('ArrowDown')
-    await expect(results.getByRole('option').last()).toHaveAttribute('aria-selected', 'true')
+    await expect(results.locator('.recent-node-row').last()).toHaveAttribute('aria-selected', 'true')
     await window.keyboard.press('Escape')
 
     await expect(popup).toHaveCount(0)
@@ -293,11 +293,11 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await input.fill('al')
     await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w', 'alpha #Work'])
     await input.fill('alpha')
-    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
     await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w', 'alpha #Work'])
     await window.screenshot({ path: `test-results/search-${mode.mode}-light.png` })
     await input.fill('Alpha')
-    await expect(results.getByRole('option')).toHaveCount(1)
+    await expect(results.locator('.recent-node-row')).toHaveCount(1)
     await expect(results.locator('.node-search-match')).toHaveText(['Alpha'])
     await input.fill('#')
     const tags = window.getByRole('listbox', { name: 'Tags' })
@@ -333,7 +333,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await expect(input).toHaveValue('')
     await input.fill('#w')
     await expect(input).toHaveValue('#w')
-    await expect(results.getByRole('option')).toHaveCount(1)
+    await expect(results.locator('.recent-node-row')).toHaveCount(1)
     await input.fill('#new_tag')
     await expect(window.getByText('No results', { exact: true })).toBeVisible()
     await input.fill('#')
@@ -347,7 +347,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await window.keyboard.press('Meta+;')
     await expect(input).toHaveValue('')
     await input.fill('alpha')
-    await expect(results.getByRole('option')).toHaveCount(2)
+    await expect(results.locator('.recent-node-row')).toHaveCount(2)
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('Enter')
 
@@ -388,7 +388,7 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
     await first.window.screenshot({ path: `.scratch/recent-nodes/${mode.mode}-popup.png` })
     await first.window.keyboard.press('Enter')
 
-    await expect(node(first.window, 1)).toBeFocused()
+    await expect(first.window.locator('[data-node-id="child"] .node-input')).toBeFocused()
     await closeApp(first.app)
 
     expect(JSON.parse(readFileSync(join(userDataDir, 'data', 'recent-nodes.json'), 'utf8'))).toEqual(['a', 'b'])
@@ -488,11 +488,13 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       const input = popup.getByRole('searchbox')
       await input.fill('Example')
       const results = popup.getByRole('listbox', { name: 'Search results' })
-      await expect(results.getByRole('option')).toHaveCount(3)
+      await expect(results.locator('.recent-node-row')).toHaveCount(3)
+      await window.keyboard.press('ArrowDown')
+      await expect(results.locator('.recent-node-group-path')).toHaveAttribute('aria-selected', 'true')
       await window.keyboard.press('ArrowDown')
 
-      await expect(results.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
-      const rows = await results.getByRole('option').evaluateAll((elements) =>
+      await expect(results.locator('.recent-node-row').nth(1)).toHaveAttribute('aria-selected', 'true')
+      const rows = await results.locator('.recent-node-row').evaluateAll((elements) =>
         elements.map((element) => {
           const bounds = element.getBoundingClientRect()
           return { top: bounds.top, bottom: bounds.bottom, height: bounds.height }
@@ -500,20 +502,20 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       )
       expect(rows[1]!.height).toBeGreaterThan(rows[0]!.height)
       const pathBox = (await results.locator('.recent-node-group-path').boundingBox())!
-      expect(rows[0]!.bottom).toBeLessThan(pathBox.y)
+      expect(rows[0]!.bottom).toBe(pathBox.y)
       expect(pathBox.y + pathBox.height).toBe(rows[1]!.top)
       expect(rows[1]!.bottom).toBe(rows[2]!.top)
       for (const match of await results.locator('.recent-node-text .node-search-match').all()) {
         await expect(match).toHaveCSS('text-decoration-line', 'underline')
       }
       await expect(results.locator('.recent-node-path .node-search-match')).toHaveCSS('text-decoration-line', 'none')
-      await expect(popup).toHaveCSS('width', '652px')
+      await expect(popup).toHaveCSS('width', '644px')
       await expect(window).toHaveScreenshot(`search-results-presentation-${appearance}.png`)
 
       const resultBounds = (await results.boundingBox())!
       await input.fill('tes')
-      await expect(results.getByRole('option')).toHaveCount(1)
-      await expect(results.getByRole('option')).toHaveAttribute('aria-selected', 'true')
+      await expect(results.locator('.recent-node-row')).toHaveCount(1)
+      await expect(results.locator('.recent-node-row')).toHaveAttribute('aria-selected', 'true')
       await expect(popup).toHaveScreenshot(`search-selected-fragment-${appearance}.png`)
 
       await input.fill('#')
@@ -532,7 +534,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
       await window.keyboard.press('Enter')
       await expect(input).toHaveValue('#beta')
       await expect(tags).toHaveCount(0)
-      await expect(results.getByRole('option')).toHaveCount(1)
+      await expect(results.locator('.recent-node-row')).toHaveCount(1)
       await expect(input).toBeFocused()
       await window.keyboard.press('Escape')
       await expect(popup).toHaveCount(0)
@@ -561,14 +563,18 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const list = window.getByRole('listbox', { name: 'Recent nodes' })
     const selected = list.locator('[aria-selected="true"]')
 
-    await expect(selected).toHaveText('★Starred item 0')
+    await expect(selected).toHaveText('Starred item 0★')
     await expect(list).toHaveAttribute('data-scroll-after', '')
     expect(await list.evaluate((element) => element.scrollTop), 'initial scroll').toBe(0)
 
     await window.keyboard.press('ArrowUp')
-    await expect(selected).toHaveText('★Starred item 17')
+    await expect(selected).toHaveText('Project 00')
+    await window.keyboard.press('ArrowUp')
+    await expect(selected).toHaveText('Starred item 17★')
     await window.keyboard.press('ArrowDown')
-    await expect(selected).toHaveText('★Starred item 0')
+    await expect(selected).toHaveText('Project 00')
+    await window.keyboard.press('ArrowDown')
+    await expect(selected).toHaveText('Starred item 0★')
 
     const atStart = await list.evaluate((element) => {
       const heading = element.querySelector('.recent-node-group-path')!.getBoundingClientRect()
@@ -578,11 +584,16 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     expect(atStart.scrollTop).toBe(0)
     expect(atStart.headingInset).toBeGreaterThanOrEqual(0)
     await expect(list).not.toHaveAttribute('data-scroll-before')
-    const headings = list.locator('.recent-node-group-path')
-    await expect(headings.first()).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
-    await expect(headings.nth(1)).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)')
+    const entries = list.locator('.recent-node-entry')
+    await expect(entries.first().locator('.recent-node-group-divider')).toHaveCount(0)
+    await expect(entries.nth(1).locator('.recent-node-group-divider')).toHaveCSS('border-top-width', '1px')
     const sectionHeading = window.getByRole('dialog', { name: 'Search' }).locator('.node-search-results-heading')
     await expect(sectionHeading).toHaveCSS('border-bottom-width', '1px')
+
+    await window.keyboard.press('ArrowUp')
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Project 00')
+    await expect(window.locator('[data-node-id="star-0"] .node-input')).toBeFocused()
   })
 
   // @requirement PRODUCT.md §20.14.2
@@ -613,7 +624,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const list = window.locator('.node-search-results')
     const input = window.getByRole('searchbox')
     await expect(list.locator('.recent-node-group-path')).toHaveText(['Project A', 'Project B', 'Project A'])
-    await expect(list.getByRole('option')).toHaveCount(5)
+    await expect(list.getByRole('option')).toHaveCount(8)
     const entries = await list.locator('.recent-node-entry').evaluateAll((elements) =>
       elements.map((element) => {
         const box = element.getBoundingClientRect()
@@ -626,12 +637,16 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.screenshot({ path: '.scratch/search-path-groups/recent-grouped.png' })
 
     await list.locator('.recent-node-group-path').first().click()
+    await expect(window.locator('[data-node-id="p0-0"] .node-input')).toBeFocused()
+    await window.keyboard.press('Meta+;')
     await expect(input).toBeFocused()
     await window.keyboard.type('Needle')
     await expect(input).toHaveValue('Needle')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 90')
     // Earlier query prefixes have the same count; wait until the final query permits navigation.
     await expect(list).toHaveAttribute('aria-busy', 'false')
+    await window.keyboard.press('ArrowUp')
+    await expect(window.getByLabel('Result position')).toHaveText('90 results')
     await window.keyboard.press('ArrowUp')
     await expect(window.getByLabel('Result position')).toHaveText('90 / 90')
     await setMainWindowBounds(app, { width: 520, height: 520 })
@@ -649,7 +664,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.keyboard.press('Enter')
     await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
     await window.keyboard.press('Meta+;')
-    await expect(list.getByRole('option').first()).toContainText('Needle 1-44')
+    await expect(list.locator('[aria-selected="true"]')).toContainText('Needle 1-44')
     await window.keyboard.press('Escape')
     await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
   })
@@ -884,7 +899,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     const heading = window.locator('.node-search-results-heading')
     const headingBox = (await heading.boundingBox())!
     const listBox = (await list.boundingBox())!
-    expect(listBox.y - headingBox.y - headingBox.height).toBeGreaterThanOrEqual(6)
+    expect(listBox.y - headingBox.y - headingBox.height).toBe(0)
     await window.screenshot({ path: 'test-results/search-edge-fade-light.png' })
     await window.evaluate(() => globalThis.window.treeApi.setAppearance('dark'))
     await window.emulateMedia({ colorScheme: 'dark' })
@@ -1008,10 +1023,10 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         await expect(popup.getByText('Tags', { exact: true })).toBeVisible()
         await expect(popup.getByText('Results', { exact: true })).toBeVisible()
         await expect(popup.locator('[aria-selected="true"]')).toHaveCount(1)
-        await expect(popup.getByText('↑ ↓ select · Enter/Tab apply · Esc close')).toBeVisible()
+        await expect(popup.getByText('↑↓ Select ↵/Tab Apply Esc Close')).toBeVisible()
         await window.keyboard.press('Tab')
         await expect(popup.getByRole('listbox', { name: 'Tags' })).toHaveCount(0)
-        await expect(popup.getByText('↑ ↓ select · Enter open · Esc close')).toBeVisible()
+        await expect(popup.getByText('↑↓ Select ↵ Open Esc Close')).toBeVisible()
         await expect(input).toHaveValue('#p1')
         await expect(popup.getByLabel('Result position')).toHaveText('1 / 1')
       }
@@ -1082,7 +1097,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await setMainWindowBounds(app, { width: 700, height: 400 })
     await node(window, 1).focus()
     await window.keyboard.press('Meta+;')
-    await window.locator('.recent-nodes-title').click()
+    await window.locator('.node-search-results-heading').click()
     await expect(window.getByRole('dialog', { name: 'Search' })).toBeVisible()
     await expect.poll(centerOffset).toBeLessThanOrEqual(1)
     await window.keyboard.press('ArrowUp')

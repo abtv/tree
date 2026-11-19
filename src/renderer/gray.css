@@ -94,7 +94,6 @@
 
 :root:is([data-appearance='gray'], [data-appearance='white']) .node-search-results-heading,
 :root:is([data-appearance='gray'], [data-appearance='white']) .node-search-tags-heading,
-:root:is([data-appearance='gray'], [data-appearance='white']) .recent-node-row[data-result-divider]::after,
 :root:is([data-appearance='gray'], [data-appearance='white']) .node-search-tag[data-result-divider]::after {
   border-bottom-color: var(--color-search-divider);
 }
@@ -105,7 +104,6 @@
 
 :root:is([data-appearance='gray'], [data-appearance='white']) .node-search-section-title,
 :root:is([data-appearance='gray'], [data-appearance='white']) .node-search-footer,
-:root:is([data-appearance='gray'], [data-appearance='white']) .recent-nodes-title,
 :root:is([data-appearance='gray'], [data-appearance='white']) .recent-node-path {
   color: var(--color-secondary);
   opacity: 1;

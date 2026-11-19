@@ -28,7 +28,7 @@ it('retains empty feedback and shows only one delayed pending label', () => {
 
   expect(screen.getByText('No recent nodes')).toBeInTheDocument()
   expect(screen.queryByText('Searching…')).toBeNull()
-  expect(screen.getByText('↑ ↓ select · Enter open · Esc close')).toBeInTheDocument()
+  expect(screen.getByText('↑↓ Select ↵ Open Esc Close')).toBeInTheDocument()
 
   act(() => vi.advanceTimersByTime(1))
 
@@ -136,13 +136,13 @@ function setup(empty = false) {
 }
 
 // @requirement PRODUCT.md §20.14.2
-it('shares only consecutive path headings without changing result order or keyboard targets', () => {
+it('navigates group headings in display order and visits the selected parent by ID', () => {
   const { store } = setup()
   const results = [
-    { id: 'a', text: 'First needle\nFull second line', path: 'Project' },
-    { id: 'b', text: 'Second needle', path: 'Project' },
-    { id: 'c', text: 'Third needle', path: 'Other' },
-    { id: 'd', text: 'Fourth needle', path: 'Project' },
+    { id: 'a', text: 'First needle\nFull second line', path: 'Project', parentId: 'p' },
+    { id: 'b', text: 'Second needle', path: 'Project', parentId: 'p' },
+    { id: 'c', text: 'Third needle', path: 'Other', parentId: 'other' },
+    { id: 'd', text: 'Fourth needle', path: 'Project', parentId: 'p' },
     { id: 'root', text: 'Root needle', path: null },
   ]
   vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
@@ -155,17 +155,23 @@ it('shares only consecutive path headings without changing result order or keybo
 
   expect(screen.getAllByText('Project')).toHaveLength(2)
   expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-    ...results.slice(0, 4).map((item) => item.text),
+    'Project',
+    results[0]!.text,
+    results[1]!.text,
+    'Other',
+    results[2]!.text,
+    'Project',
+    results[3]!.text,
     'Root needle',
   ])
   expect(screen.getAllByRole('option')[1]).toHaveAccessibleDescription('Project')
-  expect(screen.getAllByRole('option')[3]).toHaveAccessibleDescription('Project')
+  expect(screen.getAllByRole('option')[6]).toHaveAccessibleDescription('Project')
 
   fireEvent.keyDown(input, { key: 'ArrowDown' })
   fireEvent.keyDown(input, { key: 'ArrowDown' })
   fireEvent.keyDown(input, { key: 'Enter' })
 
-  expect(store.visitRecentNode).toHaveBeenCalledWith('c')
+  expect(store.visitRecentNode).toHaveBeenCalledWith('other')
 })
 
 // @requirement PRODUCT.md §20.14

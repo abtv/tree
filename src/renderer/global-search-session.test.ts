@@ -28,6 +28,20 @@ function fixture() {
 }
 
 describe('global Search session', () => {
+  it('uses parent identity for adjacent headings with identical displayed paths', () => {
+    const { session, requests } = fixture()
+    session.edit('note')
+    requests[0]!.publish([
+      { id: 'a', text: 'First note', path: 'Project', parentId: 'first' },
+      { id: 'b', text: 'Second note', path: 'Project', parentId: 'second' },
+    ])
+
+    session.moveResult(1)
+
+    expect(session.getSnapshot()).toMatchObject({ selected: 1, selectedPart: 'heading' })
+    expect(session.takeResult()).toBe('second')
+  })
+
   it('keeps accepted completion dismissed through document refresh until editing or moving the caret', () => {
     const { session, source } = fixture()
     source.suggestions.mockReturnValue(['work', 'worker'])

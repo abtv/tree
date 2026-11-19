@@ -137,6 +137,8 @@ describeForEachEditingMode('People and events', ({ mode, screenshotName }) => {
       await query.press('Enter')
 
       await expect(window.getByRole('dialog', { name: 'Search', exact: true })).toHaveCount(0)
+      await expect(window.locator('[data-node-id="hidden"] .node-input')).toBeFocused()
+      await window.keyboard.press('Meta+,')
       const destination = window.getByRole('textbox', { name: 'Node 2', exact: true })
       await expect(destination).toBeFocused()
 

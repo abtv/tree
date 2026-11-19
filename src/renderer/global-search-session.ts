@@ -14,6 +14,7 @@ interface GlobalSearchSnapshot {
   readonly completedQuery: string
   readonly pending: boolean
   readonly selected: number
+  readonly selectedPart: 'node' | 'heading'
   readonly suggestions: readonly string[]
   readonly completionQuery: string
   readonly suggestionIndex: number
@@ -25,9 +26,20 @@ const closed: GlobalSearchSnapshot = {
   completedQuery: '',
   pending: false,
   selected: 0,
+  selectedPart: 'node',
   suggestions: [],
   completionQuery: '',
   suggestionIndex: 0,
+}
+
+export function startsSearchGroup(items: readonly RecentNode[], index: number): boolean {
+  const item = items[index]!
+  const previous = items[index - 1]
+  return item.path !== previous?.path || item.parentId !== previous?.parentId
+}
+
+function hasGroupHeading(items: readonly RecentNode[], index: number): boolean {
+  return items[index]!.path !== null && startsSearchGroup(items, index)
 }
 
 /** Owns one global Search session; DOM focus and result geometry remain with its adapter. */
@@ -79,6 +91,7 @@ export class GlobalSearchSession {
       ...this.snapshot,
       query,
       selected: 0,
+      selectedPart: 'node',
       suggestionIndex: 0,
       completionQuery: completion?.text ?? '',
       suggestions:
@@ -150,20 +163,32 @@ export class GlobalSearchSession {
   }
 
   public moveResult(direction: -1 | 1): void {
-    if (this.snapshot.pending || this.snapshot.items === undefined) return
+    const { items, selected, selectedPart, pending } = this.snapshot
+    if (pending || !items?.length) return
+    if (direction === 1 && selectedPart === 'heading') {
+      this.set({ ...this.snapshot, selectedPart: 'node' })
+      return
+    }
+    if (direction === -1 && selectedPart === 'node' && hasGroupHeading(items, selected)) {
+      this.set({ ...this.snapshot, selectedPart: 'heading' })
+      return
+    }
+    const next = moveSuggestionIndex(selected, direction, items.length)
     this.set({
       ...this.snapshot,
-      selected: moveSuggestionIndex(this.snapshot.selected, direction, this.snapshot.items.length),
+      selected: next,
+      selectedPart: direction === 1 && hasGroupHeading(items, next) ? 'heading' : 'node',
     })
   }
 
   /** Close before the adapter finishes buffered edits: that can synchronously refresh the document. */
-  public takeResult(index = this.snapshot.selected): string | undefined {
+  public takeResult(index = this.snapshot.selected, part = this.snapshot.selectedPart): string | undefined {
     if (this.snapshot.pending) return undefined
     const item = this.snapshot.items?.[index]
-    if (item === undefined) return undefined
+    const target = part === 'heading' ? item?.parentId : item?.id
+    if (target === undefined) return undefined
     this.close()
-    return item.id
+    return target
   }
 
   private cancel(): void {

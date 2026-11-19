@@ -13,7 +13,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { TextMatch } from '../domain/text-search'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
-import { GlobalSearchSession } from './global-search-session'
+import { GlobalSearchSession, startsSearchGroup } from './global-search-session'
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
@@ -23,7 +23,8 @@ import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
 
 const RESULT_EDGE_INSET = 12
-const RESULT_GROUP_HEADING_ESTIMATE = 39
+const RESULT_KEYS = '↑↓ Select   ↵ Open   Esc Close'
+const SUGGESTION_KEYS = '↑↓ Select   ↵/Tab Apply   Esc Close'
 
 function updateResultEdges(element: HTMLElement): void {
   element.toggleAttribute('data-scroll-before', element.scrollTop > 1)
@@ -83,7 +84,7 @@ function SearchResultText({
     previousMatches.current = matches
     // Selection already reveals ready matches; only newly computed highlights need another pass.
     if (!changed) return
-    const row = firstMatch.current?.closest<HTMLElement>('.recent-node-row')
+    const row = firstMatch.current?.closest<HTMLElement>('[role="option"]')
     if (active && row) onReveal()
   }, [active, matches, onReveal])
 
@@ -145,8 +146,17 @@ export function GlobalSearchPopup({
       }),
     [store],
   )
-  const { items, selected, query, completedQuery, completionQuery, suggestions, suggestionIndex, pending } =
-    useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const {
+    items,
+    selected,
+    selectedPart,
+    query,
+    completedQuery,
+    completionQuery,
+    suggestions,
+    suggestionIndex,
+    pending,
+  } = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const [windowTop, setWindowTop] = useState(0)
   const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
   const [measurement, setMeasurement] = useState<{
@@ -160,8 +170,9 @@ export function GlobalSearchPopup({
     () =>
       computeOffsets(
         items?.map((item, index) => {
-          const startsGroup = item.path !== null && item.path !== items[index - 1]?.path
-          return heights.get(item.id) ?? ROW_HEIGHT_ESTIMATE + (startsGroup ? RESULT_GROUP_HEADING_ESTIMATE : 0)
+          const startsGroup = startsSearchGroup(items, index)
+          const heading = startsGroup && item.path !== null ? ROW_HEIGHT_ESTIMATE : 0
+          return heights.get(item.id) ?? ROW_HEIGHT_ESTIMATE + heading
         }) ?? [],
       ),
     [items, heights],
@@ -213,8 +224,8 @@ export function GlobalSearchPopup({
     })
     if (caret !== undefined) input.current?.setSelectionRange(caret, caret)
   }
-  const visit = (index?: number): void => {
-    const id = session.takeResult(index)
+  const visit = (index?: number, part = selectedPart): void => {
+    const id = session.takeResult(index, part)
     if (id === undefined) return
     restore.current()
     beforeVisit()
@@ -358,7 +369,7 @@ export function GlobalSearchPopup({
     if (element === null) return
     const center = (): void => {
       element.style.removeProperty('--search-top')
-      const top = Math.max(40, (window.innerHeight - element.getBoundingClientRect().height) / 2)
+      const top = (window.innerHeight - element.getBoundingClientRect().height) / 2
       element.style.setProperty('--search-top', `${top}px`)
     }
     center()
@@ -378,7 +389,7 @@ export function GlobalSearchPopup({
 
   useLayoutEffect(() => {
     revealPending.current = !pending && suggestions.length === 0
-  }, [items, selected, pending, suggestions.length])
+  }, [items, selected, selectedPart, pending, suggestions.length])
 
   useLayoutEffect(() => {
     const element = panel.current
@@ -457,7 +468,7 @@ export function GlobalSearchPopup({
       if (top !== windowTop) setWindowTop(top)
       else revealPending.current = false
     }
-  }, [items, selected, pending, suggestions.length, windowTop, layout, revealRevision])
+  }, [items, selected, selectedPart, pending, suggestions.length, windowTop, layout, revealRevision])
 
   useEffect(() => {
     if (!open) return
@@ -484,7 +495,6 @@ export function GlobalSearchPopup({
   const displayedQuery = pending ? completedQuery : query
   return (
     <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
-      <div className="recent-nodes-title">Search</div>
       <SearchQueryInput
         ref={input}
         type="search"
@@ -559,9 +569,11 @@ export function GlobalSearchPopup({
             <output
               className="node-search-position"
               aria-label="Result position"
-              title={`Result ${selected + 1} of ${items.length}`}
+              title={selectedPart === 'heading' ? 'Parent group' : `Result ${selected + 1} of ${items.length}`}
             >
-              {selected + 1} / {items.length}
+              {selectedPart === 'heading'
+                ? `${items.length} ${items.length === 1 ? 'result' : 'results'}`
+                : `${selected + 1} / ${items.length}`}
             </output>
           )}
         </div>
@@ -579,7 +591,7 @@ export function GlobalSearchPopup({
           flushSync(() => setWindowTop(event.currentTarget.scrollTop))
         }}
         data-editor-focus-borrow=""
-        aria-activedescendant={items[selected] === undefined ? undefined : `recent-node-${selected}`}
+        aria-activedescendant={items[selected] === undefined ? undefined : `recent-${selectedPart}-${selected}`}
       >
         {items.length === 0 ? (
           suggestions.length > 0 ? null : (
@@ -596,7 +608,10 @@ export function GlobalSearchPopup({
             <div style={{ position: 'sticky', top: 0, height: 0 }}>
               {renderedIndices.map((index) => {
                 const item = items[index]!
-                const startsGroup = item.path !== null && item.path !== items[index - 1]?.path
+                const startsGroup = startsSearchGroup(items, index)
+                const active = suggestions.length === 0 && index === selected
+                const headingSelected = active && selectedPart === 'heading'
+                const nodeSelected = active && selectedPart === 'node'
                 return (
                   <div
                     key={item.id}
@@ -610,49 +625,40 @@ export function GlobalSearchPopup({
                       boxSizing: 'border-box',
                     }}
                   >
+                    {startsGroup && index > 0 && <div className="recent-node-group-divider" aria-hidden="true" />}
                     {startsGroup && item.path !== null && (
                       <div
-                        className="recent-node-group-path recent-node-path"
-                        data-leading={index === 0 ? '' : undefined}
+                        id={`recent-heading-${index}`}
+                        role="option"
+                        aria-selected={headingSelected}
+                        className={`recent-node-group-path recent-node-path${headingSelected ? ' command-row-selected' : ''}`}
+                        onClick={() => visit(index, 'heading')}
                       >
                         <SearchResultText
                           text={item.path}
                           query={displayedQuery}
                           tagMatches={item.pathTagMatches}
                           struckMatches={item.pathStruckMatches}
-                          active={false}
+                          active={headingSelected && !pending}
                           onReveal={requestReveal}
                         />
                       </div>
                     )}
                     <div
                       id={`recent-node-${index}`}
-                      data-result-divider={
-                        index < items.length - 1 &&
-                        item.path === items[index + 1]?.path &&
-                        (suggestions.length > 0 || (index !== selected && index + 1 !== selected))
-                          ? ''
-                          : undefined
-                      }
                       role="option"
-                      aria-selected={suggestions.length === 0 && index === selected}
+                      aria-selected={nodeSelected}
                       aria-description={item.path ?? undefined}
-                      className={`recent-node-row${suggestions.length === 0 && index === selected ? ' command-row-selected' : ''}`}
-                      style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}
-                      onClick={() => visit(index)}
+                      className={`recent-node-row${nodeSelected ? ' command-row-selected' : ''}`}
+                      onClick={() => visit(index, 'node')}
                     >
                       <span className="recent-node-title-line">
-                        {item.starred ? (
-                          <span className="node-star" role="img" aria-label="Starred">
-                            ★
-                          </span>
-                        ) : null}
                         <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
                           <SearchResultText
                             text={item.text}
                             query={displayedQuery}
                             tagMatches={item.tagMatches}
-                            active={suggestions.length === 0 && index === selected && !pending}
+                            active={nodeSelected && !pending}
                             onReveal={requestReveal}
                           />
                         </span>
@@ -666,6 +672,11 @@ export function GlobalSearchPopup({
                             <OutlineRootIcon />
                           </span>
                         )}
+                        {item.starred && (
+                          <span className="node-star" role="img" aria-label="Starred">
+                            ★
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -676,15 +687,13 @@ export function GlobalSearchPopup({
         )}
       </div>
       <div className="node-search-footer">
-        <span>
-          {pending && suggestions.length === 0 ? (
-            <SearchPendingLabel previous="↑ ↓ select · Enter open · Esc close" />
-          ) : suggestions.length > 0 ? (
-            '↑ ↓ select · Enter/Tab apply · Esc close'
-          ) : (
-            '↑ ↓ select · Enter open · Esc close'
-          )}
-        </span>
+        {suggestions.length > 0 ? (
+          SUGGESTION_KEYS
+        ) : pending ? (
+          <SearchPendingLabel previous={RESULT_KEYS} />
+        ) : (
+          RESULT_KEYS
+        )}
       </div>
     </div>
   )

@@ -39,6 +39,7 @@ import {
   deleteSelectedTransition,
   deleteSiblingRangeTransition,
   enterTransition,
+  enteredNodeLocation,
   leaveTransition,
   moveHorizontalTransition,
   moveNodeToParentTransition,
@@ -1056,6 +1057,9 @@ export class EditorStore {
     const state = this.runtime.ready()
     const found = locateNode(state.document, nodeId)
     if (found === undefined || (state.hideFinishedTasks && found.node.struckThrough)) return
+    const location = found.node.children.length
+      ? enteredNodeLocation(found.node)
+      : { currentParentId: found.parent?.id ?? null, selectedNodeId: nodeId }
     this.endTextSession()
     this.hideSearch()
     const tree = { ...this.runtime.ready() }
@@ -1064,8 +1068,8 @@ export class EditorStore {
     this.runtime.replaceReady(
       {
         ...tree,
-        location: { currentParentId: found.parent?.id ?? null, selectedNodeId: nodeId },
-        focus: this.runtime.newFocus(nodeId, 0),
+        location,
+        focus: this.runtime.newFocus(location.selectedNodeId, 0),
       },
       true,
     )

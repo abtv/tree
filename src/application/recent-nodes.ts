@@ -8,6 +8,7 @@ export interface RecentNode {
   readonly id: string
   readonly text: string
   readonly path: string | null
+  readonly parentId?: string
   readonly tagMatches?: readonly TextMatch[]
   readonly pathTagMatches?: readonly TextMatch[]
   readonly struckThrough?: true
@@ -151,6 +152,7 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
     offset += length + 3
   }
   return {
+    ...(ancestors.length > 0 ? { parentId: ancestors[ancestors.length - 1]!.id } : {}),
     ...(node.struckThrough ? { struckThrough: true as const } : {}),
     ...(node.starred ? { starred: true as const } : {}),
     ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),

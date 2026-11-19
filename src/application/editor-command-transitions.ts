@@ -361,13 +361,16 @@ export function moveHorizontalTransition(
   return undefined
 }
 
+export function enteredNodeLocation(node: TreeNode): Location {
+  return { currentParentId: node.id, selectedNodeId: node.children[0]?.id ?? node.id }
+}
+
 export function enterTransition(document: Document, location: Location): LocationTransition | undefined {
   if (location.currentParentId === location.selectedNodeId) return undefined
-  const entered = requireNode(document, location.selectedNodeId).node
-  const selected = entered.children[0] ?? entered
+  const destination = enteredNodeLocation(requireNode(document, location.selectedNodeId).node)
   return {
-    location: { currentParentId: entered.id, selectedNodeId: selected.id },
-    focus: { nodeId: selected.id, cursor: 0 },
+    location: destination,
+    focus: { nodeId: destination.selectedNodeId, cursor: 0 },
   }
 }
 
