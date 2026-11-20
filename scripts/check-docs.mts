@@ -858,20 +858,24 @@ export function parseVerbatimArguments(args: string[]) {
     }
   }
   assertValidRef(options.ref)
-  if (
-    options.file !== undefined &&
-    (!/^[\w./-]+$/.test(options.file) ||
-      options.file.startsWith('/') ||
-      options.file.startsWith('-') ||
-      options.file.split('/').some((part) => part === '..' || part === '' || part === '.'))
-  ) {
-    throw new Error('Invalid repository-relative file')
-  }
+  assertValidFile(options.file)
   return { ...options, ref: options.ref }
 }
 
 function assertValidRef(ref: string | undefined): asserts ref is string {
   if (!ref || ref.startsWith('-') || !/^[\w./~^@{}-]+$/.test(ref)) throw new Error('Invalid git ref')
+}
+
+function assertValidFile(file: string | undefined) {
+  if (
+    file !== undefined &&
+    (!/^[\w./-]+$/.test(file) ||
+      file.startsWith('/') ||
+      file.startsWith('-') ||
+      file.split('/').some((part) => part === '..' || part === '' || part === '.'))
+  ) {
+    throw new Error('Invalid repository-relative file')
+  }
 }
 
 export function scanVerbatimUnits(content: string) {
@@ -1256,6 +1260,419 @@ export function formatVerbatimReport(report: ReturnType<typeof compareVerbatim>)
   return lines.join('\n')
 }
 
+// The detail comparison lists three classes of exact text that a rewrite must keep or account for:
+// literals (code spans, bold labels, and numbers with their units), table cells, and section references.
+// It shows differences and does not judge them.
+
+export interface DetailLocation {
+  path: string
+  section: string
+  line: number
+  column?: string | undefined
+}
+
+export interface DetailLiteral extends DetailLocation {
+  kind: 'code' | 'bold' | 'number'
+  text: string
+}
+
+export interface DetailRow extends DetailLocation {
+  header: string[]
+  cells: string[]
+}
+
+export interface DetailReference extends DetailLocation {
+  reference: string
+  sentence: string
+  context: string
+}
+
+interface DetailText extends DetailLocation {
+  text: string
+}
+
+const TABLE_SEPARATOR_CELL = /^:?-{3,}:?$/u
+const CODE_SPAN = /(`+)(.+?)\1/gu
+const BOLD_SPAN = /\*\*([^*]+)\*\*/gu
+const SECTION_RANGE = String.raw`\d+(?:\.\d+)*(?:\s*[–-]\s*\d+(?:\.\d+)*)?`
+const SECTION_REFERENCE = new RegExp(
+  String.raw`(?:${'`'}?[\w./-]+\.md${'`'}?\s+)?(?:§§${SECTION_RANGE}(?:(?:,\s*|,?\s+and\s+)${SECTION_RANGE})*|§${SECTION_RANGE})`,
+  'gu',
+)
+const NUMBER_WORDS =
+  'zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million'
+const NUMBER_WORD = new RegExp(`^(?:${NUMBER_WORDS})(?:-\\p{L}+)*$`, 'iu')
+const PURE_NUMBER = new RegExp(`^(?:\\d+(?:[.,]\\d+)*|${NUMBER_WORDS})$`, 'iu')
+const NOT_A_UNIT = /^(?:a|an|and|are|as|at|by|for|from|in|is|of|on|or|than|that|the|to|with)$/iu
+const LEADING_PUNCTUATION = /^[([{"'“‘«]+/u
+const TRAILING_PUNCTUATION = /[)\]}"'”’»,.;:!?…]+$/u
+const SENTENCE_BREAK = /(?<=[.!?])\s+(?=[^a-z\s])/gu
+
+// A private-use character keeps the length of the text, so sentence bounds still apply to the original.
+const CODE_MASK = String.fromCodePoint(0xe000)
+const maskCodeSpans = (text: string) => text.replace(CODE_SPAN, (span) => CODE_MASK.repeat(span.length))
+
+function splitTableRow(row: string) {
+  return row
+    .trim()
+    .replace(/^\|/u, '')
+    .replace(/(?<!\\)\|$/u, '')
+    .split(/(?<!\\)\|/u)
+    .map((cell) => cell.trim().replace(/\s+/gu, ' '))
+}
+
+function unnumberedHeadings(lines: ProductLine[]) {
+  const headings: { line: number; text: string }[] = []
+  let fence: { character: string; length: number } | undefined
+  const cleanLines = stripProductComments(lines.map(({ text }) => text).join('\n')).split('\n')
+  for (const [index, line] of cleanLines.entries()) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line)
+    if (fenceMatch) {
+      if (!fence) fence = { character: fenceMatch[1]![0]!, length: fenceMatch[1]!.length }
+      else if (fenceMatch[1]![0] === fence.character && fenceMatch[1]!.length >= fence.length) fence = undefined
+      continue
+    }
+    const heading = !fence && /^#{1,6}\s+(.+)$/u.exec(line.trim())
+    if (heading) headings.push({ line: lines[index]!.number, text: heading[1]!.trim() })
+  }
+  return headings
+}
+
+// Splits one specification file into located text units and table rows. Text before the first numbered
+// heading has the section ''. Fenced blocks and comments are skipped; --verbatim compares fences exactly.
+export function scanDetailDocument({ path, content }: { path: string; content: string }) {
+  const texts: DetailText[] = []
+  const rows: DetailRow[] = []
+  const sections = scanProductSections(content)
+  const allLines = content.split(/\r?\n/u)
+  const segments = [
+    {
+      section: '',
+      heading: undefined as { line: number; text: string } | undefined,
+      lines: allLines
+        .slice(0, sections[0] ? sections[0].startLine - 1 : allLines.length)
+        .map((text, index) => ({ number: index + 1, text })),
+    },
+    ...sections.map((section) => ({
+      section: section.id,
+      heading: { line: section.startLine, text: section.title },
+      lines: section.lines,
+    })),
+  ]
+  for (const { section, heading, lines } of segments) {
+    const segmentTexts: DetailText[] = []
+    if (heading) segmentTexts.push({ path, section, line: heading.line, text: heading.text })
+    for (const { line, text } of unnumberedHeadings(lines)) segmentTexts.push({ path, section, line, text })
+    const tables: { startLine: number; text: string }[][] = []
+    let previousRow = -1
+    for (const block of scanProductBlocks(lines)) {
+      if (block.kind !== 'table row') {
+        segmentTexts.push({ path, section, line: block.startLine, text: block.text })
+        continue
+      }
+      if (block.startLine === previousRow + 1) tables.at(-1)!.push(block)
+      else tables.push([block])
+      previousRow = block.startLine
+    }
+    for (const table of tables) {
+      const hasHeader =
+        table.length > 1 && splitTableRow(table[1]!.text).every((cell) => TABLE_SEPARATOR_CELL.test(cell))
+      const header = hasHeader ? splitTableRow(table[0]!.text) : []
+      for (const cell of header) segmentTexts.push({ path, section, line: table[0]!.startLine, text: cell })
+      for (const row of table.slice(hasHeader ? 2 : 0)) {
+        const cells = splitTableRow(row.text)
+        const columns = cells.map((_cell, index) => header[index] || `column ${index + 1}`)
+        rows.push({ path, section, line: row.startLine, header: columns, cells })
+        for (const [index, cell] of cells.entries()) {
+          segmentTexts.push({ path, section, line: row.startLine, column: columns[index], text: cell })
+        }
+      }
+    }
+    texts.push(...segmentTexts.sort((left, right) => left.line - right.line))
+  }
+  return { texts, rows }
+}
+
+// Code spans, bold spans, and numbers outside them. A number is a token that contains a digit or a
+// number word. A bare number takes the following word as its unit ("25 px", "3 attempts").
+export function extractDetailLiterals(text: string) {
+  const literals: { kind: DetailLiteral['kind']; text: string }[] = []
+  for (const match of text.matchAll(CODE_SPAN)) literals.push({ kind: 'code', text: match[0] })
+  const masked = maskCodeSpans(text)
+  for (const match of masked.matchAll(BOLD_SPAN)) {
+    literals.push({ kind: 'bold', text: text.slice(match.index, match.index + match[0].length) })
+  }
+  const tokens = masked
+    .replace(BOLD_SPAN, ' ')
+    .replace(/\]\([^)\s]*\)/gu, ']')
+    .replace(/<https?:[^>]*>|\bhttps?:\/\/\S+/gu, ' ')
+    .replace(SECTION_REFERENCE, ' ')
+    .replaceAll(CODE_MASK, ' ')
+    .split(/\s+/u)
+    .filter(Boolean)
+  for (const [index, raw] of tokens.entries()) {
+    const core = raw.replace(LEADING_PUNCTUATION, '').replace(TRAILING_PUNCTUATION, '')
+    const digits = /\d/u.test(core)
+    if (!digits && !NUMBER_WORD.test(core)) continue
+    let literal = digits ? core : core.toLowerCase()
+    const next = tokens[index + 1]
+    if (PURE_NUMBER.test(core) && raw.endsWith(core) && next !== undefined && !LEADING_PUNCTUATION.test(next)) {
+      const unit = next.replace(TRAILING_PUNCTUATION, '')
+      if (/^(?:%|\p{L})/u.test(unit) && !NOT_A_UNIT.test(unit)) literal += ` ${unit}`
+    }
+    literals.push({ kind: 'number', text: literal })
+  }
+  return literals
+}
+
+// Section references with the sentence that holds them. The context is the sentence with every reference
+// replaced by "§"; two references in the same section and context are one retargeted reference.
+export function extractDetailReferences(text: string) {
+  const references: { reference: string; sentence: string; context: string }[] = []
+  const searchable = text.replace(CODE_SPAN, (span) => (span.includes('§') ? ' '.repeat(span.length) : span))
+  const bounds = [0]
+  for (const match of maskCodeSpans(text).matchAll(SENTENCE_BREAK))
+    bounds.push(match.index, match.index + match[0].length)
+  bounds.push(text.length)
+  for (let index = 0; index < bounds.length; index += 2) {
+    const part = searchable.slice(bounds[index], bounds[index + 1])
+    const context = part.replace(SECTION_REFERENCE, '§').replace(/\s+/gu, ' ').trim()
+    const sentence = text.slice(bounds[index], bounds[index + 1]).trim()
+    for (const match of part.matchAll(SECTION_REFERENCE)) {
+      references.push({ reference: match[0].replaceAll('`', '').replace(/\s+/gu, ' '), sentence, context })
+    }
+  }
+  return references
+}
+
+function pairBy<T>(oldUnits: T[], newUnits: T[], key: (unit: T) => string) {
+  const queues = new Map<string, T[]>()
+  for (const unit of newUnits) {
+    const queue = queues.get(key(unit))
+    if (queue) queue.push(unit)
+    else queues.set(key(unit), [unit])
+  }
+  const pairs: { before: T; after: T }[] = []
+  const oldLeft: T[] = []
+  const used = new Set<T>()
+  for (const unit of oldUnits) {
+    const partner = queues.get(key(unit))?.shift()
+    if (partner === undefined) oldLeft.push(unit)
+    else {
+      pairs.push({ before: unit, after: partner })
+      used.add(partner)
+    }
+  }
+  return { pairs, oldLeft, newLeft: newUnits.filter((unit) => !used.has(unit)) }
+}
+
+// Pairs a changed row with the row of the same table that shares most of its cells, when more than half match.
+function pairSimilarRows(oldRows: DetailRow[], newRows: DetailRow[], table: (row: DetailRow) => string) {
+  const pairs: { before: DetailRow; after: DetailRow }[] = []
+  const oldLeft: DetailRow[] = []
+  const remaining = [...newRows]
+  for (const row of oldRows) {
+    let best = -1
+    let bestScore = 0
+    for (const [index, candidate] of remaining.entries()) {
+      if (table(candidate) !== table(row)) continue
+      const score = row.cells.filter((cell, column) => cell === candidate.cells[column]).length
+      if (score > bestScore) {
+        best = index
+        bestScore = score
+      }
+    }
+    if (best !== -1 && bestScore * 2 > Math.max(row.cells.length, remaining[best]!.cells.length)) {
+      pairs.push({ before: row, after: remaining.splice(best, 1)[0]! })
+    } else oldLeft.push(row)
+  }
+  return { pairs, oldLeft, newLeft: remaining }
+}
+
+const byLocation = (left: DetailLocation, right: DetailLocation) =>
+  left.path === right.path ? left.line - right.line : left.path < right.path ? -1 : 1
+
+export function compareDetails({
+  before,
+  after,
+}: {
+  before: { path: string; content: string }[]
+  after: { path: string; content: string }[]
+}) {
+  const scan = (documents: { path: string; content: string }[]) => {
+    const literals: DetailLiteral[] = []
+    const rows: DetailRow[] = []
+    const references: DetailReference[] = []
+    for (const document of documents) {
+      const scanned = scanDetailDocument(document)
+      rows.push(...scanned.rows)
+      for (const { text, ...location } of scanned.texts) {
+        for (const literal of extractDetailLiterals(text)) literals.push({ ...location, ...literal })
+        for (const reference of extractDetailReferences(text)) references.push({ ...location, ...reference })
+      }
+    }
+    return { literals, rows, references }
+  }
+  const oldSide = scan(before)
+  const newSide = scan(after)
+
+  // An item that keeps its section is unchanged; the same item in another section has moved.
+  const literal = (unit: DetailLiteral) => `${unit.kind}\u0000${unit.text}`
+  const keptLiterals = pairBy(oldSide.literals, newSide.literals, (unit) => `${unit.section}\u0001${literal(unit)}`)
+  const literals = pairBy(keptLiterals.oldLeft, keptLiterals.newLeft, literal)
+
+  const content = (row: DetailRow) => JSON.stringify([row.header, row.cells])
+  const table = (row: DetailRow) => JSON.stringify([row.section, row.header])
+  const keptRows = pairBy(oldSide.rows, newSide.rows, (row) => `${row.section}\u0001${content(row)}`)
+  const movedRows = pairBy(keptRows.oldLeft, keptRows.newLeft, content)
+  const sameName = pairBy(movedRows.oldLeft, movedRows.newLeft, (row) => `${table(row)}\u0001${row.cells[0] ?? ''}`)
+  const similar = pairSimilarRows(sameName.oldLeft, sameName.newLeft, table)
+  const changed = [...sameName.pairs, ...similar.pairs].flatMap(({ before: oldRow, after: newRow }) =>
+    Array.from({ length: Math.max(oldRow.cells.length, newRow.cells.length) }, (_value, index) => ({
+      before: { ...oldRow, column: oldRow.header[index] ?? newRow.header[index]! },
+      after: { ...newRow, column: newRow.header[index] ?? oldRow.header[index]! },
+      row: newRow.cells[0] ?? '',
+      oldText: oldRow.cells[index] ?? '',
+      newText: newRow.cells[index] ?? '',
+    })).filter(({ oldText, newText }) => oldText !== newText),
+  )
+
+  const place = (unit: DetailReference) => `${unit.section}\u0001${unit.context}`
+  const keptInSentence = pairBy(
+    oldSide.references,
+    newSide.references,
+    (unit) => `${place(unit)}\u0001${unit.reference}`,
+  )
+  const retargeted = pairBy(keptInSentence.oldLeft, keptInSentence.newLeft, place)
+  const keptInSection = pairBy(
+    retargeted.oldLeft,
+    retargeted.newLeft,
+    (unit) => `${unit.section}\u0001${unit.reference}`,
+  )
+  const references = pairBy(keptInSection.oldLeft, keptInSection.newLeft, (unit) => unit.reference)
+
+  const sortPairs = <T extends DetailLocation>(pairs: { before: T; after: T }[]) =>
+    pairs.sort((left, right) => byLocation(left.after, right.after))
+  return {
+    literals: {
+      removed: literals.oldLeft.sort(byLocation),
+      added: literals.newLeft.sort(byLocation),
+      moved: sortPairs(literals.pairs),
+    },
+    cells: {
+      changed: changed.sort((left, right) => byLocation(left.after, right.after)),
+      rowsRemoved: similar.oldLeft.sort(byLocation),
+      rowsAdded: similar.newLeft.sort(byLocation),
+      rowsMoved: sortPairs(movedRows.pairs),
+    },
+    references: {
+      removed: references.oldLeft.sort(byLocation),
+      added: references.newLeft.sort(byLocation),
+      retargeted: sortPairs(retargeted.pairs),
+      moved: sortPairs(references.pairs),
+    },
+  }
+}
+
+// Moves are listed but do not fail the comparison, as in --verbatim.
+export function detailChangeCount(report: ReturnType<typeof compareDetails>) {
+  const { literals, cells, references } = report
+  return (
+    literals.removed.length +
+    literals.added.length +
+    cells.changed.length +
+    cells.rowsRemoved.length +
+    cells.rowsAdded.length +
+    references.removed.length +
+    references.added.length +
+    references.retargeted.length
+  )
+}
+
+export function formatDetailsReport(report: ReturnType<typeof compareDetails>) {
+  const { literals, cells, references } = report
+  const text = JSON.stringify
+  const at = (unit: DetailLocation) =>
+    `${unit.path}:${unit.line} ${unit.section === '' ? '(no section)' : `§${unit.section}`}${
+      unit.column === undefined ? '' : ` column ${text(unit.column)}`
+    }`
+  const base = (unit: DetailLocation) => `(base ${unit.path}:${unit.line})`
+  const row = (unit: DetailRow) => unit.cells.map((cell, index) => `${unit.header[index]}: ${text(cell)}`).join(', ')
+  const lines = [
+    `Detail comparison: literals removed ${literals.removed.length}, added ${literals.added.length}, moved ${literals.moved.length}; table cells changed ${cells.changed.length}, rows removed ${cells.rowsRemoved.length}, rows added ${cells.rowsAdded.length}, rows moved ${cells.rowsMoved.length}; references removed ${references.removed.length}, added ${references.added.length}, retargeted ${references.retargeted.length}, moved ${references.moved.length}.`,
+  ]
+  for (const unit of literals.removed) lines.push(`Literal removed ${at(unit)} ${unit.kind}: ${text(unit.text)}`)
+  for (const unit of literals.added) lines.push(`Literal added ${at(unit)} ${unit.kind}: ${text(unit.text)}`)
+  for (const { before, after } of literals.moved) {
+    lines.push(`Literal moved ${at(before)} -> ${at(after)} ${after.kind}: ${text(after.text)}`)
+  }
+  for (const change of cells.changed) {
+    lines.push(
+      `Cell changed ${at(change.after)} ${base(change.before)} row ${text(change.row)}: ${text(change.oldText)} -> ${text(change.newText)}`,
+    )
+  }
+  for (const unit of cells.rowsRemoved) lines.push(`Row removed ${at(unit)}: ${row(unit)}`)
+  for (const unit of cells.rowsAdded) lines.push(`Row added ${at(unit)}: ${row(unit)}`)
+  for (const { before, after } of cells.rowsMoved) {
+    lines.push(`Row moved ${at(before)} -> ${at(after)}: row ${text(after.cells[0] ?? '')}`)
+  }
+  for (const unit of references.removed) {
+    lines.push(`Reference removed ${at(unit)}: ${text(unit.reference)} in ${text(unit.sentence)}`)
+  }
+  for (const unit of references.added) {
+    lines.push(`Reference added ${at(unit)}: ${text(unit.reference)} in ${text(unit.sentence)}`)
+  }
+  for (const { before, after } of references.retargeted) {
+    lines.push(
+      `Reference retargeted ${at(after)} ${base(before)}: ${text(before.reference)} -> ${text(after.reference)} in ${text(after.sentence)}`,
+    )
+  }
+  for (const { before, after } of references.moved) {
+    lines.push(`Reference moved ${at(before)} -> ${at(after)}: ${text(after.reference)} in ${text(after.sentence)}`)
+  }
+  return lines.join('\n')
+}
+
+export function parseDetailsArguments(args: string[]) {
+  const options: { ref: string | undefined; file: string | undefined } = { ref: undefined, file: undefined }
+  const seen = new Set()
+  for (let index = 0; index < args.length; index += 2) {
+    const option = args[index]!
+    const value = args[index + 1]
+    if (!['--details', '--file'].includes(option) || seen.has(option) || value === undefined) {
+      throw new Error('Usage: --details <git-ref> [--file <repository-relative-file>]')
+    }
+    seen.add(option)
+    if (option === '--details') options.ref = value
+    else options.file = value
+  }
+  assertValidRef(options.ref)
+  assertValidFile(options.file)
+  return { ...options, ref: options.ref }
+}
+
+// Without --file each side is the whole specification, as in the default --verbatim form.
+export function runDetails({
+  ref,
+  file,
+  rootDirectory = ROOT,
+}: {
+  ref: string
+  file?: string | undefined
+  rootDirectory?: string
+}) {
+  parseDetailsArguments(['--details', ref, ...(file === undefined ? [] : ['--file', file])])
+  const report = compareDetails(
+    file === undefined
+      ? { before: readSpecificationAtRef(rootDirectory, ref), after: readSpecificationInWorkingTree(rootDirectory) }
+      : {
+          before: [{ path: file, content: gitShow(rootDirectory, ref, file) }],
+          after: [{ path: file, content: readWorkingFile(rootDirectory, file) }],
+        },
+  )
+  return { report, exitCode: detailChangeCount(report) === 0 ? 0 : 1 }
+}
+
 export function main(args = process.argv.slice(2)) {
   let group: CheckGroup | undefined
   if (args[0] === '--group') {
@@ -1271,6 +1688,15 @@ export function main(args = process.argv.slice(2)) {
       return result.exitCode
     } catch (error) {
       console.error(`Ordered comparison failed: ${error instanceof Error ? error.message : String(error)}`)
+      return 2
+    }
+  } else if (args[0] === '--details') {
+    try {
+      const result = runDetails(parseDetailsArguments(args))
+      console.log(formatDetailsReport(result.report))
+      return result.exitCode
+    } catch (error) {
+      console.error(`Detail comparison failed: ${error instanceof Error ? error.message : String(error)}`)
       return 2
     }
   } else if (args.length > 0) {

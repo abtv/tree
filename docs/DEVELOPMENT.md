@@ -1203,6 +1203,66 @@ the first line counts differing lines. A section that is missing, extra, or defi
 twice is a structural problem. Exit 0 requires no problem and at most the number of
 differing lines given by `--allow-differences <n>`, default 0. Invalid refs exit 2.
 
+`npm run check:docs -- --details <ref>` lists the exact text that a rewrite of the
+specification must keep or account for. It reads the specification at that revision and
+in the working tree as the default `--verbatim` form does; `--file <path>` narrows both
+sides to one file. It skips fenced blocks and comments, which `--verbatim` compares
+exactly. It reports three classes separately and shows differences without judging them:
+
+* Literals: code spans, bold spans, and numbers. A number is a token that contains a
+  digit, such as `27px`, `p99`, or `Cmd+0`, or an English number word such as `three` or
+  `two-line`. A number that stands alone takes the next word as its unit, such as
+  `25 px` or `3 attempts`, except a function word such as "of" or "the". Section
+  references in a `§` form, link targets, autolinks, bare URLs, and list markers are not
+  literals. A section number without `§`, such as an entry of the Section Map in
+  `docs/PRODUCT.md`, is a literal, so a new index entry such as `9.4` is reported.
+* Table cells: every body row of every table, matched with its old row by section,
+  header, and first cell, or else by a majority of equal cells. Each changed cell prints
+  its column header and its old and new text. A row without a match prints every cell
+  with its column header.
+* Section references: `§N`, `§N–M`, `§§N and M`, and the same forms after a document
+  name such as `AGENTS.md`, each printed with its sentence. References inside code spans
+  are ignored. A reference whose sentence is otherwise unchanged but whose target changed
+  is reported once as retargeted.
+
+Every item names its file, line, and numbered section, "(no section)" before the first
+numbered heading, and its table column when it is in a cell. A removed item's line is in
+the revision and an added item's line is in the working tree; a changed cell and a
+retargeted reference print the working-tree location and the revision line as `(base
+<file>:<line>)`. An item that stays in its numbered section is unchanged, even when it
+moves within the section or the section moves to another file. An item that leaves its
+section and appears unchanged in another section is listed once as moved, with both
+locations, and not as removed and added. "Moved" means only that an equal item
+disappeared from one section and appeared in another; it does not prove that the same
+statement moved. Check every moved item against a moved or merged clause of the
+`--verbatim` report. The first line counts each class, for example
+`Detail comparison: literals removed 0, added 0, moved 0; table cells changed 0, rows
+removed 0, rows added 0, rows moved 0; references removed 2, added 3, retargeted 0, moved
+0.` Item lines follow in class order: `Literal removed`, `Literal added`, `Literal
+moved`, `Cell changed`, `Row removed`, `Row added`, `Row moved`, `Reference removed`,
+`Reference added`, `Reference retargeted`, and `Reference moved`. Exit 0 requires no
+removed, added, changed, or retargeted item; moved items alone exit 0, as in
+`--verbatim`. Any other item exits 1, and invalid arguments, refs, or files exit 2.
+
+The detail comparison does not detect:
+
+* a literal or reference that leaves one sentence and reappears in another sentence of
+  the same numbered section, or any change of order within a section;
+* interface text that is plain prose, italic, or quoted rather than bold, coded, or in a
+  table cell; `--verbatim` reports the clause that holds it;
+* key names without digits written as plain prose, ordinal words such as "first", and
+  quantity words such as "single", "both", or "once";
+* references written in words, such as "the rule above"; `--verbatim` lists antecedents;
+* the meaning of a changed cell or reference: a retargeted reference may narrow its scope,
+  and a reworded sentence that changes its reference reports it as removed and added;
+* a changed table header as one change: every row of that table is reported as removed
+  and added;
+* whether a moved item is the same statement: an equal item removed from one section and
+  an unrelated equal item added to another section are shown as one move;
+* changes inside fenced blocks, comments, link targets, autolinks such as
+  `<https://…>`, or bare URLs; `--verbatim` still reports the changed clause that holds
+  them.
+
 Preserve every sentence's characters, inline code, links, numbers, and references
 when restructuring PRODUCT.md. Add Title Case headings and `*` list markers;
 allowed wording changes are added lead-ins ending in `:`, replacing a leading

@@ -5,8 +5,13 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   conformanceCitationMatches,
+  compareDetails,
   compareOrderedSections,
   compareVerbatim,
+  detailChangeCount,
+  extractDetailLiterals,
+  extractDetailReferences,
+  formatDetailsReport,
   formatOrderedReport,
   formatVerbatimReport,
   extractTestTitles,
@@ -18,9 +23,11 @@ import {
   findStaleConformanceCitations,
   findTextBeforeFirstSection,
   parseConformanceCitations,
+  parseDetailsArguments,
   parseOrderedArguments,
   parseVerbatimArguments,
   runChecks,
+  runDetails,
   runOrdered,
   runVerbatim,
   main,
@@ -1264,5 +1271,341 @@ describe('ordered comparison of numbered sections', () => {
 
     expect(result.status).toBe(2)
     expect(result.stderr).toContain('Ordered comparison failed:')
+  })
+})
+
+describe('detail comparison of literals, table cells, and section references', () => {
+  const emptyCounts = (references: string) =>
+    `Detail comparison: literals removed 0, added 0, moved 0; table cells changed 0, rows removed 0, rows added 0, rows moved 0; references ${references}.`
+  const compareFile = (path: string, before: string, after: string) =>
+    compareDetails({ before: [{ path, content: before }], after: [{ path, content: after }] })
+
+  // Rows copied from the command registry of §20.2.30 in docs/product/command-panel.md.
+  const registryPath = 'docs/product/command-panel.md'
+  const registryHeader = [
+    '| Name | Alias | Description | Active state | Shortcut | Effect |',
+    '| --- | --- | --- | --- | --- | --- |',
+  ]
+  const findRow = '| `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |'
+  const showAgendaRow =
+    '| `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |'
+  const showTreeRow =
+    '| `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |'
+  const registry = ({ find = findRow, showAgenda = showAgendaRow } = {}) =>
+    [
+      '# Command Panel',
+      '',
+      '#### 20.2.30 Command Registry',
+      '',
+      ...registryHeader,
+      find,
+      showAgenda,
+      showTreeRow,
+      '',
+    ].join('\n')
+  const compareRegistry = (changes: { find?: string; showAgenda?: string }) =>
+    compareFile(registryPath, registry(), registry(changes))
+
+  it('reports nothing and counts no change for an unchanged specification', () => {
+    const result = compareRegistry({})
+
+    expect(formatDetailsReport(result)).toBe(emptyCounts('removed 0, added 0, retargeted 0, moved 0'))
+    expect(detailChangeCount(result)).toBe(0)
+  })
+
+  it('reports a changed Description cell of the find command with its column', () => {
+    const result = compareRegistry({ find: findRow.replace('Find in the current view', 'Find in this view') })
+
+    expect(formatDetailsReport(result)).toBe(
+      [
+        'Detail comparison: literals removed 0, added 0, moved 0; table cells changed 1, rows removed 0, rows added 0, rows moved 0; references removed 0, added 0, retargeted 0, moved 0.',
+        'Cell changed docs/product/command-panel.md:7 §20.2.30 column "Description" (base docs/product/command-panel.md:7) row "`find`": "Find in the current view" -> "Find in this view"',
+      ].join('\n'),
+    )
+    expect(detailChangeCount(result)).toBe(1)
+  })
+
+  it('reports a reworded Effect cell of show-agenda and leaves its unchanged cells and reference out', () => {
+    const reworded = showAgendaRow.replace(
+      'Open Agenda using the existing origin/caret navigation (§23);',
+      'Open Agenda; the origin and the caret follow §23;',
+    )
+
+    const result = compareRegistry({ showAgenda: reworded })
+
+    expect(formatDetailsReport(result)).toBe(
+      [
+        'Detail comparison: literals removed 0, added 0, moved 0; table cells changed 1, rows removed 0, rows added 0, rows moved 0; references removed 0, added 0, retargeted 0, moved 0.',
+        'Cell changed docs/product/command-panel.md:8 §20.2.30 column "Effect" (base docs/product/command-panel.md:8) row "`show-agenda`": "Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda" -> "Open Agenda; the origin and the caret follow §23; do nothing if already in Agenda"',
+      ].join('\n'),
+    )
+  })
+
+  it('reports a changed Active state cell of show-agenda', () => {
+    const result = compareRegistry({ showAgenda: showAgendaRow.replace('Agenda open', 'Agenda shown') })
+
+    expect(result.cells.changed.map(({ after, oldText, newText }) => [after.column, oldText, newText])).toEqual([
+      ['Active state', 'Agenda open', 'Agenda shown'],
+    ])
+    expect(detailChangeCount(result)).toBe(1)
+  })
+
+  it('reports the §23 reference of the show-agenda Effect cell when it changes', () => {
+    const result = compareRegistry({ showAgenda: showAgendaRow.replace('(§23)', '(§23.7)') })
+
+    expect(formatDetailsReport(result).split('\n').slice(1)).toEqual([
+      'Cell changed docs/product/command-panel.md:8 §20.2.30 column "Effect" (base docs/product/command-panel.md:8) row "`show-agenda`": "Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda" -> "Open Agenda using the existing origin/caret navigation (§23.7); do nothing if already in Agenda"',
+      'Reference retargeted docs/product/command-panel.md:8 §20.2.30 column "Effect" (base docs/product/command-panel.md:8): "§23" -> "§23.7" in "Open Agenda using the existing origin/caret navigation (§23.7); do nothing if already in Agenda"',
+    ])
+  })
+
+  it('reports a changed number with its unit', () => {
+    const before = '# Vim\n\n### 20.2 Modes\n\nThe bar height stays 27px. Saving locks after 3 attempts.\n'
+
+    const result = compareFile(
+      'docs/product/vim.md',
+      before,
+      before.replace('27px', '28px').replace('3 attempts', 'three attempts'),
+    )
+
+    expect(formatDetailsReport(result)).toBe(
+      [
+        'Detail comparison: literals removed 2, added 2, moved 0; table cells changed 0, rows removed 0, rows added 0, rows moved 0; references removed 0, added 0, retargeted 0, moved 0.',
+        'Literal removed docs/product/vim.md:5 §20.2 number: "27px"',
+        'Literal removed docs/product/vim.md:5 §20.2 number: "3 attempts"',
+        'Literal added docs/product/vim.md:5 §20.2 number: "28px"',
+        'Literal added docs/product/vim.md:5 §20.2 number: "three attempts"',
+      ].join('\n'),
+    )
+  })
+
+  it('reports an added, a removed, and a retargeted section reference', () => {
+    const result = compareFile(
+      'docs/product/application.md',
+      '# Application\n\n## 9. App\n\nQuit follows §16.1. Close follows §21.\n',
+      '# Application\n\n## 9. App\n\nQuit follows §16.2. Close follows the rules. Open follows §9.1.\n',
+    )
+
+    expect(formatDetailsReport(result)).toBe(
+      [
+        emptyCounts('removed 1, added 1, retargeted 1, moved 0'),
+        'Reference removed docs/product/application.md:5 §9: "§21" in "Close follows §21."',
+        'Reference added docs/product/application.md:5 §9: "§9.1" in "Open follows §9.1."',
+        'Reference retargeted docs/product/application.md:5 §9 (base docs/product/application.md:5): "§16.1" -> "§16.2" in "Quit follows §16.2."',
+      ].join('\n'),
+    )
+    expect(detailChangeCount(result)).toBe(3)
+  })
+
+  it('shows a pure move to another file and section as moved and counts no change', () => {
+    const moved = 'Quit with `Cmd+Q` (§21).\n\n| Name | Effect |\n| --- | --- |\n| `quit` | Quit (§9.1) |\n'
+    const before = [
+      { path: 'docs/product/application.md', content: `# Application\n\n## 9. App\n\n${moved}` },
+      { path: 'docs/product/persistence.md', content: '# Persistence\n\n## 16. Persistence\n\nSave rule.\n' },
+    ]
+    const after = [
+      { path: 'docs/product/application.md', content: '# Application\n\n## 9. App\n' },
+      { path: 'docs/product/persistence.md', content: `# Persistence\n\n## 16. Persistence\n\nSave rule.\n\n${moved}` },
+    ]
+
+    const result = compareDetails({ before, after })
+
+    expect(formatDetailsReport(result)).toBe(
+      [
+        'Detail comparison: literals removed 0, added 0, moved 2; table cells changed 0, rows removed 0, rows added 0, rows moved 1; references removed 0, added 0, retargeted 0, moved 2.',
+        'Literal moved docs/product/application.md:5 §9 -> docs/product/persistence.md:7 §16 code: "`Cmd+Q`"',
+        'Literal moved docs/product/application.md:9 §9 column "Name" -> docs/product/persistence.md:11 §16 column "Name" code: "`quit`"',
+        'Row moved docs/product/application.md:9 §9 -> docs/product/persistence.md:11 §16: row "`quit`"',
+        'Reference moved docs/product/application.md:5 §9 -> docs/product/persistence.md:7 §16: "§21" in "Quit with `Cmd+Q` (§21)."',
+        'Reference moved docs/product/application.md:9 §9 column "Effect" -> docs/product/persistence.md:11 §16 column "Effect": "§9.1" in "Quit (§9.1)"',
+      ].join('\n'),
+    )
+    expect(detailChangeCount(result)).toBe(0)
+  })
+
+  it('reports a removed and an added row with every cell and its column', () => {
+    const result = compareRegistry({
+      find: showTreeRow.replaceAll('Tree', 'Outline').replace('show-tree', 'show-outline'),
+    })
+
+    expect(
+      formatDetailsReport(result)
+        .split('\n')
+        .filter((line) => line.startsWith('Row')),
+    ).toEqual([
+      'Row removed docs/product/command-panel.md:7 §20.2.30: Name: "`find`", Alias: "—", Description: "Find in the current view", Active state: "—", Shortcut: "`⌘F`", Effect: "Open local Find (§20.2.26)"',
+      'Row added docs/product/command-panel.md:7 §20.2.30: Name: "`show-outline`", Alias: "—", Description: "Show Outline", Active state: "Outline open", Shortcut: "—", Effect: "Return to Outline using the existing Agenda origin (§23); do nothing if already in Outline"',
+    ])
+  })
+
+  it('pairs a row whose name changed when most of its cells are equal', () => {
+    const result = compareRegistry({ find: findRow.replace('`find`', '`find-local`') })
+
+    expect(result.cells.changed.map(({ after, oldText, newText }) => [after.column, oldText, newText])).toEqual([
+      ['Name', '`find`', '`find-local`'],
+    ])
+    expect(result.cells.rowsRemoved).toEqual([])
+  })
+
+  it('reports the §7.2 calibration sample with only items the statement map explains', () => {
+    const view =
+      '* **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with five mutually exclusive items: **Automatic**, **Light**, **Dark**, **Gray**, and **White**. The item for the current appearance choice is checked (§20.5).'
+    const laterSentences =
+      'Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup. A newer selection made during startup takes precedence over an earlier preference read, including for the first editor keystroke.'
+    const sample = (windowClose: string, firstSentence: string, viewCommands: string) =>
+      [
+        '# Application',
+        '',
+        '### 9.2 Window Close',
+        '',
+        windowClose,
+        '',
+        '### 9.3 Application Menu',
+        '',
+        view,
+        '',
+        `${firstSentence} ${laterSentences}`,
+        '',
+        viewCommands,
+        '',
+      ].join('\n')
+    const before = sample(
+      'Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.',
+      'The Appearance and Vim Editing items have no status-bar toggles.',
+      'Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing and preserves the existing origin/caret behavior (§23). These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items retain text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items retain their standard text/check-mark presentation.',
+    )
+    const after = sample(
+      'Closing the main window quits the application on macOS, including when the application is inactive. Window close and `Cmd+Q` (§9.1) have the same save-before-quit behavior, which §16.1 defines.',
+      'The status bar has no Appearance toggle. It has no Vim Editing toggle either (§20.2.1).',
+      'Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing; the origin and the caret follow §23. These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items have text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items have the standard text and check-mark presentation.',
+    )
+
+    const result = compareFile('docs/product/application.md', before, after)
+
+    // §16.2 and §21 leave §9.2 with statements 5 and 6, merged into §16.1. §9.1 and §16.1 are the
+    // citations of reworded statement 2, and §20.2.1 is the citation of merged statement 8. `Cmd+Q` stays
+    // in §9.2, and §23 stays in §9.3 with reworded statement 11, so neither is reported.
+    expect(formatDetailsReport(result)).toBe(
+      [
+        emptyCounts('removed 2, added 3, retargeted 0, moved 0'),
+        'Reference removed docs/product/application.md:5 §9.2: "§16.2" in "In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2."',
+        'Reference removed docs/product/application.md:5 §9.2: "§21" in "A terminated renderer process is the exception defined in §21."',
+        'Reference added docs/product/application.md:5 §9.2: "§9.1" in "Window close and `Cmd+Q` (§9.1) have the same save-before-quit behavior, which §16.1 defines."',
+        'Reference added docs/product/application.md:5 §9.2: "§16.1" in "Window close and `Cmd+Q` (§9.1) have the same save-before-quit behavior, which §16.1 defines."',
+        'Reference added docs/product/application.md:11 §9.3: "§20.2.1" in "It has no Vim Editing toggle either (§20.2.1)."',
+      ].join('\n'),
+    )
+  })
+
+  it('extracts code spans, bold spans, and numbers with their units', () => {
+    const literals = extractDetailLiterals(
+      '**Quit Tree** (`Cmd+Q`, §9.1) waits 5 seconds, then 25 px (25px), p99 below 5 ms, ten-second, one of them; see [ADR](a/1.md).',
+    )
+
+    expect(literals).toEqual([
+      { kind: 'code', text: '`Cmd+Q`' },
+      { kind: 'bold', text: '**Quit Tree**' },
+      { kind: 'number', text: '5 seconds' },
+      { kind: 'number', text: '25 px' },
+      { kind: 'number', text: '25px' },
+      { kind: 'number', text: 'p99' },
+      { kind: 'number', text: '5 ms' },
+      { kind: 'number', text: 'ten-second' },
+      { kind: 'number', text: 'one' },
+    ])
+  })
+
+  it('extracts the reference forms of the specification and ignores references inside code spans', () => {
+    const references = extractDetailReferences(
+      'Same as Export Notes (§24–25) and §20.2.1–3; see §§16.1 and 16.2, `AGENTS.md` §5 and [AGENTS.md §4](../AGENTS.md#4-x). Markers use `// @requirement PRODUCT.md §13.1`.',
+    )
+
+    expect(references.map(({ reference }) => reference)).toEqual([
+      '§24–25',
+      '§20.2.1–3',
+      '§§16.1 and 16.2',
+      'AGENTS.md §5',
+      'AGENTS.md §4',
+    ])
+    expect(references[0]!.context).toBe('Same as Export Notes (§) and §; see §, § and [§](../AGENTS.md#4-x).')
+  })
+
+  it('skips fenced blocks and labels text before the first numbered heading', () => {
+    const result = compareFile(
+      'docs/PRODUCT.md',
+      '# Product\n\nUse `old`.\n\n## 1. One\n\n```text\n§2 and 5 px\n```\n',
+      '# Product\n\nUse `new`.\n\n## 1. One\n\n```text\n§3 and 6 px\n```\n',
+    )
+
+    expect(formatDetailsReport(result).split('\n').slice(1)).toEqual([
+      'Literal removed docs/PRODUCT.md:3 (no section) code: "`old`"',
+      'Literal added docs/PRODUCT.md:3 (no section) code: "`new`"',
+    ])
+  })
+
+  it('parses its arguments strictly', () => {
+    expect(parseDetailsArguments(['--details', 'HEAD~1'])).toEqual({ ref: 'HEAD~1', file: undefined })
+    expect(parseDetailsArguments(['--details', 'abc123', '--file', 'docs/product/vim.md'])).toEqual({
+      ref: 'abc123',
+      file: 'docs/product/vim.md',
+    })
+    for (const args of [
+      [],
+      ['--details'],
+      ['--details', '-HEAD'],
+      ['--details', 'bad:ref'],
+      ['--details', 'HEAD', '--details', 'HEAD'],
+      ['--details', 'HEAD', '--file', '../file'],
+      ['--details', 'HEAD', '--allow-added', '1'],
+    ])
+      expect(() => parseDetailsArguments(args)).toThrow()
+  })
+
+  it('compares a Git revision with the working tree and narrows both sides with --file', () => {
+    const root = createTemporaryRoot()
+    const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+    const vim = '# Vim\n\n### 20.2 Modes\n\nThe bar height stays 27px (§20.2.7).\n'
+
+    git(['init', '--quiet'])
+    writeFile(
+      root,
+      'docs/PRODUCT.md',
+      '# Product\n\n| Sections | File |\n| --- | --- |\n| 20.2 | [vim.md](product/vim.md) |\n',
+    )
+    writeFile(root, 'docs/product/vim.md', vim)
+    git(['add', '-A'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'docs(fixture): add the specification',
+    ])
+
+    expect(runDetails({ ref: 'HEAD', rootDirectory: root }).exitCode).toBe(0)
+
+    writeFile(root, 'docs/product/vim.md', vim.replace('27px', '28px'))
+    const result = runDetails({ ref: 'HEAD', rootDirectory: root })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.report.literals.removed.map(({ path, text }) => [path, text])).toEqual([
+      ['docs/product/vim.md', '27px'],
+    ])
+    expect(runDetails({ ref: 'HEAD', file: 'docs/PRODUCT.md', rootDirectory: root }).exitCode).toBe(0)
+    expect(runDetails({ ref: 'HEAD', file: 'docs/product/vim.md', rootDirectory: root }).exitCode).toBe(1)
+    expect(() => runDetails({ ref: 'missing', rootDirectory: root })).toThrow()
+  })
+
+  it('returns process exit 2 for bad detail arguments', () => {
+    const script = join(import.meta.dirname, 'check-docs.mts')
+    const result = spawnSync(process.execPath, [script, '--details', '-HEAD'], { encoding: 'utf8' })
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('Detail comparison failed:')
   })
 })
