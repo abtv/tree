@@ -11,7 +11,7 @@ import {
   setMainWindowBounds,
 } from './fixtures'
 
-// @requirement PRODUCT.md §1.3
+// @requirement PRODUCT.md §9.4
 // @requirement PRODUCT.md §9
 // @requirement PRODUCT.md §20.5
 for (const appearance of ['light', 'dark'] as const) {

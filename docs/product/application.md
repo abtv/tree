@@ -53,6 +53,49 @@ Tree and Agenda invoke the same named view commands as the command panel (§20.2
 
 If the command panel is open, a menu view command first closes it and restores the editing surface before applying the named command. While a modal dialog or image preview is open, menu view commands do nothing and leave the modal's focus and return target intact. Browser view actions use the same preparation.
 
+### 9.4 About Tree
+
+#### Desktop Application
+
+About Tree opens an inline modal dialog and shows the
+application version from the root `package.json`, also used for the packaged app,
+followed by its UTC build date in English. The panel also shows a clickable
+**GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
+The dialog shows Tree's application icon, `© 2026 Andrei Butov` and `Licensed under the MIT License`,
+with **MIT License** linking to `https://github.com/abtv/tree/blob/main/LICENSE`.
+
+The About dialog uses the main application's selected palette (§20.5),
+including its background, text and links. Automatic follows the system appearance.
+It opens centered in the main window's content area and disappears as a whole when dismissed.
+It shares the existing renderer, including on first opening, and cannot move outside the main window.
+
+It blocks interaction with its parent until closed with Escape or the focused **Close**
+button (also activated by Enter), or a click in the main window's content outside About.
+The outside click only dismisses About; it does not act on the editor.
+Closing restores the previous focus and selection without changing editor state.
+Repeated About commands focus the existing dialog. It closes with the main window.
+
+While it is open, editor, view, data and Always on Top menu actions are disabled;
+About Tree, Quit Tree and Appearance remain available. Closing restores the menu actions.
+The shared inline dialog replaces the native About panel so its colors match Tree and it opens promptly.
+
+#### Browser Version
+
+About Tree in the browser's ellipsis menu opens the shared modal dialog with the desktop About dialog's icon,
+title, version, copyright, license and repository links, using the selected palette.
+Close, Escape and clicking outside the dialog dismiss it and restore the previous editor focus and selection.
+The information appears in the dialog rather than the menu.
+
+All builds show the root
+`package.json` version and UTC build date in English, for example
+`Version 0.1.2 · Oct 29, 2026`. Both values are fixed at build time and describe the
+loaded app, including offline and while a newer update is waiting.
+
+A **GitHub repository** link opens
+`https://github.com/abtv/tree` in a new tab.
+The dialog reads `© 2026 Andrei Butov` and `Licensed under the MIT License`.
+**MIT License** opens `https://github.com/abtv/tree/blob/main/LICENSE` in a new tab.
+
 ---
 
 ## 21. Unexpected Renderer Errors

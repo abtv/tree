@@ -14,22 +14,10 @@ Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
 The browser's ellipsis menu ends with **About Tree** below statuses and the Update App
-button when present. It opens the shared modal dialog with the desktop About dialog's icon,
-title, version, copyright, license and repository links, using the selected palette.
-Close, Escape and clicking outside the dialog dismiss it and restore the previous editor focus and selection.
-The information appears in the dialog rather than the menu.
+button when present. It opens the About dialog, which §9.4 defines.
 
-All builds show the root
-`package.json` version and UTC build date in English, for example
-`Version 0.1.2 · Oct 29, 2026`. Both values are fixed at build time and describe the
-loaded app, including offline and while a newer update is waiting. Browser
-publication requires a version greater than the last transferred web release;
+Browser publication requires a version greater than the last transferred web release;
 ordinary commits still run validation without publishing a new package.
-
-A **GitHub repository** link opens
-`https://github.com/abtv/tree` in a new tab.
-The dialog reads `© 2026 Andrei Butov` and `Licensed under the MIT License`.
-**MIT License** opens `https://github.com/abtv/tree/blob/main/LICENSE` in a new tab.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or

@@ -50,27 +50,7 @@ The application is a native-feeling macOS application and follows Apple's Human 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
 The desktop application menu starts with **About Tree**, **Check for Updates…** and
-**Restart and Install Update** (§26), followed by a separator before Quit Tree. About Tree opens an inline modal dialog and shows the
-application version from the root `package.json`, also used for the packaged app,
-followed by its UTC build date in English. The panel also shows a clickable
-**GitHub repository** link to `https://github.com/abtv/tree`, opening in the default browser.
-The dialog shows Tree's application icon, `© 2026 Andrei Butov` and `Licensed under the MIT License`,
-with **MIT License** linking to `https://github.com/abtv/tree/blob/main/LICENSE`.
-
-The About dialog uses the main application's selected palette (§20.5),
-including its background, text and links. Automatic follows the system appearance.
-It opens centered in the main window's content area and disappears as a whole when dismissed.
-It shares the existing renderer, including on first opening, and cannot move outside the main window.
-
-It blocks interaction with its parent until closed with Escape or the focused **Close**
-button (also activated by Enter), or a click in the main window's content outside About.
-The outside click only dismisses About; it does not act on the editor.
-Closing restores the previous focus and selection without changing editor state.
-Repeated About commands focus the existing dialog. It closes with the main window.
-
-While it is open, editor, view, data and Always on Top menu actions are disabled;
-About Tree, Quit Tree and Appearance remain available. Closing restores the menu actions.
-The shared inline dialog replaces the native About panel so its colors match Tree and it opens promptly, as approved by the owner.
+**Restart and Install Update** (§26), followed by a separator before Quit Tree. About Tree opens the About dialog, which §9.4 defines.
 
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
 

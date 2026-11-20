@@ -3,7 +3,7 @@ import { test, expect, capture, primaryKey } from './fixtures.mts'
 import { ready, installBackupPicker, writeFolder } from './data-helpers.mts'
 import { onePixelPng } from '../../src/electron/main/png-test-utils.ts'
 
-// @requirement PRODUCT.md §1.4
+// @requirement PRODUCT.md §9.4
 test('About isolates keyboard input and restores the editor selection on either dismissal', async ({ newContext }) => {
   const page = await (await newContext()).newPage()
   await page.goto('/')
