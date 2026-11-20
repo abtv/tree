@@ -211,7 +211,7 @@ lose uncommitted work. Browser storage is not a backup; an exported archive kept
 outside the browser profile is; Chromium folder backup provides another copy,
 subject to its reported permission and write status. Current compatibility and
 save limitations are owned by [Browser version](../src/web/README.md) and
-[the browser requirements](PRODUCT.md#14-browser-static-hosting-checkpoint).
+[the browser requirements](product/browser.md#14-browser-static-hosting-checkpoint).
 
 ## Browser publication
 

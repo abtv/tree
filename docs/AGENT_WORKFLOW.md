@@ -369,7 +369,7 @@ Do not duplicate the same information across multiple documents unless there is 
 Keep each document focused on its responsibility:
 
 * `README.md` — the project identity and documentation index.
-* `PRODUCT.md` — what the product does.
+* `PRODUCT.md` — the index of what the product does. The requirements are in the files under `docs/product/`; a requirement keeps its `PRODUCT.md §N` identifier in every file.
 * `OPEN_QUESTIONS.md` — product and technical questions that are still open, with their evidence and Product Owner decisions, none of which are requirements yet.
 * `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.

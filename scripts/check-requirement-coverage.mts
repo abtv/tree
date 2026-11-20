@@ -68,8 +68,25 @@ export const BOUNDARY_SECTIONS = new Set([
   '25.4',
 ])
 
-export function parseSections(content: string) {
-  const sections = scanProductSections(content)
+export function compareSectionIds(left: string, right: string) {
+  const leftParts = left.split('.').map(Number)
+  const rightParts = right.split('.').map(Number)
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index++) {
+    const difference = (leftParts[index] ?? -1) - (rightParts[index] ?? -1)
+    if (difference !== 0) return difference
+  }
+  return 0
+}
+
+// The specification is the index plus every file under docs/product/. Each file is scanned on its own,
+// then the sections are merged in numeric order, so a parent is detected by its next section number.
+export function scanProductDocuments(documents: { path: string; content: string }[]) {
+  return documents
+    .flatMap(({ content }) => scanProductSections(content))
+    .sort((left, right) => compareSectionIds(left.id, right.id))
+}
+
+function describeSections(sections: ReturnType<typeof scanProductSections>) {
   return sections.map((section, index) => {
     const hasChildren = (sections[index + 1]?.level ?? 0) > section.level
     const ownText = productOwnText(section.lines)
@@ -77,21 +94,28 @@ export function parseSections(content: string) {
   })
 }
 
+export function parseSections(content: string) {
+  return describeSections(scanProductDocuments([{ path: 'docs/PRODUCT.md', content }]))
+}
+
 export function checkCoverage({
   product,
+  productFiles,
   files,
   exemptions = EXEMPTIONS,
   boundarySections = BOUNDARY_SECTIONS,
 }: {
-  product: string
+  product?: string
+  productFiles?: { path: string; content: string }[]
   files: { path: string; content: string }[]
   exemptions?: Map<string, string>
   boundarySections?: Set<string>
 }) {
-  const sections = parseSections(product)
+  const scanned = scanProductDocuments(productFiles ?? [{ path: 'docs/PRODUCT.md', content: product ?? '' }])
+  const sections = describeSections(scanned)
   const ids = new Set(sections.map((section) => section.id))
   const issues = []
-  for (const section of scanProductSections(product)) {
+  for (const section of scanned) {
     if (section.level !== section.id.split('.').length + 1) {
       issues.push(`PRODUCT.md §${section.id}: heading level does not match its number depth`)
     }
@@ -168,8 +192,23 @@ export function runChecks({
   }
   for (const kind of ['src', 'e2e', 'perf']) walk(join(rootDirectory, kind), kind)
   walk(join(rootDirectory, 'scripts'), 'src')
+  const index = readFileSync(join(rootDirectory, 'docs/PRODUCT.md'), 'utf8')
+  const productFiles = [{ path: 'docs/PRODUCT.md', content: index }]
+  const productDirectory = join(rootDirectory, 'docs/product')
+  if (existsSync(productDirectory)) {
+    const names = readdirSync(productDirectory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .map((entry) => entry.name)
+      .sort()
+    for (const name of names) {
+      productFiles.push({
+        path: `docs/product/${name}`,
+        content: readFileSync(join(productDirectory, name), 'utf8'),
+      })
+    }
+  }
   return checkCoverage({
-    product: readFileSync(join(rootDirectory, 'docs/PRODUCT.md'), 'utf8'),
+    productFiles,
     files,
     exemptions,
     boundarySections,

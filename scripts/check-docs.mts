@@ -3,12 +3,107 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
-import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mts'
+import { productOwnText, scanProductBlocks, scanProductSections, stripProductComments } from './product-sections.mts'
 import { markdownLinks } from './markdown-links.mts'
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const PRODUCT_LIMITS = { block: 700, section: 8000 }
+
+export const PRODUCT_INDEX = 'docs/PRODUCT.md'
+export const PRODUCT_DIRECTORY = 'docs/product'
+
+const isProductFile = (displayPath: string) => displayPath.startsWith(`${PRODUCT_DIRECTORY}/`)
+
+// A specification file may hold only its title before the first numbered heading, so that every
+// requirement sits inside a numbered section.
+export function findTextBeforeFirstSection({ content, displayPath }: { content: string; displayPath: string }) {
+  const issues: string[] = []
+  const first = scanProductSections(content)[0]
+  const lines = stripProductComments(content).split(/\r?\n/u)
+  let titles = 0
+  for (const [index, line] of lines.slice(0, first ? first.startLine - 1 : lines.length).entries()) {
+    const trimmed = line.trim()
+    if (trimmed === '' || trimmed === '---') continue
+    if (titles === 0 && /^#\s+\S/u.test(trimmed)) {
+      titles += 1
+      continue
+    }
+    issues.push(
+      `${displayPath}:${index + 1}: text before the first numbered heading; every requirement belongs to a numbered section`,
+    )
+  }
+  if (titles === 0) issues.push(`${displayPath}: missing the level-one title before the first numbered heading`)
+  return issues
+}
+
+const SECTION_NUMBER = /\d+(?:\.\d+)*/gu
+
+// The index maps every section number to the file that holds its heading. Retired numbers stay listed
+// in a second table and never reappear as headings. The index lists numbers and no titles.
+export function validateProductIndex({
+  index,
+  files,
+  displayPath = PRODUCT_INDEX,
+}: {
+  index: string
+  files: { path: string; content: string }[]
+  displayPath?: string
+}) {
+  const issues: string[] = []
+  const listed = new Map<string, string>()
+  const retired = new Set<string>()
+  const indexedFiles = new Set<string>()
+  let inRetired = false
+  let fence = false
+  for (const line of stripProductComments(index).split(/\r?\n/u)) {
+    if (/^\s*(?:`{3,}|~{3,})/u.test(line)) fence = !fence
+    if (fence) continue
+    if (/^#{1,6}\s/u.test(line)) inRetired = /^#{1,6}\s+Retired\b/iu.test(line)
+    if (!line.trim().startsWith('|')) continue
+    const cells = line.trim().split('|').slice(1, -1)
+    const numbers = [...(cells[0] ?? '').matchAll(SECTION_NUMBER)].map((match) => match[0])
+    if (inRetired) {
+      for (const number of numbers) retired.add(number)
+      continue
+    }
+    const target = /\]\((product\/[A-Za-z0-9_.-]+\.md)\)/u.exec(cells[1] ?? '')?.[1]
+    if (target === undefined) continue
+    const path = `docs/${target}`
+    indexedFiles.add(path)
+    for (const number of numbers) {
+      if (listed.has(number)) issues.push(`${displayPath}: the index lists §${number} more than once`)
+      else listed.set(number, path)
+    }
+  }
+  const owners = new Map<string, string[]>()
+  for (const { path, content } of files) {
+    for (const { id } of scanProductSections(content)) owners.set(id, [...(owners.get(id) ?? []), path])
+  }
+  const filePaths = new Set(files.map(({ path }) => path))
+  for (const path of indexedFiles) {
+    if (!filePaths.has(path)) issues.push(`${displayPath}: the index names ${path}, which does not exist`)
+  }
+  for (const path of filePaths) {
+    if (!indexedFiles.has(path)) issues.push(`${displayPath}: the index does not list ${path}`)
+  }
+  for (const [number, paths] of owners) {
+    if (paths.length > 1) issues.push(`${displayPath}: §${number} has a heading in more than one file`)
+    if (retired.has(number))
+      issues.push(`${displayPath}: §${number} is retired but a heading in ${paths[0]} defines it`)
+    const mapped = listed.get(number)
+    if (mapped === undefined) {
+      if (!retired.has(number)) issues.push(`${displayPath}: the index does not list §${number} (${paths[0]})`)
+    } else if (!paths.includes(mapped)) {
+      issues.push(`${displayPath}: the index maps §${number} to ${mapped}, but its heading is in ${paths[0]}`)
+    }
+  }
+  for (const number of listed.keys()) {
+    if (!owners.has(number)) issues.push(`${displayPath}: the index lists §${number}, which no file defines`)
+    if (retired.has(number)) issues.push(`${displayPath}: §${number} is both listed and retired`)
+  }
+  return issues
+}
 
 export function findOversizedProductText({
   content,
@@ -587,6 +682,16 @@ function unfinishedPlanPaths(rootDirectory: string) {
   return paths
 }
 
+// Repository-relative paths of the specification files under docs/product/, sorted by name.
+function listProductFiles(rootDirectory: string) {
+  const directory = join(rootDirectory, PRODUCT_DIRECTORY)
+  if (!existsSync(directory)) return []
+  return readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .map((entry) => `${PRODUCT_DIRECTORY}/${entry.name}`)
+    .sort()
+}
+
 function collectLiveDocuments(rootDirectory: string) {
   const documents = new Set<string>()
   const addIfPresent = (filePath: string) => {
@@ -605,6 +710,7 @@ function collectLiveDocuments(rootDirectory: string) {
   ]) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
+  for (const path of listProductFiles(rootDirectory)) documents.add(join(rootDirectory, path))
   const decisions = join(rootDirectory, 'docs', 'decisions')
   if (existsSync(decisions)) {
     for (const entry of readdirSync(decisions, { withFileTypes: true })) {
@@ -677,18 +783,33 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
     const content = readFileSync(filePath, 'utf8')
     if (include('links')) issues.push(...findBrokenLinks({ content, filePath, displayPath }))
     if (include('decisions')) issues.push(...findBrokenReferences({ content, displayPath, adrNumbers }))
-    if (include('structure') && !displayPath.endsWith('PRODUCT.md')) {
+    if (include('structure') && !displayPath.endsWith('PRODUCT.md') && !isProductFile(displayPath)) {
       issues.push(...findProductQuantityRestatements({ content, displayPath }))
     }
     if (include('structure') && displayPath === 'docs/OPEN_QUESTIONS.md') {
       issues.push(...validateOpenQuestions({ content, displayPath }))
     }
-    if (include('structure') && displayPath === 'docs/PRODUCT.md') {
+    if (include('structure') && (displayPath === PRODUCT_INDEX || isProductFile(displayPath))) {
       issues.push(...findOversizedProductText({ content, displayPath }))
+    }
+    if (include('structure') && isProductFile(displayPath)) {
+      issues.push(...findTextBeforeFirstSection({ content, displayPath }))
     }
     if (include('tests') && displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))
     }
+  }
+  const productIndexPath = join(rootDirectory, PRODUCT_INDEX)
+  if (include('structure') && existsSync(productIndexPath)) {
+    issues.push(
+      ...validateProductIndex({
+        index: readFileSync(productIndexPath, 'utf8'),
+        files: listProductFiles(rootDirectory).map((path) => ({
+          path,
+          content: readFileSync(join(rootDirectory, path), 'utf8'),
+        })),
+      }),
+    )
   }
   const agentPath = join(rootDirectory, 'AGENTS.md')
   const developmentPath = join(rootDirectory, 'docs', 'DEVELOPMENT.md')
@@ -713,9 +834,10 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
 }
 
 export function parseVerbatimArguments(args: string[]) {
-  const options: { ref: string | undefined; file: string; allowAdded: number } = {
+  // Without --file the comparison reads the whole specification: the index and every file under docs/product/.
+  const options: { ref: string | undefined; file: string | undefined; allowAdded: number } = {
     ref: undefined,
-    file: 'docs/PRODUCT.md',
+    file: undefined,
     allowAdded: 0,
   }
   const seen = new Set()
@@ -735,18 +857,21 @@ export function parseVerbatimArguments(args: string[]) {
       options.allowAdded = Number(value)
     }
   }
-  if (!options.ref || options.ref.startsWith('-') || !/^[\w./~^@{}-]+$/.test(options.ref)) {
-    throw new Error('Invalid git ref')
-  }
+  assertValidRef(options.ref)
   if (
-    !/^[\w./-]+$/.test(options.file) ||
-    options.file.startsWith('/') ||
-    options.file.startsWith('-') ||
-    options.file.split('/').some((part) => part === '..' || part === '' || part === '.')
+    options.file !== undefined &&
+    (!/^[\w./-]+$/.test(options.file) ||
+      options.file.startsWith('/') ||
+      options.file.startsWith('-') ||
+      options.file.split('/').some((part) => part === '..' || part === '' || part === '.'))
   ) {
     throw new Error('Invalid repository-relative file')
   }
   return { ...options, ref: options.ref }
+}
+
+function assertValidRef(ref: string | undefined): asserts ref is string {
+  if (!ref || ref.startsWith('-') || !/^[\w./~^@{}-]+$/.test(ref)) throw new Error('Invalid git ref')
 }
 
 export function scanVerbatimUnits(content: string) {
@@ -889,6 +1014,48 @@ export function compareVerbatim(before: string, after: string) {
   }
 }
 
+function readWorkingFile(rootDirectory: string, file: string) {
+  const path = realpathSync(join(rootDirectory, file))
+  const withinRoot = relative(realpathSync(rootDirectory), path)
+  if (withinRoot === '..' || withinRoot.startsWith('../')) throw new Error('File resolves outside the repository')
+  return readFileSync(path, 'utf8')
+}
+
+function gitShow(rootDirectory: string, ref: string, file: string) {
+  return execFileSync('git', ['show', `${ref}:${file}`], {
+    cwd: rootDirectory,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+}
+
+// The specification at a revision: the index plus every file under docs/product/ that exists there.
+// A revision before the split has the single old file.
+function readSpecificationAtRef(rootDirectory: string, ref: string) {
+  const names = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, '--', `${PRODUCT_DIRECTORY}/`], {
+    cwd: rootDirectory,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+    .split('\n')
+    .filter((name) => /^docs\/product\/[^/]+\.md$/u.test(name))
+    .sort()
+  return [PRODUCT_INDEX, ...names].map((path) => ({ path, content: gitShow(rootDirectory, ref, path) }))
+}
+
+// The specification in the working tree, read the same way.
+function readSpecificationInWorkingTree(rootDirectory: string) {
+  return [PRODUCT_INDEX, ...listProductFiles(rootDirectory)].map((path) => ({
+    path,
+    content: readWorkingFile(rootDirectory, path),
+  }))
+}
+
+const joinDocuments = (documents: { content: string }[]) =>
+  documents.map(({ content }) => (content.endsWith('\n') ? content : `${content}\n`)).join('\n')
+
 export function runVerbatim({
   ref,
   file,
@@ -896,29 +1063,184 @@ export function runVerbatim({
   rootDirectory = ROOT,
 }: {
   ref: string
-  file: string
+  file?: string | undefined
   allowAdded?: number
   rootDirectory?: string
 }) {
   // Validate exported API arguments as well as the CLI. Git is invoked without a shell.
-  parseVerbatimArguments(['--verbatim', ref, '--file', file, '--allow-added', String(allowAdded)])
-  const path = realpathSync(join(rootDirectory, file))
-  const withinRoot = relative(realpathSync(rootDirectory), path)
-  if (withinRoot === '..' || withinRoot.startsWith('../')) throw new Error('File resolves outside the repository')
-  const before = execFileSync('git', ['show', `${ref}:${file}`], {
-    cwd: rootDirectory,
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  const after = readFileSync(path, 'utf8')
+  parseVerbatimArguments([
+    '--verbatim',
+    ref,
+    ...(file === undefined ? [] : ['--file', file]),
+    '--allow-added',
+    String(allowAdded),
+  ])
+  const after =
+    file === undefined
+      ? joinDocuments(readSpecificationInWorkingTree(rootDirectory))
+      : readWorkingFile(rootDirectory, file)
+  const before =
+    file === undefined ? joinDocuments(readSpecificationAtRef(rootDirectory, ref)) : gitShow(rootDirectory, ref, file)
   const comparison = compareVerbatim(before, after)
   return { comparison, exitCode: comparison.removed.length === 0 && comparison.added.length <= allowAdded ? 0 : 1 }
 }
 
+export interface OrderedDifference {
+  id: string
+  before: { label: string; line: number; text: string }[]
+  after: { label: string; line: number; text: string }[]
+}
+
+interface OrderedLine {
+  label: string
+  line: number
+  text: string
+}
+
+// The heading line and the lines up to the next numbered heading, without the blank lines and
+// separators that end the section. Every other line, including interior blank lines, is kept.
+function orderedRange(section: ReturnType<typeof scanProductSections>[number], label: string) {
+  const lines: OrderedLine[] = [
+    { label, line: section.startLine, text: section.heading },
+    ...section.lines.map(({ number, text }) => ({ label, line: number, text })),
+  ]
+  while (lines.length > 1 && ['', '---'].includes(lines.at(-1)!.text.trim())) lines.pop()
+  return lines
+}
+
+function diffOrderedLines(before: OrderedLine[], after: OrderedLine[]) {
+  const table = Array.from({ length: before.length + 1 }, () => new Array<number>(after.length + 1).fill(0))
+  for (let row = before.length - 1; row >= 0; row--) {
+    for (let column = after.length - 1; column >= 0; column--) {
+      table[row]![column] =
+        before[row]!.text === after[column]!.text
+          ? table[row + 1]![column + 1]! + 1
+          : Math.max(table[row + 1]![column]!, table[row]![column + 1]!)
+    }
+  }
+  const hunks: { before: OrderedLine[]; after: OrderedLine[] }[] = []
+  let current: { before: OrderedLine[]; after: OrderedLine[] } | undefined
+  let row = 0
+  let column = 0
+  while (row < before.length || column < after.length) {
+    if (row < before.length && column < after.length && before[row]!.text === after[column]!.text) {
+      current = undefined
+      row++
+      column++
+      continue
+    }
+    if (!current) {
+      current = { before: [], after: [] }
+      hunks.push(current)
+    }
+    if (column === after.length || (row < before.length && table[row + 1]![column]! >= table[row]![column + 1]!)) {
+      current.before.push(before[row++]!)
+    } else current.after.push(after[column++]!)
+  }
+  return hunks
+}
+
+// Compares every numbered section of the specification before a split with the same section in the files
+// after it. Line order inside a section matters; the order of the sections and of the files does not.
+export function compareOrderedSections({
+  before,
+  after,
+}: {
+  before: { path: string; content: string }[]
+  after: { path: string; content: string }[]
+}) {
+  const collect = (documents: { path: string; content: string }[]) => {
+    const sections = new Map<string, OrderedLine[]>()
+    const duplicates: string[] = []
+    for (const { path, content } of documents) {
+      for (const section of scanProductSections(content)) {
+        if (sections.has(section.id)) duplicates.push(section.id)
+        else sections.set(section.id, orderedRange(section, path))
+      }
+    }
+    return { sections, duplicates }
+  }
+  const oldSide = collect(before)
+  const newSide = collect(after)
+  const differences: OrderedDifference[] = []
+  const problems = [
+    ...oldSide.duplicates.map((id) => `§${id}: more than one heading in the base specification`),
+    ...newSide.duplicates.map((id) => `§${id}: more than one heading in the files after the split`),
+  ]
+  for (const [id, oldLines] of oldSide.sections) {
+    const newLines = newSide.sections.get(id)
+    if (newLines === undefined) {
+      problems.push(`§${id}: missing after the split`)
+      continue
+    }
+    for (const hunk of diffOrderedLines(oldLines, newLines)) differences.push({ id, ...hunk })
+  }
+  for (const id of newSide.sections.keys()) {
+    if (!oldSide.sections.has(id)) problems.push(`§${id}: not present in the base specification`)
+  }
+  // A group of changed lines counts as many lines as its longer side has.
+  const differingLines = differences.reduce(
+    (total, { before, after }) => total + Math.max(before.length, after.length),
+    0,
+  )
+  return { sectionCount: oldSide.sections.size, differences, differingLines, problems }
+}
+
+export function formatOrderedReport(report: ReturnType<typeof compareOrderedSections>) {
+  const lines = [
+    `Ordered comparison: ${report.sectionCount} sections, ${report.differingLines} differing lines (${report.differences.length} groups), ${report.problems.length} structural problems.`,
+  ]
+  for (const problem of report.problems) lines.push(`Problem ${problem}`)
+  for (const { id, before, after } of report.differences) {
+    lines.push(`Difference §${id}`)
+    for (const line of before) lines.push(`  - ${line.label}:${line.line}: ${line.text}`)
+    for (const line of after) lines.push(`  + ${line.label}:${line.line}: ${line.text}`)
+  }
+  return lines.join('\n')
+}
+
+export function parseOrderedArguments(args: string[]) {
+  const options: { ref: string | undefined; allowDifferences: number } = { ref: undefined, allowDifferences: 0 }
+  const seen = new Set()
+  for (let index = 0; index < args.length; index += 2) {
+    const option = args[index]!
+    const value = args[index + 1]
+    if (!['--ordered', '--allow-differences'].includes(option) || seen.has(option) || value === undefined) {
+      throw new Error('Usage: --ordered <git-ref> [--allow-differences <n>]')
+    }
+    seen.add(option)
+    if (option === '--ordered') options.ref = value
+    else {
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        throw new Error('--allow-differences must be a non-negative safe integer')
+      }
+      options.allowDifferences = Number(value)
+    }
+  }
+  assertValidRef(options.ref)
+  return { ...options, ref: options.ref }
+}
+
+export function runOrdered({
+  ref,
+  allowDifferences = 0,
+  rootDirectory = ROOT,
+}: {
+  ref: string
+  allowDifferences?: number
+  rootDirectory?: string
+}) {
+  parseOrderedArguments(['--ordered', ref, '--allow-differences', String(allowDifferences)])
+  const report = compareOrderedSections({
+    before: readSpecificationAtRef(rootDirectory, ref),
+    after: readSpecificationInWorkingTree(rootDirectory),
+  })
+  return { report, exitCode: report.problems.length === 0 && report.differingLines <= allowDifferences ? 0 : 1 }
+}
+
 export function formatVerbatimReport(report: ReturnType<typeof compareVerbatim>) {
   const lines = [
-    `Verbatim comparison: before ${report.before}, after ${report.after}, unchanged ${report.unchanged}, removed ${report.removed.length}, added ${report.added.length}.`,
+    `Verbatim comparison: before ${report.before}, after ${report.after}, unchanged ${report.unchanged}, removed ${report.removed.length}, added ${report.added.length}, moved ${report.moved.length}, headings removed ${report.headingsRemoved.length}, headings added ${report.headingsAdded.length}.`,
   ]
   for (const [label, units] of [
     ['Removed', report.removed],
@@ -942,6 +1264,15 @@ export function main(args = process.argv.slice(2)) {
       return 2
     }
     group = args[1] as CheckGroup
+  } else if (args[0] === '--ordered') {
+    try {
+      const result = runOrdered(parseOrderedArguments(args))
+      console.log(formatOrderedReport(result.report))
+      return result.exitCode
+    } catch (error) {
+      console.error(`Ordered comparison failed: ${error instanceof Error ? error.message : String(error)}`)
+      return 2
+    }
   } else if (args.length > 0) {
     try {
       const result = runVerbatim(parseVerbatimArguments(args))

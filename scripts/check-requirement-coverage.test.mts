@@ -147,6 +147,70 @@ describe('requirement coverage', () => {
   })
 })
 
+describe('requirement coverage across specification files', () => {
+  const files = [
+    { path: 'docs/PRODUCT.md', content: '# Index\n' },
+    { path: 'docs/product/a.md', content: '# A\n\n## 20. Principles\n\n### 20.2 Vim\n\n#### 20.2.1 Mode\nRule\n' },
+    { path: 'docs/product/b.md', content: '# B\n\n#### 20.2.7 Status\nRule\n\n## 1. Overview\nOwn rule\n' },
+  ]
+
+  it('orders merged sections by number and detects a parent through the next number', () => {
+    const result = check('', [], { productFiles: files })
+
+    expect(result.issues).toEqual([
+      'PRODUCT.md §1: missing test marker',
+      'PRODUCT.md §20.2.1: missing test marker',
+      'PRODUCT.md §20.2.7: missing test marker',
+    ])
+    expect(result.requirementCount).toBe(3)
+  })
+
+  it('rejects a marker on a parent whose children live in other files', () => {
+    const marker = '// @requirement PRODUCT.md §20.2\n'
+
+    expect(check('', [{ path: 'src/x.test.ts', content: marker }], { productFiles: files }).issues).toContain(
+      'src/x.test.ts:1: PRODUCT.md §20.2 has numbered subsections and no text of its own; cite a subsection',
+    )
+  })
+
+  it('accepts markers for sections stored in different files', () => {
+    const content = ['1', '20.2.1', '20.2.7'].map((id) => `// @requirement PRODUCT.md §${id}\n`).join('')
+
+    expect(check('', [{ path: 'src/x.test.ts', content }], { productFiles: files }).issues).toEqual([])
+  })
+
+  it('reports a number that two files both define', () => {
+    const duplicate = [...files, { path: 'docs/product/c.md', content: '# C\n\n## 1. Again\nRule\n' }]
+
+    expect(check('', [], { productFiles: duplicate }).issues).toContain('PRODUCT.md: duplicate numbered sections')
+  })
+
+  it('checks heading levels in every file', () => {
+    const wrong = [{ path: 'docs/product/a.md', content: '# A\n\n### 1. Wrong\nRule\n' }]
+
+    expect(check('', [], { productFiles: wrong }).issues).toContain(
+      'PRODUCT.md §1: heading level does not match its number depth',
+    )
+  })
+
+  it('reads every file under docs/product from the repository', () => {
+    const root = mkdtempSync(join(tmpdir(), 'tree-requirements-'))
+
+    roots.push(root)
+    for (const { path, content } of files) {
+      mkdirSync(dirname(join(root, path)), { recursive: true })
+      writeFileSync(join(root, path), content)
+    }
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(join(root, 'src/x.test.ts'), '// @requirement PRODUCT.md §20.2.7\n')
+
+    expect(runChecks({ rootDirectory: root, exemptions: new Map(), boundarySections: new Set() })).toEqual({
+      issues: ['PRODUCT.md §1: missing test marker', 'PRODUCT.md §20.2.1: missing test marker'],
+      requirementCount: 3,
+    })
+  })
+})
+
 describe('repository discovery', () => {
   it('scans source, E2E, performance and browser checks while ignoring production files and other extensions', () => {
     const root = mkdtempSync(join(tmpdir(), 'tree-requirements-'))

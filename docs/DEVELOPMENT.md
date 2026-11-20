@@ -525,7 +525,7 @@ full `npm audit` result and use `npm audit --omit=dev` to check the production
 graph. Inspect the affected paths before applying the exception. A nonzero full
 audit remains a reported finding, even when the exception permits committing.
 
-The documentation governance command accepts `--group links|tests|decisions|structure` for separate CI steps. Without arguments it checks every category: ADR metadata and indexing, relative links, ADR and test references, and documentation structure including restated product quantities outside `docs/PRODUCT.md`. Link, ADR-reference and quantity checks cover only the live documents selected by `collectLiveDocuments` in `scripts/check-docs.mts`. The link check verifies that the target file exists; it does not validate heading anchors.
+The documentation governance command accepts `--group links|tests|decisions|structure` for separate CI steps. Without arguments it checks every category: ADR metadata and indexing, relative links, ADR and test references, and documentation structure including restated product quantities outside the specification (`docs/PRODUCT.md` and `docs/product/`), the size limits and file structure of the specification, and the agreement between its index and the files under `docs/product/` (section 12 of this document). Link, ADR-reference and quantity checks cover only the live documents selected by `collectLiveDocuments` in `scripts/check-docs.mts`, which includes every Markdown file directly under `docs/product/`. The link check verifies that the target file exists; it does not validate heading anchors.
 
 It also scans Git-tracked and new nonignored Markdown for explicit scratch-file dependencies, including inline paths, Markdown links and reference definitions. Source copies without Git metadata are scanned recursively, excluding generated and scratch directories. Unfinished plans linked from `plans/README.md` and `WORKING_PLAN.md` may retain continuation evidence; a `Status: Completed`, `Closed`, `Done`, or `Retired` in the plan or its index row removes that exception. Directory paths ending in `/`, placeholders, fenced examples, and inline commands starting with a supported command name are allowed. This syntactic check complements the documentation and plan-closure review in `docs/AGENT_WORKFLOW.md` §11; it cannot determine whether prose states every lasting conclusion.
 
@@ -1130,9 +1130,12 @@ Requirement traceability uses a standalone comment directly above a test or suit
 
 `npm run check:requirements` scans `src/**/*.test.*`, `scripts/**/*.test.*`,
 `e2e/**/*.{ts,mts,mjs}` and `perf/**/*.{ts,mts,mjs}`, including both Electron and Chrome specs.
-It requires a marker for every numbered leaf section of `docs/PRODUCT.md` and for
-parents with their own text; unnumbered subheadings belong to the nearest numbered
-section. Numbered headings at levels two through four are supported (for example,
+The specification is the index `docs/PRODUCT.md` plus every file under `docs/product/`.
+The checker scans each file separately and orders the sections by number before it
+applies its rules, so a section may be stored in any file. It requires a marker for
+every numbered leaf section and for parents with their own text; unnumbered
+subheadings belong to the nearest numbered section. A parent is a section whose next
+section number is deeper. Numbered headings at levels two through four are supported (for example,
 `#### 20.2.1 Title`); heading level must match number depth plus one. A marker on
 a parent with numbered children and no own text must cite a subsection instead.
 It rejects unknown section numbers and malformed markers. The checker
@@ -1144,20 +1147,37 @@ traceability locates executable evidence; it does not prove that every sentence
 has an assertion. Add markers only to tests that exercise the cited behavior and
 review their assertions against the requirements when behavior changes.
 
-`npm run check:docs` limits PRODUCT.md blocks to 700 characters and each numbered
-section's own text to 8,000 characters. Paragraphs, individual list items with
+`npm run check:docs` limits specification blocks to 700 characters and each numbered
+section's own text to 8,000 characters, in the index and in every file under
+`docs/product/`. Paragraphs, individual list items with
 their continuation lines, and table rows are blocks; headings, fenced code,
 comments, separators, and blank lines are excluded from block counting. Section
 text includes unnumbered headings and fenced code, but excludes comments and
 separators. Block failures report the file, line, section, size, and limit with
 "Split it into one rule per list item without rewording"; section failures say
 "Split it into numbered subsections". The limits apply to every section; there is
-no exemption mechanism.
+no exemption mechanism. The files under `docs/product/` are live documents for
+link, ADR-reference, and limit checks. They are exempt from the check that rejects a
+restated product quantity, because they own those quantities.
+
+The same command checks the structure of the specification files. A file under
+`docs/product/` has one level-one title and then its first numbered heading; text
+between them, other than blank lines, comments, and separators, fails because every
+requirement belongs to a numbered section. The index lists every numbered heading
+once, in the table that names its file, and lists no titles, so retitling a heading
+does not touch the index. A number that leaves the specification moves to the index
+table of retired numbers and is never defined again. The check fails when a number has
+no entry, an entry has no heading, a number maps to a file other than the one that
+holds its heading, a file is missing from the index, or two files define one number.
 
 Before restructuring requirement text, record the starting Git ref and run
-`npm run check:docs -- --verbatim <ref>` after the edit. It compares the working
-PRODUCT.md with that revision through a shell-free Git child process. Use
-`--file docs/VIM_CONFORMANCE.md` for that document and `--allow-added <n>` for an
+`npm run check:docs -- --verbatim <ref>` after the edit. Without `--file`, it
+compares the whole specification with that revision: each side is the index plus every
+file under `docs/product/` that exists on that side, so a clause that moves to another
+file is reported as moved, not lost. A revision from before the split has the single
+old file. It reads Git through a shell-free child process. Use `--file <path>` to narrow
+both sides to one file, for example `--file docs/VIM_CONFORMANCE.md` for that document,
+and `--allow-added <n>` for an
 explicit number of added lead-in clauses. Exit 0 requires no removed clauses and
 no additions beyond that bound; differences exit 1, invalid refs or files exit 2.
 The report lists clause counts, removed and added clauses, changed headings,
@@ -1170,6 +1190,18 @@ only equality of normalized clause multisets: it does not verify clause or
 sentence order, and changes among periods, semicolons, and colons at internal
 clause boundaries are also invisible. Review the diff for order and punctuation
 under the stricter restructuring rules, and inspect each reported antecedent.
+The first report line also counts moved clauses and added and removed headings.
+
+`npm run check:docs -- --ordered <ref>` proves that a split moved text without
+changing it. It reads the specification at that revision and in the working tree as
+the default `--verbatim` form does. For every numbered section, it compares the lines
+from the section heading to the next numbered heading with the same section at the
+revision, in the same order and character for character. The comparison ignores the
+blank lines and `---` separators that end any section, and the order of sections and
+files; it reports every other difference, including every interior line. Each difference prints both locations and both lines;
+the first line counts differing lines. A section that is missing, extra, or defined
+twice is a structural problem. Exit 0 requires no problem and at most the number of
+differing lines given by `--allow-differences <n>`, default 0. Invalid refs exit 2.
 
 Preserve every sentence's characters, inline code, links, numbers, and references
 when restructuring PRODUCT.md. Add Title Case headings and `*` list markers;

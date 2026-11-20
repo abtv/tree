@@ -5,7 +5,9 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   conformanceCitationMatches,
+  compareOrderedSections,
   compareVerbatim,
+  formatOrderedReport,
   formatVerbatimReport,
   extractTestTitles,
   findBrokenLinks,
@@ -14,14 +16,18 @@ import {
   findProductQuantityRestatements,
   findOversizedProductText,
   findStaleConformanceCitations,
+  findTextBeforeFirstSection,
   parseConformanceCitations,
+  parseOrderedArguments,
   parseVerbatimArguments,
   runChecks,
+  runOrdered,
   runVerbatim,
   main,
   validateAdr,
   validateAdrIndex,
   validateOpenQuestions,
+  validateProductIndex,
   validateWorkflowOwnership,
   validateAgentCore,
   AGENT_CORE_MAX_BYTES,
@@ -829,5 +835,434 @@ describe('runChecks', () => {
 
     expect(result.issues).toEqual([expect.stringContaining('no test titled "missing name"')])
     expect(result.liveDocumentCount).toBe(1)
+  })
+})
+
+describe('specification files under docs/product', () => {
+  const index = [
+    '# Product Requirements',
+    '',
+    '| Sections | File |',
+    '| --- | --- |',
+    '| 1, 1.1 | [Overview](product/overview.md) |',
+    '| 20, 20.2, 20.2.1 | [Vim](product/vim.md) |',
+    '',
+    '## Retired Numbers',
+    '',
+    '| Number | Now owned by |',
+    '| --- | --- |',
+    '',
+  ].join('\n')
+  const overview = '# Overview\n\n## 1. One\n\n### 1.1 Child\nRule.\n'
+  const vim = '# Vim\n\n## 20. Principles\n\n### 20.2 Vim\n\n#### 20.2.1 Mode\nKeep this rule. Keep that rule.\n'
+  const files = [
+    { path: 'docs/product/overview.md', content: overview },
+    { path: 'docs/product/vim.md', content: vim },
+  ]
+
+  function writeSpecification(root: string, specification = { index, overview, vim }) {
+    writeFile(root, 'docs/PRODUCT.md', specification.index)
+    writeFile(root, 'docs/product/overview.md', specification.overview)
+    writeFile(root, 'docs/product/vim.md', specification.vim)
+  }
+
+  it('accepts an index that matches the headings and lists no titles', () => {
+    expect(validateProductIndex({ index, files })).toEqual([])
+  })
+
+  it('reports a number the index omits, maps to the wrong file, or lists without a heading', () => {
+    const omitted = index.replace('1, 1.1', '1')
+    const wrong = index.replace('1, 1.1', '1').replace('20, 20.2, 20.2.1', '1.1, 20, 20.2, 20.2.1')
+    const phantom = index.replace('20, 20.2, 20.2.1', '20, 20.2, 20.2.1, 20.2.9')
+
+    expect(validateProductIndex({ index: omitted, files })).toEqual([
+      'docs/PRODUCT.md: the index does not list §1.1 (docs/product/overview.md)',
+    ])
+    expect(validateProductIndex({ index: wrong, files })).toEqual([
+      'docs/PRODUCT.md: the index maps §1.1 to docs/product/vim.md, but its heading is in docs/product/overview.md',
+    ])
+    expect(validateProductIndex({ index: phantom, files })).toEqual([
+      'docs/PRODUCT.md: the index lists §20.2.9, which no file defines',
+    ])
+  })
+
+  it('reports a duplicated number, a missing file, and an unlisted file', () => {
+    const twice = index.replace('20, 20.2, 20.2.1', '20, 20, 20.2, 20.2.1')
+    const missing = index.replace('product/vim.md', 'product/other.md')
+
+    expect(validateProductIndex({ index: twice, files })).toEqual([
+      'docs/PRODUCT.md: the index lists §20 more than once',
+    ])
+    expect(validateProductIndex({ index: missing, files })).toEqual([
+      'docs/PRODUCT.md: the index names docs/product/other.md, which does not exist',
+      'docs/PRODUCT.md: the index does not list docs/product/vim.md',
+      'docs/PRODUCT.md: the index maps §20 to docs/product/other.md, but its heading is in docs/product/vim.md',
+      'docs/PRODUCT.md: the index maps §20.2 to docs/product/other.md, but its heading is in docs/product/vim.md',
+      'docs/PRODUCT.md: the index maps §20.2.1 to docs/product/other.md, but its heading is in docs/product/vim.md',
+    ])
+    expect(
+      validateProductIndex({
+        index,
+        files: [...files, { path: 'docs/product/extra.md', content: '# Extra\n' }],
+      }),
+    ).toEqual(['docs/PRODUCT.md: the index does not list docs/product/extra.md'])
+  })
+
+  it('reports a number that two files define', () => {
+    const duplicate = [...files, { path: 'docs/product/extra.md', content: '# Extra\n\n## 1. Again\nRule.\n' }]
+
+    expect(validateProductIndex({ index, files: duplicate })).toEqual(
+      expect.arrayContaining(['docs/PRODUCT.md: §1 has a heading in more than one file']),
+    )
+  })
+
+  it('keeps a retired number out of the headings and the listing', () => {
+    const retired = index.replace(
+      '| Number | Now owned by |\n| --- | --- |\n',
+      '| Number | Now owned by |\n| --- | --- |\n| 1.1 | `docs/DEVELOPMENT.md` |\n',
+    )
+    const withoutHeading = [{ ...files[0]!, content: '# Overview\n\n## 1. One\nRule.\n' }, files[1]!]
+
+    expect(validateProductIndex({ index: retired.replace('1, 1.1', '1'), files: withoutHeading })).toEqual([])
+    expect(validateProductIndex({ index: retired, files })).toEqual(
+      expect.arrayContaining([
+        'docs/PRODUCT.md: §1.1 is retired but a heading in docs/product/overview.md defines it',
+        'docs/PRODUCT.md: §1.1 is both listed and retired',
+      ]),
+    )
+  })
+
+  it('rejects text before the first numbered heading other than the title', () => {
+    const check = (content: string) => findTextBeforeFirstSection({ content, displayPath: 'docs/product/x.md' })
+
+    expect(check('# Title\n\n<!-- note -->\n---\n\n## 1. One\nRule.\n')).toEqual([])
+    expect(check('# Title\n')).toEqual([])
+    expect(check('# Title\n\nA rule outside a section.\n\n## 1. One\nRule.\n')).toEqual([
+      'docs/product/x.md:3: text before the first numbered heading; every requirement belongs to a numbered section',
+    ])
+    expect(check('## 1. One\nRule.\n')).toEqual([
+      'docs/product/x.md: missing the level-one title before the first numbered heading',
+    ])
+    expect(check('# One\n# Two\n## 1. One\n')).toEqual([
+      'docs/product/x.md:2: text before the first numbered heading; every requirement belongs to a numbered section',
+    ])
+  })
+
+  it('passes a consistent specification and counts its files as live documents', () => {
+    const root = createTemporaryRoot()
+
+    writeSpecification(root)
+    const result = runChecks({ rootDirectory: root })
+
+    expect(result.issues).toEqual([])
+    expect(result.liveDocumentCount).toBe(3)
+  })
+
+  it('applies the block and section limits to every file', () => {
+    const root = createTemporaryRoot()
+
+    writeSpecification(root, { index, overview, vim: vim + 'x'.repeat(701) + '\n' })
+    const result = runChecks({ rootDirectory: root })
+
+    expect(result.issues).toEqual([
+      expect.stringMatching(
+        /^docs\/product\/vim\.md:\d+ \(§20\.2\.1\): paragraph has \d+ characters; the limit is 700/,
+      ),
+    ])
+  })
+
+  it('exempts these files from the quantity restatement check but not other documents', () => {
+    const root = createTemporaryRoot()
+
+    writeSpecification(root, { index, overview, vim: vim.replace('Keep this rule.', 'Nodes remain at level 20.') })
+    writeFile(root, 'README.md', 'Nodes remain at level 20.\n')
+
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      'README.md: restates the node-depth value ("level 20"); the owner is docs/PRODUCT.md',
+    ])
+  })
+
+  it('checks links of every file relative to its own directory', () => {
+    const root = createTemporaryRoot()
+
+    writeSpecification(root, { index, overview: overview + '[Security](../SECURITY.md)\n', vim })
+    const missing = runChecks({ rootDirectory: root, group: 'links' }).issues
+
+    writeFile(root, 'docs/SECURITY.md', '# Security\n')
+
+    expect(missing).toEqual(['docs/product/overview.md: link target not found: ../SECURITY.md'])
+    expect(runChecks({ rootDirectory: root, group: 'links' }).issues).toEqual([])
+  })
+
+  it('fails when text precedes the first numbered heading of a file or the index disagrees with the files', () => {
+    const root = createTemporaryRoot()
+
+    writeSpecification(root, {
+      index: index.replace('1, 1.1', '1'),
+      overview: overview.replace('# Overview\n', '# Overview\nLoose rule.\n'),
+      vim,
+    })
+    const issues = runChecks({ rootDirectory: root }).issues
+
+    expect(issues).toEqual([
+      'docs/product/overview.md:2: text before the first numbered heading; every requirement belongs to a numbered section',
+      'docs/PRODUCT.md: the index does not list §1.1 (docs/product/overview.md)',
+    ])
+  })
+})
+
+describe('verbatim comparison of the whole specification', () => {
+  const singleFile =
+    '# Product\n\n## 1. One\nFirst rule. Second rule.\n\n## 20. Vim\n\n### 20.2 Modes\n\n#### 20.2.1 Keys\nVim rule one. Vim rule two.\n'
+  const split = {
+    index:
+      '# Product\n\n| Sections | File |\n| --- | --- |\n| 1 | [Overview](product/overview.md) |\n| 20, 20.2, 20.2.1 | [Vim](product/vim.md) |\n',
+    overview: '# Overview\n\n## 1. One\nFirst rule. Second rule.\n',
+    vim: '# Vim\n\n## 20. Vim\n\n### 20.2 Modes\n\n#### 20.2.1 Keys\nVim rule one. Vim rule two.\n',
+  }
+
+  function commit(root: string, message: string) {
+    const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+
+    git(['add', '-A'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      message,
+    ])
+    return git(['rev-parse', 'HEAD']).trim()
+  }
+
+  function writeSplit(root: string, vim = split.vim) {
+    writeFile(root, 'docs/PRODUCT.md', split.index)
+    writeFile(root, 'docs/product/overview.md', split.overview)
+    writeFile(root, 'docs/product/vim.md', vim)
+  }
+
+  it('compares the index and every file with the single file of a revision before the split', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeFile(root, 'docs/PRODUCT.md', singleFile)
+    const base = commit(root, 'docs(fixture): add the single file')
+
+    writeSplit(root)
+    const result = runVerbatim({ ref: base, rootDirectory: root, allowAdded: 100 })
+
+    expect(result.comparison.removed).toEqual([])
+    expect(result.comparison.moved).toEqual([])
+    expect(result.comparison.headingsRemoved).toEqual([])
+    expect(result.exitCode).toBe(0)
+  })
+
+  it('exits 1 when a clause is removed from a file while the index is unchanged', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeSplit(root)
+    const base = commit(root, 'docs(fixture): add the split specification')
+
+    expect(runVerbatim({ ref: base, rootDirectory: root }).exitCode).toBe(0)
+
+    writeSplit(root, split.vim.replace(' Vim rule two.', ''))
+    const result = runVerbatim({ ref: base, rootDirectory: root })
+
+    expect(result.exitCode).toBe(1)
+    expect(result.comparison.removed.map(({ text }) => text)).toEqual(['Vim rule two'])
+  })
+
+  it('reports a clause that moves to another file as moved, not lost', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeSplit(root)
+    const base = commit(root, 'docs(fixture): add the split specification')
+
+    writeFile(root, 'docs/product/overview.md', split.overview + '\nVim rule two.\n')
+    writeFile(root, 'docs/product/vim.md', split.vim.replace(' Vim rule two.', ''))
+    const result = runVerbatim({ ref: base, rootDirectory: root })
+
+    expect(result.comparison.removed).toEqual([])
+    expect(result.comparison.moved.map(({ text }) => text)).toEqual(['Vim rule two'])
+  })
+
+  it('narrows both sides to one file with --file', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeSplit(root)
+    const base = commit(root, 'docs(fixture): add the split specification')
+
+    writeSplit(root, split.vim.replace(' Vim rule two.', ''))
+
+    expect(runVerbatim({ ref: base, file: 'docs/PRODUCT.md', rootDirectory: root }).exitCode).toBe(0)
+    expect(runVerbatim({ ref: base, file: 'docs/product/vim.md', rootDirectory: root }).exitCode).toBe(1)
+  })
+
+  it('reads only the files directly under docs/product at the revision', () => {
+    const root = createTemporaryRoot()
+    execFileSync('git', ['init', '--quiet'], { cwd: root })
+    writeSplit(root)
+    writeFile(root, 'docs/product/nested/extra.md', '# Extra\n\n## 99. Nested\nNested rule.\n')
+    const base = commit(root, 'docs(fixture): add a nested file')
+
+    const result = runVerbatim({ ref: base, rootDirectory: root })
+
+    expect(result.comparison.removed).toEqual([])
+    expect(result.comparison.before).toBe(result.comparison.after)
+  })
+
+  it('has no default file in the argument parser', () => {
+    expect(parseVerbatimArguments(['--verbatim', 'HEAD'])).toEqual({ ref: 'HEAD', file: undefined, allowAdded: 0 })
+  })
+})
+
+describe('ordered comparison of numbered sections', () => {
+  const before =
+    '# Product\n\n## 1. One\n\nFirst rule.\nSee [Security](SECURITY.md).\n\n---\n\n## 2. Two\n\n### 2.1 Child\nAlpha.\nBeta.\n'
+  const after = [
+    { path: 'docs/PRODUCT.md', content: '# Product\n\n| 1, 2, 2.1 | files |\n' },
+    { path: 'docs/product/a.md', content: '# A\n\n## 1. One\n\nFirst rule.\nSee [Security](SECURITY.md).\n' },
+    { path: 'docs/product/b.md', content: '# B\n\n## 2. Two\n\n### 2.1 Child\nAlpha.\nBeta.\n\n---\n' },
+  ]
+  const compare = (files = after) =>
+    compareOrderedSections({ before: [{ path: 'docs/PRODUCT.md', content: before }], after: files })
+
+  it('accepts a split that moves whole sections and ignores trailing separators and blank lines', () => {
+    expect(compare()).toEqual({ sectionCount: 3, differences: [], differingLines: 0, problems: [] })
+  })
+
+  it('accepts the sections in any file order', () => {
+    expect(compare([after[0]!, after[2]!, after[1]!]).differences).toEqual([])
+  })
+
+  it('reports a changed line with both locations, and a changed link target', () => {
+    const changed = [
+      after[0]!,
+      { ...after[1]!, content: after[1]!.content.replace('(SECURITY.md)', '(../SECURITY.md)') },
+      after[2]!,
+    ]
+
+    const result = compare(changed)
+
+    expect(result.problems).toEqual([])
+    expect(result.differences).toEqual([
+      {
+        id: '1',
+        before: [{ label: 'docs/PRODUCT.md', line: 6, text: 'See [Security](SECURITY.md).' }],
+        after: [{ label: 'docs/product/a.md', line: 6, text: 'See [Security](../SECURITY.md).' }],
+      },
+    ])
+    expect(formatOrderedReport(result)).toBe(
+      [
+        'Ordered comparison: 3 sections, 1 differing lines (1 groups), 0 structural problems.',
+        'Difference §1',
+        '  - docs/PRODUCT.md:6: See [Security](SECURITY.md).',
+        '  + docs/product/a.md:6: See [Security](../SECURITY.md).',
+      ].join('\n'),
+    )
+  })
+
+  it('reports reordered, dropped, added, and extra interior blank lines', () => {
+    const reordered = [
+      after[0]!,
+      after[1]!,
+      { ...after[2]!, content: after[2]!.content.replace('Alpha.\nBeta.', 'Beta.\nAlpha.') },
+    ]
+    const dropped = [after[0]!, after[1]!, { ...after[2]!, content: after[2]!.content.replace('Beta.\n', '') }]
+    const added = [
+      after[0]!,
+      after[1]!,
+      { ...after[2]!, content: after[2]!.content.replace('Beta.\n', 'Beta.\nGamma.\n') },
+    ]
+    const blank = [
+      after[0]!,
+      { ...after[1]!, content: after[1]!.content.replace('First rule.', '\nFirst rule.') },
+      after[2]!,
+    ]
+
+    expect(compare(reordered).differences).not.toEqual([])
+    expect(compare(dropped).differences).toEqual([
+      { id: '2.1', before: [expect.objectContaining({ text: 'Beta.' })], after: [] },
+    ])
+    expect(compare(added).differences).toEqual([
+      { id: '2.1', before: [], after: [expect.objectContaining({ text: 'Gamma.' })] },
+    ])
+    expect(compare(blank).differences).toHaveLength(1)
+  })
+
+  it('reports a heading change, a missing section, an extra section, and a duplicate', () => {
+    const retitled = [
+      after[0]!,
+      { ...after[1]!, content: after[1]!.content.replace('## 1. One', '## 1. Uno') },
+      after[2]!,
+    ]
+    const missing = [after[0]!, after[1]!]
+    const extra = [...after, { path: 'docs/product/c.md', content: '# C\n\n## 3. Three\nRule.\n' }]
+    const duplicate = [...after, { path: 'docs/product/c.md', content: '# C\n\n## 1. One\nRule.\n' }]
+
+    expect(compare(retitled).differences).toHaveLength(1)
+    expect(compare(missing).problems).toEqual(['§2: missing after the split', '§2.1: missing after the split'])
+    expect(compare(extra).problems).toEqual(['§3: not present in the base specification'])
+    expect(compare(duplicate).problems).toEqual(['§1: more than one heading in the files after the split'])
+  })
+
+  it('parses its arguments strictly', () => {
+    expect(parseOrderedArguments(['--ordered', 'HEAD~1'])).toEqual({ ref: 'HEAD~1', allowDifferences: 0 })
+    expect(parseOrderedArguments(['--ordered', 'abc123', '--allow-differences', '4'])).toEqual({
+      ref: 'abc123',
+      allowDifferences: 4,
+    })
+    for (const args of [
+      [],
+      ['--ordered'],
+      ['--ordered', '-HEAD'],
+      ['--ordered', 'bad:ref'],
+      ['--ordered', 'HEAD', '--ordered', 'HEAD'],
+      ['--ordered', 'HEAD', '--allow-differences', '-1'],
+      ['--ordered', 'HEAD', '--file', 'docs/PRODUCT.md'],
+    ])
+      expect(() => parseOrderedArguments(args)).toThrow()
+  })
+
+  it('compares a Git revision with the working tree and exits 1 for any difference unless allowed', () => {
+    const root = createTemporaryRoot()
+    const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+
+    git(['init', '--quiet'])
+    writeFile(root, 'docs/PRODUCT.md', before)
+    git(['add', '-A'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'docs(fixture): add the single file',
+    ])
+    for (const { path, content } of after) writeFile(root, path, content)
+
+    expect(runOrdered({ ref: 'HEAD', rootDirectory: root }).exitCode).toBe(0)
+
+    writeFile(root, 'docs/product/a.md', after[1]!.content.replace('First rule.', 'Changed rule.'))
+
+    expect(runOrdered({ ref: 'HEAD', rootDirectory: root }).exitCode).toBe(1)
+    expect(runOrdered({ ref: 'HEAD', rootDirectory: root, allowDifferences: 1 }).exitCode).toBe(0)
+    expect(() => runOrdered({ ref: 'missing', rootDirectory: root })).toThrow()
+  })
+
+  it('returns process exit 2 for bad ordered arguments', () => {
+    const script = join(import.meta.dirname, 'check-docs.mts')
+    const result = spawnSync(process.execPath, [script, '--ordered', '-HEAD'], { encoding: 'utf8' })
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('Ordered comparison failed:')
   })
 })

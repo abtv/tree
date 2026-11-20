@@ -54,14 +54,14 @@ using the hosted site. It uses a separate origin from the development server.
 The build includes a meta CSP; framed startup is rejected by the existing adapter.
 The preview serves files directly without Vite transforms or a development client.
 Chrome can install the preview or hosted site as **Tree** from its menu; see
-[installation and storage protection](../../docs/PRODUCT.md#241-installation-and-storage-protection).
+[installation and storage protection](../../docs/product/browser.md#241-installation-and-storage-protection).
 The production package registers a Service Worker for offline startup and updates;
 the development server does not. After the menu reports **Ready to work offline**,
 the app can restart without Internet. A complete update downloads at startup or
 reconnection and appears as **Update App** at the bottom of the menu, with a dot
 on its trigger. It saves pending edits before reloading; other Tree windows must
 be closed first. Interrupted downloads preserve the installed version. See
-[offline access and app updates](../../docs/PRODUCT.md#247-offline-access-and-app-updates).
+[offline access and app updates](../../docs/product/browser.md#247-offline-access-and-app-updates).
 No recovery generations are added. Existing storage and save limitations below still apply.
 
 ## Local development
@@ -91,7 +91,7 @@ edit at a time.
 document and its referenced images, in the layout of the desktop data directory.
 A module worker writes the archive, so editing continues meanwhile. The archive
 format, limits and messages are defined in
-[the browser data-safety requirements](../../docs/PRODUCT.md#24-browser-data-safety).
+[the browser data-safety requirements](../../docs/product/browser.md#24-browser-data-safety).
 Keep exported archives somewhere other than the browser profile so they survive
 clearing site data.
 
@@ -123,7 +123,7 @@ active backup folder externally. See PRODUCT §24.5 for timing and failure rules
 
 Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
 and Home/End for line boundaries. The command panel shows the matching labels.
-See [keyboard mappings and exceptions](../../docs/PRODUCT.md#15-keyboard-modifiers-outside-apple-platforms).
+See [keyboard mappings and exceptions](../../docs/product/browser.md#15-keyboard-modifiers-outside-apple-platforms).
 Real-keyboard delivery of browser-reserved shortcuts on Linux and Windows remains
 unverified; Chromium automation checks application handling and default prevention.
 
@@ -133,7 +133,7 @@ use the arrow keys. Actual Windows AltGr input remains unverified. These limits
 are recorded with the mapping in the linked requirements.
 
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
-see [the browser requirements](../../docs/PRODUCT.md#14-browser-static-hosting-checkpoint).
+see [the browser requirements](../../docs/product/browser.md#14-browser-static-hosting-checkpoint).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text
 remains marked unsaved until committed. Closing with pending work warns and

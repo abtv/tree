@@ -7,7 +7,7 @@ Clarification (2026-11-15): the owner confirmed resumable roll-forward recovery.
 The original "changes no files" statement below applies to rejection of an unreadable
 or invalid journal, not to a later failure during valid recovery. Completed moves
 remain in place and loading stays blocked until recovery completes. Current guarantees
-are in [PRODUCT §25.4](../PRODUCT.md#254-replaced-notes) and
+are in [PRODUCT §25.4](../product/desktop-data.md#254-replaced-notes) and
 [Desktop notes replacement](../ARCHITECTURE.md#desktop-notes-replacement).
 
 ## Context

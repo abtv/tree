@@ -6,6 +6,7 @@ export interface ProductSection {
   id: string
   title: string
   level: number
+  heading: string
   startLine: number
   lines: ProductLine[]
 }
@@ -56,7 +57,14 @@ export function scanProductSections(content: string) {
     }
     const heading = !fenceMatch && !fence && /^(#{2,4})\s+(\d+(?:\.\d+)*)\.?\s+(.+)$/.exec(line)
     if (heading) {
-      current = { id: heading[2]!, title: heading[3]!, level: heading[1]!.length, startLine: index + 1, lines: [] }
+      current = {
+        id: heading[2]!,
+        title: heading[3]!,
+        level: heading[1]!.length,
+        heading: originalLines[index]!,
+        startLine: index + 1,
+        lines: [],
+      }
       sections.push(current)
     } else if (current) current.lines.push({ number: index + 1, text: originalLines[index]! })
   }
