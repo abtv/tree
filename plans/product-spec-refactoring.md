@@ -1,8 +1,8 @@
 # Product Specification Refactoring
 
-Status: Awaiting owner approval
+Status: Approved; T1 awaits a separate owner approval to start
 
-This plan records the analysis and the proposed task sequence for refactoring `docs/PRODUCT.md`. The Product Owner requested the plan only. No task in this plan is authorized for implementation.
+This plan records the analysis and the task sequence for refactoring `docs/PRODUCT.md`. The Product Owner accepted the plan and answered its questions on 2026-11-20 (§11). Step P0 is done. No implementation task has started: T1 waits for a separate owner approval.
 
 ## 1. Objective
 
@@ -28,12 +28,13 @@ Sources of truth: [AGENTS.md](../AGENTS.md) §§2, 8, 11; [Agent Workflow Proced
 
 ## 3. Authorization State
 
-- Authorized: recording this plan and its index row (owner request of 2026-11-20).
-- Not authorized: every task in §8. After the owner approves the plan and answers §11, step P0 records the answers in this plan and updates the affected tasks. T1 then starts only after a separate, explicit owner approval (owner instruction of 2026-11-20).
-- Proposed approval scope: the whole initiative, with a pilot checkpoint after R09.
+- Authorized and done: recording this plan, its two review corrections, and step P0 (owner instructions of 2026-11-20).
+- Accepted by the owner on 2026-11-20: the plan as corrected in commit `9178ec3`, and the recommended defaults for Q1–Q8 and Q10–Q13. Q9 is decided per confirmed candidate in round 4.
+- Not yet authorized: T1 and every later task. T1 starts only after a separate, explicit owner approval.
+- Approval scope after T1: not stated yet. The plan proposes the whole initiative with the pilot checkpoint after R09 (Q13). Until the owner states the scope, each task needs the owner's go-ahead.
 - Selected coding tool: Claude Code. The owner's model routing names Anthropic models (§9).
 - Delegated decision areas after approval: wording of present-state statements; file placement inside the approved structure; merging of statements whose meaning is identical; removal of approval attributions and pure history notes (rule W5 in §7.1).
-- Reserved for the owner: every question in §11; every statement held under rule W7(c); every suspected inconsistency in §12; every move of a detail to tests only; any new, retired, or retitled section beyond those listed in §11.
+- Reserved for the owner: every Q9 candidate; every statement held under rule W7(c); every suspected inconsistency in §12; every move of a detail to tests only; any new, retired, or retitled section beyond those listed in §11.
 
 ## 4. Analysis
 
@@ -253,14 +254,14 @@ Correction kept as a calibration case: the first version of this sample narrowed
 
 1. **Base.** Record the starting commit. Run `npm run check:requirements` and record the requirement count.
 2. **Rewrite.** Apply §7.1 to the task's sections only.
-3. **Clause inventory.** Run `npm run check:docs -- --verbatim <base> --file <file>` for each changed specification file. The command exits 1 for a rewrite; that is expected. Its report is the complete list of removed and added clauses.
-4. **Statement map.** In `.scratch/product-spec-<task>/`, give every removed clause a disposition under W2 and every added clause its source clauses. For Merged and Moved, name the surviving location.
-5. **Independent verifier.** A reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side), the rules of §7.1, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, reordered, and it audits literals under W9, order under W11, and citation scope under W12. The implementer saves the verifier's table unchanged in the task's scratch directory.
+3. **Clause inventory and literal report.** Run `npm run check:docs -- --verbatim <base> --file <file>` for each changed specification file. The command exits 1 for a rewrite; that is expected. Its report is the complete list of removed and added clauses. Then run the literal comparison mode that T2 adds, against the same base and files. Its report lists every number, code span, and bold UI label that the rewrite removed or added. Save both reports in `.scratch/product-spec-<task>/`.
+4. **Statement map.** In `.scratch/product-spec-<task>/`, give every removed clause a disposition under W2 and every added clause its source clauses. For Merged and Moved, name the surviving location. Give every literal difference of the T2 report a disposition under W9.
+5. **Independent verifier.** A reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side), the rules of §7.1, the T2 literal report, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, reordered, and it audits literals under W9, order under W11, and citation scope under W12. The implementer saves the verifier's table unchanged in the task's scratch directory.
 6. **Reconcile.** The implementer compares the verifier's table with the map. Every lost, changed, added, or unrecorded reordered entry is corrected or becomes an owner question with the sentence held verbatim. Repeat the verifier pass only when corrections are substantial (`AGENTS.md` §13).
 7. **Validation.** Minimal Risk tier: `npm run format:check:changed`, `npm run check:docs`, `npm run check:requirements`, and `npm run check:opencode` when agent workflow documents change. A task that edits a marker line in a test file is Low Risk: also run lint and the focused tests for the touched files.
 8. **Question log.** Before the commit, copy into the Owner Question Log (section 16 of this plan) every held sentence (W7(c), W13), every confirmed finding of §12, and every Q9 candidate the task verified. Each entry quotes the text and names its location, so it stays usable after the scratch directory is gone.
 9. **Commit** the rewrite with the plan status update and the log entries.
-10. **Cleanup.** Remove the task's scratch directory after the commit. Exception: R09 keeps its statement map and the verifier's table in `.scratch/product-spec-R09/` until the owner decides the pilot checkpoint; the session that records that decision removes the directory.
+10. **Cleanup.** Remove the task's scratch directory after the commit. Exception: R09 keeps its statement map, the verifier's table, and the T2 literal report in `.scratch/product-spec-R09/` until the owner decides the pilot checkpoint; the session that records that decision removes the directory.
 
 ### 7.4 Evidence that counts as "no behavior change"
 
@@ -270,7 +271,7 @@ All seven conditions hold:
 - **E2.** The statement map covers every removed and every added clause of the verbatim report, with no clause unassigned.
 - **E3.** The independent verifier's table has no unresolved lost, changed, or added entry.
 - **E4.** The requirement count is unchanged, or each difference is a section addition or retirement named in §8.
-- **E5.** Every literal is preserved or covered by a recorded Merged or Moved disposition.
+- **E5.** The T2 literal report shows no removed or added literal without a recorded Merged or Moved disposition.
 - **E6.** The checks of step 7 pass.
 - **E7.** Order is preserved wherever W11 applies, or each reordering is recorded in the map and confirmed by the verifier.
 
@@ -287,7 +288,7 @@ These conditions prove that the text keeps its statements. They do not prove tha
 
 ## 8. Tasks
 
-Working-task count: 43. Final owner acceptance under `AGENTS.md` §8 applies. Step P0 is administrative and is not counted.
+Working-task count: 39 after the three merges of Q12: T1, T2, 35 rewrite tasks, F1, F2. Final owner acceptance under `AGENTS.md` §8 applies. Step P0 is administrative and is not counted.
 
 A task edits only the files in its row. Where a row names a file with a condition ("only for a Q7 move"), the file changes only under that condition.
 
@@ -295,31 +296,27 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E7 of §7.4. Tiers fol
 
 | ID | Outcome | Depends on | Files | Tier | Routing | Evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| P0 | Record the owner's answers to §11 in this plan. Update every affected task row, file list, evidence condition, and the next-session prompt to match the answers. No other file changes. | Owner approval of the plan and answers to §11 | `plans/product-spec-refactoring.md`, `plans/README.md` | Minimal | Primary session, any model / none | Each answer is recorded in §11; each affected row cites the answer it follows; `npm run check:docs` passes | Planned |
+| P0 | Record the owner's answers to §11 in this plan. Update every affected task row, file list, evidence condition, and the next-session prompt to match the answers. No other file changes. | Owner approval of the plan and answers to §11 | `plans/product-spec-refactoring.md`, `plans/README.md` | Minimal | Primary session, any model / none | Each answer is recorded in §11; each affected row cites the answer it follows; `npm run check:docs` passes | Done |
 | T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven incoming anchor links, three outgoing link paths. No other text change and no reordering. | P0, and a separate owner approval to start T1 | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Planned |
-| T2 | Literal comparison report for rewrite verification (numbers, code spans, bold UI labels) as a `check:docs` mode, with tests. Only if Q10 is approved. | T1 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass; report on the §7.2 sample lists no unexplained literal | Planned |
-| R09 | Pilot: rewrite §9. Retitle the heading if Q3 allows. Owner checkpoint follows. | T1 | `application.md` | Minimal | Opus high / Fable high | R; the statement map and the verifier's table stay available until the owner's pilot decision (§7.3 step 10) | Planned |
-| R01a | Rewrite §1, §1.1–§1.3. Create §9.4 About Tree as the single owner of the dialog (Q4) and add it to the index. §1.1 order and §1.2 rules unchanged. | R09, Q4, Q5 | `overview.md`, `application.md`, `browser.md`; `docs/PRODUCT.md` (index entry for §9.4); `scripts/check-requirement-coverage.mts` (add `'9.4'` to `BOUNDARY_SECTIONS`, no other line); marker lines on tests that exercise only the About dialog: `e2e/electron/about-window.spec.ts:14` from §1.3 to §9.4, and any §1.4 marker of that kind, each listed in the task evidence | Low (`npm run check`) | Opus high / Fable high | R; §9.4 has an `e2e/` marker; the script diff is the one list entry; the index check passes | Planned |
-| R01b | Rewrite §1.4 and §1.5 as browser behavior. | R01a | `browser.md`; if Q3 retitles §1.4, the three anchor targets that name its heading in `docs/SECURITY.md` and `src/web/README.md` | Minimal | Fable high / Fable high | R | Planned |
-| R01c | Move release and process content of §1.4, §1.4.1, §1.5 to its owners (Q5). Retire §1.4.1. | R01b, Q5 | `browser.md`, `docs/PRODUCT.md`, `docs/releasing.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT.md`, `deployment/github-pages/README.md`, `src/web/README.md`, four marker lines in `scripts/release-source.test.mts` and `scripts/web-release/*.test.mts` | Low | Opus high / Fable high | R; per-sentence table "already stated at / moved to" for L169–210 | Planned |
+| T2 | Literal comparison report for rewrite verification (numbers, code spans, bold UI labels) as a `check:docs` mode, with tests (Q10). Every rewrite task uses its report (§7.3 step 3). | T1 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass; report on the §7.2 sample lists no unexplained literal | Planned |
+| R09 | Pilot: rewrite §9 and retitle its heading (Q3). Owner checkpoint follows (Q13). | T1, T2 | `application.md` | Minimal | Opus high / Fable high | R; the statement map, the verifier's table, and the T2 literal report stay available until the owner's pilot decision (§7.3 step 10) | Planned |
+| R01a | Rewrite §1, §1.1–§1.3. Create §9.4 About Tree as the single owner of the dialog (Q4) and add it to the index. §1.1 order and §1.2 rules unchanged. | R09 and the owner's pilot decision | `overview.md`, `application.md`, `browser.md`; `docs/PRODUCT.md` (index entry for §9.4); `scripts/check-requirement-coverage.mts` (add `'9.4'` to `BOUNDARY_SECTIONS`, no other line); marker lines on tests that exercise only the About dialog: `e2e/electron/about-window.spec.ts:14` from §1.3 to §9.4, and any §1.4 marker of that kind, each listed in the task evidence | Low (`npm run check`) | Opus high / Fable high | R; §9.4 has an `e2e/` marker; the script diff is the one list entry; the index check passes | Planned |
+| R01b | Rewrite §1.4 and §1.5 as browser behavior and retitle §1.4 (Q3). | R01a | `browser.md`; the two anchor targets that name the §1.4 heading: `docs/SECURITY.md` L214 and `src/web/README.md` L136 (line numbers at `396e094`) | Minimal | Fable high / Fable high | R | Planned |
+| R01c | Move release and process content of §1.4, §1.4.1, §1.5 to its owners (Q5). Retire §1.4.1. | R01b | `browser.md`, `docs/PRODUCT.md`, `docs/releasing.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT.md`, `deployment/github-pages/README.md`, `src/web/README.md`, four marker lines in `scripts/release-source.test.mts` and `scripts/web-release/*.test.mts` | Low | Opus high / Fable high | R; per-sentence table "already stated at / moved to" for L169–210 | Planned |
 | R02 | Rewrite §2. | R01c | `tree-model.md` | Minimal | Fable high / Fable high | R | Planned |
-| R03 | Rewrite §3. | R02 | `tree-model.md` | Minimal | Opus high / Opus high | R | Planned |
+| R03 | Rewrite §3, §18, and §19 (merged under Q12; 48 lines). | R02 | `tree-model.md` | Minimal | Opus high / Opus high | R | Planned |
 | R04 | Rewrite §4. | R03 | `editing.md` | Minimal | Opus high / Fable high | R | Planned |
 | R05 | Rewrite §5. | R04 | `editing.md` | Minimal | Fable high / Fable high | R | Planned |
-| R06 | Rewrite §6. | R05 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
-| R07 | Rewrite §7. | R06 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
-| R08 | Rewrite §8. | R07 | `editing.md` | Minimal | Fable high / Fable high | R | Planned |
+| R06 | Rewrite §6 and §7 (merged under Q12; 111 lines). | R05 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
+| R08 | Rewrite §8. | R06 | `editing.md` | Minimal | Fable high / Fable high | R | Planned |
 | R10 | Rewrite §10. | R08 | `editing.md` | Minimal | Opus high / Fable high | R | Planned |
 | R11 | Rewrite §11. | R10 | `editing.md` | Minimal | Opus high / Fable high | R | Planned |
-| R12 | Rewrite §12. | R11 | `clipboard-and-paste.md` | Minimal | Opus high / Opus high | R | Planned |
+| R12 | Rewrite §12 and §14 (merged under Q12; 71 lines). | R11 | `clipboard-and-paste.md` | Minimal | Opus high / Opus high | R | Planned |
 | R13 | Rewrite §13. | R12 | `clipboard-and-paste.md` | Minimal | Opus high / Fable high | R | Planned |
-| R14 | Rewrite §14. | R13 | `clipboard-and-paste.md` | Minimal | Opus high / Opus high | R | Planned |
-| R15 | Rewrite §15. | R14 | `images.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L1192–1193) | Minimal | Fable high / Fable high | R | Planned |
+| R15 | Rewrite §15. | R13 | `images.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L1192–1193) | Minimal | Fable high / Fable high | R | Planned |
 | R16 | Rewrite §16. | R15 | `persistence.md` | Minimal | Fable high / Fable high | R; statements 3–6 of §7.2 still present | Planned |
 | R17 | Rewrite §17. | R16 | `images.md` | Minimal | Opus high / Fable high | R | Planned |
-| R18 | Rewrite §18. | R17 | `tree-model.md` | Minimal | Opus high / Opus high | R | Planned |
-| R19 | Rewrite §19. | R18 | `tree-model.md` | Minimal | Opus high / Opus high | R | Planned |
-| R20a | Rewrite §20 own text, §20.1, §20.3, §20.4, §20.6, §20.7. | R19 | `interaction.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L1469) | Minimal | Opus high / Fable high | R | Planned |
+| R20a | Rewrite §20 own text, §20.1, §20.3, §20.4, §20.6, §20.7. | R17 | `interaction.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L1469) | Minimal | Opus high / Fable high | R | Planned |
 | R20b | Rewrite §20.5 and §20.8. | R20a | `interaction.md` | Minimal | Fable high / Fable high | R | Planned |
 | R20c | Rewrite §20.2.1–§20.2.6, §20.2.8, §20.2.27. | R20b | `vim.md` | Minimal | Fable high / Fable high | R; rows M12 and M20 of `docs/VIM_CONFORMANCE.md` stay open | Planned |
 | R20d | Rewrite §20.2.9. | R20c | `vim.md` | Minimal | Fable high / Fable high | R | Planned |
@@ -331,7 +328,7 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E7 of §7.4. Tiers fol
 | R20j | Rewrite §20.9–§20.13. | R20i | `completion-and-tags.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L2180, L2241) | Minimal | Fable high / Fable high | R | Planned |
 | R20k | Rewrite §20.14. | R20j | `search.md`; `docs/DEVELOPMENT.md` only for a Q7 move (L2284) | Minimal | Fable high / Fable high | R | Planned |
 | R21 | Rewrite §21. | R20k | `application.md` | Minimal | Opus high / Fable high | R | Planned |
-| R22 | Rewrite §22. Move procedure sentences to their owners (Q6); §22.1 and §22.2 keep their numbers. | R21, Q6 | `non-functional.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md` | Minimal, plus `npm run check:opencode` | Opus high / Fable high | R; `docs/ARCHITECTURE.md` and `AGENTS.md` citations of §22 still resolve to the cited content | Planned |
+| R22 | Rewrite §22. Move procedure sentences to their owners (Q6); §22.1 and §22.2 keep their numbers. | R21 | `non-functional.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md` | Minimal, plus `npm run check:opencode` | Opus high / Fable high | R; `docs/ARCHITECTURE.md` and `AGENTS.md` citations of §22 still resolve to the cited content | Planned |
 | R23a | Rewrite §23.1–§23.6. | R22 | `agenda.md` | Minimal | Fable high / Fable high | R | Planned |
 | R23b | Rewrite §23.7–§23.15. | R23a | `agenda.md` | Minimal | Fable high / Fable high | R | Planned |
 | R24 | Rewrite §24. | R23b | `browser.md` | Minimal | Fable high / Fable high | R | Planned |
@@ -340,11 +337,11 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E7 of §7.4. Tiers fol
 | F1 | Apply only the owner's answers that keep implemented behavior. A held sentence (W7(c)) or a §12 finding is resolved by stating what the application already does, and the resolution cites a test or source location as evidence. An answer that would change behavior is not applied here: it is recorded as a separate product task outside this initiative, and both original statements stay. Also apply approved moves to tests (Q9). Skipped parts are recorded. | R26, owner answers | Files named by the answers | By content | Fable high / Fable high | R per changed section; each resolution cites its implementation evidence; no production code and no test assertion changes | Planned |
 | F2 | Final sweep: phrase search for remaining history-relative wording, index and retired-number table, every citation and anchor in the repository resolves, acceptance package. | F1 | `docs/PRODUCT.md`, `docs/product/*.md`, citing documents | Minimal | Opus high / Fable high | Citation check listed per citing file; R for changed text | Planned |
 
-Dependencies between rewrite tasks are an order, not a technical constraint, with two exceptions: every rewrite needs T1, and a merge keeps its survivor (§7.2).
+Dependencies between rewrite tasks are an order, not a technical constraint, with three exceptions: every rewrite needs T1 and T2; no rewrite after R09 starts before the owner's pilot decision; and a merge keeps its survivor (§7.2).
 
 Marker edits in total: the About-dialog markers of R01a (one known; any other is listed by the task), four in R01c, and those the owner approves in F1. No other task edits a marker.
 
-Q7 names six sentences. If the owner declines Q7, the five rows above lose their `docs/DEVELOPMENT.md` entry in P0 and the sentences stay where they are. Process content that no approved question covers follows W13.
+Q7 is accepted. It names six sentences in five tasks. Each task decides sentence by sentence whether the text is a user-visible commitment that stays or a measurement method or guard obligation that moves to `docs/DEVELOPMENT.md` §12. Process content that no accepted question covers follows W13.
 
 ## 9. Model Routing and Roles
 
@@ -353,13 +350,13 @@ Q7 names six sentences. If the owner declines Q7, the five rows above lose their
 | T1 implementer | Primary (§1) | Sonnet, medium | `.claude/settings.json` already pins `sonnet` for a new session. The owner sets medium effort in the client. |
 | Implementer, high-risk section | Primary (§1) | Fable, high | The owner selects the model for that session with `/model`. |
 | Implementer, other section | Primary (§1) | Opus, high | The owner selects the model for that session with `/model`. |
-| Independent verifier | Reviewer (§3), fresh context | Fable, high; Opus, high for the low-risk tasks R03, R06, R07, R12, R14, R18, R19 | The primary launches the configured `reviewer` subagent. Its adapter default is `claude-opus-5-5`, high effort. For a Fable pass the primary passes a per-invocation model override. |
+| Independent verifier | Reviewer (§3), fresh context | Fable, high; Opus, high for the low-risk tasks R03, R06, R12 | The primary launches the configured `reviewer` subagent. Its adapter default is `claude-opus-5-5`, high effort. For a Fable pass the primary passes a per-invocation model override. |
 
 High-risk sections, from the owner's list and the inventory: §1.4, §2, §5, §8, §15, §16, §20.2, §20.5, §20.8, §20.9–§20.14, §23, §24, §25.
 
 The verifier is never the session that wrote the rewrite: it is a separate reviewer context that receives the diff and the rules, and not the implementer's map.
 
-Adapter configuration: no change is needed. `.claude/agents/reviewer.md` keeps `claude-opus-5-5` so reviews outside this initiative keep their cost. The per-invocation override is an initiative rule recorded here; it needs the owner's approval because `docs/AGENT_ROLES.md` §6 lists Opus for the reviewer (Q11). The effort setting for a primary session is a client setting; this repository does not configure it, and this plan has not verified the client mechanism.
+Adapter configuration: no change is needed. `.claude/agents/reviewer.md` keeps `claude-opus-5-5` so reviews outside this initiative keep their cost. The per-invocation override is an initiative rule recorded here. The owner accepted it (Q11); `docs/AGENT_ROLES.md` §6 keeps listing Opus as the reviewer default. The effort setting for a primary session is a client setting; this repository does not configure it, and this plan has not verified the client mechanism.
 
 ## 10. Owner Involvement and Budget
 
@@ -367,8 +364,8 @@ No task needs a manual application check: the initiative changes no runtime beha
 
 | Round | When | Owner action | State |
 | --- | --- | --- | --- |
-| 1 | Now | Approve or change the plan; answer §11 except Q9. After P0, approve the start of T1 separately | Confirmed |
-| 2 | After R09 | Pilot checkpoint: read the rewritten §9, its statement map, and the verifier's table in `.scratch/product-spec-R09/`; confirm the method and the budget | Confirmed |
+| 1 | 2026-11-20 | Plan accepted; Q1–Q8 and Q10–Q13 answered; P0 done. Still open: the separate approval to start T1, and the approval scope after T1 | Done, except the T1 approval |
+| 2 | After R09 | Pilot checkpoint: read the rewritten §9, its statement map, the verifier's table, and the T2 literal report in `.scratch/product-spec-R09/`; confirm the method and the budget | Confirmed |
 | 3 | After R20k | Answer the entries collected in the Owner Question Log so far | Confirmed |
 | 4 | After R26 | Answer the remaining entries of the Owner Question Log; decide each Q9 candidate separately | Confirmed |
 | 5 | After F2 | Final acceptance of the delivered specification | Confirmed |
@@ -378,16 +375,35 @@ A held sentence does not block its task: the sentence stays verbatim and the tas
 
 Budget:
 
-- Execution: 43 primary sessions, one task each, as the owner specified.
-- Recovery: at most two correction cycles per task after verifier findings; then escalate. Reserve: 8 sessions.
+- Execution: 39 primary sessions, one task each. The count was 43 before the three merges of Q12.
+- Recovery: at most two correction cycles per task after verifier findings; then escalate. Reserve: 8 sessions, about 20% of the execution budget.
 - Closure allowance: 1 session after final acceptance.
+- Ceiling: 48 sessions (39 + 8 + 1). Reaching it requires an owner decision before further work.
 - Token cost is not estimated here. T1 and R09 record measured input, output, and verifier usage, and round 2 revises the budget from those numbers.
 
 Unresolved capabilities: none identified. `npm run check:docs` and `npm run check:requirements` ran in the planning session (52 live documents; 126 numbered requirements). The reviewer role's model override has not been exercised in this repository.
 
 ## 11. Owner Questions
 
-Each question has a recommended default.
+Each question has a recommended default. The owner answered on 2026-11-20:
+
+| Question | Owner answer |
+| --- | --- |
+| Q1 | Accepted: stable global numbers |
+| Q2 | Accepted: the 16 files of §5 |
+| Q3 | Accepted: a heading may be retitled; its number stays |
+| Q4 | Accepted: §9.4 About Tree is the single owner of the dialog |
+| Q5 | Accepted: the proposed owners; §1.4.1 is retired and four marker lines are deleted |
+| Q6 | Accepted: commitments stay in §22.1; procedures move |
+| Q7 | Accepted: decided sentence by sentence in the owning task |
+| Q8 | Accepted: values, colors, and exact strings stay in the specification |
+| Q9 | Deferred: the owner decides each confirmed candidate in round 4 |
+| Q10 | Accepted: T2 is part of the plan and of every rewrite verification |
+| Q11 | Accepted: the configured `reviewer` with a per-invocation Fable override |
+| Q12 | Accepted: three merges, 39 tasks |
+| Q13 | Accepted: owner checkpoint after R09 |
+
+The question texts below are kept as the record of what was asked.
 
 **Structure and identifiers**
 
@@ -420,9 +436,11 @@ Each question has a recommended default.
   | 1 | §2.1.1 | "Before hierarchy indentation, text begins 40px after its right edge." (L352–353) | `e2e/electron/line-numbers.spec.ts`, marker L119, assertion L201: on every numbered row in Tree and Agenda, the text start minus the right edge of the number column, minus depth times the indentation step, equals 40 | Element, property, value, and conditions match |
   | 2 | §20.5 | "`#dddddd`" in "with a custom `#dddddd` background" (L2037) | `e2e/electron/gray-appearance.spec.ts`, marker L18, assertions L41–42: in Gray, the native window background is `#dddddd` and the document background is `rgb(221, 221, 221)` | All four match |
   | 3 | §20.5 | "(`#ffffff`)" in "a pure white (`#ffffff`) document and window background" (L2039) | Same file, marker L138, assertions L157–158, L182, L191: in White, the document, title bar, and native window backgrounds are white | All four match |
-  | 4 | §20.8 | "(25 px)" in "The context is the height of one single-line node (25 px)" (L2070) | `e2e/electron/scroll-selection.spec.ts`, marker L262, assertion L274: the selected row starts 25 below the content edge. The geometry helper was not read. | Element, property, and value match. Conditions match for one window size where the quarter cap does not apply; the cap sentence is not proposed. |
-  | 5 | §20.13 | "Light foregrounds are `#76517d`, `#306b74`, and `#8a522e`; dark foregrounds are `#d3afd7`, `#8cd0d3`, and `#dfaf8f` respectively" (L2207–2209) | `e2e/electron/people-events.spec.ts`, marker L14, assertions L82–93: computed text color of tag, person, and event text, in light and dark, in Tree and Agenda; the six values as `rgb` | All four match |
-  | 6 | §20.2.7 | "27px" in "the ordinary bar height stays 27px when they fit" (L1542) | `e2e/electron/summarize.spec.ts`, marker L127, assertion L153: the status bar is 27 high while an operation message and its action fit | All four match. The phrase is the only statement of the ordinary bar height. |
+  | 4 | §20.13 | "Light foregrounds are `#76517d`, `#306b74`, and `#8a522e`; dark foregrounds are `#d3afd7`, `#8cd0d3`, and `#dfaf8f` respectively" (L2207–2209) | `e2e/electron/people-events.spec.ts`, marker L14, assertions L82–93: computed text color of tag, person, and event text, in light and dark, in Tree and Agenda; the six values as `rgb` | All four match |
+  | 5 | §20.2.7 | "27px" in "the ordinary bar height stays 27px when they fit" (L1542) | `e2e/electron/summarize.spec.ts`, marker L127, assertion L153: the status bar is 27 high while an operation message and its action fit | All four match. The phrase is the only statement of the ordinary bar height. |
+
+  Not confirmed (owner decision of 2026-11-20); not a candidate unless R20b confirms all four points:
+  - Context height "(25 px)" in "The context is the height of one single-line node (25 px)" (§20.8, L2070). `e2e/electron/scroll-selection.spec.ts`, marker L262, asserts at L274 that a row starts 25 below the content edge. The planning session did not read the geometry helper, so the element and the property are unverified, and the test covers one window size.
 
   Checked and excluded, because a point does not match:
   - Bullet size of 7px (§2.1, L278). The sentence states the size of the ordinary bullet. The test (`e2e/electron/node-gutter-alignment.spec.ts` L292–294) asserts the width of the selected-node marker and its centering within 0.5 px: another element.
@@ -436,8 +454,8 @@ Each question has a recommended default.
 
 - **Q10. Literal comparison tool (T2).** Add it? It costs one session and catches a changed number, key, or string mechanically. Default: yes.
 - **Q11. Verifier routing.** Use the configured `reviewer` role with a per-invocation Fable override, leaving the adapter default at Opus? Default: yes. Alternative: change `.claude/agents/reviewer.md` and the table in `docs/AGENT_ROLES.md` §6.
-- **Q12. Small sections.** The plan follows "one top-level section per task and per session". Three merges would remove four sessions without mixing risk levels: R03 with R18 and R19 (48 lines, one file); R06 with R07 (111 lines, one file); R12 with R14 (71 lines, one file). Default: allow these three merges, giving 39 tasks.
-- **Q13. Pilot checkpoint.** Stop after R09 for owner review before the remaining 38 rewrite tasks? Default: yes.
+- **Q12. Small sections.** The plan follows "one top-level section per task and per session". Three merges would remove four sessions without mixing risk levels: R03 with R18 and R19 (48 lines, one file); R06 with R07 (111 lines, one file); R12 with R14 (71 lines, one file). Default: allow these three merges, giving 39 tasks. Applied in P0: the merged work keeps the IDs R03, R06, and R12; the rows R07, R14, R18, and R19 no longer exist.
+- **Q13. Pilot checkpoint.** Stop after R09 for owner review before the remaining rewrite tasks (34 after the merges of Q12)? Default: yes.
 
 ## 12. Suspected Inconsistencies Found During Analysis
 
@@ -462,18 +480,18 @@ The analysis found statements that appear to conflict or to refer to nothing. Su
 2. **A reworded antecedent adds behavior.** Control: W7; nothing is derived from code.
 3. **A merge survivor is later reworded away.** Control: the R16 evidence line and the F2 sweep.
 4. **Anchors break silently**, because `check:docs` does not validate them. Control: seven known links fixed in T1; F2 lists every citation.
-5. **Cost.** 43 sessions with a Fable verifier on most of them. Control: W1 keeps the verification surface small; the pilot checkpoint revises the budget; Q12 removes four sessions.
+5. **Cost.** 39 sessions with a Fable verifier on most of them. Control: W1 keeps the verification surface small; the pilot checkpoint revises the budget; the merges of Q12 already removed four sessions.
 6. **Concurrent feature work edits the specification.** Each rewrite task starts from the current commit and one section, so a conflict is local. A feature change that lands in a section already rewritten must follow §7.1; `docs/DEVELOPMENT.md` §12 should say so after T1.
 7. **T1 on a smaller model changes checker semantics.** Control: evidence S, an independent review, and the unchanged requirement count.
 8. **The inventory is partly second-hand.** Read-only subagents collected the duplicate and process entries of §4.2, §4.3, §12, and Appendix A; this session read §1, §9, §13, and parts of §16 and §23 itself, and it re-checked the Q9 rows against the specification and the tests. Control: each task confirms its own entries against the text before acting on them.
 
 ## 14. Next Task
 
-None. The plan awaits owner approval and the answers to §11. The next step after that is P0. T1 follows only after the owner approves its start separately.
+T1. It is blocked: P0 is done, and the owner has not yet given the separate approval to start T1. No session may start T1 from this plan alone.
 
 ## 15. Prompt for the Next Session
 
-Use only after P0 is committed and the owner has approved the start of T1 separately. Replace the bracketed part.
+P0 is committed. Use this prompt only after the owner has approved the start of T1 separately. Replace the bracketed part.
 
 ```text
 Execute task T1 of plans/product-spec-refactoring.md.
