@@ -133,7 +133,7 @@ use the arrow keys. Actual Windows AltGr input remains unverified. These limits
 are recorded with the mapping in the linked requirements.
 
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
-see [the browser requirements](../../docs/product/browser.md#14-browser-static-hosting-checkpoint).
+see [the browser requirements](../../docs/product/browser.md#14-browser-version).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text
 remains marked unsaved until committed. Closing with pending work warns and

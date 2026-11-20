@@ -1,11 +1,11 @@
 # Browser Version
 
-### 1.4 Browser static-hosting checkpoint
+### 1.4 Browser Version
 
-The owner-reviewed browser version under `src/web/` can be built as
+The browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
-The shared editor, compact ellipsis menu, appearance choices, Agenda and Vim
-behavior remain as accepted. This checkpoint adds no synchronization or accounts;
+Static hosting does not change the shared editor, compact ellipsis menu, appearance choices,
+Agenda and Vim behavior. The browser version has no synchronization or accounts;
 installation, offline access, app updates, storage protection, exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
 browser parity or completion of the Browser Tree initiative.
 
@@ -24,7 +24,7 @@ its trigger, or a setting action returns focus to the previous connected Tree or
 Agenda editor/row, keeping the caret, selection direction and editing mode/session.
 View changes and Vim toggles apply their own documented result.
 
-The browser menu shows decorative icons beside Tree, Agenda, Export Notes… and Import Notes…, retaining their text labels and accessible names. Tree and Agenda reuse their location glyphs; export and import use arrows pointing out of and into a tray. All menu labels share a text column, with a separate icon column. Icons inherit the item's normal, focused or disabled color; check marks remain at the trailing edge. Other actions remain text-only. When folder actions are available, a separator places them in their own text-only group below export/import, keeping each group's icon treatment consistent (§1.3).
+The browser menu shows decorative icons beside Tree, Agenda, Export Notes… and Import Notes…; these items have text labels and accessible names. Tree and Agenda reuse their location glyphs; export and import use arrows pointing out of and into a tray. All menu labels share a text column, with a separate icon column. Icons inherit the item's normal, focused or disabled color; check marks are at the trailing edge. Other actions are text-only. When folder actions are available, a separator places them in their own text-only group below export/import, keeping each group's icon treatment consistent (§1.3).
 
 An action that opens a dialog or file picker returns editing focus before opening it; the dialog then
 owns focus, and cancellation/dismissal returns to the editor. A focused activity
@@ -33,19 +33,19 @@ message also returns editing focus when dismissed. No extra Tab is required.
 Tab and Shift+Tab keep native menu navigation; leaving the menu or clicking another
 control keeps that explicit destination. Without a connected previous editor, native
 control focus remains. Opening/cancelling the menu creates no document edit or extra
-save; buffered edits follow the existing commit rules when focus moves on.
+save; buffered edits follow their ordinary commit rules when focus moves on.
 
 On iPhones and iPads, the browser version always uses standard editing and hides
 the Vim menu option, command-panel entry and mode indicator, even with an external
 keyboard attached. Detection uses the iPhone/iPad browser identity, including
 iPadOS's Mac identity with multiple touch points. A saved Vim preference is ignored
-on these devices without overwriting it. Other platforms retain existing behavior.
+on these devices without overwriting it. These rules apply only on iPhones and iPads.
 
 In the browser, rich text fields enable native editing in standard editing and
 Vim Insert/Replace modes. Normal and Visual modes keep the same focusable field
 without native editing, avoiding browser editing work during navigation. Mode
 changes preserve text, focus, caret, selection and application editing commands.
-Plain textareas and desktop editing retain their existing behavior.
+These rules do not apply to plain textareas or to desktop editing.
 
 Existing browser notes must not be cleared or migrated by building or installing
 the package. Notes belong to the browser profile and exact origin: localhost and
@@ -63,7 +63,7 @@ The browser Quit command flushes pending edits and requests window closure only
 after saving succeeds. It does not show a successful-save dialog. If the browser
 refuses scripted closure, the saved editor stays open and the user can close it
 with the browser's window controls. A failed flush keeps the editor open and
-shows the save failure. Native browser closing retains the existing warning for
+shows the save failure. Native browser closing shows a warning for
 pending edits. An accepted cut or paste counts as pending while it waits for clipboard or image data.
 Undoing to the previously saved text also remains pending while an older write can replace it.
 The save status and close warning cover both cases. Dismissing the warning lets Tree finish saving.
@@ -76,7 +76,7 @@ the clipboard data; it must not also become an unhandled page error.
 
 Browser keyboard paste uses the clipboard data supplied by the native paste event,
 without requesting separate clipboard-read confirmation. Tree handles that data
-through its existing text/image paste, size-limit, undo and save rules.
+through its text/image paste, size-limit, undo and save rules.
 
 #### 1.4.1 Release publication
 
@@ -131,7 +131,7 @@ Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with t
 * `Cmd+Left` and `Cmd+Right` are `Home` and `End`. `Option+Left` and `Option+Right` are `Ctrl+Left` and `Ctrl+Right`. In Agenda rows without an editor the same keys apply. `Home` and `End` never cross a node (§4.3); `Ctrl+Left` and `Ctrl+Right` behave as `Option+Left` and `Option+Right` do.
 * `Ctrl+click` opens a link, and holding left Ctrl shows the link cursor. Ctrl+click is no context-menu gesture there.
 * In Vim Normal, `Ctrl+D`, `Ctrl+U`, `Ctrl+O` and `Ctrl+R` stay Vim commands, because the application has no such Cmd shortcut. In the other non-Insert Vim modes they stay blocked. `Ctrl+V` pastes.
-* In Vim Normal, `Ctrl+A` and `Ctrl+X` change numbers (§20.2.10), taking precedence over Select All and Cut. Outside Normal they retain the existing application or native behavior.
+* In Vim Normal, `Ctrl+A` and `Ctrl+X` change numbers (§20.2.10), taking precedence over Select All and Cut. Outside Normal they have their application or native behavior.
 * In the non-Insert Vim modes every unmapped Ctrl combination is blocked. In standard editing and Vim Insert it keeps its native behavior.
 * `Ctrl+N` and `Ctrl+P` move the selection while a completion popup or the command panel is open (§20.2.28, §20.9.3). Otherwise `Ctrl+P` opens or closes Agenda.
 * A bare Control keydown neither dismisses suggestions nor discards a pending Vim command.
