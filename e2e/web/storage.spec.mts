@@ -30,7 +30,7 @@ const readHead = (page: Page) =>
     }
   })
 
-for (const version of [1, 2, 3, 4, 5]) {
+for (const version of [1, 2, 3, 4, 5, 6]) {
   test(`opens stored format ${version} directly and saves its notes in the current format`, async ({
     newContext,
     baseURL,
@@ -52,7 +52,7 @@ for (const version of [1, 2, 3, 4, 5]) {
     const expected = historicalNotes(version, '!')
     const head = await readStored(page, 'document', 'head')
     expect(head).toMatchObject({
-      version: 5,
+      version: 6,
       location: expected.location,
       view: expected.view ?? { expandedIds: [] },
     })

@@ -61,6 +61,7 @@ function cloneNodeShallow(node: TreeNode): BuildNode {
     ...(node.attachment === undefined ? {} : { attachment: { ...node.attachment } }),
     ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
     ...(node.starred === true ? { starred: true as const } : {}),
+    ...(node.marked === true ? { marked: true as const } : {}),
     children: [],
   }
 }
@@ -117,6 +118,7 @@ function contentReplacement(
     ...(attachment === undefined ? {} : { attachment }),
     ...(node.struckThrough === true ? { struckThrough: true as const } : {}),
     ...(node.starred === true ? { starred: true as const } : {}),
+    ...(node.marked === true ? { marked: true as const } : {}),
     children: node.children,
   }
 }
@@ -377,6 +379,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
     ...(source.attachment === undefined ? {} : { attachment: { ...source.attachment } }),
     ...(source.struckThrough === true ? { struckThrough: true as const } : {}),
     ...(source.starred === true ? { starred: true as const } : {}),
+    ...(source.marked === true ? { marked: true as const } : {}),
     children: [],
   }
   const stack: Array<{ source: TreeNode; target: BuildNode }> = [{ source, target: root }]
@@ -390,6 +393,7 @@ function cloneNodeWithFreshIds(source: TreeNode, createId: () => NodeId): TreeNo
         ...(child.attachment === undefined ? {} : { attachment: { ...child.attachment } }),
         ...(child.struckThrough === true ? { struckThrough: true as const } : {}),
         ...(child.starred === true ? { starred: true as const } : {}),
+        ...(child.marked === true ? { marked: true as const } : {}),
         children: [],
       }
       target.children.push(copy)
@@ -769,6 +773,18 @@ export function toggleStarNode(document: Document, nodeId: NodeId): Document {
   const replacement = { ...located.node }
   if (replacement.starred) delete replacement.starred
   else replacement.starred = true
+  const result = replaceNode(document, located, replacement)
+  shareIndex(document, result)
+  inheritAttachmentIds(document, result)
+  return result
+}
+
+/** Toggle one node's mark (`docs/PRODUCT.md` §2.7) without changing its identity, children, or content. */
+export function toggleMarkNode(document: Document, nodeId: NodeId): Document {
+  const located = requireNode(document, nodeId)
+  const replacement = { ...located.node }
+  if (replacement.marked) delete replacement.marked
+  else replacement.marked = true
   const result = replaceNode(document, located, replacement)
   shareIndex(document, result)
   inheritAttachmentIds(document, result)

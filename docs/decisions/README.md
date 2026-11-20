@@ -32,5 +32,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0026](0026-on-device-summarization.md) | On-Device Summarization | Accepted | 2026-11-12 |
 | [0027](0027-starred-nodes-in-schema-version-5.md) | Starred Nodes in Schema Version 5 | Accepted | 2026-11-16 |
 | [0028](0028-expansion-views-of-starred-nodes.md) | Expansion Views of Starred Nodes | Accepted | 2026-11-19 |
+| [0029](0029-marked-nodes-in-schema-version-6.md) | Marked Nodes in Schema Version 6 | Accepted | 2026-11-20 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

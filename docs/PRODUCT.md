@@ -453,7 +453,7 @@ The state belongs to the node and travels with it:
 * The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
 * Saving and reopening the application keeps completion. Existing documents preserve every leaf's state and recalculate parents from children when loaded, even if their old independent parent states disagree. A document saved before struck-through nodes existed opens with every node normal.
 
-`toggle-finished-tasks` in the command panel shows or hides struck-through nodes throughout Tree, the Agenda timeline and focused days, local Find, and global Search, including starred and recent results and marker suggestions. Find and Search include unfinished nodes in folded branches. Finished tasks are visible by default. The desktop and browser each remember the choice in their local application preferences across restarts. The choice is independent of notes and Undo history.
+`toggle-finished-tasks` in the command panel shows or hides struck-through nodes throughout Tree, the Agenda timeline and focused days, local Find, and global Search, including marked, starred and recent results and marker suggestions. Find and Search include unfinished nodes in folded branches. Finished tasks are visible by default. The desktop and browser each remember the choice in their local application preferences across restarts. The choice is independent of notes and Undo history.
 
 If the selected Tree row is hidden, select the next visible row, or the preceding row if there is no next row. In an open branch with no visible child, select its heading. If the open branch itself is finished, first move to its nearest unfinished parent or the root. If the root has no visible rows, keep it empty with no selected task. The command remains available there. In Agenda, a hidden selected occurrence moves to the next visible occurrence in its day or Overdue group, then the preceding occurrence, then the ordinary nearest day heading. A selection that remains visible keeps focus and its caret.
 
@@ -468,6 +468,24 @@ A starred node also has its own expansion view for the locations below it (§2.4
 A small star replaces the node's circular marker in Tree and Agenda. For the current node, the star itself takes the focused marker's text color; no circular focus dot is drawn over it. The editable parent heading shows a larger star to the left of its text, centered vertically on the first line. Starred Search results also show the star to the left of their text. The indicator is outside editable text and does not change text, caret offsets or the marker's navigation action.
 
 The star is document content. A toggle is one undoable change, keeps selection and caret in place, and uses the ordinary pending-save policy and save-failure lock (§16). A pending Vim Replace edit finishes as a separate change before the toggle, returning to Normal mode. Undo/Redo uses the changed node's beginning as its change site (§10). Stars survive restart, content edits and moves. Subtree copies retain each copied node's star. Newly created nodes start without a star; splitting retains it on the original identity and joining retains the surviving identity's star. Older documents load without stars. Text-only clipboard copies contain no star metadata.
+
+### 2.7 Marked Nodes
+
+`toggle-mark-node` in the command panel adds or removes a mark on the current real node. It targets the same node as `toggle-star-node` (§2.6), including the editable Tree parent heading and real Agenda nodes; synthetic Agenda rows cannot be marked. It has no default keyboard shortcut. The command shows its active state when the current node is marked.
+
+A mark has no date. Agenda lists every marked node under Today, on every day, until the mark is removed (§23.2). Striking a marked node through keeps its mark; finished-task visibility (§2.5) applies to it as to any other node. Search lists marked nodes first (§20.14).
+
+A marked node's circular marker is drawn in a calm teal in Tree and Agenda: `#4a9b8f` in the light appearance, `#6aa99b` in the dark appearance, and `#4c9a93` in Gray and White.
+
+* A marked node with children also draws its outer ring in a soft tint of that teal instead of the neutral ring color; the tint is stronger while the pointer is over the marker.
+* A node that is both starred and marked keeps its star, drawn in that teal.
+* For the current node, the dot or star uses a stronger teal (`#1c7166`, `#9fe0cf` and `#1a7068` respectively) instead of the text color, so the mark stays visible on the current row.
+* A marked parent heading without a star shows a teal dot where a star would be.
+* A live Agenda mirror of a marked node (§23.7) draws its hollow ring in that teal instead of the gutter color.
+* Marked Search results show the teal dot, or the teal star, to the left of their text.
+* The indicator is outside editable text and does not change text, caret offsets or the marker's navigation action.
+
+The mark is document content and follows the star's rules (§2.6): a toggle is one undoable change, keeps selection and caret in place, and uses the ordinary pending-save policy and save-failure lock (§16). A pending Vim Replace edit finishes as a separate change before the toggle. Undo/Redo uses the changed node's beginning as its change site (§10). Marks survive restart, content edits and moves. Subtree copies retain each copied node's mark. Newly created nodes start without a mark; splitting retains it on the original identity and joining retains the surviving identity's mark. Older documents load without marks. Text-only clipboard copies contain no mark metadata.
 
 ## 3. Initial State
 
@@ -1942,6 +1960,8 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
 | `toggle-finished-tasks` | — | Show finished tasks | Finished tasks visible | — | Toggle finished-task visibility across views and search (§2.5) |
+| `toggle-star-node` | — | Star or unstar the current node | Current node starred | — | Toggle the star of the current real node (§2.6) |
+| `toggle-mark-node` | — | Mark or unmark the current node for Today | Current node marked | — | Toggle the mark of the current real node (§2.7) |
 | `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
 | `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
 | `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
@@ -2242,7 +2262,9 @@ Getting the suggestion list from the prepared in-memory index must take less tha
 
 Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search keeps its existing behavior. Resource constraints are in §20.14.3.
 
-With empty input the popup first lists all starred nodes (§2.6), sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. Then it lists up to eight distinct nonstarred recent nodes, most recently used first, without repeating starred entries. Both parts use the existing consecutive-parent grouping (§20.14.2). The first result is selected. The heading is `Starred and recent` when stars are present and `Recent` otherwise. An empty combined list displays `No recent nodes`. Clearing the query restores this list.
+With empty input the popup first lists all marked nodes (§2.7), then all starred nodes (§2.6) that are not marked. Each of these two parts is sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. Then it lists up to eight distinct recent nodes that are neither marked nor starred, most recently used first.
+
+All parts use the existing consecutive-parent grouping (§20.14.2). The first result is selected. The heading names the marked and starred parts only when they are present, and always ends with the recent part: `Marked, starred and recent`, `Marked and recent`, `Starred and recent`, or `Recent`. An empty combined list displays `No recent nodes`. Clearing the query restores this list.
 
 Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
 
@@ -2281,7 +2303,7 @@ Ready result retrieval, including text and paths, and the complete MRU update wo
 
 #### 20.14.3 Query Terms and Ancestor Context
 
-* Search lists matching starred nodes first, followed by all other matches. Each group keeps document order.
+* Search lists matching marked nodes first, then matching starred nodes that are not marked, followed by all other matches. Each group keeps document order.
 * Every nonempty query starts search, including one- and two-character terms. Whitespace separates required terms; repeated and leading/trailing whitespace is ignored. A whitespace-only query has no results. Term order is irrelevant, and repeating a term does not require multiple occurrences. Quotes and regular-expression syntax have no special meaning.
 * Every term must match somewhere in the result node or its complete ancestor chain up to the root, regardless of depth or the displayed parent-path cutoff. At least one term must match the result node itself. Intermediate ancestors need not match; siblings and other branches never contribute. A matching ancestor and its matching descendant may both appear.
 * Ordinary terms match literal substrings. Terms beginning with `#`, `@` or `&` match complete recognized tags, people or events, excluding hyperlinks and embedded markers (§20.13); incomplete names and bare markers do not match nodes. Different terms may match different ancestors. For example, `@alex #k8s opensearch` can find a node containing `opensearch-dashboards` under ancestors containing `@Alex` and `#K8s`.
@@ -2363,6 +2385,7 @@ The location toolbar displays a calendar glyph, with no visible `Agenda` text or
 * Only valid canonical `YYYY-MM-DD` dates are recognized, with no touching digit at either end.
 * Impossible dates, incomplete tokens, and dates inside hyperlinks are ordinary text.
 * A node appears under every distinct date it contains. Only direct matches are node rows, ordered by Tree preorder within each day.
+* A marked node (§2.7) is also a direct match of Today, the day captured when Agenda opened. It appears there once, including when its text contains Today's date, in Tree preorder among that day's other matches. It keeps its occurrences under its own dates, including in Overdue. The mark adds no occurrence to any other day.
 * Consecutive direct matches with the same parent share one ancestor-path heading, using Search's compact ancestor labels (§20.14.2). A different parent starts a new group; a path that recurs after another group appears again. Grouping preserves node order within each day and Overdue. Top-level nodes have no path heading. Ancestors are not editable node rows.
 * Path headings use 12px secondary text, wrap when needed and align with node text. A new parent group starts with its heading on the next row. Each path is a selectable, read-only Agenda row; keyboard navigation and clicks can stop on it, and text selection and copying work as on day headings. Editing, folding and opening an Agenda path do nothing. Global Search path headings follow §20.14.
 * Full text is shown and wraps as in Tree.
@@ -2449,6 +2472,8 @@ Selecting a direct match makes that node's occurrence on that day active. Adding
 Removing the last recognized date keeps the item on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
 
 If the originating Tree parent or selection no longer exists, Agenda stays open and updates its return location to the nearest surviving Tree ancestor, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.
+
+A mark (§2.7) counts as a date on Today for these rules. Removing the mark of the active occurrence under Today moves it to its nearest remaining date, or keeps it on Today until selection leaves it when it has no date. Marking a temporarily kept item moves it to Today.
 
 The active editor retains focus, caret, selection and mode when its active day changes.
 

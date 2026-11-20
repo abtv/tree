@@ -14,6 +14,7 @@ import {
   replaceLinkedTextRanges,
   removeTextRange,
   requireNode,
+  toggleMarkNode,
   toggleStrikethrough,
   toggleStarNode,
   type AttachmentId,
@@ -71,7 +72,7 @@ import {
 import { EditorSaveScheduler, type SaveSchedulerResult } from './editor-save-scheduler'
 import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
-import { starredNodes } from './starred-nodes'
+import { markedAndStarredNodes } from './starred-nodes'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
@@ -236,7 +237,7 @@ export class EditorStore {
 
   public initialSearchResults(): readonly RecentNode[] {
     const state = this.runtime.ready()
-    return [...starredNodes(state.document, state.hideFinishedTasks), ...this.recentNodes.getResults()]
+    return [...markedAndStarredNodes(state.document, state.hideFinishedTasks), ...this.recentNodes.getResults()]
   }
 
   public get treeSelectionHidden(): boolean {
@@ -291,6 +292,17 @@ export class EditorStore {
     this.endTextSession()
     const state = this.runtime.ready()
     this.applyStructural(toggleStarNode(state.document, target.id), state.location, state.focus)
+    return true
+  }
+
+  /** Marks or unmarks the node `starTarget` names (`docs/PRODUCT.md` §2.7). */
+  public toggleMarkNode(): boolean {
+    const target = this.starTarget
+    if (target === undefined) return false
+    this.finishPendingEdits()
+    this.endTextSession()
+    const state = this.runtime.ready()
+    this.applyStructural(toggleMarkNode(state.document, target.id), state.location, state.focus)
     return true
   }
 

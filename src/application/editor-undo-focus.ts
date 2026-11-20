@@ -125,7 +125,7 @@ function nodeChangeSite(from: TreeNode, to: TreeNode, parentId: NodeId | null): 
   const link = firstChangedLinkStart(from.links, to.links)
   if (link !== undefined) return { nodeId: to.id, parentId, cursor: link }
   // Node flags belong to the whole node, so their change starts at the node's beginning.
-  if (from.struckThrough !== to.struckThrough || from.starred !== to.starred)
+  if (from.struckThrough !== to.struckThrough || from.starred !== to.starred || from.marked !== to.marked)
     return { nodeId: to.id, parentId, cursor: 0 }
   return forestChangeSite(from.children, to.children, to.id)
 }

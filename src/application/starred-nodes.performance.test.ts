@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { starredNodes } from './starred-nodes'
+import { markedAndStarredNodes } from './starred-nodes'
 import { editNodeText, type Document } from '../domain/document'
 
 it('reuses unchanged branch summaries after editing a 10000-node document', () => {
@@ -22,13 +22,13 @@ it('reuses unchanged branch summaries after editing a 10000-node document', () =
     ],
   }
   const start = performance.now()
-  expect(starredNodes(document)).toHaveLength(1)
+  expect(markedAndStarredNodes(document)).toHaveLength(1)
   const changed = editNodeText(document, '0', 'Edited')
   reads = 0
 
-  const result = starredNodes(changed)
+  const result = markedAndStarredNodes(changed)
   expect(result).toHaveLength(1)
   expect(reads).toBeLessThan(10)
-  expect(starredNodes(changed)).toBe(result)
+  expect(markedAndStarredNodes(changed)).toBe(result)
   expect(performance.now() - start).toBeLessThan(2000)
 })

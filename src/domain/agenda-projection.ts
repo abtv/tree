@@ -14,15 +14,23 @@ export interface AgendaProjectionDay {
   readonly rows: readonly AgendaProjectionRow[]
 }
 
+/**
+ * Dates are a property of the text alone, so a summary never depends on the calendar. A mark places its
+ * node under Today (`docs/PRODUCT.md` §2.7); the summary records only the mark, and the projection adds
+ * the day it was asked for.
+ */
 interface DateSummary {
   readonly direct: ReadonlySet<DayNumber>
   readonly subtree: ReadonlySet<DayNumber>
+  readonly marked: boolean
+  /** The node or one of its included descendants is marked. */
+  readonly subtreeMarked: boolean
 }
 
 const summaries = new WeakMap<TreeNode, DateSummary>()
 const unfinishedSummaries = new WeakMap<TreeNode, DateSummary>()
 const noDates = new Set<DayNumber>()
-const finishedSummary: DateSummary = { direct: noDates, subtree: noDates }
+const finishedSummary: DateSummary = { direct: noDates, subtree: noDates, marked: false, subtreeMarked: false }
 
 function summaryOf(node: TreeNode, hideFinishedTasks: boolean): DateSummary {
   if (hideFinishedTasks && node.struckThrough) return finishedSummary
@@ -31,25 +39,43 @@ function summaryOf(node: TreeNode, hideFinishedTasks: boolean): DateSummary {
   if (cached !== undefined) return cached
   const direct = new Set<DayNumber>()
   for (const match of findCanonicalDates(node.text, node.links)) direct.add(match.day)
+  const marked = node.marked === true
+  let subtreeMarked = marked
   let subtree: Set<DayNumber> | undefined
   for (const child of node.children) {
-    for (const day of summaryOf(child, hideFinishedTasks).subtree) {
+    const childSummary = summaryOf(child, hideFinishedTasks)
+    if (childSummary.subtreeMarked) subtreeMarked = true
+    for (const day of childSummary.subtree) {
       if ((subtree ?? direct).has(day)) continue
       ;(subtree ??= new Set(direct)).add(day)
     }
   }
-  const summary = { direct, subtree: subtree ?? direct }
+  const summary = { direct, subtree: subtree ?? direct, marked, subtreeMarked }
   cache.set(node, summary)
   return summary
 }
 
-/** Project real nodes below the scope; depth zero is a root of that scope. */
+/** The days on which Agenda lists a node: its recognized dates and, while it is marked, Today. */
+export function agendaDaysOf(node: TreeNode, today: DayNumber): readonly DayNumber[] {
+  const days = findCanonicalDates(node.text, node.links).map((date) => date.day)
+  if (node.marked === true) days.push(today)
+  return days
+}
+
+/**
+ * Project real nodes below the scope; depth zero is a root of that scope. `today` is the day that
+ * lists marked nodes; without it marks are ignored. A `previous` projection must come from the same
+ * `today`.
+ */
 export function projectAgenda(
   document: Document,
   scopeParentId: NodeId | null,
   previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
   hideFinishedTasks = false,
+  today?: DayNumber,
 ): readonly AgendaProjectionDay[] {
+  const isDirect = (summary: DateSummary, day: DayNumber): boolean =>
+    summary.direct.has(day) || (summary.marked && day === today)
   const roots = scopeParentId === null ? document.roots : requireNode(document, scopeParentId).node.children
   const previousRoots =
     previous === undefined
@@ -59,7 +85,9 @@ export function projectAgenda(
         : requireNode(previous.document, scopeParentId).node.children
   const days = new Set<DayNumber>()
   for (const root of roots) {
-    for (const day of summaryOf(root, hideFinishedTasks).subtree) days.add(day)
+    const summary = summaryOf(root, hideFinishedTasks)
+    for (const day of summary.subtree) days.add(day)
+    if (today !== undefined && summary.subtreeMarked) days.add(today)
   }
   const sorted = [...days].sort((a, b) => a - b)
   const previousDays =
@@ -81,7 +109,7 @@ export function projectAgenda(
       const leftSummary = summaryOf(left, hideFinishedTasks)
       const rightSummary = summaryOf(right, hideFinishedTasks)
       if (leftSummary === finishedSummary || rightSummary === finishedSummary) return leftSummary === rightSummary
-      if (leftSummary.direct.has(day) !== rightSummary.direct.has(day)) return false
+      if (isDirect(leftSummary, day) !== isDirect(rightSummary, day)) return false
       return left.children.every((child, index) => same(child, right.children[index]!))
     }
     if (
@@ -99,13 +127,16 @@ export function projectAgenda(
     const visit = (node: TreeNode, depth: number): void => {
       const summary = summaryOf(node, hideFinishedTasks)
       let included = false
-      for (const day of summary.subtree) {
+      const include = (day: DayNumber): void => {
         const rows = fresh.get(day)
-        if (rows === undefined) continue
+        if (rows === undefined) return
         included = true
-        rows.push({ nodeId: node.id, depth, role: summary.direct.has(day) ? 'match' : 'context' })
+        rows.push({ nodeId: node.id, depth, role: isDirect(summary, day) ? 'match' : 'context' })
       }
-      // A child's subtree days are a subset of its parent's, so a node with no wanted day has no wanted descendants.
+      for (const day of summary.subtree) include(day)
+      if (today !== undefined && summary.subtreeMarked && !summary.subtree.has(today)) include(today)
+      // A child's subtree days, with Today for a marked descendant, are a subset of its parent's, so a
+      // node with no wanted day has no wanted descendants.
       if (included) for (const child of node.children) visit(child, depth + 1)
     }
     for (const root of roots) visit(root, 0)

@@ -53,6 +53,8 @@
   --color-mode-normal-background: #396847;
   --color-mode-replace-background: #a5222f;
   --color-gutter-mark: #a39ea9;
+  --color-node-mark: #4c9a93;
+  --color-node-mark-focus: #1a7068;
   --color-disclosure-hover-background: #cbc8d0;
   --color-drag-highlight: #d3cfd9;
   --color-drop-marker: #6e33ce;

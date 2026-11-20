@@ -71,6 +71,74 @@ it('stars the real Agenda node and rejects synthetic selections', async () => {
   await store.flushPersistence()
 })
 
+// @requirement PRODUCT.md §2.7
+it('marks the real Agenda node and rejects synthetic selections', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `day:${today}` })
+  const before = ready(store).document
+
+  expect(store.toggleMarkNode()).toBe(false)
+  expect(ready(store).document).toBe(before)
+
+  store.applyAgenda({ kind: 'select', key: `node:${today}:scope` })
+  expect(store.toggleMarkNode()).toBe(true)
+  expect(store.starTarget).toMatchObject({ id: 'scope', marked: true })
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today}:scope`)
+  await store.flushPersistence()
+})
+
+// @requirement PRODUCT.md §23.2
+it('lists a marked node without a date under Today in Tree order', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+
+  expect(store.toggleMarkNode()).toBe(true)
+  store.openAgenda()
+  const nodeKeys = store
+    .getAgendaRows()
+    .filter((row) => row.kind === 'node' && row.day === today)
+    .map((row) => row.key)
+
+  expect(nodeKeys).toEqual([`node:${today}:scope`, `node:${today}:context`, `node:${today}:outside`])
+  await store.flushPersistence()
+})
+
+// @requirement PRODUCT.md §23.7
+it('keeps an unmarked active item on Today until selection leaves it, and undo restores the mark', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'scope', selectedNodeId: 'context' })
+  store.toggleMarkNode()
+  store.openAgenda()
+  const key = `node:${today}:context`
+  store.applyAgenda({ kind: 'select', key })
+
+  expect(store.toggleMarkNode()).toBe(true)
+
+  expect(pinnedAgendaOccurrence(ready(store).agenda)).toEqual({ nodeId: 'context', day: today })
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(true)
+  store.undo()
+  expect(pinnedAgendaOccurrence(ready(store).agenda)).toBeUndefined()
+  expect(store.starTarget).toMatchObject({ id: 'context', marked: true })
+  store.redo()
+  store.applyAgenda({ kind: 'select', key: `day:${today}` })
+  expect(store.getAgendaRows().some((row) => row.key === key)).toBe(false)
+  await store.flushPersistence()
+})
+
+// @requirement PRODUCT.md §23.7
+it('moves an unmarked active item with another date to that date', async () => {
+  const { store } = await agendaHarness({ currentParentId: 'context', selectedNodeId: 'match' })
+  store.toggleMarkNode()
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today}:match` })
+
+  store.toggleMarkNode()
+
+  expect(activeAgendaOccurrence(ready(store).agenda)).toEqual({ nodeId: 'match', day: today + 1 })
+  expect(ready(store).agenda?.selectedKey).toBe(`node:${today + 1}:match`)
+  expect(store.getAgendaRows().some((row) => row.key === `node:${today}:match`)).toBe(false)
+  await store.flushPersistence()
+})
+
 // @requirement PRODUCT.md §23.5
 it.each(['close', 'enter'] as const)('remembers folded days after leaving Agenda with %s', async (exit) => {
   vi.useFakeTimers()

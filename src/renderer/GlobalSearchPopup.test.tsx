@@ -107,6 +107,49 @@ it('retains rows during refinement without allowing stale activation, then repla
   expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'false')
 })
 
+// @requirement PRODUCT.md §20.14
+it('names the list parts once per result list instead of rescanning it while the selection moves', () => {
+  HTMLElement.prototype.scrollIntoView = vi.fn()
+  let markReads = 0
+  const starred = Array.from({ length: 2000 }, (_, index): RecentNode => ({
+    id: `star-${index}`,
+    text: `Star ${index}`,
+    path: null,
+    starred: true,
+    get marked(): true {
+      markReads += 1
+      return undefined as unknown as true
+    },
+  }))
+  const store = createEditorStoreDouble({ snapshot: { status: 'ready' }, recentNodes: new RecentNodes() })
+  vi.mocked(store.initialSearchResults).mockReturnValue(starred)
+  render(
+    <>
+      <textarea className="node-input" defaultValue="alpha" aria-label="Editor" />
+      <GlobalSearchPopup
+        store={store}
+        shortcuts={APPLE_SHORTCUTS}
+        blocked={false}
+        beforeOpen={vi.fn()}
+        beforeVisit={vi.fn()}
+      />
+    </>,
+  )
+  const editor = screen.getByLabelText('Editor')
+  editor.focus()
+  fireEvent.keyDown(editor, { key: ';', metaKey: true })
+
+  expect(screen.getByText('Starred and recent')).toBeInTheDocument()
+
+  markReads = 0
+  const input = screen.getByRole('searchbox')
+  for (let step = 0; step < 5; step += 1) fireEvent.keyDown(input, { key: 'ArrowDown' })
+
+  expect(screen.getByRole('option', { selected: true })).toHaveTextContent('Star 5')
+  // Mounted rows still read their own mark; a rescan per move would read all 2000 items five times.
+  expect(markReads).toBeLessThan(starred.length)
+})
+
 function setup(empty = false) {
   HTMLElement.prototype.scrollIntoView = vi.fn()
   const recentNodes = new RecentNodes()

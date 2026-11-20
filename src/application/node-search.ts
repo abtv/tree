@@ -33,6 +33,7 @@ export function* searchNodes(
   const tagTerms = terms.filter((term) => term.prefix !== undefined)
   const counts = terms.map(() => 0)
   let covered = 0
+  const markedResults: RecentNode[] = []
   const starredResults: RecentNode[] = []
   const results: RecentNode[] = []
   const ancestors: TreeNode[] = []
@@ -75,7 +76,7 @@ export function* searchNodes(
         tagMatches = yield* mergeSearchMatches(tagMatches, matches)
         pathMatches = yield* mergeSearchMatches(pathMatches, yield* pathTagMatches(ancestors, term))
       }
-      const matches = node.starred ? starredResults : results
+      const matches = node.marked ? markedResults : node.starred ? starredResults : results
       matches.push({
         id: node.id,
         text: resultText(node),
@@ -99,7 +100,9 @@ export function* searchNodes(
       }
     }
   }
-  return starredResults.length === 0 ? results : starredResults.concat(results)
+  return markedResults.length === 0 && starredResults.length === 0
+    ? results
+    : markedResults.concat(starredResults, results)
 }
 
 /** Release obsolete snapshots immediately and yield between bounded batches of search work. */

@@ -13,6 +13,7 @@ export interface RecentNode {
   readonly pathTagMatches?: readonly TextMatch[]
   readonly struckThrough?: true
   readonly starred?: true
+  readonly marked?: true
   readonly pathStruckMatches?: readonly TextMatch[]
 }
 
@@ -114,7 +115,8 @@ export class RecentNodes {
         continue
       }
       const node = found.at(-1)!
-      if (node.starred || (hideFinishedTasks && node.struckThrough)) continue
+      // Marked and starred nodes are listed before the recent ones, so they are not repeated here.
+      if (node.marked || node.starred || (hideFinishedTasks && node.struckThrough)) continue
       results.push({
         id,
         text: resultText(node),
@@ -155,6 +157,7 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
     ...(ancestors.length > 0 ? { parentId: ancestors[ancestors.length - 1]!.id } : {}),
     ...(node.struckThrough ? { struckThrough: true as const } : {}),
     ...(node.starred ? { starred: true as const } : {}),
+    ...(node.marked ? { marked: true as const } : {}),
     ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
   }
 }

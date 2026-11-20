@@ -107,6 +107,32 @@ it('puts matching stars first and preserves traversal order within each group', 
   expect(next.value.map(({ id }) => id)).toEqual(['star-child', 'star-root', 'parent', 'other'])
 })
 
+// @requirement PRODUCT.md §20.14.3
+it('puts matching marked nodes before matching stars, with a marked star among the marked', () => {
+  const work = searchNodes(
+    {
+      roots: [
+        { id: 'plain', text: 'Plain note', children: [] },
+        { id: 'star', text: 'Star note', starred: true, children: [] },
+        {
+          id: 'mark-parent',
+          text: 'Marked note',
+          marked: true,
+          children: [{ id: 'both', text: 'Both note', starred: true, marked: true, children: [] }],
+        },
+        { id: 'unmatched', text: 'Meeting', marked: true, children: [] },
+      ],
+    },
+    'note',
+  )
+
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value.map(({ id }) => id)).toEqual(['mark-parent', 'both', 'star', 'plain'])
+  expect(next.value[1]).toMatchObject({ starred: true, marked: true })
+})
+
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {
   const callbacks: (() => void)[] = []
   const cancelled = vi.fn()

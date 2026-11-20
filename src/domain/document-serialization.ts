@@ -22,7 +22,7 @@ import { dayNumberOf, weekdayOf } from './calendar-date'
 
 // Documents are immutable. Remember validation, without retaining an ID set for every history snapshot.
 const validatedDocuments = new WeakSet<Document>()
-const currentVersion = 5
+const currentVersion = 6
 
 export function hasNewerDocumentVersion(value: unknown): boolean {
   return (
@@ -121,7 +121,7 @@ function hasView(version: unknown): boolean {
 }
 
 /**
- * Checks the view shape of a version 3–5 state. An expanded id or a starred view that names no node is
+ * Checks the view shape of a version 3–6 state. An expanded id or a starred view that names no node is
  * tolerated, since it cannot display anything; a malformed view is rejected like any other malformed
  * field.
  */
@@ -347,7 +347,8 @@ function walkNodes(
       candidate.id.length === 0 ||
       typeof candidate.text !== 'string' ||
       (candidate.struckThrough !== undefined && candidate.struckThrough !== true) ||
-      (candidate.starred !== undefined && candidate.starred !== true)
+      (candidate.starred !== undefined && candidate.starred !== true) ||
+      (candidate.marked !== undefined && candidate.marked !== true)
     ) {
       throw new Error('A saved node is invalid.')
     }
@@ -371,6 +372,7 @@ function walkNodes(
         ...(attachment === undefined ? {} : { attachment }),
         ...(candidate.struckThrough === true ? { struckThrough: true as const } : {}),
         ...(candidate.starred === true ? { starred: true as const } : {}),
+        ...(candidate.marked === true ? { marked: true as const } : {}),
         children: [],
       }
       frame.output.push(node)

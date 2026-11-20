@@ -91,6 +91,13 @@
   --color-mode-replace-background: #a04b45;
   --color-mode-replace-foreground: var(--color-white);
   --color-gutter-mark: #b3ab9b;
+  /* A calm teal for marked nodes, distinct from the date, tag and link colors (docs/PRODUCT.md §2.7). */
+  --color-node-mark: #4a9b8f;
+  --color-node-mark-focus: #1c7166;
+  /* The ring of a marked node with children: the mark color softened toward the surface, as the
+     ordinary ring softens the gutter color. Derived here once for every appearance. */
+  --color-node-mark-ring: color-mix(in srgb, var(--color-node-mark) 38%, var(--color-background));
+  --color-node-mark-ring-hover: color-mix(in srgb, var(--color-node-mark) 55%, var(--color-background));
   --color-disclosure-hover-background: #e3dccb;
   --color-drag-highlight: #f1ebdd;
   --color-drop-marker: #9b4d00;
@@ -848,12 +855,60 @@ body:not(.node-drag-active) .location-link:hover {
   transform: translateY(-2px);
 }
 
+/* A marked node draws its bullet, or its star, in the mark color (docs/PRODUCT.md §2.7). These rules
+   follow the star rules so that a marked star keeps its shape and takes this color. */
+.node-enter-control[data-marked='true']::before,
+.current-parent[data-marked='true']::before {
+  background: var(--color-node-mark);
+}
+
+.agenda-mirror .node-enter-control[data-marked='true']:not([data-starred='true'])::before {
+  border-color: var(--color-node-mark);
+  background: transparent;
+}
+
+/* The parent heading has no bullet of its own, so a marked heading without a star shows a dot at
+   the star's center. */
+.current-parent[data-marked='true']:not([data-starred='true'])::before {
+  content: '';
+  position: absolute;
+  left: -17px;
+  top: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.node-star[data-marked='true'] {
+  color: var(--color-node-mark);
+}
+
+/* Occupies the star's width so that marked and starred Search results share one text edge. */
+.node-mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 6px 2px 0;
+  border-radius: 50%;
+  background: var(--color-node-mark);
+}
+
 .node-enter-control-has-children {
   background: var(--color-enter-ring-background);
 }
 
 .node-enter-control-has-children:hover {
   background: var(--color-enter-ring-hover-background);
+}
+
+/* A marked node with children tints its outer ring with the mark color too (docs/PRODUCT.md §2.7). */
+.node-enter-control-has-children[data-marked='true'] {
+  background: var(--color-node-mark-ring);
+}
+
+.node-enter-control-has-children[data-marked='true']:hover {
+  background: var(--color-node-mark-ring-hover);
 }
 
 .node-enter-control:focus-visible {
@@ -919,6 +974,12 @@ body:not(.node-drag-active) .location-link:hover {
   pointer-events: none;
 }
 
+/* A marked row keeps its mark while it is current: the focus dot takes the stronger mark color
+   instead of the text color (docs/PRODUCT.md §2.7). The star rule below overrides it for a star. */
+.node-focus-marker:has(~ .node-enter-control[data-marked='true']) {
+  background: var(--color-node-mark-focus);
+}
+
 /* Starred rows use the star itself for focus; retain the marker as the active-row hook. */
 .node-focus-marker:has(~ .node-enter-control[data-starred='true']) {
   background: transparent;
@@ -926,6 +987,10 @@ body:not(.node-drag-active) .location-link:hover {
 
 .node-focus-marker ~ .node-enter-control[data-starred='true']::before {
   background: var(--color-text);
+}
+
+.node-focus-marker ~ .node-enter-control[data-starred='true'][data-marked='true']::before {
+  background: var(--color-node-mark-focus);
 }
 
 /* Extend active-line feedback through indentation without moving content or dimming other rows. */
@@ -1756,6 +1821,8 @@ body.node-drag-invalid * {
     --color-attachment-error: #dca3a3;
     --color-save-error: var(--color-attachment-error);
     --color-gutter-mark: #9f9f8f;
+    --color-node-mark: #6aa99b;
+    --color-node-mark-focus: #9fe0cf;
     --color-disclosure-background: #4f4f4f;
     --color-disclosure-hover-background: #5f5f5f;
     --color-enter-ring-background: #4f4f4f;

@@ -69,7 +69,7 @@ export function agendaProjection(
   state: AgendaState,
   previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
 ): readonly AgendaProjectionDay[] {
-  const projection = projectAgenda(document, state.scopeParentId, previous, state.hideFinishedTasks)
+  const projection = projectAgenda(document, state.scopeParentId, previous, state.hideFinishedTasks, state.today)
   const pin = pinnedAgendaOccurrence(state)
   if (pin === undefined) return projection
   const located = locateNode(document, pin.nodeId)
@@ -263,10 +263,13 @@ export class AgendaRowsCache {
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
     const documentChanged = document !== this.document
     const filterChanged = Boolean(state.hideFinishedTasks) !== Boolean(this.state?.hideFinishedTasks)
+    // Marked nodes are listed under Today, so a projection belongs to the Today it was built for.
+    const todayChanged = state.today !== this.state?.today
     let changed = false
     if (
       document !== this.document ||
       filterChanged ||
+      todayChanged ||
       state.scopeParentId !== this.scope ||
       // The document/scope guards run first; an equal cached document always has cached state.
       pinnedAgendaOccurrence(state) !== pinnedAgendaOccurrence(this.state)
@@ -275,6 +278,7 @@ export class AgendaRowsCache {
       const reusable =
         this.document !== undefined &&
         !filterChanged &&
+        !todayChanged &&
         state.scopeParentId === this.scope &&
         pinnedAgendaOccurrence(state) === undefined &&
         pinnedAgendaOccurrence(this.state) === undefined

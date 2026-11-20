@@ -60,10 +60,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 19],
-    [false, true, 18],
-    [false, false, 17],
-    [true, false, 18],
+    [true, true, 20],
+    [false, true, 19],
+    [false, false, 18],
+    [true, false, 19],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -94,6 +94,7 @@ describe('command registry', () => {
       'summarize',
       'toggle-finished-tasks',
       'toggle-line-numbers',
+      'toggle-mark-node',
       'toggle-star-node',
     ])
     expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
@@ -128,8 +129,16 @@ describe('command registry', () => {
     ['about', ['about-tree']],
     [
       'toggle',
-      ['toggle-always-on-top', 'toggle-finished-tasks', 'toggle-line-numbers', 'toggle-star-node', 'toggle-vim-mode'],
+      [
+        'toggle-always-on-top',
+        'toggle-finished-tasks',
+        'toggle-line-numbers',
+        'toggle-mark-node',
+        'toggle-star-node',
+        'toggle-vim-mode',
+      ],
     ],
+    ['mark', ['toggle-mark-node']],
     ['q', ['quit']],
     ['qui', ['quit']],
     ['  dark  ', ['set-theme-dark']],
@@ -164,6 +173,7 @@ describe('command registry', () => {
       'toggle-always-on-top',
       'toggle-finished-tasks',
       'toggle-line-numbers',
+      'toggle-mark-node',
       'toggle-star-node',
       'toggle-vim-mode',
     ])
@@ -200,6 +210,7 @@ describe('command registry', () => {
       findPrevious: vi.fn(async () => undefined),
       searchAllNodes: vi.fn(async () => undefined),
       toggleStarNode: vi.fn(async () => undefined),
+      toggleMarkNode: vi.fn(async () => undefined),
       quit: vi.fn(async () => undefined),
       setAlwaysOnTop: vi.fn(async () => undefined),
       setAppearance: vi.fn(async () => undefined),
@@ -228,6 +239,7 @@ describe('command registry', () => {
     expect(services.findPrevious).toHaveBeenCalledExactlyOnceWith()
     expect(services.searchAllNodes).toHaveBeenCalledExactlyOnceWith()
     expect(services.toggleStarNode).toHaveBeenCalledExactlyOnceWith()
+    expect(services.toggleMarkNode).toHaveBeenCalledExactlyOnceWith()
     expect(services.showTree).toHaveBeenCalledExactlyOnceWith()
     expect(services.quit).toHaveBeenCalledExactlyOnceWith()
     expect(services.setAlwaysOnTop).toHaveBeenCalledExactlyOnceWith(false)
@@ -290,6 +302,7 @@ describe('command registry', () => {
 
     for (const name of [
       'toggle-star-node',
+      'toggle-mark-node',
       'reindex-all-images',
       'summarize',
       'image-to-text',
@@ -307,6 +320,11 @@ describe('command registry', () => {
 
     const star = commandRegistry.find((command) => command.name === 'toggle-star-node')!
     expect(star.active({ ...state, starred: true })).toBe(true)
+
+    // @requirement PRODUCT.md §2.7
+    const mark = commandRegistry.find((command) => command.name === 'toggle-mark-node')!
+    expect(mark.active({ ...state, marked: true })).toBe(true)
+    expect(mark.active({ ...state, starred: true })).toBe(false)
 
     const finished = commandRegistry.find((command) => command.name === 'toggle-finished-tasks')!
 

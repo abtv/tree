@@ -83,6 +83,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     setHideFinishedTasks: vi.fn(async () => undefined),
     starTarget: undefined,
     toggleStarNode: vi.fn(() => false),
+    toggleMarkNode: vi.fn(() => false),
     searchOrigin: vi.fn((offset: number) => ({ nodeId: 'a', offset })),
     searchNodeSuggestions: vi.fn(() => []),
     searchNodes: vi.fn((_query, publish) => {

@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { dayNumberOf } from './calendar-date'
 import * as recognition from './date-recognition'
-import { projectAgenda } from './agenda-projection'
+import { agendaDaysOf, projectAgenda } from './agenda-projection'
 import type { TreeNode } from './document-types'
 
 const day = (date: number) => dayNumberOf({ year: 2026, month: 10, day: date })
 const node = (id: string, text: string, children: readonly TreeNode[] = []): TreeNode => ({ id, text, children })
+const markedNode = (id: string, text: string): TreeNode => ({ id, text, marked: true, children: [] })
 
 describe('Agenda projection', () => {
   // @requirement PRODUCT.md §23.2
@@ -219,6 +220,67 @@ describe('Agenda projection', () => {
     expect(projectAgenda(document, 'empty')).toEqual([])
     expect(projectAgenda({ roots: [] }, null)).toEqual([])
     expect(() => projectAgenda(document, 'missing')).toThrow('Node missing does not exist.')
+  })
+
+  // @requirement PRODUCT.md §23.2
+  it('lists a marked node under Today once, with its ancestors as context, beside its own dates', () => {
+    const document = {
+      roots: [
+        node('project', 'Project', [markedNode('task', 'Task')]),
+        markedNode('dated', '2026-10-14 2026-10-20 Dated'),
+        node('plain', '2026-10-14 Plain'),
+      ],
+    }
+
+    expect(projectAgenda(document, null, undefined, false, day(14))).toEqual([
+      {
+        day: day(14),
+        rows: [
+          { nodeId: 'project', depth: 0, role: 'context' },
+          { nodeId: 'task', depth: 1, role: 'match' },
+          { nodeId: 'dated', depth: 0, role: 'match' },
+          { nodeId: 'plain', depth: 0, role: 'match' },
+        ],
+      },
+      { day: day(20), rows: [{ nodeId: 'dated', depth: 0, role: 'match' }] },
+    ])
+    expect(agendaDaysOf(document.roots[1]!, day(14))).toEqual([day(14), day(20), day(14)])
+    expect(agendaDaysOf(document.roots[2]!, day(14))).toEqual([day(14)])
+  })
+
+  // @requirement PRODUCT.md §23.2
+  it('adds Today for a mark when the day has no dated node, and ignores marks without a Today', () => {
+    const document = { roots: [markedNode('task', 'Task'), node('later', '2026-10-20')] }
+
+    expect(projectAgenda(document, null, undefined, false, day(16)).map((entry) => entry.day)).toEqual([
+      day(16),
+      day(20),
+    ])
+    expect(projectAgenda(document, null).map((entry) => entry.day)).toEqual([day(20)])
+  })
+
+  // @requirement PRODUCT.md §2.5
+  it('omits a finished marked node when finished tasks are hidden', () => {
+    const document = { roots: [{ ...markedNode('done', 'Done'), struckThrough: true as const }] }
+
+    expect(projectAgenda(document, null, undefined, false, day(14))).toHaveLength(1)
+    expect(projectAgenda(document, null, undefined, true, day(14))).toEqual([])
+  })
+
+  // @requirement PRODUCT.md §23.2
+  it.each(['mark', 'unmark'] as const)('refreshes only Today when a node is %sed', (change) => {
+    const marked = change === 'unmark'
+    const other = node('other', '2026-10-20 Other')
+    const peer = node('peer', '2026-10-14 Peer')
+    const document = { roots: [marked ? markedNode('task', 'Task') : node('task', 'Task'), other, peer] }
+    const projection = projectAgenda(document, null, undefined, false, day(14))
+    const changed = { roots: [marked ? node('task', 'Task') : markedNode('task', 'Task'), other, peer] }
+
+    const result = projectAgenda(changed, null, { document, projection }, false, day(14))
+
+    expect(result).toEqual(projectAgenda(changed, null, undefined, false, day(14)))
+    expect(result[0]!.rows.map((row) => row.nodeId)).toEqual(marked ? ['peer'] : ['task', 'peer'])
+    expect(result[1]).toBe(projection[1])
   })
 
   it('reuses summaries without mutating the input and invalidates changed link ranges', () => {

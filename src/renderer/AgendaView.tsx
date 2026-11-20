@@ -13,7 +13,8 @@ import { agendaPath } from '../application/agenda-path'
 import { agendaLineNumbers } from '../application/line-numbers'
 import type { Document, TreeNode } from '../domain/document'
 import { requireNode } from '../domain/document'
-import { findCanonicalDates } from '../domain/date-recognition'
+import { agendaDaysOf } from '../domain/agenda-projection'
+import type { DayNumber } from '../domain/calendar-date'
 import type { VimTextCommandState } from './vim-session-finish'
 import { clearCommandAssembly } from './vim-command-state'
 import { createAgendaKeyDownHandler, type AgendaRowText } from './agenda-row-keyboard'
@@ -47,16 +48,19 @@ import { AgendaViewportState } from './agenda-viewport-state'
 import { selectedAgendaDay } from '../application/agenda-reconcile'
 import { agendaCaret, arriveAgendaCaret, moveAgendaCaret } from './agenda-caret-state'
 
-/** A direct match owns an editor when it is the active occurrence or has at most one date. */
+/**
+ * A direct match owns an editor when it is the active occurrence or occupies at most one day. A mark
+ * adds Today to the node's dates (`docs/PRODUCT.md` §2.7).
+ */
 function isEditableOccurrence(
   row: Pick<Extract<AgendaRowModel, { kind: 'node' }>, 'role' | 'nodeId' | 'day'>,
   node: TreeNode,
   active: AgendaOccurrence | undefined,
+  today: DayNumber,
 ): boolean {
   return (
     row.role === 'match' &&
-    ((active?.nodeId === row.nodeId && active.day === row.day) ||
-      new Set(findCanonicalDates(node.text, node.links).map((date) => date.day)).size <= 1)
+    ((active?.nodeId === row.nodeId && active.day === row.day) || new Set(agendaDaysOf(node, today)).size <= 1)
   )
 }
 
@@ -115,6 +119,7 @@ export function AgendaView({
         { role: 'match', nodeId: selectedNode.id, day: selectedDay },
         selectedNode,
         activeAgendaOccurrence(agenda),
+        agenda.today,
       )
         ? ('native' as const)
         : ('synthetic' as const),
@@ -154,7 +159,12 @@ export function AgendaView({
           state.status === 'ready' &&
           state.agenda !== undefined &&
           row.kind === 'node' &&
-          isEditableOccurrence(row, requireNode(state.document, row.nodeId).node, activeAgendaOccurrence(state.agenda))
+          isEditableOccurrence(
+            row,
+            requireNode(state.document, row.nodeId).node,
+            activeAgendaOccurrence(state.agenda),
+            state.agenda.today,
+          )
         )
       },
       caret: () => {
@@ -547,7 +557,8 @@ export function AgendaView({
       )
     }
     const node = row.kind === 'node' ? requireNode(document, row.nodeId).node : undefined
-    const editable = row.kind === 'node' && isEditableOccurrence(row, node!, activeAgendaOccurrence(agenda))
+    const editable =
+      row.kind === 'node' && isEditableOccurrence(row, node!, activeAgendaOccurrence(agenda), agenda.today)
     return (
       <AgendaRow
         lineNumber={numbers?.get(row.key)}

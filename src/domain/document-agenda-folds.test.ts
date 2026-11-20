@@ -38,7 +38,7 @@ it.each([undefined, { days: [], overdueWeeks: [] }])(
     const parsed = parsePersistedState({ ...state, view: { ...state.view, agendaFolds } })
 
     expect(parsed.view).toEqual(state.view)
-    expect(serializeState(parsed.document, parsed.location, parsed.view)).toEqual({ ...state, version: 5 })
+    expect(serializeState(parsed.document, parsed.location, parsed.view)).toEqual({ ...state, version: 6 })
   },
 )
 

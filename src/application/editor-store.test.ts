@@ -301,6 +301,7 @@ describe('EditorStore', () => {
     it.each([
       ['split', (store: EditorStore) => store.createSiblingOrFirstChild(1)],
       ['star', (store: EditorStore) => store.toggleStarNode(), false],
+      ['mark', (store: EditorStore) => store.toggleMarkNode(), false],
       ['child', (store: EditorStore) => store.createChild(), false],
       ['sibling with text', (store: EditorStore) => store.createSiblingWithText('after', 'Inserted')],
       ['child with text', (store: EditorStore) => store.createChildWithText('Inserted')],
@@ -1389,7 +1390,7 @@ describe('EditorStore', () => {
       await store.flushPersistence()
 
       expect(services.saves.at(-1)).toMatchObject({
-        version: 5,
+        version: 6,
         document: { roots: [{ id: 'a' }, { id: 'b', struckThrough: true }, { id: 'c', struckThrough: true }] },
       })
       expect((services.saves.at(-1) as { document: { roots: TreeNode[] } }).document.roots[0]).not.toHaveProperty(
@@ -1784,7 +1785,7 @@ describe('EditorStore', () => {
       clock.runAll()
       await store.flushPersistence()
 
-      expect(services.saves.at(-1)).toMatchObject({ version: 5, view: { expandedIds: ['root'] } })
+      expect(services.saves.at(-1)).toMatchObject({ version: 6, view: { expandedIds: ['root'] } })
 
       store.applyFold('open', 'child')
       await store.flushPersistence()

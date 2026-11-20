@@ -19,6 +19,7 @@ export interface CommandCapabilities {
 export interface CommandServices {
   setHideFinishedTasks?(value: boolean): Promise<void>
   toggleStarNode?(): Promise<void>
+  toggleMarkNode?(): Promise<void>
   summarize?(): Promise<void>
   imageToText?(): Promise<void>
   reindexAllImages?(): Promise<void>
@@ -39,6 +40,7 @@ export interface CommandServices {
 export interface CommandContext {
   hideFinishedTasks?: boolean
   starred?: boolean
+  marked?: boolean
   alwaysOnTop: boolean
   appearance: CommandAppearance
   vimEnabled: boolean
@@ -72,6 +74,15 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     active: (context) => context.starred === true,
     run: async (services) => {
       await services.toggleStarNode?.()
+    },
+  },
+  {
+    name: 'toggle-mark-node',
+    aliases: [],
+    description: 'Mark or unmark the current node for Today',
+    active: (context) => context.marked === true,
+    run: async (services) => {
+      await services.toggleMarkNode?.()
     },
   },
   {

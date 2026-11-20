@@ -65,6 +65,7 @@ export {
   shiftSiblingRange,
   splitNode,
   subtreeHeight,
+  toggleMarkNode,
   toggleStrikethrough,
   toggleStarNode,
   wouldExceedMaximumDepth,

@@ -1,5 +1,5 @@
 import { nextActiveDay } from '../domain/agenda-date-edits'
-import { findCanonicalDates } from '../domain/date-recognition'
+import { agendaDaysOf } from '../domain/agenda-projection'
 import { isValidLocation, locateNode, type Document, type NodeId, type Location } from '../domain/document'
 import { agendaProjection, buildAgendaRows, type AgendaRow, type AgendaRowsCache } from './agenda-rows'
 import {
@@ -41,10 +41,7 @@ export function reconcileAgenda(
     const located = locateNode(document, active.nodeId)
     // The located guard duplicates scope membership's missing-node check; it narrows the node type.
     if (located !== undefined && isInAgendaScope(document, state, active.nodeId)) {
-      const day = nextActiveDay(
-        findCanonicalDates(located.node.text, located.node.links).map((date) => date.day),
-        active.day,
-      )
+      const day = nextActiveDay(agendaDaysOf(located.node, state.today), active.day)
       if (day === undefined) {
         if (state.activity.kind !== 'pinned-until-leave')
           next = { ...next, activity: { kind: 'pinned-until-leave', occurrence: active } }

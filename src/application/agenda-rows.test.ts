@@ -804,6 +804,31 @@ describe('Agenda rows', () => {
     expect(changedDate.filter((row) => row.kind === 'node').map((row) => row.day)).not.toContain(today + 2)
   })
 
+  // @requirement PRODUCT.md §23.2
+  it('lists a marked node under the new Today when Agenda reopens on another day with the same document', () => {
+    const cache = new AgendaRowsCache()
+    const origin = { currentParentId: null, selectedNodeId: 'task' }
+    const marked: Document = {
+      roots: [
+        { id: 'task', text: 'Task', marked: true, children: [] },
+        { id: 'dated', text: '2026-10-09 Dated', children: [] },
+      ],
+    }
+    const nodeKeys = (state: ReturnType<typeof openAgendaState>): string[] =>
+      cache
+        .get(marked, state)
+        .filter((row) => row.kind === 'node')
+        .map((row) => row.key)
+
+    expect(nodeKeys(openAgendaState(origin, 0, today))).toEqual([`node:${today}:task`, `node:${today + 1}:dated`])
+
+    const nextDay = openAgendaState(origin, 0, today + 1)
+
+    // The next day already had a cached entry for the dated node; the marked node must join it.
+    expect(nodeKeys(nextDay)).toEqual([`node:${today + 1}:task`, `node:${today + 1}:dated`])
+    expect(cache.getProjection(marked, nextDay).map((entry) => entry.day)).toEqual([today + 1])
+  })
+
   it('builds an empty-scope timeline on the first read and after clearing', () => {
     const cache = new AgendaRowsCache()
     const state = openAgendaState(location, 0, today)

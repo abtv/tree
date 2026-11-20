@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import { TouchDragSurface } from './TouchDragSurface'
+import { nodeFlagsLabel } from './node-flags'
 
 interface NodeRowProps {
   lineNumber?: number | undefined
@@ -105,7 +106,8 @@ export const NodeRow = memo(function NodeRow({
       <button
         aria-label={`Enter node ${index + 1}`}
         data-starred={node.starred}
-        title={node.starred ? 'Starred' : undefined}
+        data-marked={node.marked}
+        title={nodeFlagsLabel(node)}
         className={`node-enter-control${hasChildren ? ' node-enter-control-has-children' : ''}`}
         onClick={() => onEnter(node)}
         onMouseDown={(event) => {

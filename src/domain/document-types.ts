@@ -26,6 +26,8 @@ export interface TreeNode {
   /** Present only on a struck-through node (`docs/PRODUCT.md` §2.5); it never affects the children. */
   readonly struckThrough?: true
   readonly starred?: true
+  /** Present only on a marked node (`docs/PRODUCT.md` §2.7); Agenda lists it under Today. */
+  readonly marked?: true
   readonly children: readonly TreeNode[]
 }
 
@@ -57,7 +59,7 @@ export interface PersistedAgendaFolds {
 }
 
 export interface PersistedEditorState {
-  readonly version: 1 | 2 | 3 | 4 | 5
+  readonly version: 1 | 2 | 3 | 4 | 5 | 6
   readonly document: Document
   readonly location: Location
   readonly view?: PersistedView
@@ -80,6 +82,7 @@ export interface BuildNode {
   attachment?: AttachmentReference
   struckThrough?: true
   starred?: true
+  marked?: true
   children: BuildNode[]
 }
 

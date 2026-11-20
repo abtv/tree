@@ -30,7 +30,7 @@ export function historicalNotes(version: number, edit = '') {
             },
           ],
         },
-        { id: 'other', text: 'Other root', children: [] },
+        { id: 'other', text: 'Other root', children: [], ...(version >= 6 ? { marked: true } : {}) },
       ],
     },
     location: { currentParentId: 'project', selectedNodeId: 'entry' },

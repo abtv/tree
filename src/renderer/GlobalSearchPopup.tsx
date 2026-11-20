@@ -21,6 +21,7 @@ import { computeListWindow, computeOffsets, ROW_HEIGHT_ESTIMATE } from './list-w
 import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
+import { initialSearchHeading } from './node-flags'
 
 const RESULT_EDGE_INSET = 12
 const RESULT_KEYS = '↑↓ Select   ↵ Open   Esc Close'
@@ -177,6 +178,8 @@ export function GlobalSearchPopup({
       ),
     [items, heights],
   )
+  // The heading depends only on the listed items, so selection moves and scrolling do not rescan them.
+  const initialHeading = useMemo(() => initialSearchHeading(items ?? []), [items])
   const input = useRef<HTMLInputElement>(null)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
@@ -568,9 +571,7 @@ export function GlobalSearchPopup({
       )}
       {(suggestions.length === 0 || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">
-          <span>
-            {query === '' ? (items.some((item) => item.starred) ? 'Starred and recent' : 'Recent') : 'Results'}
-          </span>
+          <span>{query === '' ? initialHeading : 'Results'}</span>
           {query !== '' && suggestions.length === 0 && items.length > 0 && (
             <output
               className="node-search-position"
@@ -660,11 +661,18 @@ export function GlobalSearchPopup({
                       onClick={() => visit(index, 'node')}
                     >
                       <span className="recent-node-title-line">
-                        {item.starred && (
-                          <span className="node-star" role="img" aria-label="Starred">
+                        {item.starred ? (
+                          <span
+                            className="node-star"
+                            data-marked={item.marked}
+                            role="img"
+                            aria-label={item.marked ? 'Marked, starred' : 'Starred'}
+                          >
                             ★
                           </span>
-                        )}
+                        ) : item.marked ? (
+                          <span className="node-mark" role="img" aria-label="Marked" />
+                        ) : null}
                         <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
                           <SearchResultText
                             text={item.text}

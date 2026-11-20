@@ -282,6 +282,7 @@ Node
 ├── attachment?
 ├── struckThrough?
 ├── starred?
+├── marked?
 └── children
 ```
 
@@ -849,7 +850,7 @@ Conceptually:
 
 ```json id="x4p9mt"
 {
-  "version": 5,
+  "version": 6,
   "document": {
     "roots": [
       {
@@ -889,9 +890,11 @@ Keeping the selection in view (`docs/PRODUCT.md` §20.8) uses the geometry in `r
 
 The reveal lifecycle observes only its destination, the scrolling content and the fixed viewport. `NodeList.tsx` notifies layout subscribers after measurement/spacer changes commit, since a row can move without changing its own height. Corrections verify the current focus token and connected element and never rewrite focus or caret state. Wheel, touch and page-scroll input cancel the intent. Every correction also checks the current scroll offset before moving content, including layout and resize callbacks that precede native scroll delivery. An offset change outside the content-extent delta relinquishes the intent to explicit scrolling; native anchoring within that delta remains geometry settlement, with one pixel of rounding tolerance. New navigation captures its own initial offset and extent. An initial saved position leaves asynchronous alignment with `useScrollRestoration`, which retains its existing startup ownership. Cleanup disconnects observers and removes subscriptions. Performance assessment: no extra document mutation or direct disk operations; corrected scroll positions use the existing coalesced viewport-save scheduling, so a late correction can schedule another save if the earlier position was already saved. Geometry work is constant per focus, observer batch or layout notification, with three observed targets and one current intent regardless of document size. Existing large-list navigation scenarios guard latency and mounted-row bounds.
 
-Schema 5 adds optional `starred: true` per node ([ADR 0027](decisions/0027-starred-nodes-in-schema-version-5.md)); all current saves use version 5. Both validators reject other present values. Stars use the ordinary history, save scheduler, archives and failure lock. Toggling path-copies only the target's ancestor path and adds no independent writes or syncs. Cloning and content replacement preserve the flag.
+Schema 5 adds optional `starred: true` per node ([ADR 0027](decisions/0027-starred-nodes-in-schema-version-5.md)). Both validators reject other present values. Stars use the ordinary history, save scheduler, archives and failure lock. Toggling path-copies only the target's ancestor path and adds no independent writes or syncs. Cloning and content replacement preserve the flag.
 
-`starred-nodes.ts` derives empty Search entries on demand, sorts by complete ancestor text and node name, and caches results by immutable document in a weak map. Weak node summaries prune unchanged branches after edits; this preparation never runs on text input. Memory follows reachable documents/nodes and their starred results. The existing bounded recent projection skips starred IDs and supplies up to eight other entries; no second history store is added. Search retains consecutive parent-ID grouping and its existing nonempty-query executor.
+Schema 6 adds optional `marked: true` per node under the same rules ([ADR 0029](decisions/0029-marked-nodes-in-schema-version-6.md)); all current saves use version 6. A mark stores no date. `projectAgenda` in `src/domain/agenda-projection.ts` receives Agenda's captured Today and treats a marked node as a direct match of that day. The per-node date summaries stay independent of the calendar: they record only whether the node or a descendant is marked, so they remain valid when Today changes. `AgendaRowsCache` rebuilds its projection when Today changes. `agendaDaysOf` gives the active-occurrence rules and the editable-occurrence check the same day set. Performance assessment (`docs/PRODUCT.md` §22.1): a toggle adds no write or sync of its own; the projection keeps its single traversal and adds one boolean test per visited node; memory grows by one optional boolean per marked node and two booleans per cached summary.
+
+`starred-nodes.ts` derives empty Search entries on demand: marked nodes, then starred nodes that are not marked. It sorts each part by complete ancestor text and node name and caches results by immutable document in a weak map. Weak node summaries prune unchanged branches after edits; this preparation never runs on text input. Memory follows reachable documents/nodes and their marked and starred results. The existing bounded recent projection skips marked and starred IDs and supplies up to eight other entries; no second history store is added. Search retains consecutive parent-ID grouping and its existing nonempty-query executor.
 
 Persistence must support future schema evolution.
 

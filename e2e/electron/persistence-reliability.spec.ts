@@ -50,7 +50,7 @@ async function holdAttachmentWrite(app: ElectronApplication, rejectFirst = false
 test.describe('persistence reliability regressions', () => {
   configureHiddenParallelTests()
 
-  for (const version of [1, 2, 3, 4, 5]) {
+  for (const version of [1, 2, 3, 4, 5, 6]) {
     test(`opens format ${version} directly and preserves the notes on save`, async ({ userDataDir }) => {
       seedDocument(userDataDir, historicalNotes(version))
       mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
@@ -70,7 +70,7 @@ test.describe('persistence reliability regressions', () => {
 
       const expected = historicalNotes(version, '!')
       expect(readPersisted(userDataDir)).toMatchObject({
-        version: 5,
+        version: 6,
         location: expected.location,
         view: expected.view ?? { expandedIds: [] },
       })

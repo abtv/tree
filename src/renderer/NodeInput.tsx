@@ -18,6 +18,7 @@ import {
   type TextDecoration,
 } from './editor-dom'
 import { useSearchDecorations } from './search-decorations'
+import { nodeFlagsLabel } from './node-flags'
 
 export interface NodeInputBindings {
   selectedAll: boolean
@@ -142,7 +143,7 @@ export function NodeInput({
     .join(' ')
   const commonProps = {
     'aria-label': label,
-    'aria-description': node.starred ? 'Starred' : undefined,
+    'aria-description': nodeFlagsLabel(node),
     className,
     onBlur,
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {

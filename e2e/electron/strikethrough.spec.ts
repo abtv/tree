@@ -59,7 +59,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     await closeApp(first.app)
     const persisted = readPersisted(userDataDir)
 
-    expect(persisted.version).toBe(5)
+    expect(persisted.version).toBe(6)
     expect(persisted.document.roots[0]).toMatchObject({ id: 'a', text: 'AlXpha', struckThrough: true })
     expect(persisted.document.roots[0]!.children[0]).toHaveProperty('struckThrough', true)
     expect(persisted.document.roots[1]).not.toHaveProperty('struckThrough')

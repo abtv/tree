@@ -66,6 +66,7 @@ export function useCommandPanel(options: {
   const treeSelectionHidden = store.treeSelectionHidden
   const starTarget = store.starTarget
   const starred = starTarget?.starred === true
+  const marked = starTarget?.marked === true
   const canStar = starTarget !== undefined
   useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
   const canSummarize = store.canSummarize
@@ -79,7 +80,7 @@ export function useCommandPanel(options: {
           alwaysOnTop: alwaysOnTopAvailable,
           imageToText: imageToTextAvailable,
         }).map((command) =>
-          command.name === 'toggle-star-node'
+          command.name === 'toggle-star-node' || command.name === 'toggle-mark-node'
             ? { ...command, enabled: canStar }
             : command.name === 'summarize'
               ? { ...command, enabled: canSummarize }
@@ -173,6 +174,9 @@ export function useCommandPanel(options: {
             toggleStarNode: async () => {
               store.toggleStarNode()
             },
+            toggleMarkNode: async () => {
+              store.toggleMarkNode()
+            },
             summarize: async () => store.summarize(options.summarySelection),
             imageToText: async () => store.imageToText(),
             reindexAllImages: async () => store.reindexAllImages(),
@@ -198,7 +202,7 @@ export function useCommandPanel(options: {
               setAppearance(value)
             },
           },
-          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, hideFinishedTasks },
+          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked, hideFinishedTasks },
         )
         if (command.name !== 'quit') {
           const next = rememberCommand(history, command.name)
@@ -214,6 +218,7 @@ export function useCommandPanel(options: {
     [
       close,
       starred,
+      marked,
       hideFinishedTasks,
       searchCommand,
       showAbout,
@@ -365,7 +370,7 @@ export function useCommandPanel(options: {
     bindInput,
     matches,
     total: commands.length,
-    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, hideFinishedTasks },
+    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked, hideFinishedTasks },
     changeInput: (value: string) => {
       setInput(value)
       setSelected(0)

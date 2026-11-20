@@ -8,23 +8,32 @@ import type { Document, TreeNode } from './document-types'
 
 const day = (value: number) => dayNumberOf({ year: 2026, month: 10, day: value })
 
+// @requirement PRODUCT.md §23.2
 it('includes exactly the matching nodes and proper ancestors in scoped preorder', () => {
   const spec = fc.array(
     fc.record({
       parent: fc.nat(100),
       dates: fc.array(fc.integer({ min: 1, max: 28 }), { maxLength: 4 }),
       linked: fc.boolean(),
+      marked: fc.boolean(),
     }),
     { maxLength: 20 },
   )
+  // Without a Today the projection ignores marks; with one, a marked node also matches that day.
+  const todayChoice = fc.option(fc.integer({ min: 1, max: 28 }), { nil: undefined })
   fc.assert(
-    fc.property(spec, fc.nat(100), (entries, scopeChoice) => {
+    fc.property(spec, fc.nat(100), todayChoice, (entries, scopeChoice, today) => {
+      const datesOf = (id: string): number[] => {
+        const entry = entries[Number(id)]!
+        return entry.marked && today !== undefined ? [...entry.dates, today] : entry.dates
+      }
       const nodes = entries.map((entry, index) => {
         const url = `https://example.test/2026-10-${String(entry.dates[0] ?? 1).padStart(2, '0')}`
         return {
           id: String(index),
           text: `${entry.linked ? url + ' ' : ''}${entry.dates.map((date) => `2026-10-${String(date).padStart(2, '0')}`).join(' ')}`,
           ...(entry.linked ? { links: [{ start: 0, end: url.length, url }] } : {}),
+          ...(entry.marked ? { marked: true as const } : {}),
           children: [] as TreeNode[],
         }
       })
@@ -44,9 +53,9 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
       }
 
       scopedRoots.forEach((root) => walk(root, []))
-      const days = [...new Set(preorder.flatMap(({ node }) => entries[Number(node.id)]!.dates))].sort((a, b) => a - b)
+      const days = [...new Set(preorder.flatMap(({ node }) => datesOf(node.id)))].sort((a, b) => a - b)
       const expected = days.map((date) => {
-        const matches = preorder.filter(({ node }) => entries[Number(node.id)]!.dates.includes(date))
+        const matches = preorder.filter(({ node }) => datesOf(node.id).includes(date))
         const included = new Set(matches.flatMap(({ node, ancestors }) => [...ancestors, node].map((item) => item.id)))
         return {
           day: day(date),
@@ -55,12 +64,20 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
             .map(({ node, ancestors }) => ({
               nodeId: node.id,
               depth: ancestors.length,
-              role: entries[Number(node.id)]!.dates.includes(date) ? 'match' : 'context',
+              role: datesOf(node.id).includes(date) ? 'match' : 'context',
             })),
         }
       })
 
-      expect(projectAgenda({ roots }, scope === nodes.length ? null : String(scope))).toEqual(expected)
+      expect(
+        projectAgenda(
+          { roots },
+          scope === nodes.length ? null : String(scope),
+          undefined,
+          false,
+          today === undefined ? undefined : day(today),
+        ),
+      ).toEqual(expected)
     }),
     { numRuns: propertyRuns(300) },
   )

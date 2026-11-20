@@ -63,6 +63,7 @@ export const command = fc.record({
     'join',
     'moveToParent',
     'strike',
+    'mark',
   ),
   a: fc.nat({ max: 1_000 }),
   b: fc.nat({ max: 1_000 }),
@@ -95,6 +96,7 @@ export type CommandAction = {
     | 'moveToParent'
     | 'strike'
     | 'star'
+    | 'mark'
   a: number
   b: number
   text: string
@@ -322,6 +324,9 @@ export async function applyCommand(
     }
     case 'star':
       store.toggleStarNode()
+      break
+    case 'mark':
+      store.toggleMarkNode()
       break
   }
 
