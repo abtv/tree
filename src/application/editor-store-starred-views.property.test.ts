@@ -133,7 +133,26 @@ describe('EditorStore expansion views of starred nodes', () => {
           )
         },
       ),
-      { numRuns: propertyRuns(300) },
+      {
+        numRuns: propertyRuns(300),
+        // A starred root entered from the root level. fast-check runs examples on every run, so the
+        // assertion below holds for any seed and any reduced run count.
+        examples: [
+          [
+            [
+              {
+                text: 'starred',
+                hasAttachment: false,
+                struckThrough: false,
+                children: [{ text: 'child', hasAttachment: false, struckThrough: false, children: [] }],
+              },
+            ],
+            [true],
+            [{ kind: 'enter', a: 0, b: 0, text: '' }],
+            false,
+          ],
+        ],
+      },
     )
 
     // The run must reach a location governed by a starred view, not only the root view.

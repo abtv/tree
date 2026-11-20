@@ -1,6 +1,6 @@
 # Starred View Review Follow-ups
 
-Status: In progress
+Status: Awaiting owner confirmation
 
 ## Source and authorization
 
@@ -17,7 +17,7 @@ The list below is the complete list the review provided. No unverified remainder
 | R1 | 2, 3 | Tree activates a starred view only for the final displayed location, then checks the selection against that view | Done |
 | R2 | 1 | Find releases its fold ownership when the active view changes | Done |
 | R3 | 4 | Views of nodes that neither the document nor undo history contains are dropped | Done |
-| R4 | 5 | The starred-view property test always exercises a starred view | Ready |
+| R4 | 5 | The starred-view property test always exercises a starred view | Done |
 
 ### R1: Activate the view of the final location
 
@@ -53,6 +53,7 @@ The list below is the complete list the review provided. No unverified remainder
 - Files: `src/application/editor-store-starred-views.property.test.ts`.
 - Acceptance: the property passes for reduced run counts and seeds, and an explicit case enters a starred node.
 - Validation: Low Risk: focused property run with the failing seed, `npm run check`.
+- Result: an explicit fast-check example enters a starred root, and fast-check runs examples on every run. With the example disabled, `FC_SEED=1 TREE_PROPERTY_RUNS=0.001` fails as reported; with it, that seed, another reduced-run seed and the default run pass. Typecheck and lint pass.
 
 ## Owner involvement
 
@@ -60,8 +61,8 @@ Four working tasks. No manual check before a commit. After R4, the owner confirm
 
 ## Next task
 
-R4.
+None. All four tasks are committed. The owner confirms that no further follow-up from the review remains; that confirmation authorizes removing this plan and its index row. No renewed implementation approval or manual application check is required.
 
 ## Resume prompt
 
-Continue the starred view review follow-ups in `plans/starred-views-review-fixes.md` from its next task.
+Close the starred view review follow-ups in `plans/starred-views-review-fixes.md` once the owner confirms that no follow-up remains.
