@@ -259,7 +259,7 @@ On first launch, when no document exists:
 * display it;
 * place the text cursor into it.
 
-Empty nodes are valid and must never be automatically deleted.
+Empty nodes follow §19.
 
 ---
 
