@@ -57,7 +57,6 @@ async function previous(fixture: { dir: string; manifest: Manifest }) {
   return { request, attest: async () => fixture.manifest, blobs, tree }
 }
 
-// @requirement PRODUCT.md §1.4
 describe('bounded authenticated build retention', () => {
   // This filesystem integration test performs 100 publications under the parallel CI suite.
   it(

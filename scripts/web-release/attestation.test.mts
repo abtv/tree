@@ -30,7 +30,6 @@ async function fixture() {
   return { base, dir, manifest, manifestFile, bundleFile }
 }
 
-// @requirement PRODUCT.md §1.4
 describe('independent manifest authentication', () => {
   it('requires gh to verify exact signed bytes, source workflow, main ref, source digest and hosted runner', async () => {
     const f = await fixture()

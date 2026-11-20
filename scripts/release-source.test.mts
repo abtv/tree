@@ -20,7 +20,6 @@ function fixture(tags: { name: string; commit: { sha: string } }[] = [], release
   })
 }
 
-// @requirement PRODUCT.md §1.4.1
 describe('one immutable source for both release platforms', () => {
   it('reserves before either platform publishes and reuses the same tag after either platform fails', async () => {
     const request = fixture()

@@ -124,13 +124,20 @@ active backup folder externally. See PRODUCT §24.5 for timing and failure rules
 Apple devices use Cmd shortcuts. Other platforms use Ctrl, with Alt for Option
 and Home/End for line boundaries. The command panel shows the matching labels.
 See [keyboard mappings and exceptions](../../docs/product/browser.md#15-keyboard-modifiers-outside-apple-platforms).
-Real-keyboard delivery of browser-reserved shortcuts on Linux and Windows remains
-unverified; Chromium automation checks application handling and default prevention.
+
+Real-keyboard delivery of the shortcuts in Chromium on Linux and Windows is unverified.
+Chromium automation verifies application dispatch for both profiles on macOS and
+Linux arm64, including default prevention for mapped commands and native-paste
+handling. It does not prove delivery from a real keyboard:
+[Chrome documents](https://support.google.com/chrome/answer/157179?hl=en)
+`Ctrl+N/T/W` as window/tab shortcuts. Their interception is an expected browser
+constraint. AltGraph exclusion is unit-tested; actual AltGr event reporting and
+character entry on Windows remain unverified. Other non-Apple platforms and
+browsers other than Chromium are not verified.
 
 Both shortcut profiles passed the macOS Chrome and Linux arm64 Chromium checks.
 Chrome assigns Ctrl+N to a new window; if it does not reach a suggestion popup,
-use the arrow keys. Actual Windows AltGr input remains unverified. These limits
-are recorded with the mapping in the linked requirements.
+use the arrow keys.
 
 On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
 see [the browser requirements](../../docs/product/browser.md#14-browser-version).

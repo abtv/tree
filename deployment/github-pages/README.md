@@ -179,7 +179,8 @@ retained package. If three sets exceed them, publication fails before transfer;
 it does not silently evict another set. Retention counts target transfers, not days
 or successful Pages deployments. Very old tabs or cached HTML may reference an
 evicted asset and need a reload. Only the current HTML is retained, so these sets
-are not a full-release rollback archive. Manually deleting files from an already
+are not a full-release rollback archive. Retention does not change browser note
+storage. Manually deleting files from an already
 signed package makes verification fail; it does not prune the authenticated manifest.
 
 ## Failures and ordering

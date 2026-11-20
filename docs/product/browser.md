@@ -6,8 +6,7 @@ The browser version under `src/web/` can be built as
 static files for HTTPS hosting. Once hosted, using it requires no local server.
 Static hosting does not change the shared editor, compact ellipsis menu, appearance choices,
 Agenda and Vim behavior. The browser version has no synchronization or accounts;
-installation, offline access, app updates, storage protection, exporting, importing, backing up and restoring notes are defined in §24. It does not claim full
-browser parity or completion of the Browser Tree initiative.
+installation, offline access, app updates, storage protection, exporting, importing, backing up and restoring notes are defined in §24.
 
 While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
@@ -15,9 +14,6 @@ the top and right edges of the content area.
 
 The browser's ellipsis menu ends with **About Tree** below statuses and the Update App
 button when present. It opens the About dialog, which §9.4 defines.
-
-Browser publication requires a version greater than the last transferred web release;
-ordinary commits still run validation without publishing a new package.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
 its trigger, or a setting action returns focus to the previous connected Tree or
@@ -49,8 +45,7 @@ These rules do not apply to plain textareas or to desktop editing.
 
 Existing browser notes must not be cleared or migrated by building or installing
 the package. Notes belong to the browser profile and exact origin: localhost and
-the permanent HTTPS address have separate storage. Before publication, explain
-that notes will not transfer automatically. The existing browser save and storage
+the permanent HTTPS address have separate storage. The browser save and storage
 limitations are described in [Browser version](../../src/web/README.md).
 
 Only one Tree tab or installed window may edit an origin's notes at a time. If
@@ -78,52 +73,9 @@ Browser keyboard paste uses the clipboard data supplied by the native paste even
 without requesting separate clipboard-read confirmation. Tree handles that data
 through its text/image paste, size-limit, undo and save rules.
 
-#### 1.4.1 Release publication
-
-One version identifies one source commit on both Web and macOS. Before either
-platform publishes, the release reserves an immutable `v<version>` tag at the
-validated commit. Later commits with that version do not run release suites or
-publish another package, even if one platform's publication failed.
-
-A push to source `main` publishes to `https://tree-editor.github.io` only after
-the same commit passes standard validation, dependency audit, Chromium checks
-of the built package, and smoke checks in Electron on Linux/macOS, Chromium on Linux,
-and Safari on macOS. New releases also require full Linux/macOS Electron E2E and Linux memory checks.
-Electron E2E and memory suites retain weekly/manual runs; timing suites remain local.
-Demo publication also waits for successful validation.
-
-After the shared version reservation, Web and macOS releases run independently. Either failure fails the release without
-undoing the other branch. macOS publishes automatically after
-verifying the complete uploaded artifact set against signer hashes. Publication
-transfers the tested package without rebuilding it. Failed checks, transfer or
-pre-deployment verification leave the active release intact.
-
-Retries use only the original source and tested artifacts. Existing current-main
-and validation-attempt checks still apply: after main advances, recovery requires
-a new version rather than substituting new code under the reserved version.
-
-Scheduled or manual check runs must not cancel checks belonging to a publication.
-
-Publication independently authenticates a source-signed manifest and every file
-it authorizes, including retained assets. Unlisted files cannot enter the site.
-
-Publication retains assets from the current and two previous distinct asset sets,
-ordered by their most recent publication to the target repository. Identical sets
-do not consume another slot; shared files are stored once. Legacy manifests without
-build boundaries count as one complete old set during migration. Pruning happens
-only while preparing the next signed package, never as a separate live-site deletion.
-The existing file and byte limits still stop an oversized publication before transfer.
-This retention is not a full-release rollback archive or a time-based guarantee for
-old tabs, and it does not change browser note storage.
-
-The target-only publisher cannot select executable verification code: the protected
-workflow obtains it from trusted source main at an independently resolved SHA.
-Verification runs without Pages/OIDC write permissions; a separate job deploys
-the resulting artifact. Source maintainers and hosting administrators remain trusted.
-
 ### 1.5 Keyboard Modifiers Outside Apple Platforms
 
-The primary modifier is Cmd on Apple platforms (macOS, iOS, iPadOS) and Ctrl on every other platform. The supported desktop product targets macOS; Linux Electron smoke tests do not establish Linux desktop product support. This section defines the browser version's non-Apple shortcuts (§1.4), targeting Linux and Windows. Real-keyboard delivery of the shortcuts in Chromium on Linux and Windows is unverified.
+The primary modifier is Cmd on Apple platforms (macOS, iOS, iPadOS) and Ctrl on every other platform. The supported desktop product targets macOS; Linux Electron smoke tests do not establish Linux desktop product support. This section defines the browser version's non-Apple shortcuts (§1.4), targeting Linux and Windows.
 
 Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with the same Shift and Alt qualifiers, and the label `⌘Q` shows as `Ctrl+Q`. Option is Alt. The rules below settle the differences.
 
@@ -143,8 +95,6 @@ Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with t
 | `Ctrl+Backspace` | Deletes the node; it does not delete a word. Undo restores it. |
 | `Ctrl+P` | Opens Agenda; it replaces Print. |
 | `Ctrl+N` | Cycles suggestions when delivered. Chrome assigns it to a new window, so it may not reach the page. Arrow keys remain available. |
-
-Chromium automation verifies application dispatch for both profiles on macOS and Linux arm64, including default prevention for mapped commands and native-paste handling. It does not prove delivery from a real keyboard: [Chrome documents](https://support.google.com/chrome/answer/157179?hl=en) `Ctrl+N/T/W` as window/tab shortcuts. Their interception is an expected browser constraint. AltGraph exclusion is unit-tested; actual AltGr event reporting and character entry on Windows remain unverified. Other non-Apple platforms and browsers other than Chromium are not verified.
 
 ## 24. Browser Data Safety
 

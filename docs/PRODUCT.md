@@ -28,12 +28,13 @@ Each section number is listed once, with the file that holds its heading.
 | 20.9, 20.9.1, 20.9.2, 20.9.3, 20.10, 20.11, 20.12, 20.13 | [completion-and-tags.md](product/completion-and-tags.md) |
 | 22, 22.1, 22.2 | [non-functional.md](product/non-functional.md) |
 | 23, 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10, 23.11, 23.12, 23.13, 23.14, 23.15 | [agenda.md](product/agenda.md) |
-| 1.4, 1.4.1, 1.5, 24, 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 24.7 | [browser.md](product/browser.md) |
+| 1.4, 1.5, 24, 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 24.7 | [browser.md](product/browser.md) |
 | 25, 25.1, 25.2, 25.3, 25.4 | [desktop-data.md](product/desktop-data.md) |
 
 ## Retired Numbers
 
-A number whose content leaves the specification is listed here with the document that now owns the content. No number is retired.
+A number whose content leaves the specification is listed here with the document that now owns the content.
 
 | Number | Now owned by |
 | --- | --- |
+| 1.4.1 | [macOS releases](releasing.md): release identity, tag reservation, and retries. [Development Guide, Full Validation](DEVELOPMENT.md#9-full-validation): validation gates before publication. [Security Policy](SECURITY.md#browser-publication): signed manifest and publisher trust. [Automatic browser publication](../deployment/github-pages/README.md): asset retention, limits, and the cancellation rule. |

@@ -31,7 +31,6 @@ type Workflow = {
 const text = (name: string) => readFileSync(`.github/workflows/${name}.yml`, 'utf8')
 const workflow = (name: string) => load(text(name))
 
-// @requirement PRODUCT.md §1.4.1
 describe('automatic publication wiring', () => {
   it('runs code and audit in parallel, gates release suites on smoke, and gates dispatch on every result', () => {
     const ci = workflow('test-and-build-app')
