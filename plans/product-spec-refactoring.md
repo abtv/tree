@@ -1,6 +1,6 @@
 # Product Specification Refactoring
 
-Status: In progress; T1, T2, and R09 authorized; stop after R09 for the owner's pilot review
+Status: In progress; T1, T2, and R09 done; the pilot is delivered and the plan awaits the owner's pilot decision
 
 This plan records the analysis and the task sequence for refactoring `docs/PRODUCT.md`. The Product Owner accepted the plan and answered its questions on 2026-11-20 (§11). Step P0 is done. On 2026-11-20 the owner authorized T1, T2, and R09. Work stops after R09 until the owner has reviewed the pilot.
 
@@ -312,7 +312,7 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E8 of §7.4. Tiers fol
 | P0 | Record the owner's answers to §11 in this plan. Update every affected task row, file list, evidence condition, and the next-session prompt to match the answers. No other file changes. | Owner approval of the plan and answers to §11 | `plans/product-spec-refactoring.md`, `plans/README.md` | Minimal | Primary session, any model / none | Each answer is recorded in §11; each affected row cites the answer it follows; `npm run check:docs` passes | Done |
 | T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven incoming anchor links, three outgoing link paths, one positional reference (§6.3 item 10). No other text change and no reordering. | P0; owner authorization of 2026-11-20 | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Done |
 | T2 | Comparison report for rewrite verification as a `check:docs` mode, with tests (Q10). It reports three classes separately: literals (numbers with their units, code spans, bold UI labels); every changed table cell, with its column header and its old and new text; and section references. The tool shows cell changes and does not judge them; W9 and E5 say which are allowed. Every rewrite task uses its report (§7.3 step 3). | T1; owner authorization of 2026-11-20 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass, including these cases on the §20.2.30 registry. `find`: a change of the `Description` cell "Find in the current view" is reported with its column. `show-agenda`: a rewording of the `Effect` cell is reported with its column, while the unchanged `Description` "Show Agenda" and `Active state` "Agenda open" are not reported; a change of "Agenda open" is reported; the reference to §23 in the `Effect` cell appears in the reference class when it changes. Also: a changed numeric value is reported; an added, removed, or retargeted section reference is reported. The report on the §7.2 sample lists no unexplained item. | Done |
-| R09 | Pilot: rewrite §9 and retitle its heading (Q3). Owner checkpoint follows (Q13): the work stops after this task. | T1, T2; owner authorization of 2026-11-20 | `application.md` | Minimal | Opus high / Fable high | R; the statement map, the verifier's table, and the T2 report stay available until the owner's pilot decision (§7.3 step 10) | Ready |
+| R09 | Pilot: rewrite §9 and retitle its heading (Q3). Owner checkpoint follows (Q13): the work stops after this task. | T1, T2; owner authorization of 2026-11-20 | `application.md` | Minimal | Opus high / Fable high | R; the statement map, the verifier's table, and the T2 report stay available until the owner's pilot decision (§7.3 step 10) | Done |
 | R01a | Rewrite §1, §1.1–§1.3. Create §9.4 About Tree as the single owner of the dialog (Q4) and add it to the index. §1.1 order and §1.2 rules unchanged. | R09 and the owner's pilot decision | `overview.md`, `application.md`, `browser.md`; `docs/PRODUCT.md` (index entry for §9.4); `scripts/check-requirement-coverage.mts` (add `'9.4'` to `BOUNDARY_SECTIONS`, no other line); marker lines on tests that exercise only the About dialog: `e2e/electron/about-window.spec.ts:14` from §1.3 to §9.4, and any §1.4 marker of that kind, each listed in the task evidence | Low (`npm run check`) | Opus high / Fable high | R; §9.4 has an `e2e/` marker; the script diff is the one list entry; the index check passes | Planned |
 | R01b | Rewrite §1.4 and §1.5 as browser behavior and retitle §1.4 (Q3). | R01a | `browser.md`; the two anchor targets that name the §1.4 heading: `docs/SECURITY.md` L214 and `src/web/README.md` L136 (line numbers at `396e094`) | Minimal | Fable high / Fable high | R | Planned |
 | R01c | Move release and process content of §1.4, §1.4.1, §1.5 to its owners (Q5). Retire §1.4.1. | R01b | `browser.md`, `docs/PRODUCT.md`, `docs/releasing.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT.md`, `deployment/github-pages/README.md`, `src/web/README.md`, four marker lines in `scripts/release-source.test.mts` and `scripts/web-release/*.test.mts` | Low | Opus high / Fable high | R; per-sentence table "already stated at / moved to" for L169–210 | Planned |
@@ -378,7 +378,7 @@ No task needs a manual application check: the initiative changes no runtime beha
 | Round | When | Owner action | State |
 | --- | --- | --- | --- |
 | 1 | 2026-11-20 | Plan accepted; Q1–Q8 and Q10–Q13 answered; P0 done; T1, T2, and R09 authorized | Done |
-| 2 | After R09 | Pilot checkpoint. The owner receives five deliverables: the rewritten §9; the statement map of old and new requirements; the independent reviewer's table; the T2 report; and the measured cost of the pilot (T1, T2, R09: input, output, reviewer usage, elapsed time). The first four stay in `.scratch/product-spec-R09/` until the decision. The owner then decides about R01a | Confirmed |
+| 2 | After R09 | Pilot checkpoint. The owner receives five deliverables: the rewritten §9; the statement map of old and new requirements; the independent reviewer's table; the T2 report; and the measured cost of the pilot (T1, T2, R09: total tokens per agent, tool calls, elapsed time). The first four stay in `.scratch/product-spec-R09/` until the decision. The owner then decides about R01a | Confirmed |
 | 3 | After R20k | Answer the entries collected in the Owner Question Log so far | Confirmed |
 | 4 | After R26 | Answer the remaining entries of the Owner Question Log; decide each Q9 candidate separately | Confirmed |
 | 5 | After F2 | Final acceptance of the delivered specification | Confirmed |
@@ -400,9 +400,10 @@ Measured cost of the pilot (total tokens per agent, measured by the coordinating
 | --- | --- | --- | --- | --- |
 | T1 implementer | Sonnet, medium | about 464,000 | 207 | about 22 minutes, including the correction round |
 | T1 reviewer | Opus, high | about 127,000 | 40 | about 3 minutes |
-| T2 implementer | Opus, high | about 273,000 | 90 | about 18 minutes, before the correction round |
-| T2 reviewer | Opus, high | Reported by the coordinating session at the pilot checkpoint | | |
-| R09 | Opus, high; verifier Fable, high | Reported by the coordinating session at the pilot checkpoint | | |
+| T2 implementer | Opus, high | about 281,000 | 108 | about 25 minutes, including the correction round |
+| T2 reviewer | Opus, high | about 94,000 | 29 | about 5 minutes |
+| R09 implementer | Opus, high | about 181,000 | 52 | about 9 minutes, before the commit round |
+| R09 verifier | Fable, high | about 101,000 | 23 | about 3 minutes |
 
 The coordinating session's own usage is not measured by the harness and is not included.
 
@@ -512,20 +513,21 @@ The analysis found statements that appear to conflict or to refer to nothing. Su
 
 ## 14. Next Task
 
-R09. T1 and T2 are done. R09 is authorized and ready, in its own session on the model of §9, without a new owner approval. After the R09 commit the work stops for the owner's pilot review; R01a and every later task wait for the owner's pilot decision.
+None until the owner's pilot decision. T1, T2, and R09 are done, and the pilot deliverables of §10 round 2 are delivered. R01a is not authorized: it starts only after the owner's pilot decision authorizes it, in its own session on the model of §9. Every later task also waits for that decision.
 
 ## 15. Prompt for the Next Session
 
 The task that finishes replaces this prompt with the one for the next task.
 
+Use only after the owner's pilot decision, and only when §3 records that the decision authorizes R01a.
+
 ```text
-Execute task R09 of plans/product-spec-refactoring.md.
+Execute task R01a of plans/product-spec-refactoring.md.
 Model: Opus, effort high.
-The Product Owner authorized T1, T2, and R09 on 2026-11-20; the plan records it in §3. No further approval is needed for these three tasks.
-R09 is the pilot described by its row in §8: rewrite §9 in docs/product/application.md and retitle its heading (Q3). Follow §7.3 step by step, with the rules of §7.1 and the evidence E1–E8 of §7.4. Step 3 runs both `npm run check:docs -- --verbatim <base>` and `npm run check:docs -- --details <base>`.
+Use this prompt only after the owner's pilot decision. §3 of the plan must record that the decision authorizes R01a; if it does not, stop and report.
+R01a is described by its row in §8: rewrite §1 and §1.1–§1.3 in docs/product/overview.md, and create §9.4 About Tree in docs/product/application.md as the single owner of the About dialog (Q4), with its index entry in docs/PRODUCT.md, the one `BOUNDARY_SECTIONS` entry, and the About-dialog marker lines the row names. Apply every change to the method that the owner's pilot decision records. Follow §7.3 step by step, with the rules of §7.1 and the evidence E1–E8 of §7.4. Before rewriting, read the Merge Ledger rows (§17) whose survivor is in a section the task changes. Step 3 runs both `npm run check:docs -- --verbatim <base>` and `npm run check:docs -- --details <base>`.
 Independent verifier (§7.3 step 7): launch the configured `reviewer` role in a fresh context with a per-invocation model override to Fable, effort high (§9, Q11). Give it the inputs that step 7 lists and not the statement map.
-Keep the statement map, the verifier's table, and both reports in .scratch/product-spec-R09/ after the commit (§7.3 step 10).
-After the R09 commit, the work stops for the owner's pilot review (§10, round 2). Do not start R01a. Report the pilot deliverables of round 2. The coordinating session measures usage; R09 records in its report the commands it ran and its elapsed steps only.
+After the R01a commit, continue only with a task that the owner's pilot decision authorizes.
 ```
 
 ## 16. Owner Question Log
@@ -534,6 +536,7 @@ Each task writes its entries here before validation and independent review (§7.
 
 | # | Task | Kind (held sentence, §12 finding, Q9 candidate) | Location and quoted text | Question and recommended default | Owner answer |
 | --- | --- | --- | --- | --- | --- |
+| 1 | R09 | Method question (not a held sentence) | `docs/product/application.md`, old heading "## 9. Cmd+0"; `--details` report item `Literal removed … "Cmd+0"` | May a literal that an approved heading retitle (Q3) removes from the heading take the disposition "Retitled heading", provided the verifier confirms that the heading is not normative and the literal is still stated in the section body or is not a requirement? Recommended default: yes; add this disposition to W9 and E5 before R01b, which retitles §1.4. | |
 
 ## 17. Merge Ledger
 
@@ -541,6 +544,9 @@ This ledger records every merge between sections with different numbers. Two sub
 
 | # | Task | Rule: original phrase, quoted, with its location at the base commit | Removed from (now a citation) | Location of the full rule | Last confirmed by |
 | --- | --- | --- | --- | --- | --- |
+| 1 | R09 | "pending changes are flushed" (§9.2, `docs/product/application.md` L36 at `b9d9142`) | §9.2, which now cites §16.1 for the save-before-quit behavior of window close and `Cmd+Q` | §16.1, `docs/product/persistence.md`: "Every pending change is flushed before a normal quit completes." | R09 |
+| 2 | R09 | "if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry" (§9.2, `docs/product/application.md` L36 at `b9d9142`) | §9.2, which now cites §16.1 | §16.1, `docs/product/persistence.md`: "If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes." | R09 |
+| 3 | R09 | "In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2." (§9.2, `docs/product/application.md` L36 at `b9d9142`) | §9.2, which now cites §16.2 for quitting in the locked save-failure state | §16.2, `docs/product/persistence.md`: "Quitting and closing the window from the locked state still attempt a final save", with its two list items, including "if the save fails, the application asks `Quit without saving? Changes made since the last successful save will be lost.` Confirming quits without saving". §16.1 also states the rule with "can also" in place of "can instead". | R09 |
 
 ## Appendix A. Other Documents
 

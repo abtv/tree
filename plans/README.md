@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Product Specification Refactoring](product-spec-refactoring.md) | In progress; T1, T2, and R09 authorized on 2026-11-20; stop after R09 for the owner's pilot review | R09 (ready; T1 and T2 done) |
+| [Product Specification Refactoring](product-spec-refactoring.md) | In progress; T1, T2, and R09 done; the pilot is delivered and the plan awaits the owner's pilot decision | None until the owner's pilot decision; then R01a |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

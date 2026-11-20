@@ -1,6 +1,6 @@
 # Application
 
-## 9. Cmd+0
+## 9. Activation, Quit, and Application Menu
 
 `Cmd+0` surfaces and activates the application.
 
@@ -33,7 +33,7 @@ window. Restoring a minimized main window must not dismiss About.
 
 ### 9.2 Window Close
 
-Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.
+Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: §16.1 defines that behavior, §16.2 defines quitting in the locked save-failure state, and §21 defines the exception for a terminated renderer process.
 
 ### 9.3 Application Menu
 
@@ -49,7 +49,7 @@ The menu bar has five menus, laid out as macOS applications do (§1.3):
 
 The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup. A newer selection made during startup takes precedence over an earlier preference read, including for the first editor keystroke.
 
-Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing and preserves the existing origin/caret behavior (§23). These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items retain text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items retain their standard text/check-mark presentation.
+Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing and follows the origin/caret behavior (§23). These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items have text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items have their standard text/check-mark presentation.
 
 If the command panel is open, a menu view command first closes it and restores the editing surface before applying the named command. While a modal dialog or image preview is open, menu view commands do nothing and leave the modal's focus and return target intact. Browser view actions use the same preparation.
 
