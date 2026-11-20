@@ -455,7 +455,7 @@ modules; lint guards cover static imports, re-exports and dynamic imports.
 
 Before application shutdown is allowed to complete, the main process asks the renderer to flush its queued persistence work. The renderer then acknowledges shutdown through the trusted IPC path. PNG attachment writes validate the PNG signature, chunk structure and CRCs, require image data, enforce a maximum of 32767 pixels per side and 64 megapixels in total before decoding, and decode the image through the platform image decoder before bytes are stored. The decoded-size bound prevents a small, highly compressible payload from forcing an unbounded synchronous native bitmap allocation. The decoder is injected into the IPC handler so the validation rule remains unit-testable while Electron's `nativeImage` decoding stays in the main process.
 
-The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit.
+The shutdown handshake uses a request ID, suppresses duplicate requests, and times out after five seconds. A timeout or renderer-reported persistence failure cancels shutdown and surfaces an error instead of forcing a potentially lossy exit. A renderer whose process has ended is the exception below: its changes are already lost, so shutdown proceeds.
 
 Once the final flush has drained the editor and metadata queues, the store seals document edits for each active quit or update request. Canceling one request releases only its seal. The renderer locks native input before acknowledging quit. Closing and update installation share a reference-counted input lock. A native modal dialog places the locked-save confirmation above other renderer surfaces and restores their focus on cancellation. These transitions add constant state per active request and no disk writes.
 The store interrupts pending Find jumps at entry and again when it seals edits. Jumps completed while the queues drain contribute their location and expansion to the final save. The destination handler rejects later jumps while a seal is held.
@@ -463,7 +463,21 @@ The store interrupts pending Find jumps at entry and again when it seals edits. 
 `quit-handshake.ts` owns a local idle/waiting/quitting union. Only waiting carries
 the request ID and timeout handle; confirmation or force enters the terminal
 quitting state before queuing the quit microtask. Timeout restores idle for retry.
+Renderer loss also restores idle, without the timeout's failure report, because no
+renderer remains to confirm or display it.
 This changes no IPC contracts, timers, persistence operations or runtime growth.
+
+`bootstrap.ts` owns the single main-process quit phase (`running`, `updating`,
+`quitting`) and the identity of the main window whose renderer process has ended.
+Window, update and startup wiring read and change them only through its
+`QuitControl`. `render-process-gone` marks the window's renderer as gone and
+completes a waiting quit; a later quit for that window skips the handshake, as a
+window whose document never loaded does (§16). A main-frame navigation abandons a
+waiting request, because the new document must be asked again; only its commit
+(`did-navigate`) clears the mark, so a process that ends mid-navigation stays marked.
+Both transitions take the reporting window, and only the current main window can
+end a waiting request. An update rollback returns to `running` only while the phase is still
+`updating`. This state is two scalars and adds no writes, syncs or interactive work.
 
 The application layer must not contain React components or JSX.
 
@@ -919,7 +933,7 @@ already armed document save. Success clears failure accounting; explicit final f
 still attempts saving while locked. This preserves ADR 0010 and the existing scalar
 state, queue, write limits and cleanup ordering.
 
-Closing the main window is treated as a quit request: the main process intercepts the window close, runs the same renderer flush handshake as `Cmd+Q`, and only allows the application to quit after the renderer confirms. If the flush fails or times out, the window remains open and the failure is surfaced. The one exception is a window whose renderer document never loaded: it holds no document, so its load failure quits without the handshake (§16).
+Closing the main window is treated as a quit request: the main process intercepts the window close, runs the same renderer flush handshake as `Cmd+Q`, and only allows the application to quit after the renderer confirms. If the flush fails or times out, the window remains open and the failure is surfaced. Two exceptions hold no document that could be saved: a window whose renderer document never loaded quits on its load failure, and a window whose renderer process has ended quits without the handshake (§16 and the quit phase in §7).
 
 The renderer applies the automatic save policy defined in `docs/PRODUCT.md` §16.1 rather than saving on every keystroke. The store tracks whether changes are pending, counts inserted words against the volume threshold, and resets the idle timer on every persisted change. Image insertion and hyperlink insertion request an immediate save. Structural commands that insert no content mark changes pending and reset the idle timer without saving by themselves. Inserted-word accounting uses two bounded scalar watermarks: a cumulative inserted-word count and the cumulative count acknowledged by the latest successfully persisted snapshot. When the coordinator captures the document state for an actual service save, the store records the watermark in that snapshot; only a successful document save advances the acknowledged watermark. A failed save, and a cleanup-only success, leave it unchanged, so an earlier successful save cannot acknowledge edits made after its snapshot was captured and a later failed save cannot lose its accounting. The volume trigger compares the cumulative and acknowledged watermarks.
 

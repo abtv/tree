@@ -4,6 +4,7 @@ import {
   type ApplicationLifecycle,
   type BeforeQuitEvent,
   type MainWindowReference,
+  type QuitControl,
 } from './bootstrap'
 import type { QuitHandshake } from './quit-handshake'
 
@@ -46,10 +47,11 @@ function createHarness(locked = true) {
     unregisterShortcut: vi.fn(),
     onStartupError: vi.fn(),
     settleBeforeQuit: vi.fn<() => Promise<void> | null>(() => null),
-    registerUpdateQuit: vi.fn<(prepare: () => () => void) => void>(),
+    registerQuitControl: vi.fn<(control: QuitControl) => void>(),
   }
   bootstrapApplication(dependencies)
-  return { app, window, windowListeners, listeners, dependencies, registerReadyServices }
+  const quitControl = dependencies.registerQuitControl.mock.calls[0]![0]
+  return { app, window, windowListeners, listeners, dependencies, registerReadyServices, quitControl }
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -144,8 +146,7 @@ describe('bootstrapApplication', () => {
   it('allows an update to close without another save, then restores normal close handling after rollback', async () => {
     const f = createHarness()
     await Promise.resolve()
-    const prepare = f.dependencies.registerUpdateQuit.mock.calls[0]![0]
-    const rollback = prepare()
+    const rollback = f.quitControl.prepareUpdateQuit()
     const updating = { preventDefault: vi.fn() }
 
     f.windowListeners.close!(updating)
@@ -165,7 +166,7 @@ describe('bootstrapApplication', () => {
     const f = createHarness()
     await Promise.resolve()
     f.dependencies.getWindowCount.mockReturnValue(0)
-    const rollback = f.dependencies.registerUpdateQuit.mock.calls[0]![0]()
+    const rollback = f.quitControl.prepareUpdateQuit()
 
     f.listeners.activate!()
     expect(f.dependencies.createMainWindow).toHaveBeenCalledOnce()
@@ -173,6 +174,162 @@ describe('bootstrapApplication', () => {
     f.listeners.activate!()
 
     expect(f.dependencies.createMainWindow).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a confirmed quit when a failed update installation rolls back', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const rollback = f.quitControl.prepareUpdateQuit()
+    const confirmed = f.registerReadyServices.mock.calls[0]![1]
+
+    confirmed()
+    rollback()
+    const event = { preventDefault: vi.fn() }
+    f.windowListeners.close!(event)
+
+    expect(f.quitControl.isQuitting()).toBe(true)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('shares one quit phase with the window and update wiring', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    expect(f.quitControl.isQuitting()).toBe(false)
+
+    f.quitControl.quitWithoutSave()
+
+    expect(f.quitControl.isQuitting()).toBe(true)
+    expect(f.app.quit).toHaveBeenCalledOnce()
+    const event = { preventDefault: vi.fn() }
+    f.listeners.beforeQuit!(event)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+  })
+
+  // @requirement PRODUCT.md §21
+  it('quits without a renderer save when the renderer process is gone', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.quitControl.rendererGone(f.window)
+    expect(f.app.quit).not.toHaveBeenCalled()
+    const close = { preventDefault: vi.fn() }
+
+    f.windowListeners.close!(close)
+    const quit = { preventDefault: vi.fn() }
+    f.listeners.beforeQuit!(quit)
+
+    expect(close.preventDefault).toHaveBeenCalledOnce()
+    expect(f.app.quit).toHaveBeenCalledOnce()
+    expect(quit.preventDefault).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+    expect(f.dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+    expect(f.quitControl.isQuitting()).toBe(true)
+  })
+
+  // @requirement PRODUCT.md §21
+  it('completes a quit that was waiting for a save when the renderer process is gone', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = createHarness()
+      await Promise.resolve()
+      f.listeners.beforeQuit!({ preventDefault: vi.fn() })
+
+      f.quitControl.rendererGone(f.window)
+      vi.advanceTimersByTime(5_000)
+      const final = { preventDefault: vi.fn() }
+      f.listeners.beforeQuit!(final)
+
+      expect(f.app.quit).toHaveBeenCalledOnce()
+      expect(final.preventDefault).not.toHaveBeenCalled()
+      expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith('tree:quit-requested', expect.any(String))
+      expect(f.dependencies.unregisterShortcut).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // @requirement PRODUCT.md §21
+  it('abandons a waiting quit when the renderer reloads, then asks the reloaded renderer again', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = createHarness()
+      await Promise.resolve()
+      f.listeners.beforeQuit!({ preventDefault: vi.fn() })
+
+      f.quitControl.rendererReplaced(f.window)
+      vi.advanceTimersByTime(5_000)
+      const retry = { preventDefault: vi.fn() }
+      f.listeners.beforeQuit!(retry)
+
+      expect(f.app.quit).not.toHaveBeenCalled()
+      expect(retry.preventDefault).toHaveBeenCalledOnce()
+      const channels = vi.mocked(f.window.webContents.send).mock.calls.map(([channel]) => channel)
+      expect(channels).toEqual(['tree:quit-requested', 'tree:quit-requested'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('saves through a reloaded renderer once its document commits after the earlier renderer was gone', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.quitControl.rendererGone(f.window)
+    f.quitControl.rendererReplaced(f.window)
+    f.quitControl.rendererLoaded(f.window)
+    const reloaded = { preventDefault: vi.fn() }
+
+    f.listeners.beforeQuit!(reloaded)
+
+    expect(reloaded.preventDefault).toHaveBeenCalledOnce()
+    expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith('tree:quit-requested', expect.any(String))
+  })
+
+  it('keeps the gone mark when the renderer process ends while a reload is still pending', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.quitControl.rendererReplaced(f.window)
+    f.quitControl.rendererGone(f.window)
+    const beforeCommit = { preventDefault: vi.fn() }
+
+    f.listeners.beforeQuit!(beforeCommit)
+
+    expect(beforeCommit.preventDefault).not.toHaveBeenCalled()
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('protects a document that commits after the previous process ended mid-reload', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.quitControl.rendererReplaced(f.window)
+    f.quitControl.rendererGone(f.window)
+    f.quitControl.rendererLoaded(f.window)
+    const committed = { preventDefault: vi.fn() }
+
+    f.listeners.beforeQuit!(committed)
+
+    expect(committed.preventDefault).toHaveBeenCalledOnce()
+    expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith('tree:quit-requested', expect.any(String))
+  })
+
+  it('asks a new main window to save, and an earlier window cannot end its waiting quit', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const earlier = f.window
+    f.quitControl.rendererGone(earlier)
+    const replacement: MainWindowReference = { ...earlier, webContents: { send: vi.fn() } }
+    f.dependencies.getMainWindow.mockReturnValue(replacement)
+    const fresh = { preventDefault: vi.fn() }
+
+    f.listeners.beforeQuit!(fresh)
+    f.quitControl.rendererGone(earlier)
+    f.quitControl.rendererReplaced(earlier)
+    f.quitControl.rendererLoaded(earlier)
+
+    expect(fresh.preventDefault).toHaveBeenCalledOnce()
+    expect(f.app.quit).not.toHaveBeenCalled()
+    const requestId = vi.mocked(replacement.webContents.send).mock.calls[0]![1] as string
+    const [handshake] = f.registerReadyServices.mock.calls[0]!
+    expect(handshake.confirm(requestId)).toBe(true)
   })
 
   it('does not intercept a destroyed window close', async () => {
@@ -370,6 +527,7 @@ describe('bootstrapApplication', () => {
       unregisterShortcut: vi.fn(),
       onStartupError,
       settleBeforeQuit: () => null,
+      registerQuitControl: vi.fn(),
     })
 
     await Promise.resolve()

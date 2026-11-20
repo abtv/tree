@@ -41,7 +41,7 @@ import { registerIpcHandlers } from './ipc-handlers'
 import { createImageToText } from './image-to-text'
 import { createSummarization } from './summarize'
 import { showEditorContextMenu } from './editor-context-menu'
-import { bootstrapApplication } from './bootstrap'
+import { bootstrapApplication, type QuitControl } from './bootstrap'
 import { createNotesArchiveController, type NotesArchiveController } from './notes-archive-controller'
 import { createPngDecoder } from './png-decoder'
 import { handleRendererProtocol, packagedRendererUrl, registerRendererScheme } from './renderer-protocol'
@@ -62,7 +62,8 @@ app.setName('Tree')
 registerRendererScheme(protocol)
 
 let mainWindow: BrowserWindow | null = null
-let appQuitting = false
+// Assigned synchronously by bootstrapApplication below, before any window or service exists.
+let quitControl!: QuitControl
 let alwaysOnTopStore: BooleanPreferenceStore | null = null
 let vimEnabledStore: BooleanPreferenceStore | null = null
 let lineNumbersStore: BooleanPreferenceStore | null = null
@@ -76,7 +77,6 @@ let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 let rendererModalOpen = false
 let appUpdates: AppUpdates | undefined
 let appUpdateBlocked = false
-let prepareUpdateQuit: (() => () => void) | undefined
 
 const nativeClipboard: NativeClipboard = {
   read: () => clipboard.read(),
@@ -212,7 +212,7 @@ function rebuildApplicationMenu(): void {
 }
 
 function createMainWindow(quitWithoutSave: () => void): void {
-  if (appQuitting) return
+  if (quitControl.isQuitting()) return
   const resolvedRenderer = renderer
   if (resolvedRenderer === null) throw new Error('Renderer URL was not resolved before creating the window.')
   const windowBoundsStore = createWindowBoundsStore(join(app.getPath('userData'), 'data', 'window-bounds.json'))
@@ -248,9 +248,16 @@ function createMainWindow(quitWithoutSave: () => void): void {
       .catch((error: unknown) => reportMainProcessError('Could not cancel notes operation', error))
   }
   window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
-    if (isMainFrame && !isInPlace) resetNotesMenu()
+    if (!isMainFrame || isInPlace) return
+    resetNotesMenu()
+    quitControl.rendererReplaced(window)
   })
-  window.webContents.on('render-process-gone', resetNotesMenu)
+  window.webContents.on('did-navigate', () => quitControl.rendererLoaded(window))
+  window.webContents.on('render-process-gone', () => {
+    // Reset first: completing a waiting quit must not race the update and notes cancellation.
+    resetNotesMenu()
+    quitControl.rendererGone(window)
+  })
   window.webContents.on('did-stop-loading', refreshUpdateMenu)
   const saveWindowBounds = (): void => {
     const { x, y, width, height } = window.getBounds()
@@ -272,7 +279,6 @@ function createMainWindow(quitWithoutSave: () => void): void {
   })
   void window.loadURL(resolvedRenderer.url).catch((error: unknown) => {
     reportMainProcessError('Could not load the renderer', error)
-    appQuitting = true
     quitWithoutSave()
   })
 }
@@ -331,14 +337,7 @@ bootstrapApplication({
           !appUpdateBlocked &&
           notesArchive?.isIdle?.() === true &&
           notesMenuState.canImport,
-        prepareQuit: () => {
-          appQuitting = true
-          const release = prepareUpdateQuit!()
-          return () => {
-            appQuitting = false
-            release()
-          }
-        },
+        prepareQuit: () => quitControl.prepareUpdateQuit(),
         requestSave: (id) => mainWindow?.webContents.send(ipcEvents.appUpdateRequested, id),
         finished: (message) => mainWindow?.webContents.send(ipcEvents.appUpdateFinished, message),
         changed: rebuildApplicationMenu,
@@ -348,7 +347,7 @@ bootstrapApplication({
           }
         },
         notifyCheck: async (result) => {
-          if (!mainWindow || mainWindow.isDestroyed() || appQuitting) return
+          if (!mainWindow || mainWindow.isDestroyed() || quitControl.isQuitting()) return
           await dialog.showMessageBox(mainWindow, {
             type: result === 'failed' ? 'warning' : 'info',
             message:
@@ -509,10 +508,7 @@ bootstrapApplication({
       nativeClipboard,
       quitHandshake,
       decodePng,
-      onQuitConfirmed: () => {
-        appQuitting = true
-        onQuitConfirmed()
-      },
+      onQuitConfirmed,
       showEditorContextMenu: (sender, request) => {
         const window = BrowserWindow.fromWebContents(sender)
         if (window === null) return Promise.resolve(null)
@@ -555,11 +551,11 @@ bootstrapApplication({
   unregisterShortcut: () => globalShortcut.unregister('CommandOrControl+0'),
   onStartupError: (error) => {
     reportMainProcessError('Could not start the application', error)
-    appQuitting = true
-    app.quit()
+    // Startup fails before the renderer loads a document, so no save can be confirmed.
+    quitControl.quitWithoutSave()
   },
   settleBeforeQuit: () => notesArchive?.shutdown() ?? null,
-  registerUpdateQuit: (prepare) => {
-    prepareUpdateQuit = prepare
+  registerQuitControl: (control) => {
+    quitControl = control
   },
 })

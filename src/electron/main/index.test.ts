@@ -177,17 +177,53 @@ async function setup(packaged = false) {
   Object.assign(electron.app, { isPackaged: packaged })
   await import('./index')
   const lifecycle = mocks.bootstrap.mock.lastCall![0] as ApplicationBootstrapDependencies
-  const confirmed = vi.fn()
+  // Stands in for the bootstrap-owned quit phase that index.ts reads and drives.
+  let quitting = false
+  const setQuitting = (value: boolean): void => {
+    quitting = value
+  }
+  const quitControl = {
+    isQuitting: () => quitting,
+    quitWithoutSave: vi.fn(() => {
+      quitting = true
+      electron.app.quit()
+    }),
+    prepareUpdateQuit: vi.fn<() => () => void>(() => {
+      quitting = true
+      return () => {
+        quitting = false
+      }
+    }),
+    rendererGone: vi.fn<(window: unknown) => void>(),
+    rendererReplaced: vi.fn<(window: unknown) => void>(),
+    rendererLoaded: vi.fn<(window: unknown) => void>(),
+  }
+  lifecycle.registerQuitControl!(quitControl)
+  const confirmed = vi.fn(() => {
+    quitting = true
+  })
   lifecycle.registerReadyServices({} as Parameters<typeof lifecycle.registerReadyServices>[0], confirmed)
   const quit = vi.fn()
   lifecycle.setApplicationMenu(quit)
-  const quitWithoutSave = vi.fn()
+  const quitWithoutSave = quitControl.quitWithoutSave
   lifecycle.createMainWindow(quitWithoutSave)
   const ipc = mocks.ipc.mock.lastCall![0] as Parameters<typeof registerIpcHandlers>[0]
   const window = electron.BrowserWindow.getAllWindows().at(-1)!
   const actions = () => mocks.menu.mock.lastCall![1] as ApplicationMenuActions
   const state = () => mocks.menu.mock.lastCall![0] as ApplicationMenuState
-  return { lifecycle, ipc, window, actions, state, quit, confirmed, electron, quitWithoutSave }
+  return {
+    lifecycle,
+    ipc,
+    window,
+    actions,
+    state,
+    quit,
+    confirmed,
+    electron,
+    quitWithoutSave,
+    quitControl,
+    setQuitting,
+  }
 }
 
 beforeEach(async () => {
@@ -290,8 +326,13 @@ async function packagedSetup() {
   await vi.advanceTimersByTimeAsync(0)
   f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
   const release = vi.fn()
-  const prepare = vi.fn(() => release)
-  f.lifecycle.registerUpdateQuit!(prepare)
+  const prepare = f.quitControl.prepareUpdateQuit.mockImplementation(() => {
+    f.setQuitting(true)
+    return () => {
+      f.setQuitting(false)
+      release()
+    }
+  })
   const updates = f.ipc.appUpdates as AppUpdates
   const downloaded = (version = '1.2.4') =>
     autoUpdater.emit('update-downloaded', {
@@ -1415,20 +1456,42 @@ describe('desktop entry wiring', () => {
     expect(mocks.fileServices.loadRecentNodes).toHaveBeenCalledOnce()
   })
 
-  it('resets operation availability only for main-frame navigation and renderer loss', async () => {
-    const { ipc, window, state } = await setup()
+  it('resets operation availability and the pending quit only for main-frame navigation and renderer loss', async () => {
+    const { ipc, window, state, quitControl } = await setup()
     ipc.setNotesMenuState!({ canExport: true, canImport: true })
     window.webContents.emit('did-start-navigation', {}, 'url', true, true)
     window.webContents.emit('did-start-navigation', {}, 'url', false, false)
     expect(state().notes).toEqual({ canExport: true, canImport: true })
     expect(mocks.archive.cancel).not.toHaveBeenCalled()
+    expect(quitControl.rendererReplaced).not.toHaveBeenCalled()
 
     window.webContents.emit('did-start-navigation', {}, 'url', false, true)
 
     expect(state().notes).toEqual({ canExport: false, canImport: false })
     expect(mocks.archive.cancel).toHaveBeenCalledOnce()
+    expect(quitControl.rendererReplaced).toHaveBeenCalledExactlyOnceWith(window)
+    expect(quitControl.rendererGone).not.toHaveBeenCalled()
     window.webContents.emit('render-process-gone')
     expect(mocks.archive.cancel).toHaveBeenCalledTimes(2)
+    expect(quitControl.rendererGone).toHaveBeenCalledExactlyOnceWith(window)
+    expect(quitControl.rendererReplaced).toHaveBeenCalledOnce()
+    expect(quitControl.rendererLoaded).not.toHaveBeenCalled()
+    window.webContents.emit('did-navigate')
+    expect(quitControl.rendererLoaded).toHaveBeenCalledExactlyOnceWith(window)
+  })
+
+  it('cancels a pending update save before a lost renderer completes a waiting quit', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.actions().updateApp!()
+    let applyingWhenGone: boolean | undefined
+    f.quitControl.rendererGone.mockImplementation(() => {
+      applyingWhenGone = f.updates.isApplying()
+    })
+
+    f.window.webContents.emit('render-process-gone')
+
+    expect(applyingWhenGone).toBe(false)
   })
 
   it.each(['navigation', 'crash'] as const)(

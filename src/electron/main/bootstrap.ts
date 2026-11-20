@@ -21,6 +21,24 @@ export interface MainWindowReference {
   }
 }
 
+/** The single owner of the main-process quit phase, shared with the window and update wiring. */
+export interface QuitControl {
+  isQuitting(): boolean
+  /** Quits directly: used when no loaded renderer holds a document that could confirm a save. */
+  quitWithoutSave(): void
+  /** Called only after the update renderer flush; returns a rollback for installation failure. */
+  prepareUpdateQuit(): () => void
+  /**
+   * The window's renderer process ended, so its unsaved changes are gone and no save can be
+   * confirmed: a waiting quit completes, and later quits skip the save request.
+   */
+  rendererGone(window: MainWindowReference): void
+  /** The window started loading a new document, which cannot confirm the previous document's quit. */
+  rendererReplaced(window: MainWindowReference): void
+  /** The window committed a new document, so a live renderer can confirm saves again. */
+  rendererLoaded(window: MainWindowReference): void
+}
+
 export interface ApplicationBootstrapDependencies {
   app: ApplicationLifecycle
   hasSingleInstanceLock: boolean
@@ -40,9 +58,11 @@ export interface ApplicationBootstrapDependencies {
    * cleaned up first (PRODUCT §25), or null when nothing is running.
    */
   settleBeforeQuit: () => Promise<void> | null
-  /** Called only after the update renderer flush; returns a rollback for installation failure. */
-  registerUpdateQuit?: (prepare: () => () => void) => void
+  registerQuitControl: (control: QuitControl) => void
 }
+
+// `updating` lets the installer close the window without another save; its rollback returns to `running`.
+type QuitPhase = 'running' | 'updating' | 'quitting'
 
 export function bootstrapApplication({
   app,
@@ -58,15 +78,11 @@ export function bootstrapApplication({
   unregisterShortcut,
   onStartupError,
   settleBeforeQuit,
-  registerUpdateQuit,
+  registerQuitControl,
 }: ApplicationBootstrapDependencies): void {
-  let appQuitting = false
-  registerUpdateQuit?.(() => {
-    appQuitting = true
-    return () => {
-      appQuitting = false
-    }
-  })
+  let phase: QuitPhase = 'running'
+  // The window whose renderer process ended; a committed main-frame load or a new window makes it stale.
+  let goneRenderer: MainWindowReference | null = null
   const quitHandshake = new QuitHandshake(
     (requestId) => {
       getMainWindow()?.webContents.send('tree:quit-requested', requestId)
@@ -78,18 +94,41 @@ export function bootstrapApplication({
   )
 
   const quitWithoutSave = (): void => {
-    appQuitting = true
+    phase = 'quitting'
     app.quit()
   }
+  registerQuitControl({
+    isQuitting: () => phase !== 'running',
+    quitWithoutSave,
+    prepareUpdateQuit: () => {
+      phase = 'updating'
+      return () => {
+        if (phase === 'updating') phase = 'running'
+      }
+    },
+    // The handshake addresses only the current main window, so only its renderer can end a waiting request.
+    rendererGone: (window) => {
+      goneRenderer = window
+      if (window === getMainWindow() && quitHandshake.rendererLost()) app.quit()
+    },
+    rendererReplaced: (window) => {
+      if (window === getMainWindow()) quitHandshake.rendererLost()
+    },
+    // Cleared only at commit: a process that ends while the navigation is pending marks the window again.
+    rendererLoaded: (window) => {
+      if (goneRenderer === window) goneRenderer = null
+    },
+  })
 
   app.on('before-quit', (event) => {
     const mainWindow = getMainWindow()
-    if (!appQuitting && mainWindow !== null && !mainWindow.isDestroyed()) {
+    // A renderer whose process ended holds no document and cannot confirm a save, like one that never loaded.
+    if (phase === 'running' && mainWindow !== null && !mainWindow.isDestroyed() && mainWindow !== goneRenderer) {
       event.preventDefault()
       quitHandshake.request()
       return
     }
-    appQuitting = true
+    phase = 'quitting'
     const pending = settleBeforeQuit()
     if (pending !== null) {
       // Quit again once the work has ended; the next call returns null.
@@ -105,7 +144,7 @@ export function bootstrapApplication({
     const mainWindow = getMainWindow()
     if (mainWindow === null) return
     mainWindow.on('close', (event) => {
-      if (appQuitting || mainWindow.isDestroyed()) return
+      if (phase !== 'running' || mainWindow.isDestroyed()) return
       event.preventDefault()
       app.quit()
     })
@@ -119,7 +158,7 @@ export function bootstrapApplication({
         return
       }
       registerReadyServices(quitHandshake, () => {
-        appQuitting = true
+        phase = 'quitting'
       })
       if (!registerShortcut(surfaceWindow)) {
         onStartupError(new Error('The accelerator is unavailable.'))
@@ -128,7 +167,7 @@ export function bootstrapApplication({
       createMainWindow(quitWithoutSave)
       watchMainWindowClose()
       app.on('activate', () => {
-        if (!appQuitting && getWindowCount() === 0) {
+        if (phase === 'running' && getWindowCount() === 0) {
           createMainWindow(quitWithoutSave)
           watchMainWindowClose()
         }

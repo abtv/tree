@@ -124,6 +124,48 @@ describe('QuitHandshake', () => {
     expect(sent).toEqual(['request-1', 'request-2'])
   })
 
+  it('abandons a pending request when the renderer is lost, without a failure report', () => {
+    const sent: string[] = []
+    const onTimeout = vi.fn()
+    const quit = vi.fn()
+    const { clock, fire } = createClock()
+    let nextId = 0
+    const handshake = new QuitHandshake(
+      (requestId) => sent.push(requestId),
+      onTimeout,
+      quit,
+      () => `request-${++nextId}`,
+      clock,
+    )
+    handshake.request()
+
+    expect(handshake.rendererLost()).toBe(true)
+    fire()
+
+    expect(handshake.rendererLost()).toBe(false)
+    expect(clock.clearTimeout).toHaveBeenCalledExactlyOnceWith(1)
+    expect(onTimeout).not.toHaveBeenCalled()
+    expect(handshake.confirm('request-1')).toBe(false)
+    handshake.request()
+    expect(sent).toEqual(['request-1', 'request-2'])
+    expect(quit).not.toHaveBeenCalled()
+  })
+
+  it('keeps idle and quitting states when the renderer is lost', async () => {
+    const quit = vi.fn()
+    const { clock } = createClock()
+    const handshake = new QuitHandshake(vi.fn(), vi.fn(), quit, () => 'request', clock)
+
+    expect(handshake.rendererLost()).toBe(false)
+    handshake.force()
+    expect(handshake.rendererLost()).toBe(false)
+    await Promise.resolve()
+
+    expect(handshake.isQuitting()).toBe(true)
+    expect(quit).toHaveBeenCalledOnce()
+    expect(clock.clearTimeout).not.toHaveBeenCalled()
+  })
+
   it('ignores the callback from a cancelled deadline during a later quit request', async () => {
     const send = vi.fn()
     const timeout = vi.fn()

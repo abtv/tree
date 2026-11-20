@@ -842,7 +842,7 @@ window. Restoring a minimized main window must not dismiss About.
 
 ### 9.2 Window Close
 
-Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2.
+Closing the main window quits the application on macOS, including when the application is inactive. It follows the same save-before-quit behavior as `Cmd+Q`: pending changes are flushed, and if saving cannot finish within the bounded time or reports an error, the application remains open and displays the failure so the user can retry. In the locked save-failure state, the user can instead explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.
 
 ### 9.3 Application Menu
 
@@ -1291,7 +1291,7 @@ Every Tree release must open valid notes saved in any document format used by an
 
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
 
-When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2.
+When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.
 If a Find jump completes during saving, the final save includes its destination and any opened branches. A jump still pending when the final save completes cannot move the selection afterward.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
@@ -2327,6 +2327,8 @@ If the renderer encounters an unexpected error while rendering, the application 
 Instead, it displays an error message and a `Reload` action. Reloading restarts the renderer and loads the last saved document.
 
 Changes that were queued in memory but not yet persisted may be lost when the user reloads.
+
+If the renderer process itself terminates, its unsaved changes are already lost and no save can be confirmed. Quit and closing the window then quit the application immediately, without the save-before-quit wait of §16.1. A quit already waiting for a save when the renderer terminates completes the same way. If the renderer reloads while a quit waits, that quit ends without a save-failure message, and the next Quit saves through the reloaded renderer.
 
 ---
 

@@ -49,6 +49,17 @@ export class QuitHandshake {
     this.state = { kind: 'idle' }
   }
 
+  /**
+   * A lost or replaced renderer can no longer confirm the pending request, so it ends without a failure
+   * report. Returns whether a request was waiting.
+   */
+  public rendererLost(): boolean {
+    if (this.state.kind !== 'waiting') return false
+    this.clearTimeout()
+    this.state = { kind: 'idle' }
+    return true
+  }
+
   public force(): void {
     if (this.state.kind === 'quitting') return
     this.clearTimeout()

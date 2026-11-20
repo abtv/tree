@@ -70,4 +70,27 @@ test.describe('unexpected renderer errors', () => {
 
     expect(outcome).toBe('closed')
   })
+
+  // @requirement PRODUCT.md §21
+  test('quits when the renderer process is gone', async ({ userDataDir }) => {
+    const { app } = await launchTree(userDataDir)
+    const closed = new Promise<string>((resolve) => app.once('close', () => resolve('closed')))
+    await app.evaluate(
+      ({ BrowserWindow }) =>
+        new Promise<void>((resolve) => {
+          const contents = BrowserWindow.getAllWindows()[0]!.webContents
+          contents.once('render-process-gone', () => resolve())
+          contents.forcefullyCrashRenderer()
+        }),
+    )
+
+    // A lost renderer holds no document and cannot confirm a quit save, so Quit must not wait for one.
+    await clickApplicationMenuQuit(app)
+    const outcome = await Promise.race([
+      closed,
+      new Promise<string>((resolve) => setTimeout(() => resolve('still running'), 10_000)),
+    ])
+
+    expect(outcome).toBe('closed')
+  })
 })
