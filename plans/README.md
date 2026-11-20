@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Product Specification Refactoring](product-spec-refactoring.md) | In progress; T1, T2, R09, R01a, and R01b done; R01c waits for an owner decision | None is authorized; R01c (new session on Opus, effort high) starts only after the owner decides about it |
+| [Product Specification Refactoring](product-spec-refactoring.md) | In progress; T1, T2, R09, R01a, and R01b done; R01c authorized and ready | R01c (authorized; executed by the primary session that recorded the decision); then none until the owner accepts R01c and decides about R02 |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
