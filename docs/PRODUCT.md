@@ -2469,6 +2469,8 @@ Scrolling must populate the newly visible range before the next rendered frame, 
 
 Selecting a direct match makes that node's occurrence on that day active. Adding a date keeps the active occurrence on its day. Removing its date moves it to the chronologically nearest remaining recognized date, choosing the earlier day on a tie. A live edit reveals that destination if folded and switches to its week when needed so editing can continue; unrelated folds remain unchanged. Undo and Redo preserve the displayed week.
 
+A destination before the current week is the item's Overdue row only for an unfinished item. Overdue does not list finished items (§23.3), so a finished item continues in the week of that date and stays selected.
+
 Removing the last recognized date keeps the item on the active day until selection leaves it. The real node is not deleted. Selecting another row, closing Agenda, or navigating to Tree leaves it; reselecting the same item, window blur, and changing editing mode on that item do not. Restoring a recognized date removes the temporary pin. These transitions follow document changes and do not create separate Undo entries.
 
 If the originating Tree parent or selection no longer exists, Agenda stays open and updates its return location to the nearest surviving Tree ancestor, or the first root, with the cursor at the beginning. This keeps the return location valid for persistence and closing.

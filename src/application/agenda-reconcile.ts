@@ -57,10 +57,13 @@ export function reconcileAgenda(
         // A live edit continues in the nearest remaining occurrence. History never unfolds it.
         // If the day is unchanged, the active path is already visible; deleting its absent folds is equivalent.
         if (day !== active.day && !preservePresentation) {
+          // Overdue lists only unfinished nodes (`docs/PRODUCT.md` §23.3), so a finished item
+          // continues in the week of its remaining date instead.
           const overdue =
             next.presentation.kind === 'timeline' &&
             next.weekStart === agendaWeekStart(next.today) &&
-            day < next.weekStart
+            day < next.weekStart &&
+            located.node.struckThrough !== true
           if (!overdue) next = { ...next, weekStart: agendaWeekStart(day) }
           if (next.presentation.kind === 'focused-day') next = { ...next, presentation: { ...next.presentation, day } }
           const collapsed = new Set(next.collapsed)

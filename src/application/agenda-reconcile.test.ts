@@ -11,7 +11,7 @@ import {
   focusAgendaState,
 } from './agenda-state'
 import { expect, it } from 'vitest'
-import { deleteNode, editNodeText, type Document } from '../domain/document'
+import { deleteNode, editNodeText, toggleMarkNode, type Document } from '../domain/document'
 import {
   agendaHistorySelection,
   agendaOriginLocation,
@@ -179,6 +179,49 @@ it.each([
     expect(next.collapsed.has(dayKey(opened.weekStart))).toBe(overdue)
   }
 })
+
+// Overdue lists only unfinished nodes, so a finished item cannot continue there.
+// @requirement PRODUCT.md §23.3
+// @requirement PRODUCT.md §23.7
+it.each([
+  ['date', false],
+  ['date', true],
+  ['mark', false],
+  ['mark', true],
+] as const)(
+  'follows a finished item to the week of its earlier date after its %s is removed (cache %s)',
+  (removed, cached) => {
+    const source: Document = {
+      roots: [
+        {
+          id: 'done',
+          text: removed === 'date' ? '1970-04-04 1970-04-11 Done' : '1970-04-04 Done',
+          struckThrough: true,
+          ...(removed === 'mark' ? { marked: true as const } : {}),
+          children: [],
+        },
+        { id: 'open', text: '1970-04-03 Open', children: [] },
+      ],
+    }
+    const cache = cached ? new AgendaRowsCache() : undefined
+    const opened = openAgendaState({ currentParentId: null, selectedNodeId: 'done' }, 3, 100)
+    const rows =
+      cache?.get(source, opened) ?? buildAgendaRows(agendaProjection(source, opened), opened, undefined, source)
+    const active = applyAgendaCommand(opened, { kind: 'select', key: 'node:100:done' }, rows)
+    const edited = removed === 'date' ? editNodeText(source, 'done', '1970-04-04 Done') : toggleMarkNode(source, 'done')
+
+    const next = reconcileAgenda(edited, active, false, cache, source, active)!
+
+    expect(next.selectedKey).toBe('node:93:done')
+    expect(activeAgendaOccurrence(next)).toEqual({ nodeId: 'done', day: 93 })
+    expect(next.weekStart).toBe(agendaWeekStart(93))
+    expect(
+      buildAgendaRows(agendaProjection(edited, next), next, undefined, edited).some(
+        (row) => row.key === next.selectedKey,
+      ),
+    ).toBe(true)
+  },
+)
 
 // @requirement PRODUCT.md §23.7
 it('tracks explicit active occurrences, keeps added dates stable, and chooses the earlier nearest remaining day', () => {
