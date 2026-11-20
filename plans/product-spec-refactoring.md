@@ -506,7 +506,7 @@ P0 is committed. Use this prompt only after the owner has approved the start of 
 Execute task T1 of plans/product-spec-refactoring.md.
 Model: Sonnet, effort medium.
 The Product Owner approved the start of T1 on [date]. The owner's answers are recorded in the plan.
-T1 is a mechanical split with tooling changes and no wording change. Stop after the T1 commit and report.
+T1 is a mechanical split with tooling changes. Its only text differences are the four that §6.3 item 12 of the plan lists. Stop after the T1 commit and report.
 ```
 
 ## 16. Owner Question Log
