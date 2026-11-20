@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Product Specification Refactoring](product-spec-refactoring.md) | Awaiting owner approval; implementation not authorized | None until the owner approves the plan and answers its §11; then T1 |
+| [Product Specification Refactoring](product-spec-refactoring.md) | Awaiting owner approval; implementation not authorized | None until the owner approves the plan and answers its §11; then P0 (record the answers); T1 only after a separate owner approval |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
