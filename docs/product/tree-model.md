@@ -51,7 +51,7 @@ Nodes with children display a disclosure chevron to the left of their circular i
 
 Node text is always edited inline. A node must not have a persistent input border or card-like container.
 
-Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. A quick press and release still places the text cursor at the clicked position, and pressing and dragging selects text. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening. Moving the pointer by more than 4 pixels before the threshold cancels the pending drag so the gesture remains an ordinary text selection, and leaving the row while the button is still held also cancels it.
+Pressing a node row places the text cursor, selects text, or starts node movement under the hold rules of §11. When hovering an unfocused node, the pointer uses the standard pointer cursor; a focused node uses the text cursor while it is being edited. Holding the left Command key while hovering a hyperlink changes only that hyperlink to the hand cursor and enables Cmd+click opening.
 
 Node text wraps and the whole text is always shown; a node grows in height to fit its text. Wrapping adds no stored line breaks. Each visual line occupies at most 120 character cells of the editor's monospace font, wrapping earlier when the window or indentation leaves less room. This limits displayed width, not the stored text length. In standard editing and Vim Insert, `Enter` creates or splits a node in Tree (§5.1), and inserts a line break in Agenda (§23.9). Long unbroken strings are broken so that text never overflows horizontally.
 
@@ -65,9 +65,9 @@ While the Tree or Agenda list contains keyboard focus, only its selected row has
 * An active image caret uses a band whose top and bottom coincide with the outer edges of the image's visible focus outline. The band excludes the caption and surrounding spacing. Without a visible outline, the loading placeholder uses its own bounds.
 * The tint never changes the text selection.
 
-Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their existing feedback takes precedence.
+Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their own feedback takes precedence.
 
-The selected node retains its dark bullet without an additional more-options or selection-dot ornament. When the editable Tree current-parent heading has the caret, its active line uses the same full-width tint as a node row. Moving focus to a child moves the tint to that child.
+The selected node keeps its dark bullet and has no more-options or selection-dot ornament. When the editable Tree current-parent heading has the caret, its active line uses the same full-width tint as a node row. Moving focus to a child moves the tint to that child.
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 
@@ -117,7 +117,7 @@ The column begins 4px from the leading edge. Before hierarchy indentation, text
 begins 40px after its right edge. Number, disclosure, bullet and text remain
 separate; control sizes and the 20px indentation step stay unchanged in both states.
 
-This explicit Control shortcut follows the owner's keyboard-first choice (§1.3).
+This explicit Control shortcut follows the keyboard-first model (§1.3).
 Browsers may reserve Ctrl+L for their address bar; the command panel remains available.
 
 ### 2.2 Location Path
@@ -134,7 +134,7 @@ The location path represents the current parent/location, not the selected child
 
 When navigation moves to an ancestor through the location path, the direct child on the path from the destination to the previous location becomes selected and its text cursor is placed at the beginning. Clicking the current-parent segment does nothing.
 
-During a node drag, the root glyph below root level and every ancestor segment accept the dragged subtree as their last child (the last root for the glyph). The current-parent segment and the glyph at root level do not accept drops. Each segment's hit region spans its width and the toolbar's full height; an accepting segment shows the existing hover-surface color without animation or layout shift. Toolbar targets take precedence over row targets; toolbar whitespace is invalid, and hovering the toolbar does not auto-scroll the list. A successful drop displays the destination's children and selects the moved node.
+During a node drag, the root glyph below root level and every ancestor segment accept the dragged subtree as their last child (the last root for the glyph). The current-parent segment and the glyph at root level do not accept drops. Each segment's hit region spans its width and the toolbar's full height; an accepting segment shows the ordinary hover-surface color without animation or layout shift. Toolbar targets take precedence over row targets; toolbar whitespace is invalid, and hovering the toolbar does not auto-scroll the list. A successful drop displays the destination's children and selects the moved node.
 
 The location toolbar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The toolbar never causes the window to scroll horizontally, regardless of path depth or segment length.
 
