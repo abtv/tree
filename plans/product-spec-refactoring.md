@@ -62,8 +62,9 @@ Measured references (Git-tracked files):
 | Non-marker code lines with a `§` reference, many without a document name (for example `(§20.2.9)`) | 218 |
 | Lines inside the specification with an internal `§` cross-reference | 240 |
 | Markdown links with a heading anchor into the specification | 7 |
+| Relative Markdown links from the specification to other repository files | 3 |
 
-The seven anchor links are in `docs/SECURITY.md` (1), `src/web/README.md` (5), and `docs/decisions/0024-desktop-notes-archive.md` (1).
+The seven anchor links are in `docs/SECURITY.md` (1), `src/web/README.md` (5), and `docs/decisions/0024-desktop-notes-archive.md` (1). The three outgoing links are `SECURITY.md` and `VIM_CONFORMANCE.md` in §1.1 (L30, L31) and `../src/web/README.md` in §1.4 (L142). Their relative paths change when the text moves one directory down.
 
 ### 4.2 Per-section inventory
 
@@ -131,7 +132,7 @@ Lines and words are measured. "Accretion" is the number of history-relative sent
 | `docs/product/persistence.md` | §16 | 100 | 1,433 |
 | `docs/product/application.md` | §9, §21, §26 | 129 | 1,349 |
 | `docs/product/interaction.md` | §20 own text, §20.1, §20.3–§20.8 | 150 | 2,950 |
-| `docs/product/vim.md` | §20.2.1–§20.2.6, §20.2.8–§20.2.25, §20.2.27 | 299 | 7,500 |
+| `docs/product/vim.md` | §20.2 heading, §20.2.1–§20.2.6, §20.2.8–§20.2.25, §20.2.27 | 299 | 7,500 |
 | `docs/product/command-panel.md` | §20.2.7, §20.2.28–§20.2.30 | 98 | 2,111 |
 | `docs/product/search.md` | §20.2.26, §20.14 | 189 | 3,671 |
 | `docs/product/completion-and-tags.md` | §20.9–§20.13 | 144 | 3,269 |
@@ -141,6 +142,8 @@ Lines and words are measured. "Accretion" is the number of history-relative sent
 | `docs/product/desktop-data.md` | §25 | 41 | 979 |
 
 The rows sum to the measured 2,811 content lines and 45,812 words. The largest file is 16% of the current document.
+
+The heading `### 20.2 Vim-Inspired Editing` has no text of its own. It moves to `vim.md` and stays the target of every `§20.2` citation, although four of its subsections live in `command-panel.md` and `search.md`. Every numbered heading of the current document, including a parent without own text, appears in exactly one file.
 
 ## 6. Migration Strategy for Section IDs, Markers, and Links
 
@@ -175,8 +178,10 @@ Residual risk: the index becomes the only map from number to file. T1 adds a `ch
 3. `check-docs.mts` rejects text before the first numbered heading of a specification file, other than its title, so no requirement can sit outside a numbered section.
 4. `check-docs.mts` checks the index against the files (§6.2).
 5. `--verbatim` accepts the specification directory as the "after" side, so the old single file can be compared with the union of the new files.
-6. `docs/DEVELOPMENT.md` §9 and §12 describe the changed checks. `docs/AGENT_WORKFLOW.md` §11 names the directory in its document list. `AGENTS.md` needs no change.
-7. The seven anchor links are retargeted by hand to the new files.
+6. The clause comparison of `--verbatim` ignores order by design (`docs/DEVELOPMENT.md` §12), so it cannot prove a mechanical split. T1 adds an ordered per-section comparison: for every numbered section, the lines from its heading to the next numbered heading equal, in the same order, the same range of `docs/PRODUCT.md` at the base commit. The comparison ignores blank lines and `---` separators at file boundaries and reports every other difference.
+7. `docs/DEVELOPMENT.md` §9 and §12 describe the changed checks. `docs/AGENT_WORKFLOW.md` §11 names the directory in its document list. `AGENTS.md` needs no change.
+8. The seven anchor links into the specification are retargeted by hand to the new files.
+9. The three outgoing links get their new relative paths: `../SECURITY.md` and `../VIM_CONFORMANCE.md` in `overview.md`, `../../src/web/README.md` in `browser.md`. These are the only permitted text differences in T1. Both comparisons report them, because a link target is part of its clause and of its line; the T1 evidence lists the three as the complete set of differences.
 
 ## 7. Rewrite Method
 
@@ -192,6 +197,7 @@ Residual risk: the index becomes the only map from number to file. T1 adds a `ch
 - **W8. Merge only identical meaning.** Record any difference, even one word. When the two statements differ in a detail, keep both and name the detail in the map.
 - **W9. Literals.** Every number, key name, UI string, and code span survives, or its removal is a recorded Merged or Moved disposition.
 - **W10. Structure.** Unnumbered headings stay inside their numbered section. Hard-wrapped paragraphs may be unwrapped. The 700-character and 8,000-character limits apply.
+- **W11. Order.** Keep the order of statements wherever order carries meaning: the priority order of §1.1, numbered or lettered rule lists, steps, precedence lists, and any text that another sentence addresses by position ("rule 2", "the rule above"). Record every reordering in the statement map with its reason. The verbatim report does not detect reordering.
 
 ### 7.2 Calibration sample: §9.2 and §9.3 (medium risk)
 
@@ -245,14 +251,14 @@ Result: 13 statements; none lost, none changed, five merged with a cited survivo
 2. **Rewrite.** Apply §7.1 to the task's sections only.
 3. **Clause inventory.** Run `npm run check:docs -- --verbatim <base> --file <file>` for each changed specification file. The command exits 1 for a rewrite; that is expected. Its report is the complete list of removed and added clauses.
 4. **Statement map.** In `.scratch/product-spec-<task>/`, give every removed clause a disposition under W2 and every added clause its source clauses. For Merged and Moved, name the surviving location.
-5. **Independent verifier.** A reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side), the rules of §7.1, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, and it audits literals under W9.
-6. **Reconcile.** The implementer compares the verifier's table with the map. Every lost, changed, or added entry is corrected or becomes an owner question with the sentence held verbatim. Repeat the verifier pass only when corrections are substantial (`AGENTS.md` §13).
+5. **Independent verifier.** A reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side), the rules of §7.1, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, reordered, and it audits literals under W9 and order under W11.
+6. **Reconcile.** The implementer compares the verifier's table with the map. Every lost, changed, added, or unrecorded reordered entry is corrected or becomes an owner question with the sentence held verbatim. Repeat the verifier pass only when corrections are substantial (`AGENTS.md` §13).
 7. **Validation.** Minimal Risk tier: `npm run format:check:changed`, `npm run check:docs`, `npm run check:requirements`, and `npm run check:opencode` when agent workflow documents change. A task that edits a marker line in a test file is Low Risk: also run lint and the focused tests for the touched files.
 8. **Commit** the rewrite with the plan status update. Remove the scratch directory after the commit.
 
 ### 7.4 Evidence that counts as "no behavior change"
 
-All six conditions hold:
+All seven conditions hold:
 
 - **E1.** The diff touches only the files named for the task. Under `src/`, `e2e/`, `perf/`, and `scripts/`, it changes only the listed marker lines.
 - **E2.** The statement map covers every removed and every added clause of the verbatim report, with no clause unassigned.
@@ -260,8 +266,14 @@ All six conditions hold:
 - **E4.** The requirement count is unchanged, or each difference is a section addition or retirement named in §8.
 - **E5.** Every literal is preserved or covered by a recorded Merged or Moved disposition.
 - **E6.** The checks of step 7 pass.
+- **E7.** Order is preserved wherever W11 applies, or each reordering is recorded in the map and confirmed by the verifier.
 
-For T1, the evidence is stricter: the verbatim comparison of the old file with the new directory reports zero removed clauses, zero moved clauses, zero removed headings, and added clauses only from the index and file titles; `git diff --stat` shows no change under `src/`, `e2e/`, or `perf/`; the requirement count stays 126.
+For T1, the evidence is stricter:
+
+- The ordered per-section comparison of §6.3 item 6 reports exactly three differing lines, the outgoing links of §6.3 item 9, and no other difference in content or order.
+- The verbatim comparison of the old file with the new directory reports zero removed headings and zero moved clauses. Its removed and added clauses are the same three link clauses, plus added clauses from the index and the file titles.
+- Every numbered heading of the base document, including §20.2, exists in exactly one file.
+- `git diff --stat` shows no change under `src/`, `e2e/`, or `perf/`, and the requirement count stays 126.
 
 These conditions prove that the text keeps its statements. They do not prove that the old text matched the implementation; that question is outside this initiative.
 
@@ -269,11 +281,11 @@ These conditions prove that the text keeps its statements. They do not prove tha
 
 Working-task count: 43. Final owner acceptance under `AGENTS.md` §8 applies.
 
-Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E6 of §7.4. Tiers follow `docs/DEVELOPMENT.md` §9. All specification files are under `docs/product/`. Every rewrite task also updates this plan and `plans/README.md`. Routing: implementer / verifier (§9).
+Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E7 of §7.4. Tiers follow `docs/DEVELOPMENT.md` §9. All specification files are under `docs/product/`. Every rewrite task also updates this plan and `plans/README.md`. Routing: implementer / verifier (§9).
 
 | ID | Outcome | Depends on | Files | Tier | Routing | Evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven anchor links. No wording change. | Approval | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Planned |
+| T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven incoming anchor links, three outgoing link paths. No other text change and no reordering. | Approval | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Planned |
 | T2 | Literal comparison report for rewrite verification (numbers, code spans, bold UI labels) as a `check:docs` mode, with tests. Only if Q10 is approved. | T1 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass; report on the §7.2 sample lists no unexplained literal | Planned |
 | R09 | Pilot: rewrite §9. Retitle the heading if Q3 allows. Owner checkpoint follows. | T1 | `application.md` | Minimal | Opus high / Fable high | R | Planned |
 | R01a | Rewrite §1, §1.1–§1.3. Create §9.4 About Tree as the single owner of the dialog (Q4). §1.1 order and §1.2 rules unchanged. | R09, Q4, Q5 | `overview.md`, `application.md`, `browser.md`, `scripts/check-requirement-coverage.mts`, `e2e/electron/about-window.spec.ts` (one marker) | Low | Opus high / Fable high | R; new §9.4 has unit-or-E2E markers | Planned |
@@ -314,7 +326,7 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E6 of §7.4. Tiers fol
 | R24 | Rewrite §24. | R23b | `browser.md` | Minimal | Fable high / Fable high | R | Planned |
 | R25 | Rewrite §25. | R24 | `desktop-data.md` | Minimal | Fable high / Fable high | R | Planned |
 | R26 | Rewrite §26. | R25 | `application.md` | Minimal | Opus high / Fable high | R | Planned |
-| F1 | Apply the owner's answers to held sentences (W7(c)), suspected inconsistencies (§12), and approved moves to tests (Q9). Skipped parts are recorded. | R26, owner answers | Files named by the answers | By content | Fable high / Fable high | R per changed section | Planned |
+| F1 | Apply only the owner's answers that keep implemented behavior. A held sentence (W7(c)) or a §12 finding is resolved by stating what the application already does, and the resolution cites a test or source location as evidence. An answer that would change behavior is not applied here: it is recorded as a separate product task outside this initiative, and both original statements stay. Also apply approved moves to tests (Q9). Skipped parts are recorded. | R26, owner answers | Files named by the answers | By content | Fable high / Fable high | R per changed section; each resolution cites its implementation evidence; no production code and no test assertion changes | Planned |
 | F2 | Final sweep: phrase search for remaining history-relative wording, index and retired-number table, every citation and anchor in the repository resolves, acceptance package. | F1 | `docs/PRODUCT.md`, `docs/product/*.md`, citing documents | Minimal | Opus high / Fable high | Citation check listed per citing file; R for changed text | Planned |
 
 Dependencies between rewrite tasks are an order, not a technical constraint, with two exceptions: every rewrite needs T1, and a merge keeps its survivor (§7.2).
@@ -380,7 +392,7 @@ Each question has a recommended default.
   - asset retention, limits, and the cancellation rule: `deployment/github-pages/README.md`, which is where these exist today although it was not on the destination list;
   - verification status of §1.5 (L214, L235): `src/web/README.md` and `docs/DEVELOPMENT.md` §8;
   - the completion check of L77: `docs/AGENT_WORKFLOW.md` §13, which already states it.
-  
+
   Retire §1.4.1 and delete its two markers and the two release markers filed under §1.4; the tests stay. Default: yes to all. Alternative: keep §1.4.1 as a short product-level statement of release identity.
 - **Q6. §22 obligations.** §22.1 mixes product commitments with obligations on every change. Keep the commitments and the numbers §22.1 and §22.2; move the assessment procedure to `docs/AGENT_WORKFLOW.md` §4 and the pre-release memory checks to `docs/DEVELOPMENT.md`; leave one sentence in §22.1 that cites them. Default: yes. Alternative: leave §22 whole, because about 100 citations name §22.1 as the owner of the assessment.
 - **Q7. Cost-assessment sentences inside feature sections** (L1192–1193, L1469, L2180, L2241, L2284, L2811–2813). Keep where they state a user-visible commitment; move measurement method and guard obligations to `docs/DEVELOPMENT.md` §12. Default: yes, decided sentence by sentence in the owning task.
@@ -413,7 +425,7 @@ Each question has a recommended default.
 
 ## 12. Suspected Inconsistencies Found During Analysis
 
-The analysis found statements that appear to conflict or to refer to nothing. Subagents reported them; this session did not verify each one. A rewrite must not resolve them: both statements stay, and the owning task confirms the finding and adds it to the owner round.
+The analysis found statements that appear to conflict or to refer to nothing. Subagents reported them; this session did not verify each one. A rewrite must not resolve them: both statements stay, and the owning task confirms the finding and adds it to the owner round. Choosing one of two conflicting statements can differ from what the application does, so this initiative applies an answer only when it matches implemented behavior (F1). A decision that changes behavior becomes an ordinary product task under `AGENTS.md` §5, outside this plan.
 
 | # | Location | Finding |
 | --- | --- | --- |
