@@ -47,6 +47,7 @@
       "npm run test:mutation *",
       "npm run test:safari",
       "npm run test:safari *",
+      "npm run test:smoke:safari",
       "TREE_E2E_VISIBLE=1 npm run test:e2e*",
       "npm run check:full*",
       "npm run check",
