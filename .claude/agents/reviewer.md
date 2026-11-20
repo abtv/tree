@@ -2,7 +2,7 @@
 name: reviewer
 description: Independently reviews an implementation and reports only meaningful findings when AGENTS.md §13 requires a separate review.
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-opus-5-5
 effort: high
 ---
 

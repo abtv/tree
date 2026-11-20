@@ -2,7 +2,7 @@
 name: product-verifier
 description: Checks changed behavior as a careful user and reports meaningful product issues when AGENTS.md §13 requires a separate verifier.
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: claude-opus-5-5
 effort: high
 ---
 

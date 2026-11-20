@@ -2,7 +2,7 @@
 name: product-researcher
 description: Investigates a bounded product hypothesis and proposes evidence and experiments without making product decisions. Use only for product-discovery work, per AGENTS.md §5.
 tools: Read, Grep, Glob, WebFetch, WebSearch
-model: sonnet
+model: claude-opus-5-5
 effort: high
 ---
 
