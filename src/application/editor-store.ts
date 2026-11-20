@@ -87,6 +87,7 @@ import {
   type ExpansionState,
   type NodeFoldCommand,
 } from './expansion-state'
+import { ExpansionViewRetention } from './expansion-view-retention'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { AgendaFoldMemory } from './agenda-fold-memory'
@@ -162,6 +163,7 @@ export class EditorStore {
     this.recentNodesOwner.update(state.document, Boolean(state.hideFinishedTasks))
   })
   private readonly history = new EditorHistory()
+  private readonly viewRetention = new ExpansionViewRetention()
   private finishedTasksWrite = Promise.resolve()
   private readonly imageToTextQueue = new ImageToTextQueue()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
@@ -873,17 +875,22 @@ export class EditorStore {
     if (node.text === text) {
       return
     }
+    let historyReleased = false
     if (!this.textSession.isActive(nodeId)) {
       // begin replaces the active node and scheduleBoundary clears the old timer;
       // ending here also makes that session transition explicit before history capture.
       this.textSession.end()
-      if (this.history.begin(state.document)) this.queueAttachmentCleanup()
+      historyReleased = this.beginHistory(state.document)
       this.textSession.begin(nodeId)
     }
     const insertedWords = countInsertedWords(node.text, text)
     const next = editNodeContent(state.document, nodeId, text, links)
     this.recentNodesOwner.remember(nodeId, next)
-    this.runtime.replaceReady({ ...state, document: next })
+    this.runtime.replaceReady({
+      ...state,
+      document: next,
+      expansion: this.retainedViews(state.expansion, next, historyReleased),
+    })
     this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
     this.textSession.endIfStandalone()
@@ -1803,10 +1810,28 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
-    if (this.history.begin(state.document)) this.queueAttachmentCleanup()
-    this.runtime.replaceReady({ ...state, document, location, focus, expansion }, true)
+    const historyReleased = this.beginHistory(state.document)
+    this.runtime.replaceReady(
+      { ...state, document, location, focus, expansion: this.retainedViews(expansion, document, historyReleased) },
+      true,
+    )
     this.markPersistedChange()
     return true
+  }
+
+  /** Records `document` as an undo entry. Returns whether history released older or redo snapshots. */
+  private beginHistory(document: Document): boolean {
+    const released = this.history.begin(document)
+    if (released) this.queueAttachmentCleanup()
+    return released
+  }
+
+  /**
+   * After history released snapshots, drops the views of nodes that neither `document` nor the remaining
+   * history contains (`docs/PRODUCT.md` §§2.4, 22.1).
+   */
+  private retainedViews(expansion: ExpansionState, document: Document, historyReleased: boolean): ExpansionState {
+    return historyReleased ? this.viewRetention.release(expansion, document, () => this.history.documents()) : expansion
   }
 
   private markPersistedChange(): void {

@@ -12,8 +12,9 @@ export interface ExpansionState {
   /** The starred node that owns the active view, or `null` for the root view. */
   readonly viewOwnerId: NodeId | null
   /**
-   * Every inactive view, keyed by its owner, with the root view under `null`. Views of deleted or
-   * unstarred nodes stay for the session, so undo restores them; only starred nodes' views are saved.
+   * Every inactive view, keyed by its owner, with the root view under `null`. Views of unstarred nodes
+   * stay for the session, and views of deleted nodes stay while undo history holds the node
+   * (`ExpansionViewRetention`), so undo restores them; only starred nodes' views are saved.
    */
   readonly otherViews: ReadonlyMap<NodeId | null, ReadonlySet<string>>
 }

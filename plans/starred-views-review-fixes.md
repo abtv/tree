@@ -16,8 +16,8 @@ The list below is the complete list the review provided. No unverified remainder
 | --- | --- | --- | --- |
 | R1 | 2, 3 | Tree activates a starred view only for the final displayed location, then checks the selection against that view | Done |
 | R2 | 1 | Find releases its fold ownership when the active view changes | Done |
-| R3 | 4 | Views of nodes that neither the document nor undo history contains are dropped | Ready |
-| R4 | 5 | The starred-view property test always exercises a starred view | Planned |
+| R3 | 4 | Views of nodes that neither the document nor undo history contains are dropped | Done |
+| R4 | 5 | The starred-view property test always exercises a starred view | Ready |
 
 ### R1: Activate the view of the final location
 
@@ -45,6 +45,7 @@ The list below is the complete list the review provided. No unverified remainder
 - Acceptance: 500 create/star/enter/delete cycles leave a bounded number of views; undo within history still restores a deleted node's view; re-starring an existing node in the session restores its view.
 - Validation: High Risk (scale-sensitive state): `npm run check`, full `npm run test:e2e`, `npm run audit`.
 - Review: independent review.
+- Result: `ExpansionViewRetention` (`src/application/expansion-view-retention.ts`) runs when `EditorHistory.begin` releases snapshots. It walks history only after the number of views of absent nodes reaches a doubling threshold, and the walk skips subtrees the document shares. ADR 0028 records the amended retention rule. Validation passed; review found only the stale ADR sentence, now corrected.
 
 ### R4: Deterministic starred-view coverage
 
@@ -59,7 +60,7 @@ Four working tasks. No manual check before a commit. After R4, the owner confirm
 
 ## Next task
 
-R3.
+R4.
 
 ## Resume prompt
 
