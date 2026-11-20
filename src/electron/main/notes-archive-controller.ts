@@ -93,14 +93,27 @@ export const RESTART_REQUIRED_MESSAGE = 'Restart Tree to complete the notes impo
 const ZIP_FILTERS: FileDialogFilter[] = [{ name: 'ZIP Archive', extensions: ['zip'] }]
 const CANCELED: NotesOperationCanceled = { ok: false, canceled: true }
 
+type Prepared = { readonly kind: 'prepared'; readonly staging: string; readonly fileName: string }
+
+// An export started from the import confirmation keeps the prepared import as `suspended` and
+// returns to it when the export ends (PRODUCT §25.3).
 type State =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'choosing' }
-  | { readonly kind: 'export-chosen'; readonly path: string }
+  | { readonly kind: 'choosing'; readonly suspended: Prepared | undefined }
+  | { readonly kind: 'export-chosen'; readonly path: string; readonly suspended: Prepared | undefined }
   | { readonly kind: 'import-chosen'; readonly path: string }
-  | { readonly kind: 'running'; readonly operation: object; cancel(): Promise<void> }
-  | { readonly kind: 'prepared'; readonly staging: string; readonly fileName: string }
+  | {
+      readonly kind: 'running'
+      readonly operation: object
+      readonly suspended: Prepared | undefined
+      cancel(): Promise<void>
+    }
+  | Prepared
   | { readonly kind: 'committing'; readonly done: Promise<unknown> }
+
+const IDLE: State = { kind: 'idle' }
+
+const suspendedImport = (state: State): Prepared | undefined => ('suspended' in state ? state.suspended : undefined)
 
 type WorkerOutcome<T> = { readonly value: T } | { readonly crash: unknown }
 
@@ -115,20 +128,39 @@ const ignore = () => undefined
 export function createNotesArchiveController(dependencies: NotesArchiveControllerDependencies): NotesArchiveController {
   const { fileServices, dialogs } = dependencies
   const now = dependencies.now ?? (() => new Date())
-  let state: State = { kind: 'idle' }
-  let waitingImport: Extract<State, { kind: 'prepared' }> | undefined
+  let state: State = IDLE
   let closing = false
   let restartRequired = false
   let notice: { fileName?: string; folder: string | null } | undefined
   let replacedFolder: string | null = null
 
-  const beginChoice = (): void => {
+  /** Opens a native panel; an export choice keeps a prepared import, while an import choice requires none. */
+  const beginChoice = (purpose: 'export' | 'import'): void => {
     if (closing) throw new Error('Tree is quitting.')
     if (restartRequired) throw new Error(RESTART_REQUIRED_MESSAGE)
-    if (state.kind !== 'idle' && state.kind !== 'export-chosen' && state.kind !== 'import-chosen') {
+    const current = state
+    if (purpose === 'export' && current.kind === 'prepared') {
+      state = { kind: 'choosing', suspended: current }
+      return
+    }
+    if (current.kind !== 'idle' && current.kind !== 'export-chosen' && current.kind !== 'import-chosen') {
       throw new Error(BUSY_MESSAGE)
     }
-    state = { kind: 'choosing' }
+    const suspended = suspendedImport(current)
+    if (purpose === 'import' && suspended !== undefined) throw new Error(BUSY_MESSAGE)
+    state = { kind: 'choosing', suspended }
+  }
+
+  /** Ends a panel choice or operation, returning to the import it suspended, if any. */
+  const resume = (): void => {
+    state = suspendedImport(state) ?? IDLE
+  }
+
+  const detachSuspended = (): Prepared | undefined => {
+    const current = state
+    if (!('suspended' in current) || current.suspended === undefined) return undefined
+    state = { ...current, suspended: undefined }
+    return current.suspended
   }
 
   const take = <K extends State['kind']>(kind: K, missing: string): Extract<State, { kind: K }> => {
@@ -193,6 +225,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
 
   /** Runs `body` as the current operation; `cancel` terminates its worker and waits for its cleanup. */
   const runOperation = <T>(
+    suspended: Prepared | undefined,
     body: (isCanceled: () => boolean, setWorker: (terminate: () => Promise<void>) => void) => Promise<T>,
   ): Promise<T> => {
     const operation = {}
@@ -204,14 +237,12 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
         terminate = stop
       },
     ).finally(() => {
-      if (state.kind === 'running' && state.operation === operation) {
-        state = waitingImport ?? { kind: 'idle' }
-        waitingImport = undefined
-      }
+      if (state.kind === 'running' && state.operation === operation) resume()
     })
     state = {
       kind: 'running',
       operation,
+      suspended,
       async cancel() {
         canceled = true
         await terminate()
@@ -222,20 +253,20 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   }
 
   const cancel = async (): Promise<void> => {
-    const waiting = waitingImport
-    waitingImport = undefined
-    if (waiting !== undefined) await fileServices.discardStagingDirectory(waiting.staging).catch(ignore)
+    // Detach first so that an operation ending during the discard cannot resume the import.
+    const suspended = detachSuspended()
+    if (suspended !== undefined) await fileServices.discardStagingDirectory(suspended.staging).catch(ignore)
     const current = state
     switch (current.kind) {
       case 'export-chosen':
       case 'import-chosen':
-        state = { kind: 'idle' }
+        state = IDLE
         return
       case 'running':
         await current.cancel()
         return
       case 'prepared':
-        state = { kind: 'idle' }
+        state = IDLE
         await fileServices.discardStagingDirectory(current.staging).catch(ignore)
         return
       default:
@@ -247,34 +278,29 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   return {
     isIdle: () => state.kind === 'idle',
     async chooseExportDestination() {
-      if (state.kind === 'prepared' && !closing && !restartRequired) {
-        waitingImport = state
-        state = { kind: 'idle' }
-      }
-      beginChoice()
+      beginChoice('export')
       try {
         const result = await dialogs.showSaveDialog({ defaultPath: archiveFileName(now()), filters: ZIP_FILTERS })
         if (closing || result.canceled || result.filePath === undefined || result.filePath === '') {
-          state = waitingImport ?? { kind: 'idle' }
-          waitingImport = undefined
+          resume()
           return CANCELED
         }
-        state = { kind: 'export-chosen', path: result.filePath }
+        state = { kind: 'export-chosen', path: result.filePath, suspended: suspendedImport(state) }
         return { ok: true, fileName: basename(result.filePath) }
       } catch (error) {
-        state = waitingImport ?? { kind: 'idle' }
-        waitingImport = undefined
+        resume()
         throw error
       }
     },
 
     async startExport() {
-      const destination = take('export-chosen', 'No export destination was chosen.').path
+      const chosen = take('export-chosen', 'No export destination was chosen.')
+      const destination = chosen.path
       const fileName = basename(destination)
       const directory = dirname(destination)
       // Hidden and unique beside the destination, so the final rename stays on one volume.
       const temporaryPath = join(directory, `.${[...fileName].slice(0, 50).join('')}.${randomUUID().slice(0, 8)}.tmp`)
-      return runOperation<NotesExportResult>(async (isCanceled, setWorker) => {
+      return runOperation<NotesExportResult>(chosen.suspended, async (isCanceled, setWorker) => {
         let snapshot: string | undefined
         let unpin: () => void = ignore
         let stopped: () => Promise<void> = async () => undefined
@@ -335,18 +361,18 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
     },
 
     async chooseImportArchive() {
-      beginChoice()
+      beginChoice('import')
       try {
         const result = await dialogs.showOpenDialog({ properties: ['openFile'], filters: ZIP_FILTERS })
         const path = result.filePaths[0]
         if (closing || result.canceled || path === undefined) {
-          state = { kind: 'idle' }
+          state = IDLE
           return CANCELED
         }
         state = { kind: 'import-chosen', path }
         return { ok: true, fileName: basename(path) }
       } catch (error) {
-        state = { kind: 'idle' }
+        state = IDLE
         throw error
       }
     },
@@ -354,7 +380,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
     async prepareImport() {
       const archivePath = take('import-chosen', 'No archive was chosen.').path
       const fileName = basename(archivePath)
-      return runOperation<NotesImportPreparation>(async (isCanceled, setWorker) => {
+      return runOperation<NotesImportPreparation>(undefined, async (isCanceled, setWorker) => {
         let staging: string | undefined
         let snapshot: string | undefined
         let stopped: () => Promise<void> = async () => undefined
@@ -429,7 +455,7 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
           await fileServices.discardStagingDirectory(staging).catch(ignore)
           return { ok: false, restartRequired: false, message: `Your notes could not be replaced: ${reason(error)}` }
         } finally {
-          state = { kind: 'idle' }
+          state = IDLE
         }
       })()
       state = { kind: 'committing', done }
@@ -468,8 +494,10 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
       closing = true
       const current = state
       if (current.kind === 'committing') return current.done.then(ignore)
-      if (current.kind === 'running' || current.kind === 'prepared' || waitingImport !== undefined) return cancel()
-      if (current.kind === 'export-chosen' || current.kind === 'import-chosen') state = { kind: 'idle' }
+      if (current.kind === 'running' || current.kind === 'prepared' || suspendedImport(current) !== undefined) {
+        return cancel()
+      }
+      if (current.kind === 'export-chosen' || current.kind === 'import-chosen') state = IDLE
       return null
     },
   }

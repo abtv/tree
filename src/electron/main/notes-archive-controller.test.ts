@@ -21,6 +21,7 @@ import { runDesktopExport } from '../../infrastructure/main/notes-archive/deskto
 import { runDesktopImport } from '../../infrastructure/main/notes-archive/desktop-import-job'
 import { ReplacementIncompleteError } from '../../infrastructure/main/notes-replacement'
 import {
+  BUSY_MESSAGE,
   createNotesArchiveController,
   displayPath,
   type ArchiveWorkerHandle,
@@ -765,6 +766,38 @@ describe('notes archive controller: import', () => {
     await expect(controller.startExport()).resolves.toMatchObject({ ok: true })
     await expect(controller.commitImport()).resolves.toEqual({ ok: true })
     await expect(fileServices.load()).resolves.toEqual(headWithImages([], 'Incoming'))
+  })
+
+  it('refuses another import choice while a prepared import waits behind a chosen export, so no staging is orphaned', async () => {
+    const { controller, destinations, userData } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    await controller.chooseExportDestination()
+
+    await expect(controller.chooseImportArchive()).rejects.toThrow(BUSY_MESSAGE)
+    await controller.chooseExportDestination()
+    await controller.cancel()
+
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
+    expect(controller.isIdle!()).toBe(true)
+  })
+
+  it('leaves no staging behind after another import is attempted from a chosen export', async () => {
+    const { controller, destinations, userData } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    await controller.chooseExportDestination()
+
+    await controller.chooseImportArchive().then(
+      () => controller.prepareImport(),
+      () => undefined,
+    )
+    await controller.chooseExportDestination()
+    await controller.cancel()
+
+    expect(await readdir(join(userData, '.notes-import'))).toEqual([])
   })
 
   it('discards the retained import when cancellation interrupts its export choice', async () => {
