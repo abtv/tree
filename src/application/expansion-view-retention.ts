@@ -1,67 +1,65 @@
-import { buildNodeIndex, locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
-import type { ExpansionState } from './expansion-state'
+import { buildNodeIndex, type Document, type NodeId } from '../domain/document'
+import { activateExpansionView, type ExpansionState } from './expansion-state'
 
-/** The fewest views of absent nodes that start a scan of undo history. */
-export const MIN_RETAINED_VIEW_SCAN = 32
+/*
+ * Bounds the views of nodes the document no longer contains (`docs/PRODUCT.md` §§2.4, 22.1). Such a
+ * view stays while undo or redo can restore its node, so Undo and Redo restore the node with its view;
+ * then the view is dropped. A view of a node the document contains stays for the session, so starring
+ * the node again restores it.
+ *
+ * A node leaves the document only through a change, undo or redo, and each records the snapshot it
+ * replaces in `EditorHistory` with `departedViewOwners`. That snapshot is the last history state that
+ * can restore the node: older states that hold it leave history first, because eviction removes the
+ * oldest entry and a new change discards the whole redo branch, and removed node ids never return
+ * through a change. When history releases the snapshot, `releaseViews` drops the views of its departed
+ * owners unless the document holds them again. History itself is never walked. Recording a structural
+ * change may build the replacement's node index, one walk of that document that publishing it usually
+ * needs anyway, and a release that drops a view copies the map of inactive views once.
+ */
+
+const NO_OWNERS: readonly NodeId[] = []
 
 /**
- * Bounds the views of nodes the document no longer contains (`docs/PRODUCT.md` §§2.4, 22.1). Such a
- * view stays while undo or redo history holds its node, so Undo restores the node with its view; once
- * history no longer holds the node, the view is dropped. A view of a node the document contains stays
- * for the session, so starring the node again restores it.
- *
- * Scanning history costs time proportional to the nodes it holds apart from the document, so a scan
- * starts only when the number of views of absent nodes reaches a threshold, which doubles with the
- * views a scan keeps. The retained views therefore stay bounded by history, and scan cost is amortized
- * over the views that become unreachable.
+ * The owners of views, active or inactive, whose nodes `recorded` contains and `replacement` lacks.
+ * Documents that share one node index hold the same nodes, so a text edit looks up no owner.
  */
-export class ExpansionViewRetention {
-  private scanAt = MIN_RETAINED_VIEW_SCAN
-
-  /**
-   * Drops the views that `document` and the snapshots `history` returns cannot restore. Call it after
-   * history released snapshots; `history` is read only when a scan starts. Returns `expansion` itself
-   * when it drops nothing.
-   */
-  public release(expansion: ExpansionState, document: Document, history: () => Iterable<Document>): ExpansionState {
-    const index = buildNodeIndex(document)
-    const absent = new Set<NodeId>()
-    for (const ownerId of expansion.otherViews.keys()) {
-      if (ownerId !== null && !index.has(ownerId)) absent.add(ownerId)
-    }
-    if (absent.size < this.scanAt) return expansion
-
-    const reachable = idsInHistory(absent, document, history())
-    this.scanAt = Math.max(MIN_RETAINED_VIEW_SCAN, 2 * reachable.size)
-    if (reachable.size === absent.size) return expansion
-    const otherViews = new Map(expansion.otherViews)
-    for (const ownerId of absent) if (!reachable.has(ownerId)) otherViews.delete(ownerId)
-    return { ...expansion, otherViews }
+export function departedViewOwners(
+  expansion: ExpansionState,
+  recorded: Document,
+  replacement: Document,
+): readonly NodeId[] {
+  if (expansion.viewOwnerId === null && expansion.otherViews.size === 0) return NO_OWNERS
+  const before = buildNodeIndex(recorded)
+  const after = buildNodeIndex(replacement)
+  if (before === after) return NO_OWNERS
+  const departed: NodeId[] = []
+  const check = (ownerId: NodeId | null): void => {
+    if (ownerId !== null && !after.has(ownerId) && before.has(ownerId)) departed.push(ownerId)
   }
+  for (const ownerId of expansion.otherViews.keys()) check(ownerId)
+  check(expansion.viewOwnerId)
+  return departed.length === 0 ? NO_OWNERS : departed
 }
 
 /**
- * The ids among `wanted` that a history snapshot contains. `wanted` holds only ids that `document`
- * lacks, so a subtree `document` shares by reference cannot contain one, and neither can a subtree
- * already visited in another snapshot. Snapshots share every unchanged subtree, so the walk visits
- * each node history holds apart from the document at most once.
+ * Drops the views of `released` owners, which no history state can restore any longer, unless `document`
+ * contains them. Returns `expansion` itself when it drops nothing.
  */
-function idsInHistory(wanted: ReadonlySet<NodeId>, document: Document, history: Iterable<Document>): Set<NodeId> {
-  const found = new Set<NodeId>()
-  const visited = new Set<TreeNode>()
-  const stack: TreeNode[] = []
-  for (const snapshot of history) {
-    for (const root of snapshot.roots) stack.push(root)
-    while (stack.length > 0) {
-      const node = stack.pop()!
-      if (visited.has(node)) continue
-      visited.add(node)
-      if (wanted.has(node.id)) {
-        found.add(node.id)
-        if (found.size === wanted.size) return found
-      } else if (locateNode(document, node.id)?.node === node) continue
-      for (const child of node.children) stack.push(child)
-    }
-  }
-  return found
+export function releaseViews(
+  expansion: ExpansionState,
+  document: Document,
+  released: readonly NodeId[],
+): ExpansionState {
+  if (released.length === 0) return expansion
+  const unreachable = released.filter((ownerId) => !buildNodeIndex(document).has(ownerId))
+  // While Agenda is open, Tree keeps its view active even after the view's owner leaves the document.
+  // The root view replaces such a view; closing Agenda then activates the view of the Tree location.
+  const state =
+    expansion.viewOwnerId !== null && unreachable.includes(expansion.viewOwnerId)
+      ? activateExpansionView(expansion, document, null)
+      : expansion
+  if (!unreachable.some((ownerId) => state.otherViews.has(ownerId))) return state
+  const otherViews = new Map(state.otherViews)
+  for (const ownerId of unreachable) otherViews.delete(ownerId)
+  return { ...state, otherViews }
 }

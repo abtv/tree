@@ -13,8 +13,10 @@ export interface ExpansionState {
   readonly viewOwnerId: NodeId | null
   /**
    * Every inactive view, keyed by its owner, with the root view under `null`. Views of unstarred nodes
-   * stay for the session, and views of deleted nodes stay while undo history holds the node
-   * (`ExpansionViewRetention`), so undo restores them; only starred nodes' views are saved.
+   * stay for the session, and views of deleted nodes stay while undo or redo can restore the node: the
+   * snapshot that `EditorHistory` records as a node leaves stores its owner, and `releaseViews` drops
+   * the view when history releases that snapshot and the document lacks the node. Only starred nodes'
+   * views are saved.
    */
   readonly otherViews: ReadonlyMap<NodeId | null, ReadonlySet<string>>
 }

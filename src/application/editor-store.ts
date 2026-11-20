@@ -1,5 +1,6 @@
 import {
   appendTextChildren,
+  attachmentSummary,
   collectAttachmentIds,
   createInitialDocument,
   displayedNodes,
@@ -87,7 +88,7 @@ import {
   type ExpansionState,
   type NodeFoldCommand,
 } from './expansion-state'
-import { ExpansionViewRetention } from './expansion-view-retention'
+import { departedViewOwners, releaseViews } from './expansion-view-retention'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { AgendaFoldMemory } from './agenda-fold-memory'
@@ -162,8 +163,10 @@ export class EditorStore {
     this.searchOwner.update(state)
     this.recentNodesOwner.update(state.document, Boolean(state.hideFinishedTasks))
   })
-  private readonly history = new EditorHistory()
-  private readonly viewRetention = new ExpansionViewRetention()
+  // History records only the published document, so departing owners come from the published views.
+  private readonly history = new EditorHistory(attachmentSummary, (recorded, replacement) =>
+    departedViewOwners(this.runtime.ready().expansion, recorded, replacement),
+  )
   private finishedTasksWrite = Promise.resolve()
   private readonly imageToTextQueue = new ImageToTextQueue()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
@@ -875,22 +878,17 @@ export class EditorStore {
     if (node.text === text) {
       return
     }
-    let historyReleased = false
+    const next = editNodeContent(state.document, nodeId, text, links)
     if (!this.textSession.isActive(nodeId)) {
       // begin replaces the active node and scheduleBoundary clears the old timer;
       // ending here also makes that session transition explicit before history capture.
       this.textSession.end()
-      historyReleased = this.beginHistory(state.document)
+      if (this.history.begin(state.document, next)) this.queueAttachmentCleanup()
       this.textSession.begin(nodeId)
     }
     const insertedWords = countInsertedWords(node.text, text)
-    const next = editNodeContent(state.document, nodeId, text, links)
     this.recentNodesOwner.remember(nodeId, next)
-    this.runtime.replaceReady({
-      ...state,
-      document: next,
-      expansion: this.retainedViews(state.expansion, next, historyReleased),
-    })
+    this.runtime.replaceReady({ ...state, document: next, expansion: this.retainedViews(state.expansion, next) })
     this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
     this.textSession.endIfStandalone()
@@ -1749,6 +1747,7 @@ export class EditorStore {
    * only when the two snapshots hold no locatable difference.
    */
   private applyHistoryState(state: ReadySnapshot, document: Document, reconciled: Location): void {
+    const expansion = this.retainedViews(state.expansion, document)
     if (state.agenda !== undefined) {
       const restored = reconcileAgenda(document, state.agenda, true, this.agendaRowsCache, state.document)
       if (restored !== undefined) {
@@ -1774,6 +1773,7 @@ export class EditorStore {
           {
             ...state,
             document,
+            expansion,
             agenda,
             location,
             focus: hasTarget
@@ -1796,7 +1796,7 @@ export class EditorStore {
       target?.location ?? normalizeVisibleLocation(document, reconciled, (id) => isNodeExpanded(state.expansion, id))
     const focus = target?.focus ?? { nodeId: location.selectedNodeId, cursor: 0 }
     this.runtime.replaceReady(
-      { ...state, document, location, focus: this.runtime.newFocus(focus.nodeId, focus.cursor) },
+      { ...state, document, expansion, location, focus: this.runtime.newFocus(focus.nodeId, focus.cursor) },
       true,
     )
   }
@@ -1810,28 +1810,21 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
     this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
-    const historyReleased = this.beginHistory(state.document)
+    if (this.history.begin(state.document, document)) this.queueAttachmentCleanup()
     this.runtime.replaceReady(
-      { ...state, document, location, focus, expansion: this.retainedViews(expansion, document, historyReleased) },
+      { ...state, document, location, focus, expansion: this.retainedViews(expansion, document) },
       true,
     )
     this.markPersistedChange()
     return true
   }
 
-  /** Records `document` as an undo entry. Returns whether history released older or redo snapshots. */
-  private beginHistory(document: Document): boolean {
-    const released = this.history.begin(document)
-    if (released) this.queueAttachmentCleanup()
-    return released
-  }
-
   /**
-   * After history released snapshots, drops the views of nodes that neither `document` nor the remaining
-   * history contains (`docs/PRODUCT.md` §§2.4, 22.1).
+   * Drops the views of nodes that neither `document` nor any undo or redo snapshot contains
+   * (`docs/PRODUCT.md` §§2.4, 22.1).
    */
-  private retainedViews(expansion: ExpansionState, document: Document, historyReleased: boolean): ExpansionState {
-    return historyReleased ? this.viewRetention.release(expansion, document, () => this.history.documents()) : expansion
+  private retainedViews(expansion: ExpansionState, document: Document): ExpansionState {
+    return releaseViews(expansion, document, this.history.takeReleasedViewOwners())
   }
 
   private markPersistedChange(): void {

@@ -371,3 +371,52 @@ describe('EditorHistory', () => {
     )
   })
 })
+
+// @requirement PRODUCT.md §2.4
+describe('EditorHistory view owners', () => {
+  // A document whose root text starts with `x` holds the node of the view owner `x`.
+  const departedViewOwners = (recorded: Document, replacement: Document): readonly string[] =>
+    recorded.roots[0]!.text.startsWith('x') && !replacement.roots[0]!.text.startsWith('x') ? ['x'] : []
+
+  it('reports an owner when the snapshot recorded as its node left leaves history', () => {
+    const history = new EditorHistory(attachmentSummary, departedViewOwners)
+    history.begin(root('x present'), root('removed'))
+    for (let index = 0; index < HISTORY_LIMIT - 1; index += 1) history.begin(root(`v${index}`))
+
+    expect(history.takeReleasedViewOwners()).toEqual([])
+
+    history.begin(root('evicts the departure'))
+
+    expect(history.takeReleasedViewOwners()).toEqual(['x'])
+    expect(history.takeReleasedViewOwners()).toEqual([])
+  })
+
+  it('reports an owner whose node undo restores, for the caller to keep', () => {
+    const history = new EditorHistory(attachmentSummary, departedViewOwners)
+    history.begin(root('x present'), root('removed'))
+
+    history.undo(root('removed'), location)
+
+    expect(history.takeReleasedViewOwners()).toEqual(['x'])
+  })
+
+  it('records the departure of an undo and reports it when a new entry discards the redo branch', () => {
+    const history = new EditorHistory(attachmentSummary, departedViewOwners)
+    history.begin(root('before'), root('x created'))
+    history.undo(root('x created'), location)
+
+    expect(history.takeReleasedViewOwners()).toEqual([])
+
+    history.begin(root('before'), root('before, edited'))
+
+    expect(history.takeReleasedViewOwners()).toEqual(['x'])
+  })
+
+  it('records no departure for an entry whose replacement holds the same nodes', () => {
+    const history = new EditorHistory(attachmentSummary, departedViewOwners)
+    history.begin(root('x present'))
+    for (let index = 0; index < HISTORY_LIMIT; index += 1) history.begin(root(`v${index}`))
+
+    expect(history.takeReleasedViewOwners()).toEqual([])
+  })
+})
