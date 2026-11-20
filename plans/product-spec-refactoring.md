@@ -1,6 +1,6 @@
 # Product Specification Refactoring
 
-Status: In progress; T1, T2, R09, R01a, R01b, and R01c done and accepted; R02 and R03 done; R04 to F2 authorized
+Status: In progress; T1, T2, R09, R01a, R01b, and R01c done and accepted; R02 to R04 done; R05 to F2 authorized
 
 This plan records the analysis and the task sequence for refactoring `docs/PRODUCT.md`. The Product Owner accepted the plan and answered its questions on 2026-11-20 (§11). Step P0 is done. On 2026-11-20 the owner authorized T1, T2, and R09. On 2026-11-20 the owner accepted the rewritten §9, recorded three method decisions (§3), and authorized R01a only. On 2026-11-20 the owner accepted R01a, answered Owner Question Log entries 2 and 3 (§3, decisions D4 and D5), and authorized R01b only. On 2026-11-20 the owner accepted R01b, answered Owner Question Log entries 4, 5, and 6 (§3, decisions D6, D7, and D8), and authorized R01c only. On 2026-11-21 the owner accepted R01c and authorized the autonomous execution of every remaining task, R02 to F2, on Opus with high effort (§3). Final owner acceptance follows F2.
 
@@ -58,6 +58,7 @@ Sources of truth: [AGENTS.md](../AGENTS.md) §§2, 8, 11; [Agent Workflow Proced
   - **Owner contact.** Before F2 the session contacts the owner only for a blocking product choice, a needed access, an exhausted budget, or a mandatory check that still fails after the recovery attempts of §10. After F2 it sends one final report: the result, the remaining questions, and the request for final acceptance (§10, round 5).
 - Done on 2026-11-21: R02. It merged the mouse-hold rules of §2.1 into §11 (Merge Ledger row 4), excluded Q9 candidate 1, and added Owner Question Log entry 8.
 - Done on 2026-11-21: R03. It merged the empty-node sentence of §3 into §19 (Merge Ledger row 5); §18 and §19 needed no change.
+- Done on 2026-11-21: R04. It removed the attribution "explicitly requested" from §4.3 (W5); the reason for that Vim divergence survives in `docs/VIM_CONFORMANCE.md` ("the owner's explicit single-step emoji requirement"). Precedent for later tasks: where an owner request is the only stated reason for a deliberate divergence, the words stay unless the task shows that the reason survives in another owning document. Lead "L520 and L680" is an identical duplicate: §4.1 "When the editable current parent is selected, pressing `↑` places the caret at the beginning of the current parent." and §6.1 "`↑` moves the caret to the beginning of the parent's text". R06 merges it with §4.1 as the survivor. The other leads of §4 differ in detail and stay (W8).
 - Selected coding tool: Claude Code. The owner's model routing names Anthropic models (§9).
 - Delegated decision areas after approval: wording of present-state statements; file placement inside the approved structure; merging of statements whose meaning is identical; removal of approval attributions and pure history notes (rule W5 in §7.1).
 - Reserved for the owner: every Q9 candidate; every statement held under rule W7(c); every suspected inconsistency in §12; every move of a detail to tests only; any new, retired, or retitled section beyond those listed in §11.
@@ -345,9 +346,9 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E8 of §7.4. Tiers fol
 | R01c | Move release and process content of §1.4, §1.4.1, §1.5 to its owners (Q5). Retire §1.4.1. Apply decisions D6 and D7 (§3) to §1.4. | R01b; owner authorization of 2026-11-20 (§3) | `browser.md`, `docs/PRODUCT.md` (Section Map, Retired Numbers, and the sentence "No number is retired." under decision D5), `docs/releasing.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT.md`, `deployment/github-pages/README.md`, `src/web/README.md`, four marker lines in `scripts/release-source.test.mts` and `scripts/web-release/*.test.mts` | Low | The primary session that recorded the owner's decision of 2026-11-20 (Fable; the earlier plan named Opus high) / Fable high; the verifier writes its own table, and the implementer compares it with its map (§3) | R; per-sentence table "already stated at / moved to" for L169–210, naming for every sentence of §1.4.1 the exact location of the full rule; D5: only `1.4.1` leaves the `browser.md` row of the Section Map, with path, other numbers, and order kept; one Retired Numbers row for 1.4.1 that links every Q5 destination document; "No number is retired." removed; the actual table changes checked; D6 and D7 applied to §1.4; the transfer table and the reviewer's original table kept in `.scratch/product-spec-R01c/` until the owner's acceptance (§7.3 step 10) | Done; accepted 2026-11-21 |
 | R02 | Rewrite §2. | R01c | `tree-model.md` | Minimal | Opus high / Opus high | R | Done |
 | R03 | Rewrite §3, §18, and §19 (merged under Q12; 48 lines). | R02 | `tree-model.md` | Minimal | Opus high / Opus high | R | Done |
-| R04 | Rewrite §4. | R03 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
+| R04 | Rewrite §4. | R03 | `editing.md` | Minimal | Opus high / Opus high | R | Done |
 | R05 | Rewrite §5. | R04 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
-| R06 | Rewrite §6 and §7 (merged under Q12; 111 lines). | R05 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
+| R06 | Rewrite §6 and §7 (merged under Q12; 111 lines). The §6.1 bullet "`↑` moves the caret to the beginning of the parent's text" duplicates §4.1, which is the survivor of that merge (§3, R04 note). | R05 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
 | R08 | Rewrite §8. The §8.2 sentence "Empty nodes are never deleted automatically." repeats §19; a merge names §19 as the survivor, not §3, which is a citation since R03. | R06 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
 | R10 | Rewrite §10. | R08 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
 | R11 | Rewrite §11. | R10 | `editing.md` | Minimal | Opus high / Opus high | R | Planned |
@@ -580,7 +581,7 @@ The analysis found statements that appear to conflict or to refer to nothing. Su
 
 ## 14. Next Task
 
-R02 and R03 are done. R04 is the next task and is authorized (§3, owner decision of 2026-11-21). Every task from R02 to F2 is authorized; ordinary continuation starts the first task in the order of §8 whose status is not Done.
+R02, R03, and R04 are done. R05 is the next task and is authorized (§3, owner decision of 2026-11-21). Every task from R02 to F2 is authorized; ordinary continuation starts the first task in the order of §8 whose status is not Done.
 
 ## 15. Prompt for the Next Session
 
