@@ -1,8 +1,8 @@
 # Product Specification Refactoring
 
-Status: Approved; T1 awaits a separate owner approval to start
+Status: In progress; T1, T2, and R09 authorized; stop after R09 for the owner's pilot review
 
-This plan records the analysis and the task sequence for refactoring `docs/PRODUCT.md`. The Product Owner accepted the plan and answered its questions on 2026-11-20 (§11). Step P0 is done. No implementation task has started: T1 waits for a separate owner approval.
+This plan records the analysis and the task sequence for refactoring `docs/PRODUCT.md`. The Product Owner accepted the plan and answered its questions on 2026-11-20 (§11). Step P0 is done. On 2026-11-20 the owner authorized T1, T2, and R09. Work stops after R09 until the owner has reviewed the pilot.
 
 ## 1. Objective
 
@@ -30,8 +30,9 @@ Sources of truth: [AGENTS.md](../AGENTS.md) §§2, 8, 11; [Agent Workflow Proced
 
 - Authorized and done: recording this plan, its two review corrections, and step P0 (owner instructions of 2026-11-20).
 - Accepted by the owner on 2026-11-20: the plan as corrected in commit `9178ec3`, and the recommended defaults for Q1–Q8 and Q10–Q13. Q9 is decided per confirmed candidate in round 4.
-- Not yet authorized: T1 and every later task. T1 starts only after a separate, explicit owner approval.
-- Approval scope after T1: not stated yet. The plan proposes the whole initiative with the pilot checkpoint after R09 (Q13). Until the owner states the scope, each task needs the owner's go-ahead.
+- Authorized by the owner on 2026-11-20: T1, T2, and R09, in that order. The authorization holds across the session changes between these three tasks; a new session for T2 or R09 does not ask again.
+- Execution arrangement (same instruction): each task keeps its own session and the model of §9.
+- Not authorized: R01a and every later task. After R09 the work stops. The owner decides about R01a after reviewing the pilot deliverables (§10, round 2).
 - Selected coding tool: Claude Code. The owner's model routing names Anthropic models (§9).
 - Delegated decision areas after approval: wording of present-state statements; file placement inside the approved structure; merging of statements whose meaning is identical; removal of approval attributions and pure history notes (rule W5 in §7.1).
 - Reserved for the owner: every Q9 candidate; every statement held under rule W7(c); every suspected inconsistency in §12; every move of a detail to tests only; any new, retired, or retitled section beyond those listed in §11.
@@ -201,12 +202,15 @@ Residual risk: the index becomes the only map from number to file. T1 adds a `ch
 - **W6. No new normative content.** An added clause must trace to one or more old clauses.
 - **W7. Antecedents.** For "X retains its existing behavior": (a) if a section defines that behavior, cite the section; (b) if the sentence only limits the scope of the rule beside it, reword it as a scope limit ("This rule applies only to …"); (c) if it asserts behavior that no section states, hold the sentence verbatim and add an owner question. Do not derive the missing behavior from code.
 - **W8. Merge only identical meaning.** Record any difference, even one word. When the two statements differ in a detail, keep both and name the detail in the map.
-- **W9. Literals.** Every number, key name, UI string, and code span survives, or its removal is a recorded Merged or Moved disposition. A UI string is not always marked: the command registry of §20.2.30 gives labels as plain text in table cells, so the text of every table cell counts as a literal.
+- **W9. Literals.** Every number, key name, UI string, and code span survives, or its removal is a recorded Merged or Moved disposition. A UI string is not always marked: the command registry of §20.2.30 gives labels as plain text in table cells. For tables the rule is by cell:
+  - A cell that holds exact interface text keeps its text exactly. In the registry these are `Description` and `Active state`. The same holds for a cell that holds a name, an alias, a shortcut, or a value.
+  - A cell that explains behavior, such as `Effect` in the registry, may be Reworded. The rewording must keep the commands, the values, the conditions, the exceptions, and the meaning of every reference (W12).
+  - Every changed cell appears in the T2 report and gets a disposition in the statement map.
 - **W10. Structure.** Unnumbered headings stay inside their numbered section. Hard-wrapped paragraphs may be unwrapped. The 700-character and 8,000-character limits apply.
 - **W11. Order.** Keep the order of statements wherever order carries meaning: the priority order of §1.1, numbered or lettered rule lists, steps, precedence lists, and any text that another sentence addresses by position ("rule 2", "the rule above"). Record every reordering in the statement map with its reason. The verbatim report does not detect reordering.
 - **W12. Citation scope.** Keep the scope of a cross-reference. A task may narrow a citation only when the verifier shows that the new target covers every condition of the old rule, including its exceptions.
 - **W13. Process content without an approved destination.** A task edits only the files in its row of §8. Process content whose destination the owner has not approved stays verbatim and goes to the Owner Question Log (section 16 of this plan).
-- **W14. A merged rule keeps one full statement.** Before rewriting a section, read the rows of the Merge Ledger (section 17 of this plan) whose survivor is in that section. A survivor may be reworded with equal meaning. It may be replaced by a citation only when the same task moves the survivor role to another location that states the rule in full and updates the ledger row. A citation never points to another citation of the same rule.
+- **W14. A merged rule keeps one full statement.** The Merge Ledger (section 17 of this plan) has one row for every merge between sections with different numbers, including two subsections of one section, and each row names the location where the full rule remains. Before rewriting a section, read the rows whose survivor is in that section. A survivor may be reworded with equal meaning. It may be replaced by a citation only when the same task moves the survivor role to another location that states the rule in full and updates the ledger row. A citation never points to another citation of the same rule.
 
 ### 7.2 Calibration sample: §9.2 and §9.3 (medium risk)
 
@@ -260,13 +264,13 @@ Correction kept as a calibration case: the first version of this sample narrowed
 
 1. **Base.** Record the starting commit. Run `npm run check:requirements` and record the requirement count.
 2. **Rewrite.** Apply §7.1 to the task's sections only.
-3. **Clause inventory and T2 report.** Run `npm run check:docs -- --verbatim <base>` in its default form, which compares the whole specification (§6.3 item 5), so a clause moved to another file is reported as moved and not as lost. The command exits 1 for a rewrite; that is expected. Its report is the complete list of removed, added, and moved clauses. Then run the comparison mode that T2 adds against the same base. Its report has three classes: literals (numbers with their units, code spans, bold UI labels), the text of table cells, and section references. Save both reports in `.scratch/product-spec-<task>/`.
-4. **Statement map.** In `.scratch/product-spec-<task>/`, give every removed clause a disposition under W2 and every added clause its source clauses. For Merged and Moved, name the surviving location. Give every difference in each class of the T2 report a disposition: Merged or Moved for a literal or a table cell (W9); for a section reference, the row of §8 that adds or retires the number, or the W12 evidence for a changed target.
-5. **Validation.** Minimal Risk tier: `npm run format:check:changed`, `npm run check:docs`, `npm run check:requirements`, and `npm run check:opencode` when agent workflow documents change. A task that edits a marker line in a test file is Low Risk: also run lint and the focused tests for the touched files. Record the commands and results; this record is an input of the reviewer (`docs/AGENT_ROLES.md` §3).
-6. **Independent verifier.** After validation, a reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side), the validation record, the rules of §7.1, the T2 report, the Merge Ledger rows for the changed sections, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, reordered, and it audits literals under W9, order under W11, citation scope under W12, and merge survivors under W14. The implementer saves the verifier's table unchanged in the task's scratch directory.
-7. **Reconcile.** The implementer compares the verifier's table with the map. Every lost, changed, added, or unrecorded reordered entry is corrected or becomes an owner question with the sentence held verbatim. After a correction, rerun only the checks that the correction invalidates. Repeat the verifier pass only when corrections are substantial (`AGENTS.md` §13).
-8. **Question log and merge ledger.** Before the commit, copy into the Owner Question Log (section 16 of this plan) every held sentence (W7(c), W13), every confirmed finding of §12, and every Q9 candidate the task verified. Each entry quotes the text and names its location, so it stays usable after the scratch directory is gone. Add to the Merge Ledger (section 17) every merge whose survivor is in another numbered top-level section, and update the rows whose survivor the task reworded or moved.
-9. **Commit** the rewrite with the plan status update, the log entries, and the ledger rows.
+3. **Clause inventory and T2 report.** Run `npm run check:docs -- --verbatim <base>` in its default form, which compares the whole specification (§6.3 item 5), so a clause moved to another file is reported as moved and not as lost. The command exits 1 for a rewrite; that is expected. Its report is the complete list of removed, added, and moved clauses. Then run the comparison mode that T2 adds against the same base. Its report has three classes: literals (numbers with their units, code spans, bold UI labels), every changed table cell with its column header, and section references. Save both reports in `.scratch/product-spec-<task>/`.
+4. **Statement map.** In `.scratch/product-spec-<task>/`, give every removed clause a disposition under W2 and every added clause its source clauses. For Merged and Moved, name the surviving location. Give every difference in each class of the T2 report a disposition: Merged or Moved for a literal; for a table cell, Merged, Moved, or, for an explanatory cell only, Reworded with the five kept points of W9 named; for a section reference, the row of §8 that adds or retires the number, or the W12 evidence for a changed target.
+5. **Question log and merge ledger.** Write the task's entries into this plan before validation and review, so the reviewer sees what the commit will contain. Copy into the Owner Question Log (section 16) every held sentence (W7(c), W13), every confirmed finding of §12, and every Q9 candidate the task verified. Each entry quotes the text and names its location, so it stays usable after the scratch directory is gone. Add to the Merge Ledger (section 17) every merge between sections with different numbers, including two subsections of one section, with the location where the full rule remains. Update the rows whose survivor the task reworded or moved.
+6. **Validation.** Minimal Risk tier: `npm run format:check:changed`, `npm run check:docs`, `npm run check:requirements`, and `npm run check:opencode` when agent workflow documents change. A task that edits a marker line in a test file is Low Risk: also run lint and the focused tests for the touched files. Record the commands and results; this record is an input of the reviewer (`docs/AGENT_ROLES.md` §3).
+7. **Independent verifier.** After validation, a reviewer in a fresh context receives the Git status, the full Git diff (old text on the removed side, new text on the added side; the diff includes the new log entries and ledger rows of this plan), the validation record, the rules of §7.1, the T2 report, the existing Merge Ledger rows for the changed sections, and read access to the new files. It does not receive the statement map. It produces its own statement-level table with the classes lost, changed, merged, moved, added, reordered. It audits literals and table cells under W9, order under W11, citation scope under W12, and merge survivors under W14. It checks that the new log entries and ledger rows match the diff. The implementer saves the verifier's table unchanged in the task's scratch directory.
+8. **Reconcile.** The implementer compares the verifier's table with the map. Every lost, changed, added, or unrecorded reordered entry is corrected or becomes an owner question with the sentence held verbatim. If a correction changes the text, the log entries, or the ledger rows, update them and rerun the checks that the change invalidates. Repeat the verifier pass only when corrections are substantial (`AGENTS.md` §13).
+9. **Commit** the rewrite with the plan status update, the log entries, and the ledger rows that the reviewer saw or that step 8 updated.
 10. **Cleanup.** Remove the task's scratch directory after the commit. Exception: R09 keeps its statement map, the verifier's table, and the T2 report in `.scratch/product-spec-R09/` until the owner decides the pilot checkpoint; the session that records that decision removes the directory.
 
 ### 7.4 Evidence that counts as "no behavior change"
@@ -277,10 +281,10 @@ All eight conditions hold:
 - **E2.** The statement map covers every removed and every added clause of the verbatim report, with no clause unassigned.
 - **E3.** The independent verifier's table has no unresolved lost, changed, or added entry.
 - **E4.** The requirement count is unchanged, or each difference is a section addition or retirement named in §8.
-- **E5.** The T2 report shows no removed or added item in any of its three classes without a recorded disposition (§7.3 step 4). A new section reference that a row of §8 names, such as §9.4 in R01a, is covered by that row.
-- **E6.** The checks of step 5 pass, including after the last correction.
+- **E5.** The T2 report shows no removed or added item in any of its three classes without a recorded disposition (§7.3 step 4). No cell of exact interface text, name, alias, shortcut, or value has changed. A changed explanatory cell is Reworded with its commands, values, conditions, exceptions, and reference meaning kept, and the verifier confirms it. A new section reference that a row of §8 names, such as §9.4 in R01a, is covered by that row.
+- **E6.** The checks of step 6 pass, including after the last correction.
 - **E7.** Order is preserved wherever W11 applies, or each reordering is recorded in the map and confirmed by the verifier.
-- **E8.** Every Merge Ledger row whose survivor is in a changed section still names a location that states the rule in full (W14).
+- **E8.** Every merge of the task between sections with different numbers has a Merge Ledger row that names the location of the full rule, and every existing row whose survivor is in a changed section still names a location that states the rule in full (W14). The reviewer saw these rows, or step 8 updated them and the affected checks ran again.
 
 For T1, the evidence is stricter:
 
@@ -306,9 +310,9 @@ Evidence sets: **S** = T1 evidence of §7.4; **R** = E1–E8 of §7.4. Tiers fol
 | ID | Outcome | Depends on | Files | Tier | Routing | Evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P0 | Record the owner's answers to §11 in this plan. Update every affected task row, file list, evidence condition, and the next-session prompt to match the answers. No other file changes. | Owner approval of the plan and answers to §11 | `plans/product-spec-refactoring.md`, `plans/README.md` | Minimal | Primary session, any model / none | Each answer is recorded in §11; each affected row cites the answer it follows; `npm run check:docs` passes | Done |
-| T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven incoming anchor links, three outgoing link paths, one positional reference (§6.3 item 10). No other text change and no reordering. | P0, and a separate owner approval to start T1 | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Planned |
-| T2 | Comparison report for rewrite verification as a `check:docs` mode, with tests (Q10). It reports three classes separately: literals (numbers with their units, code spans, bold UI labels), the text of table cells, and section references. Every rewrite task uses its report (§7.3 step 3). | T1 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass, including: a changed plain-text table cell is reported (model: the `find` row of the §20.2.30 registry); a changed numeric value is reported; an added, removed, or retargeted section reference is reported. The report on the §7.2 sample lists no unexplained item. | Planned |
-| R09 | Pilot: rewrite §9 and retitle its heading (Q3). Owner checkpoint follows (Q13). | T1, T2 | `application.md` | Minimal | Opus high / Fable high | R; the statement map, the verifier's table, and the T2 report stay available until the owner's pilot decision (§7.3 step 10) | Planned |
+| T1 | Mechanical split into the files of §5, index, tooling of §6.3, seven incoming anchor links, three outgoing link paths, one positional reference (§6.3 item 10). No other text change and no reordering. | P0; owner authorization of 2026-11-20 | `docs/PRODUCT.md`, `docs/product/*.md`, `scripts/product-sections.mts`, `scripts/check-requirement-coverage.mts`, `scripts/check-docs.mts`, their tests, `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/SECURITY.md`, `src/web/README.md`, `docs/decisions/0024-desktop-notes-archive.md` | Low (`npm run check`) | Sonnet medium / Opus high | S | Ready |
+| T2 | Comparison report for rewrite verification as a `check:docs` mode, with tests (Q10). It reports three classes separately: literals (numbers with their units, code spans, bold UI labels); every changed table cell, with its column header and its old and new text; and section references. The tool shows cell changes and does not judge them; W9 and E5 say which are allowed. Every rewrite task uses its report (§7.3 step 3). | T1; owner authorization of 2026-11-20 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Low (`npm run check`) | Opus high / Opus high | Tool tests pass, including these cases on the §20.2.30 registry. `find`: a change of the `Description` cell "Find in the current view" is reported with its column. `show-agenda`: a rewording of the `Effect` cell is reported with its column, while the unchanged `Description` "Show Agenda" and `Active state` "Agenda open" are not reported; a change of "Agenda open" is reported; the reference to §23 in the `Effect` cell appears in the reference class when it changes. Also: a changed numeric value is reported; an added, removed, or retargeted section reference is reported. The report on the §7.2 sample lists no unexplained item. | Planned |
+| R09 | Pilot: rewrite §9 and retitle its heading (Q3). Owner checkpoint follows (Q13): the work stops after this task. | T1, T2; owner authorization of 2026-11-20 | `application.md` | Minimal | Opus high / Fable high | R; the statement map, the verifier's table, and the T2 report stay available until the owner's pilot decision (§7.3 step 10) | Planned |
 | R01a | Rewrite §1, §1.1–§1.3. Create §9.4 About Tree as the single owner of the dialog (Q4) and add it to the index. §1.1 order and §1.2 rules unchanged. | R09 and the owner's pilot decision | `overview.md`, `application.md`, `browser.md`; `docs/PRODUCT.md` (index entry for §9.4); `scripts/check-requirement-coverage.mts` (add `'9.4'` to `BOUNDARY_SECTIONS`, no other line); marker lines on tests that exercise only the About dialog: `e2e/electron/about-window.spec.ts:14` from §1.3 to §9.4, and any §1.4 marker of that kind, each listed in the task evidence | Low (`npm run check`) | Opus high / Fable high | R; §9.4 has an `e2e/` marker; the script diff is the one list entry; the index check passes | Planned |
 | R01b | Rewrite §1.4 and §1.5 as browser behavior and retitle §1.4 (Q3). | R01a | `browser.md`; the two anchor targets that name the §1.4 heading: `docs/SECURITY.md` L214 and `src/web/README.md` L136 (line numbers at `396e094`) | Minimal | Fable high / Fable high | R | Planned |
 | R01c | Move release and process content of §1.4, §1.4.1, §1.5 to its owners (Q5). Retire §1.4.1. | R01b | `browser.md`, `docs/PRODUCT.md`, `docs/releasing.md`, `docs/SECURITY.md`, `docs/DEVELOPMENT.md`, `deployment/github-pages/README.md`, `src/web/README.md`, four marker lines in `scripts/release-source.test.mts` and `scripts/web-release/*.test.mts` | Low | Opus high / Fable high | R; per-sentence table "already stated at / moved to" for L169–210 | Planned |
@@ -373,8 +377,8 @@ No task needs a manual application check: the initiative changes no runtime beha
 
 | Round | When | Owner action | State |
 | --- | --- | --- | --- |
-| 1 | 2026-11-20 | Plan accepted; Q1–Q8 and Q10–Q13 answered; P0 done. Still open: the separate approval to start T1, and the approval scope after T1 | Done, except the T1 approval |
-| 2 | After R09 | Pilot checkpoint: read the rewritten §9, its statement map, the verifier's table, and the T2 report in `.scratch/product-spec-R09/`; confirm the method and the budget | Confirmed |
+| 1 | 2026-11-20 | Plan accepted; Q1–Q8 and Q10–Q13 answered; P0 done; T1, T2, and R09 authorized | Done |
+| 2 | After R09 | Pilot checkpoint. The owner receives five deliverables: the rewritten §9; the statement map of old and new requirements; the independent reviewer's table; the T2 report; and the measured cost of the pilot (T1, T2, R09: input, output, reviewer usage, elapsed time). The first four stay in `.scratch/product-spec-R09/` until the decision. The owner then decides about R01a | Confirmed |
 | 3 | After R20k | Answer the entries collected in the Owner Question Log so far | Confirmed |
 | 4 | After R26 | Answer the remaining entries of the Owner Question Log; decide each Q9 candidate separately | Confirmed |
 | 5 | After F2 | Final acceptance of the delivered specification | Confirmed |
@@ -496,31 +500,32 @@ The analysis found statements that appear to conflict or to refer to nothing. Su
 
 ## 14. Next Task
 
-T1. It is blocked: P0 is done, and the owner has not yet given the separate approval to start T1. No session may start T1 from this plan alone.
+T1. It is authorized and ready. T2 follows T1, and R09 follows T2, each in its own session on the model of §9, without a new owner approval. After the R09 commit the work stops for the owner's pilot review.
 
 ## 15. Prompt for the Next Session
 
-P0 is committed. Use this prompt only after the owner has approved the start of T1 separately. Replace the bracketed part.
+The task that finishes replaces this prompt with the one for the next task.
 
 ```text
 Execute task T1 of plans/product-spec-refactoring.md.
 Model: Sonnet, effort medium.
-The Product Owner approved the start of T1 on [date]. The owner's answers are recorded in the plan.
-T1 is a mechanical split with tooling changes. Its only text differences are the four that §6.3 item 12 of the plan lists. Stop after the T1 commit and report.
+The Product Owner authorized T1, T2, and R09 on 2026-11-20; the plan records it in §3. No further approval is needed for these three tasks.
+T1 is a mechanical split with tooling changes. Its only text differences are the four that §6.3 item 12 of the plan lists.
+After the T1 commit, replace this prompt with the T2 prompt and report. The work stops after R09 for the owner's pilot review.
 ```
 
 ## 16. Owner Question Log
 
-Each task adds its entries here before it removes its temporary materials (§7.3 step 8). The owner answers the entries in rounds 3 and 4. An entry is closed only by an owner answer; F1 applies the answers under its limits.
+Each task writes its entries here before validation and independent review (§7.3 step 5), so the reviewer sees them, and updates them if the review changes them (§7.3 step 8). The owner answers the entries in rounds 3 and 4. An entry is closed only by an owner answer; F1 applies the answers under its limits.
 
 | # | Task | Kind (held sentence, §12 finding, Q9 candidate) | Location and quoted text | Question and recommended default | Owner answer |
 | --- | --- | --- | --- | --- | --- |
 
 ## 17. Merge Ledger
 
-This ledger records every merge whose survivor is in another numbered top-level section. Statement maps are temporary; the ledger is what later tasks and the final acceptance read. A task adds its rows before it removes its temporary materials (§7.3 step 8). A task that rewords or moves a survivor updates the row (W14). F2 checks every row against the final text: the rule, as the original phrase states it, is present in full at the survivor location. A merge inside one top-level section needs no row; the verifier of that task sees both statements in one diff.
+This ledger records every merge between sections with different numbers. Two subsections of one section count as different sections: a merge between §20.2.22 and §20.2.26 needs a row. Only a merge inside one numbered section, where both statements carry the same number, needs no row. Each row names the location where the full rule remains. Statement maps are temporary; the ledger is what later tasks and the final acceptance read. A task writes its rows before validation and independent review (§7.3 step 5) and updates them if the review changes them (§7.3 step 8). A task that rewords or moves a survivor updates the row (W14). F2 checks every row against the final text: the rule, as the original phrase states it, is present in full at the named location.
 
-| # | Task | Rule: original phrase, quoted, with its location at the base commit | Removed from (now a citation) | Survivor location | Last confirmed by |
+| # | Task | Rule: original phrase, quoted, with its location at the base commit | Removed from (now a citation) | Location of the full rule | Last confirmed by |
 | --- | --- | --- | --- | --- | --- |
 
 ## Appendix A. Other Documents
