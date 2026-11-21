@@ -1,5 +1,7 @@
 # Documentation Consistency and Policy Load
 
+**Status:** Awaiting owner acceptance.
+
 **Authorization state:** Authorized by the Product Owner on 2026-11-21 for the whole initiative (Q1). Q1–Q11 are answered (see Owner Questions). Order of work: T1, T2, T10, T11, T0, then T3, T6, T7, T8, then T4 and T5 only if T0 shows an effect, then T9.
 
 ## Objective
@@ -197,7 +199,7 @@ Working-task count: 11 (T0–T8, T10, T11; T4 and T5 may be cancelled). Final ow
 | T6 | Add routing rows for release work and for the `continue` and `status` calls. Place the two defect-fix obligations of U4 in the defect-first steps. | Q2 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md` | Minimal+ | `AGENTS.md` byte size within the limit; `npm run check:docs` passes | Done |
 | T7 | Tooling: add the documents of U7 to the link and ADR-reference checks; add a byte budget on the total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md`, set at their total when T7 starts (Q4); add to procedure §9 or §12 the rule that a mechanically checkable failure first gets a check, not prose (Q4), within that budget; correct the comment at `scripts/check-requirement-coverage.mts:19` (C6). Tests for the checks. | T3 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `scripts/check-requirement-coverage.mts`, `docs/DEVELOPMENT.md` §9, `docs/AGENT_WORKFLOW.md` | Low (`npm run check`) | New tests fail without the change; `npm run check` passes | Done |
 | T8 | Record the persisted Agenda fold choices in a new ADR that amends ADR 0020, and index it. | none | `docs/decisions/` (new file), `docs/decisions/README.md` | Minimal | The ADR cites `docs/product/agenda.md` §23 and `docs/ARCHITECTURE.md` §13; `npm run check:docs` passes | Done |
-| T9 | Final measurement with the Baseline method, acceptance package, plan status `Awaiting owner acceptance`. | all other tasks | this plan, `plans/README.md` | Minimal | The Baseline tables repeated at the final commit | Planned |
+| T9 | Final measurement with the Baseline method, acceptance package, plan status `Awaiting owner acceptance`. | all other tasks | this plan, `plans/README.md` | Minimal | The Baseline tables repeated at the final commit | Done |
 | T10 | Remove OpenCode support (Q3): `opencode.json`, `.opencode/`, `npm run check:opencode` and its script and tests, its stage in `npm run check` and CI, `package.json`, and every mention in documents, including the model routing of `AGENTS.md` §1 and `docs/AGENT_ROLES.md` §§6–7. Keep the documented-command check of `scripts/documented-npm-workflows.mts`: it now requires that every `npm run` command named in `docs/DEVELOPMENT.md` and `docs/DEVELOPMENT_REFERENCE.md` has an allow rule in `.claude/settings.json` and a matching rule in `.codex/rules/`, with tests. Keep the Claude Code interpreter-deny assertions that the OpenCode check made, under the new check's name. C1 and Q11 end with this task. | T2 | `opencode.json`, `.opencode/`, `scripts/check-opencode-permissions.mts` and its replacement with tests, `scripts/documented-npm-workflows.mts`, `package.json`, `.github/workflows/*`, `.claude/settings.json` (only the renamed npm script), `.gitignore` if needed, `AGENTS.md`, `docs/*.md`, nested `AGENTS.md`, skills | Low (`npm run check`) | `git grep -i opencode` finds only history-neutral mentions that the task lists; the new check fails when a documented command lacks a Claude Code or Codex rule (test); `npm run check` passes | Done |
 | T11 | Replace the "at most four tasks per primary session" rule of `AGENTS.md` §12 and procedure §12 with the owner's session rule (Owner Questions, "Session rule"). Count plan budgets in tasks and fix cycles instead of sessions in procedures §8 and §12, `docs/DEVELOPMENT.md` §11 and this plan. Remove the next-session prompt requirement where the rule makes it unnecessary. The total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` must not grow (Q4). Not delegated to subagents. | T10 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md`, `docs/WORKING_WITH_AGENT.md`, this plan | Minimal | The three rule points of the owner's text are each traceable to one sentence; the byte total before and after; `npm run check:docs` passes | Done |
 
@@ -322,9 +324,29 @@ Conclusions [AI from the table]:
 * T5 goes ahead. Claude Code reads procedure §4 as a window sized to the section in 13 of 28 sessions, and Codex reads the whole procedures file about once every two sessions; both shrink with the section.
 * The largest measured lever is outside this plan: Codex re-reads `AGENTS.md` (22 KB) about three times per primary session and about 2.5 times per subagent, after loading it automatically. See Q12.
 
+## Final Measurement and Acceptance (T9, 2026-11-21, commit `ffd4463`)
+
+Same method as the Baseline section (`wc -c`; section bytes from `grep -b -n '^## '` offsets).
+
+| Mandatory reading by section | Baseline `bba6aa1` | Final | Change |
+| --- | --- | --- | --- |
+| Product change | 103,179 | 101,254 | −1,925 (−1.9%) |
+| Defect fix | 92,073 | 89,622 | −2,451 (−2.7%) |
+| Documentation only | 86,131 | 83,839 | −2,292 (−2.7%) |
+| `AGENTS.md` + procedures + `docs/DEVELOPMENT.md` read whole | 240,170 | 236,872 | −3,298 (−1.4%) |
+| Rule total (`AGENTS.md`, procedures, `docs/AGENT_ROLES.md`) | 107,102 | 105,031, now the enforced budget | −2,071 |
+
+Section sizes now: procedures §4 7,930 (was 9,877), §9 10,088 (9,837), §12 9,436 (10,037); `docs/DEVELOPMENT.md` §9 25,848 (26,160) and §10 4,655 (4,916).
+
+Result [AI from T0 and the table]: the reading reduction is small, as T0 predicted, because sessions read in line windows and most remaining text is rule text. The main delivered changes are correctness (C1–C16 closed), one owner per duplicated rule, removal of OpenCode, the session rule, a growth budget enforced by `check:docs`, link checks for 12 more documents, and ADR 0030. The largest measured lever, Codex re-reading `AGENTS.md` (Q12), and the `make release` gap (Q13) wait for owner answers.
+
+How to inspect: `git log --oneline 0e6517e..ffd4463`; `npm run check:docs` and `npm run check:permissions`; read `AGENTS.md` §12 (session rule) and procedure §12 "Delivery reports".
+
+Status: Awaiting owner acceptance. Budget used: 11 working tasks of 11 plus T9; 1 fix cycle of 6 (the review findings).
+
 ## Next Task
 
-T9.
+None until the Product Owner accepts or rejects the result; then the closure task removes this plan and its index row. Q12 and Q13 are open owner questions.
 
 ## Appendix A. Feature Cost Map
 
