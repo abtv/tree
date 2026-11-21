@@ -78,7 +78,7 @@ The bundled Unicode catalog uses gemoji v4.1.0 English shortcodes and aliases. S
 
 * Accepting an emoji with Enter, Tab or a click moves its shortcode to the front of a unique history shared by Tree and Agenda and saved locally between launches. Typing, dismissal and Undo/Redo do not change this history.
 * History retains at most 100 shortcodes, following the bounded command-history precedent and §22 responsiveness principle. It is an application preference independent of the notes and excluded from notes archives; missing, unreadable or invalid entries are ignored.
-* A failed history write uses the existing operation-error surface and remains retryable on the next acceptance or persistence flush. Reaccepting the first entry requires no history write.
+* A failed history write uses the operation-error surface and remains retryable on the next acceptance or persistence flush. Reaccepting the first entry requires no history write.
 * History changes prepare the initial order once; typing performs no history writes or document traversal. Writes are asynchronous and serialized, with at most one small preference write per changed acceptance, no added document writes or syncs, and memory bounded by the fixed catalog and history (§22.1).
 
 Results rank exact names first, then name prefixes, prefixes of words after `_`, contiguous substrings inside words, and finally matches with gaps. The first four groups use shortcode order. Matches with gaps prefer more matched word-start characters, then fewer skipped characters between the first and last match, then an earlier start, then a shorter shortcode, then shortcode order. A word starts at the beginning of a name or after `_`.
@@ -89,7 +89,7 @@ When several alignments match a name, its best alignment determines its rank. As
 * Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row.
 * Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; plain `Enter`, plain `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit.
 * The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged.
-* These shortcuts override ordinary commands only while suggestions are open, following the approved keyboard-first completion interaction in standard editing and Vim Insert.
+* These shortcuts override ordinary commands only while suggestions are open, following the keyboard-first completion interaction in standard editing and Vim Insert.
 
 Without a popup, Enter and Tab retain their ordinary actions; modified Enter always keeps its ordinary behavior. Modified Tab dismisses suggestions and retains its ordinary behavior, including Shift+Tab's structural action (§20.2.24, §23.10).
 
@@ -108,7 +108,7 @@ Tags use muted
 violet, people muted teal, and events warm ochre in light appearance and peach in
 dark appearance, with the same subtle rounded background treatment. Light
 foregrounds are `#76517d`, `#306b74`, and `#8a522e`; dark foregrounds are `#d3afd7`,
-`#8cd0d3`, and `#dfaf8f` respectively, coordinated with the existing palette.
+`#8cd0d3`, and `#dfaf8f` respectively, coordinated with the appearance palette.
 Completion labels are `Tag suggestions`,
 `People suggestions`, and `Events suggestions` respectively.
 
