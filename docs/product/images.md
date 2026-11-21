@@ -2,7 +2,7 @@
 
 ## 15. Image Paste
 
-Each node can contain at most one image.
+Image paste follows the one-image limit of §17.
 
 Images are displayed after the node's text.
 
@@ -74,7 +74,7 @@ identities and is retired when its source disappears or shutdown cancels recogni
 
 `reindex-all-images` repeats hidden English text recognition for every unique image in
 the document, including images with completed results. It is available on the same
-platforms as `image-to-text`, in Tree and Agenda. It uses the existing sequential queue,
+platforms as `image-to-text`, in Tree and Agenda. It uses the same sequential queue as `image-to-text`,
 does not duplicate pending image requests, and creates no children or Undo steps.
 Existing hidden text stays usable until recognition succeeds; failures retain it.
 The command does nothing while saving is locked or shutdown recognition is suspended.
@@ -115,7 +115,7 @@ Each invocation captures the current immutable text after buffered edits finish.
 Editing and navigation remain available and do not change that snapshot. Large
 branches are reduced sequentially from children toward parents in fresh bounded
 sessions; long node text and wide forests are split and combined without silent
-truncation. Intermediate summaries remain temporary and can lose source detail.
+truncation. Intermediate summaries are temporary and can lose source detail.
 
 The final English result is a concise paragraph with key bullet points when useful,
 proportional to the input. Completion copies it to the system clipboard once and
