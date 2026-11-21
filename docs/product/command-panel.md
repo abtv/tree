@@ -6,7 +6,7 @@
 * The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
-* Operation status messages, including save failures, image recognition, summarization, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. Confirmation dialogs retain their existing behavior. App update feedback retains its priority rules (§26).
+* Operation status messages, including save failures, image recognition, summarization, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. Confirmation dialogs retain their existing behavior. App update feedback follows the priority rules of §26.
 
 #### 20.2.28 Command Panel
 
@@ -31,7 +31,7 @@ Input is case-sensitive; leading and trailing spaces are ignored. A command matc
 
 Both opening keys use the same command list. Only platform-supported commands appear or count. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
-Every action in the desktop menu bar or browser Tree menu, including future actions, must also be available in this panel. Headings, separators and status text are not actions. Platform support, availability, confirmations, cancellation and results must match the menu. State-dependent commands follow the current menu action, including backup start, stop and resume (§24–25).
+Every action in the desktop menu bar or browser Tree menu must also be available in this panel. Headings, separators and status text are not actions. Platform support, availability, confirmations, cancellation and results must match the menu. State-dependent commands follow the current menu action, including backup start, stop and resume (§24–25).
 
 Temporarily disabled menu actions remain listed, visibly dimmed and marked disabled for assistive technology; Enter or clicking them does nothing and leaves the panel open. Availability updates while the panel is open. Opening the panel is also possible when the document cannot be opened, so Import Notes remains reachable; loading still prevents opening it.
 
@@ -63,9 +63,9 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |
 | `search-all-nodes` | — | Search all nodes | — | `⌘;` | Open document-wide node and tag search (§20.14) |
 | `quit` | `q` | Quit Tree | — | `⌘Q` (`Ctrl+Q` outside Apple platforms, §1.5) | Same as Cmd+Q (§9.1, §16), including save-before-quit, failure and locked-state behavior |
-| `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the existing origin/caret navigation (§23); do nothing if already in Agenda |
-| `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the existing Agenda origin (§23); do nothing if already in Tree |
-| `about-tree` | — | About Tree | — | — | Open About (§1.3, §1.4) |
+| `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the origin/caret navigation of §23; do nothing if already in Agenda |
+| `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the Agenda origin of §23; do nothing if already in Tree |
+| `about-tree` | — | About Tree | — | — | Open About (§9.4) |
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
 | `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
@@ -96,4 +96,4 @@ Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 
-**Vim divergence.** At the Product Owner's request, this panel lists application commands and runs the selected row, whereas Vim runs typed command-line text. Up/Down select rows rather than recalling history; history instead orders the list. This keyboard-first model is the deliberate platform difference under §1.3.
+**Vim divergence.** This panel lists application commands and runs the selected row, whereas Vim runs typed command-line text. Up/Down select rows rather than recalling history; history instead orders the list. This keyboard-first model is the deliberate platform difference under §1.3.
