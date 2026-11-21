@@ -95,7 +95,7 @@ Search and live editing may temporarily reveal a remembered folded day without c
 
 Agenda uses the windowing behavior of §20.1 above 100 projected rows, including day headers, parent paths and separators. The selected row stays mounted and focused when scrolled off-screen. Repeated occurrences of a real node have independent positions and measured heights. Day folding and window resizing update the layout without losing selection or focus; windowing adds no document saves. Single-line entries, headings and separators use the same row bounds for keyboard reveal, so crossing between them does not shift the caret vertically at a viewport edge. Wrapped text and attached images retain their caret-line reveal behavior.
 
-Measurement corrections preserve scroll continuity under §20.1. An explicit jump to the end continues to follow the end while its rows are measured. Opening Today, returning from a focused day and keeping an edited occurrence in place retain their existing alignment rules.
+Measurement corrections preserve scroll continuity under §20.1. An explicit jump to the end continues to follow the end while its rows are measured. Opening Today, returning from a focused day and keeping an edited occurrence in place follow the alignment rules of §23.1, §23.15 and §23.7.
 
 Scrolling must populate the newly visible range before the next rendered frame, including large scrollbar jumps and rapid direction changes. The viewport must not flash empty while its rows are replaced. Scrolling preserves the selected occurrence, active editor, caret, text selection and editing mode.
 

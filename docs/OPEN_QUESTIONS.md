@@ -169,6 +169,52 @@ Support requires at least one important scenario that current persistence and sy
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
 - 2026-11-03 — Repository fact: PRODUCT §§24–25 and the browser/desktop archive implementations supersede the original absence-of-export premise. The recorded status is unchanged; any further experiment must assess the existing workflows first.
 
+## PD-005: How a counted vertical motion counts an image-bearing node it passes
+
+Kind: product
+Status: Idea
+
+### Question
+
+`docs/PRODUCT.md` §20.2.9 says that counts consume visible text-line steps and that "an intervening image-bearing node retains its existing node-level step", but no section defines that step. For a single `j`, the attached image is a separate vertical step after the node's final text line. Whether a counted `j`/`k` that passes through such a node should count its image, its text lines, or the node as one step is undecided, and the implementation treats the two directions differently.
+
+### What we are watching
+
+Counted `j`/`k` and `J`/`K` in Tree and Agenda over documents with images between text nodes: whether the landing row matches what the user expects from the count.
+
+### What would settle it
+
+A Product Owner choice of one rule for both directions, stated in §20.2.9 and covered by a test of counted motion through an image-bearing node in each direction. If the current behavior is chosen, the specification describes it and the test pins it.
+
+### Evidence
+
+- 2026-11-21 — Repository fact: `src/renderer/vim-vertical-navigation.ts:62` passes the image only for the starting node; an intervening node's image is not a step. Moving down, its wrapped text lines count as steps (`:39–45`); moving up, the motion arrives on its image (`:106`) and the next step leaves the node.
+- 2026-11-21 — Repository fact: `e2e/electron/vim-image-caret.spec.ts:963` ("moves focus across an image-bearing sibling with counted k") lands `2k` from the last node on the first node at offset 2, passing a node with text and an image; `src/renderer/vim-vertical-navigation.test.ts:221–243` covers the image as a step only on the starting node.
+- 2026-11-21 — Product Owner statement: record this as an open question rather than fix it now (acceptance of the product-specification refactoring).
+
+## PD-006: Character Visual `j` and `k` in Agenda
+
+Kind: product
+Status: Idea
+
+### Question
+
+In Tree, character Visual `j` and `k` move the active endpoint by visible text line (`docs/PRODUCT.md` §20.2.20). The same section says only that "Agenda retains its existing character Visual rules", and §23.4 says that Visual motions stay within the current row without stating what `j` and `k` do inside it. Whether they should do nothing, move by display line within the row, or clamp is undecided and untested.
+
+### What we are watching
+
+Character Visual selection in Agenda direct matches and rows without an editor, especially multi-line entries.
+
+### What would settle it
+
+A Product Owner choice stated in §23.4 (and the §20.2.20 clause rewritten to cite it), with a test that pins `j` and `k` in Agenda character Visual on a multi-line row.
+
+### Evidence
+
+- 2026-11-21 — Repository fact: on rows without an editor, `src/renderer/agenda-row-keyboard.ts:518–523` handles `j`/`k` only in Normal mode, and `isTextMotion` in `src/renderer/vim-text-commands.ts:35–36` excludes them, so the key is consumed with no effect. On direct-match editors, Tree's Visual display-line `j`/`k` is guarded by `snapshot.agenda === undefined` (`src/renderer/vim-keyboard-handler.ts:721–725`), and the key falls through without effect (`:1018`). ArrowUp and ArrowDown still move rows in Visual.
+- 2026-11-21 — Repository fact: no test asserts `j` or `k` in Agenda character Visual.
+- 2026-11-21 — Product Owner statement: record this as an open question rather than fix it now (acceptance of the product-specification refactoring).
+
 ## TD-001: Whether a written rule is the right response to a recurring defect
 
 Kind: technical

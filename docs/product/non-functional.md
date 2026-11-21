@@ -24,4 +24,4 @@ Vertical Vim navigation through long wrapped text must remain responsive in Tree
 
 Everyday Vim editing must feel lightweight and consistently responsive on supported documents. Typing, caret movement, moving between nearby nodes, switching modes, and common edit commands must give prompt visible feedback so the user can stay in an editing flow. Repeated interactions must not develop noticeable pauses, and work that only changes the active node or caret must not become slower merely because the document contains more off-screen nodes.
 
-Performance guards must exercise representative sequences in the running application, including key-to-visible-frame latency for Vim interactions and typing, as well as document-scale cases that could expose renderer or React work on the interactive path. Measure both typical and slow interactions; investigate regressions before adding further editing features. This requirement does not imply support for Vim-sized files or prescribe a particular UI implementation.
+This requirement does not imply support for Vim-sized files or prescribe a particular UI implementation. `docs/DEVELOPMENT.md` §12 defines its performance guards.

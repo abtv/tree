@@ -112,9 +112,6 @@ If the renderer process itself terminates, its unsaved changes are already lost 
 
 ## 26. Desktop App Updates
 
-The owner selects desktop releases by explicitly increasing the version; ordinary
-commits do not release another desktop version.
-
 Packaged macOS builds check published stable GitHub releases at startup and when
 connectivity returns. Downloads run in the background without stealing focus;
 offline or failed downloads leave the installed application usable. Development
