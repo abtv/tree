@@ -960,6 +960,56 @@ test.describe('Vim editing: image caret', () => {
     await expect(next).toHaveJSProperty('selectionEnd', 1)
   })
 
+  // @requirement PRODUCT.md §20.2.9
+  test('keeps the saved return column when k enters the image of a rich-text node', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'dated-image',
+            text: '2026-10-09 Image',
+            attachment: { id: 'dated-attachment', mimeType: 'image/png' },
+            children: [],
+          },
+          { id: 'dated-next', text: '2026-10-09 After', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'dated-image' },
+    })
+    seedAttachmentImage(userDataDir, 'dated-attachment')
+    const { window } = await launchTree(userDataDir)
+    const offset = (field: ReturnType<typeof node>): Promise<number> =>
+      field.evaluate((element) => {
+        const selection = document.getSelection()!
+        const range = document.createRange()
+        range.selectNodeContents(element)
+        range.setEnd(selection.anchorNode!, selection.anchorOffset)
+        return range.toString().length
+      })
+    const image = node(window, 1)
+    const next = node(window, 2)
+    await image.focus()
+
+    await window.keyboard.type('05l')
+    await window.keyboard.press('j')
+    await window.keyboard.press('j')
+
+    await expect(next).toBeFocused()
+    expect(await offset(next)).toBe(0)
+
+    await window.keyboard.type('3l')
+    await window.keyboard.press('k')
+
+    await expect(image).toBeFocused()
+    await expect(image).toHaveClass(/node-input-image-caret/)
+
+    await window.keyboard.press('k')
+
+    await expect(image).toBeFocused()
+    await expect(image).not.toHaveClass(/node-input-image-caret/)
+    expect(await offset(image)).toBe(3)
+  })
+
   test('moves focus across an image-bearing sibling with counted k', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

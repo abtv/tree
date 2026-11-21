@@ -162,7 +162,10 @@ export function createPointerHandlers(
           store.applyAgenda({ kind: 'select', key, cursor: getCaret(event.currentTarget) })
         return
       }
-      if (selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
+      // Placing a caret in a contenteditable focuses it before React re-renders this handler, so the
+      // store's live selection, not the rendered prop, decides whether focus selects another node.
+      const liveSelectedNodeId = snapshot.status === 'ready' ? snapshot.location.selectedNodeId : selectedNodeId
+      if (liveSelectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
       else if (
         getMode() === 'normal' &&
         node.attachment !== undefined &&

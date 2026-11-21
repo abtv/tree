@@ -30,14 +30,21 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
     await window.evaluate(
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
     )
-    const treeTop = await window
+    // Moving down, a reveal stops the bottom of its revealed rectangle on the bottom context boundary.
+    // Tree Vim j/k reveal the destination text line (§20.8); other Tree commands and every single-line
+    // Agenda row reveal the whole row (§23.6).
+    const treeBoundary = await window
       .getByRole('textbox', { name: 'Node 31', exact: true })
-      .evaluate((input) => input.closest('.node-row')!.getBoundingClientRect().top)
+      .evaluate((input, revealsLine) => {
+        if (!revealsLine) return input.closest('.node-row')!.getBoundingClientRect().bottom
+        const style = getComputedStyle(input)
+        return input.getBoundingClientRect().bottom - Number.parseFloat(style.paddingBottom)
+      }, mode === 'vim')
 
     await window.keyboard.press('Meta+p')
     await window.getByRole('textbox', { name: 'Agenda node item-0', exact: true }).click()
     const initialScroll = await window.locator('.scroll-viewport').evaluate((element) => element.scrollTop)
-    const samples: { kind: string; top: number }[] = []
+    const samples: { kind: string; bottom: number }[] = []
     for (let step = 0; step < 44; step++) {
       await window.keyboard.press(down)
       await window.evaluate(
@@ -47,13 +54,13 @@ describeForEachEditingMode('Agenda scroll rendering', ({ mode }) => {
         const viewport = document.querySelector('.scroll-viewport')!
         if (viewport.scrollTop < initialScroll + 100) return undefined
         const row = document.querySelector<HTMLElement>('.agenda-row[aria-selected="true"]')!
-        return { kind: row.dataset.agendaKey!.split(':')[0]!, top: row.getBoundingClientRect().top }
+        return { kind: row.dataset.agendaKey!.split(':')[0]!, bottom: row.getBoundingClientRect().bottom }
       }, initialScroll)
       if (sample !== undefined) samples.push(sample)
     }
 
     expect(new Set(samples.map((sample) => sample.kind))).toEqual(new Set(['node', 'separator', 'day', 'path']))
-    for (const sample of samples) expect(Math.abs(sample.top - treeTop)).toBeLessThan(1)
+    for (const sample of samples) expect(Math.abs(sample.bottom - treeBoundary)).toBeLessThan(1)
     await window.screenshot({ path: test.info().outputPath(`edge-cadence-${mode}.png`) })
   })
 

@@ -595,13 +595,31 @@ describe('mouse up', () => {
 })
 
 describe('focus', () => {
-  it('selects a node that is not the selected one at the focus caret', async () => {
-    const f = await fixture({ selectedNodeId: 'other' })
+  it.each(['other', 'node'])('selects a node the store has not selected, with a rendered %s prop', async (prop) => {
+    const f = await fixture({ selectedNodeId: prop })
+    const handlers = f.handlers()
+    f.store.selectNode('other', 0)
 
-    f.handlers().onFocus({ currentTarget: textarea('hello', 4) } as never)
+    handlers.onFocus({ currentTarget: textarea('hello', 4) } as never)
 
     expect(f.snapshot().location.selectedNodeId).toBe('node')
     expect(f.snapshot().focus?.cursor).toBe(4)
+  })
+
+  // @requirement PRODUCT.md §20.2.9
+  it('keeps the focus token when a caret placement focuses an editor the store already selected', async () => {
+    const f = await fixture({
+      mode: 'normal',
+      selectedNodeId: 'other',
+      node: { attachment: { id: 'image', mimeType: 'image/png' } },
+    })
+    const selectNode = vi.spyOn(f.store, 'selectNode')
+    const focus = f.snapshot().focus
+
+    f.handlers().onFocus({ currentTarget: richInput('hello', 5, true) } as never)
+
+    expect(selectNode).not.toHaveBeenCalled()
+    expect(f.snapshot().focus).toBe(focus)
   })
 
   it('does not select again when the node is already selected', async () => {
