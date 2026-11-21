@@ -57,7 +57,7 @@ npm install
 
 The install runs the project's `postinstall` script to download the Electron runtime for the current platform, and its `prepare` script to point Git at the repository's tracked hooks (`.githooks/`). Do not disable lifecycle scripts when preparing a development environment.
 
-The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests. It only runs on the machine that makes the commit, so the Attribution GitHub Actions workflow (`§9`) is the backstop for a commit made without the hook installed and for a pull request description, which no Git hook can see.
+The tracked `commit-msg` hook rejects a commit message that adds an agent co-authorship or attribution line, per `AGENTS.md` §12. It applies to every coding agent through Git itself, not through any one tool's configuration, so it holds regardless of which tool is committing or what a session-level instruction suggests. It only runs on the machine that makes the commit, so the Attribution GitHub Actions workflow (`§9`) is the backstop for the commits of a pull request made without the hook installed and for a pull request description, which no Git hook can see. The workflow runs only on pull requests; a direct push to `main` is checked only by the local hook.
 
 The same hook runs `scripts/check-release-notes.mts` to require release-note fields
 on new feature, fix and performance commits. `Test and build app` runs the same
@@ -402,7 +402,7 @@ Native editor context-menu behavior is covered by renderer and IPC contract test
 
 ### Defect regression workflow
 
-The defect-first and boundary-testing rules are defined in `AGENTS.md` §9. Boundary contract tests live next to the implementation; end-to-end tests live in `e2e/`. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
+The defect-first and boundary-testing rules are defined in `AGENTS.md` §9 and procedure §9 (`docs/AGENT_WORKFLOW.md`). Boundary contract tests live next to the implementation; end-to-end tests live in `e2e/`. Use unit tests for deterministic state-machine branches and E2E tests for the real Electron wiring.
 
 ### Navigation and caret changes
 
@@ -449,7 +449,7 @@ Standard editing is the first-run default and Vim editing is a permanent mode (`
 
 `launchTree` writes the Vim preference from the Playwright option fixture `editingMode` (`'vim'` by default) unless the test passes `vimPreference` itself. `describeForEachEditingMode(title, body)` in `e2e/electron/fixtures.ts` runs a describe body once per mode, names each block `<title> [vim editing]` or `<title> [standard editing]`, and hands the body a `screenshotName` function that gives each mode its own baseline (`name-vim.png`, `name-standard.png`). Tests whose behavior exists only in Vim sit in a separate `Vim editing only` describe block of the same file, outside the helper.
 
-Every `e2e/electron/*.spec.ts` file declares one category on its first line, as `// @editing-modes: <category>`, and `npm run check:e2e-modes` enforces it:
+Every spec file under `e2e/` (Electron, browser and smoke) declares one category on its first line, as `// @editing-modes: <category>`, and `npm run check:e2e-modes` enforces it:
 
 * `both` — tests with mode-dependent assertions run through `describeForEachEditingMode`. Independent cases may stay outside that describe helper in the same file and run once. The check fails a `both` file that never calls the helper, and any other file that does.
 * `vim` — the behavior under test exists only in Vim editing.
@@ -518,7 +518,7 @@ does not establish that a changed scenario ran.
 
 Chromium container tests, GitHub Actions with its scroll-rendering, smoke-check and naming subsections, and build and test configuration are in [Development Reference §1, Validation Infrastructure](DEVELOPMENT_REFERENCE.md#1-validation-infrastructure); README screenshot maintenance and demo video generation are in [Development Reference §2, README Media](DEVELOPMENT_REFERENCE.md#2-readme-media).
 
-The `Enforce agent attribution policy` workflow runs `scripts/check-attribution.mts` on every pull request. It fails the check when the pull request description or any of its commits carries an agent co-authorship or "generated with/by" line, per `AGENTS.md` §12. This is the server-side backstop described in §3; it holds regardless of whether the author's machine had the `commit-msg` hook installed.
+The `Enforce agent attribution policy` workflow runs `scripts/check-attribution.mts` on every pull request. It fails the check when the pull request description or any of its commits carries an agent co-authorship or "generated with/by" line, per `AGENTS.md` §12. This is the server-side backstop described in §3; for the commits of a pull request it holds regardless of whether the author's machine had the `commit-msg` hook installed. It does not run on direct pushes to `main`.
 
 ### Risk-Based Validation
 
@@ -589,7 +589,7 @@ For each result, use this compact record:
   Invalidation notes: <stages retained or invalidated by later changes, or none>
 ```
 
-For a rendering-sensitive change as defined by `AGENTS.md` §9, add a separate visual-evidence record after the command results:
+For a rendering-sensitive change as defined by the visual-regression workflow of procedure §9 (`docs/AGENT_WORKFLOW.md`), add a separate visual-evidence record after the command results:
 
 ```text
 - Visual evidence: <affected states inspected>
@@ -667,7 +667,7 @@ Each active plan should contain:
 * an explicit authorization state, including decisions still reserved for the Product Owner;
 * the approval's scope (whole initiative or named tasks), selected coding tool, priorities, delegated decision areas and principles, execution/recovery budget, and a separate closure allowance when final owner acceptance applies;
 * an ordered table of task IDs, outcomes, dependencies, acceptance evidence, and status (`Planned`, `Ready`, `In progress`, `Blocked`, or `Done`);
-* for each task, the files it is expected to change and its §9 validation tier, as required by `AGENTS.md` §8;
+* for each task, the files it is expected to change and its §9 validation tier, as required by procedure §8 (`docs/AGENT_WORKFLOW.md`);
 * the source review or report and its task IDs when the plan tracks a review follow-up batch, plus an explicit unverified-remainder note when the full list is unavailable;
 * a single exact next task, or the reason no task can proceed;
 * concise decisions and findings needed by later sessions, including baseline or final measurements when they affect the initiative;
@@ -677,8 +677,6 @@ Each active plan should contain:
 At the start of a continuation session, read the index, the named plan or the one resolved under `AGENTS.md` §8, `AGENTS.md` itself, and any existing `WORKING_PLAN.md`. Compare plan status with `git status` and recent commits. Reconcile dirty work or an unfinished working plan before selecting another task; resume owned unfinished work, preserve unrelated changes, and block when ownership cannot be established. When the worktree is clean, take the next `Ready` task within initiative-wide approval or an explicit continuation request. Do not infer approval from a status label or a plan's existence. Each initiative task uses the temporary working plan required by `AGENTS.md` §8, performs its required validation/review, and commits the task with the initiative status update. Session rotation follows `AGENTS.md` §12. In the handoff, cite the plan, completed task, next task and resume prompt. Do not repeat valid validation merely because the session changed.
 
 For small fresh contexts, pass the selected task, authorization and decision boundaries, starting Git state, relevant source-of-truth section links and required acceptance evidence. Read applicable nested instructions when reaching an owner. Keep the full diff, validation record and relevant untracked files available to independent roles; a concise task prompt must not hide their required inputs. Use compaction within a task as needed, but preserve decisions and blockers in repository records before relying on a context reset. Measure total input, cached input, output, review/retry usage, elapsed time, human interventions and rework rather than assuming fresh contexts cost less.
-
-
 
 If blocked, record the concrete blocker and the safe next action in the active plan when that update can be committed independently; otherwise preserve the uncommitted work and `WORKING_PLAN.md` and give the same information in the handoff. A plan's status must never imply a task passed validation or was committed when it did not. At completion, follow the final owner acceptance rule in `AGENTS.md` §8 before retiring a qualifying initiative. A review follow-up batch also requires confirmation that no further tasks remain. Move lasting product, architecture, or development knowledge to its owner, then remove the plan and index entry in the closure commit. Git history provides the completed plan's record; do not keep an archive or permanent validation log.
 
@@ -726,7 +724,7 @@ section number is deeper. Numbered headings at levels two through four are suppo
 a parent with numbered children and no own text must cite a subsection instead.
 It rejects unknown section numbers and malformed markers. The checker
 owns explicit exemptions with reasons for overview and product governance prose,
-and a boundary-section list derived from `AGENTS.md` §9. Boundary sections also
+and a boundary-section list derived from procedure §9 (`docs/AGENT_WORKFLOW.md`). Boundary sections also
 require a marker under `e2e/`; a unit or performance marker cannot replace it.
 Review the boundary list when adding or changing requirements. Section-level
 traceability locates executable evidence; it does not prove that every sentence
@@ -878,7 +876,7 @@ End-to-end tests complement unit tests by exercising the real Electron applicati
 
 Platform-routed shortcuts need boundary-faithful end-to-end tests. Playwright injects key events through the DevTools protocol, which triggers Chromium's native editing behavior even though macOS does not route those commands in the running application. An end-to-end test for an editing command (Undo, Redo, Cut, Copy, Paste, Select All) must therefore suppress or disable the native browser behavior, such as the `copy`, `cut`, or `paste` event, and assert that the application still performs the action. A test that relies on the native default can pass while the product is broken. See `docs/decisions/0003-renderer-owns-standard-editing-commands.md`.
 
-Coverage policy is defined in `AGENTS.md` §9. The enforced global and per-file floors are configured in `config/testing/vitest.config.mts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met. Coverage output can vary slightly between runs with identical inputs; treat a single-run global delta of a statement or two as measurement noise rather than a regression.
+Coverage policy is defined in `AGENTS.md` §9 and procedure §9 (`docs/AGENT_WORKFLOW.md`). The enforced global and per-file floors are configured in `config/testing/vitest.config.mts`, and `npm run check` runs the coverage-enabled unit suite that fails when a floor is not met. Coverage output can vary slightly between runs with identical inputs; treat a single-run global delta of a statement or two as measurement noise rather than a regression.
 
 Per-file floors for the renderer interaction-state owners, their projection point, and scroll restoration are configured in `config/testing/vitest.config.mts` and enforced by this coverage run. They are set just below coverage measured when each guard is introduced or strengthened, so losing a guarded module's focused coverage fails `npm run check`. Treat them as regression guards, not coverage targets: add behavior in its owner module with focused or property tests and restore coverage rather than lowering a floor. The single-owner pattern they guard is recorded in [ARCHITECTURE.md](ARCHITECTURE.md) §9 and [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md).
 
@@ -933,9 +931,6 @@ Known Electron/macOS issue (observed on macOS 26.6.2, November 2026): the idle m
 The Product Owner classified this as a known runtime issue separate from the windowing optimization. Keep the test and its limits unchanged, report any failing run explicitly, and do not describe that run as passing. A focused recheck with another runtime uses `npm run test:perf -- --project=electron notes-archive.spec.ts`; a native workaround or dependency change requires its own decision and validation.
 
 The owner selected Electron 44.10.2 on 2026-11-08. A same-machine series of repeated archive checks showed no idle main-delay failures on that runtime, but one run still exceeded the main-delay limit during import preparation. The earlier Electron 44.10.1 series also had an isolated paint-latency failure. These results do not establish that either older runtime is free of stalls; retain the existing guards and report each failing scenario separately.
-
-For this downgrade only, the owner accepted the isolated import-preparation timing failure and the existing minimatch advisory GHSA-g3hv-75wg-m249 with its 17 moderate transitive audit entries on 2026-11-08. This acceptance permits the downgrade to proceed; it does not make either failed check pass, authorize suppressing the guards or audit, or extend acceptance to other changes.
-
 ### Preparing a macOS release
 
 Commit the intended application changes, then create the version commit as described in [macOS releases, Create a release](releasing.md#create-a-release).
@@ -1057,7 +1052,7 @@ Follow the repository's `.gitignore`.
 
 Agent-created temporary work belongs in `.scratch/<task>/` under the repository root, as required by `AGENTS.md` §4 for Codex, Claude Code, and OpenCode. Create task directories only when needed; no tracked placeholder is required. Use a unique task name and separate agent subdirectories for concurrent work. The folder is ignored by Git, ESLint, Prettier, and Vitest discovery and is not copied into Stryker's mutation sandbox, so saved diagnostic scripts, unfinished examples and browser profiles do not enter ordinary validation. A hidden name and `.gitignore` are not a confidentiality boundary or automatic cleanup mechanism.
 
-Keep reports needed across test runs here, rather than in system temporary directories or Playwright's cleared `test-results/` directory. Existing tool-managed outputs such as `test-results/`, `reports/`, and `out/`, library-managed temporary directories, and application test profiles retain their current locations. A diagnostic spec that needs the E2E or performance runner's discovery stays in its designated suite while in use; the existing permitted retirement workflow remains valid. Working and initiative plans retain the locations defined in `AGENTS.md` §8.
+Keep reports needed across test runs here, rather than in system temporary directories or Playwright's cleared `test-results/` directory. Existing tool-managed outputs such as `test-results/`, `reports/`, and `out/`, library-managed temporary directories, and application test profiles retain their current locations. A diagnostic spec that needs the E2E or performance runner's discovery stays in its designated suite while in use; the existing permitted retirement workflow remains valid. Working and initiative plans retain the locations defined in procedure §8 (`docs/AGENT_WORKFLOW.md`).
 
 Read and write scratch files through the agent's normal repository file tools, including when a tool needs an explicit path to discover Git-ignored files. Do not widen external-directory access to accommodate an agent-chosen temporary destination. For a user-specified path or a tool that requires an external location, establish the required write and read access before depending on its artifacts. Keep referenced evidence available through handoff. After a task's final commit, remove its directory with `npm run retire:scratch -- <task>`. The script accepts one directory name directly under `.scratch/`, refuses option-like names, nested paths, symlinks, regular files and locations that resolve outside `.scratch/`, and never follows nested symlinks. The retained-name list in `scripts/retire-scratch.mts` is currently empty: the owner authorized retirement of the four former infrastructure namespaces on 2026-10-14 after their durable conclusions were checked. The command does not authorize deleting another task’s evidence or resetting execution allowances. There is no automatic purge, and this workflow grants no other shell or recursive deletion permission.
 

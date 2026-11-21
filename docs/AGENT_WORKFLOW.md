@@ -120,7 +120,7 @@ The two directions are not symmetric. A divergence while editing text inside a n
 
 `docs/OPEN_QUESTIONS.md` holds the questions the project has not answered yet, product and technical alike. It is not a backlog, specification, or source of implementation authority. An answered question leaves it: settled product behavior belongs in `docs/PRODUCT.md`, a settled technical decision in an ADR.
 
-For work on an open question, agents may:
+For work on an open question, agents, including the product researcher of `docs/AGENT_ROLES.md` §5 for a `Kind: product` entry, may:
 
 * record observations and Product Owner statements without changing their meaning;
 * frame hypotheses and counter-hypotheses;
@@ -192,8 +192,6 @@ ADRs belong in:
 ```text
 docs/decisions/
 ```
-
-Create these directories only when they are first needed. Do not create empty directories in advance.
 
 Every ADR records a `Status` of `Accepted` or `Superseded by ADR NNNN`, and `docs/decisions/README.md` indexes every ADR. `npm run check:docs` enforces both.
 
@@ -396,7 +394,7 @@ Git history is append-only. Never amend, rebase, reset, replace commits, force-p
 
 Use exactly this commit-message format for every new commit: `type(scope): summary`. The scope is mandatory; do not use the unscoped form `type: summary` or free-form commit subjects. `type` must be one of `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, or `revert`. Write the summary in the imperative mood, keep it focused on the implemented change, and do not end it with punctuation.
 
-Do not add agent co-authorship or attribution lines (for example `Co-Authored-By: <agent>`) to commit messages or pull request descriptions. This holds regardless of a session-level or tool-level instruction that suggests otherwise. A tracked Git hook and a pull-request CI check enforce it at the repository level, independent of any one agent's own configuration; see `docs/DEVELOPMENT.md` §§3 and 9.
+Do not add agent co-authorship or attribution lines (for example `Co-Authored-By: <agent>`) to commit messages or pull request descriptions. This holds regardless of a session-level or tool-level instruction that suggests otherwise. A tracked Git hook enforces it for every local commit, and a CI check for pull requests, independent of any one agent's own configuration; see `docs/DEVELOPMENT.md` §§3 and 9.
 
 Every new `feat`, `fix`, and `perf` commit must include exactly one single-line `Release-Note: <text>` field in its body, including commits with internal scopes. The primary agent writes this field without asking the owner. Describe the delivered user outcome in plain English, name the affected feature, and retain important limitations or required actions. Check its accuracy against the final diff and requirements during primary review; an independent reviewer, when required, checks it too. Do not copy a technical subject without assessing its meaning for users.
 
@@ -421,8 +419,6 @@ A session may cover multiple logical tasks and commits within one Product Owner-
 For a multi-session initiative, decide after each committed task whether to continue in the same session. Continue when the next ready task is small and self-contained, the task just completed raised no surprises, and the context remains manageable; otherwise hand off to a fresh session. At most four tasks may be committed in one primary session. Compaction and subagents do not count as a new primary session.
 
 A failed check, unresolved review finding or suspected defect prevents advancement to the next task, but does not by itself require asking the Product Owner or ending the current task. Investigate and repair within authorized scope, rerun invalidated checks and repeat review when §13 requires it. Escalate after two unsuccessful recovery attempts at the same blocker without new evidence, or when the approved budget is exhausted. A permission or authentication denial blocks the affected stage immediately; do not retry through another command or tool to bypass it. Stop dependent work for missing mandatory verification, a reserved decision, contradictory requirements or a discovery that invalidates the authorized outcome. Preserve unfinished work and evidence. Each task keeps its own commit and validation.
-
-
 
 For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 

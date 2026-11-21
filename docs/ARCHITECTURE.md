@@ -580,7 +580,7 @@ Performance assessment (`docs/PRODUCT.md` §22.1): recognition scans only the ed
 
 Date recognition is domain-owned: `findDateLikeTokens` and `findCanonicalDates` in `date-recognition.ts` return token ranges, and `date-decorations.ts` turns them into `TextDecoration` ranges for Tree and Agenda (`docs/PRODUCT.md` §§20.10–20.11). Tree reuses Agenda's active-date styling for every canonical date. A Tree row keeps its plain `<textarea>` until its text contains a canonical date or a resembling token; it then renders through the rich `NodeInput` path that links already use, and keeps that element for as long as the row stays mounted, so a focused row is never swapped back while typing. `NodeInput` records the textarea's focus and selection from its events and restores both in a layout effect when the element is replaced. The hide-under-caret rule is an attribute toggled on the existing invalid-date spans by `updateDateLikeUnderline`, called from the shared `selectionchange` and `focusout` listeners and, for the focused input only, after each commit; it causes no React render. Performance assessment (`docs/PRODUCT.md` §22.1): recognition scans one node's text per render of that node; the caret rule measures only spans inside the focused input; no document traversal, disk write, sync, history entry or retained document state is added. Decoration arrays and spans are bounded by mounted node text and released on unmount. Rows without date tokens render exactly as before.
 
-Live mirrors are derived in the renderer from `activeOccurrence` by `isAgendaMirror` and drawn as the `agenda-mirror` row class; they mount no input. When a document change re-derives the rows (a new row array) and the active node's occurrence moves, `AgendaView` measures the selected row's viewport top from a store subscription, which runs before React renders and mutates the DOM, and corrects the scroll by the difference after the commit, skipping viewport reveal for that commit. Pure selection changes never publish a new document and take no adjustment, and a keystroke that keeps the same rows does no measuring. The transient status message is derived from the store state by `agendaStatusMessage`; the status bar renders it only while it exists, so Tree layout and the Tree live regions are unchanged.
+Live mirrors are derived in the renderer by `isAgendaMirror` from the active occurrence (`activeAgendaOccurrence`) and drawn as the `agenda-mirror` row class; they mount no input. When a document change re-derives the rows (a new row array) and the active node's occurrence moves, `AgendaView` measures the selected row's viewport top from a store subscription, which runs before React renders and mutates the DOM, and corrects the scroll by the difference after the commit, skipping viewport reveal for that commit. Pure selection changes never publish a new document and take no adjustment, and a keystroke that keeps the same rows does no measuring. The transient status message is derived from the store state by `agendaStatusMessage`; the status bar renders it only while it exists, so Tree layout and the Tree live regions are unchanged.
 
 Agenda editing reuses document history, clipboard operations and persistence scheduling. Decoration work is bounded by mounted rows and each node's text; it adds no disk write or sync. Unmounted rows release their input and geometry references.
 
@@ -1392,41 +1392,33 @@ An abstraction is justified when it provides a clear boundary, improves testabil
 
 ## 21. Module Structure
 
-The implementation may use a structure similar to:
+The source tree has one directory per layer or process. Most modules sit directly in their layer directory; subdirectories exist only where listed:
 
 ```text id="0q0fvr"
 src/
 ├── domain/
-│   ├── model/
-│   ├── operations/
-│   ├── navigation/
-│   └── history/
-│
 ├── application/
-│   └── commands/
-│
+│   └── notes-archive/
 ├── infrastructure/
-│   ├── persistence/
-│   ├── clipboard/
-│   └── attachments/
-│
+│   ├── archive/
+│   ├── main/
+│   └── renderer/
 ├── renderer/
-│   ├── components/
-│   ├── hooks/
-│   └── styles/
-│
+│   └── assets/
 ├── electron/
 │   ├── main/
+│   ├── native/
 │   └── preload/
-│
 ├── web/
-│
-└── shared/
+│   ├── archive/
+│   ├── backup/
+│   ├── public/
+│   └── workers/
+├── shared/
+└── test/
 ```
 
-This is a guideline, not a requirement to create every directory immediately.
-
-The actual structure should reflect the codebase as it evolves.
+`test/` directories under `src/`, `src/application/` and `src/renderer/` hold shared test support. Add a subdirectory when a group of modules needs its own boundary, not in advance.
 
 `caret-projection-state.ts` is the pure renderer-local owner for caret authority, pending caret and Visual placement, mode and focus currency, and the consumed image-focus token. The hook holds one instance rather than separate refs for those facts. Command, completion, pointer and drag adapters call its transitions. One layout-effect pipeline synchronizes authority, projects a changed mode, applies a changed focus and viewport policy, restores Visual endpoints, applies current pending placement, refreshes selection decoration, and reconciles completion, in that explicit order. Commit gates preserve native selection on unrelated renders. Deferred focus work captures the owner's focus token and revision; a later placement, mode change or restored selection invalidates it. DOM input currency and textarea-to-rich replacement remain in `caret-projection-rules.ts`. Replacing a focused textarea retains its directional selection through that same pending-placement owner, using the previous committed focus token. This fallback yields to explicit caret or Visual work and newer focus intents; `NodeInput` never independently restores focus. This follows ADR [0014](decisions/0014-single-owner-for-renderer-interaction-state.md), adds no disk operations or document traversal, and retains one bounded request per placement kind rather than a queue.
 

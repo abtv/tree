@@ -37,7 +37,7 @@ Earlier work: `git show bb427a3:plans/product-spec-refactoring.md` (Appendix A.4
 * Delegated decisions and their principles:
   * The wording of pointer sentences. Principle: one sentence that names the owning document and section.
   * Whether a paragraph is decision material. Principle: a rule needed to choose validation, record evidence, check capabilities or write tests stays in the routed section. Fixture internals, tool internals, dated investigations and per-tool permission mechanics move to `docs/DEVELOPMENT_REFERENCE.md`.
-  * The rule-size budget of Q4. Principle: the budget covers the binding agent rules, `AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`, as one total, because a budget on one file moved growth to another file once already (L2). Until T7 sets the number, a task must not increase that total (T11 in particular).
+  * The rule-size budget of Q4. Principle: the budget covers the binding agent rules, `AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`, as one total, because a budget on one file moved growth to another file once already (L2). Until T7 sets the number, the total is held at 107,102 bytes (commit `0e6517e`): T1 adds 233 bytes for two corrections, T10 must end below that baseline, and T11 must not increase the total it receives.
 * Reserved decisions: any difference in meaning between copies that Q2 does not settle; any deletion outside the Scope Limits; any permission change in `.codex/` or `.claude/settings.json` beyond what T10 needs to keep the documented-command check working.
 
 ## Evidence Labels
@@ -189,7 +189,7 @@ Working-task count: 11 (T0–T8, T10, T11; T4 and T5 may be cancelled). Final ow
 | ID | Outcome | Depends on | Files expected to change | Tier | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | T0 | Investigation: from the session logs of this project, measure separately for Claude Code (`~/.claude/projects/`) and Codex (its session directory, found and reported to the owner) whether agents read the policy and `docs/DEVELOPMENT.md` by section or whole, and how many bytes. Only reading figures enter the report and the repository, never conversation content. | T11 | this plan | Minimal | A table per tool: sessions, files read, ranges, bytes; the command or method behind each number | Planned |
-| T1 | Correct C5–C13, C15 and the wording of C14. Add the omission rule to `docs/AGENT_ROLES.md` §2 so that C7 becomes true. Delete the four one-time advisory acceptances of C16 (Q6). No rule changes. The comment at `scripts/check-requirement-coverage.mts:19` moves to T7, which already changes scripts. | none | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, `docs/AGENT_WORKFLOW.md`, `docs/AGENT_ROLES.md`, `docs/WORKING_WITH_AGENT.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` | Minimal+ | Each row quoted before and after; `npm run check:docs` passes; `AGENTS.md` within its limit | Planned |
+| T1 | Correct C5–C13, C15 and the wording of C14. Add the omission rule to `docs/AGENT_ROLES.md` §2 so that C7 becomes true. Delete the four one-time advisory acceptances of C16 (Q6). No rule changes. The comment at `scripts/check-requirement-coverage.mts:19` moves to T7, which already changes scripts. | none | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, `docs/AGENT_WORKFLOW.md`, `docs/AGENT_ROLES.md`, `docs/WORKING_WITH_AGENT.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` | Minimal+ | Each row quoted before and after; `npm run check:docs` passes; `AGENTS.md` within its limit | Done |
 | T2 | Record the TD-001 evidence of Appendix B and the TD-003 evidence of L6 in `docs/OPEN_QUESTIONS.md`, with basis labels and without a status change. | none | `docs/OPEN_QUESTIONS.md` | Minimal | Each new evidence line names its commit or command | Planned |
 | T3 | One owner per duplicated rule: resolve D1, D2, D9–D12, U1 and U2 by the Q2 answers; replace the restatements of D3–D8 outside the owner with one pointer sentence each. Apply Q5: delete the token-measurement sentence (U5); name the Product Owner as the actor of the two manual checks of U6 and list them in the owner-involvement inventory of procedure §8. | T11 | `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `AGENTS.md`, `docs/WORKING_WITH_AGENT.md`, `docs/AGENT_ROLES.md`, `e2e/electron/AGENTS.md`, `plans/README.md` | Minimal+ | For each D row, the one remaining full statement and its pointers; `npm run check:docs -- --verbatim <ref> --file <file>` for each file, with every removed unit found in the owner text or listed for the owner | Planned |
 | T4 | Move the L3 material out of `docs/DEVELOPMENT.md` §9 and the restructuring tooling out of §12 into `docs/DEVELOPMENT_REFERENCE.md`, verbatim, with one pointer sentence per source section. Retarget every citation, including the error messages at `scripts/check-docs.mts:122,128`. | T0, T3 | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, citing documents, `scripts/check-docs.mts` and its test | Low (`npm run check`) | Lost-text proof by the Git method of the earlier plan; section sizes before and after | Planned |
@@ -289,10 +289,25 @@ The questions as proposed:
 * `check:docs` ignores `*.md` in formatting (`.prettierignore`), validates link targets but not anchors, and checks only its live-document list (U7).
 * The earlier plan's lost-text method applies to T3–T5: every line removed from a file (`git diff --unified=0`) must occur in the destination file, except retargeted citations.
 * `AGENTS.md` has 2,471 bytes of headroom under its limit. T1, T3 and T6 must fit in it.
+* T1 results (2026-11-21):
+  * C5: the editing-mode paragraph of `docs/DEVELOPMENT.md` §8 names every spec file under `e2e/`.
+  * C6: five citations in `docs/DEVELOPMENT.md` (§8 defect-first rules and coverage policy, §9 rendering-sensitive change, §11 plan contents, §12 boundary list, §16 plan locations) and one in `docs/WORKING_WITH_AGENT.md` now name procedure §8 or §9. The comment at `scripts/check-requirement-coverage.mts:19` is left for T7.
+  * C7: `docs/AGENT_ROLES.md` §2 states the omission rule that the planner adapters cite.
+  * C8: `docs/AGENT_ROLES.md` §§1 and 5 cite the Open Questions rules of procedure §5, which now name the product researcher.
+  * C9: the verifier command list cites `docs/DEVELOPMENT.md` §§8–9 and no longer says "lint".
+  * C10: `docs/ARCHITECTURE.md` §8 names `activeAgendaOccurrence`.
+  * C11: `docs/ARCHITECTURE.md` §21 shows the actual directories (`find src -mindepth 1 -maxdepth 2 -type d`).
+  * C12: the sentence about creating the ADR directory is deleted from procedure §8.
+  * C13: `docs/AGENT_ROLES.md` §7 cites commit `5cabe49` instead of PD-007.
+  * C14: `docs/DEVELOPMENT.md` §§3 and 9 and procedure §12 state that the CI attribution check runs only on pull requests.
+  * C15: the three empty gaps are closed.
+  * C16 (Q6): the three acceptances in `docs/DEVELOPMENT_REFERENCE.md` §1 and the one in `docs/DEVELOPMENT.md` §12 are deleted; the standing `test:e2e:linux` authorization and the Electron 45 note stay.
+  * Rule total (`AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`): 107,102 bytes before, 107,335 after T1 (+233, the two sentences of C7 and C8).
+  * Validation: `npm run check:docs`, `npm run check:opencode` and `npm run format:check:changed` passed.
 
 ## Next Task
 
-T1.
+T2.
 
 ## Next-Session Prompt
 
