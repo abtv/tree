@@ -7,15 +7,12 @@ The source is `abtv/tree`; the application destination is
 
 ## Release checks
 
-The release workflow verifies the successful source validation run, including code
-checks, the high-severity dependency audit and Chromium production-build tests on
-Linux for the same source commit. It reuses that run's tested browser artifact
-instead of repeating those checks.
+The release workflow verifies the successful source validation run for the same
+source commit. It reuses that run's tested browser artifact instead of repeating
+its checks, which are listed under [GitHub Actions](../../docs/DEVELOPMENT_REFERENCE.md#github-actions).
 Failed, missing, skipped or canceled checks block publication.
-Full Linux/macOS Electron E2E and Linux Electron memory measurements also gate new release versions and retain weekly/manual runs.
-The memory suite enforces sampled growth and footprint budgets; see [detection limits](../../docs/DEVELOPMENT.md#what-the-memory-suite-can-detect). Timing suites stay local.
-Linux/macOS smoke, including Safari smoke, gate every release. Demo also waits for
-successful validation. Property soak and mutation testing remain separate.
+The memory suite enforces sampled growth and footprint budgets; see [detection limits](../../docs/DEVELOPMENT.md#what-the-memory-suite-can-detect).
+Demo also waits for successful validation.
 Playwright's Chromium on Linux arm64 is the current browser gate; Google Chrome,
 Full Safari E2E and browser parity remain later work. The source demo workflow keeps
 publishing to its existing media site.
@@ -288,18 +285,12 @@ but target deployment failed, follow the target-run link, rerun failed jobs ther
 retry the source Web job. The App remains Contents-only; it cannot rerun target Actions.
 The source authenticates the existing transferred package and never retransfers the same
 version. When an E2E or other validation prerequisite fails in `Test and build app`,
-use **Re-run failed jobs**; the release gate verifies and reuses the successful
-browser job's immutable artifact for the same source SHA. If only publication dispatch
-fails after the gate succeeded, rerun all jobs. Missing or expired artifacts require
-rerunning their producer and dependent jobs, or all jobs. See the
-[validation retry procedure](../../docs/releasing.md#signing-and-packaging).
+follow the [validation retry procedure](../../docs/releasing.md#signing-and-packaging).
 
 Both platforms share the immutable `v<version>` tag reserved before either publishes.
 Web candidate checks, preflight and transfer require that tag to match the validated
-source. Later same-version commits do not start release suites or publication merely
-because Web is behind. Retries retain the original source and artifacts; current-main
-checks still reject an old source after main advances. In that case, recover with a
-new version rather than reusing the old number for different code.
+source. Tag reservation, same-version skips and recovery after main advances follow
+[macOS releases, Create a release](../../docs/releasing.md#create-a-release).
 
 After modifying trusted target workflow/scripts, copy and commit the reviewed files again. The
 setup commit itself does not publish a package; a later valid transfer does.

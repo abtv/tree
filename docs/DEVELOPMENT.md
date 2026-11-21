@@ -938,42 +938,25 @@ For this downgrade only, the owner accepted the isolated import-preparation timi
 
 ### Preparing a macOS release
 
-Commit the intended application changes, then run this command from the repository root:
+Commit the intended application changes, then create the version commit as described in [macOS releases, Create a release](releasing.md#create-a-release).
 
-```bash
-npm run release
-```
-
-The command requires a clean working tree on a branch. It increments patch in `package.json` and both root version fields in `package-lock.json`, then creates `chore(release): bump version to <version>`. `make release` runs the same default patch bump. For minor or major use `make release minor` or `make release major`, equivalent to `npm run release -- minor` or `npm run release -- major`. The earlier `BUMP=minor` and `BUMP=major` forms remain supported.
-
-It runs no tests, accesses no remote, creates no tags and pushes nothing. A rejected commit hook leaves the version changes staged for inspection and an ordinary commit; rerunning the command refuses the dirty tree rather than bumping again. Use `npm run release -- --help` or `make release BUMP=--help` for usage without side effects.
-
-Push or merge the version commit to main normally. `Test and build app` runs checks,
-audit and platform smoke, plus browser E2E, Linux/macOS Electron E2E and Linux Electron
-memory measurements for a new release version. After success, publication is dispatched only
-when the version is eligible for that source commit. Eligibility compares the checked
-package version and SHA with the shared version tag and platform release state, not
-the previous push. If a version-bump push fails validation before tag reservation,
-a later successful push can release that same version without another bump. Once
-reserved, only the tagged source can be retried; later same-version pushes skip release
-suites and publication. Current-main checks still apply, so recovery after main advances
-requires a new version. Tags and transferred web versions prevent duplicate releases.
-Web transfer still requires a version greater than
-the last transferred release and rechecks it against the exact hosting parent before writing.
+Push or merge the version commit to main normally. `Test and build app` runs the release gate
+listed under [GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions). After success, publication is dispatched only
+when the version is eligible for that source commit; eligibility, tag reservation, same-version
+skips and recovery after main advances follow [macOS releases, Create a release](releasing.md#create-a-release).
 The combined `Release new app version` verifies the completed main validation run, SHA and
 attempt, reserves the common immutable tag, then runs independent Web and macOS branches. The Web job waits for deployment
 and verifies hosted bytes. The macOS branch reserves an owned draft, signs its installer,
 checks the application copied from that DMG on a fresh runner without signing secrets,
 and uploads the original signer artifact from a separate runner after SHA-256 verification.
 That runner publishes the complete release only after GitHub asset digests match the signer outputs.
-It does not rerun standard validation. Failed-only release retries keep successful
-work. A failed target deployment requires manual retry through the target-run link; App
+It does not rerun standard validation. A failed target deployment requires manual retry through the target-run link; App
 permissions remain unchanged. See [macOS releases](releasing.md) and
 [Browser publication](../deployment/github-pages/README.md) for recovery and trust details.
 
-A new version must exceed all valid semantic-version `v*` tags and release versions, including drafts, or be the first release. Build metadata does not change precedence. An obsolete version or superseded main commit is skipped without writes. A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Reservation, upload and automatic publication are serialized across versions. The owner selects releases through the local version command. Full release, retry and signing details are in [macOS releases](releasing.md).
+Version precedence and the skip of obsolete versions and superseded main commits follow [macOS releases, Create a release](releasing.md#create-a-release). A new candidate creates an immutable tag at the checked SHA and a draft, then builds, signs and notarizes the DMG and verifies the packaged application. Reservation, upload and automatic publication are serialized across versions. The owner selects releases through the local version command. Full release, retry and signing details are in [macOS releases](releasing.md).
 
-The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; CI requires full Electron coverage across Linux and macOS and the Linux memory suite for a new release version. The memory suite's detection limits are described under [What the memory suite can detect](#what-the-memory-suite-can-detect).
+The local version command remains owner-invoked and approval-gated in coding agents. Keep the `v*` tag ruleset restricting updates and deletions. Manual tag pushes no longer trigger macOS builds. Local timing and functional suites remain governed by change risk; the CI release gate is listed under [GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions). The memory suite's detection limits are described under [What the memory suite can detect](#what-the-memory-suite-can-detect).
 
 Optional, approval-required [local Safari comparisons](../src/web/README.md#local-safari-performance-comparisons)
 are separate from the automatic validation workflows and ordinary Electron suite.

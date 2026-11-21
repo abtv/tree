@@ -102,12 +102,12 @@ The container's network restriction applies to test execution. It does not disab
 ### GitHub Actions
 
 On each PR and push to main, `Test and build app` runs code/documentation/unit checks
-alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
+alongside one high-severity dependency audit. After both succeed, Linux/macOS smoke runs on every change.
 After both platform smoke jobs succeed, browser E2E, full Electron coverage across Linux
 and macOS, and Linux Electron memory tests run in parallel when the main push has an
 unpublished release version. A failed smoke job prevents these release suites from starting.
-An existing version tag on another commit makes the push ineligible, even when Web
-is behind macOS; ordinary checks and smoke still run.
+Release eligibility follows the tag rules in [macOS releases](releasing.md#create-a-release);
+an ineligible push still runs ordinary checks and smoke.
 Browser E2E also
 runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
 job requires checks, audit, version detection and smoke to succeed, plus browser E2E,
@@ -125,16 +125,11 @@ The source Web job waits for target deployment and checks every hosted byte.
 
 The built-in source token gets Actions write only in the publication dispatcher, to start
 these two source workflows. The cross-repository publishing App remains Contents-only.
-A failed target deployment requires the owner's retry through the link in the source job.
-Retry failed release jobs afterward; do not retransfer a completed version.
-Use **Re-run failed jobs** after an E2E or validation-prerequisite failure. The release gate reuses
-the successful browser job's immutable artifact ID, verifies its original identity
-and bytes, and preserves the package with the current attempt's provenance.
-Missing or expired artifacts require rerunning the producer and dependent jobs or all jobs.
-If only publication dispatch failed after the gate succeeded, rerun all jobs to renew
-the gate and package for the new attempt.
+Failed-job retries and validation-artifact reuse are described in [macOS releases](releasing.md#signing-and-packaging);
+a failed target deployment follows the recovery in [Browser publication](../deployment/github-pages/README.md).
 
 Scheduled/manual dependency audits and Electron E2E/memory suites retain separate runs.
+Property soak and mutation testing remain separate.
 Timing suites stay local. New source validation cancels superseded validation, but release
 publication is serialized without canceling in-flight work. Required checks and artifacts
 must remain available; an expired artifact or changed validation attempt fails closed.

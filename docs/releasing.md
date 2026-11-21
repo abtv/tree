@@ -14,9 +14,14 @@ Commit reviewed changes, then prepare the next patch version locally:
 npm run release
 ```
 
-The command updates package.json and package-lock.json and creates a version
-commit. It runs no tests, makes no network requests and creates no tag.
-Optional `-- minor` and `-- major` select those increments. Push or merge the
+The command requires a clean working tree on a branch. It increments patch in
+`package.json` and both root version fields in `package-lock.json`, then creates
+`chore(release): bump version to <version>`. It runs no tests, makes no network
+requests, creates no tag and pushes nothing. A rejected commit hook leaves the
+version changes staged for inspection and an ordinary commit; rerunning the
+command refuses the dirty tree rather than bumping again. Optional `-- minor` and
+`-- major` select those increments. Use `npm run release -- --help` or
+`make release BUMP=--help` for usage without side effects. Push or merge the
 commit into `main` using the normal development workflow.
 
 The Make shortcut accepts the same increments:
@@ -30,8 +35,8 @@ make release major
 `make release patch` selects patch explicitly. The earlier `BUMP=minor` and
 `BUMP=major` forms remain supported.
 
-The `Test and build app` main workflow runs code checks, audit, browser and Linux/macOS Electron E2E, Linux Electron memory measurements, and
-Linux/macOS smoke once. After success it dispatches the versioned release, whose
+The `Test and build app` main workflow runs the release gate listed under
+[GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions). After success it dispatches the versioned release, whose
 shared gate reserves the immutable `v<version>` tag at the checked commit before
 Web and macOS branches run independently. The macOS branch calls
 `create-macos-release-draft.yml`.
@@ -43,11 +48,18 @@ every downstream desktop job checks out the exact validated source SHA.
 
 A new lightweight `v<version>` tag is reserved by the shared gate only for a version
 higher than all existing valid SemVer tags and releases, or the first version.
+Build metadata does not change precedence.
 It must also exceed the latest transferred Web version, including legacy Web-only
-releases without a tag.
+releases without a tag. Web transfer rechecks it against the exact hosting parent
+before writing.
+Eligibility compares the checked package version and SHA with the shared version
+tag and platform release state, not the previous push. If a version-bump push fails
+validation before tag reservation, a later successful push can release that same
+version without another bump.
 The macOS branch creates its owned draft using that same tag and source SHA.
 Drafts reserve their numbers too. Later same-version commits and older versions skip
-all release suites and publication, even if Web is behind. New reservations require the source still to be current
+all release suites and publication, even if Web is behind. An obsolete version or
+superseded main commit is skipped without writes. New reservations require the source still to be current
 main. The combined release concurrency group serializes shared tag reservation and
 both platforms; the desktop group also serializes draft reservations and uploads.
 Arbitrary external tag pushes and manual draft publication are outside that lock.
@@ -119,7 +131,7 @@ The successful source workflow already checked code and audited its lockfile.
 Desktop preparation does not repeat formatting, lint, type checks, ordinary
 tests, audit or development Electron smoke. It installs the same locked
 dependencies, builds the checked source and verifies the newly packaged artifact.
-Full Linux/macOS Electron E2E and Linux Electron memory measurements gate every new release version in the source workflow.
+The source workflow's release gate is listed under [GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions).
 The memory suite enforces sampled memory-growth and footprint budgets and verifies its detector with retained allocations.
 See [memory detection limits](DEVELOPMENT.md#what-the-memory-suite-can-detect).
 Local E2E and timing suites follow the development change-risk rules. No dependency upgrades are automatic.
