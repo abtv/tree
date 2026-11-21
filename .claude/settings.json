@@ -109,7 +109,6 @@
     ],
     "ask": [
       "Bash(git push*)",
-      "Bash(npm run release*)",
       "Bash(npm install*)",
       "Bash(npm i *)",
       "Bash(npm ci*)",
@@ -118,6 +117,14 @@
       "Bash(rm -rf*)"
     ],
     "deny": [
+      "Bash(npm run release)",
+      "Bash(npm run release *)",
+      "Bash(make release)",
+      "Bash(make release *)",
+      "Bash(gh release*)",
+      "Bash(gh workflow run release-new-app-version*)",
+      "Bash(gh workflow run 'Release new app version'*)",
+      "Bash(gh workflow run \"Release new app version\"*)",
       "Bash(python*)",
       "Bash(node)",
       "Bash(node *)",

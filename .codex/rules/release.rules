@@ -1,0 +1,44 @@
+# Only the Product Owner runs a release; agents never start one or any of its parts.
+# These prefixes cover the local version command, its Make shortcut, the command-line entry
+# points of the release and web-publication scripts, and the GitHub CLI release operations.
+# A prefix rule matches argv tokens, so other spellings (another runner, a different working
+# directory) are not covered; the rule is a guardrail, not a sandbox.
+prefix_rule(
+    pattern = ["npm", "run", "release"],
+    decision = "forbidden",
+    justification = "The Product Owner runs releases manually; agents never run the version command.",
+    match = ["npm run release", "npm run release -- minor", "npm run release -- --help"],
+    not_match = ["npm run test", "npm run check"],
+)
+
+prefix_rule(
+    pattern = ["make", "release"],
+    decision = "forbidden",
+    justification = "The Product Owner runs releases manually; agents never run the version command.",
+    match = ["make release", "make release major", "make release BUMP=--help"],
+    not_match = ["make test-smoke", "make setup"],
+)
+
+prefix_rule(
+    pattern = ["node", ["scripts/release-tag.mts", "scripts/release-draft.mts", "scripts/release-artifact.mts", "scripts/publication.mts", "scripts/web-release/cli.mts", "scripts/web-release/cli.mjs", "scripts/web-release/publish.mts", "scripts/web-release/publish.mjs", "scripts/web-release/status.mts", "scripts/web-release/verify-target.mts", "scripts/web-release/verify-target.mjs", "scripts/web-release/version.mts"]],
+    decision = "forbidden",
+    justification = "Release and publication scripts run only in release CI or by the Product Owner.",
+    match = ["node scripts/release-tag.mts minor", "node scripts/release-draft.mts publish", "node scripts/web-release/publish.mts transfer"],
+    not_match = ["node scripts/check-docs.mts", "node scripts/fix-history.mts"],
+)
+
+prefix_rule(
+    pattern = ["gh", "release"],
+    decision = "forbidden",
+    justification = "GitHub releases are created, edited and published only by release CI or the Product Owner.",
+    match = ["gh release create v1.0.0", "gh release delete v1.0.0"],
+    not_match = ["gh run list", "gh pr view 1"],
+)
+
+prefix_rule(
+    pattern = ["gh", "workflow", "run", ["release-new-app-version.yml", "Release new app version"]],
+    decision = "forbidden",
+    justification = "Release dispatch belongs to validated main CI or the Product Owner.",
+    match = ["gh workflow run release-new-app-version.yml", "gh workflow run 'Release new app version'"],
+    not_match = ["gh workflow run run-electron-e2e-tests.yml", "gh workflow list"],
+)

@@ -6,6 +6,7 @@ import {
   CODEX_OWNER_ONLY_SCRIPTS,
   CODEX_SANDBOX_SCRIPTS,
   codexExplicitlyAllows,
+  codexForbids,
   codexScriptArguments,
   declaredCodexRules,
 } from './codex-rules.mts'
@@ -31,9 +32,8 @@ it('covers every package workflow with repository approval or an explicit exempt
 
   for (const name of exemptions) expect(name in scripts, `Stale permission exemption: ${name}`).toBe(true)
   for (const name of CODEX_OWNER_ONLY_SCRIPTS) {
-    expect(codexExplicitlyAllows(rules, ['npm', 'run', name]), `Publishing must remain approval-gated: ${name}`).toBe(
-      false,
-    )
+    expect(codexExplicitlyAllows(rules, ['npm', 'run', name]), `Owner-only workflow is allowed: ${name}`).toBe(false)
+    expect(codexForbids(rules, ['npm', 'run', name]), `Owner-only workflow must be forbidden: ${name}`).toBe(true)
   }
 
   for (const name of Object.keys(scripts)) {

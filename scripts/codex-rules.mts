@@ -4,7 +4,7 @@ export type CodexRule = { pattern: (string | string[])[]; decision: string }
 
 // Lifecycle hooks run through their parent npm workflow rather than as standalone commands.
 export const CODEX_LIFECYCLE_SCRIPTS = ['postinstall', 'prepare', 'predev', 'prestart', 'pretest:web:built'] as const
-// Publishing stays owner-invoked or explicitly approved; never grant it a standing host allowance.
+// Only the Product Owner runs a release; `.codex/rules/release.rules` forbids it to agents.
 export const CODEX_OWNER_ONLY_SCRIPTS = ['release'] as const
 // Ordinary repository tooling runs in the workspace sandbox and needs no standing host allowance.
 export const CODEX_SANDBOX_SCRIPTS = [
@@ -71,6 +71,17 @@ export function codexExplicitlyAllows(rules: readonly CodexRule[], args: readonl
     ),
   )
   return matching.length > 0 && matching.every((rule) => rule.decision === 'allow')
+}
+
+// Whether a literal rule forbids the command; Codex applies the most restrictive matching decision.
+export function codexForbids(rules: readonly CodexRule[], args: readonly string[]) {
+  return rules.some(
+    (rule) =>
+      rule.decision === 'forbidden' &&
+      rule.pattern.every((part, index) =>
+        typeof part === 'string' ? part === args[index] : part.some((value) => value === args[index]),
+      ),
+  )
 }
 
 // The arguments Codex receives for `npm run <name>`; the scratch rule requires its task separator.

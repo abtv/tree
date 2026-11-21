@@ -1,11 +1,18 @@
 import { readFile } from 'node:fs/promises'
 
 import { claudeDecision, claudeRunsOutsideSandbox, readClaudeSettings } from './claude-permissions.mts'
-import { CODEX_LIFECYCLE_SCRIPTS, codexPermitsScript, declaredCodexRules } from './codex-rules.mts'
+import {
+  CODEX_LIFECYCLE_SCRIPTS,
+  codexForbids,
+  codexPermitsScript,
+  codexScriptArguments,
+  declaredCodexRules,
+} from './codex-rules.mts'
 import {
   DEVELOPMENT_DOCUMENTS,
   documentedNpmWorkflows,
   findWorkflowApprovalIssues,
+  type ToolDecision,
 } from './documented-npm-workflows.mts'
 
 // Checks that the Claude Code and Codex configurations keep the approval boundaries the development
@@ -17,7 +24,16 @@ let checked = 0
 
 const claude = readClaudeSettings()
 const codexRules = declaredCodexRules()
-const claudePermits = (command: string) => ['allow', 'sandbox'].includes(claudeDecision(claude, command))
+const claudeDecide = (command: string): ToolDecision => {
+  const decision = claudeDecision(claude, command)
+  if (decision === 'deny') return 'denied'
+  return decision === 'ask' ? 'prompt' : 'permitted'
+}
+const codexDecide = (command: string): ToolDecision => {
+  const name = command.slice('npm run '.length)
+  if (codexForbids(codexRules, codexScriptArguments(name))) return 'denied'
+  return codexPermitsScript(codexRules, name) ? 'permitted' : 'prompt'
+}
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
   scripts: Record<string, string>
@@ -37,13 +53,34 @@ const documentedWorkflows = documentedNpmWorkflows(developmentDocuments)
 for (const command of documentedWorkflows) {
   if (!packageWorkflows.includes(command)) issues.push(`documented workflow ${command} is not a package.json script`)
 }
-issues.push(...findWorkflowApprovalIssues('Claude Code', packageWorkflows, claudePermits))
-issues.push(
-  ...findWorkflowApprovalIssues('Codex', packageWorkflows, (command) =>
-    codexPermitsScript(codexRules, command.slice('npm run '.length)),
-  ),
-)
+issues.push(...findWorkflowApprovalIssues('Claude Code', packageWorkflows, claudeDecide))
+issues.push(...findWorkflowApprovalIssues('Codex', packageWorkflows, codexDecide))
 checked += documentedWorkflows.length + packageWorkflows.length * 2
+
+// Only the Product Owner runs a release. Every local entry point into the release or its parts is
+// denied in both tools, including argument forms, the Make shortcut, direct script runs and the
+// GitHub CLI release operations.
+const ownerOnlyCommands = [
+  'npm run release',
+  'npm run release -- minor',
+  'npm run release -- --help',
+  'make release',
+  'make release major',
+  'make release BUMP=--help',
+  'node scripts/release-tag.mts',
+  'node scripts/release-draft.mts publish',
+  'node scripts/release-artifact.mts verify',
+  'node scripts/publication.mts dispatch',
+  'node scripts/web-release/cli.mts prepare',
+  'node scripts/web-release/publish.mts transfer',
+  'gh release create v1.0.0',
+  'gh workflow run release-new-app-version.yml',
+]
+for (const command of ownerOnlyCommands) {
+  if (claudeDecision(claude, command) !== 'deny') issues.push(`Claude Code must deny owner-only command ${command}`)
+  if (!codexForbids(codexRules, command.split(' '))) issues.push(`Codex must forbid owner-only command ${command}`)
+  checked += 2
+}
 
 // Named host checks need both a Bash allowance and a sandbox exclusion in Claude Code, and the
 // exclusion must not extend to lookalike names.

@@ -8,7 +8,7 @@ explicitly increasing the version; ordinary commits do not release a new desktop
 
 ## Create a release
 
-Commit reviewed changes, then prepare the next patch version locally:
+Only the Product Owner runs a release; coding agents do not run it, and their tool configuration denies the release commands. Commit reviewed changes, then prepare the next patch version locally:
 
 ```bash
 npm run release

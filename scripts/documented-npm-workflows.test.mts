@@ -22,19 +22,22 @@ describe('documented npm workflows', () => {
 
   it('fails a workflow named only in the reference document when the tool does not permit it', () => {
     const workflows = documentedNpmWorkflows(['Run `npm run check`.', 'Use `npm run test:e2e:linux`.'])
-    const permitted = new Set(['npm run check'])
 
-    const issues = findWorkflowApprovalIssues('Codex', workflows, (command) => permitted.has(command))
+    const issues = findWorkflowApprovalIssues('Codex', workflows, (command) =>
+      command === 'npm run check' ? 'permitted' : 'prompt',
+    )
 
-    expect(issues).toEqual(['Codex: documented workflow npm run test:e2e:linux must retain its approval boundary'])
+    expect(issues).toEqual(['Codex: documented workflow npm run test:e2e:linux must run without a new approval'])
   })
 
-  it('requires the release workflow to stay approval-gated', () => {
+  it('accepts only a denial for the owner-only release workflow', () => {
     const workflows = documentedNpmWorkflows(['Run `npm run release`.'])
 
-    expect(findWorkflowApprovalIssues('Claude Code', workflows, () => false)).toEqual([])
-    expect(findWorkflowApprovalIssues('Claude Code', workflows, () => true)).toEqual([
-      'Claude Code: documented workflow npm run release must retain its approval boundary',
-    ])
+    expect(findWorkflowApprovalIssues('Claude Code', workflows, () => 'denied')).toEqual([])
+    for (const decision of ['prompt', 'permitted'] as const) {
+      expect(findWorkflowApprovalIssues('Claude Code', workflows, () => decision)).toEqual([
+        'Claude Code: owner-only workflow npm run release must be denied to agents',
+      ])
+    }
   })
 })
