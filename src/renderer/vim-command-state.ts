@@ -27,7 +27,7 @@ export type VimVisualMemory =
  * behavior is unit-testable without a browser.
  */
 export interface VimCommandState {
-  /** Desired text-relative x for consecutive Normal motions in either view or Tree character Visual. */
+  /** Desired text-relative x for consecutive Normal motions and character Visual motions in either view. */
   verticalGoal?:
     | {
         nodeId: string

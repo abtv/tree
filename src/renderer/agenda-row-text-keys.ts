@@ -11,7 +11,12 @@ export interface RowTextKeyContext {
   vim: VimTextCommandState | undefined
   text: string
   caret: RowCaret
-  setCaret: (caret: RowCaret) => void
+  setCaret: (caret: RowCaret, revealLine?: boolean) => void
+  /**
+   * The offset `steps` displayed lines above or below `focus` in this row, clamped at its first and
+   * last line; absent where the row's line geometry cannot be measured.
+   */
+  visualLine?: ((focus: number, direction: 'up' | 'down', steps: number) => number) | undefined
   /** Writes plain text to the system clipboard. */
   copy: (text: string) => void
   /** The platform's primary-modifier profile; Apple conventions when absent. */
@@ -114,6 +119,13 @@ export function handleRowTextKey(context: RowTextKeyContext): boolean {
   if (isTextMotion(key)) {
     clearPending(commandState)
     motion(key, count)
+    return true
+  }
+  if (visual && context.visualLine !== undefined && ['j', 'k', 'J', 'K'].includes(key)) {
+    clearPending(commandState)
+    const direction = key.toLowerCase() === 'j' ? 'down' : 'up'
+    const focus = context.visualLine(caret.focus, direction, count * (key === 'J' || key === 'K' ? 10 : 1))
+    setCaret(clampCaret({ key: caret.key, anchor: caret.anchor, focus }, text, mode), true)
     return true
   }
   if (key === 'v') {

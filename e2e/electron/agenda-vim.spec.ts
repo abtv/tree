@@ -93,6 +93,55 @@ test('walks wrapped visual lines with j and k before crossing Agenda nodes', asy
   await window.screenshot({ path: testInfo.outputPath('agenda-wrapped-vertical-arrival-dark.png') })
 })
 
+// @requirement PRODUCT.md §20.2.20
+// @requirement PRODUCT.md §23.4
+test('extends character Visual by displayed line within a multi-line Agenda entry', async ({
+  userDataDir,
+}, testInfo) => {
+  const text = `2026-10-10 ${'Wrapped selection words. '.repeat(60)}`
+  seedDocument(userDataDir, {
+    document: { roots: [node('wrapped', text), node('next', '2026-10-10 Next')] },
+    location: { currentParentId: null, selectedNodeId: 'wrapped' },
+  })
+  const { window } = await launchTree(userDataDir)
+  const selectedText = (): Promise<string> => window.evaluate(() => getSelection()?.toString() ?? '')
+  const wrappedRow = row(window, nodeKey(10, 10, 'wrapped'))
+
+  await openAndSelect(window, nodeKey(10, 10, 'wrapped'))
+  const input = window.getByRole('textbox', { name: 'Agenda node wrapped', exact: true })
+  await window.keyboard.press('0')
+  await window.keyboard.press('j')
+  const secondLine = await caretOffset(input)
+  await window.keyboard.press('k')
+
+  await expect.poll(() => caretOffset(input)).toBe(0)
+  expect(secondLine).toBeGreaterThan(0)
+
+  await window.keyboard.press('v')
+  await window.keyboard.press('j')
+
+  await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+  await expect.poll(selectedText).toBe(text.slice(0, secondLine + 1))
+  await expect(wrappedRow).toHaveAttribute('aria-selected', 'true')
+  await window.screenshot({ path: testInfo.outputPath('agenda-visual-wrapped-selection.png') })
+
+  await window.keyboard.press('k')
+
+  await expect.poll(selectedText).toBe(text.slice(0, 1))
+
+  await window.keyboard.type('9J')
+  const clamped = await selectedText()
+
+  expect(clamped.length).toBeGreaterThan(secondLine + 1)
+
+  await window.keyboard.press('j')
+
+  await expect(input).toBeFocused()
+  await expect(wrappedRow).toHaveAttribute('aria-selected', 'true')
+  expect(await selectedText()).toBe(clamped)
+  await window.screenshot({ path: testInfo.outputPath('agenda-visual-wrapped-bottom.png') })
+})
+
 // @requirement PRODUCT.md §23.4
 test('counted wrapped motion measures windowed Agenda destinations like repeated motion', async ({ userDataDir }) => {
   seedDocument(userDataDir, {

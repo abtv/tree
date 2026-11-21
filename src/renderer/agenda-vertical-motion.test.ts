@@ -157,6 +157,60 @@ it('restarts the desired column at zero after leaving an image during a count', 
   expect(caret).toEqual({ cursor: 30, imageActive: false })
 })
 
+// @requirement PRODUCT.md §20.2.20
+// @requirement PRODUCT.md §23.4
+it('moves the character Visual endpoint by displayed line within a row without an editor', async () => {
+  const f = await fixture()
+  const selected = f.rows[0]!
+  let caret = { key: selected.key, anchor: 5, focus: 5 }
+  const set = vi.fn((next: typeof caret) => {
+    caret = next
+  })
+  const rowText: AgendaRowText = {
+    textOf: () => f.input.value,
+    hasEditor: () => false,
+    caret: () => caret,
+    setCaret: set,
+    copy: vi.fn(),
+  }
+  const handler = createAgendaKeyDownHandler({
+    store: f.store,
+    vim: f.vim,
+    rowText,
+    measureRow: () => ({
+      position: (offset) => ({ top: Math.floor(offset / 10) * 20, left: (offset % 10) * 8 }),
+      dispose: vi.fn(),
+    }),
+  })
+  const press = (key: string) => handler({ key, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
+  f.vim.mode = 'visual'
+
+  press('j')
+
+  expect(caret).toEqual({ key: selected.key, anchor: 5, focus: 15 })
+  expect(set).toHaveBeenLastCalledWith({ key: selected.key, anchor: 5, focus: 15 }, true)
+
+  press('9')
+  press('j')
+
+  expect(caret).toEqual({ key: selected.key, anchor: 5, focus: 35 })
+
+  press('j')
+
+  expect(caret).toEqual({ key: selected.key, anchor: 5, focus: 35 })
+  expect(f.snapshot().agenda?.selectedKey).toBe(selected.key)
+
+  press('k')
+
+  expect(caret.focus).toBe(25)
+
+  press('K')
+
+  expect(caret).toEqual({ key: selected.key, anchor: 5, focus: 5 })
+  expect(f.snapshot().agenda?.selectedKey).toBe(selected.key)
+  expect(f.vim.mode).toBe('visual')
+})
+
 it('uses local caret state and line reveal for a wrapped row without an editor', async () => {
   const f = await fixture()
   const selected = f.rows[0]!

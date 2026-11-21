@@ -718,12 +718,8 @@ export function handleVimKey(
       setSelectionRange(input, cursor, cursor)
       vim.setMode('visual-node')
     }
-  } else if (
-    visual &&
-    snapshot.status === 'ready' &&
-    snapshot.agenda === undefined &&
-    ['j', 'k', 'J', 'K'].includes(event.key)
-  ) {
+  } else if (visual && snapshot.status === 'ready' && ['j', 'k', 'J', 'K'].includes(event.key)) {
+    // Tree and an Agenda direct match share display-line Visual motion confined to the node's text.
     const direction = event.key.toLowerCase() === 'j' ? 'down' : 'up'
     if (input.getBoundingClientRect().width === 0) return handled()
     const measured = visualTextGeometry(input)

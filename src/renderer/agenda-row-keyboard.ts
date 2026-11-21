@@ -309,18 +309,62 @@ export function createAgendaKeyDownHandler({
       clearPending(vim.commandState)
       return
     }
-    const rowTextKey = (): boolean =>
-      rowText !== undefined &&
-      !rowText.hasEditor(row) &&
-      handleRowTextKey({
+    // Character Visual j/k over a row without an editor move by displayed line within that row.
+    const rowVisualLine = (text: string, focus: number, direction: 'up' | 'down', steps: number): number => {
+      const measured = measureRow(
+        row,
+        text,
+        focusedAgendaDay(state.agenda) !== undefined,
+        row.kind === 'node' ? requireNode(state.document, row.nodeId).node : undefined,
+        state.agenda!.today,
+      )
+      if (measured === undefined) return focus
+      try {
+        const viewportWidth = document.documentElement.clientWidth
+        const goal = vim?.commandState.verticalGoal
+        const left =
+          goal?.agendaKey === row.key &&
+          goal.cursor === focus &&
+          goal.text === text &&
+          goal.viewportWidth === viewportWidth &&
+          goal.focusToken === state.focus.token
+            ? goal.left
+            : measured.position(focus).left
+        let target = focus
+        for (let step = 0; step < steps; step += 1) {
+          const next = visualLineCursor(text, measured.position, target, direction, left)
+          if (next === undefined) break
+          target = next
+        }
+        if (vim !== undefined)
+          vim.commandState.verticalGoal = {
+            nodeId: row.kind === 'node' ? row.nodeId : state.location.selectedNodeId,
+            agendaKey: row.key,
+            cursor: target,
+            left,
+            viewportWidth,
+            text,
+            focusToken: state.focus.token,
+          }
+        return target
+      } finally {
+        measured.dispose()
+      }
+    }
+    const rowTextKey = (): boolean => {
+      if (rowText === undefined || rowText.hasEditor(row)) return false
+      const text = rowText.textOf(row)
+      return handleRowTextKey({
         event,
         vim,
-        text: rowText.textOf(row),
+        text,
         caret: rowText.caret(),
         setCaret: rowText.setCaret,
+        visualLine: (focus, direction, steps) => rowVisualLine(text, focus, direction, steps),
         copy: rowText.copy,
         shortcuts,
       })
+    }
     // Ctrl+D/U/O/R stay Vim commands where Ctrl is the primary modifier; the app has no such Cmd shortcut.
     const vimCtrl = event.ctrlKey && !event.metaKey && !event.altKey && isVimCtrlKey(event.key)
     if (shortcuts.isPrimary(event) && !vimCtrl) {
