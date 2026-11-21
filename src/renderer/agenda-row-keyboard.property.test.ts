@@ -131,7 +131,12 @@ it('carries the original column through a short contextual row during counted na
       document.body.append(input)
       setCaret(input, cursor)
       const vim: VimTextCommandState = { mode: 'normal', commandState: createVimCommandState(), setMode: vi.fn() }
-      const handler = createAgendaKeyDownHandler({ store: f.store, vim })
+      // Single-line rows with an 8 px advance: the desired column survives through measured geometry.
+      const handler = createAgendaKeyDownHandler({
+        store: f.store,
+        vim,
+        measureRow: () => ({ position: (offset) => ({ top: 0, left: offset * 8 }), dispose: vi.fn() }),
+      })
       try {
         handler({ key: '2', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
         handler({ key: 'j', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)

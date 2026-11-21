@@ -1012,6 +1012,37 @@ test.describe('Vim editing: image caret', () => {
   })
 
   // @requirement PRODUCT.md §20.2.9
+  test('stops counted j on the image of an intervening sibling', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'first', text: 'First', children: [] },
+          { id: 'middle', text: 'Middle', attachment: { id: 'middle-image', mimeType: 'image/png' }, children: [] },
+          { id: 'last', text: 'Last', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    seedAttachmentImage(userDataDir, 'middle-image')
+    const { window } = await launchTree(userDataDir)
+    const first = node(window, 1)
+    await first.focus()
+
+    await setCursor(first, 2)
+    await first.press('2')
+    await first.press('j')
+    const middle = node(window, 2)
+
+    await expect(middle).toBeFocused()
+    await expect(middle).toHaveClass(/node-input-image-caret/)
+
+    await middle.press('j')
+
+    await expect(node(window, 3)).toBeFocused()
+    await expect(node(window, 3)).toHaveJSProperty('selectionStart', 0)
+  })
+
+  // @requirement PRODUCT.md §20.2.9
   test('stops counted k on the text of an image-bearing sibling before moving past it', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

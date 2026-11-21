@@ -129,37 +129,37 @@ export function expectedStep(state: SequenceExpected, specs: readonly SequenceSp
     }
     return
   }
-  // A count takes the same steps as repeating the motion, including every node's image step.
-  let navigationCursor = state.cursor
-  for (let step = 0; step < count; step += 1) {
-    const current = specs[state.index]!
-    const currentLength = state.texts[state.index]!.length
-    if (key === 'j' && current.image && !state.image && state.cursor < currentLength) {
-      state.returned = state.cursor
-      state.cursor = currentLength
-      state.image = true
-      navigationCursor = currentLength
-      continue
-    }
-    if (key === 'k' && current.image && state.image && currentLength > 0) {
-      state.cursor = state.returned ?? currentLength - 1
-      state.image = false
-      state.returned = undefined
-      navigationCursor = state.cursor
-      continue
-    }
-    const nextIndex = state.index + (key === 'j' ? 1 : -1)
-    if (nextIndex < 0 || nextIndex >= specs.length) break
-    if (key === 'j' && state.image) navigationCursor = 0
-    const requested = step === 0 ? (key === 'j' && state.image ? 0 : state.cursor) : navigationCursor
-    state.index = nextIndex
-    const destination = specs[nextIndex]!
-    const destinationLength = state.texts[nextIndex]!.length
-    state.image = destination.image && (key === 'k' || requested >= destinationLength)
-    state.cursor = state.image ? destinationLength : Math.min(requested, Math.max(0, destinationLength - 1))
-    state.returned =
-      state.image && key === 'k' && destinationLength > 0 ? Math.min(requested, destinationLength - 1) : undefined
+  // §20.2.9: a count is the single motion repeated, so the model applies one press `count` times.
+  for (let step = 0; step < count; step += 1) if (!singleVerticalStep(state, specs, key)) break
+}
+
+/** One `j` or `k` press without text-line geometry; false when the motion is clamped. */
+function singleVerticalStep(state: SequenceExpected, specs: readonly SequenceSpec[], key: 'j' | 'k'): boolean {
+  const current = specs[state.index]!
+  const currentLength = state.texts[state.index]!.length
+  if (key === 'j' && current.image && !state.image && state.cursor < currentLength) {
+    state.returned = state.cursor
+    state.cursor = currentLength
+    state.image = true
+    return true
   }
+  if (key === 'k' && current.image && state.image && currentLength > 0) {
+    state.cursor = state.returned ?? currentLength - 1
+    state.image = false
+    state.returned = undefined
+    return true
+  }
+  const nextIndex = state.index + (key === 'j' ? 1 : -1)
+  if (nextIndex < 0 || nextIndex >= specs.length) return false
+  const requested = key === 'j' && state.image ? 0 : state.cursor
+  state.index = nextIndex
+  const destination = specs[nextIndex]!
+  const destinationLength = state.texts[nextIndex]!.length
+  state.image = destination.image && (key === 'k' || requested >= destinationLength)
+  state.cursor = state.image ? destinationLength : Math.min(requested, Math.max(0, destinationLength - 1))
+  state.returned =
+    state.image && key === 'k' && destinationLength > 0 ? Math.min(requested, destinationLength - 1) : undefined
+  return true
 }
 
 export const sequenceEventArbitrary: fc.Arbitrary<SequenceEvent> = fc.oneof(

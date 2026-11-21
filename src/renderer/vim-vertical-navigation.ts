@@ -30,8 +30,9 @@ export function navigateVertically({
 }: VimVerticalNavigationOptions): void {
   let currentNode = node
   let caret = initialCaret
-  let navigationCursor = initialCaret.cursor
 
+  // Each iteration is one complete single motion from the current caret, so a count takes exactly
+  // the steps of repeated presses; the desired column survives through `textLineCursor`.
   for (let index = 0; index < count; index += 1) {
     const before = store.getSnapshot()
     if (before.status !== 'ready') break
@@ -39,7 +40,6 @@ export function navigateVertically({
       const lineCursor = textLineCursor?.(currentNode, caret.cursor, false)
       if (lineCursor !== undefined) {
         caret = { cursor: lineCursor, imageActive: false }
-        navigationCursor = lineCursor
         applyCaretState(currentNode.id, caret)
         continue
       }
@@ -69,15 +69,11 @@ export function navigateVertically({
         break
       }
       caret = step.caret
-      navigationCursor = caret.cursor
       applyCaretState(currentNode.id, caret)
       continue
     }
 
-    // Mutation triage: an upward crossing with the image active only happens for an image-only node,
-    // whose cursor is already `0`, so resetting the navigation cursor for both directions is a no-op.
-    if (direction === 'down' && caret.imageActive) navigationCursor = 0
-    const focusCursor = index === 0 ? step.focusCursor : navigationCursor
+    const focusCursor = step.focusCursor
     store.moveSelection(direction, focusCursor)
     const after = store.getSnapshot()
     if (after.status !== 'ready') break

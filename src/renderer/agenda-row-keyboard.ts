@@ -108,15 +108,15 @@ export function createAgendaKeyDownHandler({
       }
       let current = row
       let position = index
-      let navigationCursor = sourceCursor()
+      const startCursor = sourceCursor()
       let caret: VimCaretState =
         current.kind === 'node' && current.role === 'match' && vim.getCaretState !== undefined
           ? vim.getCaretState(
               current.nodeId,
-              navigationCursor,
+              startCursor,
               event.currentTarget?.classList.contains('node-input-image-caret') ?? false,
             )
-          : { cursor: navigationCursor, imageActive: false }
+          : { cursor: startCursor, imageActive: false }
       let measuredKey: string | undefined
       let measuredRow: AgendaTextGeometry | undefined
       const geometry = (candidate: AgendaRow): AgendaTextGeometry | undefined => {
@@ -171,7 +171,6 @@ export function createAgendaKeyDownHandler({
                 : visualLineCursor(textOf(current), measured.position, caret.cursor, direction, preferredLeft)
             if (lineCursor !== undefined) {
               caret = { cursor: lineCursor, imageActive: false }
-              navigationCursor = lineCursor
               publishCaret(current, caret)
               continue
             }
@@ -188,13 +187,12 @@ export function createAgendaKeyDownHandler({
           if (!step.crossNode) {
             if (step.caret === caret) break
             caret = step.caret
-            navigationCursor = caret.cursor
             publishCaret(current, caret)
             continue
           }
+          // Each step is one complete single motion from the current caret (§20.2.9).
           const leftImage = caret.imageActive
-          if (direction === 'down' && leftImage) navigationCursor = 0
-          const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
+          const cursor = step.focusCursor
           current = rows[nextIndex]!
           position = nextIndex
           caret = focusCaretTransition(

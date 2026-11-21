@@ -272,6 +272,46 @@ describe('Vim vertical navigation', () => {
   )
 
   // @requirement PRODUCT.md §20.2.9
+  it.each(['down', 'up'] as const)(
+    'clamps the column at a short intervening node %s exactly as repeated motions do',
+    (direction) => {
+      const roots = [node('a', 'abcdefgh'), node('b', 'ab'), node('c', 'abcdefgh')]
+      const start = direction === 'down' ? roots[0]! : roots[2]!
+      const counted = store({ roots }, start.id, null)
+      const countedCarets = vi.fn()
+      const repeated = store({ roots }, start.id, null)
+      let repeatedNode: TreeNode = start
+      let repeatedCaret = { cursor: 6, imageActive: false } as Parameters<typeof navigateVertically>[0]['caret']
+
+      navigateVertically({
+        store: counted,
+        node: start,
+        caret: { cursor: 6, imageActive: false },
+        direction,
+        count: 2,
+        applyCaretState: countedCarets,
+      })
+      for (let step = 0; step < 2; step += 1) {
+        navigateVertically({
+          store: repeated,
+          node: repeatedNode,
+          caret: repeatedCaret,
+          direction,
+          count: 1,
+          applyCaretState: (nodeId, caret) => {
+            repeatedNode = roots.find((root) => root.id === nodeId)!
+            repeatedCaret = caret
+          },
+        })
+      }
+
+      expect(counted.snapshot.location.selectedNodeId).toBe(repeatedNode.id)
+      expect(countedCarets.mock.lastCall?.[1]).toEqual(repeatedCaret)
+      expect(repeatedCaret.cursor).toBe(1)
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.9
   it.each([
     ['down', 'a', 'b', { cursor: 6, imageActive: true, imageTextReturnCursor: 2 }],
     ['up', 'c', 'b', { cursor: 2, imageActive: false }],
