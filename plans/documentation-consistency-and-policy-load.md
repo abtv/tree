@@ -1,6 +1,6 @@
 # Documentation Consistency and Policy Load
 
-**Authorization state:** Proposed; awaiting owner decision; no task authorized.
+**Authorization state:** Authorized by the Product Owner on 2026-11-21 for the whole initiative (Q1). Q1–Q11 are answered (see Owner Questions). Order of work: T1, T2, T10, T11, T0, then T3, T6, T7, T8, then T4 and T5 only if T0 shows an effect, then T9.
 
 ## Objective
 
@@ -13,9 +13,10 @@ The audit ran on 2026-11-21 at commit `bba6aa1`. It answers the Product Owner's 
 
 ## Scope Limits
 
-* Documentation, agent adapter text and documentation checks only. No product behavior changes and no production code changes.
+* Documentation, agent adapter text and documentation checks only, plus the removal of OpenCode support (T10). No product behavior changes and no production code changes.
 * No rule is added, removed or changed in meaning unless an Owner Question below settles it. A task that finds a difference in meaning between two copies stops and reports it.
-* No rewrite of `AGENTS.md` or `docs/AGENT_WORKFLOW.md`. Sections keep their numbers. `AGENTS.md` stays within its 24 KiB limit.
+* No rewrite of `AGENTS.md` or `docs/AGENT_WORKFLOW.md`. Sections keep their numbers. `AGENTS.md` stays within its 24 KiB limit. T11 replaces one rule by the owner's text.
+* Implementation is not delegated to subagents (owner instruction of 2026-11-21). Review and verification roles remain available under procedure §13.
 * `docs/product/` is not edited. It was restructured by the initiative closed in `526706e`.
 * Existing ADRs are not edited. A changed decision is recorded by a new ADR (Q7).
 * `docs/ARCHITECTURE.md` is not regrouped. TD-003 stays deferred (Q8).
@@ -30,13 +31,14 @@ Earlier work: `git show bb427a3:plans/product-spec-refactoring.md` (Appendix A.4
 
 ## Authorization
 
-* Proposed approval scope: the whole initiative after the answers to Q1–Q11. T1 and T2 need no answer and can be authorized first.
-* Selected coding tool: chosen at authorization. This plan was prepared in Claude Code.
-* Priorities: correctness (T1), then single ownership (T3), then load (T4, T5), then tooling (T7).
-* Proposed delegated decisions and their principles:
+* Approval scope: the whole initiative, authorized by the Product Owner on 2026-11-21 (Q1). The authorization holds across task and session changes; a new session does not ask again. Final owner acceptance follows T9.
+* Selected coding tool: Claude Code.
+* Order: T1, T2, T10, T11, T0, T3, T6, T7, T8, then T4 and T5 only if T0 shows that moving text reduces what sessions read; otherwise T4 and T5 are marked `Cancelled` with the T0 result as the reason. T9 last.
+* Delegated decisions and their principles:
   * The wording of pointer sentences. Principle: one sentence that names the owning document and section.
   * Whether a paragraph is decision material. Principle: a rule needed to choose validation, record evidence, check capabilities or write tests stays in the routed section. Fixture internals, tool internals, dated investigations and per-tool permission mechanics move to `docs/DEVELOPMENT_REFERENCE.md`.
-* Reserved decisions: Q1–Q11; any difference in meaning between copies that Q2 does not settle; any deletion outside the Scope Limits; any permission change in `opencode.json`, `.codex/` or `.claude/settings.json`.
+  * The rule-size budget of Q4. Principle: the budget covers the binding agent rules, `AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`, as one total, because a budget on one file moved growth to another file once already (L2). Until T7 sets the number, a task must not increase that total (T11 in particular).
+* Reserved decisions: any difference in meaning between copies that Q2 does not settle; any deletion outside the Scope Limits; any permission change in `.codex/` or `.claude/settings.json` beyond what T10 needs to keep the documented-command check working.
 
 ## Evidence Labels
 
@@ -182,20 +184,22 @@ Not confirmed [RF]: `npm run check:docs` passes on 69 live documents. Every anch
 
 ## Tasks
 
-Working-task count: 9 (T0–T8). Final owner acceptance applies. Every task also updates this plan and `plans/README.md` in its commit. Tiers follow `docs/DEVELOPMENT.md` §9; "Minimal+" means Minimal Risk plus `npm run check:opencode`.
+Working-task count: 11 (T0–T8, T10, T11; T4 and T5 may be cancelled). Final owner acceptance applies. The table lists tasks by ID; the order of work is in Authorization. Every task also updates this plan and `plans/README.md` in its commit. Tiers follow `docs/DEVELOPMENT.md` §9; "Minimal+" means Minimal Risk plus `npm run check:opencode`.
 
 | ID | Outcome | Depends on | Files expected to change | Tier | Acceptance evidence | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| T0 | Investigation: learn from three to five past sessions whether agents read the procedures and `docs/DEVELOPMENT.md` by section or whole. Report bytes read per session. No repository change except this plan. | Q10 | this plan | Minimal | A table of sessions, files read, ranges and bytes; the source of each number | Planned |
-| T1 | Correct C5–C13, C15 and the wording of C14. Add the omission rule to `docs/AGENT_ROLES.md` §2 so that C7 becomes true. No rule changes. | none | `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `docs/AGENT_ROLES.md`, `docs/WORKING_WITH_AGENT.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` | Minimal+ | Each row quoted before and after; `npm run check:docs` passes; `AGENTS.md` within its limit | Planned |
+| T0 | Investigation: from the session logs of this project, measure separately for Claude Code (`~/.claude/projects/`) and Codex (its session directory, found and reported to the owner) whether agents read the policy and `docs/DEVELOPMENT.md` by section or whole, and how many bytes. Only reading figures enter the report and the repository, never conversation content. | T11 | this plan | Minimal | A table per tool: sessions, files read, ranges, bytes; the command or method behind each number | Planned |
+| T1 | Correct C5–C13, C15 and the wording of C14. Add the omission rule to `docs/AGENT_ROLES.md` §2 so that C7 becomes true. Delete the four one-time advisory acceptances of C16 (Q6). No rule changes. The comment at `scripts/check-requirement-coverage.mts:19` moves to T7, which already changes scripts. | none | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, `docs/AGENT_WORKFLOW.md`, `docs/AGENT_ROLES.md`, `docs/WORKING_WITH_AGENT.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` | Minimal+ | Each row quoted before and after; `npm run check:docs` passes; `AGENTS.md` within its limit | Planned |
 | T2 | Record the TD-001 evidence of Appendix B and the TD-003 evidence of L6 in `docs/OPEN_QUESTIONS.md`, with basis labels and without a status change. | none | `docs/OPEN_QUESTIONS.md` | Minimal | Each new evidence line names its commit or command | Planned |
-| T3 | One owner per duplicated rule: resolve D1, D2, D9–D12 and U2 by the Q2 answers; replace the restatements of D3–D8 outside the owner with one pointer sentence each. | Q2 | `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `AGENTS.md`, `docs/WORKING_WITH_AGENT.md`, `docs/AGENT_ROLES.md`, `e2e/electron/AGENTS.md`, `plans/README.md` | Minimal+ | For each D row, the one remaining full statement and its pointers; `npm run check:docs -- --verbatim <ref> --file <file>` for each file, with every removed unit found in the owner text or listed for the owner | Planned |
+| T3 | One owner per duplicated rule: resolve D1, D2, D9–D12, U1 and U2 by the Q2 answers; replace the restatements of D3–D8 outside the owner with one pointer sentence each. Apply Q5: delete the token-measurement sentence (U5); name the Product Owner as the actor of the two manual checks of U6 and list them in the owner-involvement inventory of procedure §8. | T11 | `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `AGENTS.md`, `docs/WORKING_WITH_AGENT.md`, `docs/AGENT_ROLES.md`, `e2e/electron/AGENTS.md`, `plans/README.md` | Minimal+ | For each D row, the one remaining full statement and its pointers; `npm run check:docs -- --verbatim <ref> --file <file>` for each file, with every removed unit found in the owner text or listed for the owner | Planned |
 | T4 | Move the L3 material out of `docs/DEVELOPMENT.md` §9 and the restructuring tooling out of §12 into `docs/DEVELOPMENT_REFERENCE.md`, verbatim, with one pointer sentence per source section. Retarget every citation, including the error messages at `scripts/check-docs.mts:122,128`. | T0, T3 | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, citing documents, `scripts/check-docs.mts` and its test | Low (`npm run check`) | Lost-text proof by the Git method of the earlier plan; section sizes before and after | Planned |
-| T5 | Move the per-tool permission bullets of Procedures §4 to `docs/DEVELOPMENT_REFERENCE.md` §3 and leave one routing sentence per tool. | Q3, T0 | `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT_REFERENCE.md`, `AGENTS.md` | Minimal+ | Lost-text proof; §4 size before and after; each tool's sentence names its section | Planned |
+| T5 | Move the per-tool permission bullets of Procedures §4 (Codex and Claude Code after T10) to `docs/DEVELOPMENT_REFERENCE.md` §3 and leave one routing sentence per tool. | T0, T10 | `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT_REFERENCE.md`, `AGENTS.md` | Minimal+ | Lost-text proof; §4 size before and after; each tool's sentence names its section | Planned |
 | T6 | Add routing rows for release work and for the `continue` and `status` calls. Place the two defect-fix obligations of U4 in the defect-first steps. | Q2 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md` | Minimal+ | `AGENTS.md` byte size within the limit; `npm run check:docs` passes | Planned |
-| T7 | Tooling: add the documents of U7 to the link and ADR-reference checks; add the size budget chosen in Q4, if any; tests for both. | Q4 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 | Low (`npm run check`) | New tests fail without the change; `npm run check` passes | Planned |
-| T8 | Record the persisted Agenda fold choices in a new ADR that amends ADR 0020, and index it. | Q7 | `docs/decisions/` (new file), `docs/decisions/README.md` | Minimal | The ADR cites `docs/product/agenda.md` §23 and `docs/ARCHITECTURE.md` §13; `npm run check:docs` passes | Planned |
-| T9 | Final measurement with the Baseline method, acceptance package, plan status `Awaiting owner acceptance`. | T1–T8 | this plan, `plans/README.md` | Minimal | The Baseline tables repeated at the final commit | Planned |
+| T7 | Tooling: add the documents of U7 to the link and ADR-reference checks; add a byte budget on the total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md`, set at their total when T7 starts (Q4); add to procedure §9 or §12 the rule that a mechanically checkable failure first gets a check, not prose (Q4), within that budget; correct the comment at `scripts/check-requirement-coverage.mts:19` (C6). Tests for the checks. | T3 | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `scripts/check-requirement-coverage.mts`, `docs/DEVELOPMENT.md` §9, `docs/AGENT_WORKFLOW.md` | Low (`npm run check`) | New tests fail without the change; `npm run check` passes | Planned |
+| T8 | Record the persisted Agenda fold choices in a new ADR that amends ADR 0020, and index it. | none | `docs/decisions/` (new file), `docs/decisions/README.md` | Minimal | The ADR cites `docs/product/agenda.md` §23 and `docs/ARCHITECTURE.md` §13; `npm run check:docs` passes | Planned |
+| T9 | Final measurement with the Baseline method, acceptance package, plan status `Awaiting owner acceptance`. | all other tasks | this plan, `plans/README.md` | Minimal | The Baseline tables repeated at the final commit | Planned |
+| T10 | Remove OpenCode support (Q3): `opencode.json`, `.opencode/`, `npm run check:opencode` and its script and tests, its stage in `npm run check` and CI, `package.json`, and every mention in documents, including the model routing of `AGENTS.md` §1 and `docs/AGENT_ROLES.md` §§6–7. Keep the documented-command check of `scripts/documented-npm-workflows.mts`: it now requires that every `npm run` command named in `docs/DEVELOPMENT.md` and `docs/DEVELOPMENT_REFERENCE.md` has an allow rule in `.claude/settings.json` and a matching rule in `.codex/rules/`, with tests. Keep the Claude Code interpreter-deny assertions that the OpenCode check made, under the new check's name. C1 and Q11 end with this task. | T2 | `opencode.json`, `.opencode/`, `scripts/check-opencode-permissions.mts` and its replacement with tests, `scripts/documented-npm-workflows.mts`, `package.json`, `.github/workflows/*`, `.claude/settings.json` (only the renamed npm script), `.gitignore` if needed, `AGENTS.md`, `docs/*.md`, nested `AGENTS.md`, skills | Low (`npm run check`) | `git grep -i opencode` finds only history-neutral mentions that the task lists; the new check fails when a documented command lacks a Claude Code or Codex rule (test); `npm run check` passes | Planned |
+| T11 | Replace the "at most four tasks per primary session" rule of `AGENTS.md` §12 and procedure §12 with the owner's session rule (Owner Questions, "Session rule"). Count plan budgets in tasks and fix cycles instead of sessions in procedures §8 and §12, `docs/DEVELOPMENT.md` §11 and this plan. Remove the next-session prompt requirement where the rule makes it unnecessary. The total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` must not grow (Q4). Not delegated to subagents. | T10 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md`, `docs/WORKING_WITH_AGENT.md`, this plan | Minimal | The three rule points of the owner's text are each traceable to one sentence; the byte total before and after; `npm run check:docs` passes | Planned |
 
 Expected effect [AI, estimate]: mandatory reading for a product change falls from 103,179 to about 86,000 bytes by section (L3, L4 and about 3 KB of restatements), about 16%. Read as whole files, the three documents fall from 240,170 to about 218,000 bytes, about 9%. The remaining text is rule text; reducing it further means removing rules, which is the Product Owner's decision (Q4, Q5).
 
@@ -203,19 +207,39 @@ Expected effect [AI, estimate]: mandatory reading for a product change falls fro
 
 | Round | When | Owner action |
 | --- | --- | --- |
-| 1 | Before authorization | Answer Q1–Q11. T1 and T2 can start without the answers if authorized. |
+| 1 | Before authorization | Done on 2026-11-21: Q1–Q11 answered. |
 | 2 | After T9 | Read the final report and the Baseline comparison. Accept or reject. |
-| Possible extra rounds | T3 finds a difference in meaning that Q2 does not settle; T0 changes the value of T4 or T5 | 0–2 |
+| Possible extra rounds | T3 finds a difference in meaning that Q2 does not settle; T10 finds a permission that the documented-command check cannot express without a new rule | 0–2 |
 
-No task needs a manual application check: no product behavior changes. Unresolved capabilities: T0 needs read access to session transcripts outside the repository; the Product Owner grants it or supplies exported transcripts (Q10).
+No task needs a manual application check: no product behavior changes. Capabilities: T0 reads session logs outside the repository with the owner's permission of 2026-11-21 (Q10); the sandbox of this session does not allow reading `~/.claude/projects/`, so T0 needs one approved command outside the sandbox per directory listing or read. Unverified until T0 runs.
 
 ## Budget
 
-* Execution: 4 primary sessions. Session 1: T0, T1, T2. Session 2: T3, T6. Session 3: T4, T5. Session 4: T7, T8, T9.
-* Recovery: at most 1 additional primary session. The two-attempt limit per blocker in procedure §12 applies.
-* Closure allowance: 1 short session after acceptance.
+Counted in tasks and fix cycles, not in sessions (owner instruction of 2026-11-21).
+
+* Execution: 11 working tasks plus T9.
+* Recovery: at most 2 fix cycles per task for the same blocker (procedure §12) and at most 6 fix cycles in the whole initiative. A fix cycle is one repair of a failed check, a review finding or a rejected result followed by the rerun of the invalidated checks.
+* Closure allowance: 1 task after acceptance.
 
 ## Owner Questions
+
+Answers of the Product Owner, 2026-11-21:
+
+* **Q1.** The whole initiative is authorized. T1 and T2 first; the rest in the order of Authorization.
+* **Q2.** All recommendations accepted (D1, U2, D2, D9–D12, U1).
+* **Q3.** Codex and Claude Code stay supported. OpenCode support is removed (T10). The documented-command check is kept and moved to `.claude/settings.json` and the Codex rules, so that every documented command is still checked for a permission.
+* **Q4.** Yes: a budget on the total size of the rules in `check:docs`, and the rule that a mechanically checkable failure first gets a check, not prose (T7).
+* **Q5.** W1 and W3 stay. W4 and U5 are deleted (T3). U6: the actor is the Product Owner (T3). W2: no tool; the Product Owner deletes old `.scratch` directories.
+* **Q6, Q7, Q8, Q9.** Recommendations accepted: delete the four one-time acceptances and keep the Electron 45 note (T1); one new ADR amends ADR 0020 (T8); TD-003 stays deferred; the §8 measurement block stays.
+* **Q10.** Yes. T0 may read the session logs of this project for Claude Code (`~/.claude/projects/`) and Codex (the agent finds and reports the path). Reading is measured separately per tool. Only reading figures enter the report and the repository, never conversation content.
+* **Q11.** Withdrawn with OpenCode (T10).
+* **Session rule (T11).** Replace the "at most four tasks per primary session" limit in `AGENTS.md` §12 with this rule, in the owner's words translated:
+  1. Each task starts from the state in the plan (or `WORKING_PLAN.md` for work without a plan) and Git, not from conversation memory. It is finished when the plan records the next task and what cannot be recovered from the repository: decisions from the conversation and unverified observations. A summary of what was done is not written; Git holds it.
+  2. After a context compaction the agent rereads the task row and the procedures for the next action. If the compaction happened in the middle of a task, it reviews the whole diff against the task row again before checks and commit.
+  3. There is no limit on the number of tasks. The agent stops only for an owner decision or permission, an exhausted plan budget, or when the tool cannot continue. No continuation text is needed: a new session continues from the plan on the command "continue".
+  Plan budgets are counted in tasks and fix cycles, not in sessions, in procedures §8 and §12 and in this plan. Implementation is not delegated to subagents. The rule must fit the rule-size budget of Q4.
+
+The questions as proposed:
 
 * **Q1. Approval scope.**
   * Recommended: authorize T1 and T2 now, and the rest as one initiative after Q2–Q11.
@@ -268,7 +292,7 @@ No task needs a manual application check: no product behavior changes. Unresolve
 
 ## Next Task
 
-None. No task is authorized. After authorization, the next task is T1.
+T1.
 
 ## Next-Session Prompt
 
