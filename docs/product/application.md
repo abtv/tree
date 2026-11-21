@@ -67,7 +67,7 @@ with **MIT License** linking to `https://github.com/abtv/tree/blob/main/LICENSE`
 The About dialog uses the main application's selected palette (§20.5),
 including its background, text and links. Automatic follows the system appearance.
 It opens centered in the main window's content area and disappears as a whole when dismissed.
-It shares the existing renderer, including on first opening, and cannot move outside the main window.
+It shares the main window's renderer, including on first opening, and cannot move outside the main window.
 
 It blocks interaction with its parent until closed with Escape or the focused **Close**
 button (also activated by Enter), or a click in the main window's content outside About.

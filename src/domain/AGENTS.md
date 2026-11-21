@@ -14,4 +14,4 @@ Layer-specific rules for `src/domain/`. The repository-wide rules in the root `A
 
 * Tests run in the Node environment. Run `npm test -- src/domain`.
 * Assess existing `*.property.test.ts` generators and assertions when a change affects tree structure, ordering, node identity, serialization, cursor or paste transforms, or undo/redo consistency. Extend insufficient coverage; reuse an adequate guard under root procedure §9.
-* Assess the performance implications of state or persistence changes per `docs/PRODUCT.md` §22.1.
+* Assess the performance implications of state or persistence changes per root procedure §4 (`docs/AGENT_WORKFLOW.md`), against the commitments of `docs/PRODUCT.md` §22.1.

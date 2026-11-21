@@ -266,7 +266,7 @@ At the root level:
 
 `Cmd+Backspace` deletes the selected displayed node and its entire subtree.
 
-This is different from normal `Backspace`, which is ordinary text editing except when the node is empty or the caret is at its beginning (see 8.2–8.3).
+This is different from normal `Backspace`, which is ordinary text editing except when the node is empty or the caret is at its beginning (see §8.2–§8.3).
 
 After deleting a node from the currently displayed level:
 

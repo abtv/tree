@@ -35,7 +35,7 @@ Below the root level, the current parent is a real tree node, not a fake UI-only
 
 If the current parent's text changes, the displayed context must update immediately.
 
-The current parent is not part of `↑` / `↓` sibling navigation, except that `↑` on the first child moves selection to the current parent (see 4.1).
+The current parent is not part of `↑` / `↓` sibling navigation, except that `↑` on the first child moves selection to the current parent (see §4.1).
 
 ### 2.1 Node Presentation
 
@@ -295,4 +295,4 @@ An empty node can:
 * receive an image;
 * receive children;
 * be deleted explicitly by the user;
-* be deleted by pressing `Backspace` when its text is empty (see 8.2).
+* be deleted by pressing `Backspace` when its text is empty (see §8.2).

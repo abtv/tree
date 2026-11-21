@@ -82,7 +82,7 @@ Use native file-editing tools for repository changes; no shell edit scripts or i
 Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; in Codex use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
 
 
-Keep ordinary shortcuts application-scoped; use `globalShortcut` only for an explicit inactive-application requirement. State/persistence changes require the assessment in `docs/PRODUCT.md` §22 (writes/syncs, interactive CPU, memory growth) and automated scale guards when relevant.
+Keep ordinary shortcuts application-scoped; use `globalShortcut` only for an explicit inactive-application requirement. State/persistence changes require the assessment in procedure §4 (writes/syncs, interactive CPU, memory growth) and automated scale guards when relevant.
 
 ## 5. Product Changes
 

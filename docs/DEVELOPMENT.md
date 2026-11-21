@@ -37,7 +37,7 @@ Linux builds skip this native compilation. The Apple Silicon macOS Electron smok
 image recognition; the release verifier repeats it from the signed DMG and ZIP.
 
 Both platform entry points use the shared inline About dialog in
-`src/renderer/about-dialog.ts`, as specified in PRODUCT §1.3–§1.4.
+`src/renderer/about-dialog.ts`, as specified in PRODUCT §9.4.
 Its icon and links are bundled with the renderer; no native About-panel resource
 needs to be installed in the Electron bundle.
 
