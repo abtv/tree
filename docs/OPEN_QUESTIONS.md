@@ -195,6 +195,7 @@ For each rule added in response to a defect, whether that defect class recurred 
 - 2026-11-21 — Repository fact: the policy was split into `AGENTS.md` and `docs/AGENT_WORKFLOW.md` in `daa8414` (2026-10-14). The total was 59,556 bytes before the split (`966c785`), 80,047 after it, and 89,988 at `bba6aa1`. The 24 KiB limit of `check:docs` covers only `AGENTS.md`, which stayed between 20.5 and 23.5 KB; the uncapped procedures grew.
 - 2026-11-21 — Repository fact: the agent-attribution rule existed as prose from `f5257c0` (2026-09-25); seven commits of 2026-09-26 to 09-28 still carried a Claude co-author trailer. The `commit-msg` hook of `71290b6` (2026-09-29) followed. The `Release-Note` field, enforced by hook and CI from `34783b3` (2026-11-07), is present in 102 of 102 later `feat`, `fix` and `perf` commits.
 - 2026-11-21 — Repository fact (commit subjects; diffs read only for the rule commits): prose rules about permission prompts (`06ac7eb` and others, 2026-10-11) were followed by five more prose rules and nine permission-configuration commits; the delivery-report rule (`53c9cf3`) was re-addressed in `53bf5f3`, `7cbfa2b`, `d3b43cc` and `43e9c53`; 73 `.scratch` directories remain after the retirement rule of `879be92`. No later fix subject names a window flash after `ab2a7bb`, and four of 1,247 subjects break the commit format of `87800b7`.
+- 2026-11-21 — Usage evidence (session logs read with the owner's permission; reading figures only): policy text read per primary session had a median of about 54,000 characters in 28 Claude Code sessions (20% of all tool output) and about 225,000 in 69 Codex sessions (29%, an upper bound). Both tools read `docs/DEVELOPMENT.md` in line windows. Codex re-read the automatically loaded `AGENTS.md` about three times per session, which `450ab0e` addresses. Since `05e11c1`, `check:docs` holds `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` to one byte budget, and procedure §11 asks for a check before prose when a failure is mechanically detectable.
 - 2026-11-21 — Agent inference: where a hook, a check or a permission rule exists, Git shows no later violation; prose-only rules have a mixed record. This does not establish that policy size lowers adherence, and rules whose compliance is visible only in conversations were not observed.
 
 ## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
@@ -212,7 +213,7 @@ Whether agents and the Product Owner read the whole of §8 or §13 for a task th
 
 ### What would settle it
 
-A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004's §13 citation valid. The Product Owner deferred the question on 2026-11-21 (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`), and kept it deferred until the decision about removing features (Q8 of `plans/documentation-consistency-and-policy-load.md`).
+A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004's §13 citation valid. The Product Owner deferred the question on 2026-11-21 (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`), and kept it deferred until the decision about removing features (Q8 in `git show 1d20944:plans/documentation-consistency-and-policy-load.md`).
 
 ### Evidence
 
