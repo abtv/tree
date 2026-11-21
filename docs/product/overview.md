@@ -53,5 +53,3 @@ The desktop application menu starts with **About Tree**, **Check for Updates…*
 **Restart and Install Update** (§26), followed by a separator before Quit Tree. About Tree opens the About dialog, which §9.4 defines.
 
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.
-
-Every change to user-visible behavior is checked against the guidelines before it is considered complete. A conflict that is not already recorded as a deliberate difference is reported to the Product Owner instead of being settled silently, under `AGENTS.md` §14.

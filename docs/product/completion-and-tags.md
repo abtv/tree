@@ -28,12 +28,12 @@ Long digit runs in node text must not cause quadratic date-recognition work on t
 
 * `next month` and `last month` offer the 1st, 15th and actual last day of the next or previous calendar month. The closest date to Today is initially selected: the 1st for next month, the last day for last month. Year transitions and leap years apply; months outside years 0000–9999 offer nothing.
 * `in N week(s)` and `N week(s) ago` use the same counts as relative days and offer the date exactly N × 7 days after or before Today.
-* `in` plus a full English month name offers one date when it names the current month: the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward. For another month, it prefers the nearest upcoming month start and also offers the nearest past month start. For example, on October 8, 2026, `in September` offers September 1, 2026 and September 1, 2027, with 2027 selected initially; the past alternative means the nearest past occurrence, rather than necessarily the previous calendar year.
-* `last` plus a full English month name offers the nearest month start strictly before Today.
+* `in` plus an English month name, or a prefix of at least three letters (§20.9.1), offers one date when it names the current month: the 15th of that month on days 1–10 inclusive, and the actual last day of that month from day 11 onward. For another month, it prefers the nearest upcoming month start and also offers the nearest past month start. For example, on October 8, 2026, `in September` offers September 1, 2026 and September 1, 2027, with 2027 selected initially; the past alternative means the nearest past occurrence, rather than necessarily the previous calendar year.
+* `last` plus an English month name, or a prefix of at least three letters (§20.9.1), offers the nearest month start strictly before Today.
 * For example, on October 8, 2026, `in 3 weeks` offers `2026-10-29`, `3 weeks ago` offers `2026-09-17`, `in October` offers `2026-10-15`, and `last October` offers `2026-10-01`. On October 10, `in October` still offers `2026-10-15`; on October 11 it offers `2026-10-31`.
 * The same case, spacing, expression-boundary and canonical-calendar rules apply.
 
-`in the end of` plus a full English month name offers the nearest month end on or after Today. During October, `in the end of October` offers October 31 of the current year, including on October 31 itself; after October it offers October 31 of the next year. The suggestion uses the month's actual last day, including February 29 in leap years. The same case, spacing, expression-boundary and canonical-calendar rules apply.
+`in the end of` plus an English month name, or a prefix of at least three letters (§20.9.1), offers the nearest month end on or after Today. During October, `in the end of October` offers October 31 of the current year, including on October 31 itself; after October it offers October 31 of the next year. The suggestion uses the month's actual last day, including February 29 in leap years. The same case, spacing, expression-boundary and canonical-calendar rules apply.
 
 #### 20.9.3 Popup
 
@@ -140,4 +140,4 @@ Matching ignores case and uses the emoji ordering: exact name, prefix, word pref
 
 The popup initially selects the first result and resets selection on refinement. All matching names are reachable. Accepting with Enter, Tab or a click replaces only the fragment with the full `#name` as one undoable edit and leaves the caret after it. The geometry, keyboard controls, dismissal and composition lifecycle follow §20.12. Ignoring or dismissing suggestions preserves the typed tag.
 
-Getting the suggestion list from the prepared in-memory index must take less than 1 ms in the automated representative scale workload. This budget covers recognition, active-occurrence exclusion and ranking; it excludes initial index construction and popup layout/painting. Index updates and real typing responsiveness have separate scale guards (§22.1).
+Getting the suggestion list from the prepared in-memory index must take less than 5 ms in the representative scale workload of `docs/DEVELOPMENT.md` §12. This budget covers recognition, active-occurrence exclusion and ranking; it excludes initial index construction and popup layout/painting.

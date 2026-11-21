@@ -12,7 +12,7 @@ While an image preview is open, the browser's ellipsis menu button is hidden.
 Closing the preview restores it. The preview close button stays 16 pixels from
 the top and right edges of the content area.
 
-The browser's ellipsis menu ends with **About Tree** below statuses and the Update App
+The browser's ellipsis menu ends with **About Tree** below the Update App
 button when present. It opens the About dialog, which §9.4 defines.
 
 The browser Tree menu temporarily borrows editing focus. Closing it with Escape,
@@ -247,7 +247,7 @@ Tree checks for updates at startup and when connectivity returns. It downloads a
 new package in the background without interrupting editing. A failed or interrupted download
 leaves the installed version usable. Updates never clear or upload notes.
 
-When the new version is ready, **Update App** appears at the bottom of the ellipsis menu and
+When the new version is ready, **Update App** appears directly above **About Tree**, which ends the ellipsis menu (§1.4), and
 a small dot appears on its trigger. The trigger also describes the update for assistive
 technology. The dot shares the position of the backup-attention dot of §24.5. No update prompt steals
 focus or reloads an open editor. Applying a waiting update requires no network connection.

@@ -182,7 +182,7 @@ Exception: a requested security audit delivers the full structured report requir
 
 ## 13. Completion Criteria
 
-Before completion, read procedure §13. Complete the authorized behavior, appropriate coverage, documentation, required tier and boundary/visual verification, and primary diff review. Keep the repository coherent and preserve unrelated behavior. User-visible changes require the HIG check in `docs/PRODUCT.md` §1.3.
+Before completion, read procedure §13. Complete the authorized behavior, appropriate coverage, documentation, required tier and boundary/visual verification, and primary diff review. Keep the repository coherent and preserve unrelated behavior. User-visible changes require the HIG check of procedure §13 against `docs/PRODUCT.md` §1.3.
 
 Independent review is required for shared interaction state, process/persistence boundaries, major architecture, and High Risk. Product verification is always required for changed user-visible behavior; use a separate verifier for cross-state, process/platform, and other High Risk user-visible changes. Resolve meaningful findings and rerun affected checks; repeat a pass only when corrections invalidate it. Full repeat is limited to substantial, architectural, high-risk, or likely-regressive fixes. Contained internal changes need no separate roles unless the approved task calls for them.
 

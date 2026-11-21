@@ -10,7 +10,7 @@ Malformed break tags in clipboard HTML must not stall paste through superlinear 
 
 If the current clipboard item exposes both image and text representations, the image takes precedence. Paste the image and do not also paste the text representation.
 
-PNG clipboard images larger than 25 MiB are rejected. The application reports an operation error stating the size limit, leaves the document unchanged, and does not fall back to the item's text representation. Existing attachment format and decoded-image limits still apply to images within this byte limit.
+PNG clipboard images larger than 25 MiB are rejected. The application reports an operation error stating the size limit, leaves the document unchanged, and does not fall back to the item's text representation. Images within this byte limit must also meet the attachment format and pixel limits of §17.
 
 The application must support:
 

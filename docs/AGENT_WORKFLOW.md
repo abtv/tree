@@ -89,6 +89,8 @@ When a requested change modifies product behavior:
 
 Do not make a product decision on the Product Owner's behalf beyond what the gap rule below allows.
 
+A change to the command registry (`docs/PRODUCT.md` §20.2.30) that introduces a new verb requires updating the naming rule there. A new command alias requires an owner decision.
+
 ### Requirement gaps
 
 Find the gaps before implementing, not in the middle of implementing. When planning a task — a single task or an initiative — read the product requirements the task depends on and identify every place where they do not determine the behavior the task has to produce. Do this before writing code, and record the result with the plan.
@@ -237,7 +239,7 @@ Follow the project-wide navigation and caret matrix and invariant in `docs/DEVEL
 
 ### Visual-regression workflow
 
-For a change that can alter rendered pixels — including stylesheet, layout, typography, color, caret, selection, focus, drag-feedback, or contenteditable rendering — DOM, CSS-class, and computed-style assertions are not sufficient visual evidence. Select the smallest representative set of affected states, run it in the real Electron renderer, and inspect its screenshot before handoff. Include light and dark appearances only when the change or affected styling differs by appearance.
+For a change that can alter rendered pixels — including stylesheet, layout, typography, color, caret, selection, focus, drag-feedback, or contenteditable rendering — DOM, CSS-class, and computed-style assertions are not sufficient visual evidence. Select the smallest representative set of affected states, run it in the real Electron renderer, and inspect its screenshot before handoff. Include light and dark appearances only when the change or affected styling differs by appearance. Adding an appearance requires checking the shared semantic presentation rules of `docs/PRODUCT.md` §20.5 in that appearance; the owner must not have to discover and request separate fixes for each surface.
 
 Treat visual requirements in `docs/PRODUCT.md` as hard acceptance criteria. When a requirement specifies relative placement or alignment, add a real-renderer geometry assertion for that relationship where practical; a screenshot baseline alone can preserve an already-misaligned result. For focus or selection indicators, cover the selected row, an unfocused neighbor, and focus moving between them when the state persists across rows.
 
@@ -469,7 +471,7 @@ A task is complete only when:
 * the highest applicable validation tier in `docs/DEVELOPMENT.md` §9 passes;
 * no required end-to-end test is skipped because of the environment;
 * no unrelated behavior was changed;
-* a change to user-visible behavior was checked against Apple's Human Interface Guidelines as `docs/PRODUCT.md` §1.3 requires, and any unrecorded conflict was raised under §14;
+* every change to user-visible behavior was checked against Apple's Human Interface Guidelines, the platform convention of `docs/PRODUCT.md` §1.3, and a conflict that is not already recorded in `docs/PRODUCT.md` as a deliberate difference was reported to the Product Owner under §14 instead of being settled silently;
 * the repository remains in a coherent state.
 
 When a working plan is required, satisfy it and extract durable knowledge before deleting it.

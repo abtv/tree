@@ -102,14 +102,14 @@ entry and hides search feedback. Both retain the last confirmed query for recall
 Entering or leaving a focused Agenda day also closes search. Query recall is shared
 between Tree and Agenda. Agenda edits update all mounted mirrors; leaving a temporarily
 pinned item removes it from the search corpus and refreshes the count.
-While search is visible, Agenda's existing status message remains visible in the
+While search is visible, the Agenda status message of §23.7 remains visible in the
 bottom status bar, independently of the Find panel and without changing document geometry.
 
 Only that query is remembered in application-session memory; no search state is
 persisted in documents, view state, preferences or backups.
 
 Visual-mode search entry, backward `?` entry, regex and operator search motions are
-outside this version.
+not supported.
 
 ### 20.14 Search and Recent Nodes
 

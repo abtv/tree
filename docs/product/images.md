@@ -60,7 +60,7 @@ Saving locks and the maximum depth apply at insertion time. Closing or reloading
 renderer cancels native work. Preparing to quit or install an update retires pending
 recognition and rejects new requests until the save flush ends. An archive export
 does not cancel recognition. Pending OCR itself is not saved or resumed on restart.
-Each image is limited to 25 MiB and the normal decoded-image dimensions. Native work
+Each image is limited to 25 MiB and the pixel limits of §17. Native work
 times out after 60 seconds; results are limited to 1 MiB and 1,000 entries.
 
 Pasting a new image also recognizes its English text automatically when image-to-text
@@ -148,6 +148,8 @@ resources; Tree does not promise GPU execution or zero impact on responsiveness.
 Each node may contain at most one image attachment.
 
 Images are stored as local attachments rather than embedded directly into the document data.
+
+An attachment is PNG data of at most 25 MiB, with at most 32,767 pixels per side and at most 67,108,864 pixels in total.
 
 Attachments belong to their nodes.
 

@@ -64,7 +64,7 @@ The application has five appearance choices in the **View > Appearance** menu (�
 
 The command panel (§20.2.28) exposes the same five choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, `set-theme-gray`, and `set-theme-white`.
 
-Every appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. The palette-specific choices below apply only to their stated surfaces. Adding an appearance requires checking these shared rules in that appearance; the owner must not have to discover and request separate fixes for each surface.
+Every appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. The palette-specific choices below apply only to their stated surfaces.
 
 Selected hyperlinks use the same foreground and background as the surrounding text selection in every appearance and editing mode. Any link highlight retained when focus moves to another control keeps that appearance's selection colors.
 

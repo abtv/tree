@@ -67,7 +67,7 @@ While the Tree or Agenda list contains keyboard focus, only its selected row has
 
 Other rows retain their normal background and text contrast; hover does not tint rows. Dragging and whole-node Visual selection suppress this tint so their own feedback takes precedence.
 
-The selected node keeps its dark bullet and has no more-options or selection-dot ornament. When the editable Tree current-parent heading has the caret, its active line uses the same full-width tint as a node row. Moving focus to a child moves the tint to that child.
+The selected node keeps its bullet in the ordinary text color and has no more-options or selection-dot ornament. When the editable Tree current-parent heading has the caret, its active line uses the same full-width tint as a node row. Moving focus to a child moves the tint to that child.
 
 The current parent is presented above its children as a larger, bold, editable heading without a bullet.
 

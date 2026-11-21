@@ -6,7 +6,7 @@
 * The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
-* Operation status messages, including save failures, image recognition, summarization, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. Confirmation dialogs retain their existing behavior. App update feedback follows the priority rules of §26.
+* Operation status messages, including save failures, image recognition, summarization, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. The status-bar placement of operation status messages does not apply to confirmation dialogs. App update feedback follows the priority rules of §26.
 
 #### 20.2.28 Command Panel
 
@@ -27,7 +27,7 @@ Opening also dismisses the current five-second export-success notice (§24.3, §
 * The selected row uses the shared selection highlight pair in each appearance.
 * Opening and closing have no animation (§20.4).
 
-Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space is reserved for future arguments and matches nothing in this version. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
+Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space matches nothing. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
 
 Both opening keys use the same command list. Only platform-supported commands appear or count. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
@@ -43,11 +43,11 @@ The available commands and their history rules are specified in §20.2.30.
 
 While Vim editing is enabled, application-owned dialogs and activity messages support `h` and `l` to focus the previous and next visible, enabled button in their horizontal action row. Movement stops at either end without wrapping or activating a button. This applies independently of the editor's current Vim mode, only while focus is inside the popup. Import/restore confirmation, backup conflict/permission confirmation, quit confirmation and activity messages share this rule in desktop and browser versions where available. Image preview instead uses `h/j/k/l` to pan its image (§17.1).
 
-`Enter` activates the focused button; `Escape` cancels or dismisses the popup through its existing action. Busy operations retain their existing cancellation restrictions. In a focused activity message, Escape invokes its Cancel or OK action. Existing initial focus, Tab/Shift+Tab navigation and focus restoration remain unchanged. Moving focus must not edit notes or execute an editor command.
+`Enter` activates the focused button; `Escape` runs the popup's own cancel or dismiss action. These bindings do not change the cancellation restrictions of busy operations, initial focus, Tab/Shift+Tab navigation, or focus restoration. In a focused activity message, Escape invokes its Cancel or OK action. Moving focus must not edit notes or execute an editor command.
 
 The browser's vertical Tree menu uses `j` for the next button and `k` for the previous button, with the same visibility, enabled-state and non-wrapping rules. Opening this menu with Vim enabled focuses its first available button. Enter activates the focused item and Escape closes the menu. The horizontal `h/l` bindings do not apply to this vertical menu.
 
-Text-entry surfaces, including the command panel, search and date/emoji completions, retain literal letters and their existing navigation keys. Modified keys and native text composition retain their existing behavior. With Vim editing disabled, these extra letter bindings are inactive. System-owned menus, file pickers and permission prompts retain platform keyboard behavior.
+These letter bindings do not apply on text-entry surfaces, including the command panel, search and date/emoji completions; there, letters are literal and each surface keeps its own navigation keys. Modified keys and native text composition retain their existing behavior. With Vim editing disabled, these extra letter bindings are inactive. System-owned menus, file pickers and permission prompts retain platform keyboard behavior.
 
 These application-control bindings extend the keyboard-first model (§1.3); they do not change Vim text editing.
 
@@ -92,7 +92,7 @@ Results match the corresponding menu item or toggle, including saved preferences
 
 View changes resolve editing sessions and selection as `Cmd+P` does; an already-active destination preserves them. Neither edits the document nor adds undo history. Both update command history.
 
-Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. New verbs require updating this rule. `q` is the only alias; new aliases require an owner decision. `theme` means Appearance; `auto` means Automatic.
+Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. `q` is the only alias. `theme` means Appearance; `auto` means Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 

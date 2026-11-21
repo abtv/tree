@@ -310,7 +310,7 @@ If neither rule applies, nothing changes. The editable current-parent heading ca
 
 ## 10. Undo and Redo
 
-Undo and redo are mandatory in v1.
+Undo and redo are mandatory.
 
 ### Undo
 
