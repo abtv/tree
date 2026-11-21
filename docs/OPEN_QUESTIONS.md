@@ -235,25 +235,42 @@ Whether agents and the Product Owner read the whole of §8 or §13 for a task th
 
 A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004's §13 citation valid. The Product Owner deferred the question on 2026-11-21 (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`).
 
-## TD-004: Intermittent failure of the command-panel quit test
+## TD-004: Intermittent failures of window-lifecycle E2E tests
 
 Kind: technical
 Status: Idea
 
 ### Question
 
-`e2e/electron/command-panel.spec.ts`, "Normal command panel › quits through the save-before-quit handshake with the exact q alias", failed once in a full local run and passed three times in a row when rerun alone. Is the cause the test's synchronization or a product defect in the quit path?
+Three Electron tests that exercise the window lifecycle fail now and then in full local runs and pass when rerun alone:
+
+1. `e2e/electron/command-panel.spec.ts`, "Normal command panel › quits through the save-before-quit handshake with the exact q alias".
+2. `e2e/electron/about-window.spec.ts`, "About Tree shares the renderer, uses the … palette and restores focus".
+3. `e2e/electron/selection-interruptions.spec.ts`, "continues a rich Visual selection after native window blur".
+
+For each: is the cause the test's synchronization, the test environment under parallel load, or a product defect? And do they share one cause?
 
 ### What we are watching
 
-Further failures of this test in local full runs and in CI, with their error text and trace.
+Further failures of these tests in local full runs and in CI, with their error text and trace.
 
 ### What would settle it
 
-A reproduction under load (for example `--repeat-each` in a full run) with a trace, showing whether the save completed and the application quit correctly while only the test's `keyboard.press` call failed. If the document was saved and the application closed, the fix belongs in the test; otherwise it is a quit-path defect for the defect-first workflow.
+For each test, a reproduction with a trace that shows whether the product did what the test expects while only the test's own call failed. A fix belongs in the test when the product behaved correctly; otherwise the failure is a defect for the defect-first workflow in `AGENTS.md` §9. A shared cause would justify one change instead of three.
+
+### Product Owner perspective
+
+Product Owner statement (2026-11-21): the three tests are all about the window lifecycle; investigate whether they have a common cause, without fixes, and report on each test.
 
 ### Evidence
 
 - 2026-11-21 — Usage evidence: full `npm run test:e2e` at `777ab5f` before commit; the test failed at `command-panel.spec.ts:328` with `keyboard.press: Target page, context or browser has been closed`. A focused rerun (`--repeat-each=3`) passed all three times.
 - 2026-11-21 — Usage evidence: the same failure (`keyboard.press: Target page, context or browser has been closed`) recurred in a full local `npm run test:e2e` at `782f883` with uncommitted image-size rendering changes; a focused rerun (`--repeat-each=3`) passed all three times.
 - 2026-11-21 — Agent inference, not verified: `Enter` runs the quit command, and the application can close before Playwright finishes the `keyboard.press` call, so the call fails although the expected quit happened. The trace of that run was not kept.
+- 2026-11-21 — Usage evidence: in a full run at `491d81c` with the uncommitted changes of `782f883`, test 2 failed at `about-window.spec.ts:131` after `window.mouse.click(10, 100)` closed the dialog from its backdrop: the editor was no longer the active element and the selection was at offset 0 (`active: false, anchor: 0, focus: 0`; expected `active: true, anchor: 4, focus: 4`). It passed ten times in a focused rerun. The document has no image, so the image-size code did not run.
+- 2026-11-21 — Usage evidence: in the full run at `782f883` that also failed test 1, test 3 failed with `Electron driver close timed out` and `keyboard.press: Target page, context or browser has been closed`. It passed three times in a focused rerun.
+- 2026-11-21 — Usage evidence: reproduction attempts at `72ff192`. The three specs together with `vim-navigation-and-visual.spec.ts` (`--repeat-each=4`, 6 workers) passed all 460 tests. Two full runs (`--repeat-each=2`, 2,215 tests, 10.9 minutes) reproduced only test 3, once.
+- 2026-11-21 — Usage evidence (test 3, trace of that failure): every step through `other.destroy()` (line 66) completed within about 400 ms of launch. After it, two calls to the main page never completed: the `keyboard.press('h')` at line 68 and a concurrent fixture evaluation of `.save-error`. The test reached its 60-second timeout, and teardown then failed with `Renderer error collection timed out.` The main page stopped answering the driver after the second native window was destroyed. Whether the renderer hung or only the driver connection stalled is not known. This is the only spec that launches a visible window (`windows: 'visible'`); the other 5 workers run hidden windows.
+- 2026-11-21 — Repository fact (test 1): the command panel runs a command on the `Enter` keydown (`src/renderer/use-command-panel.ts`, keydown handler), and `keyboard.press` sends keyup after keydown. `e2e/electron/persistence-lock.spec.ts` (around line 286, added in `ef9dfdd`) already handles the same error on a quit, with the comment "Immediate quit can close the CDP target before Playwright sends Enter's keyup". This supports the earlier inference that test 1 is a test-synchronization failure. Whether the document was saved in the failing runs was not observed.
+- 2026-11-21 — Agent inference (test 2), not reproduced: the observed state is what a press on the window outside the editor leaves: focus off the editor and the selection collapsed at the start. The dialog restores focus synchronously when the backdrop click closes it (`src/renderer/about-dialog.ts`, `captureFocusRestoration`), so that state suggests the pointer press reached the page after the dialog had closed, or that focus moved again after the restoration. No trace was kept.
+- 2026-11-21 — Agent inference: no single shared cause is established. The three failures have different mechanisms: a keyup sent after the application quit (test 1), a focus assertion after a modal dialog closes (test 2), and a page that stops answering the driver after a native window is destroyed (test 3). Their only established common factor is load: each failed only in a full run with 6 workers and passed alone. Cheapest next experiments: for test 1, the keyup guard of `persistence-lock.spec.ts` plus a saved-document check after the quit; for test 2, record the active element and pointer and focus events around the backdrop click; for test 3, repeat the full run and, on failure, check whether the main window's renderer still answers through the main process.
