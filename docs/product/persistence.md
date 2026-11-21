@@ -37,7 +37,7 @@ Every Tree release must open valid notes saved in any document format used by an
 
 The main window's size and position must persist between application restarts. On the next launch, the application restores the last saved size and position. If no valid window geometry has been saved, the application uses its default window size and position.
 
-When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within a bounded time or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.
+When the user quits, the application waits for queued automatic saves to finish. If saving cannot finish within five seconds or reports an error, the application remains open and displays the failure so the user can retry without silently losing changes. In the locked save-failure state, the user can also explicitly confirm quitting without saving, as defined in §16.2. A terminated renderer process is the exception defined in §21.
 If a Find jump completes during saving, the final save includes its destination and any opened branches. A jump still pending when the final save completes cannot move the selection afterward.
 
 Pending cut and paste operations, including image attachment writes, must finish and their resulting document changes must be saved before quit completes. Successful attachment cleanup does not resolve a failed document save; that failure remains visible and blocks quit until a document save succeeds.
@@ -67,7 +67,7 @@ The following state must be persisted:
 
 On launch, the application scrolls so the selected node's row sits at the same distance from the top of the window as when the document was saved, or as close to it as a shorter window allows while showing the whole row, and keeps it there while rows and images finish laying out, until the user scrolls, types, or clicks. When scrolling had moved the selected row off-screen, it is shown at the nearest edge of the visible content area instead (below the toolbar at the top), so the selected node is always visible at launch.
 
-Scrolling by the user is a pending change like a selection change, and every save, including the quit flush, records the position shown at that moment.
+Scrolling by the user is a pending change like a selection change, but it does not reset an idle timer that is already running, so continuous scrolling cannot postpone the idle save of an earlier change. Every save, including the quit flush, records the position shown at that moment.
 
 The scroll position is restored only at launch; the restore does not apply to navigation within a running session.
 

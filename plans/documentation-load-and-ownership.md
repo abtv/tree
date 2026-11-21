@@ -1,6 +1,6 @@
 # Documentation Load and Ownership
 
-**Authorization state:** Authorized by the Product Owner on 2026-11-21 for the whole initiative (Q6). Q1–Q5 are answered (see Owner Questions). In progress.
+**Authorization state:** Authorized by the Product Owner on 2026-11-21 for the whole initiative (Q6). Q1–Q5 are answered (see Owner Questions). T1–T5 are done. Awaiting owner acceptance.
 
 ## Objective
 
@@ -129,7 +129,7 @@ All other `DEVELOPMENT.md` §8/§9/§10 citations name content that stays in pla
 | T2 | §8 and §10 reference material moved to the reference document | T1 | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `e2e/electron/AGENTS.md`, `src/web/README.md`, `scripts/check-opencode-permissions.mts` (comment only), this plan | Low (`npm run check`, plus `npm run check:opencode`) | Every removed paragraph unit occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement after | None required | Done |
 | T3 | One owner for each of release rules 1–4 | T1, Q5 (answered) | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `docs/releasing.md`, `deployment/github-pages/README.md`, `docs/ARCHITECTURE.md` §2, this plan | Minimal + `check:opencode` | Each rule appears in full once; other copies cite it; manual link check | None required | Done |
 | T4 | Rows 6, 7 and 15 resolved | none | `docs/ARCHITECTURE.md` §§2, 7, 11, this plan | Minimal | Code constants match the specification; diff contains only the citation sentences | None required | Done |
-| T5 | Rows 1 and 4 resolved | Q2, Q3 | `docs/ARCHITECTURE.md` §§7, 9, 13, `docs/product/persistence.md`, this plan | Minimal | Owner answers applied; existing automated coverage named | None required | Planned |
+| T5 | Rows 1 and 4 resolved | Q2, Q3 | `docs/ARCHITECTURE.md` §§7, 9, 13, `docs/product/persistence.md`, this plan | Minimal | Owner answers applied; existing automated coverage named | None required | Done |
 | T6 | Closure after acceptance | Acceptance | this plan, `plans/README.md` | Minimal | Plan and index row removed | None | Planned |
 
 Validation commands for each tier:
@@ -301,14 +301,19 @@ The question texts below are kept as the record of what was asked.
   * Row 6: `src/shared/png-validation.ts` sets `MAX_ATTACHMENT_DIMENSION = 32_767` and `MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024` (67,108,864), equal to `docs/product/images.md` §17. `ARCHITECTURE.md` §7 now cites the §17 pixel limits.
   * Row 7: `docs/product/editing.md` §10 defines the history limit, the history entry and the discard rule. `ARCHITECTURE.md` §11 now cites them and keeps the redo-stack bound, which `src/application/editor-history.ts` enforces on `future` with `HISTORY_LIMIT`.
   * Row 15: `ARCHITECTURE.md` §2 cites `SECURITY.md#browser-publication` and lists no trusted parties. No edit.
+* T5 results:
+  * Row 1 (Q2): `docs/product/persistence.md` §16.1 now says "within five seconds". `ARCHITECTURE.md` §7 cites the §16.1 time limit for the quit save. §13 cites §16.1 and §16.2 for the quit flush, failure reporting and locked-state confirmation, cites §9.2 and §16.1 for window close, and no longer restates the "every keystroke" rule or the structural-command trigger. Its sentence "resets the idle timer on every persisted change" became "resets or arms the idle timer … as that policy requires", because the scrolling rule is an exception.
+  * Row 4 (Q3): §16.1 now states that scrolling does not reset an idle timer that is already running. `ARCHITECTURE.md` §13 cites that rule and names `noteViewportChange` and `EditorSaveScheduler.markPersistedChangeWithoutDelay` as mechanism. §9 cites the §16.1 persisted-state list and keeps `selectedRowTop`.
+  * Existing automated coverage: the five-second value is asserted by `e2e/electron/quit-timer.ts` (`captureQuitTimer`, used by `e2e/electron/shutdown-failures.spec.ts`); the timeout result by `src/electron/main/quit-handshake.test.ts` ("reports a timeout and permits a later request"). The scrolling rule is asserted by `src/application/editor-save-scheduler.test.ts` ("does not postpone an armed idle save for a change without delay", "arms an idle save for a change without delay after an immediate save cleared the timer") and `src/application/editor-store.test.ts` ("never postpones an idle save already armed when the user scrolls").
+  * No ADR cites the replaced text.
 * The primary planning session confirmed at 421359d: `src/electron/main/quit-handshake.ts:23` sets `timeoutMilliseconds = 5_000`; `docs/ARCHITECTURE.md` line 456 states "32767 pixels per side and 64 megapixels in total"; line 901 states that a scroll "never resets an idle timer that is already armed".
 
 ## Next Task
 
-T5. It is authorized (whole-initiative approval of 2026-11-21) and ready; Q2 and Q3 are answered.
+None until the Product Owner accepts the result (see Owner Involvement, "After T5"). After explicit acceptance, T6 closes the initiative. A rejection keeps the plan open for repairs within the recovery allowance.
 
 ## Next-Session Prompt
 
 ```text
-Continue plans/documentation-load-and-ownership.md: execute the first task in the Tasks table whose status is not Done. The Product Owner authorized the whole initiative on 2026-11-21 and answered Q1–Q6; do not ask again. Follow the task's section, the Scope Limits, and the Citation Inventory; record the Baseline measurements that T1 and T2 require. Validate at the task's tier, review the diff, commit with the plan status and next-task update, and continue while the budget allows. After T5, set the plan and its index row to Awaiting owner acceptance and send the final report with the before and after measurements.
+plans/documentation-load-and-ownership.md is Awaiting owner acceptance. If the Product Owner has explicitly accepted the result, execute T6: remove the plan and its row in plans/README.md and commit. If they rejected it, record the reported issues in the plan and repair them within the recovery allowance. Otherwise do nothing.
 ```
