@@ -215,6 +215,116 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 | Emoji completion | 4,499 B | 127, plus a 1,915-line catalog | 13 | 498 | 768 lines, 9 tests | Smoke scenario |
 
 - 2026-11-21 — Repository fact: a removed section's number is retired, not reused (`docs/PRODUCT.md`), and tests cite sections through `@requirement` markers that `npm run check:requirements` checks.
+- 2026-11-21 — Repository fact: with empty input, the Search popup lists marked and starred nodes before up to eight recent nodes (§20.14).
+
+### Decision and rationale
+
+- 2026-11-21 — Remove Summarize (§15.2): the Product Owner does not use it. The removal is a separate product change.
+- 2026-11-21 — Keep Vim mode complete: the Product Owner uses every command family, including case changes, surround, node operations and `Ctrl+A`/`Ctrl+X`.
+- 2026-11-21 — Keep the browser version, Search, desktop and browser export, import and backup, Image to Text, the command panel, images and attachments, clipboard and links, node states, drag and drop, inline expansion, desktop updates, Appearance, emoji completion and Agenda. Improvements are open in PD-009 (Agenda), PD-011 (Search), PD-012 (command panel) and PD-014 (Image to Text in the browser).
+- Still open: Recent nodes. Product Owner statement: probably not needed, given stars, marks and global search. Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.
+
+## PD-009: How to improve Agenda
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): Agenda should be improved, but how is not yet known. Which Agenda problems in ordinary use are worth solving? Dates and date completion (PD-010) may be part of the answer.
+
+### What we are watching
+
+Moments in ordinary use when Agenda (§23) is slow, confusing or missing something, with what was being attempted.
+
+### What would settle it
+
+A list of concrete Agenda problems from use. Each becomes its own product change or question. Without such problems, Agenda stays as specified.
+
+## PD-010: Dates and date completion
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): dates and date completion (§20.9–20.11, §23.2) are in question and need research, probably together with Agenda (PD-009). What does not work for the Product Owner is not yet recorded.
+
+### What we are watching
+
+Each time a typed, completed or displayed date in Tree or Agenda is unexpected or awkward, with what was intended.
+
+### What would settle it
+
+Research that compares the observed problems with the current date model, followed by a Product Owner choice: keep, change together with Agenda, or simplify.
+
+## PD-011: Two search interfaces
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): there are currently two versions of search, and Search should be improved, but how is not yet known. Repository fact: local search in the current view (`/` and `Cmd+F`, §20.2.26) uses the status bar in Vim and a Find panel in standard editing; document-wide node search is `Cmd+;` (§20.14). Which two versions the Product Owner means is not yet recorded. PD-001 asks the related retrieval question.
+
+### What we are watching
+
+Which search is used for which purpose in ordinary use, and when the wrong one is opened or neither finds the note.
+
+### What would settle it
+
+The Product Owner names the two versions and the friction between them. Agent inference: the options include merging them, separating their purposes more clearly, or changing one of them.
+
+## PD-012: The `:` prompt of the command panel in standard editing
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): `:` suits the command panel in Vim, but showing `:` in standard editing is strange and should be adjusted. Repository fact: `Cmd+Shift+P` opens the panel in both editing modes, and its input line always starts with `:` (§20.2.28). The standard-editing presentation is not decided.
+
+### What we are watching
+
+Whether the prompt feels out of place when the panel is opened from standard editing.
+
+### What would settle it
+
+A Product Owner choice of the standard-editing prompt, checked against the platform conventions of `docs/PRODUCT.md` §1.3. Agent inference: the options include no prefix, an icon, or placeholder text.
+
+## PD-013: Whether `#` tags and `&` events are useful
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): `@` people are definitely used; `#` tags and `&` events were expected to be useful, but whether they are is not yet known. Each marker kind has its own completion catalog, highlighting and search terms (§20.13, §20.14.4).
+
+### What we are watching
+
+Whether `#` and `&` are typed or searched in ordinary use.
+
+### What would settle it
+
+A period of ordinary use. An unused marker kind becomes a removal candidate under PD-008; a used one stays.
+
+## PD-014: Image to Text in the browser version
+
+Kind: product
+Status: Idea
+
+### Question
+
+Product Owner statement (2026-11-21): the browser version will need image text recognition for feature parity, later. Repository fact: Image to Text runs only on Apple Silicon macOS Electron (§15.1).
+
+### What we are watching
+
+Browser use with images whose text should be searchable.
+
+### What would settle it
+
+The Product Owner decides when to start. A browser recognition approach then needs research and an architecture decision, since it may add a dependency or a service.
 
 ## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
 
