@@ -125,7 +125,8 @@ it('resets the desired column after a horizontal command', async () => {
   expect(f.vim.commandState.verticalGoal?.left).toBe(32)
 })
 
-it('reseeds the desired column from the carried offset after crossing an image during a count', async () => {
+// @requirement PRODUCT.md §20.2.9
+it('restarts the desired column at zero after leaving an image during a count', async () => {
   const f = await fixture(true)
   let caret: VimCaretState = { cursor: 5, imageActive: false }
   const apply = f.vim.applyCaretState!
@@ -146,14 +147,14 @@ it('reseeds the desired column from the carried offset after crossing an image d
   f.press('j')
 
   expect(f.snapshot().agenda?.selectedKey).toBe(f.rows[1]!.key)
-  expect(caret).toEqual({ cursor: 9, imageActive: false })
-  expect(f.vim.commandState.verticalGoal?.left).toBe(36)
+  expect(caret).toEqual({ cursor: 0, imageActive: false })
+  expect(f.vim.commandState.verticalGoal?.left).toBe(0)
 
   f.press('k')
   f.press('k')
 
   expect(f.snapshot().agenda?.selectedKey).toBe(f.rows[0]!.key)
-  expect(caret).toEqual({ cursor: 34, imageActive: false })
+  expect(caret).toEqual({ cursor: 30, imageActive: false })
 })
 
 it('uses local caret state and line reveal for a wrapped row without an editor', async () => {

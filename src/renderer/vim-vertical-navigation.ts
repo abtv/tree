@@ -55,11 +55,12 @@ export function navigateVertically({
         : true
       : rowIndex < 0 ||
         (direction === 'down' ? rowIndex < rows.length - 1 : rowIndex > 0 || before.location.currentParentId !== null)
+    // Every node's image is a step, so a count consumes the same steps as repeated single motions.
     const step = verticalCaretTransition(
       caret,
       direction,
       currentNode.text.length,
-      currentNode.id === node.id && currentNode.attachment !== undefined,
+      currentNode.attachment !== undefined,
       canCrossNode,
     )
     if (!step.crossNode) {
@@ -73,11 +74,11 @@ export function navigateVertically({
       continue
     }
 
-    const focusCursor = index === 0 ? step.focusCursor : navigationCursor
-    store.moveSelection(direction, focusCursor)
     // Mutation triage: an upward crossing with the image active only happens for an image-only node,
     // whose cursor is already `0`, so resetting the navigation cursor for both directions is a no-op.
-    if (index === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
+    if (direction === 'down' && caret.imageActive) navigationCursor = 0
+    const focusCursor = index === 0 ? step.focusCursor : navigationCursor
+    store.moveSelection(direction, focusCursor)
     const after = store.getSnapshot()
     if (after.status !== 'ready') break
     // Mutation triage: a ready snapshot always carries `focus` and `document` (see `EditorSnapshot`),
@@ -105,8 +106,7 @@ export function navigateVertically({
       true,
       direction === 'up' && crossedToDifferentNode,
     )
-    // Retain the existing counted-image arrival offset; wrapped text only changes text-line steps.
-    if (crossedToDifferentNode && currentNode.text.length > 0 && !(leftImage && index > 0 && direction === 'down')) {
+    if (crossedToDifferentNode && currentNode.text.length > 0) {
       const lineCursor = textLineCursor?.(currentNode, caret.cursor, true, direction === 'down' && leftImage)
       if (lineCursor !== undefined)
         caret =

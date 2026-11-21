@@ -159,38 +159,59 @@ describe('read-only Agenda keyboard', () => {
     }
   })
 
-  it.each(['down', 'up'] as const)(
-    'matches Tree when a counted motion passes an intermediate image moving %s',
-    async (direction) => {
-      const f = await fixture({
+  // @requirement PRODUCT.md §20.2.9
+  it.each([
+    ['down', 1],
+    ['down', 2],
+    ['down', 3],
+    ['down', 4],
+    ['up', 1],
+    ['up', 2],
+    ['up', 3],
+    ['up', 4],
+  ] as const)(
+    'counts an intermediate image as one step moving %s, so a count of %i equals repeated motions',
+    async (direction, count) => {
+      const document_ = {
         roots: [
           { id: 'before', text: '2026-10-15 Before', children: [] },
           { id: 'image', text: '2026-10-15 Image', children: [], attachment: { id: 'image', mimeType: 'image/png' } },
           { id: 'after', text: '2026-10-15 After', children: [] },
         ],
-      })
+      } satisfies Document
       const source = direction === 'down' ? 'before' : 'after'
-      const destination = direction === 'down' ? 'after' : 'before'
-      const row = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === source)!
-      f.store.applyAgenda({ kind: 'select', key: row.key, cursor: 4 })
-      const input = document.createElement('textarea')
-      input.className = 'node-input'
-      input.value = `2026-10-15 ${source}`
-      document.body.append(input)
-      setCaret(input, 4)
-      const handler = createAgendaKeyDownHandler({ store: f.store, vim: f.vim })
-      try {
-        handler({ key: '2', currentTarget: input, preventDefault: vi.fn() } as unknown as KeyboardEvent<HTMLElement>)
-        handler({
-          key: direction === 'down' ? 'j' : 'k',
-          currentTarget: input,
-          preventDefault: vi.fn(),
-        } as unknown as KeyboardEvent<HTMLElement>)
+      const key = direction === 'down' ? 'j' : 'k'
+      const run = async (keys: readonly string[]) => {
+        const f = await fixture(document_)
+        const row = f.store.getAgendaRows().find((row) => row.kind === 'node' && row.nodeId === source)!
+        f.store.applyAgenda({ kind: 'select', key: row.key, cursor: 4 })
+        const input = document.createElement('textarea')
+        input.className = 'node-input'
+        document.body.append(input)
+        let caret: VimCaretState = { cursor: 4, imageActive: false }
+        f.vim.getCaretState = () => caret
+        f.vim.applyCaretState = (_id, next) => {
+          caret = next
+        }
+        const handler = createAgendaKeyDownHandler({ store: f.store, vim: f.vim })
+        try {
+          for (const pressed of keys) {
+            const event = { key: pressed, currentTarget: input, preventDefault: vi.fn() }
+            handler(event as unknown as KeyboardEvent<HTMLElement>)
+          }
+        } finally {
+          input.remove()
+        }
+        return { nodeId: f.snapshot().location.selectedNodeId, agenda: f.snapshot().agenda, caret }
+      }
 
-        expect(f.snapshot().location.selectedNodeId).toBe(destination)
-        expect(f.snapshot().focus.cursor).toBe(4)
-      } finally {
-        input.remove()
+      const counted = await run(count === 1 ? [key] : [String(count), key])
+      const repeated = await run(Array.from({ length: count }, () => key))
+
+      expect(counted).toEqual(repeated)
+      if (count === 2) {
+        expect(counted.nodeId).toBe('image')
+        expect(counted.caret.imageActive).toBe(direction === 'down')
       }
     },
   )
@@ -251,13 +272,13 @@ describe('read-only Agenda keyboard', () => {
       press('j')
 
       expect(f.snapshot().location.selectedNodeId).toBe('after')
-      expect(f.snapshot().focus.cursor).toBe(input.value.length - 1)
+      expect(f.snapshot().focus.cursor).toBe(0)
 
       press('k')
 
       expect(f.snapshot().location.selectedNodeId).toBe('image')
       expect(caret.imageActive).toBe(true)
-      expect(caret.imageTextReturnCursor).toBe(input.value.length - 1)
+      expect(caret.imageTextReturnCursor).toBe(0)
     } finally {
       input.remove()
     }

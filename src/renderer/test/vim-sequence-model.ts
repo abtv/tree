@@ -129,18 +129,19 @@ export function expectedStep(state: SequenceExpected, specs: readonly SequenceSp
     }
     return
   }
+  // A count takes the same steps as repeating the motion, including every node's image step.
   let navigationCursor = state.cursor
   for (let step = 0; step < count; step += 1) {
     const current = specs[state.index]!
     const currentLength = state.texts[state.index]!.length
-    if (step === 0 && key === 'j' && current.image && !state.image && state.cursor < currentLength) {
+    if (key === 'j' && current.image && !state.image && state.cursor < currentLength) {
       state.returned = state.cursor
       state.cursor = currentLength
       state.image = true
       navigationCursor = currentLength
       continue
     }
-    if (step === 0 && key === 'k' && current.image && state.image && currentLength > 0) {
+    if (key === 'k' && current.image && state.image && currentLength > 0) {
       state.cursor = state.returned ?? currentLength - 1
       state.image = false
       state.returned = undefined
@@ -149,8 +150,8 @@ export function expectedStep(state: SequenceExpected, specs: readonly SequenceSp
     }
     const nextIndex = state.index + (key === 'j' ? 1 : -1)
     if (nextIndex < 0 || nextIndex >= specs.length) break
+    if (key === 'j' && state.image) navigationCursor = 0
     const requested = step === 0 ? (key === 'j' && state.image ? 0 : state.cursor) : navigationCursor
-    if (step === 0 && key === 'j' && state.image) navigationCursor = 0
     state.index = nextIndex
     const destination = specs[nextIndex]!
     const destinationLength = state.texts[nextIndex]!.length

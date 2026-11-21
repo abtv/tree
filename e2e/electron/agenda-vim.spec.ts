@@ -581,7 +581,8 @@ test.describe('Agenda Vim commands', () => {
   })
 
   // @requirement PRODUCT.md §23.4
-  test('vertical navigation enters and leaves images and preserves a clamped image return position', async ({
+  // @requirement PRODUCT.md §20.2.9
+  test('vertical navigation enters and leaves images and counts them like repeated motions', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
@@ -612,12 +613,16 @@ test.describe('Agenda Vim commands', () => {
     await window.keyboard.press('j')
     await window.keyboard.press('k')
     await window.keyboard.type('2j')
+
+    await expect(window.locator('.node-row[data-node-id="after"] .node-input')).toBeFocused()
+    expect(await caretOffset(window.locator('.node-row[data-node-id="after"] .node-input'))).toBe(0)
+
     await window.keyboard.press('k')
     await window.keyboard.press('k')
 
     const returnedColumn = await caretOffset(treeInput)
 
-    expect(returnedColumn).toBe('2026-10-09 Image'.length - 1)
+    expect(returnedColumn).toBe(0)
 
     await openAndSelect(window, nodeKey(10, 9, 'image'))
     const imageRow = row(window, nodeKey(10, 9, 'image'))
@@ -683,7 +688,8 @@ test.describe('Agenda Vim commands', () => {
 
     await window.keyboard.type('2k')
 
-    await expect(row(window, nodeKey(10, 9, 'before'))).toHaveAttribute('aria-selected', 'true')
+    await expect(imageRow).toHaveAttribute('aria-selected', 'true')
+    await expect(image).not.toHaveClass(/attachment-image-caret/)
 
     await window.keyboard.type('2j')
 

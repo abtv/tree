@@ -181,7 +181,8 @@ export function createAgendaKeyDownHandler({
             caret,
             direction,
             textOf(current).length,
-            current.key === row.key && hasImage(current),
+            // Every row's image is a step, so a count consumes the same steps as repeated single motions.
+            hasImage(current),
             nextIndex !== position,
           )
           if (!step.crossNode) {
@@ -191,9 +192,9 @@ export function createAgendaKeyDownHandler({
             publishCaret(current, caret)
             continue
           }
-          const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
           const leftImage = caret.imageActive
-          if (stepIndex === 0 && direction === 'down' && caret.imageActive) navigationCursor = 0
+          if (direction === 'down' && leftImage) navigationCursor = 0
+          const cursor = stepIndex === 0 ? step.focusCursor : navigationCursor
           current = rows[nextIndex]!
           position = nextIndex
           caret = focusCaretTransition(
@@ -204,7 +205,7 @@ export function createAgendaKeyDownHandler({
             true,
             direction === 'up' && hasImage(current),
           )
-          if (textOf(current).length > 0 && !(leftImage && stepIndex > 0 && direction === 'down')) {
+          if (textOf(current).length > 0) {
             if (direction === 'down' && leftImage) preferredLeft = 0
             const measured = geometry(current)
             const entering =

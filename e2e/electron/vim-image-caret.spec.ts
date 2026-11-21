@@ -838,6 +838,7 @@ test.describe('Vim editing: image caret', () => {
     )
   })
 
+  // @requirement PRODUCT.md §20.2.9
   test('counts the image row when moving from text to the next sibling', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
@@ -858,7 +859,7 @@ test.describe('Vim editing: image caret', () => {
     await withImage.press('j')
 
     await expect(node(window, 2)).toBeFocused()
-    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 3)
+    await expect(node(window, 2)).toHaveJSProperty('selectionStart', 0)
 
     await node(window, 2).press('k')
 
@@ -867,7 +868,7 @@ test.describe('Vim editing: image caret', () => {
     await withImage.press('k')
 
     await expect(withImage).not.toHaveClass(/node-input-image-caret/)
-    await expect(withImage).toHaveJSProperty('selectionStart', 3)
+    await expect(withImage).toHaveJSProperty('selectionStart', 0)
   })
 
   test('leaves an image through a pointer focus change without leaving Normal mode', async ({ userDataDir }) => {
@@ -1010,7 +1011,8 @@ test.describe('Vim editing: image caret', () => {
     expect(await offset(image)).toBe(3)
   })
 
-  test('moves focus across an image-bearing sibling with counted k', async ({ userDataDir }) => {
+  // @requirement PRODUCT.md §20.2.9
+  test('stops counted k on the text of an image-bearing sibling before moving past it', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -1030,6 +1032,12 @@ test.describe('Vim editing: image caret', () => {
     await last.press('2')
     await last.press('k')
 
+    const middle = node(window, 2)
+
+    await expect(middle).toBeFocused()
+    await expect(middle).not.toHaveClass(/node-input-image-caret/)
+
+    await middle.press('k')
     const first = node(window, 1)
 
     await expect(first).toBeFocused()

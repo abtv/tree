@@ -195,7 +195,7 @@ describe('Vim vertical navigation', () => {
   })
 
   // @requirement PRODUCT.md §4.3
-  it('preserves the carried column through an image-only row during counted text-line navigation', () => {
+  it('starts the next node at text position zero when a counted motion leaves an image-only row', () => {
     const first = node('a', 'abcdef')
     const image = { ...node('b', ''), attachment: IMAGE }
     const last = node('c', 'ghijkl')
@@ -209,13 +209,89 @@ describe('Vim vertical navigation', () => {
       direction: 'down',
       count: 2,
       applyCaretState,
-      textLineCursor: (target, _cursor, entering) => (entering && target.text.length > 0 ? 0 : undefined),
+      textLineCursor: (target, cursor, entering, resetColumn) =>
+        entering && target.text.length > 0 ? (resetColumn ? 0 : cursor) : undefined,
     })
 
     expect(applyCaretState.mock.calls.map((call) => call[1])).toEqual([
       { cursor: 0, imageActive: true, imageTextReturnCursor: undefined },
-      { cursor: 2, imageActive: false, imageTextReturnCursor: undefined },
+      { cursor: 0, imageActive: false },
     ])
+  })
+
+  // @requirement PRODUCT.md §20.2.9
+  it.each([
+    ['down', 'a', 1],
+    ['down', 'a', 2],
+    ['down', 'a', 3],
+    ['down', 'a', 4],
+    ['up', 'c', 1],
+    ['up', 'c', 2],
+    ['up', 'c', 3],
+    ['up', 'c', 4],
+  ] as const)(
+    'counts an intervening image as one step moving %s from %s, so a count of %i equals repeated motions',
+    (direction, start, count) => {
+      const roots = [node('a', 'abcdef'), { ...node('b', 'ghijkl'), attachment: IMAGE }, node('c', 'mnopqr')]
+      const textLineCursor = (target: TreeNode, cursor: number, entering: boolean, resetColumn?: boolean) =>
+        entering && target.text.length > 0 ? (resetColumn ? 0 : Math.min(cursor, target.text.length - 1)) : undefined
+      const startNode = roots.find((root) => root.id === start)!
+      const counted = store({ roots }, start, null)
+      const countedCarets = vi.fn()
+      const repeated = store({ roots }, start, null)
+      let repeatedNode: TreeNode = startNode
+      let repeatedCaret = { cursor: 2, imageActive: false } as Parameters<typeof navigateVertically>[0]['caret']
+
+      navigateVertically({
+        store: counted,
+        node: startNode,
+        caret: { cursor: 2, imageActive: false },
+        direction,
+        count,
+        applyCaretState: countedCarets,
+        textLineCursor,
+      })
+      for (let step = 0; step < count; step += 1) {
+        navigateVertically({
+          store: repeated,
+          node: repeatedNode,
+          caret: repeatedCaret,
+          direction,
+          count: 1,
+          applyCaretState: (nodeId, caret) => {
+            repeatedNode = roots.find((root) => root.id === nodeId)!
+            repeatedCaret = caret
+          },
+          textLineCursor,
+        })
+      }
+
+      expect(counted.snapshot.location.selectedNodeId).toBe(repeatedNode.id)
+      expect(countedCarets.mock.lastCall?.[1]).toEqual(repeatedCaret)
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.9
+  it.each([
+    ['down', 'a', 'b', { cursor: 6, imageActive: true, imageTextReturnCursor: 2 }],
+    ['up', 'c', 'b', { cursor: 2, imageActive: false }],
+  ] as const)('stops a counted %s motion from %s on the intervening image step', (direction, start, end, caret) => {
+    const roots = [node('a', 'abcdef'), { ...node('b', 'ghijkl'), attachment: IMAGE }, node('c', 'mnopqr')]
+    const navigationStore = store({ roots }, start, null)
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: roots.find((root) => root.id === start)!,
+      caret: { cursor: 2, imageActive: false },
+      direction,
+      count: 2,
+      applyCaretState,
+      textLineCursor: (target, _cursor, entering) => (entering && target.text.length > 0 ? 2 : undefined),
+    })
+
+    expect(navigationStore.snapshot.location.selectedNodeId).toBe(end)
+    expect(applyCaretState.mock.lastCall?.[1]).toEqual(caret)
   })
 
   it('consumes wrapped text steps before entering an image in a counted motion', () => {
@@ -403,7 +479,7 @@ describe('Vim vertical navigation', () => {
     ])
   })
 
-  it('keeps the starting column when a later step passes through an image-only node', () => {
+  it('restarts the column at zero when a later step leaves an image-only node', () => {
     const roots = [
       node('a', 'abcdef'),
       { ...node('b', ''), attachment: IMAGE },
@@ -424,8 +500,8 @@ describe('Vim vertical navigation', () => {
 
     expect(moveSelection.mock.calls).toEqual([
       ['down', 2],
-      ['down', 2],
-      ['down', 2],
+      ['down', 0],
+      ['down', 0],
     ])
   })
 
