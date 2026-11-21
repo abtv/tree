@@ -130,7 +130,7 @@ An archive holds at most 65,535 entries (`document.json` and 65,534 images). `do
 
 **Export Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while another export or an import (§24.4) runs.
 
-Choosing it closes the menu and first saves pending edits, as Quit does. It then exports the saved document and every referenced image in browser storage. Stored images that the document no longer references are not exported. Export never changes the stored notes.
+Choosing it closes the menu and first saves pending edits, as Quit does. It then exports the saved document and every referenced image in browser storage. Stored images that the document does not reference are not exported. Export never changes the stored notes.
 
 Export runs in the background, and editing remains available. Changes made after the export started are not part of the archive.
 
@@ -195,9 +195,9 @@ Cancel, at any point before Replace Notes, leaves the notes unchanged. A failure
 
 ### 24.5 Automatic Folder Backup
 
-**Back Up to Folder…** appears in the Data block only when the browser provides a directory picker and writable file handles (Chromium-based browsers). It has no dedicated shortcut and must also be available in the command panel (§20.2.28). Choosing it opens a read/write folder picker. Cancelling leaves the backup choice and all files unchanged. It is disabled while another Data operation runs or editing is locked (§16.2).
+**Back Up to Folder…** appears in the Data block only when the browser provides a directory picker and writable file handles (Chromium-based browsers). Like the other Data controls, it follows the shortcut and command-panel rule of §24. Choosing it opens a read/write folder picker. Cancelling leaves the backup choice and all files unchanged. It is disabled while another Data operation runs or editing is locked (§16.2).
 
-A new folder starts a backup after pending edits are saved and the folder choice is stored. The choice belongs to this browser profile and origin, in the existing preferences store. An active backup changes the command to **Stop Backing Up**. Stopping removes the choice and stops the worker; it never removes files. Choose Back Up to Folder… again to change folders.
+A new folder starts a backup after pending edits are saved and the folder choice is stored. The choice belongs to this browser profile and origin and is stored with Tree's other preferences. An active backup changes the command to **Stop Backing Up**. Stopping removes the choice and stops the worker; it never removes files. Choose Back Up to Folder… again to change folders.
 
 If the chosen folder contains `document.json`, Tree opens **This Folder Already Contains Notes** with the folder name and an explanation of replacement. It offers **Restore from This Folder**, **Replace Backup with Current Notes**, **Choose Another Folder**, and default **Cancel**. Escape cancels. Nothing is overwritten before an explicit Replace choice. Unrelated folder content and existing image files are kept.
 
@@ -249,7 +249,7 @@ leaves the installed version usable. Updates never clear or upload notes.
 
 When the new version is ready, **Update App** appears at the bottom of the ellipsis menu and
 a small dot appears on its trigger. The trigger also describes the update for assistive
-technology. The dot shares the existing backup-attention position. No update prompt steals
+technology. The dot shares the position of the backup-attention dot of §24.5. No update prompt steals
 focus or reloads an open editor. Applying a waiting update requires no network connection.
 
 Update App saves pending work, including buffered Vim edits, before activating the new package
@@ -260,8 +260,8 @@ Repeated requests do not start concurrent updates. A running data operation must
 An update can also run from the document-load error screen. It preserves the unopened document.
 
 If other Tree tabs or windows are open, Tree asks the user to close them and retry, without
-activating the update. This edge follows the durability principle (§1.1) and the existing single
-writer restriction: an update must not switch another window's runtime underneath its work.
+activating the update. This edge follows the durability principle (§1.1) and the single writer
+restriction of §1.4: an update must not switch another window's runtime underneath its work.
 These controls and the offline package apply only to the browser version, not Electron.
 
 If a new tab arrives during the final switch, it displays a message asking the user to reload before opening the editor. The same other-window check applies when the first page needs to reload an already installed package. If an older worker cannot check open tabs or confirm activation, Tree saves the notes and asks the user to close all Tree tabs and reopen the app.
