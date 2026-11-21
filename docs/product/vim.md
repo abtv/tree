@@ -211,7 +211,7 @@ Normal mode also supports:
 * Each structural repetition is a separate undoable command and subtree puts assign fresh IDs on every repetition.
 * A repeated whole-node mutation applies to the original number of siblings starting at the current node; if that many siblings are unavailable, it makes no change.
 * A repeated `p` applies the put rule above to the current node, so it goes into the first children of an expanded branch or the current-parent heading, and after a collapsed branch or a leaf.
-* A repeated put uses the originally incoming value and copy count even if a Visual `p` has since exchanged the register; `gp` and `gP` retain their post-put destination.
+* A repeated put uses the originally incoming value and copy count even if a Visual `p` has since exchanged the register; a repeated `gp` or `gP` uses the post-put destination of §20.2.13.
 * Motions, yanks, and failed changes do not replace the saved change.
 * Every individual command and repetition is atomic: when it cannot complete in full, it changes neither the document, the register, the history, the focus, nor the saved change for `.`.
 
@@ -281,7 +281,7 @@ Normal mode also supports:
 * The move keeps the editing mode, focus, caret, and text selection. In Normal mode it discards an unfinished command. In Replace mode it commits any buffered replacement as one undoable edit, performs the move as a separate command, and continues in Replace mode with a new replacement session at the same caret. In Insert mode the move ends the current text undo session and keeps Insert mode active.
 * Whole-node Visual mode keeps its range through the move, and an active image caret keeps its saved text position.
 * Each Tab press requests one level and uses the same maximum-depth behavior as `>` and `<`.
-* When the current parent is a zoomed node, Shift+Tab does not move a direct child of that node, or a selected range of its direct children, outside the current location; it is a no-op that preserves the pending edit session and editor state. A deeper descendant may move out one level when it remains inside the current parent's subtree. This location boundary applies to Tab shortcuts only; Vim `<` retains its separately specified behavior.
+* When the current parent is a zoomed node, Shift+Tab does not move a direct child of that node, or a selected range of its direct children, outside the current location; it is a no-op that preserves the pending edit session and editor state. A deeper descendant may move out one level when it remains inside the current parent's subtree. This location boundary applies to Tab shortcuts only, not to Vim `<`.
 * Outside a node editor, Tab and Shift+Tab retain native focus traversal, including navigation to the status-bar controls. This node-focused Tab behavior is a deliberate exception to macOS focus traversal, in service of the keyboard-first editing model (§1.1).
 
 #### 20.2.25 Restoring a Selection with gv
