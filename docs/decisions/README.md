@@ -33,5 +33,6 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0027](0027-starred-nodes-in-schema-version-5.md) | Starred Nodes in Schema Version 5 | Accepted | 2026-11-16 |
 | [0028](0028-expansion-views-of-starred-nodes.md) | Expansion Views of Starred Nodes | Accepted | 2026-11-19 |
 | [0029](0029-marked-nodes-in-schema-version-6.md) | Marked Nodes in Schema Version 6 | Accepted | 2026-11-20 |
+| [0030](0030-persisted-agenda-fold-choices.md) | Persisted Agenda Fold Choices (amends ADR 0020) | Accepted | 2026-11-21 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.
