@@ -61,7 +61,7 @@ An explicit prototype request authorizes a reversible experiment within its scop
 
 ### Agent and Model Routing
 
-Stay in the coding tool selected by the owner. Codex uses OpenAI, Claude Code uses Anthropic, and OpenCode uses DeepSeek models. Standing authorization: delegate to the configured planner, reviewer, product verifier, and product researcher when their roles are needed under §§5, 8, and 13, without a separate launch question. Follow `docs/AGENT_ROLES.md`; authorization does not expand tools or permissions. Report a higher-priority launch restriction as a blocked role, not a completed independent pass.
+Stay in the coding tool selected by the owner. Codex uses OpenAI and Claude Code uses Anthropic models. Standing authorization: delegate to the configured planner, reviewer, product verifier, and product researcher when their roles are needed under §§5, 8, and 13, without a separate launch question. Follow `docs/AGENT_ROLES.md`; authorization does not expand tools or permissions. Report a higher-priority launch restriction as a blocked role, not a completed independent pass.
 
 ## 2. Source of Truth
 

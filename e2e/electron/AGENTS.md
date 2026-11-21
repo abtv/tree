@@ -34,4 +34,4 @@ Rules for the Playwright Electron suite in `e2e/electron/`. The root `AGENTS.md`
 * Run `TREE_E2E_VISIBLE=1 npm run test:e2e` to observe the real UI.
 * Run `TREE_E2E_VISIBLE=1 npm run test:e2e -- <spec>` or `TREE_E2E_VISIBLE=1 npx playwright test -c config/testing/playwright.config.ts <spec>` to observe a single spec with visible windows.
 * In Codex, use `npm run test:e2e:visible -- <spec>` for visible runs so the project allow rule covers changing spec paths and flags. Do not prepend `TREE_E2E_VISIBLE=1` to that command or wrap it in an explicit shell invocation. See `docs/DEVELOPMENT_REFERENCE.md` §3 for rule loading and restart requirements.
-* Prefer these documented command forms. One-off diagnostic environment variables are not pre-approved and must not be added to `opencode.json`.
+* Prefer these documented command forms. One-off diagnostic environment variables are not pre-approved and must not be added to the tools' permission configuration.

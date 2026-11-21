@@ -80,7 +80,7 @@ describe('automatic publication wiring', () => {
       'format:check',
       'check:requirements',
       'check:e2e-modes',
-      'check:opencode',
+      'check:permissions',
       'test:coverage',
     ])
       expect(commands).toContain(`npm run ${command}`)

@@ -70,7 +70,6 @@
       "Bash(npm run typecheck*)",
       "Bash(npm run format:check*)",
       "Bash(npm run check:docs*)",
-      "Bash(npm run check:opencode*)",
       "Bash(npm run fix:history*)",
       "Bash(npm run retire:scratch -- *)",
       "Bash(npm run test*)",
@@ -110,6 +109,7 @@
     ],
     "ask": [
       "Bash(git push*)",
+      "Bash(npm run release*)",
       "Bash(npm install*)",
       "Bash(npm i *)",
       "Bash(npm ci*)",

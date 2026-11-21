@@ -58,7 +58,7 @@ jobs:
       - name: Check requirement test coverage
         run: npm run check:requirements
       - name: Check editing-mode coverage and agent permissions
-        run: npm run check:e2e-modes && npm run check:opencode
+        run: npm run check:e2e-modes && npm run check:permissions
       - name: Run unit tests
         run: npm run test:coverage
 

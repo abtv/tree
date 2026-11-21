@@ -4,7 +4,7 @@ As Product Owner, describe the problem, desired result, or question in ordinary 
 
 ### Command Menu
 
-Write `menu` to see these calls in your conversation language. Use them as ordinary messages in Codex, Claude Code, or OpenCode; they require no installation or terminal command. Natural-language requests work too. The text after `:` describes the target; you do not need to choose files, record IDs, tools, or validation commands. An unambiguous reference to the current discussion is sufficient.
+Write `menu` to see these calls in your conversation language. Use them as ordinary messages in Codex or Claude Code; they require no installation or terminal command. Natural-language requests work too. The text after `:` describes the target; you do not need to choose files, record IDs, tools, or validation commands. An unambiguous reference to the current discussion is sufficient.
 
 | Call | Result | File changes |
 | --- | --- | --- |

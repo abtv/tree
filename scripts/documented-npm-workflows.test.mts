@@ -20,21 +20,21 @@ describe('documented npm workflows', () => {
     expect(workflows).toEqual(['npm run check', 'npm run test:e2e:linux'])
   })
 
-  it('fails a workflow named only in the reference document when no approval rule allows it', () => {
+  it('fails a workflow named only in the reference document when the tool does not permit it', () => {
     const workflows = documentedNpmWorkflows(['Run `npm run check`.', 'Use `npm run test:e2e:linux`.'])
-    const allowed = new Set(['npm run check'])
+    const permitted = new Set(['npm run check'])
 
-    const issues = findWorkflowApprovalIssues(workflows, (command) => (allowed.has(command) ? 'allow' : undefined))
+    const issues = findWorkflowApprovalIssues('Codex', workflows, (command) => permitted.has(command))
 
-    expect(issues).toEqual(['develop: documented workflow npm run test:e2e:linux must retain its approval boundary'])
+    expect(issues).toEqual(['Codex: documented workflow npm run test:e2e:linux must retain its approval boundary'])
   })
 
-  it('requires the release workflow to keep asking', () => {
+  it('requires the release workflow to stay approval-gated', () => {
     const workflows = documentedNpmWorkflows(['Run `npm run release`.'])
 
-    expect(findWorkflowApprovalIssues(workflows, () => 'ask')).toEqual([])
-    expect(findWorkflowApprovalIssues(workflows, () => 'allow')).toEqual([
-      'develop: documented workflow npm run release must retain its approval boundary',
+    expect(findWorkflowApprovalIssues('Claude Code', workflows, () => false)).toEqual([])
+    expect(findWorkflowApprovalIssues('Claude Code', workflows, () => true)).toEqual([
+      'Claude Code: documented workflow npm run release must retain its approval boundary',
     ])
   })
 })
