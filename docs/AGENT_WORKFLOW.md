@@ -154,7 +154,7 @@ Exclude owner-deferred work from ready-task selection and continuation below.
 
 For a contained change with a clear outcome and one existing owner, make a concise plan in the conversation and proceed without a planner subagent or temporary plan file. Use the configured planner subagent in a fresh context when the outcome requires a multi-session initiative, changes major architecture, or has several interacting owners or material design choices that benefit from independent planning. Review its plan against the Product Owner's request and repository requirements, resolve ordinary engineering details, and share a concise plan or progress update. Continue without a separate approval pause within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding product behavior or major architecture.
 
-For a new initiative, investigate first, collect the necessary questions in one batch, and present the resulting scope, priorities, delegated decisions, reserved decisions, task sequence, validation, expected owner-verification rounds and checks, unresolved capabilities, and execution budget. Obtain explicit authorization to implement that initiative before starting implementation. A request to investigate or record a plan is not implementation authorization. When the Product Owner has already explicitly authorized the presented outcome and boundaries, record that approval rather than asking again. Initiative-wide approval covers its in-scope tasks and required review corrections; closure is subject to the owner acceptance rule below. It does not authorize a different initiative, publishing, or scope expansion. Task-by-task authorization and explicit prototype or no-commit conditions remain valid when the Product Owner chooses them.
+For a new initiative, investigate first, collect the necessary questions in one batch, and present the resulting scope, priorities, delegated decisions, reserved decisions, task sequence, validation, expected owner-verification rounds and checks, unresolved capabilities, and budget. Count the execution budget in tasks and the recovery budget in fix cycles, not in sessions; a fix cycle is one repair followed by the rerun of the checks it invalidated. Obtain explicit authorization to implement that initiative before starting implementation. A request to investigate or record a plan is not implementation authorization. When the Product Owner has already explicitly authorized the presented outcome and boundaries, record that approval rather than asking again. Initiative-wide approval covers its in-scope tasks and required review corrections; closure is subject to the owner acceptance rule below. It does not authorize a different initiative, publishing, or scope expansion. Task-by-task authorization and explicit prototype or no-commit conditions remain valid when the Product Owner chooses them.
 
 ### Final owner acceptance
 
@@ -414,13 +414,13 @@ When the Product Owner reports that the most recently committed fix still does n
 
 ### Session boundaries
 
-A session may cover multiple logical tasks and commits within one Product Owner-authorized outcome. Keep each commit focused and independently validated. Continue to the next authorized task in that outcome when context remains manageable; stop at a completed outcome, a material decision reserved for the Product Owner, or a context limit that warrants a new session. Do not infer authorization for unrelated work from permission to continue the session.
+A session may cover any number of logical tasks within one Product Owner-authorized outcome; no task limit applies per session. Keep each commit focused and independently validated. Do not infer authorization for unrelated work from permission to continue.
 
-For a multi-session initiative, decide after each committed task whether to continue in the same session. Continue when the next ready task is small and self-contained, the task just completed raised no surprises, and the context remains manageable; otherwise hand off to a fresh session. At most four tasks may be committed in one primary session. Compaction and subagents do not count as a new primary session.
+Apply the task-state, compaction and stopping rules of `AGENTS.md` §12. Record a task's next step and conversation-only facts in the commit that completes it. Do not infer completion from a checkbox when the change is uncommitted or validation is incomplete.
 
 A failed check, unresolved review finding or suspected defect prevents advancement to the next task, but does not by itself require asking the Product Owner or ending the current task. Investigate and repair within authorized scope, rerun invalidated checks and repeat review when §13 requires it. Escalate after two unsuccessful recovery attempts at the same blocker without new evidence, or when the approved budget is exhausted. A permission or authentication denial blocks the affected stage immediately; do not retry through another command or tool to bypass it. Stop dependent work for missing mandatory verification, a reserved decision, contradictory requirements or a discovery that invalidates the authorized outcome. Preserve unfinished work and evidence. Each task keeps its own commit and validation.
 
-For a multi-session initiative, commit the updated task status and next task with the completed change. A later session reads the active plan and Git state before starting; it does not infer completion from a checkbox when the corresponding change is uncommitted or validation is incomplete. If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
+If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree intact, record the blocker in the handoff, and resume that same task next time.
 
 ### Delivery reports
 
@@ -445,7 +445,7 @@ The technical evidence states:
 
 Never leave unresolved validation failures without identifying the next action needed to investigate them.
 
-The direct follow-up rule above still applies when the Product Owner reports that the most recently committed fix does not work. Context grows with every message and tool call; use a new session when continuing would make the work harder to verify.
+The direct follow-up rule above still applies when the Product Owner reports that the most recently committed fix does not work.
 
 ### New-session prompts
 

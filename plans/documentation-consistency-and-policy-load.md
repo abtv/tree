@@ -199,7 +199,7 @@ Working-task count: 11 (T0–T8, T10, T11; T4 and T5 may be cancelled). Final ow
 | T8 | Record the persisted Agenda fold choices in a new ADR that amends ADR 0020, and index it. | none | `docs/decisions/` (new file), `docs/decisions/README.md` | Minimal | The ADR cites `docs/product/agenda.md` §23 and `docs/ARCHITECTURE.md` §13; `npm run check:docs` passes | Planned |
 | T9 | Final measurement with the Baseline method, acceptance package, plan status `Awaiting owner acceptance`. | all other tasks | this plan, `plans/README.md` | Minimal | The Baseline tables repeated at the final commit | Planned |
 | T10 | Remove OpenCode support (Q3): `opencode.json`, `.opencode/`, `npm run check:opencode` and its script and tests, its stage in `npm run check` and CI, `package.json`, and every mention in documents, including the model routing of `AGENTS.md` §1 and `docs/AGENT_ROLES.md` §§6–7. Keep the documented-command check of `scripts/documented-npm-workflows.mts`: it now requires that every `npm run` command named in `docs/DEVELOPMENT.md` and `docs/DEVELOPMENT_REFERENCE.md` has an allow rule in `.claude/settings.json` and a matching rule in `.codex/rules/`, with tests. Keep the Claude Code interpreter-deny assertions that the OpenCode check made, under the new check's name. C1 and Q11 end with this task. | T2 | `opencode.json`, `.opencode/`, `scripts/check-opencode-permissions.mts` and its replacement with tests, `scripts/documented-npm-workflows.mts`, `package.json`, `.github/workflows/*`, `.claude/settings.json` (only the renamed npm script), `.gitignore` if needed, `AGENTS.md`, `docs/*.md`, nested `AGENTS.md`, skills | Low (`npm run check`) | `git grep -i opencode` finds only history-neutral mentions that the task lists; the new check fails when a documented command lacks a Claude Code or Codex rule (test); `npm run check` passes | Done |
-| T11 | Replace the "at most four tasks per primary session" rule of `AGENTS.md` §12 and procedure §12 with the owner's session rule (Owner Questions, "Session rule"). Count plan budgets in tasks and fix cycles instead of sessions in procedures §8 and §12, `docs/DEVELOPMENT.md` §11 and this plan. Remove the next-session prompt requirement where the rule makes it unnecessary. The total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` must not grow (Q4). Not delegated to subagents. | T10 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md`, `docs/WORKING_WITH_AGENT.md`, this plan | Minimal | The three rule points of the owner's text are each traceable to one sentence; the byte total before and after; `npm run check:docs` passes | Planned |
+| T11 | Replace the "at most four tasks per primary session" rule of `AGENTS.md` §12 and procedure §12 with the owner's session rule (Owner Questions, "Session rule"). Count plan budgets in tasks and fix cycles instead of sessions in procedures §8 and §12, `docs/DEVELOPMENT.md` §11 and this plan. Remove the next-session prompt requirement where the rule makes it unnecessary. The total of `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` must not grow (Q4). Not delegated to subagents. | T10 | `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT.md`, `docs/WORKING_WITH_AGENT.md`, this plan | Minimal | The three rule points of the owner's text are each traceable to one sentence; the byte total before and after; `npm run check:docs` passes | Done |
 
 Expected effect [AI, estimate]: mandatory reading for a product change falls from 103,179 to about 86,000 bytes by section (L3, L4 and about 3 KB of restatements), about 16%. Read as whole files, the three documents fall from 240,170 to about 218,000 bytes, about 9%. The remaining text is rule text; reducing it further means removing rules, which is the Product Owner's decision (Q4, Q5).
 
@@ -288,42 +288,17 @@ The questions as proposed:
 * The earlier conclusion "do not rewrite `AGENTS.md` or `docs/AGENT_WORKFLOW.md`" was checked again. Its stated reason, a size limit enforced by `check:docs`, holds for the core only (L2). The independent reviewer still judged a rewrite unwarranted: the main rules are coherent and the contradictions are local. This plan follows that judgment and proposes targeted corrections, single ownership and a growth control instead.
 * `check:docs` ignores `*.md` in formatting (`.prettierignore`), validates link targets but not anchors, and checks only its live-document list (U7).
 * The earlier plan's lost-text method applies to T3–T5: every line removed from a file (`git diff --unified=0`) must occur in the destination file, except retargeted citations.
-* `AGENTS.md` has 2,471 bytes of headroom under its limit. T1, T3 and T6 must fit in it.
-* T1 results (2026-11-21):
-  * C5: the editing-mode paragraph of `docs/DEVELOPMENT.md` §8 names every spec file under `e2e/`.
-  * C6: five citations in `docs/DEVELOPMENT.md` (§8 defect-first rules and coverage policy, §9 rendering-sensitive change, §11 plan contents, §12 boundary list, §16 plan locations) and one in `docs/WORKING_WITH_AGENT.md` now name procedure §8 or §9. The comment at `scripts/check-requirement-coverage.mts:19` is left for T7.
-  * C7: `docs/AGENT_ROLES.md` §2 states the omission rule that the planner adapters cite.
-  * C8: `docs/AGENT_ROLES.md` §§1 and 5 cite the Open Questions rules of procedure §5, which now name the product researcher.
-  * C9: the verifier command list cites `docs/DEVELOPMENT.md` §§8–9 and no longer says "lint".
-  * C10: `docs/ARCHITECTURE.md` §8 names `activeAgendaOccurrence`.
-  * C11: `docs/ARCHITECTURE.md` §21 shows the actual directories (`find src -mindepth 1 -maxdepth 2 -type d`).
-  * C12: the sentence about creating the ADR directory is deleted from procedure §8.
-  * C13: `docs/AGENT_ROLES.md` §7 cites commit `5cabe49` instead of PD-007.
-  * C14: `docs/DEVELOPMENT.md` §§3 and 9 and procedure §12 state that the CI attribution check runs only on pull requests.
-  * C15: the three empty gaps are closed.
-  * C16 (Q6): the three acceptances in `docs/DEVELOPMENT_REFERENCE.md` §1 and the one in `docs/DEVELOPMENT.md` §12 are deleted; the standing `test:e2e:linux` authorization and the Electron 45 note stay.
-  * Rule total (`AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`): 107,102 bytes before, 107,335 after T1 (+233, the two sentences of C7 and C8).
-  * Validation: `npm run check:docs`, `npm run check:opencode` and `npm run format:check:changed` passed.
-* T10 results (2026-11-21):
-  * Removed `opencode.json`, `.opencode/agents/*` and `scripts/check-opencode-permissions.mts`. The ignored local files under `.opencode/` (`node_modules`, `package.json`, `package-lock.json`, `.gitignore`) are not tracked and were left for the Product Owner to delete.
-  * `npm run check:opencode` became `npm run check:permissions` (`scripts/check-agent-permissions.mts`), in `npm run check`, the CI check job and `scripts/web-release/workflows.test.mts`. It requires that every `npm run` command named in `docs/DEVELOPMENT.md` and `docs/DEVELOPMENT_REFERENCE.md` is a package script, and that Claude Code and Codex run every standalone package workflow without a new approval, except `npm run release`. It keeps the Claude Code Safari and mutation host checks and the shell-editing deny category.
-  * Claude Code decision model (`scripts/claude-permissions.mts`, tested): deny, ask and allow rules in that precedence, then sandbox exclusions (prompt without an allow rule), then the sandbox auto-allow. Codex rule parsing moved into `scripts/codex-rules.mts`, shared with `scripts/codex-permissions.test.mts`.
-  * The first run of the new check found that Claude Code would run `npm run release` in the sandbox without a prompt. `.claude/settings.json` gained `Bash(npm run release*)` under `ask`, matching the documented owner-invoked boundary; the `check:opencode` allow entry was removed.
-  * Kept on purpose: `opencode` in the agent-name patterns of `.githooks/commit-msg` and `scripts/check-attribution.mts`. They reject attribution lines of any agent tool and are not OpenCode support.
-  * Documents: OpenCode text removed from `AGENTS.md` §1, `docs/AGENT_ROLES.md` (§§1, 6, 7 and the adapter list), procedure §4, `docs/DEVELOPMENT.md` §§8–10, 16, `docs/DEVELOPMENT_REFERENCE.md` §3, `docs/SECURITY.md`, `docs/WORKING_WITH_AGENT.md`, `e2e/electron/AGENTS.md` and the Claude Code verifier adapter. C1 and Q11 are closed.
-  * Rule total: 106,750 bytes, below the 107,102 baseline.
-  * Validation: `npm run check` passed (381 test files, 7,516 tests); `npm run check:permissions` checked 188 expectations.
-* T2 results (2026-11-21): TD-001 has four new evidence lines (size history, mechanical against prose enforcement, prose rules re-patched, the inference and its limits). TD-003 has an Evidence section with three lines and records that Q8 keeps it deferred. Statuses unchanged. The §4, §7 and §21 subject claims were re-checked against the text. `npm run check:docs` passed.
+* `AGENTS.md` has 2,147 bytes of headroom under its limit after T11 (22,429 of 24,576). T3 and T6 must fit in it.
+* Rule total (`AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`), measured with `wc -c`: 107,102 bytes at `0e6517e`; 106,496 after T11.
+* The comment at `scripts/check-requirement-coverage.mts:19` (C6) is left for T7.
+* Kept on purpose in T10: `opencode` in the agent-name patterns of `.githooks/commit-msg` and `scripts/check-attribution.mts`. They reject attribution lines of any agent tool and are not OpenCode support.
+* Unverified: the ignored local files under `.opencode/` (`node_modules`, `package.json`, `package-lock.json`, `.gitignore`) were not tracked and remain on the owner's machine.
+* Decision made for the owner in T11 (principle: the Q2 answer to D2, a working plan only when its criteria apply): the owner's "or `WORKING_PLAN.md` for work without a plan" is written as "or an existing `WORKING_PLAN.md`", so the session rule does not make a working plan mandatory for every task.
+* T11 kept the full session rule in `AGENTS.md` §12 and replaced its former restatement in procedure §12 with a pointer, so the rule total fell instead of growing.
 
 ## Next Task
 
-T11.
-
-## Next-Session Prompt
-
-```text
-Continue plans/documentation-consistency-and-policy-load.md. Read the plan. Check that its authorization state records the Product Owner's approval and the answers to the Owner Questions that the next task depends on. Then take the task named under "Next Task". If the plan still says "no task authorized", stop and report that instead of starting work.
-```
+T0.
 
 ## Appendix A. Feature Cost Map
 

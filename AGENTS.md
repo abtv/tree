@@ -171,7 +171,7 @@ If the owner says the latest committed fix still fails, reproduce and make the n
 
 ### Session boundaries
 
-Continue authorized work while context permits. Preserve exact remaining work and valid evidence for a new session; ordinary “continue” must be sufficient to resume an identifiable authorized task. Do not require the owner to reconstruct context. Resolve multiple ready initiatives under procedure §8, excluding deferred work. Procedure §12 governs bounded recovery, budgets, no more than four initiative task commits per primary session, and ordinary continuation.
+Start each task from its plan (or an existing `WORKING_PLAN.md`) and Git, not from conversation memory. A task is finished when that record holds the next task and what the repository cannot show: conversation decisions and unverified observations; never a summary of work Git records. After context compaction, reread the task row and the procedures for the next action; after compaction mid-task, review the whole diff against the task row before checks and commit. No task limit applies per session. Stop only for an owner decision or permission, an exhausted plan budget, a tool that cannot continue, or completed work; “continue” resumes from the plan without continuation text. Resolve multiple ready initiatives under procedure §8, excluding deferred work. Procedure §12 governs bounded recovery and budgets.
 
 For a requested new-session prompt, follow [procedure §12, New-session prompts](docs/AGENT_WORKFLOW.md#new-session-prompts). Include the new objective and necessary conversation-only context; the receiving agent recovers permanent rules and repository state itself.
 
