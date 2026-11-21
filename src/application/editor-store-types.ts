@@ -1,5 +1,6 @@
 import type { AttachmentId, Document, Location, NodeId, PersistedEditorState } from '../domain/document'
 import type { ClipboardContent, ClipboardPayload, ClipboardWritePayload } from '../shared/ipc'
+import type { AttachmentDimensions } from '../domain/attachment-dimensions'
 import type { ExpansionState } from './expansion-state'
 import type { DayNumber } from '../domain/calendar-date'
 import type { AgendaState } from './agenda-state'
@@ -25,6 +26,8 @@ export interface EditorServices {
   writeClipboard?: (payload: ClipboardWritePayload) => Promise<void>
   writeClipboardContent?: (payload: ClipboardContent) => Promise<void>
   writeAttachment(id: AttachmentId, png: Uint8Array): Promise<void>
+  /** Reads the PNG header sizes of up to `MAX_ATTACHMENT_SIZE_BATCH` attachments; null when unreadable. */
+  readAttachmentDimensions?(ids: readonly AttachmentId[]): Promise<Array<AttachmentDimensions | null>>
   cleanupAttachments(referencedIds: AttachmentId[]): Promise<void>
 }
 

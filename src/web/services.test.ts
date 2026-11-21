@@ -6,6 +6,7 @@ import { installBrowserPrototype } from './services'
 import { applyAppearance } from './appearance'
 import { validatePngAttachment } from './attachment-validation'
 import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
+import { transparentPng } from '../shared/png-test-utils'
 
 const storage = vi.hoisted(() => ({ open: vi.fn(), read: vi.fn(), sweep: vi.fn(), discard: vi.fn() }))
 vi.mock('./storage-schema', () => ({
@@ -787,6 +788,18 @@ describe('browser editing service contracts', () => {
     expect(await window.treeApi.readAttachment('missing')).toBeNull()
     f.values.set('blobs:image', new Uint8Array([1, 2]))
     expect(await window.treeApi.readAttachment('image')).toEqual(new Uint8Array([1, 2]))
+  })
+
+  // @requirement PRODUCT.md §17
+  it('reads stored image sizes from PNG headers, with null for missing or unreadable images', async () => {
+    const f = fixture()
+    const { services } = await installBrowserPrototype()
+    f.values.set('blobs:sized', transparentPng)
+    f.values.set('blobs:other', new Uint8Array([1, 2]))
+
+    const sizes = await services.readAttachmentDimensions!(['sized', 'missing', 'other'])
+
+    expect(sizes).toEqual([{ width: 2, height: 1 }, null, null])
   })
 
   it('requires an available exclusive writer lock before opening storage', async () => {

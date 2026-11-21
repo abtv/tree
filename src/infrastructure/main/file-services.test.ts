@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFileServices, findNewestValidDocument } from './file-services'
+import { transparentPng } from '../../shared/png-test-utils'
 
 const mocks = vi.hoisted(() => ({
   readdir: vi.fn<(path: string) => Promise<string[]>>(),
@@ -77,6 +78,19 @@ describe('file services', () => {
 
     expect(await readFile(unrelated, 'utf8')).toBe('Unrelated contents')
     await expect(services.readAttachment('orphan')).resolves.toBeNull()
+  })
+
+  // @requirement PRODUCT.md §17
+  it('reads image sizes from attachment headers, with null for missing or unreadable images', async () => {
+    const { services } = await servicesForTest()
+    await services.writeAttachment('sized', transparentPng)
+    await services.writeAttachment('short', transparentPng.subarray(0, 20))
+    await services.writeAttachment('other', new Uint8Array([1, 2, 3]))
+
+    const sizes = await services.readAttachmentDimensions(['sized', 'missing', 'short', 'other', 'sized'])
+
+    expect(sizes).toEqual([{ width: 2, height: 1 }, null, null, null, { width: 2, height: 1 }])
+    await expect(services.readAttachmentDimensions(['bad/id'])).rejects.toThrow('Attachment IDs')
   })
 
   it('logs the original filesystem failure even when persistence debugging is disabled', async () => {

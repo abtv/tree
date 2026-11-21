@@ -1,7 +1,7 @@
 // @editing-modes: independent
 import type { ElectronApplication } from '@playwright/test'
 import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs'
-import { historicalNotes } from '../document-formats'
+import { historicalNotes, savedHistoricalNotes } from '../document-formats'
 import { controlPostedTasksWithClock } from '../search-clock'
 import { onePixelPng } from '../../src/shared/png-test-utils'
 import { join } from 'node:path'
@@ -68,7 +68,7 @@ test.describe('persistence reliability regressions', () => {
       await clickApplicationMenuQuit(app)
       await closed
 
-      const expected = historicalNotes(version, '!')
+      const expected = savedHistoricalNotes(version, '!')
       expect(readPersisted(userDataDir)).toMatchObject({
         version: 6,
         location: expected.location,
@@ -85,7 +85,7 @@ test.describe('persistence reliability regressions', () => {
         await clickApplicationMenuQuit(reopened.app)
         await done
         const saved = readPersisted(userDataDir)
-        expect(saved.document).toEqual(historicalNotes(1, '!!').document)
+        expect(saved.document).toEqual(savedHistoricalNotes(1, '!!').document)
         expect(saved.location).toEqual(expected.location)
         expect(readFileSync(image)).toEqual(Buffer.from(onePixelPng))
       }

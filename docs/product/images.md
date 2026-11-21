@@ -153,6 +153,8 @@ An attachment is PNG data of at most 25 MiB, with at most 32,767 pixels per side
 
 An attachment reference stores the image's width and height in pixels, read from the PNG header when the image is pasted or dropped. The size is derived data, like hidden recognized text (§15.1): older Tree versions may discard it when re-saving the document. A stored size that is missing one value, is not a positive whole number, or exceeds the limits above does not prevent the document from opening; Tree ignores it.
 
+When a document opens with images that have no stored size, Tree reads their PNG headers in the background after the document is displayed, without delaying startup. It stores the sizes without an Undo step and without a save of its own; the next ordinary save writes them. An image whose header cannot be read keeps no size until the next launch.
+
 Attachments belong to their nodes.
 
 Moving a node moves the attachment with the node logically; the attachment does not need to be copied to another location.

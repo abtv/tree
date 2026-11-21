@@ -11,6 +11,8 @@ import {
   type PersistedEditorState,
 } from '../../domain/document'
 import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
+import { PNG_DIMENSIONS_HEADER_BYTES, readPngDimensions } from '../../shared/png-validation'
+import type { AttachmentDimensions } from '../../domain/attachment-dimensions'
 import { createRecentNodesStore } from './recent-nodes'
 import {
   commitReplacement,
@@ -29,6 +31,8 @@ export interface FileServices {
   save(state: PersistedEditorState): Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
   readAttachment(id: string): Promise<Uint8Array | null>
+  /** Reads only each attachment's PNG header; a missing file or unreadable header yields null. */
+  readAttachmentDimensions(ids: readonly string[]): Promise<Array<AttachmentDimensions | null>>
   cleanupAttachments(referencedIds: string[]): Promise<void>
 }
 
@@ -69,6 +73,7 @@ export interface FileOperationEvent {
     | 'save'
     | 'writeAttachment'
     | 'readAttachment'
+    | 'readAttachmentDimensions'
     | 'cleanupAttachments'
     | 'replaceNotes'
     | 'snapshotDocuments'
@@ -185,6 +190,13 @@ export function createFileServices(
           }
           throw error
         }
+      })
+    },
+    readAttachmentDimensions(ids) {
+      return enqueue('readAttachmentDimensions', [attachmentsDirectory], async () => {
+        const sizes: Array<AttachmentDimensions | null> = []
+        for (const id of ids) sizes.push(await readAttachmentHeader(attachmentPath(attachmentsDirectory, id)))
+        return sizes
       })
     },
     cleanupAttachments(referencedIds) {
@@ -413,6 +425,24 @@ function attachmentPath(attachmentsDirectory: string, id: string): string {
     throw new Error('Attachment IDs may contain only letters, numbers, underscores, and hyphens.')
   }
   return join(attachmentsDirectory, `${id}.png`)
+}
+
+/** Reads the first bytes of an attachment, never the whole file; a missing file has no size. */
+async function readAttachmentHeader(path: string): Promise<AttachmentDimensions | null> {
+  let handle
+  try {
+    handle = await open(path, 'r')
+  } catch (error) {
+    if (isNotFound(error)) return null
+    throw error
+  }
+  try {
+    const header = new Uint8Array(PNG_DIMENSIONS_HEADER_BYTES)
+    const { bytesRead } = await handle.read(header, 0, header.length, 0)
+    return readPngDimensions(header.subarray(0, bytesRead)) ?? null
+  } finally {
+    await handle.close()
+  }
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

@@ -100,6 +100,27 @@ describe('renderer Electron services', () => {
     await expect(services.imageToText!('image-2')).rejects.toBe(failure)
   })
 
+  it('forwards image-size reads and their failures when the bridge provides them', async () => {
+    expect(createElectronEditorServices().readAttachmentDimensions).toBeUndefined()
+    const readAttachmentDimensions = vi.fn<NonNullable<TreeApi['readAttachmentDimensions']>>(async () => [
+      { width: 3, height: 2 },
+      null,
+    ])
+    window.treeApi = { ...window.treeApi, readAttachmentDimensions }
+    const services = createElectronEditorServices()
+
+    await expect(services.readAttachmentDimensions!(['image-1', 'image-2'])).resolves.toEqual([
+      { width: 3, height: 2 },
+      null,
+    ])
+
+    expect(readAttachmentDimensions).toHaveBeenCalledExactlyOnceWith(['image-1', 'image-2'])
+    const failure = new Error('Header read failed')
+    readAttachmentDimensions.mockRejectedValueOnce(failure)
+
+    await expect(services.readAttachmentDimensions!(['image-3'])).rejects.toBe(failure)
+  })
+
   it('forwards finished-task preferences and preserves write failures from the bridge', async () => {
     const getHideFinishedTasks = vi.fn(async () => true)
     const setHideFinishedTasks = vi.fn<NonNullable<TreeApi['setHideFinishedTasks']>>(async () => undefined)

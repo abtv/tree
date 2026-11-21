@@ -134,6 +134,7 @@ export const treeApi: TreeApi = {
   writeClipboardContent: (payload) => ipcRenderer.invoke(ipcChannels.writeClipboardContent, payload),
   writeAttachment: (id, png) => ipcRenderer.invoke(ipcChannels.writeAttachment, id, png),
   readAttachment: (id) => ipcRenderer.invoke(ipcChannels.readAttachment, id),
+  readAttachmentDimensions: (ids) => ipcRenderer.invoke(ipcChannels.readAttachmentDimensions, ids),
   cleanupAttachments: (referencedIds) => ipcRenderer.invoke(ipcChannels.cleanupAttachments, referencedIds),
   showEditorContextMenu: (request) => ipcRenderer.invoke(ipcChannels.showEditorContextMenu, request),
   getAlwaysOnTop: () => ipcRenderer.invoke(ipcChannels.getAlwaysOnTop),

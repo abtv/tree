@@ -1,8 +1,9 @@
 import type { PersistedEditorState } from '../../domain/document'
 import { isValidAttachmentId, validatePersistedState } from '../../domain/document'
 import type { ClipboardContent, ClipboardWritePayload, EditorContextMenuRequest } from '../../shared/ipc'
+import { MAX_ATTACHMENT_SIZE_BATCH } from '../../shared/attachment-limits'
 
-export { MAX_ATTACHMENT_BYTES } from '../../shared/attachment-limits'
+export { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_SIZE_BATCH } from '../../shared/attachment-limits'
 export {
   isPng,
   MAX_ATTACHMENT_DIMENSION,
@@ -99,6 +100,14 @@ export function validateAttachmentId(value: unknown): string {
 
 export function validateAttachmentIds(value: unknown): string[] {
   if (!Array.isArray(value)) throw new Error('Attachment IDs are invalid.')
+  return value.map(validateAttachmentId)
+}
+
+/** A nonempty image-size request of at most `MAX_ATTACHMENT_SIZE_BATCH` valid attachment ids. */
+export function validateAttachmentSizeBatch(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_ATTACHMENT_SIZE_BATCH) {
+    throw new Error('Attachment IDs are invalid.')
+  }
   return value.map(validateAttachmentId)
 }
 

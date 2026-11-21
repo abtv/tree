@@ -1,7 +1,7 @@
 // @editing-modes: independent
 import { test, expect, capture, primaryKey } from './fixtures.mts'
 import type { Page } from '@playwright/test'
-import { historicalNotes } from '../document-formats.ts'
+import { historicalNotes, savedHistoricalNotes } from '../document-formats.ts'
 import { onePixelPng } from '../../src/shared/png-test-utils.ts'
 import { holdHeadAcknowledgement, readStored, writeStored } from './data-helpers.mts'
 
@@ -49,7 +49,7 @@ for (const version of [1, 2, 3, 4, 5, 6]) {
     await entry.fill('Notes\n第二行!')
     await saved(page)
 
-    const expected = historicalNotes(version, '!')
+    const expected = savedHistoricalNotes(version, '!')
     const head = await readStored(page, 'document', 'head')
     expect(head).toMatchObject({
       version: 6,

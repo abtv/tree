@@ -29,6 +29,13 @@ import {
 import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
 import type { ClipboardContent } from '../shared/ipc'
 import { readPngDimensions } from '../shared/png-validation'
+import { MAX_ATTACHMENT_SIZE_BATCH } from '../shared/attachment-limits'
+import { isValidAttachmentDimensions, type AttachmentDimensions } from '../domain/attachment-dimensions'
+import {
+  attachmentIdsWithoutDimensions,
+  attachmentSizeEnrichment,
+  type AttachmentSizeMode,
+} from '../domain/attachment-size-enrichment'
 import { vimForestClipboardContent } from './vim-clipboard-content'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import {
@@ -123,6 +130,9 @@ import { ImageToTextQueue } from './image-to-text-queue'
 export type { ClipboardValue, Clock, EditorServices, EditorSnapshot, FocusIntent } from './editor-store-types'
 export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transitions'
 
+// Long enough to gather the images of one screen as they finish decoding.
+const ATTACHMENT_SIZE_BATCH_DELAY_MS = 100
+
 export class EditorStore {
   public readonly summarization: Summarization
   public readonly emojiHistory: EmojiHistory
@@ -172,6 +182,10 @@ export class EditorStore {
   private finishedTasksWrite = Promise.resolve()
   private readonly imageToTextQueue = new ImageToTextQueue()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
+  // Decoded image sizes that differ from the stored ones, applied together after a short delay.
+  private readonly pendingAttachmentSizes = new Map<AttachmentId, AttachmentDimensions>()
+  private attachmentSizeTimer: unknown
+  private readonly clock: Clock
   private readonly textSession: EditorTextSession
   private readonly saveScheduler: EditorSaveScheduler
   private readonly pendingEditFinishers = new Set<() => boolean>()
@@ -190,6 +204,7 @@ export class EditorStore {
     clock: Clock = systemClock,
     saveTiming: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
+    this.clock = clock
     this.summarization = new Summarization(services.summarization)
     void this.summarization.refresh()
     this.emojiHistory = new EmojiHistory(services.saveEmojiHistory?.bind(services), (error) => this.reportError(error))
@@ -707,7 +722,7 @@ export class EditorStore {
           const current = this.runtime.ready()
           const enrich = imageSearchTextEnrichment(job.attachmentId, paragraphs.join('\n').slice(0, 1_048_576))
           const enriched = enrich(current.document)
-          this.history.enrichImageSearchText(enrich)
+          this.history.enrichAttachments(enrich)
           this.runtime.replaceReady({ ...current, document: enriched })
           this.markPersistedChange()
           if (job.kind !== 'append') continue
@@ -820,10 +835,64 @@ export class EditorStore {
         hideFinishedTasks: hideFinishedTasks === true,
       })
       this.queueAttachmentCleanup()
+      // Startup does not wait for the image headers (`docs/PRODUCT.md` §17).
+      void this.backfillAttachmentSizes()
     } catch (error) {
       this.runtime.snapshot = { status: 'error', message: messageOf(error) }
       this.runtime.emit()
     }
+  }
+
+  /**
+   * Reads the PNG header of every attachment the loaded document stores without a size, in bounded
+   * batches, and publishes the sizes once as derived data: no history entry and no save of its own, so
+   * the next ordinary save writes them. A failed batch leaves its images without a size until next launch.
+   */
+  private async backfillAttachmentSizes(): Promise<void> {
+    const read = this.services.readAttachmentDimensions
+    if (read === undefined) return
+    const ids = attachmentIdsWithoutDimensions(this.runtime.ready().document)
+    const sizes = new Map<AttachmentId, AttachmentDimensions>()
+    for (let start = 0; start < ids.length; start += MAX_ATTACHMENT_SIZE_BATCH) {
+      const batch = ids.slice(start, start + MAX_ATTACHMENT_SIZE_BATCH)
+      try {
+        const results = await read.call(this.services, batch)
+        batch.forEach((id, index) => {
+          const size = results[index]
+          if (size !== null && size !== undefined && isValidAttachmentDimensions(size.width, size.height)) {
+            sizes.set(id, { width: size.width, height: size.height })
+          }
+        })
+      } catch {
+        // Sizes are derived data; the image still displays and reserves its space once loaded.
+      }
+    }
+    this.applyAttachmentSizes(sizes, 'fill')
+  }
+
+  /**
+   * Records the natural size of a decoded image when it differs from the stored one (`docs/PRODUCT.md`
+   * §17.1). Reports arriving together are applied in one publication, like the header backfill.
+   */
+  public recordAttachmentDimensions(attachmentId: AttachmentId, width: number, height: number): void {
+    if (!isValidAttachmentDimensions(width, height)) return
+    this.pendingAttachmentSizes.set(attachmentId, { width, height })
+    if (this.attachmentSizeTimer !== undefined) return
+    this.attachmentSizeTimer = this.clock.setTimeout(() => {
+      this.attachmentSizeTimer = undefined
+      const sizes = new Map(this.pendingAttachmentSizes)
+      this.pendingAttachmentSizes.clear()
+      this.applyAttachmentSizes(sizes, 'replace')
+    }, ATTACHMENT_SIZE_BATCH_DELAY_MS)
+  }
+
+  private applyAttachmentSizes(sizes: ReadonlyMap<AttachmentId, AttachmentDimensions>, mode: AttachmentSizeMode): void {
+    if (sizes.size === 0 || this.runtime.snapshot.status !== 'ready' || this.isPersistenceLocked()) return
+    const enrich = attachmentSizeEnrichment(sizes, mode)
+    const current = this.runtime.ready()
+    const document = enrich(current.document)
+    this.history.enrichAttachments(enrich)
+    if (document !== current.document) this.runtime.replaceReady({ ...current, document })
   }
 
   public searchOrigin(offset: number): SearchPosition {

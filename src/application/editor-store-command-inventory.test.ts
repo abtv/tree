@@ -32,6 +32,8 @@ const exclusions: Record<string, string> = {
   summarize: 'Read-only asynchronous summarization has focused snapshot, cancellation and clipboard coverage.',
   imageToText: 'Async recognition has dedicated queue, cancellation, Undo and insertion property tests.',
   reindexAllImages: 'Hidden recognition has focused deduplication, scale, failure and history coverage.',
+  recordAttachmentDimensions:
+    'Derived image sizes change no text or structure; focused tests cover batching, history and saving.',
   imageToTextAvailable: 'Read-only platform capability covered by OCR store and preload tests.',
   disposeSearch: 'Renderer unmount retires search without document changes; editor-search.test.ts covers retirement.',
   visitRecentNode: 'Recent-node navigation is covered by focused store properties and real popup navigation tests.',

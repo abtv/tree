@@ -315,6 +315,7 @@ describe('preload bridge', () => {
     await treeApi.writeClipboardContent?.({ kind: 'image', attachmentId: 'attachment-1' })
     await treeApi.writeAttachment('attachment-1', bytes)
     await treeApi.readAttachment('attachment-1')
+    await treeApi.readAttachmentDimensions?.(['attachment-1', 'attachment-2'])
 
     await treeApi.cleanupAttachments(['attachment-1'])
     await treeApi.getAlwaysOnTop()
@@ -348,6 +349,7 @@ describe('preload bridge', () => {
       [ipcChannels.writeClipboardContent, { kind: 'image', attachmentId: 'attachment-1' }],
       [ipcChannels.writeAttachment, 'attachment-1', bytes],
       [ipcChannels.readAttachment, 'attachment-1'],
+      [ipcChannels.readAttachmentDimensions, ['attachment-1', 'attachment-2']],
       [ipcChannels.cleanupAttachments, ['attachment-1']],
       [ipcChannels.getAlwaysOnTop],
       [ipcChannels.setAlwaysOnTop, true],

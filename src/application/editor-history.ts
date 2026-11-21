@@ -78,7 +78,7 @@ export class EditorHistory {
   }
 
   /** Derived attachment metadata changes neither history order nor attachment reachability. */
-  public enrichImageSearchText(enrich: (document: Document) => Document): void {
+  public enrichAttachments(enrich: (document: Document) => Document): void {
     for (const entry of this.past) entry.document = enrich(entry.document)
     for (const entry of this.future) entry.document = enrich(entry.document)
   }

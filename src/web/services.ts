@@ -6,6 +6,8 @@ import { requireNode, serializeState, validatePersistedState } from '../domain/d
 import { readEditableContent } from '../renderer/editor-dom'
 import { extractClipboardLinks } from '../shared/clipboard-links'
 import { MAX_ATTACHMENT_BYTES } from '../shared/attachment-limits'
+import { readPngDimensions } from '../shared/png-validation'
+import type { AttachmentDimensions } from '../domain/attachment-dimensions'
 import { applyAppearance } from './appearance'
 import { validatePngAttachment } from './attachment-validation'
 import { isIPhoneOrIPad } from './device'
@@ -252,6 +254,15 @@ export async function installBrowserPrototype(): Promise<{
     async writeAttachment(id, bytes) {
       await validatePngAttachment(bytes)
       await write('blobs', id, bytes)
+    },
+    async readAttachmentDimensions(ids) {
+      // IndexedDB returns the whole stored value; only its header is parsed, one image at a time.
+      const sizes: Array<AttachmentDimensions | null> = []
+      for (const id of ids) {
+        const bytes = await read<Uint8Array>('blobs', id)
+        sizes.push(bytes === undefined ? null : (readPngDimensions(bytes) ?? null))
+      }
+      return sizes
     },
     async cleanupAttachments() {
       /* Prototype retains image bytes; no production GC policy. */

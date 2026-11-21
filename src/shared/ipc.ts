@@ -1,5 +1,6 @@
 import type { PersistedEditorState } from '../domain/document'
 import type { LinkRange } from '../domain/document'
+import type { AttachmentDimensions } from '../domain/attachment-dimensions'
 import type { NotesArchiveProgress, NotesArchiveSummary } from '../application/notes-archive/export-notes'
 import type { IncomingNotes, NotesCounts } from '../application/notes-archive/import-notes'
 import type { AppearancePreference } from './appearance'
@@ -30,6 +31,7 @@ export const ipcChannels = {
   writeClipboardContent: 'tree:write-clipboard-content',
   writeAttachment: 'tree:write-attachment',
   readAttachment: 'tree:read-attachment',
+  readAttachmentDimensions: 'tree:read-attachment-dimensions',
   cleanupAttachments: 'tree:cleanup-attachments',
   showEditorContextMenu: 'tree:show-editor-context-menu',
   getAlwaysOnTop: 'tree:get-always-on-top',
@@ -195,6 +197,11 @@ export interface TreeApi {
   writeClipboardContent?: (payload: ClipboardContent) => Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
   readAttachment(id: string): Promise<Uint8Array | null>
+  /**
+   * Reads only the PNG header of each attachment, at most `MAX_ATTACHMENT_SIZE_BATCH` per request. A
+   * missing attachment or an unreadable header yields null in its position.
+   */
+  readAttachmentDimensions?: (ids: readonly string[]) => Promise<Array<AttachmentDimensions | null>>
   cleanupAttachments(referencedIds: string[]): Promise<void>
   showEditorContextMenu?: (request: EditorContextMenuRequest) => Promise<EditorContextMenuCommand>
   getAlwaysOnTop(): Promise<boolean>

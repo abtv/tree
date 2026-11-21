@@ -60,6 +60,9 @@ export function createElectronEditorServices(): EditorServices {
       const encoded = await encodeJson(state)
       await notesWrite(() => window.treeApi.save(encoded))
     },
+    ...(window.treeApi.readAttachmentDimensions === undefined
+      ? {}
+      : { readAttachmentDimensions: window.treeApi.readAttachmentDimensions }),
     readClipboard: () => window.treeApi.readClipboard(),
     writeClipboard: (payload) => window.treeApi.writeClipboard?.(payload) ?? Promise.resolve(),
     writeClipboardContent: (payload) => window.treeApi.writeClipboardContent?.(payload) ?? Promise.resolve(),

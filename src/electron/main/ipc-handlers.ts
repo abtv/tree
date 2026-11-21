@@ -4,6 +4,7 @@ import {
   validateAttachmentBytes,
   validateAttachmentId,
   validateAttachmentIds,
+  validateAttachmentSizeBatch,
   validateClipboardWritePayload,
   validateClipboardContent,
   validateEditorContextMenuRequest,
@@ -373,6 +374,10 @@ export function registerIpcHandlers({
   ipcMain.handle(ipcChannels.readAttachment, (event, id) => {
     requireTrustedRenderer(event)
     return fileServices.readAttachment(validateAttachmentId(id))
+  })
+  ipcMain.handle(ipcChannels.readAttachmentDimensions, (event, ids) => {
+    requireTrustedRenderer(event)
+    return fileServices.readAttachmentDimensions(validateAttachmentSizeBatch(ids))
   })
   ipcMain.handle(ipcChannels.cleanupAttachments, (event, referencedIds) => {
     requireTrustedRenderer(event)

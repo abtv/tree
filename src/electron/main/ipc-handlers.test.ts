@@ -3,7 +3,7 @@ import { ipcChannels } from '../../shared/ipc'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import type { NativeClipboard } from '../../infrastructure/main/clipboard'
 import { registerIpcHandlers, type IpcHandlerDependencies, type IpcInvokeEvent } from './ipc-handlers'
-import { MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
+import { MAX_ATTACHMENT_SIZE_BATCH, MAX_CONTEXT_MENU_SELECTION_CODE_POINTS } from './ipc-security'
 import { decodePngWithZlib, onePixelPng, pngIhdr, pngWith } from './png-test-utils'
 import emojiCatalog from '../../domain/emoji-catalog.json'
 import { EventEmitter } from 'node:events'
@@ -28,6 +28,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
     save: vi.fn(async () => undefined),
     writeAttachment: vi.fn(async () => undefined),
     readAttachment: vi.fn(async () => null),
+    readAttachmentDimensions: vi.fn(async () => []),
     cleanupAttachments: vi.fn(async () => undefined),
   }
   const nativeClipboard = {
@@ -1367,6 +1368,29 @@ describe('main IPC handlers', () => {
     await handlers.get(ipcChannels.readAttachment)!(event, 'image-1')
 
     expect(decodePng).toHaveBeenCalledOnce()
+  })
+
+  // @requirement PRODUCT.md §17
+  it('validates image-size requests before reading headers and forwards sizes and failures', async () => {
+    const { handlers, fileServices } = createHarness()
+    const event = { senderFrame: { url: rendererUrl } }
+    const read = handlers.get(ipcChannels.readAttachmentDimensions)!
+    const tooMany = Array.from({ length: MAX_ATTACHMENT_SIZE_BATCH + 1 }, (_, index) => `image-${index}`)
+    vi.mocked(fileServices.readAttachmentDimensions).mockResolvedValueOnce([{ width: 4, height: 3 }, null])
+
+    for (const ids of [undefined, 'image-1', [], ['../escape'], [1], tooMany]) {
+      await expect(Promise.resolve().then(() => read(event, ids))).rejects.toThrow()
+    }
+    await expect(
+      Promise.resolve().then(() => read({ senderFrame: { url: 'https://untrusted.test/' } }, ['image-1'])),
+    ).rejects.toThrow('Untrusted')
+    expect(fileServices.readAttachmentDimensions).not.toHaveBeenCalled()
+
+    await expect(read(event, ['image-1', 'image-2'])).resolves.toEqual([{ width: 4, height: 3 }, null])
+    expect(fileServices.readAttachmentDimensions).toHaveBeenCalledWith(['image-1', 'image-2'])
+
+    vi.mocked(fileServices.readAttachmentDimensions).mockRejectedValueOnce(new Error('header read failed'))
+    await expect(Promise.resolve().then(() => read(event, ['image-1']))).rejects.toThrow('header read failed')
   })
 
   it('forwards cleanup ids, returns successfully, and propagates cleanup failures', async () => {
