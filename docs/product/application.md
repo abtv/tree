@@ -170,5 +170,5 @@ Ordinary Quit does not initiate installation of an update the user has not reque
 Closing the window or choosing Quit while macOS is still preparing the package uses the ordinary save-and-quit path. The installer takes over closing windows when Tree calls it to quit and install. If installation fails while the document cannot open, both errors remain visible.
 
 Update checks add no document writes or document traversal. Explicit installation
-uses the existing persistence flush. Download/cache storage is proportional to the
+uses the persistence flush of §16.1. Download/cache storage is proportional to the
 application package; update state and listeners are bounded and independent of note count.
