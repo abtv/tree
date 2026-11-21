@@ -26,7 +26,7 @@ The desktop app keeps the mouse pointer visible while typing and navigating with
 
 When the current location contains more than 100 visible rows, including inline descendants, the application renders only the rows near the viewport plus a small overscan. The off-screen rows are absent from the DOM: browser find-in-page and assistive technology expose only the mounted rows, and selecting or copying text that spans off-screen rows requires scrolling to them.
 
-Windowing starts at this medium-list size to bound keyboard-driven row updates and browser layout work. It changes no document data, history entries, disk writes or syncs. Mounted DOM and per-row editor state remain bounded by the viewport and overscan, while the existing logical row projection and height offsets still scale with the displayed list. Splitting, merging or folding across the threshold must preserve focus, caret and text even when the rendering mode changes.
+Windowing starts at this medium-list size to bound keyboard-driven row updates and browser layout work. It changes no document data, history entries, disk writes or syncs. Mounted DOM and per-row editor state remain bounded by the viewport and overscan, while the logical row projection and height offsets still scale with the displayed list. Splitting, merging or folding across the threshold must preserve focus, caret and text even when the rendering mode changes.
 
 The focused row stays mounted even when it is off-screen, so keyboard navigation, focus restoration, typing, and the caret never lose their input.
 
@@ -36,7 +36,7 @@ The content continues to scroll as a single document. The location bar stays fix
 
 During scrolling, the last painted rows remain visible until the replacement rows and their position are ready together. Large scroll jumps must not expose an empty viewport while waiting for the next visible range. This retains a bounded rendered window rather than mounting the full document, and preserves the selected input and caret.
 
-Replacing estimated heights with measured heights must keep the first visible row at the same viewport position, including its partially clipped top. Measurements above it must not add a jump or reverse the user's scroll movement. Explicit navigation, caret reveal and restoration retain their existing destinations; natural scroll limits still apply.
+Replacing estimated heights with measured heights must keep the first visible row at the same viewport position, including its partially clipped top. Measurements above it must not add a jump or reverse the user's scroll movement. Replacing estimated heights does not change the destinations of explicit navigation, caret reveal and restoration; natural scroll limits still apply.
 
 At or below 100 visible rows, the list renders every row, including inline descendants, without windowing.
 
@@ -52,7 +52,7 @@ Text is drawn character by character: the typeface's ligatures and contextual al
 
 The application does not animate its own interface. Navigation, entering and leaving a node, expanding and collapsing a node inline, creating and deleting nodes, reordering, selection, Vim mode changes, and error states all apply immediately: no transition, easing, or fade stands between the user's action and its visible result.
 
-The browser version suppresses the browser's fading tap highlight on editor and menu controls, including node dots on iPhone and iPad. Existing control feedback applies immediately.
+The browser version suppresses the browser's fading tap highlight on editor and menu controls, including node dots on iPhone and iPad. The controls' other feedback applies immediately.
 
 This deepens the Responsiveness commitment in §1.1: even a smooth, well-performing animation still spends a fixed delay before the user can act on its result, and that delay cannot be removed by animation quality alone.
 
@@ -102,7 +102,7 @@ Content scrolls at pixel granularity, so a row can be cut where the content area
 
 The top fade shows while content is scrolled beneath the toolbar, and the bottom fade shows while more content lies below the status bar. At the start of the document there is no top fade, at its end there is no bottom fade, and content that fits the window shows neither. Each fade is shorter than one text row and no taller than the capped context of §20.8, leaves the scrollbar uncovered, and does not intercept the pointer: clicking, selecting, and dragging behave inside it exactly as elsewhere. The fade strength follows the scroll position directly, reaching full strength within the first few pixels scrolled away from an edge.
 
-The edges stay flat. A shadow cast by the bars onto the content was tried and rejected: it made the bars look raised above the content, a depth the otherwise flat interface has nowhere else, and it still showed the cut text.
+The edges stay flat: the bars cast no shadow onto the content. A shadow would make the bars look raised above the content, a depth the otherwise flat interface has nowhere else, and it would still show the cut text.
 
 ### 20.7 Consistency Across Input Paths
 
