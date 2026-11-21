@@ -195,7 +195,16 @@ export function createFileServices(
     readAttachmentDimensions(ids) {
       return enqueue('readAttachmentDimensions', [attachmentsDirectory], async () => {
         const sizes: Array<AttachmentDimensions | null> = []
-        for (const id of ids) sizes.push(await readAttachmentHeader(attachmentPath(attachmentsDirectory, id)))
+        for (const id of ids) {
+          const path = attachmentPath(attachmentsDirectory, id)
+          try {
+            sizes.push(await readAttachmentHeader(path))
+          } catch (error) {
+            // One unreadable file must not cost the other images in the batch their sizes.
+            logger({ operation: 'readAttachmentDimensions', paths: [path], phase: 'failure', error: messageOf(error) })
+            sizes.push(null)
+          }
+        }
         return sizes
       })
     },

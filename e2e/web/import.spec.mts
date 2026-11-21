@@ -124,10 +124,18 @@ test('imports an exported archive into another browser profile after confirmatio
   await reloaded
   await ready(target)
 
+  // The imported images had no stored size: the header backfill adds it in memory only, without a save
+  // of its own, and leaves the missing image without one (PRODUCT.md §17).
+  const sized = structuredClone(sourceHead.document)
+  for (const node of sized.roots.flatMap((root) => [root, ...root.children])) {
+    const attachment = node.attachment as { id: string; width?: number; height?: number } | undefined
+    if (attachment?.id === 'image-a') Object.assign(attachment, { width: 24, height: 24 })
+    if (attachment?.id === 'image-b') Object.assign(attachment, { width: 1, height: 1 })
+  }
+  await expect
+    .poll(() => target.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document))
+    .toEqual(sized)
   expect(await readStored(target, 'document', 'head')).toEqual(sourceHead)
-  expect(await target.evaluate(() => (window.prototypeStore.getSnapshot() as ReadyEditorSnapshot).document)).toEqual(
-    sourceHead.document,
-  )
   await expect(target.locator('[data-node-id="welcome"] .node-input')).toHaveValue(/^Typed before exporting /)
   expect(await readStored(target, 'blobs', 'image-a')).toEqual(noise)
   expect(await readStored(target, 'blobs', 'image-b')).toEqual([...onePixelPng])

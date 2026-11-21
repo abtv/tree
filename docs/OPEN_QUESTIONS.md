@@ -192,7 +192,7 @@ Product Owner statement (2026-11-21): record this as a product question; the rec
 
 ### Evidence
 
-- 2026-11-21 — Usage evidence (TD-002 survey, candidate 4, at `0f2fb33`): in a 600 px window, the selected row stood at 556 px before `gd` and at 317 px after `Ctrl+o`. Each command was one transition with no intermediate frame.
+- 2026-11-21 — Usage evidence (survey of late layout changes recorded in `81e46a0`, candidate 4, at `0f2fb33`): in a 600 px window, the selected row stood at 556 px before `gd` and at 317 px after `Ctrl+o`. Each command was one transition with no intermediate frame.
 
 ## TD-001: Whether a written rule is the right response to a recurring defect
 
@@ -217,50 +217,6 @@ For each rule added in response to a defect, whether that defect class recurred 
 - 2026-09-29 — Repository fact: `576cf41` (2026-09-26) and `bdf073b` (2026-09-27) added navigation and caret rules; 8 and 4 fixes of the same class followed them. The cluster ended after the ownership refactor recorded in [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md), whose context states that test volume was not the constraint and ownership was.
 - 2026-09-29 — Repository fact: `4f3f365` fixed a misaligned focus marker and, in the same commit, added a normative paragraph to `docs/PRODUCT.md`, a paragraph to `AGENTS.md` §9, and a rewritten sentence in `docs/DEVELOPMENT.md` §9 — three days after the visual-evidence rules of 2026-09-25 failed to prevent that defect.
 - 2026-09-29 — Agent inference: past some size, an added rule may reduce adherence to the rest. Not established.
-
-## TD-002: Other places where content appears or resizes after the first paint
-
-Kind: technical
-Status: Idea
-
-### Question
-
-One defect of a class is fixed; whether the class has other members is not known. The fixed defect: leaving a node with `Ctrl+o` remounted the rows, and an attachment image rendered nothing until its bytes loaded, so every row below it jumped down about two frames later. The class is any view that starts from an empty or default state on mount and fills in or resizes after the first paint, which the user sees as blinking or a lack of smoothness. The Product Owner expects more of them. The question is which transitions have this defect, and whether they share a structural cause that one change would remove, rather than being fixed one at a time.
-
-### What we are watching
-
-Any transition where the Product Owner sees a blink, a jump, or content that arrives late. The cheapest observation is a frame-by-frame record of the geometry of a row that sits below the changing content, as in `e2e/electron/leave-layout-stability.spec.ts`: the list of distinct positions a row takes during the transition should have one entry.
-
-### What would settle it
-
-A survey that runs that kind of frame recording over the transitions listed under Evidence and reports, for each, whether it shifts and by how much. Each reproduced shift is a defect for the defect-first workflow in `AGENTS.md` §9. If most reproduced shifts share one cause, such as state that is initialised asynchronously after mount, the survey should say so, because that would justify a structural change under `AGENTS.md` §8 instead of separate fixes. A survey that finds no further shifts closes the question.
-
-### Product Owner perspective
-
-Product Owner statement (2026-10-03): after the `Ctrl+o` defect was fixed, they asked whether other places have the same kind of problem, because they notice a lack of smoothness. They asked to record this as an observation, expecting that a defect of this kind makes others likely, and to leave the investigation to a later session with a more capable model.
-
-### Evidence
-
-- 2026-10-03 — Usage evidence: `gd` into a node and `Ctrl+o` back, in a document with an image above a row containing a hyperlink, made the row visibly move. Reproduced with frame recording: the row stood at 116 px, then at 236 px; the 120 px difference equals the image height. Fixed in `5d9859b`.
-- 2026-10-03 — Repository fact: the cause was `AttachmentImage` in `src/renderer/AttachmentPreview.tsx`. Its state starts as `loading` and renders `null`; the bytes arrive through a Promise and a `useEffect`, and the `<img>` is decoded asynchronously.
-- 2026-10-03 — Agent inference, none reproduced. Candidates found by reading code, most likely first:
-  1. Opening the image preview: `ImagePreview` uses the same loading hook, so the dialog renders without its image for at least one frame. The size memory added in `5d9859b` does not apply, because the preview size depends on the window.
-  2. The always-on-top control at launch: `src/renderer/App.tsx` starts `alwaysOnTop` as `false` and sets the real value from an asynchronous call, while the Vim preference is read before the first render for the same reason (comment on `initialVimEnabled`).
-  3. The first link in a node: `src/renderer/NodeInput.tsx` swaps a `textarea` for a `contentEditable` element, and `src/renderer/use-node-input-bindings.ts` restores focus and caret in a layout effect and again in a microtask.
-  4. Scroll position on entering and leaving a node: one scroll container serves all levels, and `revealInViewport` in `src/renderer/scroll-viewport.ts` centered a selected row that is not fully visible, which read as a jump. Keyboard movement at the window edge now scrolls by about one row (`docs/PRODUCT.md` §20.8); entering and leaving a node was not re-checked.
-  5. The bundled font: `@font-face` in `src/renderer/styles.css` sets no `font-display`.
-  6. Lists above 500 rows: row heights are estimated at 25 px until measured (`src/renderer/list-window.ts`); `e2e/electron/windowed-list.spec.ts` already records a shift from image loading there as accepted.
-- 2026-10-03 — Repository fact: `AGENTS.md` §9 requires flash-free window creation, loading, reloading, and closing (`docs/PRODUCT.md` §20.5). Whether any requirement covers transitions inside the editor was not checked.
-- 2026-10-22 — Usage evidence: the Product Owner held `Cmd+P` for 15 seconds as a stress test; on returning to Tree the inline image was sometimes missing. Reproduced: the remounted row had no `<img>` in its first render. Fixed by caching decoded images (`docs/ARCHITECTURE.md`, attachment cache), which also lets a cached image appear at once in the image preview (candidate 1 above). Auto-repeat toggling of Agenda while `Cmd+P` is held is kept by Product Owner decision.
-- 2026-11-21 — Usage evidence: survey of the six candidates at `0f2fb33` in the real Electron renderer. A probe recorded each distinct value at every DOM mutation and animation frame, with the number of frames each value lasted; a value that lasted no frame was not painted. No fixes were made.
-  1. Image preview: not reproduced. The preview showed the decoded image in its first painted frame, for the first and a second inline image.
-  2. Always-on-top control: not reproduced after a renderer reload; the control showed the pinned state from its first render. Repository fact: `src/renderer/main.tsx` awaits the Vim preference before the first render but not the pin preference, so the result depends on IPC order. First launch was not observed, because the probe starts after the first document loads.
-  3. First link: not reproduced. The `textarea` became the rich editor between two typed characters with the same row height, the row below in place, focus kept and a continuous caret offset.
-  4. Entering and leaving a node: no intermediate frame; each of `gd` and `Ctrl+o` was one transition. After leaving, the parent row was not where it was before entering (row top 556 before `gd`, 317 after `Ctrl+o`). That is a restored-position question, not a late resize.
-  5. Bundled font: not reproduced after a renderer reload; text width was constant from the first render. First launch was not observed (same limit as 2).
-  6. Lists above 500 rows: reproduced only with an image. `G` to the last of 600 rows painted the destination at 512 px, then for one frame at 679 px, then at 512 px again, when a never-displayed 160 px image 9 rows above it loaded. The same document without the image painted no intermediate position; estimated heights of wrapped rows were corrected before paint.
-  7. (Added) Expanding a branch with `zo` whose child holds a never-displayed image painted one frame without the image; the row below then moved from 156 px to 323 px.
-- 2026-11-21 — Agent inference: the reproduced shifts (6, 7 and the fixed `Ctrl+o` defect) share one cause. An image whose decoded bytes are not cached renders nothing until it loads, and nothing records its size in advance, so its row grows after the first paint. The decoded-image cache only helps images already displayed in the session. Reserving the size before decode, for example from dimensions stored with the attachment, would remove the class at once; that changes stored data and needs a Product Owner decision. Candidates 2 and 5 remain unverified at first launch.
 
 ## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
 
@@ -299,4 +255,5 @@ A reproduction under load (for example `--repeat-each` in a full run) with a tra
 ### Evidence
 
 - 2026-11-21 — Usage evidence: full `npm run test:e2e` at `777ab5f` before commit; the test failed at `command-panel.spec.ts:328` with `keyboard.press: Target page, context or browser has been closed`. A focused rerun (`--repeat-each=3`) passed all three times.
+- 2026-11-21 — Usage evidence: the same failure (`keyboard.press: Target page, context or browser has been closed`) recurred in a full local `npm run test:e2e` at `782f883` with uncommitted image-size rendering changes; a focused rerun (`--repeat-each=3`) passed all three times.
 - 2026-11-21 — Agent inference, not verified: `Enter` runs the quit command, and the application can close before Playwright finishes the `keyboard.press` call, so the call fails although the expected quit happened. The trace of that run was not kept.

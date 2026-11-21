@@ -106,6 +106,63 @@ describe('AttachmentImage', () => {
     expect(container.querySelector('.attachment-placeholder')).toBeNull()
   })
 
+  // @requirement PRODUCT.md §17.1
+  it.each([
+    [800, 400, '200px', '100px'],
+    [120, 90, '120px', '90px'],
+  ])(
+    'reserves the fitted box of a stored %i×%i size before an image first loads',
+    async (width, height, boxWidth, boxHeight) => {
+      const onNaturalSize = vi.fn()
+      const { container } = render(
+        <AttachmentImage
+          attachmentId={`stored-${width}`}
+          width={width}
+          height={height}
+          onOpen={() => undefined}
+          onNaturalSize={onNaturalSize}
+        />,
+      )
+
+      expect(container.querySelector('.attachment-placeholder')).toHaveStyle({ width: boxWidth, height: boxHeight })
+
+      const image = await screen.findByAltText('Attached image')
+      Object.defineProperty(image, 'naturalWidth', { configurable: true, value: width })
+      Object.defineProperty(image, 'naturalHeight', { configurable: true, value: height })
+      fireEvent.load(image)
+
+      expect(image).toHaveAttribute('width', boxWidth.slice(0, -2))
+      expect(image).toHaveAttribute('height', boxHeight.slice(0, -2))
+      expect(onNaturalSize).not.toHaveBeenCalled()
+    },
+  )
+
+  // @requirement PRODUCT.md §17.1
+  it('displays and reports the decoded size when it differs from the stored one', async () => {
+    const onNaturalSize = vi.fn()
+    render(
+      <AttachmentImage
+        attachmentId="wrong-size"
+        width={400}
+        height={100}
+        onOpen={() => undefined}
+        onNaturalSize={onNaturalSize}
+      />,
+    )
+    const image = await screen.findByAltText('Attached image')
+
+    expect(image).toHaveAttribute('width', '200')
+    expect(image).toHaveAttribute('height', '50')
+
+    Object.defineProperty(image, 'naturalWidth', { configurable: true, value: 100 })
+    Object.defineProperty(image, 'naturalHeight', { configurable: true, value: 400 })
+    fireEvent.load(image)
+
+    expect(onNaturalSize).toHaveBeenCalledExactlyOnceWith('wrong-size', 100, 400)
+    expect(image).toHaveAttribute('width', '50')
+    expect(image).toHaveAttribute('height', '200')
+  })
+
   it('reports missing attachment bytes', async () => {
     mockTreeApi({ readAttachment: async () => null })
     render(<AttachmentImage attachmentId="image" onOpen={() => undefined} />)

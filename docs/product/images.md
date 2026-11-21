@@ -177,6 +177,8 @@ An attached image is displayed inline beneath its node's text.
 
 Inline images are constrained to a 200×200 CSS-pixel bounding box while preserving their aspect ratio. An image whose natural size exceeds the box is scaled down to fit. An image whose natural size is smaller than the box is displayed at its natural size; it is not enlarged.
 
+An image with a stored size (§17) occupies its fitted box from the first frame in which its row is displayed, before its bytes load, so the rows below it do not move when it appears. This holds when a branch opens, when a list window moves to rows not yet displayed, for example after `G`, and when a node is left. When the decoded image's size differs from the stored size, the image is displayed at its decoded size and Tree corrects the stored size without an Undo step or a save of its own; the next ordinary save writes it.
+
 A recently displayed image appears in the first frame when its row is displayed again, for example after Agenda closes or after leaving a node, without an empty placeholder. This holds while the image is in the bounded in-memory image cache; an image no longer in the cache loads again.
 
 Clicking an attached image opens an image preview.

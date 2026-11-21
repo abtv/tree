@@ -1590,9 +1590,18 @@ body.node-drag-invalid * {
   outline-offset: 0;
 }
 
+/* The reserved box takes the margins of the image button it stands in for. */
 .attachment-placeholder {
   display: block;
   margin: 6px;
+}
+
+.node-input-image-only + .attachment-placeholder {
+  margin-top: -1px;
+}
+
+.vim-state-insert .node-input-image-only:focus + .attachment-placeholder {
+  margin-top: 6px;
 }
 
 .attachment-error {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { IMAGE_LOAD_ERROR } from '../domain/product-messages'
 import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
@@ -13,18 +13,23 @@ type AttachmentState =
 const MAX_IMAGE_SIDE = 200 // Keep in sync with `.attachment-image` in styles.css.
 const MAX_REMEMBERED_SIZES = 1024
 
-// The box each attachment image occupied the last time it loaded, as two numbers per attachment.
-const renderedSizes = new Map<string, { width: number; height: number }>()
+interface ImageBox {
+  readonly width: number
+  readonly height: number
+}
 
-function rememberRenderedSize(attachmentId: string, image: HTMLImageElement): void {
-  const { naturalWidth, naturalHeight } = image
-  if (naturalWidth === 0 || naturalHeight === 0) return
+// The box each attachment image occupied the last time it loaded, as two numbers per attachment.
+const renderedSizes = new Map<string, ImageBox>()
+
+/** The inline box of an image with this natural size: fitted to 200×200 and never enlarged (§17.1). */
+function inlineBox(naturalWidth: number, naturalHeight: number): ImageBox {
   const scale = Math.min(1, MAX_IMAGE_SIDE / naturalWidth, MAX_IMAGE_SIDE / naturalHeight)
+  return { width: Math.round(naturalWidth * scale), height: Math.round(naturalHeight * scale) }
+}
+
+function rememberRenderedSize(attachmentId: string, box: ImageBox): void {
   renderedSizes.delete(attachmentId)
-  renderedSizes.set(attachmentId, {
-    width: Math.round(naturalWidth * scale),
-    height: Math.round(naturalHeight * scale),
-  })
+  renderedSizes.set(attachmentId, box)
   if (renderedSizes.size > MAX_REMEMBERED_SIZES) renderedSizes.delete(renderedSizes.keys().next().value!)
 }
 
@@ -95,22 +100,42 @@ function ImageErrorMessage(): React.JSX.Element {
 
 export function AttachmentImage({
   attachmentId,
+  width,
+  height,
   onOpen,
+  onNaturalSize,
   imageCaretActive = false,
   recognitionComplete = false,
   images = attachmentImageCache,
 }: {
   attachmentId: string
+  /** The natural size stored with the attachment, when the document has one (§17). */
+  width?: number | undefined
+  height?: number | undefined
   onOpen: (attachmentId: string) => void
+  /** Reports a decoded natural size that differs from the stored one. */
+  onNaturalSize?: ((attachmentId: string, width: number, height: number) => void) | undefined
   imageCaretActive?: boolean
   recognitionComplete?: boolean
   images?: AttachmentImageCache
 }): React.JSX.Element | null {
   const { state, onImageError } = useAttachmentImage(images, attachmentId)
-  const size = renderedSizes.get(attachmentId)
+  const [, showDecodedSize] = useReducer((count: number) => count + 1, 0)
+  // A size measured from the decoded image wins over the stored one, which may be missing or wrong.
+  const size =
+    renderedSizes.get(attachmentId) ??
+    (width === undefined || height === undefined ? undefined : inlineBox(width, height))
+  const onLoad = (image: HTMLImageElement): void => {
+    const { naturalWidth, naturalHeight } = image
+    if (naturalWidth === 0 || naturalHeight === 0) return
+    const box = inlineBox(naturalWidth, naturalHeight)
+    rememberRenderedSize(attachmentId, box)
+    if (naturalWidth !== width || naturalHeight !== height) onNaturalSize?.(attachmentId, naturalWidth, naturalHeight)
+    if (box.width !== size?.width || box.height !== size.height) showDecodedSize()
+  }
   if (state.status === 'loading') {
-    // Leaving a node remounts its rows. Reserving the size the image had last time keeps the rows
-    // below it from shifting when the bytes arrive.
+    // Rows remount when a node is left, a branch opens or a list window moves. Reserving the image's
+    // size keeps the rows below it from shifting when the bytes arrive.
     return size === undefined ? null : <span aria-hidden="true" className="attachment-placeholder" style={size} />
   }
   if (state.status === 'error') return <ImageErrorMessage />
@@ -137,7 +162,7 @@ export function AttachmentImage({
         alt="Attached image"
         {...size}
         onError={onImageError}
-        onLoad={(event) => rememberRenderedSize(attachmentId, event.currentTarget)}
+        onLoad={(event) => onLoad(event.currentTarget)}
       />
     </button>
   )

@@ -82,15 +82,24 @@ describe('file services', () => {
 
   // @requirement PRODUCT.md §17
   it('reads image sizes from attachment headers, with null for missing or unreadable images', async () => {
-    const { services } = await servicesForTest()
+    const { directory, services } = await servicesForTest()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     await services.writeAttachment('sized', transparentPng)
     await services.writeAttachment('short', transparentPng.subarray(0, 20))
     await services.writeAttachment('other', new Uint8Array([1, 2, 3]))
+    // A directory where an image should be makes its read fail with an error other than not-found.
+    await mkdir(join(directory, 'attachments', 'unreadable.png'))
 
-    const sizes = await services.readAttachmentDimensions(['sized', 'missing', 'short', 'other', 'sized'])
+    try {
+      const ids = ['sized', 'missing', 'short', 'unreadable', 'other', 'sized']
+      const sizes = await services.readAttachmentDimensions(ids)
 
-    expect(sizes).toEqual([{ width: 2, height: 1 }, null, null, null, { width: 2, height: 1 }])
-    await expect(services.readAttachmentDimensions(['bad/id'])).rejects.toThrow('Attachment IDs')
+      expect(sizes).toEqual([{ width: 2, height: 1 }, null, null, null, null, { width: 2, height: 1 }])
+      expect(errors).toHaveBeenCalledOnce()
+      await expect(services.readAttachmentDimensions(['bad/id'])).rejects.toThrow('Attachment IDs')
+    } finally {
+      errors.mockRestore()
+    }
   })
 
   it('logs the original filesystem failure even when persistence debugging is disabled', async () => {

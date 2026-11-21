@@ -69,7 +69,11 @@ const releaseWorkers = (app: ElectronApplication) => app.evaluate(() => globalTh
 
 function seedNotesWithImage(userDataDir: string, text: string, imageId: string): void {
   seedDocument(userDataDir, {
-    document: { roots: [{ id: 'root', text, attachment: { id: imageId, mimeType: 'image/png' }, children: [] }] },
+    document: {
+      roots: [
+        { id: 'root', text, attachment: { id: imageId, mimeType: 'image/png', width: 1, height: 1 }, children: [] },
+      ],
+    },
     location: { currentParentId: null, selectedNodeId: 'root' },
   })
   mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
@@ -78,7 +82,14 @@ function seedNotesWithImage(userDataDir: string, text: string, imageId: string):
 
 const importedHead = serializeState(
   {
-    roots: [{ id: 'imported', text: 'Imported notes', attachment: { id: 'new', mimeType: 'image/png' }, children: [] }],
+    roots: [
+      {
+        id: 'imported',
+        text: 'Imported notes',
+        attachment: { id: 'new', mimeType: 'image/png', width: 1, height: 1 },
+        children: [],
+      },
+    ],
   },
   { currentParentId: null, selectedNodeId: 'imported' },
   { expandedIds: [] },
@@ -167,6 +178,7 @@ test.describe('desktop notes archive boundary', () => {
 
     expect([...contents.keys()]).toEqual(['document.json', 'attachments/picture.png'])
     expect(JSON.parse(new TextDecoder().decode(contents.get('document.json')))).toEqual(readPersisted(userDataDir))
+    expect(readPersisted(userDataDir).document.roots[0]!.attachment).toMatchObject({ width: 1, height: 1 })
     expect(contents.get('attachments/picture.png')).toEqual(onePixelPng)
     expect(entries(exports)).toEqual(['Tree Notes 2026-10-23.zip'])
     expect(entries(join(userDataDir, '.notes-export'))).toEqual([])
@@ -215,6 +227,9 @@ test.describe('desktop notes archive boundary', () => {
     await window.reload()
 
     await expect(node(window, 1)).toHaveValue('Imported notes')
+    // The imported size reaches the renderer through the same parser as a saved document.
+    await expect(window.getByAltText('Attached image')).toHaveAttribute('width', '1')
+    expect(readPersisted(userDataDir).document.roots[0]!.attachment).toMatchObject({ width: 1, height: 1 })
 
     const replacedNotes = join(userDataDir, 'Replaced Notes')
     const [folderName] = entries(replacedNotes)

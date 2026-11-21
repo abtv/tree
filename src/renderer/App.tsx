@@ -454,6 +454,11 @@ export function App({
   const quitWithoutSaving = useCallback((): void => {
     void window.treeApi.quitWithoutSaving()
   }, [])
+  const recordImageSize = useCallback(
+    (attachmentId: string, width: number, height: number) =>
+      store.recordAttachmentDimensions(attachmentId, width, height),
+    [store],
+  )
   const renderInput = useCallback(
     (node: TreeNode, label: string): React.JSX.Element => (
       <>
@@ -471,28 +476,43 @@ export function App({
         {node.attachment === undefined ? null : (
           <AttachmentImage
             attachmentId={node.attachment.id}
+            width={node.attachment.width}
+            height={node.attachment.height}
             recognitionComplete={node.attachment.searchText !== undefined}
             imageCaretActive={isImageCaretActive(node)}
             images={attachmentImages}
             onOpen={setPreviewAttachmentId}
+            onNaturalSize={recordImageSize}
           />
         )}
       </>
     ),
-    [attachmentImages, isImageCaretActive, nodeInputBindings, richEditingEnabled, searchQuery, searchResult, treeToday],
+    [
+      attachmentImages,
+      isImageCaretActive,
+      nodeInputBindings,
+      recordImageSize,
+      richEditingEnabled,
+      searchQuery,
+      searchResult,
+      treeToday,
+    ],
   )
   const renderAgendaAttachment = useCallback(
     (node: TreeNode, editable: boolean): React.JSX.Element | null =>
       node.attachment === undefined ? null : (
         <AttachmentImage
           attachmentId={node.attachment.id}
+          width={node.attachment.width}
+          height={node.attachment.height}
           recognitionComplete={node.attachment.searchText !== undefined}
           imageCaretActive={editable && isImageCaretActive(node)}
           images={attachmentImages}
           onOpen={setPreviewAttachmentId}
+          onNaturalSize={recordImageSize}
         />
       ),
-    [attachmentImages, isImageCaretActive],
+    [attachmentImages, isImageCaretActive, recordImageSize],
   )
 
   const renderAgendaInput = useCallback(
@@ -754,10 +774,13 @@ export function App({
                   {currentParent.attachment === undefined ? null : (
                     <AttachmentImage
                       attachmentId={currentParent.attachment.id}
+                      width={currentParent.attachment.width}
+                      height={currentParent.attachment.height}
                       recognitionComplete={currentParent.attachment.searchText !== undefined}
                       imageCaretActive={isImageCaretActive(currentParent)}
                       images={attachmentImages}
                       onOpen={setPreviewAttachmentId}
+                      onNaturalSize={recordImageSize}
                     />
                   )}
                 </section>
