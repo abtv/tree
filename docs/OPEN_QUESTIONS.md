@@ -233,4 +233,14 @@ Product Owner statement (2026-10-03): after the `Ctrl+o` defect was fixed, they 
 Kind: technical
 Status: Deferred
 
-Deferred by the Product Owner on 2026-11-21: §13 Persistence (65,001 bytes) also holds search, emoji, command-history, recent-node and finished-task text, and §8 UI Layer is 50,956 bytes; regrouping needs the owner's choice of section boundaries and must keep ADR 0004's §13 citation valid (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`).
+### Question
+
+Should `docs/ARCHITECTURE.md` §8 UI Layer (50,956 bytes) and §13 Persistence (65,001 bytes) be regrouped? §13 also holds search, emoji, command-history, recent-node and finished-task text beside persistence, so a reader looking for one subject loads the others.
+
+### What we are watching
+
+Whether agents and the Product Owner read the whole of §8 or §13 for a task that needs only one of its subjects, and how much each section grows.
+
+### What would settle it
+
+A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004's §13 citation valid. The Product Owner deferred the question on 2026-11-21 (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`).
