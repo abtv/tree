@@ -60,10 +60,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 20],
-    [false, true, 19],
-    [false, false, 18],
-    [true, false, 19],
+    [true, true, 19],
+    [false, true, 18],
+    [false, false, 17],
+    [true, false, 18],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -91,7 +91,6 @@ describe('command registry', () => {
       'set-theme-white',
       'show-agenda',
       'show-tree',
-      'summarize',
       'toggle-finished-tasks',
       'toggle-line-numbers',
       'toggle-mark-node',
@@ -169,7 +168,6 @@ describe('command registry', () => {
       'set-theme-white',
       'show-agenda',
       'show-tree',
-      'summarize',
       'toggle-always-on-top',
       'toggle-finished-tasks',
       'toggle-line-numbers',
@@ -201,7 +199,6 @@ describe('command registry', () => {
 
   it('delegates all actions to existing services and queries their current state', async () => {
     const services = {
-      summarize: vi.fn(async () => undefined),
       imageToText: vi.fn(async () => undefined),
       reindexAllImages: vi.fn(async () => undefined),
       showAbout: vi.fn(async () => undefined),
@@ -229,7 +226,6 @@ describe('command registry', () => {
         view: 'tree',
       })
 
-    expect(services.summarize).toHaveBeenCalledExactlyOnceWith()
     expect(services.imageToText).toHaveBeenCalledExactlyOnceWith()
     expect(services.reindexAllImages).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
@@ -304,7 +300,6 @@ describe('command registry', () => {
       'toggle-star-node',
       'toggle-mark-node',
       'reindex-all-images',
-      'summarize',
       'image-to-text',
       'about-tree',
       'find',

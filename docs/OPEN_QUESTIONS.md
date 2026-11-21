@@ -219,7 +219,7 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 
 ### Decision and rationale
 
-- 2026-11-21 — Remove Summarize (§15.2): the Product Owner does not use it. The removal is a separate product change.
+- 2026-11-21 — Remove Summarize (§15.2): the Product Owner does not use it. Removed under [ADR 0031](decisions/0031-remove-on-device-summarization.md).
 - 2026-11-21 — Keep Vim mode complete: the Product Owner uses every command family, including case changes, surround, node operations and `Ctrl+A`/`Ctrl+X`.
 - 2026-11-21 — Keep the browser version, Search, desktop and browser export, import and backup, Image to Text, the command panel, images and attachments, clipboard and links, node states, drag and drop, inline expansion, desktop updates, Appearance, emoji completion and Agenda. Improvements are open in PD-009 (Agenda), PD-011 (Search), PD-012 (command panel) and PD-014 (Image to Text in the browser).
 - Still open: Recent nodes. Product Owner statement: probably not needed, given stars, marks and global search. Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.

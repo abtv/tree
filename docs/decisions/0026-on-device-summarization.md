@@ -1,6 +1,6 @@
 # On-Device Summarization
 
-Status: Accepted
+Status: Superseded by ADR 0031
 Date: 2026-11-12
 
 ## Context

@@ -103,13 +103,7 @@ import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { AgendaFoldMemory } from './agenda-fold-memory'
 import { ReturnPositions } from './return-positions'
-import {
-  activeAgendaOccurrence,
-  focusedAgendaDay,
-  applyAgendaCommand,
-  openAgendaState,
-  type AgendaCommand,
-} from './agenda-state'
+import { focusedAgendaDay, applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
 import { dayNumberOf } from '../domain/calendar-date'
 import {
   agendaHistorySelection,
@@ -125,7 +119,6 @@ import { RecentNodePersistence } from './recent-node-persistence'
 import { EmojiHistory } from './emoji-history'
 import { runNodeSearch } from './node-search'
 import type { RecentNode } from './recent-nodes'
-import { Summarization, summaryRoots, type SummarySelection } from './summarization'
 import { imageSearchTextEnrichment } from '../domain/image-search-text'
 import { ImageToTextQueue } from './image-to-text-queue'
 
@@ -136,7 +129,6 @@ export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transit
 const ATTACHMENT_SIZE_BATCH_DELAY_MS = 100
 
 export class EditorStore {
-  public readonly summarization: Summarization
   public readonly emojiHistory: EmojiHistory
   private readonly recentPersistence: RecentNodePersistence
   private readonly recentNodesOwner = new RecentNodes(() => this.recentPersistence.changed())
@@ -211,8 +203,6 @@ export class EditorStore {
     saveTiming: SaveTiming = DEFAULT_SAVE_TIMING,
   ) {
     this.clock = clock
-    this.summarization = new Summarization(services.summarization)
-    void this.summarization.refresh()
     this.emojiHistory = new EmojiHistory(services.saveEmojiHistory?.bind(services), (error) => this.reportError(error))
     this.recentPersistence = new RecentNodePersistence(
       clock,
@@ -574,7 +564,6 @@ export class EditorStore {
   ): Promise<void> {
     // Quit or update takes focus authority even if its first save later fails.
     if (options.sealEditsUntil && !options.sealEditsUntil.aborted) this.search.interruptNavigation()
-    const resumeSummarization = options.cancelImageRecognition ? this.summarization.suspend() : undefined
     const resumeImageRecognition = options.cancelImageRecognition ? this.imageToTextQueue.suspend() : undefined
     try {
       let committed: boolean
@@ -605,7 +594,6 @@ export class EditorStore {
         seal.addEventListener('abort', () => this.editSeals.delete(seal), { once: true })
       }
     } finally {
-      resumeSummarization?.()
       resumeImageRecognition?.()
     }
   }
@@ -625,28 +613,6 @@ export class EditorStore {
 
   public get imageToTextAvailable(): boolean {
     return this.services.imageToText !== undefined
-  }
-
-  public get canSummarize(): boolean {
-    const state = this.runtime.snapshot
-    const summary = this.summarization.getSnapshot()
-    return (
-      state.status === 'ready' &&
-      !this.treeSelectionHidden &&
-      summary.available &&
-      !summary.running &&
-      (state.agenda === undefined || activeAgendaOccurrence(state.agenda) !== undefined)
-    )
-  }
-
-  public summarize(selection?: SummarySelection): void {
-    if (!this.canSummarize) return
-    this.finishPendingEdits()
-    const state = this.runtime.snapshot
-    if (state.status !== 'ready') return
-    this.summarization.start(
-      summaryRoots(state.document, state.location.selectedNodeId, state.agenda ? undefined : selection),
-    )
   }
 
   public imageToText(): void {
@@ -905,9 +871,8 @@ export class EditorStore {
     return this.searchOwner.origin(this.runtime.ready(), offset)
   }
 
-  /** Retire asynchronous search and summarization on renderer unmount without changing persisted view state. */
+  /** Retire asynchronous search on renderer unmount without changing persisted view state. */
   public disposeSearch(): void {
-    this.summarization.cancel()
     this.searchOwner.hide()
   }
 

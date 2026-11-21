@@ -110,7 +110,6 @@ export function App({
     return () => window.clearTimeout(timer)
   }, [store, imageToTextStatus, imageToTextStatusRevision])
 
-  const summary = useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
   const agendaToday = state.status === 'ready' ? state.agenda?.today : undefined
   const treeToday = localToday()
   const search = useSyncExternalStore(store.search.subscribe, store.search.session.getSnapshot)
@@ -263,7 +262,6 @@ export function App({
   })
   const searchAction = useRef<(command: EditorFindCommand) => void>(() => undefined)
   const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
-    summarySelection: vimMode === 'visual-node' ? nodeVisualSelection : undefined,
     showAbout,
     searchCommand: (command) => {
       window.setTimeout(() => searchAction.current(command), 0)
@@ -882,16 +880,6 @@ export function App({
             <span className="save-error persistence-locked" role="alert">
               {SAVE_LOCKED_MESSAGE}
             </span>
-          ) : null}
-          {summary.message === undefined ? null : (
-            <span className="summary-status" role="status">
-              {summary.message}
-            </span>
-          )}
-          {summary.running ? (
-            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={store.summarization.cancel}>
-              Cancel summarization
-            </button>
           ) : null}
           {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
           {platformStatus}

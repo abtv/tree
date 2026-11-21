@@ -649,7 +649,7 @@ Use inspection and the first necessary operation as evidence rather than launchi
 
 When access is missing, use an already authorized supported alternative if it satisfies the same requirement. Follow the tool's approval mechanism when additional permission is necessary; never bypass a denial, broaden permissions, or weaken role restrictions to complete the check. Report the blocked requirement and supported next action early, and continue work that does not depend on it. The Product Owner should be asked only when their action or decision is needed under `AGENTS.md` §14.
 
-Per-tool configuration of Claude Code and Codex, including the mutation-testing and Safari allowances, is in [Development Reference §3, Agent Tool Configuration](DEVELOPMENT_REFERENCE.md#3-agent-tool-configuration); the on-device summarization build is described in [§1](DEVELOPMENT_REFERENCE.md#on-device-summarization).
+Per-tool configuration of Claude Code and Codex, including the mutation-testing and Safari allowances, is in [Development Reference §3, Agent Tool Configuration](DEVELOPMENT_REFERENCE.md#3-agent-tool-configuration).
 
 Before fixing a reported defect, run `npm run fix:history` — with no arguments it inspects the fix at `HEAD` or the working-tree diff, and it takes repository-relative paths otherwise — to see the earlier `fix` commits in the same production files, and when it reports a possible shared design cause include the proposed structural initiative or the reason none is needed in the handoff.
 

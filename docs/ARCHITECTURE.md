@@ -23,7 +23,7 @@ The application uses:
 * Electron for the desktop application shell and operating-system integration;
 * React for the user interface;
 * TypeScript as the programming language;
-* Swift helpers using Apple Vision for macOS image recognition (ADR 0025) and Foundation Models for on-device summarization (ADR 0026);
+* a Swift helper using Apple Vision for macOS image recognition (ADR 0025);
 * Vite for the frontend development and build tooling.
 
 Do not change the core technology stack without explicit Product Owner approval.
@@ -1257,17 +1257,6 @@ The Vim editing preference uses the same boolean preference store (`createBoolea
 
 ## 17. Process Boundaries
 
-Summarization (PRODUCT §15.2, ADR 0026) uses a separate bounded Swift helper with
-Foundation Models `SystemLanguageModel`. The application owns immutable source
-selection and sequential branch reduction; Electron main owns trusted IPC, native
-cancellation and the final guarded plain-text clipboard write. Fresh sessions avoid
-context growth across requests. No model or job state enters persistence.
-
-Performance assessment (§22.1): summarization adds no document writes or syncs.
-Source processing yields between bounded batches; one native request runs at a time.
-An explicit stack retains bounded branch buffers and references to the immutable
-selected forest until completion/cancel. Node, byte, request and lifetime limits
-bound retention. System model memory and hardware scheduling remain Apple-owned.
 The shared bottom status bar renders operation messages independently of document
 changes; browser controllers retain their existing status owners and DOM nodes.
 

@@ -20,7 +20,6 @@ export interface CommandServices {
   setHideFinishedTasks?(value: boolean): Promise<void>
   toggleStarNode?(): Promise<void>
   toggleMarkNode?(): Promise<void>
-  summarize?(): Promise<void>
   imageToText?(): Promise<void>
   reindexAllImages?(): Promise<void>
   showAbout?(): Promise<void>
@@ -93,16 +92,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     active: () => false,
     run: async (services) => {
       await services.reindexAllImages?.()
-    },
-  },
-  {
-    name: 'summarize',
-    aliases: [],
-    description: 'Summarize selected nodes and copy the summary',
-    enabled: false,
-    active: () => false,
-    run: async (services) => {
-      await services.summarize?.()
     },
   },
   {

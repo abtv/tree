@@ -30,33 +30,6 @@ describe('renderer Electron services', () => {
     expect(save).toHaveBeenCalledExactlyOnceWith(JSON.stringify(state))
   })
 
-  it('preserves the optional Summary bridge and its results and failures', async () => {
-    expect(createElectronEditorServices().summarization).toBeUndefined()
-    const summarization = {
-      available: vi.fn(async () => true),
-      begin: vi.fn(async () => undefined),
-      reduce: vi.fn(async () => 'Summary'),
-      finish: vi.fn(async () => undefined),
-      cancel: vi.fn(async () => true),
-    }
-    window.treeApi = { ...window.treeApi, summarization }
-    const service = createElectronEditorServices().summarization!
-
-    await expect(service.available()).resolves.toBe(true)
-    await service.begin('job')
-    await expect(service.reduce('job', 'Notes', true)).resolves.toBe('Summary')
-    await service.finish('job', 'Summary')
-    await expect(service.cancel('job')).resolves.toBe(true)
-
-    expect(summarization.begin).toHaveBeenCalledExactlyOnceWith('job')
-    expect(summarization.reduce).toHaveBeenCalledExactlyOnceWith('job', 'Notes', true)
-    expect(summarization.finish).toHaveBeenCalledExactlyOnceWith('job', 'Summary')
-    expect(summarization.cancel).toHaveBeenCalledExactlyOnceWith('job')
-    const failure = new Error('Native Summary unavailable')
-    summarization.reduce.mockRejectedValueOnce(failure)
-    await expect(service.reduce('next', 'Notes', false)).rejects.toBe(failure)
-  })
-
   it('does not send a snapshot whose encoding overlaps notes replacement', async () => {
     let release!: (text: string) => void
     const gate = new Promise<string>((resolve) => {

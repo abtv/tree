@@ -15,13 +15,11 @@ import { clearPending } from './vim-command-state'
 import { moveSuggestionIndex } from './completion-controller'
 import { captureFocusRestoration, getCaret } from './editor-dom'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
-import type { SummarySelection } from '../application/summarization'
 
 export function useCommandPanel(options: {
   showAbout?: (() => void) | undefined
   searchCommand?: (command: 'find' | 'next' | 'previous' | 'all') => void
   store: EditorStore
-  summarySelection?: SummarySelection | undefined
   vimEnabled: boolean
   vimAvailable?: boolean
   alwaysOnTopAvailable?: boolean
@@ -68,8 +66,6 @@ export function useCommandPanel(options: {
   const starred = starTarget?.starred === true
   const marked = starTarget?.marked === true
   const canStar = starTarget !== undefined
-  useSyncExternalStore(store.summarization.subscribe, store.summarization.getSnapshot)
-  const canSummarize = store.canSummarize
   const imageToTextAvailable = store.imageToTextAvailable === true
   const view: 'agenda' | 'tree' = snapshot.status === 'ready' && snapshot.agenda !== undefined ? 'agenda' : 'tree'
   const commands = useMemo(
@@ -82,26 +78,15 @@ export function useCommandPanel(options: {
         }).map((command) =>
           command.name === 'toggle-star-node' || command.name === 'toggle-mark-node'
             ? { ...command, enabled: canStar }
-            : command.name === 'summarize'
-              ? { ...command, enabled: canSummarize }
-              : command.name === 'toggle-finished-tasks'
-                ? { ...command, enabled: ready }
-                : command.name === 'image-to-text' && treeSelectionHidden
-                  ? { ...command, enabled: false }
-                  : command,
+            : command.name === 'toggle-finished-tasks'
+              ? { ...command, enabled: ready }
+              : command.name === 'image-to-text' && treeSelectionHidden
+                ? { ...command, enabled: false }
+                : command,
         ),
         ...menuEntries,
       ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    [
-      vimAvailable,
-      alwaysOnTopAvailable,
-      imageToTextAvailable,
-      menuEntries,
-      canSummarize,
-      canStar,
-      ready,
-      treeSelectionHidden,
-    ],
+    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canStar, ready, treeSelectionHidden],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -154,9 +139,6 @@ export function useCommandPanel(options: {
     async (command: ApplicationCommand | undefined) => {
       if (running.current) return
       if (command?.enabled === false) return
-      if (command?.name === 'summarize') {
-        if (!store.canSummarize) return
-      }
       if (menuEntries.includes(command!)) {
         const current = menuCommands.getSnapshot().find((entry) => entry.name === command?.name)
         if (current === undefined || current.enabled === false) return
@@ -177,7 +159,6 @@ export function useCommandPanel(options: {
             toggleMarkNode: async () => {
               store.toggleMarkNode()
             },
-            summarize: async () => store.summarize(options.summarySelection),
             imageToText: async () => store.imageToText(),
             reindexAllImages: async () => store.reindexAllImages(),
             showAbout: async () => {
@@ -237,7 +218,6 @@ export function useCommandPanel(options: {
       showTree,
       menuCommands,
       menuEntries,
-      options.summarySelection,
     ],
   )
 
@@ -293,7 +273,6 @@ export function useCommandPanel(options: {
       event.stopImmediatePropagation()
       clearPending(commandState)
       beforeOpen?.()
-      void store.summarization.refresh()
       restore.current = captureFocusRestoration(document.activeElement, 'native')
       setInput('')
       setSelected(0)

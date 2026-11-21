@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process'
 import { mkdir, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildSummarize } from './build-summarize.mts'
 
 export async function buildImageToText(platform = process.platform, arch = process.arch): Promise<void> {
   if (platform !== 'darwin' || arch !== 'arm64') return
@@ -46,5 +45,4 @@ export async function buildImageToText(platform = process.platform, arch = proce
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await buildImageToText()
-  await buildSummarize()
 }

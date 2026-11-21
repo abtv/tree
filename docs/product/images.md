@@ -95,54 +95,6 @@ retry occurs. Successful explicit `image-to-text` also stores the hidden result.
 The border does not change image geometry or replace the image-caret
 indicator, and appears in Tree and Agenda, including the current-parent image.
 
----
-
-### 15.2 Summarize
-
-`summarize` is visible in the command panel on every platform. It is disabled
-unless on-device Apple Intelligence is ready on Apple Silicon macOS Electron
-(macOS 26 or later), and while a summarization runs. Tree uses only the system
-on-device model, never Private Cloud Compute, a network model or its own downloader.
-macOS manages model installation and availability.
-
-The command summarizes the current node, or all whole-node selected siblings,
-including every descendant even when collapsed. Input follows tree order and each
-node is included once. In Agenda it uses the current node and its descendants.
-Only node text is included; images are not recognized and links are not fetched.
-Agenda day headings have no current node, so the command is disabled there.
-
-Each invocation captures the current immutable text after buffered edits finish.
-Editing and navigation remain available and do not change that snapshot. Large
-branches are reduced sequentially from children toward parents in fresh bounded
-sessions; long node text and wide forests are split and combined without silent
-truncation. Intermediate summaries are temporary and can lose source detail.
-
-The final English result is a concise paragraph with key bullet points when useful,
-proportional to the input. Completion copies it to the system clipboard once and
-shows `Summary copied.` in the bottom status bar. This replaces the clipboard even
-if its contents changed while processing. No nodes, history entries or document saves are
-created. Source selection and editing focus remain unchanged.
-
-The bottom status bar shows progress and **Cancel summarization** without taking
-editor focus. Waiting for the final clipboard queue shows `Copying summary…` and
-remains cancellable. Once the clipboard commit begins, cancellation cannot undo
-the write and normal completion is reported. Cancel, failure,
-renderer loss/reload, note replacement, and preparing to quit or install an update
-retire work before the commit point and prevent a late result from being copied.
-No pending job is saved or resumed. Failure and cancellation preserve the clipboard.
-Empty input reports that the selection contains no text.
-
-Processing admits at most 100,000 nodes, 16 MiB of source UTF-8 text, 1,000 model
-requests, and 15 minutes per invocation. Each native request times out after
-60 seconds, accepts at most 2,400 UTF-8 input bytes and returns at most 8,000 bytes.
-
-Intermediate summaries must fit 800 bytes. If the model exceeds that limit, Tree
-recompresses the complete intermediate result up to twice more, within the same
-request and time limits. It never truncates the result. Output too large for another
-request, empty output or failure to fit after these attempts fails explicitly.
-The byte budget reserves context for instructions and output. Apple controls compute
-resources; Tree does not promise GPU execution or zero impact on responsiveness.
-
 ## 17. Images and Attachments
 
 Each node may contain at most one image attachment.

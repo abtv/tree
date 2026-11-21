@@ -18,7 +18,7 @@ Each section number is listed once, with the file that holds its heading.
 | 2, 2.1, 2.1.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3, 18, 19 | [tree-model.md](product/tree-model.md) |
 | 4, 4.1, 4.2, 4.3, 5, 5.1, 6, 6.1, 7, 7.1, 8, 8.1, 8.2, 8.3, 10, 11 | [editing.md](product/editing.md) |
 | 12, 13, 13.1, 13.2, 14 | [clipboard-and-paste.md](product/clipboard-and-paste.md) |
-| 15, 15.1, 15.2, 17, 17.1 | [images.md](product/images.md) |
+| 15, 15.1, 17, 17.1 | [images.md](product/images.md) |
 | 16, 16.1, 16.2 | [persistence.md](product/persistence.md) |
 | 9, 9.1, 9.2, 9.3, 9.4, 21, 26 | [application.md](product/application.md) |
 | 20, 20.1, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8 | [interaction.md](product/interaction.md) |
@@ -33,8 +33,9 @@ Each section number is listed once, with the file that holds its heading.
 
 ## Retired Numbers
 
-A number whose content leaves the specification is listed here with the document that now owns the content.
+A number whose content leaves the specification is listed here with the document that now owns the content, or with the record of its removal.
 
 | Number | Now owned by |
 | --- | --- |
+| 15.2 | Removed. Summarize left the product; see [ADR 0031](decisions/0031-remove-on-device-summarization.md). |
 | 1.4.1 | [macOS releases](releasing.md): release identity, tag reservation, and retries. [Development Reference, GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions): validation gates before publication. [Security Policy](SECURITY.md#browser-publication): signed manifest and publisher trust. [Automatic browser publication](../deployment/github-pages/README.md): asset retention, limits, and the cancellation rule. |

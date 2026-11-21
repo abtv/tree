@@ -301,20 +301,6 @@ TypeScript target configurations live in `config/typescript/`; the root `tsconfi
 Tooling tests live alongside the maintained scripts, including `scripts/vitest-config.test.mts`.
 Their test, setup and output paths must continue to resolve to the existing repository directories.
 
-### On-device summarization
-
-Apple Silicon builds also compile `src/electron/native/summarize.swift` through
-`scripts/build-summarize.mts`, called by the existing native build entry. An SDK with
-Foundation Models is required. macOS CI build jobs explicitly select the installed
-Xcode 26.2 because the `macos-15` image defaults to Xcode 16.4, whose SDK lacks
-Foundation Models. Local builds use the SDK selected by `xcrun`.
-The helper preserves macOS 13 compatibility but
-reports unavailable below macOS 26 or when Apple Intelligence is not ready.
-`e2e/electron/summarize.spec.ts` exercises real model inference and the native
-clipboard on synthetic English notes; its real-model case requires a ready local
-model and does not treat an unavailable model as successful inference validation.
-Do not substitute deterministic IPC doubles for this native boundary check.
-
 ## 2. README Media
 
 ### README Screenshot Maintenance

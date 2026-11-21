@@ -29,10 +29,11 @@ Architecture Decision Records (ADRs) capture important technical or architectura
 | [0023](0023-browser-folder-backup.md) | Browser Folder Backup | Accepted | 2026-10-20 |
 | [0024](0024-desktop-notes-archive.md) | Desktop Notes Archive: Worker Thread, Shared Archive Code and Crash-Safe Replacement | Accepted | 2026-10-23 |
 | [0025](0025-apple-vision-image-to-text.md) | Apple Vision Image to Text | Accepted | 2026-11-11 |
-| [0026](0026-on-device-summarization.md) | On-Device Summarization | Accepted | 2026-11-12 |
+| [0026](0026-on-device-summarization.md) | On-Device Summarization | Superseded by ADR 0031 | 2026-11-12 |
 | [0027](0027-starred-nodes-in-schema-version-5.md) | Starred Nodes in Schema Version 5 | Accepted | 2026-11-16 |
 | [0028](0028-expansion-views-of-starred-nodes.md) | Expansion Views of Starred Nodes | Accepted | 2026-11-19 |
 | [0029](0029-marked-nodes-in-schema-version-6.md) | Marked Nodes in Schema Version 6 | Accepted | 2026-11-20 |
 | [0030](0030-persisted-agenda-fold-choices.md) | Persisted Agenda Fold Choices (amends ADR 0020) | Accepted | 2026-11-21 |
+| [0031](0031-remove-on-device-summarization.md) | Remove On-Device Summarization | Accepted | 2026-11-21 |
 
 Every ADR carries a `Status` of `Accepted` or `Superseded by ADR NNNN`, and this index lists every ADR. `npm run check:docs` enforces both.

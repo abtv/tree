@@ -7,11 +7,10 @@ import { resolve, join } from 'node:path'
 import { chromium } from '@playwright/test'
 import { packagedSmokeEnvironment } from './packaged-smoke-environment.mts'
 import { imageToTextSmoke } from '../e2e/smoke/image-to-text.mts'
-import { summarizeSmoke } from '../e2e/smoke/summarize.mts'
 
 const app = process.argv[2]
 if (!app) throw new Error('Provide a packaged .app path')
-await access(resolve(app, 'Contents/Helpers/tree-summarize'), constants.X_OK)
+await access(resolve(app, 'Contents/Helpers/tree-image-to-text'), constants.X_OK)
 const profile = await mkdtemp(join(tmpdir(), 'tree-packaged-smoke-'))
 await mkdir(join(profile, 'data'))
 await writeFile(join(profile, 'data/vim-enabled.json'), 'false')
@@ -59,8 +58,6 @@ try {
   console.log('Packaged renderer editing and reload smoke passed')
   await imageToTextSmoke(page)
   console.log('Packaged Apple Vision image-to-text smoke passed')
-  await summarizeSmoke(page)
-  console.log('Packaged summarization capability smoke passed')
 } finally {
   try {
     await browser?.close()

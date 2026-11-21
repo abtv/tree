@@ -4,7 +4,6 @@ import type { AttachmentDimensions } from '../domain/attachment-dimensions'
 import type { ExpansionState } from './expansion-state'
 import type { DayNumber } from '../domain/calendar-date'
 import type { AgendaState } from './agenda-state'
-import type { SummarizationPort } from '../shared/summarize'
 
 export type ClipboardValue = ClipboardPayload
 
@@ -13,7 +12,6 @@ export interface EditorServices {
   saveHideFinishedTasks?(value: boolean): Promise<void>
   /** A cut or paste can still change the document after its platform I/O finishes. */
   onPendingEditsChanged?(pending: boolean): void
-  summarization?: SummarizationPort
   imageToText?(attachmentId: AttachmentId): Promise<string[]>
   loadEmojiHistory?(): Promise<unknown>
   saveEmojiHistory?(names: readonly string[]): Promise<void>

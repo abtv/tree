@@ -85,7 +85,6 @@ export function containerSourceFiles(smoke = false) {
           'config/build/electron.vite.config.ts',
           'scripts/rename-dev-app.mts',
           'scripts/build-image-to-text.mts',
-          'scripts/build-summarize.mts',
           'config/testing/playwright.smoke.config.ts',
           'config/testing/playwright.smoke-electron.config.ts',
           ...sourceFiles('e2e/smoke'),

@@ -37,7 +37,6 @@ export const BOUNDARY_SECTIONS = new Set([
   '14',
   '15',
   '15.1',
-  '15.2',
   '16',
   '16.1',
   '16.2',

@@ -28,8 +28,6 @@ const exclusions: Record<string, string> = {
   isTaskHidden: 'Read-only task visibility guard covered by finished-task visibility tests.',
   setHideFinishedTasks: 'Preference and cross-view transitions have focused tests and platform relaunch coverage.',
   starTarget: 'Read-only active node guard covered by star command tests.',
-  canSummarize: 'Read-only capability and active Agenda node guard covered by summarization tests.',
-  summarize: 'Read-only asynchronous summarization has focused snapshot, cancellation and clipboard coverage.',
   imageToText: 'Async recognition has dedicated queue, cancellation, Undo and insertion property tests.',
   reindexAllImages: 'Hidden recognition has focused deduplication, scale, failure and history coverage.',
   recordAttachmentDimensions:
