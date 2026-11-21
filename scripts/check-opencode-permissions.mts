@@ -423,7 +423,7 @@ for (const name of Object.keys(packageJson.scripts)) {
 // OpenCode and Claude Code enforce that by denying interpreters and in-place stream editing, and
 // the two configurations previously drifted: OpenCode denied them while Claude Code did not. This
 // asserts parity for that category only; each tool's other denials belong to its own approval
-// boundary (Claude Code's also rely on its Bash sandbox, see docs/DEVELOPMENT.md §10).
+// boundary (Claude Code's also rely on its Bash sandbox, see docs/DEVELOPMENT_REFERENCE.md §3).
 const claudeSettings = JSON.parse(await readFile(new URL('../.claude/settings.json', import.meta.url), 'utf8'))
 const claudeDeny: string[] = claudeSettings.permissions?.deny ?? []
 
