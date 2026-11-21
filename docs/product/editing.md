@@ -334,7 +334,7 @@ Undo/redo must support:
 * image paste;
 * image-containing node deletion.
 
-Stable node IDs must survive undo and redo.
+Node identity under undo and redo follows §18.
 
 Consecutive direct text edits are grouped into a continuous editing session for undo purposes. Direct text edits include typing, `Backspace`, and `Delete` within the same node.
 
