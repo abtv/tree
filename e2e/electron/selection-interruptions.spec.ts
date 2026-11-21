@@ -35,6 +35,8 @@ test('continues a rich Visual selection after native window blur', async ({ user
     location: { currentParentId: null, selectedNodeId: 'one' },
   })
   // A visible native window is required; Playwright otherwise emulates an always-focused document.
+  // The test therefore needs exclusive macOS activation. Copies that run in parallel compete for
+  // it and fail a focus poll, so repeat this test with `--workers=1`. An ordinary run starts one copy.
   const { app, window } = await launchTree(userDataDir, {
     initialMode: 'normal',
     windows: 'visible',
