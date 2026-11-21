@@ -366,11 +366,11 @@ The undo/redo history retains at most the 200 most recent entries. A history ent
 
 ## 11. Drag and Drop
 
-External drops are not accepted anywhere in the desktop window or browser page, including Tree, Agenda, text fields, and dialogs. Dropping text, HTML, links, images, or files must not insert content, load resources, navigate, or import notes. This deliberately limits native drag-and-drop for security (§1.3); use clipboard paste or the explicit import commands to bring in content. Internal node movement described below remains available.
+External drops are not accepted anywhere in the desktop window or browser page, including Tree, Agenda, text fields, and dialogs. Dropping text, HTML, links, images, or files must not insert content, load resources, navigate, or import notes. This deliberately limits native drag-and-drop for security (§1.3); use clipboard paste or the explicit import commands to bring in content. Internal node movement described below is available.
 
 Mouse drag-and-drop moves one node together with its subtree. Between-row gaps can reorder siblings or move the node to another parent. Dropping onto the middle of a node row makes the dragged node its last child. Dropping onto an ancestor breadcrumb segment or the root glyph appends to that destination and follows it, as specified in §2.2.
 
-On touch devices, holding the empty gutter beside a node or its trailing row margin starts the same drag after 200 ms. Holding text retains native text selection and its magnifier. The node dot and fold arrow keep their existing actions. Touch dragging uses Tree's destinations and cancellation rules. Agenda does not support node dragging (§23.12). Moving more than 4 pixels before activation or releasing early cancels the hold. Browser scrolling, text selection and callouts are disabled only on the empty drag surfaces, preserving native gestures over text and elsewhere.
+On touch devices, holding the empty gutter beside a node or its trailing row margin starts the same drag after 200 ms. Holding text uses native text selection and its magnifier. The node dot and fold arrow keep the actions of §2.1 and §2.4. Touch dragging uses Tree's destinations and cancellation rules. Agenda does not support node dragging (§23.12). Moving more than 4 pixels before activation or releasing early cancels the hold. Browser scrolling, text selection and callouts are disabled only on the empty drag surfaces, preserving native gestures over text and elsewhere.
 
 Node movement begins when the primary mouse button is pressed and held on a node row for 200 ms. A quick press and release edits text and places the text cursor at the clicked position. Pointer movement within 4 pixels does not cancel the pending hold, but moving farther before the threshold cancels the pending drag so the gesture selects text instead; the pending hold also cancels if the pointer leaves the row.
 
@@ -385,13 +385,11 @@ Node movement begins when the primary mouse button is pressed and held on a node
 
 Gap targets are resolved against the visible rows with the dragged block removed. The chosen level cannot be shallower than the row below or deeper than one level below the row above. A gap inside the dragged block is invalid. Drops may reorder siblings, indent beneath a visible node, or outdent to a displayed ancestor or the document root.
 
-The circular indicator remains a dedicated pointer target for entering the node; it never places a text cursor or starts a row drag.
+The circular indicator is a dedicated pointer target for entering the node; it never places a text cursor or starts a row drag.
 
 While a node is being dragged, its row displays a subtle gray background. The highlight clears when the drag ends.
 
 The entire subtree moves together with its node.
-
-Use the outer row bands for gaps and the middle for dropping onto a node.
 
 The drop zones before the first sibling and after the last sibling have expanded hit areas while preserving the list's normal spacing. The bottom edge target is larger than the top edge target to make use of the available space after the final sibling.
 
