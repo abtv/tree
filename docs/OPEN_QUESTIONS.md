@@ -273,3 +273,10 @@ Product Owner statement (2026-10-03): after the `Ctrl+o` defect was fixed, they 
   6. Lists above 500 rows: row heights are estimated at 25 px until measured (`src/renderer/list-window.ts`); `e2e/electron/windowed-list.spec.ts` already records a shift from image loading there as accepted.
 - 2026-10-03 — Repository fact: `AGENTS.md` §9 requires flash-free window creation, loading, reloading, and closing (`docs/PRODUCT.md` §20.5). Whether any requirement covers transitions inside the editor was not checked.
 - 2026-10-22 — Usage evidence: the Product Owner held `Cmd+P` for 15 seconds as a stress test; on returning to Tree the inline image was sometimes missing. Reproduced: the remounted row had no `<img>` in its first render. Fixed by caching decoded images (`docs/ARCHITECTURE.md`, attachment cache), which also lets a cached image appear at once in the image preview (candidate 1 above). Auto-repeat toggling of Agenda while `Cmd+P` is held is kept by Product Owner decision.
+
+## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
+
+Kind: technical
+Status: Deferred
+
+Deferred by the Product Owner on 2026-11-21: §13 Persistence (65,001 bytes) also holds search, emoji, command-history, recent-node and finished-task text, and §8 UI Layer is 50,956 bytes; regrouping needs the owner's choice of section boundaries and must keep ADR 0004's §13 citation valid (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`).
