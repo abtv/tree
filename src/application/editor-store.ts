@@ -1,5 +1,4 @@
 import {
-  appendTextChildren,
   attachmentSummary,
   collectAttachmentIds,
   createInitialDocument,
@@ -615,34 +614,6 @@ export class EditorStore {
     return this.services.imageToText !== undefined
   }
 
-  public imageToText(): void {
-    if (!this.imageToTextAvailable || this.runtime.snapshot.status !== 'ready' || this.treeSelectionHidden) return
-    if (this.runtime.snapshot.agenda !== undefined) return
-    if (this.imageToTextQueue.suspended) {
-      this.setImageToTextStatus('Image to text: saving in progress. Please wait.')
-      return
-    }
-    const state = this.runtime.ready()
-    const nodeId = state.location.selectedNodeId
-    const attachmentId = locateNode(state.document, nodeId)?.node.attachment?.id
-    if (this.isPersistenceLocked() || attachmentId === undefined) {
-      this.setImageToTextStatus('Image to text: select an editable node with an image.')
-      return
-    }
-    const admission = this.imageToTextQueue.enqueueExplicit(nodeId, attachmentId)
-    if (admission !== 'queued') {
-      const messages = {
-        duplicate: 'Image to text: this image is already queued.',
-        full: 'Image to text: the queue is full. Please wait.',
-        suspended: 'Image to text: saving in progress. Please wait.',
-      }
-      this.setImageToTextStatus(messages[admission])
-      return
-    }
-    this.setImageToTextStatus(`Recognizing image… ${this.imageToTextQueue.size - 1} queued`)
-    void this.runImageToTextQueue()
-  }
-
   public reindexAllImages(): void {
     if (!this.imageToTextAvailable || this.runtime.snapshot.status !== 'ready') return
     if (this.isPersistenceLocked() || this.imageToTextQueue.suspended) return
@@ -650,96 +621,29 @@ export class EditorStore {
     void this.runImageToTextQueue()
   }
 
-  private setImageToTextStatus(message: string): void {
-    if (this.runtime.snapshot.status !== 'ready') return
-    this.runtime.snapshot = {
-      ...this.runtime.snapshot,
-      imageToTextStatus: message,
-      imageToTextStatusRevision: (this.runtime.snapshot.imageToTextStatusRevision ?? 0) + 1,
-    }
-    this.runtime.emit()
-  }
-
-  public dismissImageToTextStatus(): void {
-    if (this.runtime.snapshot.status !== 'ready' || this.runtime.snapshot.imageToTextStatus === undefined) return
-    const next = { ...this.runtime.snapshot }
-    delete next.imageToTextStatus
-    this.runtime.snapshot = next
-    this.runtime.emit()
-  }
-
   private async runImageToTextQueue(): Promise<void> {
     if (!this.imageToTextQueue.start()) return
-    let result = 'Image to text: finished.'
-    let failure: string | undefined
-    let addedParagraphs = 0
-    let explicit = false
     try {
       for (let job = this.imageToTextQueue.next(); job !== undefined; job = this.imageToTextQueue.next()) {
-        if (job.kind === 'append') explicit = true
         try {
-          if (job.canceled) {
-            result = 'Image to text: canceled.'
-            continue
-          }
-          if (job.kind === 'append')
-            this.setImageToTextStatus(`Recognizing image… ${this.imageToTextQueue.size - 1} queued`)
+          if (job.canceled) continue
           const paragraphs = await this.services.imageToText!(job.attachmentId)
-          if (job.canceled || this.runtime.snapshot.status !== 'ready') {
-            result = 'Image to text: canceled.'
-            continue
-          }
-          if (this.isPersistenceLocked())
-            throw new Error('Saving is unavailable. Please retry after saving is restored.')
+          if (job.canceled || this.runtime.snapshot.status !== 'ready' || this.isPersistenceLocked()) continue
+
           const current = this.runtime.ready()
           const enrich = imageSearchTextEnrichment(job.attachmentId, paragraphs.join('\n').slice(0, 1_048_576))
           const enriched = enrich(current.document)
           this.history.enrichAttachments(enrich)
           this.runtime.replaceReady({ ...current, document: enriched })
           this.markPersistedChange()
-          if (job.kind !== 'append') continue
-          const normalized = paragraphs.map((text) =>
-            text
-              .split(/\r\n|[\r\n\u2028\u2029]/u)
-              .map((line) => line.trim())
-              .filter(Boolean)
-              .join(' '),
-          )
-          const texts = normalized
-            .slice(normalized.findIndex(Boolean), normalized.findLastIndex(Boolean) + 1)
-            .filter((text, index, all) => text !== '' || all[index - 1] !== '')
-          if (texts.length === 0) {
-            result = 'Image to text: no English text found.'
-            continue
-          }
-          this.endTextSession()
-          const state = this.runtime.ready()
-          const document = appendTextChildren(state.document, job.nodeId, texts, this.createId)
-          this.applyStructural(document, state.location, state.focus)
-          this.noteChange(countPastedWords(texts.join('\n'), undefined), false)
-          this.endTextSession()
-          const paragraphCount = texts.filter(Boolean).length
-          addedParagraphs += paragraphCount
-          result = `Image to text: added ${paragraphCount} ${paragraphCount === 1 ? 'paragraph' : 'paragraphs'}.`
-        } catch (error) {
-          if (job.kind === 'append') {
-            failure = `Image to text failed: ${messageOf(error)}`
-            this.setImageToTextStatus(failure)
-          }
+        } catch {
+          // Hidden recognition reports no status: a failure leaves the image usable without search text.
         } finally {
           this.imageToTextQueue.complete(job)
         }
       }
     } finally {
       this.imageToTextQueue.finish()
-      const summary =
-        addedParagraphs > 0 && failure !== undefined
-          ? `Image to text: added ${addedParagraphs} ${addedParagraphs === 1 ? 'paragraph' : 'paragraphs'}.`
-          : result
-      if (explicit)
-        this.setImageToTextStatus(
-          failure === undefined ? summary : addedParagraphs > 0 ? `${summary} ${failure}` : failure,
-        )
     }
   }
 

@@ -107,7 +107,7 @@ test.describe('Normal command panel', () => {
     await window.keyboard.press('d')
     await open(window)
 
-    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 25 : 23
+    const commandCount = process.platform === 'darwin' && process.arch === 'arm64' ? 24 : 23
     await expect(window.locator('.command-count')).toHaveText(`${commandCount} of ${commandCount}`)
 
     await window.keyboard.press('ArrowUp')
@@ -252,7 +252,6 @@ test.describe('Normal command panel', () => {
       'find',
       'find-next',
       'find-previous',
-      ...(process.platform === 'darwin' && process.arch === 'arm64' ? ['image-to-text'] : []),
       'import-notes',
       'quit',
       ...(process.platform === 'darwin' && process.arch === 'arm64' ? ['reindex-all-images'] : []),

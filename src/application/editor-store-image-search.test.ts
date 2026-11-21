@@ -214,7 +214,6 @@ it('marks an empty successful result complete and does not retry errors or unsup
   await failed.store.paste('source', 0)
   await vi.advanceTimersByTimeAsync(60_000)
   expect(ready(failed.store).document.roots[0]!.attachment?.searchText).toBeUndefined()
-  expect(ready(failed.store).imageToTextStatus).toBeUndefined()
   expect(recognize).toHaveBeenCalledOnce()
 
   const unsupported = await setup()

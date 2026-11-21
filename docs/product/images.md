@@ -28,53 +28,31 @@ Images are attachments, not independently draggable objects.
 
 Dragging a node moves its image together with the node.
 
-### 15.1 Image to Text
+### 15.1 Image Text Recognition
 
-On Apple Silicon macOS Electron, `image-to-text` in the command panel recognizes
-English text from the selected node's image. It is unavailable in the browser,
-Linux and Intel Electron. The explicit command creates visible text as described below.
-Apple Vision processes the image locally without model downloads, network calls,
-telemetry or task creation.
+On Apple Silicon macOS Electron, Tree recognizes English text in images so that global
+Search can find them. Recognition is unavailable in the browser, Linux and Intel
+Electron. Apple Vision processes the image locally without model downloads, network
+calls, telemetry or task creation. Recognized text never becomes visible node text.
 
-The result is appended after the source node's existing last child. Existing image,
-text, children, selection and editing focus remain intact. Paragraphs, headings and
-list items become ordinary nodes without embedded line breaks. Wrapped lines within
-a paragraph are joined with spaces; recognized bullet markers are removed. Large
-vertical gaps produce one empty node between blocks, never leading, trailing or
-consecutive empty nodes. Grouping is a geometric approximation, not a layout replica.
+Pasting a new image recognizes its English text automatically, including image paste
+in Agenda. The result stays hidden and participates only in global Search (`Cmd+;`),
+not local Find or Vim `/`. It does not create children, tags, dates, or status
+feedback, and never moves focus. Failures leave the image usable without search text.
+Existing images are not automatically backfilled.
 
-Recognition runs outside the UI thread through a sequential queue. Duplicate pending
-requests for a node are ignored; the queue admits at most 20 requests. The status bar
-reports recognition, queued count, completion, no text and failures. Terminal feedback
-includes both the total added paragraphs and the error when a queue partly succeeds.
+Recognition runs outside the UI thread through a sequential queue. Pending work
+retains only image identities and is retired when its source disappears. Closing or
+reloading the renderer cancels native work. Preparing to quit or install an update
+retires pending recognition and rejects new requests until the save flush ends. An
+archive export does not cancel recognition. A result that arrives while saving is
+locked is discarded. Pending recognition is not saved or resumed on restart. Each
+image is limited to 25 MiB and the pixel limits of §17. Native work times out after
+60 seconds; results are limited to 1 MiB and 1,000 entries.
 
-Recognition feedback disappears five seconds after its latest update, or immediately
-when the command panel opens with `:` or `Cmd+Shift+P`. It stays hidden while that
-panel is open. Find/Agenda feedback remains in the controls row, while recognition
-and update feedback can appear alongside it. A missing image or noneditable selection is
-reported without changing the document. Image-to-text does nothing throughout Agenda (§23.9), because recognition creates nodes.
-
-Each result is one Undo/Redo operation and uses normal autosave. Deleting or replacing
-the source image discards pending results, even if Undo restores it before completion.
-Saving locks and the maximum depth apply at insertion time. Closing or reloading the
-renderer cancels native work. Preparing to quit or install an update retires pending
-recognition and rejects new requests until the save flush ends. An archive export
-does not cancel recognition. Pending OCR itself is not saved or resumed on restart.
-Each image is limited to 25 MiB and the pixel limits of §17. Native work
-times out after 60 seconds; results are limited to 1 MiB and 1,000 entries.
-
-Pasting a new image also recognizes its English text automatically when image-to-text
-is available, including image paste in Agenda. This background result stays hidden and
-participates only in global Search (`Cmd+;`), not local Find or Vim `/`. It does not
-create children, tags, dates, or status feedback, and never moves focus. Failures leave
-the image usable without search text. Existing images are not automatically backfilled.
-Automatic and explicit requests share sequential native execution; the explicit-request
-limit does not discard automatic requests. Automatic pending work retains only image
-identities and is retired when its source disappears or shutdown cancels recognition.
-
-`reindex-all-images` repeats hidden English text recognition for every unique image in
-the document, including images with completed results. It is available on the same
-platforms as `image-to-text`, in Tree and Agenda. It uses the same sequential queue as `image-to-text`,
+`reindex-all-images` in the command panel repeats hidden English text recognition for
+every unique image in the document, including images with completed results. It is
+available on the platforms above, in Tree and Agenda. It uses the same sequential queue,
 does not duplicate pending image requests, and creates no children or Undo steps.
 Existing hidden text stays usable until recognition succeeds; failures retain it.
 The command does nothing while saving is locked or shutdown recognition is suspended.
@@ -91,8 +69,7 @@ An image without a completed hidden recognition result has a yellow border and t
 tooltip `Image text recognition is not complete`. This includes queued work, errors,
 timeouts, interrupted work after restart, older images, and platforms without OCR.
 A successful empty result counts as completed and removes the border. No automatic
-retry occurs. Successful explicit `image-to-text` also stores the hidden result.
-The border does not change image geometry or replace the image-caret
+retry occurs. The border does not change image geometry or replace the image-caret
 indicator, and appears in Tree and Agenda, including the current-parent image.
 
 ## 17. Images and Attachments

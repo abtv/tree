@@ -13,15 +13,12 @@ const names = (query: string, history: readonly string[] = []): string[] =>
 
 describe('command registry', () => {
   it('cannot restore unsupported image recognition from command history', () => {
-    const history = ['image-to-text']
+    const history = ['reindex-all-images']
     const unsupported = availableCommands({ alwaysOnTop: false, vim: true, imageToText: false })
     const supported = availableCommands({ alwaysOnTop: true, vim: true, imageToText: true })
 
     expect(matchCommands('image', history, unsupported)).toEqual([])
-    expect(matchCommands('image', history, supported).map((command) => command.name)).toEqual([
-      'image-to-text',
-      'reindex-all-images',
-    ])
+    expect(matchCommands('image', history, supported).map((command) => command.name)).toEqual(['reindex-all-images'])
   })
   // @requirement PRODUCT.md §20.2.30
   // @requirement PRODUCT.md §20.2.28
@@ -159,7 +156,6 @@ describe('command registry', () => {
       'find',
       'find-next',
       'find-previous',
-      'image-to-text',
       'quit',
       'reindex-all-images',
       'search-all-nodes',
@@ -199,7 +195,6 @@ describe('command registry', () => {
 
   it('delegates all actions to existing services and queries their current state', async () => {
     const services = {
-      imageToText: vi.fn(async () => undefined),
       reindexAllImages: vi.fn(async () => undefined),
       showAbout: vi.fn(async () => undefined),
       find: vi.fn(async () => undefined),
@@ -226,7 +221,6 @@ describe('command registry', () => {
         view: 'tree',
       })
 
-    expect(services.imageToText).toHaveBeenCalledExactlyOnceWith()
     expect(services.reindexAllImages).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAbout).toHaveBeenCalledExactlyOnceWith()
     expect(services.showAgenda).toHaveBeenCalledExactlyOnceWith()
@@ -300,7 +294,6 @@ describe('command registry', () => {
       'toggle-star-node',
       'toggle-mark-node',
       'reindex-all-images',
-      'image-to-text',
       'about-tree',
       'find',
       'find-next',

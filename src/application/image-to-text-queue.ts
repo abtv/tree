@@ -1,14 +1,13 @@
 import { locateNode, type AttachmentId, type Document, type NodeId, type TreeNode } from '../domain/document'
 
 interface QueuedImage {
-  kind: 'append' | 'index' | 'reindex'
+  kind: 'index' | 'reindex'
   nodeId: NodeId
   attachmentId: AttachmentId
   canceled: boolean
 }
 
 export type ImageToTextJob = Readonly<QueuedImage>
-export type ImageToTextAdmission = 'queued' | 'duplicate' | 'full' | 'suspended'
 
 type DrainState = { phase: 'idle' } | { phase: 'draining'; active: QueuedImage | undefined }
 
@@ -24,19 +23,6 @@ export class ImageToTextQueue {
 
   public get size(): number {
     return this.pending.length + (this.drain.phase === 'draining' && this.drain.active !== undefined ? 1 : 0)
-  }
-
-  public enqueueExplicit(nodeId: NodeId, attachmentId: AttachmentId): ImageToTextAdmission {
-    if (this.suspended) return 'suspended'
-    let explicit = 0
-    for (const job of this.jobs()) {
-      if (job.kind !== 'append') continue
-      if (!job.canceled && job.nodeId === nodeId) return 'duplicate'
-      explicit++
-    }
-    if (explicit >= 20) return 'full'
-    this.pending.push({ kind: 'append', nodeId, attachmentId, canceled: false })
-    return 'queued'
   }
 
   public enqueueIndex(nodeId: NodeId, attachmentId: AttachmentId): boolean {
@@ -71,7 +57,7 @@ export class ImageToTextQueue {
     }
     for (let index = this.pending.length - 1; index >= 0; index--) {
       const job = this.pending[index]!
-      if (job.kind !== 'append' && job.canceled) this.pending.splice(index, 1)
+      if (job.canceled) this.pending.splice(index, 1)
     }
   }
 

@@ -36,7 +36,6 @@ export { attachmentSummary, collectAttachmentIds, isValidAttachmentId } from './
 
 export {
   attachImage,
-  appendTextChildren,
   cloneDocument,
   cloneNode,
   cloneNodeWithNewIds,

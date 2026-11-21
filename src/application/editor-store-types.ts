@@ -53,8 +53,6 @@ export type EditorSnapshot =
       location: Location
       focus: FocusIntent
       structuralVersion: number
-      imageToTextStatus?: string
-      imageToTextStatusRevision?: number
       expansion: ExpansionState
       hideFinishedTasks?: boolean
       agenda?: AgendaState

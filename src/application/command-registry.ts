@@ -20,7 +20,6 @@ export interface CommandServices {
   setHideFinishedTasks?(value: boolean): Promise<void>
   toggleStarNode?(): Promise<void>
   toggleMarkNode?(): Promise<void>
-  imageToText?(): Promise<void>
   reindexAllImages?(): Promise<void>
   showAbout?(): Promise<void>
   find?(): Promise<void>
@@ -92,16 +91,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     active: () => false,
     run: async (services) => {
       await services.reindexAllImages?.()
-    },
-  },
-  {
-    name: 'image-to-text',
-    aliases: [],
-    description: 'Recognize English text from the selected image',
-    requires: 'imageToText',
-    active: () => false,
-    run: async (services) => {
-      await services.imageToText?.()
     },
   },
   {

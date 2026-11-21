@@ -134,7 +134,7 @@ Pending Cut/Paste operations apply only if their target node is still selected w
 * Canonical dates are recognized immediately after typing or pasting. Date emphasis preserves every character, caret offset and text-selection operation; dates remain editable text.
 * A single-date node has one editor; a node appearing on several days has an editor only at its active occurrence. Other direct-match occurrences display the current text, hyperlinks and attached image.
 * Native context-menu commands follow keyboard editing rules. Enter in standard editing or Vim Insert inserts a newline in the existing node rather than splitting it. Multiline paste inserts at the text cursor in that node and preserves hyperlinks, following §13. Normalize CRLF and CR line endings to LF, keeping the caret and hyperlink ranges aligned. Completion acceptance takes precedence.
-* Image paste can attach an image to a node without one; a paste that would create a sibling for a second image does nothing. Overlapping image pastes obey the same restriction. Image-to-text does nothing in Agenda because it creates nodes.
+* Image paste can attach an image to a node without one; a paste that would create a sibling for a second image does nothing. Overlapping image pastes obey the same restriction.
 
 ### 23.10 Structural Restrictions
 

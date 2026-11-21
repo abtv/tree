@@ -61,7 +61,6 @@ export function useCommandPanel(options: {
   const snapshot = store.getSnapshot()
   const ready = snapshot.status === 'ready'
   const hideFinishedTasks = ready && Boolean(snapshot.hideFinishedTasks)
-  const treeSelectionHidden = store.treeSelectionHidden
   const starTarget = store.starTarget
   const starred = starTarget?.starred === true
   const marked = starTarget?.marked === true
@@ -80,13 +79,11 @@ export function useCommandPanel(options: {
             ? { ...command, enabled: canStar }
             : command.name === 'toggle-finished-tasks'
               ? { ...command, enabled: ready }
-              : command.name === 'image-to-text' && treeSelectionHidden
-                ? { ...command, enabled: false }
-                : command,
+              : command,
         ),
         ...menuEntries,
       ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canStar, ready, treeSelectionHidden],
+    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canStar, ready],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -159,7 +156,6 @@ export function useCommandPanel(options: {
             toggleMarkNode: async () => {
               store.toggleMarkNode()
             },
-            imageToText: async () => store.imageToText(),
             reindexAllImages: async () => store.reindexAllImages(),
             showAbout: async () => {
               showAbout?.()

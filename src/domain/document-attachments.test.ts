@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   attachImage,
-  appendTextChildren,
   attachmentSummary,
   deleteNode,
   insertSiblingAfter,
@@ -139,7 +138,6 @@ describe('derived attachment accounting', () => {
     const image = { id: 'added', mimeType: 'image/png' as const }
     const operations = [
       () => attachImage(document, 'target', image),
-      () => appendTextChildren(document, 'target', ['child'], () => 'new-child'),
       () => insertSiblingAfter(document, 'target', 'new', '', image),
       () =>
         insertSubtreeSibling(

@@ -312,7 +312,7 @@ it.each(['insert', 'replace'])('preserves %s editing when background OCR complet
   )
   renderReact(<App store={store} initialVimEnabled />)
   act(() => {
-    store.imageToText()
+    store.reindexAllImages()
     store.selectNode('other', 0)
   })
   const input = screen.getByRole('textbox', { name: 'Node 2' }) as HTMLTextAreaElement
@@ -336,53 +336,32 @@ it.each(['insert', 'replace'])('preserves %s editing when background OCR complet
   }
 })
 
-it.each(['expiry', 'colon', 'palette'])(
-  'dismisses OCR feedback on %s while retaining persistent errors and mode',
+it.each(['colon', 'palette'])(
+  'dismisses transient status on %s while retaining persistent errors and mode',
   async (action) => {
     const dismissTransientStatus = vi.fn()
     const store = await createSeededStore(
       { roots: [{ id: 'root', text: 'Task', children: [] }] },
       { currentParentId: null, selectedNodeId: 'root' },
-      async () => undefined,
-      { imageToText: async () => [] },
     )
     renderReact(<App store={store} initialVimEnabled={true} dismissTransientStatus={dismissTransientStatus} />)
     await act(async () => {})
-    vi.useFakeTimers()
-    act(() => {
-      store.reportError(new Error('Persistent error'))
-      store.imageToText()
-    })
+    act(() => store.reportError(new Error('Persistent error')))
 
-    expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
+    fireEvent.keyDown(
+      document.activeElement!,
+      action === 'colon' ? { key: ':' } : { key: 'P', metaKey: true, shiftKey: true },
+    )
+    expect(screen.getByRole('combobox', { name: 'Command' })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
 
-    if (action === 'expiry') {
-      act(() => vi.advanceTimersByTime(4000))
-      act(() => store.imageToText())
-      act(() => vi.advanceTimersByTime(4999))
-      expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
-      act(() => vi.advanceTimersByTime(1))
-    } else {
-      fireEvent.keyDown(
-        document.activeElement!,
-        action === 'colon' ? { key: ':' } : { key: 'P', metaKey: true, shiftKey: true },
-      )
-      expect(screen.getByRole('combobox', { name: 'Command' })).toHaveFocus()
-      fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
-    }
-
-    expect(screen.queryByText('Image to text: select an editable node with an image.')).toBeNull()
-    expect(dismissTransientStatus).toHaveBeenCalledTimes(action === 'expiry' ? 0 : 1)
+    expect(dismissTransientStatus).toHaveBeenCalledOnce()
     expect(screen.getByRole('alert')).toHaveTextContent('Persistent error')
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
-
-    act(() => store.imageToText())
-
-    expect(screen.getByText('Image to text: select an editable node with an image.')).toBeInTheDocument()
   },
 )
 
-it('keeps update progress visible alongside completed OCR feedback', async () => {
+it('keeps update progress visible in the status bar', async () => {
   const store = await createSeededStore(
     { roots: [{ id: 'root', text: '', children: [] }] },
     {
@@ -390,18 +369,11 @@ it('keeps update progress visible alongside completed OCR feedback', async () =>
       selectedNodeId: 'root',
     },
   )
-  const snapshot = store.getSnapshot()
-  if (snapshot.status !== 'ready') throw new Error('Expected ready state')
-  vi.spyOn(store, 'getSnapshot').mockReturnValue({
-    ...snapshot,
-    imageToTextStatus: 'Image to text: added 1 paragraph.',
-  })
   window.treeApi.getUpdateCommands = async () => ({ 'check-for-updates': false, 'update-app': false, status: 42 })
 
   renderReact(<App store={store} initialVimEnabled={true} />)
 
   expect(await screen.findByText('Downloading update… 42%')).toBeInTheDocument()
-  expect(screen.getByText('Image to text: added 1 paragraph.')).toBeInTheDocument()
 })
 
 function mockAppRowRects(originTop = 0, height = 24): void {

@@ -6,13 +6,13 @@
 * The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
-* Operation status messages, including save failures, image recognition, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. The status-bar placement of operation status messages does not apply to confirmation dialogs. App update feedback follows the priority rules of §26.
+* Operation status messages, including save failures, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. The status-bar placement of operation status messages does not apply to confirmation dialogs. App update feedback follows the priority rules of §26.
 
 #### 20.2.28 Command Panel
 
 `Cmd+Shift+P` opens the command panel in Tree or Agenda in standard editing and every Vim mode. With Vim editing enabled, `:` also opens it in Normal mode; in other modes `:` retains its ordinary key behavior. Opening discards any pending count or unfinished command, preserving the editing mode, selection and edit session.
 
-Opening also dismisses the current five-second export-success notice (§24.3, §25.2). Closing the panel does not restore it. Archive progress and results that require acknowledgement, including errors and missing-image warnings, remain visible under §20.2.7. Image-recognition feedback follows §15.1.
+Opening also dismisses the current five-second export-success notice (§24.3, §25.2). Closing the panel does not restore it. Archive progress and results that require acknowledgement, including errors and missing-image warnings, remain visible under §20.2.7.
 
 `Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-mode` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
 
@@ -56,7 +56,6 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | Name | Alias | Description | Active state | Shortcut | Effect |
 | --- | --- | --- | --- | --- | --- |
 | `find` | — | Find in the current view | — | `⌘F` | Open local Find (§20.2.26) |
-| `image-to-text` | — | Recognize English text in the selected image | — | — | Append recognized children on Apple Silicon macOS Electron (§15.1) |
 | `reindex-all-images` | — | Reindex English text from all images | — | — | Refresh hidden search text for all document images (§15.1) |
 | `find-next` | — | Find next match | — | `⌘G` | Navigate to the next local match (§20.2.26) |
 | `find-previous` | — | Find previous match | — | `⌘Shift+G` | Navigate to the previous local match (§20.2.26) |

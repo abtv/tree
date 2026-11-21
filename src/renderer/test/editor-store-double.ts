@@ -68,10 +68,8 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
 
   const double: EditorStorePublic = {
     imageToTextAvailable: false,
-    imageToText: vi.fn(),
     reindexAllImages: vi.fn(),
     recordAttachmentDimensions: vi.fn(),
-    dismissImageToTextStatus: vi.fn(),
     emojiHistory: new EmojiHistory(undefined, () => undefined),
     recentNodes: new RecentNodes(),
     initialSearchResults: vi.fn(() => double.recentNodes.getResults()),

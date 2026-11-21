@@ -28,7 +28,6 @@ const exclusions: Record<string, string> = {
   isTaskHidden: 'Read-only task visibility guard covered by finished-task visibility tests.',
   setHideFinishedTasks: 'Preference and cross-view transitions have focused tests and platform relaunch coverage.',
   starTarget: 'Read-only active node guard covered by star command tests.',
-  imageToText: 'Async recognition has dedicated queue, cancellation, Undo and insertion property tests.',
   reindexAllImages: 'Hidden recognition has focused deduplication, scale, failure and history coverage.',
   recordAttachmentDimensions:
     'Derived image sizes change no text or structure; focused tests cover batching, history and saving.',
@@ -48,7 +47,6 @@ const exclusions: Record<string, string> = {
   registerPendingEditFinisher: 'Renderer edit lifecycle registration requires an input harness.',
   flushPersistence: 'Shutdown persistence lifecycle is covered by dedicated persistence tests.',
   reportError: 'Failure injection is covered by error and persistence-lock tests.',
-  dismissImageToTextStatus: 'Transient OCR feedback dismissal is covered by App timer and command-panel tests.',
   requestQuitWithoutSavingPrompt: 'Quit prompt lifecycle is covered by dedicated shutdown tests.',
   dismissQuitWithoutSavingPrompt: 'Quit prompt lifecycle is covered by dedicated shutdown tests.',
   initialize: 'Startup is performed by the property harness before command generation.',

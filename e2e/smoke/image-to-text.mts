@@ -42,24 +42,20 @@ export async function imageToTextSmoke(page: Page): Promise<void> {
   await page.reload()
   await page.locator('.node-input').first().click()
   await page.keyboard.press('Meta+Shift+p')
-  await page.getByRole('combobox', { name: 'Command' }).fill('image-to-text')
+  await page.getByRole('combobox', { name: 'Command' }).fill('reindex-all-images')
   await page.keyboard.press('Enter')
-  await expect(page.locator('.status-bar')).toContainText('Image to text: added 1 paragraph.', { timeout: 15000 })
-  await page.getByRole('button', { name: 'Expand node 1', exact: true }).click()
-  await expect(page.locator('.node-input').nth(1)).toHaveValue(
-    'Local image recognition works with English text on this device.',
-  )
-  const savedText = () =>
+  const savedSearchText = () =>
     page.evaluate(async () => {
       const api = (window as unknown as { treeApi: SmokeApi }).treeApi
       const state = (await api.load()) as {
-        document: { roots: { children: { text: string }[] }[] }
+        document: { roots: { attachment?: { searchText?: string } }[] }
       } | null
-      return state?.document.roots[0]?.children[0]?.text
+      return state?.document.roots[0]?.attachment?.searchText
     })
-  // Wait for normal autosave before simulating an abrupt renderer reload.
-  await expect.poll(savedText).toBe('Local image recognition works with English text on this device.')
+  // Hidden recognition uses the ordinary metadata save policy, so wait for that save.
+  await expect.poll(savedSearchText, { timeout: 30000 }).toContain('Local image recognition works with English text')
   await page.reload()
   await page.locator('.node-input').first().waitFor()
-  expect(await savedText()).toBe('Local image recognition works with English text on this device.')
+  expect(await savedSearchText()).toContain('Local image recognition works with English text')
+  await expect(page.locator('.node-input')).toHaveCount(1)
 }
