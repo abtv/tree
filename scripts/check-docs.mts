@@ -153,7 +153,7 @@ export const AGENT_CORE_MAX_BYTES = 24 * 1024
 // The binding agent rules share one budget, so that growth cannot move from a capped file to an
 // uncapped one. A new rule replaces or shortens existing text; raising the budget is an owner decision.
 export const AGENT_RULE_DOCUMENTS = ['AGENTS.md', 'docs/AGENT_WORKFLOW.md', 'docs/AGENT_ROLES.md'] as const
-export const AGENT_RULES_MAX_BYTES = 105_031
+export const AGENT_RULES_MAX_BYTES = 104_935
 const WORKFLOW_PROCEDURES = 'docs/AGENT_WORKFLOW.md'
 const REQUIRED_WORKFLOW_ROUTES = [
   '1. Project Role',

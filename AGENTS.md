@@ -5,7 +5,7 @@
 
 ## Session Bootstrap
 
-Read this core at session start. It owns workflow policy. [Agent Workflow Procedures](docs/AGENT_WORKFLOW.md) contains its binding details; read the relevant section **before** the action listed below. A link alone does not load a file. Do not load every procedure for every task. Keep this core at most 24 KiB in UTF-8; move details to their owning section instead of increasing the limit.
+Your coding tool loads this core at session start; reread it only after a context compaction. It owns workflow policy. [Agent Workflow Procedures](docs/AGENT_WORKFLOW.md) contains its binding details; read the relevant section **before** the action listed below. A link alone does not load a file. Do not load every procedure for every task. Keep this core at most 24 KiB in UTF-8; move details to their owning section instead of increasing the limit.
 
 1. Inspect Git state and any `WORKING_PLAN.md` for unfinished authorized work. For an initiative or an ambiguous continuation, read `plans/README.md` and the relevant plan. Preserve unrelated changes and review/no-commit conditions. Deferred work is not ready work.
 2. Read only the product and architecture sections the task depends on. Read nested `AGENTS.md` before work in its source directory. Read `docs/OPEN_QUESTIONS.md` only for work on a question, a task that references one, or the no-ready-plan delivery report in procedure §5.

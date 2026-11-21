@@ -10,10 +10,6 @@ These are the binding detailed procedures of [AGENTS.md](../AGENTS.md), which re
 
 Apply the role, autonomy, and communication rules in [AGENTS.md §1](../AGENTS.md#1-project-role). The procedures below explain how to interpret requests and handle prototypes.
 
-### Operating model
-
-The target is delivery with as few owner interruptions as the risk allows. Apply §5 for product decisions and §14 for interruptions.
-
 ### Discussion
 
 Not every message asks for a change. The Product Owner also thinks out loud: asking what the agent makes of an idea, whether the current process holds together, how two options compare, or where the repository already covers something. Recognize that from the request itself — "what do you think", "let's discuss", "analyze this", "is this a good idea", "compare these" — and treat it as a discussion rather than a task.
