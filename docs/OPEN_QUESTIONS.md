@@ -216,39 +216,6 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 
 - 2026-11-21 — Repository fact: a removed section's number is retired, not reused (`docs/PRODUCT.md`), and tests cite sections through `@requirement` markers that `npm run check:requirements` checks.
 
-## TD-001: Whether a written rule is the right response to a recurring defect
-
-Kind: technical
-Status: Idea
-
-### Question
-
-The project's default response to a defect or a process gap is another paragraph in `AGENTS.md`. It is not established that this works. If it does not, the cost is paid twice: the defect recurs anyway, and every later session reads a longer policy.
-
-### What we are watching
-
-The size of `AGENTS.md` over time, and whether a rule added in response to a defect is followed in the sessions after it. A recurrence of the same defect class after its rule exists is the signal that the rule was not the fix.
-
-### What would settle it
-
-For each rule added in response to a defect, whether that defect class recurred afterwards. A structural change is the alternative to compare against: the caret defect cluster stopped after the ownership refactor, not after the two rules that preceded it.
-
-### Evidence
-
-- 2026-09-29 — Repository fact: `AGENTS.md` grew from 7,052 bytes (`5f03f6b`, 2026-09-11) to 36,810 bytes (`02242a3`, 2026-09-29). Of its 51 revisions, 4 reduced the file.
-- 2026-09-29 — Repository fact: `576cf41` (2026-09-26) and `bdf073b` (2026-09-27) added navigation and caret rules; 8 and 4 fixes of the same class followed them. The cluster ended after the ownership refactor recorded in [ADR 0014](decisions/0014-single-owner-for-renderer-interaction-state.md), whose context states that test volume was not the constraint and ownership was.
-- 2026-09-29 — Repository fact: `4f3f365` fixed a misaligned focus marker and, in the same commit, added a normative paragraph to `docs/PRODUCT.md`, a paragraph to `AGENTS.md` §9, and a rewritten sentence in `docs/DEVELOPMENT.md` §9 — three days after the visual-evidence rules of 2026-09-25 failed to prevent that defect.
-- 2026-09-29 — Agent inference: past some size, an added rule may reduce adherence to the rest. Not established.
-- 2026-11-21 — Repository fact: the policy was split into `AGENTS.md` and `docs/AGENT_WORKFLOW.md` in `daa8414` (2026-10-14). The total was 59,556 bytes before the split (`966c785`), 80,047 after it, and 89,988 at `bba6aa1`. The 24 KiB limit of `check:docs` covers only `AGENTS.md`, which stayed between 20.5 and 23.5 KB; the uncapped procedures grew.
-- 2026-11-21 — Repository fact: the agent-attribution rule existed as prose from `f5257c0` (2026-09-25); seven commits of 2026-09-26 to 09-28 still carried a Claude co-author trailer. The `commit-msg` hook of `71290b6` (2026-09-29) followed. The `Release-Note` field, enforced by hook and CI from `34783b3` (2026-11-07), is present in 102 of 102 later `feat`, `fix` and `perf` commits.
-- 2026-11-21 — Repository fact (commit subjects; diffs read only for the rule commits): prose rules about permission prompts (`06ac7eb` and others, 2026-10-11) were followed by five more prose rules and nine permission-configuration commits; the delivery-report rule (`53c9cf3`) was re-addressed in `53bf5f3`, `7cbfa2b`, `d3b43cc` and `43e9c53`; 73 `.scratch` directories remain after the retirement rule of `879be92`. No later fix subject names a window flash after `ab2a7bb`, and four of 1,247 subjects break the commit format of `87800b7`.
-- 2026-11-21 — Usage evidence (session logs read with the owner's permission; reading figures only): policy text read per primary session had a median of about 54,000 characters in 28 Claude Code sessions (20% of all tool output) and about 225,000 in 69 Codex sessions (29%, an upper bound). Both tools read `docs/DEVELOPMENT.md` in line windows. Codex re-read the automatically loaded `AGENTS.md` about three times per session, which `450ab0e` addresses. Since `05e11c1`, `check:docs` holds `AGENTS.md`, `docs/AGENT_WORKFLOW.md` and `docs/AGENT_ROLES.md` to one byte budget, and procedure §11 asks for a check before prose when a failure is mechanically detectable.
-- 2026-11-21 — Recount of explicit tool results qualifies the preceding figures. The original method and cohorts are in `1d20944:plans/documentation-consistency-and-policy-load.md` (T0). The 4.16 ratio includes entire mixed Codex results. With the same content matcher, medians were 94,724 characters for Codex and 49,819 for Claude Code (1.90). Counting the selected results in full gave 220,591 and 51,969. The difference includes unrelated output, serialization and unrecognized policy lines; it cannot all be assigned to shell overhead.
-  - Method: select primary rollouts with repository-root cwd starting Nov 14–20 and at least ten outer tool calls (83 Codex sessions, versus 69 originally); select primary Claude project logs starting Nov 19–21 with at least ten calls before the T0 record, excluding sessions editing the initiative plan (28). Join results to Codex shell inspections naming a policy file or Claude Read calls to that file, counting each Claude result ID once. Strip serialization and line prefixes, count trimmed complete lines of at least 20 characters unique to one of the six T0 documents across Git versions, plus one newline per match. Count repeated delivery, exclude automatic context. This measures identifiable text; truncated, short, ambiguous or indirectly requested lines can be missed. The historical session selection could not be exactly reproduced.
-  - Excess mean matched characters per Codex session by file: workflow procedures 36,468, development guide 15,714, roles 12,491, root instructions 3,646, owner guide 537, development reference −5. Repeat occurrences of previously matched lines within a session averaged 37,407 against 257; this overlaps the file totals. Codex command text contained 46 direct whole-workflow and 78 whole-role reads. Simple two-endpoint `sed` windows had median lengths of 57 lines for workflow (443 windows) and 43 for development (352). Only 17 literal `cat AGENTS.md` commands were found; the original 214 count was not reproduced. Command mentions do not establish delivery of an entire file.
-  - Restricting starts to Nov 19–20 gave 84,186 vs 48,385 characters (17 vs 15 sessions, 1.74). Session tasks were not paired. For the full cohorts median outer tool calls were 63 vs 140.5; Codex can batch commands. These figures cannot isolate a client effect. Only one other primary Codex session started after `450ab0e` by this audit; it contained no literal `cat AGENTS.md`. The effect of the change remains unverified.
-- 2026-11-21 — Agent inference: where a hook, a check or a permission rule exists, Git shows no later violation; prose-only rules have a mixed record. This does not establish that policy size lowers adherence, and rules whose compliance is visible only in conversations were not observed.
-
 ## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
 
 Kind: technical
