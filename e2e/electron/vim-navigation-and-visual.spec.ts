@@ -136,6 +136,37 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     })
   }
 
+  // @requirement PRODUCT.md §2.1
+  // @requirement PRODUCT.md §20.2.20
+  test('keeps the Visual selection visible on the tinted active line', async ({ userDataDir }) => {
+    const text = 'A synthetic note with enough words to wrap over several visible lines. '.repeat(3)
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'wrapped', text, children: [] },
+          { id: 'next', text: 'Neighbor', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'wrapped' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 640, height: 400 })
+    const first = node(window, 1)
+    const row = window.locator('.node-row[data-node-id="wrapped"]')
+    await first.focus()
+    await setCursor(first, 4)
+    await window.keyboard.press('v')
+    await window.keyboard.press('j')
+
+    // The pale highlight differs from the tint by less than the default per-pixel threshold.
+    await expect(row).toHaveAttribute('style', /--active-line-top: 20px/)
+    await expect(row).toHaveScreenshot('vim-visual-active-line-selection-light.png', { threshold: 0.02 })
+
+    await window.emulateMedia({ colorScheme: 'dark' })
+
+    await expect(row).toHaveScreenshot('vim-visual-active-line-selection-dark.png', { threshold: 0.02 })
+  })
+
   // @requirement PRODUCT.md §4.3
   // @requirement PRODUCT.md §20.2.9
   test('crosses rich text and unmounted rows with counted horizontal navigation', async ({ userDataDir }) => {

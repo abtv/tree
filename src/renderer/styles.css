@@ -1021,6 +1021,13 @@ body:not(.node-drag-active)
     background: color-mix(in srgb, var(--color-text) 8%, transparent);
     pointer-events: none;
   }
+
+  /* Chromium leaves a pale ::selection background unpainted where any background lies behind it, so
+     a band beneath selected text hid the selection on the active line. Above the text, the
+     translucent band only tints the selection; other states keep the band beneath. */
+  &:has(.node-input-text-selected)::after {
+    z-index: 1;
+  }
 }
 
 body.node-drag-active,

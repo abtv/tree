@@ -94,6 +94,32 @@ test('walks wrapped visual lines with j and k before crossing Agenda nodes', asy
   await window.screenshot({ path: testInfo.outputPath('agenda-wrapped-vertical-arrival-dark.png') })
 })
 
+// @requirement PRODUCT.md §2.1
+// @requirement PRODUCT.md §20.2.20
+test('keeps the Visual selection visible on the tinted active line of an Agenda entry', async ({ userDataDir }) => {
+  const text = `2026-10-10 ${'A synthetic entry with enough words to wrap. '.repeat(4)}`
+  seedDocument(userDataDir, {
+    document: { roots: [node('wrapped', text), node('next', '2026-10-10 Next')] },
+    location: { currentParentId: null, selectedNodeId: 'wrapped' },
+  })
+  const { app, window } = await launchTree(userDataDir)
+  await setMainWindowContentSize(app, { width: 640, height: 420 })
+  const wrappedRow = row(window, nodeKey(10, 10, 'wrapped'))
+
+  await openAndSelect(window, nodeKey(10, 10, 'wrapped'))
+  await window.keyboard.type('04l')
+  await window.keyboard.press('v')
+  await window.keyboard.press('j')
+
+  // The pale highlight differs from the tint by less than the default per-pixel threshold.
+  await expect(wrappedRow).toHaveAttribute('style', /--active-line-top: 20px/)
+  await expect(wrappedRow).toHaveScreenshot('agenda-visual-active-line-selection-light.png', { threshold: 0.02 })
+
+  await window.emulateMedia({ colorScheme: 'dark' })
+
+  await expect(wrappedRow).toHaveScreenshot('agenda-visual-active-line-selection-dark.png', { threshold: 0.02 })
+})
+
 // @requirement PRODUCT.md §20.2.20
 // @requirement PRODUCT.md §23.4
 test('extends character Visual by displayed line within a multi-line Agenda entry', async ({
