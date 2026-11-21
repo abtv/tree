@@ -119,7 +119,7 @@ While the last date is removed, the status bar shows `Add a date to keep this it
 
 ### 23.8 Agenda History Focus
 
-Agenda uses the existing document Undo/Redo history. Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the captured Tree return location, Agenda folds or Tree expansion while the originating nodes still exist.
+Agenda uses the document's Undo/Redo history (§10). Restored document content updates its occurrences, including restoring removed dates and pinning an active item when its last date is removed again. History does not change the captured Tree return location, Agenda folds or Tree expansion while the originating nodes still exist.
 
 After Undo or Redo, select the nearest visible occurrence of the change-site node relative to the current occurrence's day, choosing the earlier day on a tie. If none is visible, keep the current selection and focus. A selection whose row no longer exists falls back to the nearest displayed day. History focus uses the change-site text cursor when selecting that node. Persistence locking continues to reject document edits and Undo/Redo, while navigation remains available.
 
@@ -154,7 +154,7 @@ Agenda has no node drag or occurrence move command. Holding or moving the pointe
 
 ### 23.13 Vim Node Commands
 
-Vim `dd`, including counted forms, does nothing in Agenda: it neither deletes nor starts a pending move, changes registers, writes the clipboard or creates history. Node-register `p`/`P` does nothing. Text-register `p`/`P` on a direct match remains ordinary text editing (§23.9). `yy` copies as in Tree.
+Vim `dd`, including counted forms, does nothing in Agenda: it neither deletes nor starts a pending move, changes registers, writes the clipboard or creates history. Node-register `p`/`P` does nothing. Text-register `p`/`P` on a direct match is ordinary text editing (§23.9). `yy` copies as in Tree.
 
 ### 23.14 Vim Whole-Node Selection
 
