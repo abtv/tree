@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Documentation Consistency and Policy Load](documentation-consistency-and-policy-load.md) | Authorized (whole initiative) | T5 |
+| [Documentation Consistency and Policy Load](documentation-consistency-and-policy-load.md) | Authorized (whole initiative) | T9 |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

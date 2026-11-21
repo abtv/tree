@@ -345,6 +345,22 @@ The separate `Publish demo video and screenshots` workflow is dispatched after s
 
 ## 3. Agent Tool Configuration
 
+### Codex execution rules
+
+Procedure §4 of `docs/AGENT_WORKFLOW.md` routes Codex sessions here. These rules are binding in Codex:
+
+* Run `npm run test:property` in the default workspace sandbox, including during full-project validation. This Vitest command needs no host execution permission.
+* Check the current session's approved command prefixes before requesting a new allowance. Reuse a matching approval through the supported host-execution mechanism; do not ask the owner again in conversation. For a missing named npm workflow allowance, propose the reusable `npm run <script>` prefix rather than including a task-specific file or concurrency argument. Keep temporary probe approvals scoped to their script path; never replace them with unrestricted `node` permission. A platform prompt or denial remains authoritative even when a matching approval was expected.
+* Request host execution from the first invocation of `npm run test:web:chromium`.
+* Run Electron E2E tests outside the sandbox from the first invocation, using `sandbox_permissions: "require_escalated"` and the named npm workflows allowed by `.codex/rules/tests.rules` and `.codex/rules/e2e.rules`. Project rules require trusted `.codex/` configuration and are loaded at session startup; restart Codex after changing them. If a rule is unavailable, follow the platform approval flow rather than bypassing it.
+* Retire a finished scratch task with `npm run retire:scratch -- <task>` outside the sandbox from the first invocation, using `sandbox_permissions: "require_escalated"`. `.codex/rules/scratch.rules` allows this guarded command, including the Git metadata updates needed for temporary worktrees. Let the command inspect and remove worktrees; do not precede it with raw `git worktree remove --force` or bypass a refusal with recursive deletion. Rule loading and trust requirements are the same as for the test commands above.
+
+### Process interruption permissions
+
+In Codex, `.codex/rules/processes.rules` allows `kill -INT <pid>` and `kill -TERM <pid>` outside the sandbox; in Claude Code, `.claude/settings.json` allows the same two forms and runs them outside the sandbox. Both refuse the all-process target `-1` and the process-group target `0`; Claude Code refuses any negative target, while Codex prefix rules check only the first target. The ownership and signal rules are in procedure §4.
+
+### Tool rules and checks
+
 Codex's project rules in `.codex/rules/tests.rules` allow the named Electron workflows of [Development Guide §8](DEVELOPMENT.md#8-tests), plus `npm run test:e2e:changed` and `npm run test:e2e:diagnose`, outside the sandbox, including their spec paths and flags. They load at startup when the project's `.codex/` configuration layer is trusted; restart Codex after adding or changing rules. More restrictive user or administrator rules still take precedence. These allowances authorize the complete npm scripts outside the sandbox, including their builds; review script changes with that permission in mind.
 
 For process inspection in both tools, run `ps -axo pid=,ppid=,command=` by itself and inspect the returned text for the task's processes. Codex allows it through `.codex/rules/processes.rules`; Claude Code explicitly allows it and excludes it from the Bash sandbox in `.claude/settings.json`. Piping it into `rg` introduces a separate command requiring its own allowance. Verify task ownership before using the existing termination rules. Rules saved using Codex's terminal persistent-approval option belong to the user's Codex configuration; shared project allowances belong in the tracked `.codex/rules/` files. Check a Codex rule without executing the target command using `codex execpolicy check --rules .codex/rules/tests.rules npm run test:e2e:diagnose -- --shared-reset=reload --workers=6`.
