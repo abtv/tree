@@ -4,6 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
+| [Documentation Load and Ownership](documentation-load-and-ownership.md) | Proposed; awaiting owner decision; no task authorized | None until authorized |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
