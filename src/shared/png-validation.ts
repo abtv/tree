@@ -1,9 +1,34 @@
 import { MAX_ATTACHMENT_BYTES } from './attachment-limits'
+import {
+  isValidAttachmentDimensions,
+  MAX_ATTACHMENT_DIMENSION,
+  MAX_ATTACHMENT_PIXELS,
+  type AttachmentDimensions,
+} from '../domain/attachment-dimensions'
 
-export const MAX_ATTACHMENT_DIMENSION = 32_767
-export const MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024
+export { MAX_ATTACHMENT_DIMENSION, MAX_ATTACHMENT_PIXELS }
+
+/** The bytes `readPngDimensions` needs: the signature, the IHDR length and type, width and height. */
+export const PNG_DIMENSIONS_HEADER_BYTES = 24
 
 export type PngDecoder = (bytes: Uint8Array) => boolean
+
+/**
+ * Reads the image size from the IHDR chunk that must follow the PNG signature, without validating the
+ * rest of the file. Returns undefined for anything that is not such a header or whose size is outside
+ * the attachment limits. Reads only the first `PNG_DIMENSIONS_HEADER_BYTES` bytes.
+ */
+export function readPngDimensions(bytes: Uint8Array): AttachmentDimensions | undefined {
+  if (bytes.length < PNG_DIMENSIONS_HEADER_BYTES) return undefined
+  if (!PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)) return undefined
+  if (readUint32(bytes, 8) !== 13 || !IHDR.every((byte, index) => bytes[12 + index] === byte)) return undefined
+  const width = readUint32(bytes, 16)
+  const height = readUint32(bytes, 20)
+  return isValidAttachmentDimensions(width, height) ? { width, height } : undefined
+}
+
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
+const IHDR = [73, 72, 68, 82]
 
 export function validateAttachmentBytes(value: unknown, decode: PngDecoder): Uint8Array {
   const bytes = toUint8Array(value)
@@ -23,10 +48,9 @@ function exceedsDecodeBudget(bytes: Uint8Array): boolean {
 }
 
 export function isPng(bytes: Uint8Array): boolean {
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
-  if (bytes.length < signature.length || !signature.every((byte, index) => bytes[index] === byte)) return false
+  if (bytes.length < PNG_SIGNATURE.length || !PNG_SIGNATURE.every((byte, index) => bytes[index] === byte)) return false
 
-  let offset = signature.length
+  let offset = PNG_SIGNATURE.length
   let sawHeader = false
   let sawData = false
   let sawEnd = false

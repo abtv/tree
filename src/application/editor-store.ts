@@ -28,6 +28,7 @@ import {
 } from '../domain/document'
 import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
 import type { ClipboardContent } from '../shared/ipc'
+import { readPngDimensions } from '../shared/png-validation'
 import { vimForestClipboardContent } from './vim-clipboard-content'
 import { clipboardSelectionTransition, imagePasteTransition, textPasteTransition } from './editor-clipboard-transitions'
 import {
@@ -1676,7 +1677,12 @@ export class EditorStore {
     if (current === undefined || this.isPersistenceLocked()) return
     if (clipboard.kind === 'image') {
       if (current.agenda !== undefined && requireNode(current.document, nodeId).node.attachment !== undefined) return
-      const attachment: AttachmentReference = { id: this.createId(), mimeType: 'image/png' }
+      // The stored size lets the image reserve its space before its bytes load (`docs/PRODUCT.md` §17.1).
+      const attachment: AttachmentReference = {
+        id: this.createId(),
+        mimeType: 'image/png',
+        ...readPngDimensions(clipboard.png),
+      }
       this.pendingAttachmentIds.add(attachment.id)
       try {
         await this.services.writeAttachment(attachment.id, clipboard.png)

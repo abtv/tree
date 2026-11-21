@@ -15,6 +15,7 @@ import {
 import { isValidLocation } from './document-operations'
 import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
+import { isValidAttachmentDimensions } from './attachment-dimensions'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
 import { deriveCompletion } from './node-completion'
 import { buildNodeIndex, locateNode } from './document-index'
@@ -418,10 +419,14 @@ function parseAttachment(value: unknown): AttachmentReference | undefined {
   ) {
     throw new Error('A saved attachment is invalid.')
   }
+  // Unlike searchText, an invalid size does not reject the document: it is dropped here and read again
+  // from the image header after load (`docs/ARCHITECTURE.md` §13).
+  const sized = isValidAttachmentDimensions(value.width, value.height)
   return {
     id: value.id,
     mimeType: value.mimeType,
     ...(value.searchText === undefined ? {} : { searchText: value.searchText as string }),
+    ...(sized ? { width: value.width as number, height: value.height as number } : {}),
   }
 }
 

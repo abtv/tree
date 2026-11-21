@@ -10,6 +10,9 @@ export interface AttachmentReference {
   readonly id: AttachmentId
   readonly mimeType: 'image/png'
   readonly searchText?: string
+  /** Natural image size in pixels. Both are present or neither; see `attachment-dimensions.ts`. */
+  readonly width?: number
+  readonly height?: number
 }
 
 export interface LinkRange {

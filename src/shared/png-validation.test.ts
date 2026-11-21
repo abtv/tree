@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isPng, validateAttachmentBytes } from './png-validation'
-import { onePixelPng, pngIhdr, pngWith } from './png-test-utils'
+import { isPng, PNG_DIMENSIONS_HEADER_BYTES, readPngDimensions, validateAttachmentBytes } from './png-validation'
+import { onePixelPng, pngIhdr, pngWith, transparentPng } from './png-test-utils'
 import { MAX_ATTACHMENT_BYTES } from './attachment-limits'
 
 function withHeader(header: number[]) {
@@ -136,6 +136,39 @@ describe('shared PNG structural validation', () => {
     for (const input of [[value], { type: 'Buffer', data: [value] }]) {
       expect(() => validateAttachmentBytes(input, () => true)).toThrow('Attachment data is invalid.')
     }
+  })
+
+  it('reads the image size from the header alone', () => {
+    const header = withHeader(pngIhdr(640, 480)).subarray(0, PNG_DIMENSIONS_HEADER_BYTES)
+
+    expect(readPngDimensions(header)).toEqual({ width: 640, height: 480 })
+    expect(readPngDimensions(onePixelPng)).toEqual({ width: 1, height: 1 })
+    expect(readPngDimensions(transparentPng)).toEqual({ width: 2, height: 1 })
+  })
+
+  it.each([
+    [32_767, 2048, { width: 32_767, height: 2048 }],
+    [8192, 8192, { width: 8192, height: 8192 }],
+    [32_768, 1, undefined],
+    [8193, 8192, undefined],
+    [0, 1, undefined],
+    [1, 0, undefined],
+  ])('reads a %i×%i header within the attachment limits only', (width, height, expected) => {
+    expect(readPngDimensions(withHeader(pngIhdr(width, height)))).toEqual(expected)
+  })
+
+  it('returns no size for anything that is not a PNG signature followed by an IHDR header', () => {
+    const wrongSignature = onePixelPng.slice()
+    wrongSignature[1] = 0
+    const wrongLength = onePixelPng.slice()
+    wrongLength[11] = 14
+    const wrongType = pngWith([['tEXt', pngIhdr(1, 1)]])
+
+    expect(readPngDimensions(onePixelPng.subarray(0, PNG_DIMENSIONS_HEADER_BYTES - 1))).toBeUndefined()
+    expect(readPngDimensions(wrongSignature)).toBeUndefined()
+    expect(readPngDimensions(wrongLength)).toBeUndefined()
+    expect(readPngDimensions(wrongType)).toBeUndefined()
+    expect(readPngDimensions(new Uint8Array(0))).toBeUndefined()
   })
 
   it('accepts an ArrayBuffer and respects the offset and length of a view', () => {

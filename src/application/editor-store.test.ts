@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { EditorStore, type ClipboardValue, type Clock, type EditorServices } from './editor-store'
 import type { ReadySnapshot } from './editor-runtime-state'
+import { transparentPng } from '../shared/png-test-utils'
 import {
   displayedNodes,
   isValidLocation,
@@ -3425,6 +3426,32 @@ describe('EditorStore', () => {
     state = store.getSnapshot()
 
     expect(state.status === 'ready' && state.document.roots[0]!.attachment).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §17
+  it('stores the pasted image size read from its PNG header, and no size for an unreadable header', async () => {
+    const sized = createServices({ kind: 'image', png: transparentPng })
+    const sizedStore = new EditorStore(sized, ids('root', 'image'))
+    const unsized = createServices({ kind: 'image', png: new Uint8Array([1, 2]) })
+    const unsizedStore = new EditorStore(unsized, ids('root', 'image'))
+    await sizedStore.initialize()
+    await unsizedStore.initialize()
+
+    await sizedStore.paste('root', 0)
+    await unsizedStore.paste('root', 0)
+
+    const sizedState = sizedStore.getSnapshot()
+    const unsizedState = unsizedStore.getSnapshot()
+    expect(sizedState.status === 'ready' && sizedState.document.roots[0]!.attachment).toEqual({
+      id: 'image',
+      mimeType: 'image/png',
+      width: 2,
+      height: 1,
+    })
+    expect(unsizedState.status === 'ready' && unsizedState.document.roots[0]!.attachment).toEqual({
+      id: 'image',
+      mimeType: 'image/png',
+    })
   })
 
   it('rejects empty copy and cut selections and propagates clipboard failures', async () => {
