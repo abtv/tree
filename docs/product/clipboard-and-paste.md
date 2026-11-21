@@ -120,8 +120,6 @@ two
 threedef
 ```
 
-The final node contains the remainder of the original text.
-
 If the original node had an image:
 
 * the image remains attached to the final node containing the remainder of the original text;
