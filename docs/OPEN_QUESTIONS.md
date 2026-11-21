@@ -223,6 +223,7 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 - 2026-11-21 — Remove the `image-to-text` command, which inserts recognized text as child nodes: the Product Owner does not use it. Keep automatic recognition of pasted images, `reindex-all-images` and the hidden search text, which the Product Owner uses through Search (§15.1).
 - 2026-11-21 — Keep Vim mode complete: the Product Owner uses every command family, including case changes, surround, node operations and `Ctrl+A`/`Ctrl+X`.
 - 2026-11-21 — Keep the browser version, Search, desktop and browser export, import and backup, Image to Text, the command panel, images and attachments, clipboard and links, node states, drag and drop, inline expansion, desktop updates, Appearance, emoji completion and Agenda. Improvements are open in PD-009 (Agenda), PD-011 (Search), PD-012 (command panel) and PD-014 (Image to Text in the browser).
+- 2026-11-22 — PD-012 (command panel prompt) answered: in standard editing the input line has no `:` prefix and shows the placeholder `Run Command`; Vim editing keeps `:` (§20.2.28).
 - Still open: Recent nodes. Product Owner statement: probably not needed, given stars, marks and global search. Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.
 
 ## PD-009: How to improve Agenda
@@ -275,23 +276,6 @@ Which search is used for which purpose in ordinary use, and when the wrong one i
 ### What would settle it
 
 The Product Owner names the two versions and the friction between them. Agent inference: the options include merging them, separating their purposes more clearly, or changing one of them.
-
-## PD-012: The `:` prompt of the command panel in standard editing
-
-Kind: product
-Status: Idea
-
-### Question
-
-Product Owner statement (2026-11-21): `:` suits the command panel in Vim, but showing `:` in standard editing is strange and should be adjusted. Repository fact: `Cmd+Shift+P` opens the panel in both editing modes, and its input line always starts with `:` (§20.2.28). The standard-editing presentation is not decided.
-
-### What we are watching
-
-Whether the prompt feels out of place when the panel is opened from standard editing.
-
-### What would settle it
-
-A Product Owner choice of the standard-editing prompt, checked against the platform conventions of `docs/PRODUCT.md` §1.3. Agent inference: the options include no prefix, an icon, or placeholder text.
 
 ## PD-013: Whether `#` tags and `&` events are useful
 

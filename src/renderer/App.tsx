@@ -557,9 +557,10 @@ export function App({
   ) : null
   const commandInput = (
     <label className="command-input-line">
-      <span>:</span>
+      {vimEnabled ? <span>:</span> : null}
       <input
         ref={bindCommandInput}
+        placeholder={vimEnabled ? undefined : 'Run Command'}
         value={commandPanel.input}
         onChange={(event) => commandPanel.changeInput(event.target.value)}
         aria-label="Command"

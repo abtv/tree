@@ -361,6 +361,26 @@ it.each(['colon', 'palette'])(
   },
 )
 
+// @requirement PRODUCT.md §20.2.28
+it.each([
+  [true, ':', null],
+  [false, '', 'Run Command'],
+])('shows the command prompt for Vim editing %s', async (vimEnabled, prefix, placeholder) => {
+  const store = await createSeededStore(
+    { roots: [{ id: 'root', text: 'Task', children: [] }] },
+    { currentParentId: null, selectedNodeId: 'root' },
+  )
+  renderReact(<App store={store} initialVimEnabled={vimEnabled} />)
+  await act(async () => {})
+
+  fireEvent.keyDown(document.activeElement!, { key: 'P', metaKey: true, shiftKey: true })
+
+  const input = screen.getByRole('combobox', { name: 'Command' })
+  expect(input).toHaveFocus()
+  expect(input.closest('.command-input-line')).toHaveTextContent(new RegExp(`^${prefix}$`))
+  expect(input.getAttribute('placeholder')).toBe(placeholder)
+})
+
 it('keeps update progress visible in the status bar', async () => {
   const store = await createSeededStore(
     { roots: [{ id: 'root', text: '', children: [] }] },

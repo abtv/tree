@@ -570,6 +570,39 @@ test.describe('Normal command panel', () => {
 })
 
 test.describe('Command panel application shortcut', () => {
+  for (const appearance of ['light', 'dark'] as const) {
+    // @requirement PRODUCT.md §20.2.28
+    test(`shows the Run Command placeholder without a prefix in standard editing in ${appearance}`, async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'one', text: 'Command panel review', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'one' },
+      })
+      const { window } = await launchTree(userDataDir, { vimPreference: false, appearance })
+      await window.emulateMedia({ colorScheme: appearance })
+      await node(window, 1).focus()
+
+      await window.keyboard.press('Meta+Shift+p')
+
+      const line = window.locator('.command-input-line')
+      const input = window.getByRole('combobox', { name: 'Command' })
+      await expect(input).toBeFocused()
+      await expect(input).toHaveAttribute('placeholder', 'Run Command')
+      await expect(line).toHaveText('')
+      expect((await input.boundingBox())!.x).toBe((await line.boundingBox())!.x)
+
+      await window.screenshot({ path: `.scratch/command-panel/standard-${appearance}.png` })
+
+      await expect(window).toHaveScreenshot(`command-panel-standard-${appearance}.png`)
+
+      await input.pressSequentially('theme')
+
+      await expect(line).toHaveText('')
+      await expect(input).toHaveValue('theme')
+    })
+  }
+
   describeForEachEditingMode('named views and editing preference', ({ mode }) => {
     // @requirement PRODUCT.md §20.2.28
     test('restores a selection, toggles Vim and selects named views idempotently', async ({ userDataDir }) => {
