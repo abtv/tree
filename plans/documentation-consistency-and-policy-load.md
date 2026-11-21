@@ -190,7 +190,7 @@ Working-task count: 11 (T0–T8, T10, T11; T4 and T5 may be cancelled). Final ow
 | --- | --- | --- | --- | --- | --- | --- |
 | T0 | Investigation: from the session logs of this project, measure separately for Claude Code (`~/.claude/projects/`) and Codex (its session directory, found and reported to the owner) whether agents read the policy and `docs/DEVELOPMENT.md` by section or whole, and how many bytes. Only reading figures enter the report and the repository, never conversation content. | T11 | this plan | Minimal | A table per tool: sessions, files read, ranges, bytes; the command or method behind each number | Planned |
 | T1 | Correct C5–C13, C15 and the wording of C14. Add the omission rule to `docs/AGENT_ROLES.md` §2 so that C7 becomes true. Delete the four one-time advisory acceptances of C16 (Q6). No rule changes. The comment at `scripts/check-requirement-coverage.mts:19` moves to T7, which already changes scripts. | none | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, `docs/AGENT_WORKFLOW.md`, `docs/AGENT_ROLES.md`, `docs/WORKING_WITH_AGENT.md`, `docs/ARCHITECTURE.md`, `AGENTS.md` | Minimal+ | Each row quoted before and after; `npm run check:docs` passes; `AGENTS.md` within its limit | Done |
-| T2 | Record the TD-001 evidence of Appendix B and the TD-003 evidence of L6 in `docs/OPEN_QUESTIONS.md`, with basis labels and without a status change. | none | `docs/OPEN_QUESTIONS.md` | Minimal | Each new evidence line names its commit or command | Planned |
+| T2 | Record the TD-001 evidence of Appendix B and the TD-003 evidence of L6 in `docs/OPEN_QUESTIONS.md`, with basis labels and without a status change. | none | `docs/OPEN_QUESTIONS.md` | Minimal | Each new evidence line names its commit or command | Done |
 | T3 | One owner per duplicated rule: resolve D1, D2, D9–D12, U1 and U2 by the Q2 answers; replace the restatements of D3–D8 outside the owner with one pointer sentence each. Apply Q5: delete the token-measurement sentence (U5); name the Product Owner as the actor of the two manual checks of U6 and list them in the owner-involvement inventory of procedure §8. | T11 | `docs/DEVELOPMENT.md`, `docs/AGENT_WORKFLOW.md`, `AGENTS.md`, `docs/WORKING_WITH_AGENT.md`, `docs/AGENT_ROLES.md`, `e2e/electron/AGENTS.md`, `plans/README.md` | Minimal+ | For each D row, the one remaining full statement and its pointers; `npm run check:docs -- --verbatim <ref> --file <file>` for each file, with every removed unit found in the owner text or listed for the owner | Planned |
 | T4 | Move the L3 material out of `docs/DEVELOPMENT.md` §9 and the restructuring tooling out of §12 into `docs/DEVELOPMENT_REFERENCE.md`, verbatim, with one pointer sentence per source section. Retarget every citation, including the error messages at `scripts/check-docs.mts:122,128`. | T0, T3 | `docs/DEVELOPMENT.md`, `docs/DEVELOPMENT_REFERENCE.md`, citing documents, `scripts/check-docs.mts` and its test | Low (`npm run check`) | Lost-text proof by the Git method of the earlier plan; section sizes before and after | Planned |
 | T5 | Move the per-tool permission bullets of Procedures §4 (Codex and Claude Code after T10) to `docs/DEVELOPMENT_REFERENCE.md` §3 and leave one routing sentence per tool. | T0, T10 | `docs/AGENT_WORKFLOW.md`, `docs/DEVELOPMENT_REFERENCE.md`, `AGENTS.md` | Minimal+ | Lost-text proof; §4 size before and after; each tool's sentence names its section | Planned |
@@ -304,10 +304,11 @@ The questions as proposed:
   * C16 (Q6): the three acceptances in `docs/DEVELOPMENT_REFERENCE.md` §1 and the one in `docs/DEVELOPMENT.md` §12 are deleted; the standing `test:e2e:linux` authorization and the Electron 45 note stay.
   * Rule total (`AGENTS.md` + `docs/AGENT_WORKFLOW.md` + `docs/AGENT_ROLES.md`): 107,102 bytes before, 107,335 after T1 (+233, the two sentences of C7 and C8).
   * Validation: `npm run check:docs`, `npm run check:opencode` and `npm run format:check:changed` passed.
+* T2 results (2026-11-21): TD-001 has four new evidence lines (size history, mechanical against prose enforcement, prose rules re-patched, the inference and its limits). TD-003 has an Evidence section with three lines and records that Q8 keeps it deferred. Statuses unchanged. The §4, §7 and §21 subject claims were re-checked against the text. `npm run check:docs` passed.
 
 ## Next Task
 
-T2.
+T10.
 
 ## Next-Session Prompt
 
