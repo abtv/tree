@@ -97,7 +97,7 @@ Find the gaps before implementing, not in the middle of implementing. When plann
 
 Classify each gap:
 
-* **Minor.** It concerns an edge case, leaves the requirement's main flow intact, is reversible in a later change, and one option is clearly more consistent with the principles `docs/PRODUCT.md` already records than the alternatives are. Choose that option, write the resulting behavior into `docs/PRODUCT.md` as part of the change, implement it, and report the decision and the principle it followed in the handoff.
+* **Minor.** It concerns an edge case, leaves the requirement's main flow intact, is reversible in a later change, and one option is clearly more consistent with the principles `docs/PRODUCT.md` already records than the alternatives are. Choose that option, write the resulting behavior into `docs/PRODUCT.md` as part of the change, implement it, and report the decision and the principle it followed in the delivery report.
 * **Material.** It changes a requirement's main flow, is not reversible in a later change, touches data or persistence, or two reasonable readings would produce a different user experience. Raise it under §14 before implementing.
 
 Size of the implementation is not the measure. A change that gives the user something they could not do before is material by definition, however small its code: a new command, mode, control, gesture, or screen enters the product for good and is expensive to withdraw. Settling an edge case of behavior the product already has stays minor.
@@ -110,7 +110,7 @@ An approved initiative may explicitly delegate reversible UX decisions within na
 
 By default no area is exploratory, and the rule above applies everywhere. The Product Owner marks an area exploratory explicitly, with the marker `docs/PRODUCT.md` §1.2 defines, and removes it once the behavior settles. The agent never marks or unmarks an area itself, and never infers that an area is exploratory from how new or incomplete it looks.
 
-Inside a marked section the minor-gap rule does not apply. Implement exactly what the Product Owner asked, do not fill a gap by choosing a default, and do not extend the behavior to a neighbouring case. Report what you noticed — friction, an inconsistency with adjacent behavior, or a case the section does not cover — in the handoff, as observations rather than proposals. Everything else applies unchanged, including tests, validation, and documentation.
+Inside a marked section the minor-gap rule does not apply. Implement exactly what the Product Owner asked, do not fill a gap by choosing a default, and do not extend the behavior to a neighbouring case. Report what you noticed — friction, an inconsistency with adjacent behavior, or a case the section does not cover — in the delivery report, as observations rather than proposals. Everything else applies unchanged, including tests, validation, and documentation.
 
 ### Vim divergences
 
@@ -132,7 +132,7 @@ Agents must preserve Product Owner disagreement instead of resolving it silently
 
 When the Product Owner accepts a direction, propose the corresponding `docs/PRODUCT.md` change or ADR separately. Acceptance alone does not authorize implementation; follow the product-change rules above once the Product Owner requests the change.
 
-Open questions need a moment when the Product Owner actually sees them, or they accumulate unread. When no plan in `plans/README.md` has a ready next task, the handoff lists the open questions in one line each as candidates and stops there. Selecting one is the Product Owner's decision: never start work on an open question because nothing else was pending.
+Open questions need a moment when the Product Owner actually sees them, or they accumulate unread. When no plan in `plans/README.md` has a ready next task, the delivery report lists the open questions in one line each as candidates and stops there. Selecting one is the Product Owner's decision: never start work on an open question because nothing else was pending.
 
 ---
 
@@ -154,7 +154,7 @@ Exclude owner-deferred work from ready-task selection and continuation below.
 
 For a contained change with a clear outcome and one existing owner, make a concise plan in the conversation and proceed without a planner subagent or temporary plan file. Use the configured planner subagent in a fresh context when the outcome requires a multi-session initiative, changes major architecture, or has several interacting owners or material design choices that benefit from independent planning. Review its plan against the Product Owner's request and repository requirements, resolve ordinary engineering details, and share a concise plan or progress update. Continue without a separate approval pause within the authorized outcome. Ask for a decision before implementing a material unresolved choice or expanding product behavior or major architecture.
 
-For a new initiative, investigate first, collect the necessary questions in one batch, and present the resulting scope, priorities, delegated decisions, reserved decisions, task sequence, validation, expected owner-verification rounds and checks, unresolved capabilities, and budget. Count the execution budget in tasks and the recovery budget in fix cycles, not in sessions; a fix cycle is one repair followed by the rerun of the checks it invalidated. Obtain explicit authorization to implement that initiative before starting implementation. A request to investigate or record a plan is not implementation authorization. When the Product Owner has already explicitly authorized the presented outcome and boundaries, record that approval rather than asking again. Initiative-wide approval covers its in-scope tasks and required review corrections; closure is subject to the owner acceptance rule below. It does not authorize a different initiative, publishing, or scope expansion. Task-by-task authorization and explicit prototype or no-commit conditions remain valid when the Product Owner chooses them.
+For a new initiative, investigate first, collect the necessary questions in one batch, and present the resulting scope, priorities, delegated decisions, reserved decisions, task sequence, validation, expected owner-verification rounds and checks, unresolved capabilities, and budget. Count the execution budget in tasks and the recovery budget in fix cycles, not in sessions; a fix cycle is one repair followed by the rerun of the checks it invalidated. Owner-required checks include the real-keyboard check of input handling and the Retina check of rendering scale (`docs/DEVELOPMENT.md` §9). Obtain explicit authorization to implement that initiative before starting implementation. A request to investigate or record a plan is not implementation authorization. When the Product Owner has already explicitly authorized the presented outcome and boundaries, record that approval rather than asking again. Initiative-wide approval covers its in-scope tasks and required review corrections; closure is subject to the owner acceptance rule below. It does not authorize a different initiative, publishing, or scope expansion. Task-by-task authorization and explicit prototype or no-commit conditions remain valid when the Product Owner chooses them.
 
 ### Final owner acceptance
 
@@ -313,7 +313,7 @@ Record the affected cost and selected scenarios, or a brief reason why no Electr
 
 ### Validation evidence
 
-Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in `WORKING_PLAN.md` when one is required under §8; otherwise include it in the final handoff.
+Record each validation result with its exact command and scope, pass/fail/blocked status, the tested repository snapshot, and relevant environment or generated-artifact assumptions. Keep this record in the handoff (§12).
 
 Select local E2E scope using [Development Guide §9, Local affected-spec E2E validation](DEVELOPMENT.md#local-affected-spec-e2e-validation), including production-coverage inventory, empty-selection handling, and full-suite requirements.
 
@@ -426,13 +426,13 @@ If a session stops before a commit, leave any `WORKING_PLAN.md` and the worktree
 
 For a requested security audit, use the full structured report in [Security Audit](SECURITY_AUDIT.md), including findings, coverage and evidence. The summary-only restrictions below (length, headings, tables and technical evidence) do not apply to that report. They still apply to delivery of changes to the audit instructions themselves.
 
-For completed or interrupted repository work, provide an explicit delivery report. The checklist below applies to that report; a requested prompt for another session uses the separate procedure below.
+For completed or interrupted repository work, provide an explicit delivery report: the conversation summary below. The handoff is the technical evidence listed below, kept in `WORKING_PLAN.md` or `.scratch/<task>/` and given on request. A requested prompt for another session uses the separate procedure below.
 
 The conversation report is a bottom-line summary of at most three short lines, in this order: what was delivered and its completion status, with the commit; what failed, remains unverified or is blocked; and whether a Product Owner decision or action is needed. For a completed task requiring no action, say so rather than requesting confirmation. Add a line only for product decisions made on the Product Owner's behalf, listing every one of them with its principle rather than the most prominent one, a possible shared cause reported by `npm run fix:history`, or, for an interface change, a link to representative inspected screenshots or recordings from the required visual evidence. Do not add headings, tables, check lists or mechanism explanations to the conversation report. Do not invent a manual application check for documentation or internal changes.
 
-Keep the technical evidence out of the conversation report. Give it when the Product Owner asks for it. When work is interrupted or a handoff remains, record the evidence in `WORKING_PLAN.md` or `.scratch/<task>/` and link it in one line; a link must remain usable at handoff, so never link to a deleted working plan. Failures, blockers and the next action always stay in the summary. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
+Keep the handoff out of the conversation report. When work is interrupted or unfinished, link the handoff in one line; never link a deleted working plan. Failures, blockers and the next action always stay in the summary. Detailed evidence remains required under §10 and the list below. Do not create a permanent validation archive.
 
-The technical evidence states:
+The handoff states:
 
 * what was completed;
 * for a defect fix, the output of `npm run fix:history`, and, when it reports a possible shared cause, a proposed structural initiative under §8 or a stated reason why none is needed;
@@ -495,6 +495,6 @@ For ordinary implementation details that do not affect these areas, make a reaso
 
 When requesting an optional preference on a reversible choice already within delegated authority, recommend one concrete action and state “if you do not answer, I will do X.” Give the owner a reasonable opportunity to respond and continue independent work meanwhile. If the answer is required for a reserved decision, explicit confirmation, platform permission, destructive action, or final acceptance, state that the dependent action waits for an answer. Silence never supplies that authorization. Do not turn routine engineering choices into questions merely to attach a default.
 
-Ask once, early. Collect the material gaps, scope boundaries, priorities, delegated decision areas, verification obligations and budget needed for initiative approval in one exchange. After approval, interrupt only for the reserved decisions above, a missing mandatory capability or owner check, a permission/authentication action that requires the owner, exhausted recovery or budget under §12, or a discovery that invalidates the authorized outcome. Resolve ordinary engineering choices and explicitly delegated details autonomously, record the reasoning, and report them in the handoff. An initial approval does not waive a newly discovered reserved decision. Report a new manual-verification obligation promptly with its cause and the revised estimate; never defer a required pre-commit check merely to reduce interruptions.
+Ask once, early. Collect the material gaps, scope boundaries, priorities, delegated decision areas, verification obligations and budget needed for initiative approval in one exchange. After approval, interrupt only for the reserved decisions above, a missing mandatory capability or owner check, a permission/authentication action that requires the owner, exhausted recovery or budget under §12, or a discovery that invalidates the authorized outcome. Resolve ordinary engineering choices and explicitly delegated details autonomously, record the reasoning in the handoff, and list delegated decisions in the delivery report. An initial approval does not waive a newly discovered reserved decision. Report a new manual-verification obligation promptly with its cause and the revised estimate; never defer a required pre-commit check merely to reduce interruptions.
 
 These are not reasons to interrupt: wanting an already-authorized piece of work confirmed, wanting reassurance that an approach is acceptable, reporting progress, or asking whether to carry on with the task in hand.

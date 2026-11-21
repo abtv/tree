@@ -79,7 +79,7 @@ Use blank lines to separate logical stages in code. In tests, separate distinct 
 
 Use native file-editing tools for repository changes; no shell edit scripts or interpreter-based writes. Use native read/search tools when available; otherwise the primary agent and configured subagents may use the limited read-only shell fallback in `docs/AGENT_ROLES.md`. Run separate shell commands, without chains or shell loops. Use named workflows and their documented arguments. In Codex, Electron E2E runs outside the sandbox from the first invocation through the supported approval mechanism.
 
-Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; in Codex use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
+Keep agent-created temporary materials in `.scratch/<task>/`, preserving existing tool-owned paths, explicit owner destinations, and required suite locations. Do not force-add scratch evidence. After the task's final commit, remove its directory with `npm run retire:scratch -- <task>`. Verify ownership before process cleanup; use standalone `kill -INT <pid>`, never terminal Ctrl+C, and follow the bounded cleanup rules. An unavailable signal or canceled request remains blocked.
 
 Keep ordinary shortcuts application-scoped; use `globalShortcut` only for an explicit inactive-application requirement. State/persistence changes require the assessment in procedure §4 (writes/syncs, interactive CPU, memory growth) and automated scale guards when relevant.
 
@@ -175,7 +175,7 @@ Start each task from its plan (or an existing `WORKING_PLAN.md`) and Git, not fr
 
 For a requested new-session prompt, follow [procedure §12, New-session prompts](docs/AGENT_WORKFLOW.md#new-session-prompts). Include the new objective and necessary conversation-only context; the receiving agent recovers permanent rules and repository state itself.
 
-A delivery report is a bottom-line summary of at most three short lines: delivery/status with the commit, anything failed, unverified or blocked, and any required owner action. Keep the technical evidence required by procedure §12 out of the conversation; give it on request, or link it in one line when a handoff remains. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
+A delivery report is a bottom-line summary of at most three short lines: delivery/status with the commit, anything failed, unverified or blocked, and any required owner action, plus only the added lines procedure §12 names. Keep the handoff (technical evidence, procedure §12) out of the conversation; give it on request, or link it in one line when work remains unfinished. Never link deleted plans. Do not create a permanent validation archive or invent manual checks for internal changes.
 
 Exception: a requested security audit delivers the full structured report required by [Security Audit](docs/SECURITY_AUDIT.md). The three-line limit and exclusion of technical evidence do not apply to that audit report; a short summary must not replace it.
 
