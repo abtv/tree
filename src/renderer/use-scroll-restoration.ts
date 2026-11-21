@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { EditorStore } from '../application/editor-store'
-import { onViewportScroll, scrollViewportBy, viewportBounds, viewportContent } from './scroll-viewport'
+import { alignRowAt, clampRowTop, onViewportScroll, viewportContent } from './scroll-viewport'
 
 const USER_INPUT_EVENTS = ['wheel', 'keydown', 'pointerdown', 'touchstart'] as const
 
@@ -13,22 +13,6 @@ function selectedRowElement(store: EditorStore): HTMLElement | undefined {
   for (const row of document.querySelectorAll<HTMLElement>('.node-list [data-node-id]'))
     if (row.dataset.nodeId === selectedNodeId) return row
   return undefined
-}
-
-/**
- * Clamps a distance from the top of the window so the whole row fits in the current window. A saved
- * distance is clamped again at launch, because the window may now be shorter than when it was saved.
- */
-function clampRowTop(row: HTMLElement, top: number): number {
-  const { height } = row.getBoundingClientRect()
-  const viewport = viewportBounds()
-  const lowest = Math.max(viewport.top, viewport.bottom - Math.min(height, viewport.bottom - viewport.top))
-  return Math.min(Math.max(top, viewport.top), lowest)
-}
-
-/** Scrolls the content so the row sits at the clamped target distance from the top of the window. */
-function alignRow(row: HTMLElement, target: number): void {
-  scrollViewportBy(row.getBoundingClientRect().top - clampRowTop(row, target))
 }
 
 /**
@@ -55,7 +39,7 @@ export function useScrollRestoration(store: EditorStore, ready: boolean): void {
     if (target === undefined) return
     pendingTop.current = target
     const row = selectedRowElement(store)
-    if (row !== undefined) alignRow(row, target)
+    if (row !== undefined) alignRowAt(row, target)
   }, [ready, store])
 
   useEffect(() => {
@@ -68,7 +52,7 @@ export function useScrollRestoration(store: EditorStore, ready: boolean): void {
     const realign = (): void => {
       const target = pendingTop.current
       const row = target === undefined ? undefined : selectedRowElement(store)
-      if (target !== undefined && row !== undefined) alignRow(row, target)
+      if (target !== undefined && row !== undefined) alignRowAt(row, target)
     }
     // Programmatic scrolling at launch is not a change; only scrolling after user input is.
     const onScroll = (): void => {

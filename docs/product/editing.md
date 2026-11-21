@@ -201,7 +201,7 @@ Finance
 Travel
 ```
 
-The application remembers the node from which the user entered so that it can restore that selection when navigating back.
+The application remembers the node from which the user entered, and where its row stood in the window, so that it can restore that selection and that position when navigating back (§7.1).
 
 ---
 
@@ -253,6 +253,19 @@ Ideas
 ```
 
 with `Personal` selected.
+
+#### Return Position
+
+Going back works like Back in a file browser: the row of the node the user entered from returns to the same distance from the top of the window it had when the user entered that node with `Cmd+.`, `gd`, or the node's enter control (§6.1). This replaces the reveal rules of §20.8 for that row, so a round trip does not move it. Each level keeps its own position: in the example above, the first `Cmd+,` places `Finance` where it stood in the list of `Personal`, and the second places `Personal` where it stood at the root level.
+
+Navigating to an ancestor through the location path (§2.2) restores the position of the node it selects in the same way, so one click on an ancestor segment gives the same result as the equivalent number of `Cmd+,` presses (§20.7).
+
+* The position applies only when going back shows the list in which the row stood. After entering a row shown by inline expansion (§2.4) or a node selected in Agenda, going back shows a different list, and §20.8 applies.
+* A position is kept while its node remains the current parent or one of its ancestors, whatever navigation happens in between, such as search, recent nodes, a starred view, Agenda, or undo. It is forgotten once the current parent is no longer that node or one of its descendants, and it is used once: the next entry into the node records a new position.
+* When the position cannot be restored exactly — the window is now shorter, rows above the row were deleted or collapsed, or the row has grown — the row is placed as close to it as the content allows while the whole row stays visible. A row taller than the content area shows its start at the top of the content area. A row that was scrolled out of view when the user entered it returns at the nearest edge of the content area. These are the same limits as the launch restore of §16.1, and they keep the destination visible as §20.8 requires.
+* While rows are measured and images load after going back, the row keeps its restored position until the user scrolls, as in §20.8 under Changing Geometry.
+
+Return positions exist only in memory for the running session. They are not saved with the document and do not survive a restart: after a restart, going back follows §20.8 until the user enters a node again. The scroll position restored at launch (§16.1) is separate and unaffected.
 
 At the root level:
 

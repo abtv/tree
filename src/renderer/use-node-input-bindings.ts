@@ -622,6 +622,8 @@ export function useNodeInputBindings({
           const row = input.closest('.node-row, .agenda-row') ?? input
           if (firstPass && focus.revealLine === true)
             viewportReveal.beginLine(() => inputs.current.get(focus.nodeId), focus.cursor, isCurrent)
+          else if (firstPass && focus.returnRowTop !== undefined)
+            viewportReveal.beginAt(row, focus.returnRowTop, isCurrent)
           else if (viewportReveal.hasLine()) viewportReveal.correct()
           else if (restoring) {
             // Session restoration owns startup alignment and its asynchronous geometry until input.

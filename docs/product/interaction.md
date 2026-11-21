@@ -114,6 +114,8 @@ A difference between paths is allowed only where this document records it and it
 
 The content area is the scrolling region between the location toolbar and the status bar (§2.2, §20.2). When the selection or the caret moves to another node, the content scrolls so the destination is visible and the position it ends in does not depend on the key or direction that led there.
 
+Going back to the node the user entered from (§7.1) is the exception: its row returns to the window position it had before entering, within the limits §7.1 states, instead of following the rules below.
+
 In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and other commands use the node-reveal rules.
 
 #### Context

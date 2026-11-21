@@ -39,6 +39,8 @@ export interface Clock {
 export interface FocusIntent {
   /** Reveal the caret line when arriving at a read-only projected row. */
   readonly revealLine?: boolean
+  /** Going back: place the row at this distance from the top of the window (`docs/PRODUCT.md` §7.1). */
+  readonly returnRowTop?: number
   nodeId: NodeId
   cursor: number
   token: number

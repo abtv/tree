@@ -41,6 +41,23 @@ export function scrollViewportBy(deltaY: number): void {
   else element.scrollBy(0, deltaY)
 }
 
+/**
+ * Clamps a distance from the top of the window so the whole row fits in the current content area; a
+ * row taller than the area keeps its start at the top. A remembered distance is clamped again when it
+ * is used, because the window may now be shorter (`docs/PRODUCT.md` §7.1, §16.1).
+ */
+export function clampRowTop(row: Element, top: number): number {
+  const { height } = row.getBoundingClientRect()
+  const viewport = viewportBounds()
+  const lowest = Math.max(viewport.top, viewport.bottom - Math.min(height, viewport.bottom - viewport.top))
+  return Math.min(Math.max(top, viewport.top), lowest)
+}
+
+/** Scrolls the content so the row sits at the clamped target distance from the top of the window. */
+export function alignRowAt(row: Element, top: number): void {
+  scrollViewportBy(row.getBoundingClientRect().top - clampRowTop(row, top))
+}
+
 /** A shrinking extent can clamp native scroll before the measured layout's commit effect runs. */
 export function scrollViewportAfterMeasurement(deltaY: number, beforeTop: number): void {
   const element = viewportScroller()

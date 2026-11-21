@@ -1,4 +1,5 @@
 import {
+  alignRowAt,
   onViewportLayout,
   onViewportScroll,
   refreshViewportContext,
@@ -16,6 +17,8 @@ interface RevealIntent {
   isCurrent: () => boolean
   cursor?: number
   region?: () => DOMRect | undefined
+  /** A remembered distance of the row from the top of the window (`docs/PRODUCT.md` §7.1). */
+  top?: number
 }
 
 /** One navigation's geometry projection; it never writes focus, caret, selection or document state. */
@@ -63,7 +66,8 @@ export function createViewportReveal() {
       const rect = intent.region()
       if (rect === undefined) return
       centerRectInViewport(rect)
-    } else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
+    } else if (intent.top !== undefined) alignRowAt(element, intent.top)
+    else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
     else {
       let rect = caretLineRect(element as HTMLElement, intent.cursor)
       const agendaRow = element.closest<HTMLElement>('.agenda-row')
@@ -95,6 +99,12 @@ export function createViewportReveal() {
   const beginLine = (element: () => HTMLElement | undefined, cursor: number, isCurrent: () => boolean): void => {
     cancel()
     intent = { element, cursor, keepContext: true, isCurrent }
+    rememberScroll()
+    correct()
+  }
+  const beginAt = (element: Element, top: number, isCurrent: () => boolean): void => {
+    cancel()
+    intent = { element: () => element, top, keepContext: false, isCurrent }
     rememberScroll()
     correct()
   }
@@ -133,5 +143,5 @@ export function createViewportReveal() {
       globalThis.removeEventListener('resize', onResize)
     }
   }
-  return { begin, beginLine, beginRegion, hasLine, correct, cancel, mount }
+  return { begin, beginAt, beginLine, beginRegion, hasLine, correct, cancel, mount }
 }

@@ -169,31 +169,6 @@ Support requires at least one important scenario that current persistence and sy
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
 - 2026-11-03 — Repository fact: PRODUCT §§24–25 and the browser/desktop archive implementations supersede the original absence-of-export premise. The recorded status is unchanged; any further experiment must assess the existing workflows first.
 
-## PD-007: Where the parent's row stands after leaving a node
-
-Kind: product
-Status: Idea
-
-### Question
-
-`docs/PRODUCT.md` §7.1 restores the previous current parent and selects the node the user entered from, but no section says where that row appears in the window. The general rule of §20.8 then applies, and a row far from the top is centered as a distant destination. So the row can stand in a different place than before entering the node, which reads as a jump on a round trip.
-
-### What we are watching
-
-Round trips with `Cmd+.`/`gd` and `Cmd+,`/`Ctrl+o` in long locations: whether the user loses their place when the parent's row returns somewhere other than where they left it.
-
-### What would settle it
-
-A Product Owner choice stated in §7.1: restore the row at the window position it had before entering, or keep the §20.8 reveal. Either choice needs an Electron test of the row position after a round trip.
-
-### Product Owner perspective
-
-Product Owner statement (2026-11-21): record this as a product question; the recommendation is to restore the previous position.
-
-### Evidence
-
-- 2026-11-21 — Usage evidence (survey of late layout changes recorded in `81e46a0`, candidate 4, at `0f2fb33`): in a 600 px window, the selected row stood at 556 px before `gd` and at 317 px after `Ctrl+o`. Each command was one transition with no intermediate frame.
-
 ## TD-001: Whether a written rule is the right response to a recurring defect
 
 Kind: technical

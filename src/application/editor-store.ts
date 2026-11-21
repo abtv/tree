@@ -58,6 +58,7 @@ import {
   moveSelectionBoundaryTransition,
   openBelowTransition,
   pasteSubtreeTransition,
+  type LocationTransition,
   type SiblingInsertionPosition,
   type StructuralTransition,
 } from './editor-command-transitions'
@@ -101,6 +102,7 @@ import { departedViewOwners, releaseViews } from './expansion-view-retention'
 import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { AgendaFoldMemory } from './agenda-fold-memory'
+import { ReturnPositions } from './return-positions'
 import {
   activeAgendaOccurrence,
   focusedAgendaDay,
@@ -142,6 +144,7 @@ export class EditorStore {
   private readonly tags = new Map<TagPrefix, TagCatalog>(TAG_PREFIXES.map((prefix) => [prefix, new TagCatalog(prefix)]))
   private readonly agendaRowsCache = new AgendaRowsCache()
   private readonly agendaFoldMemory = new AgendaFoldMemory()
+  private readonly returnPositions = new ReturnPositions()
   private visibleRowsCache:
     | {
         document: Document
@@ -174,6 +177,9 @@ export class EditorStore {
     for (const catalog of this.tags.values()) catalog.update(state.document)
     this.searchOwner.update(state)
     this.recentNodesOwner.update(state.document, Boolean(state.hideFinishedTasks))
+    // While Agenda is open, the Tree location it returns to is still the user's path.
+    const treeLocation = state.agenda?.origin.location ?? state.location
+    this.returnPositions.retainPath(state.document, treeLocation.currentParentId)
   })
   // History records only the published document, so departing owners come from the published views.
   private readonly history = new EditorHistory(attachmentSummary, (recorded, replacement) =>
@@ -1139,6 +1145,12 @@ export class EditorStore {
     const transition = enterTransition(state.document, location)
     if (transition === undefined) return
     this.recentNodesOwner.remember(location.selectedNodeId, state.document)
+    // Agenda's rows are not the list going back shows, so entering from Agenda records no position.
+    const rowTop = state.agenda === undefined ? this.readSelectedRowTop?.() : undefined
+    // An entry without a measurement must not leave an older position of the same node in place.
+    if (rowTop !== undefined && Number.isFinite(rowTop))
+      this.returnPositions.remember(location.selectedNodeId, location.currentParentId, rowTop)
+    else this.returnPositions.forget(location.selectedNodeId)
     this.endTextSession()
     const tree = { ...state }
     delete tree.agenda
@@ -1185,11 +1197,19 @@ export class EditorStore {
       {
         ...state,
         location: transition.location,
-        focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        focus: this.returnFocus(transition),
       },
       true,
     )
     this.markPersistedChange()
+  }
+
+  /** Going back returns the entered node's row to where it stood (`docs/PRODUCT.md` §7.1). */
+  private returnFocus(transition: LocationTransition): FocusIntent {
+    const focus = this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor)
+    const { currentParentId, selectedNodeId } = transition.location
+    const returnRowTop = this.returnPositions.take(selectedNodeId, currentParentId)
+    return returnRowTop === undefined ? focus : { ...focus, returnRowTop }
   }
 
   public navigateToAncestor(parentId: NodeId | null): void {
@@ -1201,7 +1221,7 @@ export class EditorStore {
       {
         ...state,
         location: transition.location,
-        focus: this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
+        focus: this.returnFocus(transition),
       },
       true,
     )

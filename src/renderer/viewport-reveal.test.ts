@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createViewportReveal } from './viewport-reveal'
-import { centerRectInViewport, notifyViewportLayout, revealInViewport, revealRectInViewport } from './scroll-viewport'
+import {
+  alignRowAt,
+  centerRectInViewport,
+  notifyViewportLayout,
+  revealInViewport,
+  revealRectInViewport,
+} from './scroll-viewport'
 import { caretLineRect } from './editor-dom'
 
 vi.mock('./editor-dom', () => ({ caretLineRect: vi.fn(() => new DOMRect(0, 700, 400, 20)) }))
@@ -11,6 +17,7 @@ vi.mock('./scroll-viewport', async (original) => ({
   revealInViewport: vi.fn(),
   revealRectInViewport: vi.fn(),
   centerRectInViewport: vi.fn(),
+  alignRowAt: vi.fn(),
 }))
 
 let notify: () => void
@@ -181,6 +188,28 @@ describe('viewport reveal lifecycle', () => {
 
     expect(observed.size).toBe(0)
     expect(revealRectInViewport).toHaveBeenCalledTimes(2)
+  })
+
+  // @requirement PRODUCT.md §7.1
+  it('keeps a returning row at its remembered top while layout settles until deliberate scrolling', () => {
+    const { row, reveal } = fixture()
+
+    reveal.beginAt(row, 420, () => true)
+
+    expect(alignRowAt).toHaveBeenLastCalledWith(row, 420)
+    expect(observed.size).toBe(3)
+
+    notifyViewportLayout()
+    notify()
+
+    expect(alignRowAt).toHaveBeenCalledTimes(3)
+    expect(revealInViewport).not.toHaveBeenCalled()
+
+    document.dispatchEvent(new Event('wheel'))
+    notifyViewportLayout()
+
+    expect(alignRowAt).toHaveBeenCalledTimes(3)
+    expect(observed.size).toBe(0)
   })
 
   it('replaces a line destination and relinquishes it on deliberate scrolling', () => {
