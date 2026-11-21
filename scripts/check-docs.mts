@@ -150,6 +150,10 @@ const WORKFLOW_POLICY_REFERENCE = '<!-- workflow-policy-reference: AGENTS.md -->
 const VALIDATION_MECHANICS_REFERENCE = '<!-- validation-mechanics-reference: docs/DEVELOPMENT.md -->'
 const OPEN_QUESTIONS_DECLARATION = '> This document is non-normative.'
 export const AGENT_CORE_MAX_BYTES = 24 * 1024
+// The binding agent rules share one budget, so that growth cannot move from a capped file to an
+// uncapped one. A new rule replaces or shortens existing text; raising the budget is an owner decision.
+export const AGENT_RULE_DOCUMENTS = ['AGENTS.md', 'docs/AGENT_WORKFLOW.md', 'docs/AGENT_ROLES.md'] as const
+export const AGENT_RULES_MAX_BYTES = 106_930
 const WORKFLOW_PROCEDURES = 'docs/AGENT_WORKFLOW.md'
 const REQUIRED_WORKFLOW_ROUTES = [
   '1. Project Role',
@@ -190,6 +194,23 @@ export function validateAgentCore({
     }
   }
   return issues
+}
+
+export function validateAgentRuleBudget({
+  sizes,
+  limit = AGENT_RULES_MAX_BYTES,
+}: {
+  sizes: Readonly<Record<string, number>>
+  limit?: number
+}) {
+  const total = Object.values(sizes).reduce((sum, size) => sum + size, 0)
+  if (total <= limit) return []
+  const parts = Object.entries(sizes)
+    .map(([path, size]) => `${path} ${size}`)
+    .join(', ')
+  return [
+    `agent rules: ${total} UTF-8 bytes (${parts}) exceed the ${limit}-byte budget; replace or shorten existing rules instead of adding text`,
+  ]
 }
 
 export function validateAdr({
@@ -707,7 +728,10 @@ function collectLiveDocuments(rootDirectory: string) {
     'SECURITY.md',
     'VIM_CONFORMANCE.md',
     'AGENT_WORKFLOW.md',
+    'AGENT_ROLES.md',
     'WORKING_WITH_AGENT.md',
+    'SECURITY_AUDIT.md',
+    'releasing.md',
   ]) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
@@ -724,12 +748,18 @@ function collectLiveDocuments(rootDirectory: string) {
       if (entry.isFile() && entry.name.endsWith('.md')) documents.add(join(plans, entry.name))
     }
   }
+  // Nested instructions, every README, and the shared agent skills are live documents too.
+  const skills = join(rootDirectory, '.agents')
   const walk = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         if (SKIPPED_DIRECTORIES.has(entry.name)) continue
         walk(join(directory, entry.name))
-      } else if (entry.name === 'AGENTS.md') {
+      } else if (
+        entry.name === 'AGENTS.md' ||
+        entry.name === 'README.md' ||
+        (entry.isFile() && entry.name.endsWith('.md') && directory.startsWith(skills))
+      ) {
         documents.add(join(directory, entry.name))
       }
     }
@@ -822,6 +852,14 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
         procedureContent: existsSync(procedurePath) ? readFileSync(procedurePath, 'utf8') : undefined,
       }),
     )
+  }
+  if (include('structure')) {
+    const sizes: Record<string, number> = {}
+    for (const path of AGENT_RULE_DOCUMENTS) {
+      const filePath = join(rootDirectory, path)
+      if (existsSync(filePath)) sizes[path] = Buffer.byteLength(readFileSync(filePath, 'utf8'), 'utf8')
+    }
+    issues.push(...validateAgentRuleBudget({ sizes }))
   }
   if (include('structure') && existsSync(agentPath) && existsSync(developmentPath)) {
     issues.push(

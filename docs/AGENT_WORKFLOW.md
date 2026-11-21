@@ -42,13 +42,13 @@ Apply the standing delegation authorization and tool/model boundaries in [AGENTS
 
 ## 2. Source of Truth
 
-The complete source-ownership and conflict rule is in `AGENTS.md` §2. This supplement belongs to its workflow policy; it does not create another source of product or architecture requirements.
+See `AGENTS.md` §2.
 
 ---
 
 ## 3. Language
 
-Apply `AGENTS.md` §3 to every repository artifact, including this supplement. Conversation language does not change the repository language.
+See `AGENTS.md` §3.
 
 ---
 
@@ -138,13 +138,13 @@ Open questions need a moment when the Product Owner actually sees them, or they 
 
 ## 6. Architecture Changes
 
-The complete architectural and technical decision boundary is in `AGENTS.md` §6. Use the recommendation format in its §1 before a reserved decision. Do not ask again for decisions already covered by explicit authorization unless new evidence changes their consequences.
+See `AGENTS.md` §6.
 
 ---
 
 ## 7. Domain and UI Separation
 
-The complete separation and domain-testability rule is in `AGENTS.md` §7. It applies to all implementation procedures below.
+See `AGENTS.md` §7.
 
 ---
 
@@ -365,6 +365,8 @@ Update documentation when a change affects:
 * important technical decisions.
 
 Do not duplicate the same information across multiple documents unless there is a clear reason.
+
+Before adding a rule after a defect or a process failure, check whether a test, check script, hook or permission rule can detect that failure. If one can, add it first and write prose only for what it cannot detect. `npm run check:docs` holds `AGENTS.md`, this document and `docs/AGENT_ROLES.md` to one byte budget: a new rule replaces or shortens existing text, and only the Product Owner raises the budget.
 
 Keep each document focused on its responsibility:
 

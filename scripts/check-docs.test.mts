@@ -37,7 +37,9 @@ import {
   validateProductIndex,
   validateWorkflowOwnership,
   validateAgentCore,
+  validateAgentRuleBudget,
   AGENT_CORE_MAX_BYTES,
+  AGENT_RULES_MAX_BYTES,
 } from './check-docs.mts'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mts'
 
@@ -732,6 +734,53 @@ describe('agent instruction routing', () => {
     writeFile(root, 'AGENTS.md', routes + 'a'.repeat(AGENT_CORE_MAX_BYTES))
 
     expect(runChecks({ rootDirectory: root }).issues).toContainEqual(expect.stringContaining('UTF-8 bytes exceeds'))
+  })
+
+  it('holds the core, the procedures and the roles to one shared byte budget', () => {
+    const atLimit = { 'AGENTS.md': 100, 'docs/AGENT_WORKFLOW.md': 200, 'docs/AGENT_ROLES.md': 50 }
+
+    expect(validateAgentRuleBudget({ sizes: atLimit, limit: 350 })).toEqual([])
+    expect(validateAgentRuleBudget({ sizes: { ...atLimit, 'AGENTS.md': 101 }, limit: 350 })).toEqual([
+      'agent rules: 351 UTF-8 bytes (AGENTS.md 101, docs/AGENT_WORKFLOW.md 200, docs/AGENT_ROLES.md 50) exceed the 350-byte budget; replace or shorten existing rules instead of adding text',
+    ])
+  })
+
+  it('fails the repository check when growth moves from the capped core into the other rule documents', () => {
+    const root = createTemporaryRoot()
+
+    writeFile(root, 'AGENTS.md', routes)
+    writeFile(root, 'docs/AGENT_WORKFLOW.md', procedureContent)
+    writeFile(root, 'docs/AGENT_ROLES.md', 'é'.repeat(AGENT_RULES_MAX_BYTES / 2))
+
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([expect.stringContaining('agent rules:')])
+  })
+
+  it('checks links in the role, release and audit documents, every README and the agent skills', () => {
+    const root = createTemporaryRoot()
+
+    writeFile(root, 'AGENTS.md', routes)
+    writeFile(root, 'docs/AGENT_WORKFLOW.md', procedureContent)
+    for (const path of [
+      'docs/AGENT_ROLES.md',
+      'docs/releasing.md',
+      'docs/SECURITY_AUDIT.md',
+      'deployment/github-pages/README.md',
+      '.agents/skills/example/SKILL.md',
+      '.agents/skills/example/references/notes.md',
+    ]) {
+      writeFile(root, path, '[Missing](MISSING.md)\n')
+    }
+
+    expect(runChecks({ rootDirectory: root, group: 'links' }).issues.sort()).toEqual(
+      [
+        '.agents/skills/example/SKILL.md: link target not found: MISSING.md',
+        '.agents/skills/example/references/notes.md: link target not found: MISSING.md',
+        'deployment/github-pages/README.md: link target not found: MISSING.md',
+        'docs/AGENT_ROLES.md: link target not found: MISSING.md',
+        'docs/SECURITY_AUDIT.md: link target not found: MISSING.md',
+        'docs/releasing.md: link target not found: MISSING.md',
+      ].sort(),
+    )
   })
 })
 
