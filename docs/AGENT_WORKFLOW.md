@@ -253,7 +253,7 @@ Record the inspected states, command, and artifact location separately from auto
 
 When fixing a reported defect:
 
-1. Reproduce the defect before changing the implementation.
+1. Run `npm run fix:history` (`docs/DEVELOPMENT.md` §10) and report a possible shared cause under §12. Reproduce the defect before changing the implementation. When the suites missed an owner-reported defect, name the test level that should have caught it (`docs/DEVELOPMENT.md` §9).
 2. Add or extend a regression test at the appropriate level that fails because of the defect.
 3. Implement the fix.
 4. Confirm that the regression test passes.

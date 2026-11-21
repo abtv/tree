@@ -17,11 +17,12 @@ Read this core at session start. It owns workflow policy. [Agent Workflow Proced
 | Interpreting an ambiguous request, prototyping, or delegating | [Procedures §1](docs/AGENT_WORKFLOW.md#1-project-role); `docs/AGENT_ROLES.md` before delegation |
 | Editing files, running commands, requesting permissions, or managing processes/artifacts | [Procedures §4](docs/AGENT_WORKFLOW.md#4-general-working-rules) |
 | Planning or implementing product behavior, resolving gaps, or handling open questions | [Procedures §5](docs/AGENT_WORKFLOW.md#5-product-changes) |
-| Planning an initiative, handling a review batch, or writing an ADR | [Procedures §8](docs/AGENT_WORKFLOW.md#8-plans-and-architecture-decisions) |
+| Planning an initiative, handling a review batch, writing an ADR, or resuming work (`continue`, `status`) | [Procedures §8](docs/AGENT_WORKFLOW.md#8-plans-and-architecture-decisions) |
 | Fixing a defect or changing implementation/tests | [Procedures §9](docs/AGENT_WORKFLOW.md#9-tests) |
 | Selecting or reporting validation | [Procedures §10](docs/AGENT_WORKFLOW.md#10-validation); `docs/DEVELOPMENT.md` §9 |
 | Changing documentation or README imagery | [Procedures §11](docs/AGENT_WORKFLOW.md#11-documentation) |
 | Committing, resuming unfinished work, or handing off | [Procedures §12](docs/AGENT_WORKFLOW.md#12-git) |
+| Preparing a release | [macOS releases](docs/releasing.md) |
 | Claiming completion or selecting review roles | [Procedures §13](docs/AGENT_WORKFLOW.md#13-completion-criteria) |
 | Asking for an owner decision | [Procedures §14](docs/AGENT_WORKFLOW.md#14-when-to-ask-the-product-owner) |
 
