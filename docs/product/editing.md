@@ -178,7 +178,7 @@ When the editable current parent is selected:
 * after `Enter`, the new child is selected and the text cursor moves to the beginning of its empty text;
 * `↓` selects the first child and preserves the horizontal cursor position as much as possible, clamping it to the child's text length;
 * if the parent has no children, `↓` keeps the parent selected and places the caret at the end of the parent's text;
-* `↑` moves the caret to the beginning of the parent's text;
+* `↑` follows §4.1;
 * `Cmd+.` does nothing.
 
 Example:
