@@ -111,6 +111,30 @@ test.describe('Image space reserved from the stored size', () => {
   })
 
   // @requirement PRODUCT.md §17.1
+  test('zo keeps the row below in place when an image with a stored size cannot be loaded', async ({ userDataDir }) => {
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    seedDocument(userDataDir, {
+      document: { roots: rows({ index: 2, id: 'picture-node', parent: true }) },
+      location: { currentParentId: null, selectedNodeId: 'row-2' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+
+    await expect(window.locator('[data-node-id="row-3"]')).toBeVisible()
+
+    await startProbe(window, 'row-3')
+    await window.keyboard.press('z')
+    await window.keyboard.press('o')
+    await expect(window.locator('[data-node-id="picture-node"]')).toContainText('Image could not be loaded.')
+    // Let several animation frames paint the message.
+    await window.waitForTimeout(300)
+
+    const tops = await paintedTops(window)
+
+    expect(tops.length).toBeGreaterThan(0)
+    expect(tops).toEqual([tops[0]])
+  })
+
+  // @requirement PRODUCT.md §17.1
   test('G to the last of 600 rows keeps it in place while an image nine rows above loads', async ({ userDataDir }) => {
     seedPicture(userDataDir)
     seedDocument(userDataDir, {

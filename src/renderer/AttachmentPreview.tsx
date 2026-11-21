@@ -90,9 +90,10 @@ function useAttachmentImage(
   return { state, onImageError }
 }
 
-function ImageErrorMessage(): React.JSX.Element {
+/** With a reserved box, the message keeps at least the image's height, so the rows below stay in place. */
+function ImageErrorMessage({ box }: { box?: ImageBox | undefined }): React.JSX.Element {
   return (
-    <p className="attachment-error" role="status">
+    <p className="attachment-error" role="status" style={box === undefined ? undefined : { minHeight: box.height }}>
       {IMAGE_LOAD_ERROR}
     </p>
   )
@@ -138,7 +139,7 @@ export function AttachmentImage({
     // size keeps the rows below it from shifting when the bytes arrive.
     return size === undefined ? null : <span aria-hidden="true" className="attachment-placeholder" style={size} />
   }
-  if (state.status === 'error') return <ImageErrorMessage />
+  if (state.status === 'error') return <ImageErrorMessage box={size} />
   return (
     <button
       aria-label="Open image preview"

@@ -171,6 +171,20 @@ describe('AttachmentImage', () => {
     expect(screen.queryByRole('button', { name: 'Open image preview' })).not.toBeInTheDocument()
   })
 
+  // @requirement PRODUCT.md §17.1
+  it('keeps the reserved height for the message when an image with a stored size cannot be loaded', async () => {
+    mockTreeApi({ readAttachment: async () => null })
+    const { container } = render(
+      <AttachmentImage attachmentId="lost" width={400} height={300} onOpen={() => undefined} />,
+    )
+
+    expect(container.querySelector('.attachment-placeholder')).toHaveStyle({ height: '150px' })
+
+    const message = await screen.findByText('Image could not be loaded.')
+
+    expect(message).toHaveStyle({ minHeight: '150px' })
+  })
+
   it('reports a failed attachment read without rejecting', async () => {
     mockTreeApi({
       readAttachment: async () => {

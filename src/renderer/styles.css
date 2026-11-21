@@ -1596,11 +1596,14 @@ body.node-drag-invalid * {
   margin: 6px;
 }
 
-.node-input-image-only + .attachment-placeholder {
+/* The load-error message stands in for the image in the same way. */
+.node-input-image-only + .attachment-placeholder,
+.node-input-image-only + .attachment-error {
   margin-top: -1px;
 }
 
-.vim-state-insert .node-input-image-only:focus + .attachment-placeholder {
+.vim-state-insert .node-input-image-only:focus + .attachment-placeholder,
+.vim-state-insert .node-input-image-only:focus + .attachment-error {
   margin-top: 6px;
 }
 
