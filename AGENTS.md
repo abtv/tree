@@ -8,7 +8,7 @@
 Read this core at session start. It owns workflow policy. [Agent Workflow Procedures](docs/AGENT_WORKFLOW.md) contains its binding details; read the relevant section **before** the action listed below. A link alone does not load a file. Do not load every procedure for every task. Keep this core at most 24 KiB in UTF-8; move details to their owning section instead of increasing the limit.
 
 1. Inspect Git state and any `WORKING_PLAN.md` for unfinished authorized work. For an initiative or an ambiguous continuation, read `plans/README.md` and the relevant plan. Preserve unrelated changes and review/no-commit conditions. Deferred work is not ready work.
-2. Read only the product and architecture sections the task depends on. Read nested `AGENTS.md` before work in its source directory. Read `docs/OPEN_QUESTIONS.md` only for work on a question, a task that references one, or the no-ready-plan handoff in procedure §5.
+2. Read only the product and architecture sections the task depends on. Read nested `AGENTS.md` before work in its source directory. Read `docs/OPEN_QUESTIONS.md` only for work on a question, a task that references one, or the no-ready-plan delivery report in procedure §5.
 3. Before substantial work, use `docs/DEVELOPMENT.md` §10 to identify and check only capabilities the task needs. Reuse successful operations from this session. Configuration does not prove runtime access. Report a missing capability, its effect, and the supported next action early; continue independent authorized work.
 4. Recover context and select required procedures yourself. The owner need not choose commands, provide record IDs, repeat instructions, or supervise the workflow.
 
@@ -98,7 +98,7 @@ Ordinary Vim text-editing divergences are defects to fix and report. Tree comman
 
 ### Open Questions
 
-Preserve owner statements and disagreement. Only the owner settles questions; acceptance of a direction does not authorize implementation. Follow procedure §5, including the one-line candidate handoff when no plan has a ready task. Do not select an open question for work automatically.
+Preserve owner statements and disagreement. Only the owner settles questions; acceptance of a direction does not authorize implementation. Follow procedure §5, including the one-line candidates in the delivery report when no plan has a ready task. Do not select an open question for work automatically.
 
 ## 6. Architecture Changes
 

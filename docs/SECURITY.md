@@ -318,7 +318,7 @@ The protections differ by tool:
 | --- | --- | --- |
 | Codex primary | `workspace-write`, approval-on-request, and configured network access; the sandbox limits filesystem scope but does not restrict individual shell commands | repository workflow, command safety, and role behavior |
 | Codex planner/reviewer | read-only sandbox configured in role defaults; actual session permissions may override those defaults | inspection-only shell fallback, no edits and no tests; web research is allowed for the planner and forbidden for the reviewer; see `AGENT_ROLES.md` for observed runtime limits |
-| Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test/build/lint command list and no-edits rule |
+| Codex product verifier | project-scoped `workspace-write` with network disabled; the sandbox does not restrict which command runs | documented test and build command list and no-edits rule |
 | Claude Code primary and subagents | configured macOS sandbox for ordinary Bash commands, restricted network domains and selected secret environment variables; explicitly excluded workflows run outside the sandbox under permission rules | shared role behavior, no-edits rules for read-only roles, and restrictions beyond the configured sandbox and permission patterns |
 
 These boundaries reduce accidental access and unsafe tool use; they do not make execution of malicious repository code safe. The primary agent remains responsible for reviewing the repository, validation commands, and generated changes before commit.
