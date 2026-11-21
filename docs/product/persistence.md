@@ -68,7 +68,7 @@ On launch, the application scrolls so the selected node's row sits at the same d
 
 Scrolling by the user is a pending change like a selection change, and every save, including the quit flush, records the position shown at that moment.
 
-The scroll position is restored only at launch; navigating within a running session scrolls as before.
+The scroll position is restored only at launch; the restore does not apply to navigation within a running session.
 
 The exact text cursor position does not need to be persisted.
 
@@ -96,4 +96,4 @@ Quitting and closing the window from the locked state still attempt a final save
 
 The quit confirmation takes focus above other open surfaces, including About, Search and a Find draft. Cancel restores the previous surface and its input. The user can immediately retry a reported save failure.
 
-A failed save, including when the storage is full, must never destroy or damage the previously saved document. The next launch opens the newest stored version that can be parsed and validated, whether it is the primary file, a retained generation, or an interrupted save.
+A failed save, including when the storage is full, must never destroy or damage the previously saved document. The next launch opens the document that the load rule of §16.1 selects.
