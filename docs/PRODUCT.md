@@ -37,4 +37,4 @@ A number whose content leaves the specification is listed here with the document
 
 | Number | Now owned by |
 | --- | --- |
-| 1.4.1 | [macOS releases](releasing.md): release identity, tag reservation, and retries. [Development Guide, Full Validation](DEVELOPMENT.md#9-full-validation): validation gates before publication. [Security Policy](SECURITY.md#browser-publication): signed manifest and publisher trust. [Automatic browser publication](../deployment/github-pages/README.md): asset retention, limits, and the cancellation rule. |
+| 1.4.1 | [macOS releases](releasing.md): release identity, tag reservation, and retries. [Development Reference, GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions): validation gates before publication. [Security Policy](SECURITY.md#browser-publication): signed manifest and publisher trust. [Automatic browser publication](../deployment/github-pages/README.md): asset retention, limits, and the cancellation rule. |

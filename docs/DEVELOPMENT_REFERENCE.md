@@ -1,0 +1,351 @@
+# Development Reference
+
+Read this document on demand: it holds CI, Linux container, README media, agent tool configuration and historical-measurement material, while the [Development Guide](DEVELOPMENT.md) owns the rules that every session needs.
+
+## 1. Validation Infrastructure
+
+### Chromium container tests
+
+The Product Owner granted standing authorization on 2026-11-05 to run Linux
+Electron E2E tests in Docker through the project's isolated
+`npm run test:e2e:linux` workflow. Do not request conversational approval again
+for these runs. This authorization covers using the prepared local dependency
+image with the runner's fixed isolation settings; dependency preparation remains
+owner-operated as described below. Platform sandbox permissions remain enforced.
+If a client has not loaded a matching command rule, use its supported execution
+approval mechanism; the absence of that rule does not revoke the owner's decision.
+
+For the Linux Electron migration, the owner accepted the existing minimatch
+advisory GHSA-g3hv-75wg-m249 and its transitive audit entries on 2026-11-05.
+Do not request that initiative's risk acceptance again. This was a scoped
+exception, not a passing audit or authorization to suppress audits, change
+dependencies, or accept other advisories.
+
+For the stable outline spacing and scroll-rendering change, the owner accepted
+the same existing minimatch advisory and its 17 moderate transitive audit entries
+on 2026-11-07, without dependency changes. This exception covers that UI change
+only; it does not make the audit pass or extend acceptance to future tasks.
+
+For people and event markers, the owner accepted the same no-fix minimatch
+advisory GHSA-g3hv-75wg-m249 and its 17 moderate direct/transitive audit entries
+on 2026-11-10, without dependency changes. This exception covers that feature
+only; it does not make the audit pass or authorize suppressing future audits.
+
+Use `npm run test:web:chromium` for the full built-browser suite in Linux arm64 Chromium. It copies current source into a disposable container and runs `test:web:built` there. It accepts no arguments, disables external networking, drops all capabilities, prohibits privilege escalation, and limits processes, memory, and CPUs. It mounts no host directories or Docker socket and publishes no ports. Build output, browser profiles, and failure artifacts remain inside the container and disappear after exit; test results stream to the terminal. This does not replace macOS Electron validation or Chrome-specific checks.
+
+Use `npm run test:smoke:linux` for both Linux smoke checks in the same prepared image; `make test-smoke` includes these after the macOS checks. This command also accepts no arguments and retains the full-suite runner's isolation settings. It transfers the current sources, smoke configuration and the Electron launch helpers without Electron screenshot baselines or host build output. The container builds Electron and the browser package, runs Electron under Xvfb, then runs Chromium even if the Electron check failed. Any failed check fails the command. The entry point permits only the fixed full-browser, smoke, Electron E2E or memory modes; it cannot select external scripts, profiles, origins or Docker options.
+
+Use `npm run test:e2e:linux`, without arguments, for the Linux Electron functional
+subset. The same prepared image receives current sources and builds
+Electron before running `config/testing/playwright.linux.config.ts` under Xvfb.
+It uses four workers, no retries and a 15-minute child-process deadline. Failure
+or timeout fails the command; remaining descendants are removed with the container.
+
+Use `npm run test:e2e:memory`, without arguments, for the Linux Electron memory
+guards and detector self-checks in the same prepared image. It selects a fixed `memory` container mode,
+builds Electron, and runs `config/testing/playwright.memory.config.ts` under Xvfb
+with the same isolation and 15-minute deadline. No dependencies are installed and
+no host environment overrides are forwarded. The host preserves a unique output log
+under `reports/electron-memory/`; CI also retains sample attachments and failure traces.
+
+`config/testing/electron-platforms.ts` owns the explicit Linux file list and the
+small shared launch/reset/text-clipboard overlap. In mixed specs, `{ tag: '@linux' }`
+selects independent functional cases. New files and untagged cases in mixed files
+default to macOS; tests added to a Linux-owned file inherit that file's ownership.
+Keep image clipboard, native selection, window/updater integration and all screenshot
+comparisons on macOS. A passing Linux run does not establish native macOS behavior.
+The discovered union and exact overlap are checked by
+`scripts/electron-platforms.test.mts`. Shared clipboard scenarios use stable
+`@shared-clipboard-text` and `@shared-clipboard-link` tags; discovery requires
+both editing modes on both platforms, independently of test titles.
+Electron tests and helpers import `expect` from `fixtures.ts` or
+`platform-expect.ts`. The latter rejects `toHaveScreenshot` and `toMatchSnapshot`
+on Linux at runtime, including assertions called through helpers; macOS keeps
+the original Playwright matchers. ESLint rejects direct Playwright `expect`
+imports and re-exports outside that owner. Diagnostic `page.screenshot()` calls
+remain available on both platforms. Do not add conditional skips or weaken
+assertions to move a case.
+
+The complete local command remains `npm run test:e2e`. Run just the macOS
+complement with `npm run test:e2e -- --config=config/testing/playwright.macos.config.ts`.
+It preserves the original projects and snapshot paths. The allocation changes
+where functional cases run, not their bodies or editing-mode parameterization.
+
+Linux uses its native scrollbar geometry; the zero-width overlay-scrollbar
+assertion and Apple user-defaults argument remain macOS-only. Both platforms
+retain the canonical renderer scale assertion, hidden-window and shortcut guards,
+clipboard lock and process ownership. The renderer keeps its Apple shortcut
+profile, including `Meta`. Linux image clipboard, native pointer selection and
+macOS screenshot comparisons are outside the Linux subset. No screenshot baselines are
+transferred or generated intentionally, and no production CSS is changed.
+
+Each smoke invocation reports elapsed time including its runner, application/browser startup and successful cleanup, and fails if it exceeds 20 seconds. Dependency-image preparation, source transfer, container startup and production builds are outside that budget. At 25 seconds the container supervisor forcibly kills a hung command so it can report failure and run the other target. Any remaining descendants stay inside the disposable container and are destroyed when its entry process exits after both bounded invocations. The container sets `CI=1` for smoke children so Linux Electron can run without its Chromium sandbox in this offline disposable environment. Linux arm64 container timings are local evidence, not measurements of the GitHub runner. The smoke scenario is described under [Cross-platform smoke checks](#cross-platform-smoke-checks).
+
+Browser tests run files across four workers locally and in CI, with tests inside each file remaining sequential. Each worker owns its browser and virtual clipboard; persistent profiles use test-specific output paths. The local container is limited to four CPUs, 4 GiB of memory, and 2048 processes/threads; the former 512-task limit exhausted Chromium's thread budget with four workers. OrbStack's global resource limits must allow those resources.
+
+Docker must be running. The Product Owner prepares dependencies manually from the repository root:
+
+```bash
+make setup
+```
+
+This builds the dependency image using Docker's cache and needs network access. Agents must not execute this target, build or pull images, or install dependencies for this workflow. If the image is missing or stale, the test command stops and asks the owner to run `make setup`. The Makefile defaults to help, not a build. The former `chromium-image` and `chromium-image-rebuild` targets are replaced by `setup`.
+
+Preparation uses `scripts/web/chromium.Dockerfile` and installs locked dependencies with lifecycle scripts disabled, then explicitly downloads the locked Electron binary through its installer. The Playwright base image supplies Chromium, Xvfb and browser system libraries; preparation adds the `xauth` utility needed by `xvfb-run` and installs `libbrotli1=1.1.0-2ubuntu0.1`, the Ubuntu 24.04 security update for the system Brotli decoder used by curl and Git. The Dockerfile replaces the base image's Node.js binary with Node.js 24.22.1 from a digest-pinned official Node image, so runtime security updates do not depend on a Playwright release. That binary replacement does not update Electron's embedded Node.js or the operating-system libraries. The Dockerfile-specific ignore file limits the build context to the package manifests. Both runners require an existing image and never build, pull or install dependencies. The image tag depends on dependency-related package fields, the parsed lockfile excluding the application version at its root and in `packages[""]`, the Dockerfile, its ignore file, and the separate build recipe in `scripts/web/chromium-image.mk`. The root Makefile includes that recipe; edits to its other commands or help do not change the image tag. Code, documentation, npm-script edits, and application version bumps alone reuse the image; dependency, other lockfile, or recipe changes require owner preparation. Each runner resolves the tag to a local immutable image ID before execution. Normalizing the lockfile changes the tag once; run `make setup` again for an image prepared before this change. Later `make release` runs do not require preparation unless installation inputs also change.
+
+In Codex, use host execution (`sandbox_permissions: "require_escalated"`) from the first invocation. `.codex/rules/chromium.rules` approves only the named full-browser, Linux-smoke and Linux Electron E2E npm workflows, not general Docker access. As with the existing npm permissions, the rule trusts mutable repository scripts and matches command arguments, not the working directory. Review runner, package script, Dockerfile, and rule changes together. It is not a security boundary against an agent that changes those files. Trust the project configuration and restart Codex after rule changes; native rule matching alone does not prove the current session loaded the rule.
+
+The folder-backup picker stub returns OPFS handles. Its reload cases in `e2e/web/backup.spec.mts` run on both Linux Chromium and macOS Chrome, checking persisted handles across documents and backup recovery. Playwright 1.63.0's Linux arm64 Chromium crashed when reading a stored OPFS handle after reload; the crash canary stopped reproducing in the Playwright 1.64.1 CI run. The canary and Linux skips were removed together so the backup scenarios now guard this behavior directly.
+
+The container's network restriction applies to test execution. It does not disable the coding agent's other network tools or revoke existing Docker permissions. Owner-only preparation is a workflow rule; enforcing it against an agent that can change the runner requires a separately protected launcher and host access controls.
+
+### GitHub Actions
+
+On each PR and push to main, `Test and build app` runs code/documentation/unit checks
+alongside one dependency audit. After both succeed, Linux/macOS smoke runs on every change.
+After both platform smoke jobs succeed, browser E2E, full Electron coverage across Linux
+and macOS, and Linux Electron memory tests run in parallel when the main push has an
+unpublished release version. A failed smoke job prevents these release suites from starting.
+An existing version tag on another commit makes the push ineligible, even when Web
+is behind macOS; ordinary checks and smoke still run.
+Browser E2E also
+runs weekly on Sunday at 03:00 UTC and on manual dispatch. The final `Check release version`
+job requires checks, audit, version detection and smoke to succeed, plus browser E2E,
+Electron E2E and Linux Electron memory tests for a release. A non-release run requires
+all three release suites to be skipped.
+PRs never dispatch publications or receive release credentials.
+
+A successful main run dispatches `Publish demo video and screenshots` and, only for
+a new version, `Release new app version`. Both consumers verify the exact successful
+main validation run, attempt and source SHA before publication. Browser bytes come
+from that validation run's artifact, without rebuilding. A shared gate reserves the
+immutable version tag at the validated SHA before Web and macOS release branches
+run independently; either failure makes the release red while preserving the other result.
+The source Web job waits for target deployment and checks every hosted byte.
+
+The built-in source token gets Actions write only in the publication dispatcher, to start
+these two source workflows. The cross-repository publishing App remains Contents-only.
+A failed target deployment requires the owner's retry through the link in the source job.
+Retry failed release jobs afterward; do not retransfer a completed version.
+Use **Re-run failed jobs** after an E2E or validation-prerequisite failure. The release gate reuses
+the successful browser job's immutable artifact ID, verifies its original identity
+and bytes, and preserves the package with the current attempt's provenance.
+Missing or expired artifacts require rerunning the producer and dependent jobs or all jobs.
+If only publication dispatch failed after the gate succeeded, rerun all jobs to renew
+the gate and package for the new attempt.
+
+Scheduled/manual dependency audits and Electron E2E/memory suites retain separate runs.
+Timing suites stay local. New source validation cancels superseded validation, but release
+publication is serialized without canceling in-flight work. Required checks and artifacts
+must remain available; an expired artifact or changed validation attempt fails closed.
+
+Full Electron CI runs weekly on Sunday at 02:00 UTC, manually, and for release
+candidates. Four `macos-15` shards run `playwright.macos.config.ts`; one
+`ubuntu-24.04` job runs `playwright.linux.config.ts` under Xvfb. Each macOS shard uses
+three workers; Linux uses four. Both have 12-minute job limits. Linux retains zero retries; macOS retains the
+regression configuration's single CI retry. The stable
+`Require all Electron E2E shards to pass` check requires both platform groups to
+succeed, including every macOS shard. Failure, cancellation and unexpected skips
+fail the gate. Failure artifacts include the platform, shard and run attempt.
+The separate Linux memory workflow also gates release candidates; its scope and
+limitations are described under [What the memory suite can detect](DEVELOPMENT.md#what-the-memory-suite-can-detect).
+
+This allocation replaces six macOS preparations with four plus one Linux
+preparation. Independent functional tests move to Linux; macOS retains native
+integration and screenshot checks. The initial allocation has 219 Linux cases,
+782 macOS cases and 22 shared boundary cases, covering all 979 original cases.
+These counts describe the migration, not quotas. Keep long functional/visual
+sequences together on macOS when splitting would duplicate their interactions.
+
+Measure savings from actual job start/completion durations, summing each
+platform separately and including dependency installation, builds and retries.
+Keep queue delay and total workflow elapsed time separate. Compare the same
+source snapshot and runner configuration when making a controlled claim. Local
+ARM64 Docker and macOS results verify execution but do not establish hosted
+AMD64 Linux timings or a percentage saving in GitHub runner-minutes.
+The first [hosted run](https://github.com/abtv/tree/actions/runs/42101828682)
+validated the allocation: its macOS jobs totaled 17.25 runner-minutes and Linux
+4.33, compared with 22.78 macOS runner-minutes in the earlier six-shard run.
+Those runs used different source snapshots, so this observation does not establish
+a controlled savings percentage. Keep the initial allocation until further
+hosted evidence justifies changing it.
+
+#### Scroll rendering regressions
+
+`tree-scroll-rendering.spec.ts`, `agenda-scroll-rendering.spec.ts`,
+`scroll-frames.spec.ts` and the search selection case in `recent-nodes.spec.ts`
+belong to the ordinary Electron E2E suite. Run them through `npm run test:e2e`
+or `make test-e2e`, or select a spec with `npm run test:e2e -- <spec>`.
+The existing full Electron CI workflow includes them for release candidates,
+weekly runs and manual dispatch. They have no separate PR/main invocation and
+are not included in `make test-smoke` or the `test:smoke:*` commands.
+The existing platform allocation keeps the Tree/Agenda and pixel-frame specs on
+macOS; `recent-nodes.spec.ts` runs on Linux. Browser smoke does not check scroll frames.
+
+The first two check continuous row coverage after large scroll jumps and preserve
+the pinned editor/caret in both editing modes. Coverage sums the union of visible
+row intervals, so internal holes cannot pass through their outer bounding box.
+The frame checks exercise wheel direction changes, wrapped rows, window resizing
+and delayed attachment growth in Tree and Agenda. Search (`Cmd+;`) additionally
+checks painted result content during arrows, wheel reversal, query refinement and
+resizing. Its sampled region lies inside the results list, excluding the header,
+footer, edge fades and underlying document. They decode sampled compositor
+PNGs through Electron and require ink in every 48-pixel band of a fixed central
+viewport region with dense synthetic text in light appearance. A painted blank
+band is the negative control: row geometry remains unchanged, but the detector
+must reject the captured pixels. Failure artifacts retain frame samples and traces.
+This detects empty sampled regions; it does not prove glyph fidelity, observe every
+presented frame, reproduce physical trackpad inertia, or enforce frame-time budgets.
+Timing checks remain local.
+
+The `recent-nodes.spec.ts` case matching
+`keeps selection visible in every animation frame` is mode-independent and runs in both
+appearances. It checks selected-row geometry on animation-frame callbacks;
+the light-appearance pixel case complements that check. The ordinary Electron E2E
+workflow retains failure artifacts. Neither check observes every presented frame.
+
+#### Cross-platform smoke checks
+
+Electron smoke logs the start and elapsed duration of startup, the Tree/Agenda scenario,
+Apple Vision OCR (on Apple Silicon), and cleanup. The last started phase identifies
+where a test timeout occurred; phase completion logs also run on failure and do not imply success.
+Electron launch uses the test timeout rather than a shorter startup deadline, so cold
+CI startup can use the available scenario budget without extending the overall smoke limit.
+
+`Run smoke tests` is reusable and runs inside `Test and build app` after code checks
+and audit pass. Its Linux and macOS jobs run in parallel with each other;
+release browser E2E starts only after both succeed.
+Linux checks Electron under Xvfb and Chromium; macOS checks Electron and real Safari.
+A failed Electron smoke does not skip browser smoke when its build succeeded.
+Both platform results gate publication. They supplement, rather than replace, full E2E.
+
+The shared happy path opens the production build with isolated synthetic data, types a parent, creates a sibling with Enter, and indents it with Tab. In the child it types `today`, checks the selected date suggestion, and accepts it with Enter without creating a node. It then types ` :cat`, checks the selected emoji suggestion, and accepts 🐱 with Tab without changing the child's depth. Both acceptances close their popup and retain editor focus. Additional text crosses the normal word-volume save threshold; the checks verify the persisted text and parent/child relationship through the real platform adapter without waiting for the idle timer or mocking persistence. Each target enables Vim through its menu and checks Quit/reopen as described below, including the restored text, hierarchy and Normal mode. It enters Insert with `i`, types a prefix, and returns to Normal with Escape, asserting both the text and mode transitions. Vim `/` search must then move from the child to its parent in Tree. The check opens the command panel with `:`, types `agenda`, verifies that `show-agenda` is the single selected result, and executes it with Enter. It requires the panel to close and Agenda to show the child dated with today's local canonical date and its selectable, read-only parent path, searches from the day header to the child, and returns to Tree through its menu with the original selection. Both local searches assert a unique match count, confirmed current highlight and destination focus. Electron uses the existing test entry for hidden windows and a stubbed global shortcut; its production main, preload, renderer and file storage still run. Browser checks use fresh contexts/origins. Safari uses an isolated automation session and native WebDriver input, not Playwright WebKit.
+
+After the volume-triggered save, the scenario replaces the child's final punctuation in Vim Replace and verifies both the visible buffered text and the unchanged stored document. It quits without blurring or ending Replace and requires the replacement to survive reopening. Ordinary autosave cannot persist that renderer buffer, including with the browser's shorter save interval. Electron uses the application-menu Quit and requires a clean process exit before fixture cleanup. Chromium uses the primary-modifier Quit shortcut. Safari invokes the production `treeApi.quit()` adapter while keeping editor focus because SafariDriver does not deliver that shortcut to the application. Both browsers require the script-opened application window to close, then reopen the same origin through an isolated launcher window. This Safari check verifies the real save-and-close boundary, not native Quit shortcut delivery. There is no mocked persistence, explicit test flush, clock override or idle wait.
+
+The scenario edits the dated child in Agenda, undoes and redoes that text edit, and verifies the resulting text after returning to Tree. It also opens Search with `Cmd+;` (`Ctrl+;` outside Apple platforms), moves between the recent nodes with ArrowDown/ArrowUp, cancels with Escape and checks restored focus, then reopens and confirms the child with Enter, checking its real parent context and focused text. It then returns to the root, searches for the parent, checks the matching parent and child results, and confirms that opening the parent focuses its first child in Tree.
+
+Build first with `npm run build` (Electron) or `npm run build:web` (browser), then run `npm run test:smoke:electron`, `npm run test:smoke:chromium`, or `npm run test:smoke:safari`. The Chromium command uses Chrome on macOS for local diagnosis and Playwright Chromium on Linux. The Safari command takes no arguments. On a local Mac, Safari Remote Automation must already be enabled by the owner; CI enables it only on its disposable runner. Linux Electron requires a display (CI supplies Xvfb), and disables Chromium's sandbox only in Linux CI.
+
+The same scenario also checks standard ArrowUp/ArrowDown selection, empty-node Backspace deletion, structural undo/redo, and Shift+Tab outdent followed by reindent. Structural history assertions require the deleted row to reappear and disappear, so native browser text undo cannot satisfy them. In Vim Normal, `k`/`j` move between the parent and child, `za` hides and restores the child, and `gd`/`Ctrl+o` enter the parent and return with its selection restored (Safari reserves `Cmd+,` for browser settings). Each transition asserts the resulting focus, row count or depth, allowing for the browser's initial sample nodes. Playwright polls the resolved condition value, including asynchronous persistence reads; a truthy Promise is not a successful assertion. Keep these representative editing and navigation checks in one small document and one application session (plus the required persistence reopen); detailed command matrices, clipboard/attachments, failure paths and visual regressions belong to the focused suites.
+
+Linux Electron and Chromium smoke invocations have a 20-second budget including application/browser startup and successful cleanup, with a 15-second Playwright test timeout. macOS Electron uses a 45-second test timeout and a 60-second global timeout to accommodate hosted-runner startup, restart and native OCR. Its npm command selects `config/testing/playwright.smoke-electron.config.ts`, which preserves the Linux limits; Chromium retains the base smoke configuration and its 20-second global timeout on both platforms. Safari has a 100-second budget. Safari uses the same 100-second limit for aborting operations and checking total elapsed time after cleanup. Individual SafariDriver requests, including session creation, have a 30-second timeout; cleanup requests retain a 5-second timeout. On disposable GitHub Actions runners only, Safari retries once after a session-creation request timeout, after stopping the owned SafariDriver and Safari. Each attempt refuses pre-existing Safari/SafariDriver processes before claiming exclusive ownership of Safari on that runner. Local runs never terminate personal Safari processes and do not retry. Other failures, application assertions, interruption, exhausted total budget, or failed cleanup do not trigger retries. Failure cleanup is bounded and may extend beyond the successful-run budget. Safari reports startup phases and elapsed times in the job output; CI does not enable SafariDriver diagnostic logging or upload diagnostic log artifacts. Dependency installation, builds, runner allocation and the prerequisite audit are outside these budgets; the entire CI job therefore takes longer. Smoke commands do not capture screenshots, browser traces, videos or performance measurements, and do not retry application checks.
+
+Release checks are isolated from standalone manual and scheduled check cancellation;
+the concurrency rules are described in [Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
+
+Browser smoke additionally types a URL into a rich editor, switches Vim Insert → Normal → Insert, and checks the link, text, focus and caret. It then selects a character with the keyboard, opens the Tree menu, dismisses it with Escape and replaces the restored selection. Chromium and real Safari share these assertions; Electron retains its existing scenario because its editing policy and menu differ. These checks use native keyboard and pointer events, without clipboard access, extra jobs or larger time budgets.
+
+Safari installs error and unhandled-rejection listeners after each application document becomes ready. Errors during the interactions are retained in the isolated origin's local storage across reload and Quit/reopen, and fail the smoke check. This observes interaction errors; it does not claim coverage of errors before the document becomes ready. Playwright smoke retains its page-error and renderer-crash checks.
+
+When opening the Safari smoke application window, the runner selects the same window before each readiness probe. A `no such window` response is recoverable within the 15-second readiness deadline only if that window's handle still exists. A missing handle or any other error fails immediately. This does not reopen a failed application or repeat its interactions; the overall smoke budget remains unchanged.
+
+#### Workflow and job naming policy
+
+Name GitHub Actions workflows by the work they perform, using an imperative verb
+and its object in English sentence case. Use the same principle for job display
+names. A reader should understand the purpose without opening the YAML.
+
+* Use direct actions such as `Release new app version`, `Audit dependencies`, and
+  `Publish demo video and screenshots`. Use `Run` with established test names, including
+  `Run mutation testing` and `Run property tests`; preserve those terms rather
+  than inventing synonyms for grammatical uniformity.
+* Distinguish a release pipeline from its individual suites. `Release new app version`
+  consumes the exact successful main validation run and tested artifact. Web and macOS
+  branches are independent. The source Web job waits for the separate hosting deployment.
+* Keep names concise. Do not add category prefixes, local jargon such as
+  `property soak`, or execution settings merely to describe implementation.
+  Increased property-test counts and memory-report thresholds belong in suite
+  documentation. Use `memory tests` for the memory suite and describe its actual
+  assertions and detection limits in that documentation.
+* Add a platform, browser, tool, or build-mode qualifier when it distinguishes
+  the work. Use the actual implementation: the Linux web job uses Chromium,
+  not Google Chrome. Put execution-specific detail in job names and descriptions
+  when the workflow's broader purpose is already clear.
+* Derive YAML filenames from the workflow display name: lowercase, remove
+  punctuation, replace spaces with hyphens, and append `.yml`. Keep the same
+  words and order; do not introduce a second vocabulary of abbreviations.
+
+Source filenames below are relative to `.github/workflows/`. The hosting
+workflow is maintained as `deployment/github-pages/deploy-web-app.yml` and
+installed separately in the hosting repository.
+
+| Workflow name | Filename |
+| --- | --- |
+| Release new app version | `release-new-app-version.yml` |
+| Test and build app | `test-and-build-app.yml` |
+| Publish macOS release (reusable) | `create-macos-release-draft.yml` |
+| Run smoke tests (reusable) | `run-smoke-tests.yml` |
+| Run web E2E tests | `run-web-e2e-tests.yml` |
+| Run Electron E2E tests | `run-electron-e2e-tests.yml` |
+| Run Electron memory tests | `run-electron-memory-tests.yml` |
+| Run mutation testing | `run-mutation-testing.yml` |
+| Run property tests | `run-property-tests.yml` |
+| Audit dependencies | `audit-dependencies.yml` |
+| Scan code with CodeQL | `scan-code-with-codeql.yml` |
+| Enforce agent attribution policy | `enforce-agent-attribution-policy.yml` |
+| Publish demo video and screenshots | `publish-demo-video-and-screenshots.yml` |
+| Deploy web app (hosting repository) | `deploy-web-app.yml` |
+
+Give every job an explicit display name. Name reusable-workflow calling jobs by
+the work they invoke, and execution jobs by the stage they perform. For example,
+`Run web E2E tests / Test production build (Chromium)` explains both the suite
+and the execution stage. Avoid generic names such as `Check`, `generate`, or
+`chrome`, and avoid repeating the entire workflow name at every nesting level.
+Matrix jobs include the distinguishing shard or layer, such as
+`Run macOS Electron E2E tests (shard 1/4)` or `Run mutation testing (domain)`; aggregate
+jobs state their role, such as `Require all Electron E2E shards to pass`.
+
+Review the complete set of names together, including PR checks and nested
+release jobs. Keep check names unambiguous across workflows; repeated audit
+calls need caller context in their composed names. Technical job IDs may remain
+stable when display names change. Playwright project names are test-report
+identifiers, not workflow or job names.
+
+When applying a rename, update reusable-workflow paths, scripts, tests, and
+documentation that consume the old names or paths. Check required status-check
+settings before changing their names. In particular, release verification
+matches `Check release version` in `test-and-build-app.yml`, while the current
+signer is `release-new-app-version.yml`;
+those are functional contracts, not cosmetic labels. A naming change must
+preserve the release verification contract and existing triggers and dependencies.
+
+### Build and test configuration
+
+Build configurations live in `config/build/` and test configurations in `config/testing/`.
+Vite 8, `@vitejs/plugin-react` 6 and `electron-vite` 6 form the compatible build toolchain.
+Use `build.rolldownOptions` for bundle inputs and `oxc.jsx.runtime` for the web JSX transform.
+Electron main and preload dependencies use `electron-vite`'s default externalization.
+The npm scripts select them explicitly; use those scripts instead of relying on tool discovery.
+Keep ESLint and the TypeScript solution entry point in the repository root for editor discovery.
+TypeScript target configurations live in `config/typescript/`; the root `tsconfig.json` references them.
+Tooling tests live alongside the maintained scripts, including `scripts/vitest-config.test.mts`.
+Their test, setup and output paths must continue to resolve to the existing repository directories.
+
+## 2. README Media
+
+### README Screenshot Maintenance
+
+The README gallery uses [the synthetic demo document](images/demo-document.json). It is a documentation resource, not a copy of a user's application data. Preserve its contents across captures; changes to the example itself should be deliberate and reviewed. The capture script launches the built Electron application with a newly created temporary profile and never opens the normal profile. It captures the overview and then enters the meetup branch in the same running application without editing the document or changing that branch's expanded state. In the dark appearance with Vim enabled, it captures the focused branch, a search for `book` with two highlighted matches, and the unfiltered command panel. It finally fixes only `Date` to Thursday 2026-10-08, opens the Agenda with `Cmd+P` in the light appearance, and captures it; the document's dated nodes (2026-10-08 through 2026-10-15) surround that fixed Today, so the Agenda shows the same node text as the Tree images.
+
+The `Publish demo video and screenshots` workflow described below captures the images after recording the video and publishes them to GitHub Pages with it. The README shows the latest successful capture, refreshed after successful validation of each push to `main`; publication can lag while the workflow runs or if it fails. The images are not stored in Git. The script refuses to write any image when the focused branch's nodes differ from the overview or when the capture changed the document. Like the E2E fixture, it passes `-AppleShowScrollBars WhenScrolling` so CI runners without a trackpad draw overlay scrollbars.
+
+Run `npm run screenshots:readme` on macOS to build and capture the images locally, for example after changing the capture script. It writes `tree-overview.png`, `tree-focus-dark.png`, `agenda-light.png`, `tree-search.png`, and `tree-commands.png` to ignored `reports/readme/`, replacing that directory only after every capture succeeds. Capture uses a verified device scale factor of 2 and lossless PNG output; README images keep their logical width of 860 pixels so high-density displays receive sharp text. Inspect all images, including matching node text and order, before relying on a script change. The command never stages or commits files.
+
+The README maintenance rules are owned by `AGENTS.md` §11. This documentation gallery is separate from visual regression baselines: it is not a pixel acceptance test.
+
+### Demo Video Generation
+
+Run `npm run demo:video` on macOS to build the app, install Playwright's recording encoder, and record the predefined sequence in `scripts/record-demo.mts`. The script uses the committed synthetic screenshot document in a fresh temporary profile and opens a visible window so native keyboard input reaches the editor. The entire demo must use dark appearance, including window creation and closing, regardless of the machine's system appearance. Vim editing must remain enabled throughout the demo. The sequence opens Agenda from Root with `Cmd+P`, shows dated nodes from both the Work and neighborhood reading club branches, and returns to Tree. It then uses the keyboard for the Tree walkthrough: `zo` opens the root fold, `3j` selects the meetup branch, `zO` opens its nested folds, `gd` enters the branch, and `3j` selects the note. `A` appends in Insert mode and Escape returns to Normal mode. `0vw` demonstrates character Visual selection; `Vj` selects two sibling nodes; `>` and `<` move the selected nodes into and out of a parent; `u` and `Ctrl+r` demonstrate undo and redo of a move. No mouse clicks are used. Pauses are brief so the demo shows these actions within its duration budget. The original fixture and normal application profile are never edited.
+
+`npm install` or `npm ci` installs Playwright. The command downloads Playwright's recording encoder when needed; no Homebrew installation or additional conversion encoder is required. Dependency installation and the first recording-encoder download require network access.
+
+After inline editing, the demo opens search with `/`, types `book`, and shows two highlighted matches and their count. Escape cancels search. It then opens the command panel with `:`, shows the command list, types `show` to filter it to the Tree and Agenda commands, and cancels with Escape before continuing the editing walkthrough. Representative frames include `search.png`, `commands.png`, and `commands-filtered.png`.
+
+After the move and undo/redo sequence, `gv` restores the two-node Visual selection and `d` cuts the selected discussion topics from the meetup's conversation outline. `Ctrl+o` returns to the overview, `zc` folds the meetup, `2j` selects “Ideas for later”, and `gd` enters that different branch. The destination is shown before `P` pastes the topics above its existing ideas. The capture verifies that the topics disappear from the source and appear together in the destination, with its existing children preserved.
+
+Recording begins after the renderer and fonts are ready. Playwright's screencast captures at maximum frame quality, with a rendering scale of 1.5 and a 1500-by-1080 recording of the 1000-by-720 window. This improves source text clarity without enlarging the logical interface. The output remains a WebM video with standard playback controls.
+
+The WebM video, representative PNG frames, and source metadata are written to ignored `reports/demo/`. Each run replaces that directory. Open `reports/demo/tree-demo.webm` in a compatible browser or video player to review playback and inspect the PNGs for text readability. This documentation demo does not replace visual regression tests. The video must be smaller than 5 MB (5,000,000 bytes) and shorter than 30 seconds. The script rejects empty recordings, missing or invalid WebM duration metadata, and recordings reaching either limit. The measured duration and file size are recorded in the output metadata.
+
+The separate `Publish demo video and screenshots` workflow is dispatched after successful validation of a push to `main`. It also runs the README screenshot capture and assembles both outputs into ignored `reports/site/`. Successful runs upload that directory as a downloadable artifact with one-day retention. Runs on `main` also deploy it to GitHub Pages, keeping the README's video and image URLs stable without storing generated files in Git. A Pages deployment replaces the whole site, so any other published file must be added to this workflow's site directory rather than deployed by a separate workflow. Dispatch verifies the successful main run and exact SHA; arbitrary branch publication is rejected. A failed run deploys nothing, and Pages keeps the previous video and images.

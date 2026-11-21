@@ -833,6 +833,27 @@ describe('runChecks', () => {
     expect(result.liveDocumentCount).toBe(1)
   })
 
+  it('governs the development reference as a live document like the development guide', () => {
+    const root = createTemporaryRoot()
+
+    writeFile(root, 'docs/DEVELOPMENT.md', '# Development Guide\n[Reference](DEVELOPMENT_REFERENCE.md)\n')
+    writeFile(
+      root,
+      'docs/DEVELOPMENT_REFERENCE.md',
+      '# Development Reference\n[missing](MISSING.md)\nSee ADR 0099.\nNodes remain at level 20.\n',
+    )
+    const result = runChecks({ rootDirectory: root })
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('docs/DEVELOPMENT_REFERENCE.md: link target not found'),
+        'docs/DEVELOPMENT_REFERENCE.md: prose references missing ADR 0099',
+        expect.stringContaining('restates the node-depth value'),
+      ]),
+    )
+    expect(result.liveDocumentCount).toBe(2)
+  })
+
   it('checks Vim conformance citations as a live document', () => {
     const root = createTemporaryRoot()
 

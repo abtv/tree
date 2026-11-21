@@ -4,6 +4,6 @@ The root `AGENTS.md` applies to both targets. Read the target's nested instructi
 
 - `electron/` owns Electron tests, launch fixtures, process controls and screenshot baselines. Use `config/testing/playwright.config.ts` and `config/testing/playwright.memory.config.ts`.
 - `web/` owns Chrome tests and browser fixtures. Use `config/testing/playwright.web.config.ts`.
-- `smoke/` owns the Playwright smoke scenario for the Electron and Chromium smoke commands. Use `config/testing/playwright.smoke.config.ts`; `config/testing/playwright.smoke-electron.config.ts` extends it for Electron. `docs/DEVELOPMENT.md` §9 describes the smoke checks.
+- `smoke/` owns the Playwright smoke scenario for the Electron and Chromium smoke commands. Use `config/testing/playwright.smoke.config.ts`; `config/testing/playwright.smoke-electron.config.ts` extends it for Electron. `docs/DEVELOPMENT_REFERENCE.md` §1, "Cross-platform smoke checks", describes the smoke checks.
 - Keep target-specific helpers inside their target directory. Put a helper at this level only when both targets use it.
 - Preserve target isolation, test coverage and synthetic test data when reorganizing files.

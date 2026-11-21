@@ -703,6 +703,7 @@ function collectLiveDocuments(rootDirectory: string) {
     'OPEN_QUESTIONS.md',
     'ARCHITECTURE.md',
     'DEVELOPMENT.md',
+    'DEVELOPMENT_REFERENCE.md',
     'SECURITY.md',
     'VIM_CONFORMANCE.md',
     'AGENT_WORKFLOW.md',

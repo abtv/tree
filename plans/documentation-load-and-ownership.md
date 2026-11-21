@@ -53,6 +53,22 @@ Mandatory reading, measured with the method of Appendix A.4 of the retired plan 
 
 The last two rows record the Product Owner's reason for Q1: an agent that reads `docs/DEVELOPMENT.md` without a line range loads it whole, so only a move to another file reduces that reading. T1 and T2 each record the same rows after their change; the final report shows before and after.
 
+After T1 (measured on the T1 working tree, same method):
+
+| Text | Before | After T1 |
+| --- | --- | --- |
+| `AGENTS.md` (whole) | 22,105 | 22,105 |
+| `docs/AGENT_WORKFLOW.md` §§4, 5, 9, 10, 12, 13, 14 | 48,186 | 48,200 |
+| `docs/DEVELOPMENT.md` §9 Full Validation | 65,090 (lines 496–1006) | 26,132 (lines 496–666) |
+| `docs/DEVELOPMENT.md` §10 Development Workflow | 15,067 | 15,067 (lines 667–735) |
+| Total by section (A.4 method) | 150,448 | 111,504 |
+| Conditional: `docs/DEVELOPMENT.md` §8 Tests | 61,635 | 61,734 (lines 209–495) |
+| Whole `docs/DEVELOPMENT.md` | 207,541 bytes, 1,516 lines | 168,748 bytes, 1,176 lines |
+| Total when `docs/DEVELOPMENT.md` is read whole | 277,832 | 239,053 |
+| `docs/DEVELOPMENT_REFERENCE.md` (read on demand) | — | 39,709 bytes, 351 lines |
+
+The `docs/AGENT_WORKFLOW.md` and §8 increases are the retargeted links. §8 shrinks in T2.
+
 Planner estimates of the subsections at commit 421359d (line ranges exact, sizes within about 10%):
 
 | Text | Lines | Est. size |
@@ -109,7 +125,7 @@ All other `DEVELOPMENT.md` §8/§9/§10 citations name content that stays in pla
 
 | ID | Outcome | Depends on | Files | Tier | Acceptance evidence | Reviewer | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | New `docs/DEVELOPMENT_REFERENCE.md` covered by `check:docs` and `check:opencode`; §9 reference material moved into it | Q1 (answered) | `docs/DEVELOPMENT_REFERENCE.md` (new), `docs/DEVELOPMENT.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `scripts/check-opencode-permissions.mts` and its test, `e2e/AGENTS.md`, `e2e/electron/AGENTS.md`, `docs/PRODUCT.md`, `docs/AGENT_WORKFLOW.md` §11 (document list) only if it lists development documents, other files whose links target a moved heading, this plan | Low (`npm run check`, plus `npm run check:opencode`) | Tool tests show both documents are checked; every removed paragraph unit of `docs/DEVELOPMENT.md` occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement before and after | None required | Planned |
+| T1 | New `docs/DEVELOPMENT_REFERENCE.md` covered by `check:docs` and `check:opencode`; §9 reference material moved into it | Q1 (answered) | `docs/DEVELOPMENT_REFERENCE.md` (new), `docs/DEVELOPMENT.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `scripts/check-opencode-permissions.mts` and its test, `e2e/AGENTS.md`, `e2e/electron/AGENTS.md`, `docs/PRODUCT.md`, `docs/AGENT_WORKFLOW.md` §11 (document list) only if it lists development documents, other files whose links target a moved heading, this plan | Low (`npm run check`, plus `npm run check:opencode`) | Tool tests show both documents are checked; every removed paragraph unit of `docs/DEVELOPMENT.md` occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement before and after | None required | Done |
 | T2 | §8 and §10 reference material moved to the reference document | T1 | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `e2e/electron/AGENTS.md`, `src/web/README.md`, `scripts/check-opencode-permissions.mts` (comment only), this plan | Low (`npm run check`, plus `npm run check:opencode`) | Every removed paragraph unit occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement after | None required | Planned |
 | T3 | One owner for each of release rules 1–4 | T1, Q5 (answered) | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `docs/releasing.md`, `deployment/github-pages/README.md`, `docs/ARCHITECTURE.md` §2, this plan | Minimal + `check:opencode` | Each rule appears in full once; other copies cite it; manual link check | None required | Planned |
 | T4 | Rows 6, 7 and 15 resolved | none | `docs/ARCHITECTURE.md` §§2, 7, 11, this plan | Minimal | Code constants match the specification; diff contains only the citation sentences | None required | Planned |
@@ -263,11 +279,17 @@ The question texts below are kept as the record of what was asked.
 * `npm run check:docs -- --verbatim <ref> --file <file>` reports removed, added and moved paragraph units of one file. A move to another file appears as removed units; T1 and T2 prove that no text was lost by finding every removed unit verbatim in `docs/DEVELOPMENT_REFERENCE.md`.
 * The specification already owns the limits of row 6 (commit 4153d93). Row 15's trusted parties are cited, not restated (commit 421359d).
 * The scoped audit acceptances in §9 (2026-11-05, 2026-11-07, 2026-11-10) and §12 (2026-11-08) cover completed work. They move verbatim. Removing them is not in scope.
+* T1 results:
+  * `docs/DEVELOPMENT_REFERENCE.md` §1 Validation Infrastructure holds Chromium container tests, GitHub Actions (with its three h4 subsections) and Build and test configuration; §2 README Media holds README Screenshot Maintenance and Demo Video Generation. Moved headings keep their text and level, so their anchors are unchanged in the new file. No ADR links a moved heading, so no stub heading was needed. T2 appends §3 and later sections.
+  * `scripts/check-docs.mts` lists the reference document in `collectLiveDocuments`. The `npm run` scan of `check:opencode` moved into `scripts/documented-npm-workflows.mts`, which scans both documents and has its own test file; `check-opencode-permissions.mts` had no test file.
+  * Lost-text proof. `check:docs --verbatim` reports clause units, which a fixed-string search cannot find across wrapped lines, and running a scratch comparison script through `node` was denied. The proof used Git instead: every line removed from `docs/DEVELOPMENT.md` (`git diff --unified=0 HEAD -- docs/DEVELOPMENT.md`) occurs as a whole line in the reference document (`grep -F -x -v -f`), except the five lines whose citations were retargeted. A `git diff --diff-algorithm=patience` of the old guide against a blob of the reference document (`git hash-object -w`) showed only the title, the introduction, two section headings, the Build and test configuration heading and the retargeted memory-suite link as added lines. Use the same method in T2.
+  * Additional citations retargeted beyond the inventory: `docs/DEVELOPMENT.md` §4 (`make setup` row), §8 (memory suite), §15 ("as described under Full Validation"), `docs/AGENT_WORKFLOW.md` §4 and §11, and the documentation lists in `README.md` and `docs/AGENT_WORKFLOW.md` §11.
+  * For T2: the §10 OpenCode paragraph says that `check:opencode` "covers workflows named in this document". After the move, change "this document" to name both documents; that is a citation change.
 * The primary planning session confirmed at 421359d: `src/electron/main/quit-handshake.ts:23` sets `timeoutMilliseconds = 5_000`; `docs/ARCHITECTURE.md` line 456 states "32767 pixels per side and 64 megapixels in total"; line 901 states that a scroll "never resets an idle timer that is already armed".
 
 ## Next Task
 
-T1. It is authorized (whole-initiative approval of 2026-11-21) and ready.
+T2. It is authorized (whole-initiative approval of 2026-11-21) and ready.
 
 ## Next-Session Prompt
 

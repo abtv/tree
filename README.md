@@ -75,6 +75,7 @@ Its source, checks and current limitations are in [Browser version](src/web/READ
 * [Open Questions](docs/OPEN_QUESTIONS.md) — non-normative product and technical questions that are still open, with their evidence and decisions.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.
+* [Development Reference](docs/DEVELOPMENT_REFERENCE.md) — CI, container tests, README media, and other development reference material.
 * [macOS Releases](docs/releasing.md) — signing, installer verification, and publication.
 * [Agent Roles](docs/AGENT_ROLES.md) — the formal definition of each agent role, shared by every coding-agent tool's config.
 * [Security Policy](docs/SECURITY.md) — the security model and the tests that verify it.

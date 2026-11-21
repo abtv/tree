@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
+import {
+  DEVELOPMENT_DOCUMENTS,
+  documentedNpmWorkflows,
+  findWorkflowApprovalIssues,
+} from './documented-npm-workflows.mts'
+
 const config = JSON.parse(await readFile(new URL('../opencode.json', import.meta.url), 'utf8'))
 
 function globMatches(pattern: string, value: string) {
@@ -355,18 +361,20 @@ for (const { name, rules, cases } of agents) {
   }
 }
 
-// Every npm workflow named in docs/DEVELOPMENT.md must stay inside the develop approval boundary.
-// A newly documented workflow without a matching rule fails this check instead of prompting later.
-const development = await readFile(new URL('../docs/DEVELOPMENT.md', import.meta.url), 'utf8')
-const documentedWorkflows = [...new Set([...development.matchAll(/npm run [A-Za-z0-9:_-]+/g)].map((match) => match[0]))]
-for (const command of documentedWorkflows) {
-  assert.equal(
+// Every npm workflow named in the development guide or its reference must stay inside the develop
+// approval boundary. A newly documented workflow without a matching rule fails this check instead of
+// prompting later.
+const developmentDocuments = await Promise.all(
+  DEVELOPMENT_DOCUMENTS.map((path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')),
+)
+const documentedWorkflows = documentedNpmWorkflows(developmentDocuments)
+assert.deepEqual(
+  findWorkflowApprovalIssues(documentedWorkflows, (command) =>
     chainedPermissionFor(config.agent.develop.permission.bash, command),
-    command === 'npm run release' ? 'ask' : 'allow',
-    `develop: documented workflow ${command} must retain its approval boundary`,
-  )
-  checked += 1
-}
+  ),
+  [],
+)
+checked += documentedWorkflows.length
 
 // Package scripts outside the main development guide need the same approval coverage.
 // Lifecycle hooks run through their parent npm workflow rather than as standalone commands.
