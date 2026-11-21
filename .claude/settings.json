@@ -51,6 +51,8 @@
       "npm run test:smoke:electron",
       "npm run test:smoke:chromium",
       "npm run test:property",
+      "npm run test:web:chromium",
+      "npm run test:smoke:linux",
       "TREE_E2E_VISIBLE=1 npm run test:e2e*",
       "npm run check:full*",
       "npm run check",
