@@ -63,7 +63,14 @@ test('continues a rich Visual selection after native window blur', async ({ user
   await main.evaluate((browserWindow) => browserWindow.focus())
   await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(true)
   await expect(editor).toBeFocused()
-  await other.evaluate((browserWindow) => browserWindow.destroy())
+  // Close the test-owned window through the ordinary close path; the application never destroys a second window.
+  await other.evaluate(
+    (browserWindow) =>
+      new Promise<void>((resolve) => {
+        browserWindow.once('closed', () => resolve())
+        browserWindow.close()
+      }),
+  )
   await other.dispose()
   await window.keyboard.press('h')
 
