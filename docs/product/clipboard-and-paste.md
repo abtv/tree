@@ -32,8 +32,26 @@ Plain text is inserted at the current cursor position.
 
 It does not replace the entire node.
 
+Example:
+
+```text
+abc|def
+```
+
+Paste:
+
+```text
+XYZ
+```
+
+Result:
+
+```text
+abcXYZdef
+```
+
 * Pasted valid HTTP(S) URLs receive hyperlink behavior at the inserted range immediately, including browser native paste without HTML hyperlink metadata in standard editing and Vim Insert. No subsequent edit is required.
-* Plain-text paste recognizes complete whitespace-delimited HTTP(S) URLs within surrounding text, including later lines of a multiline node and text inserted from a Vim register. Surrounding text and whitespace remain unchanged. Explicit hyperlink ranges from rich clipboard content remain authoritative.
+* Plain-text paste recognizes complete whitespace-delimited HTTP(S) URLs within surrounding text, including later lines of a multiline node and text inserted from a Vim register. Surrounding text and whitespace remain unchanged. Explicit hyperlink ranges from rich clipboard content are authoritative.
 * A URL typed by hand becomes a hyperlink in any node while it is being typed: as soon as the whitespace-delimited word under the edit is a valid HTTP(S) URL, that word is underlined, colored as a link, and clickable, and the caret and focus stay where they were so typing continues without interruption. Typing more characters at its end extends the link.
 * A word that is not (or no longer) a valid URL is ordinary text, so a prefix such as `http:/` is plain until the typed word becomes a valid URL.
 * Typing whitespace inside a link splits it into words, and each resulting word that is a valid URL stays a link.
@@ -63,24 +81,6 @@ Pasting that content into another node inserts the text and preserves its clicka
 Secondary-clicking an editable node text field opens the native macOS context menu with Look Up, Search with Google, Cut, Copy, Paste, and Select All. The menu is available for both plain-text nodes and nodes containing hyperlinks, and is not available on read-only fields or other application controls. A selected text value is bounded to 256 Unicode code points for the native menu request; longer selections are truncated with an ellipsis, and the same bounded text is used by Look Up and Search with Google.
 
 The editing commands use the same selection, clipboard, hyperlink, image-paste, multiline-paste, undo, and persistence behavior as their keyboard commands. Within one node, secondary-clicking inside an existing selection preserves it; secondary-clicking elsewhere places the insertion point there. Selection and caret state are never shared between nodes.
-
-Example:
-
-```text
-abc|def
-```
-
-Paste:
-
-```text
-XYZ
-```
-
-Result:
-
-```text
-abcXYZdef
-```
 
 ---
 
