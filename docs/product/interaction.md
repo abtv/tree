@@ -60,11 +60,11 @@ This does not govern motion the application does not itself decide to add: nativ
 
 ### 20.5 Appearance
 
-The command panel (§20.2.28) exposes the same five choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, `set-theme-gray`, and `set-theme-white`.
-
 The application has five appearance choices in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, **Dark**, **Gray**, and **White**. Automatic follows the operating system's light or dark appearance and restyles the open window immediately when the system appearance changes. Each explicit choice keeps its appearance whatever the system uses. Gray and White use light native controls. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
 
-Every current and future appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. Existing palette-specific choices below remain limited to their stated surfaces. Adding an appearance requires checking these shared rules in that appearance; the owner must not have to discover and request separate fixes for each surface.
+The command panel (§20.2.28) exposes the same five choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, `set-theme-gray`, and `set-theme-white`.
+
+Every appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. The palette-specific choices below apply only to their stated surfaces. Adding an appearance requires checking these shared rules in that appearance; the owner must not have to discover and request separate fixes for each surface.
 
 Selected hyperlinks use the same foreground and background as the surrounding text selection in every appearance and editing mode. Any link highlight retained when focus moves to another control keeps that appearance's selection colors.
 
@@ -76,11 +76,11 @@ The window's top strip, which holds the window controls (close, minimize, zoom) 
 
 The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors.
 
-* In the dark appearance, Tree node text uses the existing eight-color depth palette based on its absolute depth in the document: root nodes use the first color, their children the second, and so on. Nodes deeper than the eighth level use the ordinary text color.
+* In the dark appearance, Tree node text uses an eight-color depth palette based on its absolute depth in the document: root nodes use the first color, their children the second, and so on. Nodes deeper than the eighth level use the ordinary text color.
 * Entering or leaving a focused parent preserves each node's color, including when the node becomes the editable current-parent heading; indentation remains relative to the current parent.
 * Agenda retains its depth colors. The light appearance does not color text by depth. Semantic colors for links, dates, struck-through text, and selection highlights still apply.
 
-* The light appearance is an original palette, not adapted from a published color scheme. Its direction is a soft, paper-like notebook surface, set by a reference screenshot the Product Owner supplied (a note-taking application with a cream background and muted accents) and by the dotted-page look of a bullet journal. It uses a warm cream document surface, warm graphite text, warm gray-beige secondary text and rules, and a muted amber selection highlight with dark text.
+* The light appearance is an original palette, not adapted from a published color scheme. Its direction is a soft, paper-like notebook surface, modeled on a note-taking application with a cream background and muted accents and on the dotted-page look of a bullet journal. It uses a warm cream document surface, warm graphite text, warm gray-beige secondary text and rules, and a muted amber selection highlight with dark text.
 * The gutter dots of node rows are light warm gray, so they stay quiet beside the text.
 * The outer ring of a node with children is a darker warm beige than the surface and its disclosure chevron is a mid warm gray, so both stay visible on the cream surface.
 * Links are a muted blue.
@@ -90,7 +90,7 @@ The Gray appearance adapts Dayfox from [Nightfox](https://github.com/EdenEast/ni
 
 White uses the Gray palette and styling with a pure white (`#ffffff`) document and window background. Tints derived from the background use the white surface.
 
-Tags use muted violet `#5b496c` and the shared subtle background; people and event markers retain their semantic colors. Search and command results use the current Tree row's muted selection fill. Search focus uses a visible secondary-color border; paths, labels and hints use the secondary text color, and separators are subdued. Visual selections, text selections and the Visual badge share a stronger gray-violet highlight with the ordinary text color. Light and Dark retain their original palettes. The palette's MIT attribution is retained in the distributed stylesheet.
+Tags use muted violet `#5b496c` and the shared subtle background; people and event markers retain their semantic colors. Search and command results use the current Tree row's muted selection fill. Search focus uses a visible secondary-color border; paths, labels and hints use the secondary text color, and separators are subdued. Visual selections, text selections and the Visual badge share a stronger gray-violet highlight with the ordinary text color. These choices do not change the Light and Dark palettes. The palette's MIT attribution is retained in the distributed stylesheet.
 
 In the dark appearance, Vim mode indicators share a dark gray background and use muted text colors from the document palette: green for Normal, cyan for Insert, sandy yellow for Visual and whole-node Visual, and red for Replace. The Visual indicators retain the shared selection highlight pair.
 
@@ -114,7 +114,7 @@ A difference between paths is allowed only where this document records it and it
 
 The content area is the scrolling region between the location toolbar and the status bar (§2.2, §20.2). When the selection or the caret moves to another node, the content scrolls so the destination is visible and the position it ends in does not depend on the key or direction that led there.
 
-In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and other commands retain their node-reveal rules.
+In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and other commands use the node-reveal rules.
 
 #### Context
 
