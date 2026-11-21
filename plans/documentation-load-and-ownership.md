@@ -128,7 +128,7 @@ All other `DEVELOPMENT.md` §8/§9/§10 citations name content that stays in pla
 | T1 | New `docs/DEVELOPMENT_REFERENCE.md` covered by `check:docs` and `check:opencode`; §9 reference material moved into it | Q1 (answered) | `docs/DEVELOPMENT_REFERENCE.md` (new), `docs/DEVELOPMENT.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `scripts/check-opencode-permissions.mts` and its test, `e2e/AGENTS.md`, `e2e/electron/AGENTS.md`, `docs/PRODUCT.md`, `docs/AGENT_WORKFLOW.md` §11 (document list) only if it lists development documents, other files whose links target a moved heading, this plan | Low (`npm run check`, plus `npm run check:opencode`) | Tool tests show both documents are checked; every removed paragraph unit of `docs/DEVELOPMENT.md` occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement before and after | None required | Done |
 | T2 | §8 and §10 reference material moved to the reference document | T1 | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `e2e/electron/AGENTS.md`, `src/web/README.md`, `scripts/check-opencode-permissions.mts` (comment only), this plan | Low (`npm run check`, plus `npm run check:opencode`) | Every removed paragraph unit occurs verbatim in the reference document; inventory rows resolved; mandatory-reading measurement after | None required | Done |
 | T3 | One owner for each of release rules 1–4 | T1, Q5 (answered) | `docs/DEVELOPMENT_REFERENCE.md`, `docs/DEVELOPMENT.md`, `docs/releasing.md`, `deployment/github-pages/README.md`, `docs/ARCHITECTURE.md` §2, this plan | Minimal + `check:opencode` | Each rule appears in full once; other copies cite it; manual link check | None required | Done |
-| T4 | Rows 6, 7 and 15 resolved | none | `docs/ARCHITECTURE.md` §§2, 7, 11, this plan | Minimal | Code constants match the specification; diff contains only the citation sentences | None required | Planned |
+| T4 | Rows 6, 7 and 15 resolved | none | `docs/ARCHITECTURE.md` §§2, 7, 11, this plan | Minimal | Code constants match the specification; diff contains only the citation sentences | None required | Done |
 | T5 | Rows 1 and 4 resolved | Q2, Q3 | `docs/ARCHITECTURE.md` §§7, 9, 13, `docs/product/persistence.md`, this plan | Minimal | Owner answers applied; existing automated coverage named | None required | Planned |
 | T6 | Closure after acceptance | Acceptance | this plan, `plans/README.md` | Minimal | Plan and index row removed | None | Planned |
 
@@ -297,11 +297,15 @@ The question texts below are kept as the record of what was asked.
   * Facts that only a copy stated moved to the owner. Rule 4: the clean-tree requirement, the exact version fields and commit subject, "pushes nothing", the rejected-hook behavior and the `--help` forms (from `docs/DEVELOPMENT.md` §12). Rule 2: build metadata precedence, the eligibility comparison, release of the same version after a failure before reservation, the skip without writes, and the Web hosting-parent recheck (from §12). Rule 1: the high-severity audit level (from the deployment README, confirmed in `.github/workflows/audit-dependencies.yml`) and "Property soak and mutation testing remain separate".
   * Copies replaced with citations: `docs/releasing.md` (gate composition twice), `deployment/github-pages/README.md` (gate composition, validation retry, tag rules), `docs/DEVELOPMENT.md` §12 (version command, gate, eligibility, retry sentence, precedence, CI gate), `docs/DEVELOPMENT_REFERENCE.md` GitHub Actions (tag eligibility, retry) and `docs/ARCHITECTURE.md` §2 (suite list, tag rules). The deployment README keeps its Web-specific statements: the Web target-deployment retry, the tag match of Web candidate checks, the Chromium browser gate and its later work. `ARCHITECTURE.md` §2 keeps the dispatch, provenance, reservation-job and recheck mechanism.
   * Manual link check: every added link targets an existing file and heading (`#github-actions`, `#create-a-release`, `#signing-and-packaging`) from its file's directory.
+* T4 results:
+  * Row 6: `src/shared/png-validation.ts` sets `MAX_ATTACHMENT_DIMENSION = 32_767` and `MAX_ATTACHMENT_PIXELS = 64 * 1024 * 1024` (67,108,864), equal to `docs/product/images.md` §17. `ARCHITECTURE.md` §7 now cites the §17 pixel limits.
+  * Row 7: `docs/product/editing.md` §10 defines the history limit, the history entry and the discard rule. `ARCHITECTURE.md` §11 now cites them and keeps the redo-stack bound, which `src/application/editor-history.ts` enforces on `future` with `HISTORY_LIMIT`.
+  * Row 15: `ARCHITECTURE.md` §2 cites `SECURITY.md#browser-publication` and lists no trusted parties. No edit.
 * The primary planning session confirmed at 421359d: `src/electron/main/quit-handshake.ts:23` sets `timeoutMilliseconds = 5_000`; `docs/ARCHITECTURE.md` line 456 states "32767 pixels per side and 64 megapixels in total"; line 901 states that a scroll "never resets an idle timer that is already armed".
 
 ## Next Task
 
-T4. It is authorized (whole-initiative approval of 2026-11-21) and ready.
+T5. It is authorized (whole-initiative approval of 2026-11-21) and ready; Q2 and Q3 are answered.
 
 ## Next-Session Prompt
 
