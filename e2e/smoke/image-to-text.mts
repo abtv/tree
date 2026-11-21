@@ -44,18 +44,28 @@ export async function imageToTextSmoke(page: Page): Promise<void> {
   await page.keyboard.press('Meta+Shift+p')
   await page.getByRole('combobox', { name: 'Command' }).fill('reindex-all-images')
   await page.keyboard.press('Enter')
-  const savedSearchText = () =>
+  const savedRoot = () =>
     page.evaluate(async () => {
       const api = (window as unknown as { treeApi: SmokeApi }).treeApi
       const state = (await api.load()) as {
-        document: { roots: { attachment?: { searchText?: string } }[] }
+        document: { roots: { attachment?: { searchText?: string }; children: unknown[] }[] }
       } | null
-      return state?.document.roots[0]?.attachment?.searchText
+      const root = state?.document.roots[0]
+      return { searchText: root?.attachment?.searchText, childCount: root?.children.length }
     })
   // Hidden recognition uses the ordinary metadata save policy, so wait for that save.
-  await expect.poll(savedSearchText, { timeout: 30000 }).toContain('Local image recognition works with English text')
+  await expect
+    .poll(async () => (await savedRoot()).searchText, { timeout: 30000 })
+    .toContain('Local image recognition works with English text')
+  expect((await savedRoot()).childCount).toBe(0)
+
+  // After a reload the editor must still hold the hidden text that global Search reads.
   await page.reload()
-  await page.locator('.node-input').first().waitFor()
-  expect(await savedSearchText()).toContain('Local image recognition works with English text')
-  await expect(page.locator('.node-input')).toHaveCount(1)
+  await page.locator('.node-input').first().click()
+  await page.keyboard.press('Meta+;')
+  await page.getByRole('searchbox', { name: 'Search query' }).fill('Local image recognition')
+  const results = page.getByRole('listbox', { name: 'Search results' })
+  await expect(results.getByRole('option')).toHaveCount(1)
+  await expect(results).toContainText('OCR smoke')
+  await page.keyboard.press('Escape')
 }
