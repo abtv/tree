@@ -14,6 +14,7 @@ import {
   idleSavePoll,
   launchTree,
   node,
+  pressKeyThatQuits,
   readPersisted,
   readSaveAttempts,
   restoreSaves,
@@ -283,11 +284,7 @@ test.describe('save failure lock', () => {
     await window.keyboard.press(editingMode === 'vim' ? 'l' : 'Tab')
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
 
-    await window.keyboard.press('Enter').catch((error: unknown) => {
-      // Immediate quit can close the CDP target before Playwright sends Enter's keyup.
-      if (!(error instanceof Error) || !error.message.includes('Target page, context or browser has been closed'))
-        throw error
-    })
+    await pressKeyThatQuits(window, 'Enter')
     await closed
 
     const relaunched = await launchTree(userDataDir)

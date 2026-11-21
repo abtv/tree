@@ -11,6 +11,7 @@ import {
   clickApplicationMenuQuit,
   expect,
   launchTree,
+  pressKeyThatQuits,
   readPersisted,
   seedDocument,
   test,
@@ -589,7 +590,7 @@ test('updates only on request, flushes edits, and keeps normal quit safe after i
   const closed = app.waitForEvent('close')
   await window.keyboard.press('Meta+Shift+P')
   await window.locator('.command-input-line input').fill('update-app')
-  await window.keyboard.press('Enter')
+  await pressKeyThatQuits(window, 'Enter')
   await closed
   expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Edited after failed update')
 })

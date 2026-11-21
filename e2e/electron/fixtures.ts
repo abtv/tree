@@ -403,6 +403,15 @@ export async function clickApplicationMenuQuit(app: ElectronApplication): Promis
   })
 }
 
+// A key whose keydown quits the application can close the CDP target before Playwright sends the
+// keyup. Only that error is tolerated; the caller still awaits the close and asserts the saved state.
+export async function pressKeyThatQuits(window: Page, key: string): Promise<void> {
+  await window.keyboard.press(key).catch((error: unknown) => {
+    if (!(error instanceof Error) || !error.message.includes('Target page, context or browser has been closed'))
+      throw error
+  })
+}
+
 // The suite runs on a live desktop, so the application is not necessarily frontmost when a test
 // addresses its window. BrowserWindow.getFocusedWindow() returns null in that case and a close through
 // it would silently do nothing, even though closing the window must flush and quit while inactive

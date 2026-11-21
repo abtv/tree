@@ -12,6 +12,7 @@ import {
   expect,
   launchTree,
   node,
+  pressKeyThatQuits,
   readPersisted,
   seedDocument,
   setCursor,
@@ -325,11 +326,7 @@ test.describe('Normal command panel', () => {
     await open(window, 'q')
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
 
-    await window.keyboard.press('Enter').catch((error: unknown) => {
-      // The quit command runs on Enter's keydown and can close the CDP target before Playwright sends the keyup.
-      if (!(error instanceof Error) || !error.message.includes('Target page, context or browser has been closed'))
-        throw error
-    })
+    await pressKeyThatQuits(window, 'Enter')
     await closed
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('saved by command quit')
