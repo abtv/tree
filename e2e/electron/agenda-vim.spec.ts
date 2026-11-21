@@ -9,6 +9,7 @@ import {
   readPersisted,
   seedDocument,
   setAgendaToday,
+  setMainWindowContentSize,
   test,
   attachmentPath,
   setCursor,
@@ -281,6 +282,69 @@ test('keeps horizontal image carets separate across repeated Agenda occurrences 
   const label = await heading.innerText()
 
   await expect(heading.locator('.agenda-caret')).toHaveText(label.at(-1)!)
+})
+
+// @requirement PRODUCT.md §20.2.20
+// @requirement PRODUCT.md §23.4
+test('extends character Visual by displayed line within a tall row without an editor and keeps its end visible', async ({
+  userDataDir,
+}, testInfo) => {
+  // A contextual ancestor row has no editor; in a narrow window its label wraps over several lines.
+  const text = `Context ${'contextual ancestor words '.repeat(20)}`
+  const items = Array.from({ length: 30 }, (_, index) => node(`item-${index}`, `2026-10-09 Item ${index}`))
+  seedDocument(userDataDir, {
+    document: { roots: [...items, node('context', text, [node('plan', '2026-10-10 Plan')])] },
+    location: { currentParentId: null, selectedNodeId: 'item-0' },
+  })
+  const { app, window } = await launchTree(userDataDir)
+  await setMainWindowContentSize(app, { width: 420, height: 420 })
+  await openAndSelect(window, nodeKey(10, 9, 'item-29'))
+  const path = window.locator('.agenda-row-path').first()
+  const viewport = window.locator('.scroll-viewport')
+  const selection = path.locator('.agenda-selection')
+  const selectedText = async (): Promise<string> => (await selection.allTextContents()).join('')
+  const scrollTop = (): Promise<number> => viewport.evaluate((element) => element.scrollTop)
+
+  // Keyboard arrival from above reveals only the path's first line at the bottom context.
+  await window.keyboard.press('0')
+  for (let step = 0; step < 6 && (await path.getAttribute('aria-selected')) !== 'true'; step++)
+    await window.keyboard.press('j')
+
+  await expect(path).toHaveAttribute('aria-selected', 'true')
+
+  // Leave only the path's first line inside the viewport, so the clamped endpoint needs a reveal.
+  await viewport.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const pathTop = element.querySelector('.agenda-row-path')!.getBoundingClientRect().top
+    element.scrollTop -= bounds.bottom - 30 - pathTop
+  })
+  await window.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const before = await scrollTop()
+  await window.keyboard.press('v')
+  await window.keyboard.press('j')
+  const oneLine = await selectedText()
+
+  expect(oneLine.length).toBeGreaterThan(1)
+  expect(text.startsWith(oneLine)).toBe(true)
+
+  await window.keyboard.type('9J')
+
+  await expect.poll(async () => (await selectedText()).length).toBeGreaterThan(oneLine.length)
+  const clamped = await selectedText()
+  await window.keyboard.press('j')
+
+  expect(await selectedText()).toBe(clamped)
+  await expect(path).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(scrollTop).toBeGreaterThan(before)
+  const endVisible = await selection.last().evaluate((element) => {
+    const rects = element.getClientRects()
+    const end = rects[rects.length - 1]!
+    const bounds = element.closest('.scroll-viewport')!.getBoundingClientRect()
+    return end.top >= bounds.top && end.bottom <= bounds.bottom
+  })
+
+  expect(endVisible).toBe(true)
+  await window.screenshot({ path: testInfo.outputPath('agenda-visual-path-bottom.png') })
 })
 
 // @requirement PRODUCT.md §23.4

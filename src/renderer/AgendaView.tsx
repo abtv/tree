@@ -509,7 +509,8 @@ export function AgendaView({
         const state = store.getSnapshot()
         return (
           state.status === 'ready' &&
-          vim?.mode === 'normal' &&
+          // Normal vertical motion and the character Visual endpoint both keep their line visible.
+          (vim?.mode === 'normal' || vim?.mode === 'visual') &&
           globalThis.document.activeElement?.closest('.agenda-row') === row &&
           state.agenda?.selectedKey === intent.key &&
           caretRef.current.key === intent.key &&
