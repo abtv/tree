@@ -72,8 +72,8 @@ obtains verifier code from source main at an independently resolved immutable SH
 it never executes target scripts. It verifies the detached attestation and hashes,
 source run/SHA/attempt and current heads. A separate Pages/OIDC write job deploys
 the read-only verifier's artifact. The App has no Workflows write permission.
-This protects against a stolen target publisher token, while source maintainers
-and GitHub/Sigstore remain trusted. Browser-local
+This protects against a stolen target publisher token; the parties that remain
+trusted are listed in [`docs/SECURITY.md`, Browser publication](SECURITY.md#browser-publication). Browser-local
 documents never enter this pipeline. Setup and trust boundaries are described in
 [Browser publication](../deployment/github-pages/README.md).
 
