@@ -6,21 +6,11 @@
 
 The application must stay responsive and must not accumulate unbounded memory or perform unnecessary disk operations as the document and edit history grow.
 
-Typing in long decorated rows must keep the caret and viewport stable without pauses caused by redundant replacement of unchanged formatted content. Actual formatting changes, undo/redo and composition must retain their existing behavior.
+Typing in long decorated rows must keep the caret and viewport stable without pauses caused by redundant replacement of unchanged formatted content. This rule does not change the behavior of actual formatting changes, undo/redo and composition.
 
-Preparing and dispatching a large save must leave ongoing typing and navigation responsive, including when a save scheduled in Tree becomes due after opening Agenda. This must preserve the existing save timing, ordering, failure handling and durable acknowledgment.
+Preparing and dispatching a large save must leave ongoing typing and navigation responsive, including when a save scheduled in Tree becomes due after opening Agenda. This rule does not change save timing, ordering, failure handling or durable acknowledgment.
 
-Any change to editor state or persistence must include an explicit assessment of its performance implications, covering:
-
-* disk operations, especially writes and filesystem syncs, which must be minimized to limit SSD wear;
-* CPU work added to interactive paths, such as typing, navigation, and commands;
-* memory usage, especially any structure that can grow without bound with document size or edit count.
-
-The assessment must consider how the cost scales with document size and the number of edits, and the change must state the expected cost and any mitigation.
-
-Concrete budgets are not fixed here. When a change can affect performance at scale, the implementation must add or update an automated performance guard at the appropriate level (unit, boundary, or performance suite). Budgets are derived from measured baselines and recorded by the owning automated guard and its result artifacts.
-
-Pre-release Linux memory checks must reject fast retained-memory growth and excessive sampled footprint in the maintained scenarios. The checks must demonstrate detection with deliberately retained allocations and preserve measurements on failure. Slow leaks below their finite-run budgets remain an accepted testing risk, not a relaxation of the application's bounded-memory requirement.
+Concrete budgets are not fixed here. `docs/AGENT_WORKFLOW.md` §4 defines the performance assessment that every change to editor state or persistence requires and the automated performance guards that a change affecting performance at scale requires, and `docs/DEVELOPMENT.md` §8 defines the pre-release Linux memory checks.
 
 Text recognition must avoid quadratic retries over whitespace when joining nodes. Link reconciliation must consume word matches incrementally, retaining only recognized links. Relative-date count parsing must retain only the fields needed for validation, and Vim number case detection must not collect every letter merely to inspect the last one. These rules do not impose a new text-length limit.
 
