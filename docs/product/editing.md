@@ -266,7 +266,7 @@ At the root level:
 
 `Cmd+Backspace` deletes the selected displayed node and its entire subtree.
 
-This is different from normal `Backspace`, which remains ordinary text editing except when the node is empty or the caret is at its beginning (see 8.2–8.3).
+This is different from normal `Backspace`, which is ordinary text editing except when the node is empty or the caret is at its beginning (see 8.2–8.3).
 
 After deleting a node from the currently displayed level:
 
@@ -277,15 +277,13 @@ After deleting a node from the currently displayed level:
 
 When the deleted node is a visible descendant shown by inline expansion (§2.4) and has no sibling, its parent is selected and the location does not change; deleting a node never enters or leaves a location. The same holds for `dd`.
 
-When inside a parent, `Cmd+Backspace` deletes the currently selected child.
-
 When the editable current parent is focused, `Cmd+Backspace` does nothing. The current parent and its subtree can only be removed by explicitly deleting that node from its displayed parent level.
 
 ### 8.2 Backspace on an Empty Node
 
 Pressing `Backspace` on a node whose text is empty deletes that node and its entire subtree.
 
-This applies to nodes on the displayed level. It does not apply to the editable current-parent heading, where `Backspace` remains ordinary text editing.
+This applies to nodes on the displayed level. It does not apply to the editable current-parent heading, where `Backspace` is ordinary text editing.
 
 An empty node that has an attachment or children is still deleted this way, including its subtree and its attachment.
 
@@ -298,7 +296,7 @@ After the deletion:
 
 When the deleted node is a visible descendant shown by inline expansion (§2.4), rule 2 selects its own parent with the text cursor at the end of its text and leaves the location unchanged. Only an explicit command — `Cmd+.`, `gd`, or the node's enter control — changes the location.
 
-This is an explicit user action. Empty nodes are never deleted automatically.
+This is an explicit user action; §19 forbids automatic deletion of empty nodes.
 
 ### 8.3 Backspace at the Beginning of a Nonempty Node
 
@@ -306,7 +304,7 @@ In Tree standard editing and Vim Insert, plain `Backspace` with a collapsed text
 
 Otherwise, if the current node and its immediately preceding sibling both have nonempty text, no children and no attachment, the command joins them. It appends the current text unchanged, without inserting a space, to the preceding sibling. The preceding sibling keeps its ID; hyperlink ranges move with their text. Selection moves to that sibling with the text caret at the join, while location and editing mode remain unchanged. Nodes with different parents never join, even if their rows are adjacent on screen.
 
-If neither rule applies, nothing changes. The editable current-parent heading cannot be removed or joined this way. Each removal or join is one undoable change. A successful change interrupts Vim Insert recording while keeping the previous repeatable change; a no-op keeps the Insert recording. Backspace on an empty current node retains §8.2, and Backspace with selected text or a caret after position zero retains ordinary text editing. Agenda does not join nodes (§23.10).
+If neither rule applies, nothing changes. The editable current-parent heading cannot be removed or joined this way. Each removal or join is one undoable change. A successful change interrupts Vim Insert recording while keeping the previous repeatable change; a no-op keeps the Insert recording. Backspace on an empty current node follows §8.2, and Backspace with selected text or a caret after position zero is ordinary text editing. Agenda does not join nodes (§23.10).
 
 ---
 
