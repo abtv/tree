@@ -6,7 +6,7 @@ Status: In progress
 
 1. Split `docs/ARCHITECTURE.md` (209,630 bytes at `e85fed30`) into per-area files under `docs/architecture/`, with `docs/ARCHITECTURE.md` as the index, the same way `docs/PRODUCT.md` indexes `docs/product/`.
 2. Give §4, §7, §8, §13 and §21 numbered subsections by subject, so that each subject is stored in the file of its area. This answered the open question TD-003, which T2 removed from `docs/OPEN_QUESTIONS.md`.
-3. Rewrite the wording of every file as present-state statements without losing an architectural fact.
+3. Rework every file from a series of change notes into a description of the present design, without losing a lasting architectural fact (Rework Method below).
 
 ## Scope Limits
 
@@ -30,7 +30,8 @@ Status: In progress
   * **D1.** Subsections for §4, §7, §8, §13 and §21, and the 17-file map below.
   * **D2.** From R14 on, `check:docs` enforces 8,000 characters of own text per architecture section. No per-block limit applies.
   * **D3.** An independent Reviewer checks every rewrite task (R1–R13).
-  * **D4.** After R1 the Product Owner reads the rewritten files and confirms the style before R2 starts.
+  * **D4.** After R1 the Product Owner reads the rewritten files and confirms the style before R2 starts. Done on 2026-11-22: the Product Owner accepted the pilot and asked for a deeper rework (D5).
+  * **D5.** Product Owner statement of 2026-11-22: the rework should go deeper than the pilot; the agent defines what that means and decides the details itself. The principle: a good working architecture description that is a sound base for future work, and no refactoring for the sake of appearance. The Rewrite Method below is the agent's definition under this principle. No further style checkpoint is required before the final acceptance.
 * Delegated decisions and their principles:
   * Titles of new subsections, the order of files in the index, and the wording of the index. Principle: the same form as `docs/PRODUCT.md`.
   * Which paragraph belongs to which subsection when the map below is inexact. Principle: the paragraph goes to the subject it describes, and a paragraph stays next to the paragraph it refers to.
@@ -38,7 +39,7 @@ Status: In progress
 * Reserved decisions:
   * A mechanism or behavior claim that the code contradicts. Do not reword it; record it under Findings and ask the Product Owner in one batch.
   * A sentence that states user-visible behavior which no `docs/product/` file states. Keep the sentence and record it under Findings as a candidate requirement gap.
-* Execution budget: 16 working tasks. Recovery budget: 2 fix cycles each for T1 and T2, and 10 pooled fix cycles for R1–R14. Closure allowance: 2 fix cycles after a rejected acceptance, plus the retirement commit.
+* Execution budget: 17 working tasks. Recovery budget: 2 fix cycles each for T1 and T2, and 12 pooled fix cycles for R1–R14. Closure allowance: 2 fix cycles after a rejected acceptance, plus the retirement commit.
 
 ## Structure
 
@@ -80,27 +81,39 @@ Paragraphs that refer to their neighbour and must stay adjacent: 542→544, 558�
 
 `docs/ARCHITECTURE.md` keeps the title, a statement that it holds no architecture text, the citation convention, the section map, and the retired-number list. ADR 0024 links to `../ARCHITECTURE.md#desktop-notes-replacement`; the index keeps an anchor with that id that points to §13.12, because the link check does not validate anchors and ADRs are not edited.
 
-## Rewrite Method (R1–R13)
+## Rework Method (R1b–R13)
 
-Wording rules:
+R1 changed only history-relative wording. Under D5 the remaining tasks rework each file so that a reader who changes one area opens one file and finds, for each mechanism, which module owns it, which rules a change must keep, and what it costs. The text was written as a series of change notes; the rework turns it into a description of the present design. It does not polish text beyond that purpose.
 
-* **Rewrite the minimum.** Change a sentence only when it is history-relative, restates product behavior, or is unclear. Leave every other sentence byte-identical.
-* State what the code does now. Remove change-history phrasing such as "no longer", "the existing", "added", "adds no", "as before", "unchanged", "now" and restate the fact. Example: "adds no writes or syncs" becomes "performs no writes or syncs".
-* Follow the communication style of `AGENTS.md` §1: active voice, literal terms, short sentences, the owning module or type as the subject, one mechanism per paragraph.
-* Add no new fact. Every added clause traces to one or more old clauses.
-* Replace a sentence that only restates user-visible behavior with a citation of `PRODUCT.md §N`, after reading the product file and confirming that it states the fact. Otherwise keep the sentence (reserved decision above).
-* Keep the reason for a rejected alternative when it constrains future change, as a present-state reason.
-* Keep exactly: module, file, symbol, type, IPC channel, CSS class, attribute and storage-key names; ADR links; section references and their scope; numbers, limits, counts and units; state names; order statements; the modality `must`, `should`, `may`; `never`, `only`, `no`; write and sync counts, complexity bounds, retained-memory bounds and named guards of every performance assessment; stated limits of measurements.
-* Keep the order of statements where order carries meaning, and keep a paragraph next to the paragraph it refers to.
-* A task may add numbered subsections inside its file and then updates the section map.
+A task does this to its file:
 
-Proof for each rewrite task, with the task's starting commit as `<base>`:
+1. **Organize by owner and mechanism.** Each numbered subsection describes one owner or one mechanism. When a subsection covers several, add numbered subsections with the next free numbers under the parent and update the section map. Inside a subsection use this order where it applies: what the module owns and where it is; its states, transitions and ordering rules; the constraints a change must keep; costs and guards.
+2. **State each fact once.** When several paragraphs state one fact, keep one full statement at its owner and cite that section elsewhere. Merge the performance assessments of one mechanism into one assessment that keeps every distinct count, bound and named guard.
+3. **Remove text that holds no lasting fact.** Remove the narration of a past change, and remove a sentence that only says a past change did not affect something else. Keep a negative statement when breaking it would be a regression that someone must prevent: a commitment under PRODUCT.md §22.1 (no write, sync, document traversal or unbounded memory on a named path), a security or process boundary, or an ownership rule. The test: if a later change made the sentence false, would that change need a decision or a guard? If yes, keep the sentence as a constraint. If no, remove it.
+4. **Keep decisions and shorten their story.** Keep the reason for a rejected alternative, and keep the conclusion and the stated limit of a measurement, when they constrain a later choice. Shorten the account of how the measurement was made.
+5. **Cite the product; do not restate it.** Replace a sentence that only restates user-visible behavior with a citation of `PRODUCT.md §N`, after reading the product file and confirming that it states the fact. Otherwise keep the sentence (reserved decision above).
+6. **Use present-state, literal wording.** State what the code does. Do not use change-history phrasing such as "no longer", "the existing", "added", "adds no", "as before", "unchanged", "now". Follow the communication style of `AGENTS.md` §1: active voice, the owning module or type as the subject, short sentences. Cite the product as `PRODUCT.md §N`.
+7. **Check the names.** Check that every file, module and symbol name that the file cites exists in the repository. Correct a stale name (delegated decision above).
 
-1. `npm run check:docs -- --details <base> --file docs/architecture/<file>.md`. Every removed literal and changed reference has a ledger entry; no table cell changes.
-2. `npm run check:docs -- --verbatim <base> --file docs/architecture/<file>.md`. It exits 1 for a rewrite. Every removed clause gets one disposition in `.scratch/architecture-split-<task>/ledger.md`: Restated (new location), Product-owned (`PRODUCT.md §N`, verified), History-only (no fact), Corrected (code evidence `path:line`), or Moved within file. "Dropped" is not a disposition.
+A task does not do this:
+
+* It does not reword a sentence that is already a clear present-state statement. Such a sentence stays byte-identical.
+* It does not audit the whole text against the code. It checks a claim against the code only when the rework changes the claim's meaning or the claim looks wrong.
+* It does not move text to another file. The exception is a paragraph that is clearly about another file's subject; that move is a separate commit proven by `--regrouped`.
+* It does not change a section number, an ADR, a product file or code.
+* It has no size target. Text leaves only under rules 2 to 5.
+* It adds no fact. Every added clause traces to one or more old clauses or to code evidence recorded in the ledger.
+
+Keep exactly: module, file, symbol, type, IPC channel, CSS class, attribute and storage-key names; ADR links; section references and their scope; numbers, limits, counts and units; state names; order statements; the modality `must`, `should`, `may`; `never`, `only`, `no`; write and sync counts, complexity bounds, retained-memory bounds and named guards of every performance assessment; stated limits of measurements. Keep the order of statements where order carries meaning.
+
+Proof for each task, with the task's starting commit as `<base>`:
+
+1. `npm run check:docs -- --details <base> --file docs/architecture/<file>.md`. Every removed literal and changed reference has a ledger entry. A literal may leave only with the disposition Merged or Removed.
+2. `npm run check:docs -- --verbatim <base> --file docs/architecture/<file>.md`. It exits 1 for a rework. Every removed clause gets one disposition in `.scratch/architecture-split-<task>/ledger.md`: Restated (new location), Merged (location of the surviving full statement), Product-owned (`PRODUCT.md §N`, verified), Removed (no lasting fact, with the reason in a few words), Corrected (code evidence `path:line`), or Moved within file.
 3. `npm run check:docs` and `npm run format:check:changed` pass.
 4. `git diff --stat` shows only the task's files, the index when subsections are added, and this plan.
-5. The Reviewer receives the old file, the new file, the ledger and both reports, and confirms that no fact is lost, changed or added.
+5. The Reviewer receives the old text, the new file and the ledger. It confirms that no lasting fact is lost or changed, that every Removed clause holds no lasting fact under rule 3, and that every Merged survivor states the full fact. It checks against the code the claims whose meaning the rework touched. The Reviewer has no shell: before editing, copy the file into the task's scratch directory, or paste the complete removed-clause list of step 2 into the Reviewer's prompt, as R1 did.
+6. After the commit, remove the scratch directory with `npm run retire:scratch -- architecture-split-<task>`.
 
 ## Tasks
 
@@ -109,7 +122,8 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 | T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Done |
 | T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Done |
 | R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Done |
-| R2 | Rewrite | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless they hold change-history phrasing. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rewrite proof | Minimal Risk | Blocked: owner checkpoint D4 |
+| R1b | Rework of the two pilot files under the Rework Method. They are the reference example for R2–R13 | `command-panel.md`, `completion-and-tags.md` | Rework proof | Minimal Risk | Ready |
+| R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Planned |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Planned |
 | R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Planned |
@@ -121,20 +135,19 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 | R11 | Rewrite | `save-scheduling.md`, `attachments-and-clipboard.md` | Rewrite proof | Minimal Risk | Planned |
 | R12 | Rewrite | `desktop-data.md`. Keep the crash-safety step order (ADR 0024) | Rewrite proof | Minimal Risk | Planned |
 | R13 | Rewrite | `browser.md` | Rewrite proof | Minimal Risk | Planned |
-| R14 | Lasting wording rules in the index; size limit D2 | `docs/ARCHITECTURE.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Every file is within the limit; `npm run check` passes | Low Risk: `npm run check` | Planned |
+| R14 | Lasting writing rules in the index; size limit D2; a check that every source file name cited under `docs/architecture/` exists in the repository | `docs/ARCHITECTURE.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Every file is within the limit; the name check passes and has tests; `npm run check` passes | Low Risk: `npm run check` | Planned |
 
 T2 wrote each file once with the file-editing tool from the line ranges above, then wrote the index.
 
 ## Owner Involvement
 
-* Working tasks: 16. The final owner acceptance of `AGENTS.md` §8 applies.
-* Verification rounds: one style checkpoint after R1 (D4); at most one batch of Findings questions during R2–R13; one final acceptance round.
+* Working tasks: 17. The final owner acceptance of `AGENTS.md` §8 applies.
+* Verification rounds: the style checkpoint after R1 (D4) is done; at most one batch of Findings questions during R1b–R13; one final acceptance round.
 * Owner-required checks: none. No user-visible behavior changes.
 * Capabilities to confirm at run time: `npm run check:docs` with the new arguments runs without a prompt; the Reviewer launches.
 
 | Task | Check | Owner action |
 | --- | --- | --- |
-| R1 | Style of the rewritten files | Read `docs/architecture/command-panel.md` and `docs/architecture/completion-and-tags.md`; confirm or correct the style |
 | R14 | Final acceptance | Read the index and two or three files; compare with `git show e85fed30:docs/ARCHITECTURE.md` |
 
 ## Decisions and Findings
@@ -151,13 +164,14 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * `--regrouped` does not fail for text added before the first numbered heading. `npm run check:docs` rejects such text in the files under `docs/architecture/`, but not in the index. Check the index by reading it when `--regrouped` is used again.
   * `--regrouped` also resolves link targets inside code spans and fenced blocks. The architecture files have no link inside code.
 
-* R1 result (base `e5225f51`): 53 of 178 clauses changed in the two files; every other clause is byte-identical. `--details` shows no changed name, number or table cell; the only changed literals and references are the citation form. The Reviewer found no lost, changed or added fact; its three low-severity wording findings are applied. The ledger stays in `.scratch/architecture-split-R1/ledger.md` until the owner checkpoint D4; the session that records D4 removes it with `npm run retire:scratch -- architecture-split-R1`.
-* Style choices of the pilot that D4 confirms or corrects, and that R2–R13 then apply the same way:
+* R1 result (base `e5225f51`): 53 of 178 clauses changed in the two files; every other clause is byte-identical. `--details` shows no changed name, number or table cell; the only changed literals and references are the citation form. The Reviewer found no lost, changed or added fact; its three low-severity wording findings are applied.
+* R14 gains the file-name check under D5: a description that cites modules which no longer exist is not a sound base for later work, and a check prevents that without a recurring review.
+* Style choices of the pilot, accepted at D4, that R1b–R13 apply the same way:
   * Citations of the product specification use the plain form `PRODUCT.md §N`, replacing `docs/PRODUCT.md` in a code span, `PRODUCT §N` and `§N of PRODUCT`. Citations inside ADRs and other documents are not changed.
   * An assessment that only said "this adds no …" becomes a sentence with a named subject, and starts with "Performance assessment (PRODUCT.md §22.1):" when it states costs.
-  * A sentence that compared the mechanism with an earlier state ("remains unchanged", "retains its existing …") states the present fact. When the present fact is that one mechanism does not affect another, the sentence says so ("The adapters do not change …") instead of being removed.
-  * A long paragraph is split at sentence boundaries when it describes several mechanisms; no sentence moves to another subsection.
+  * A sentence that compared the mechanism with an earlier state ("remains unchanged", "retains its existing …") states the present fact, or leaves under rule 3 of the Rework Method when it holds no lasting fact.
+  * A long paragraph is split at sentence boundaries when it describes several mechanisms.
 
 ## Next Task
 
-Owner checkpoint D4: the Product Owner reads `docs/architecture/command-panel.md` and `docs/architecture/completion-and-tags.md` (compare with `git show e5225f51:docs/architecture/command-panel.md`) and confirms or corrects the style. After that, R2. Record its starting commit as `<base>` before editing.
+R1b. Record its starting commit as `<base>` before editing. Continue with R2–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
