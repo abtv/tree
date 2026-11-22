@@ -33,7 +33,6 @@ import {
   removeTextRange,
   replaceLinkedTextRanges,
   replaceSiblingRange,
-  requireNode,
   serializeState,
   shiftSiblingRange,
   splitNode,
@@ -82,35 +81,16 @@ function materialize(rawForest: RawNode[]): Document {
   const build = (raw: RawNode): TreeNode => {
     const id = `n${counter++}`
     const children = raw.children.map(build)
-    const complete = children.length === 0 ? raw.struckThrough : children.every((child) => child.struckThrough)
     return {
       id,
       text: raw.text,
       ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
-      ...(complete ? { struckThrough: true as const } : {}),
+      ...(raw.struckThrough ? { struckThrough: true as const } : {}),
       ...(raw.starred ? { starred: true as const } : {}),
       children,
     }
   }
   return { roots: rawForest.map(build) }
-}
-
-/** Inverse moves restore structure, but a temporary parent keeps its last derived state on becoming a leaf. */
-function expectRestoredStructure(before: Document, intermediate: Document, restored: Document): void {
-  const rebuild = (node: TreeNode): TreeNode => {
-    const children = node.children.map(rebuild)
-    const during = requireNode(intermediate, node.id).node
-    const complete =
-      children.length > 0
-        ? children.every((child) => child.struckThrough === true)
-        : during.children.length > 0
-          ? during.struckThrough === true
-          : node.struckThrough === true
-    const content = { ...node }
-    delete content.struckThrough
-    return { ...content, ...(complete ? { struckThrough: true as const } : {}), children }
-  }
-  expect(restored).toEqual({ roots: before.roots.map(rebuild) })
 }
 
 function allNodes(document: Document): TreeNode[] {
@@ -564,7 +544,7 @@ describe('document invariants', () => {
     )
   })
 
-  it('shiftSiblingRange out restores structure after in, retaining the former parent completion when it becomes a leaf', () => {
+  it('shiftSiblingRange out restores the document after in, keeping every node state', () => {
     fc.assert(
       fc.property(forest, fc.nat(), fc.integer({ min: 1, max: 3 }), (rawForest, seed, count) => {
         const document = materialize(rawForest)
@@ -577,12 +557,12 @@ describe('document invariants', () => {
         const restored = shiftSiblingRange(shifted.document, first.id, count, 'out')
 
         expect(restored.kind).toBe('moved')
-        if (restored.kind === 'moved') expectRestoredStructure(document, shifted.document, restored.document)
+        if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
     )
   })
 
-  it('moveSubtree keeps the moved subtree and its inverse restores structure with derived completion', () => {
+  it('moveSubtree keeps the moved subtree and its inverse restores the document with every node state', () => {
     fc.assert(
       fc.property(forest, fc.nat(), fc.nat(), fc.integer({ min: -1, max: 6 }), (rawForest, seed, parentSeed, index) => {
         const document = materialize(rawForest)
@@ -624,7 +604,7 @@ describe('document invariants', () => {
         const restored = moveSubtree(result.document, node.id, before.parent?.id ?? null, before.index)
 
         expect(restored.kind).toBe('moved')
-        if (restored.kind === 'moved') expectRestoredStructure(document, result.document, restored.document)
+        if (restored.kind === 'moved') expect(restored.document).toEqual(document)
       }),
       { numRuns: propertyRuns(100) },
     )
@@ -676,7 +656,7 @@ describe('document invariants', () => {
     )
   })
 
-  it('toggleStrikethrough changes selected subtrees and derives ancestors while sharing unrelated branches', () => {
+  it('toggleStrikethrough changes only the selected sibling nodes while sharing unrelated branches', () => {
     fc.assert(
       fc.property(forest, fc.nat(), fc.nat(), (rawForest, seed, otherSeed) => {
         const document = materialize(rawForest)
@@ -689,7 +669,8 @@ describe('document invariants', () => {
         const strike = !range.every((node) => node.struckThrough === true)
 
         const result = toggleStrikethrough(document, anchor.id, focus.id)!
-        const rangeIds = new Set(range.flatMap(subtreeIds))
+        const rangeIds = new Set(range.map((node) => node.id))
+        const ancestorIds = new Set(located.ancestors.map((ancestor) => ancestor.id))
 
         expect(allIds(result)).toEqual(allIds(document))
         expect(attachmentSummary(result)).toEqual(attachmentSummary(document))
@@ -703,18 +684,16 @@ describe('document invariants', () => {
             expect(node.text).toBe(original.text)
             expect(node.links).toBe(original.links)
             expect(node.attachment).toBe(original.attachment)
-            expect(node.children.map((child) => child.id)).toEqual(original.children.map((child) => child.id))
-          } else if (!located.ancestors.some((ancestor) => ancestor.id === node.id)) {
+            expect(node.children).toBe(original.children)
+          } else if (ancestorIds.has(node.id)) {
+            expect(node.struckThrough).toBe(original.struckThrough)
+          } else {
             expect(node).toBe(original)
           }
         }
 
-        if (strike && [...rangeIds].every((id) => before.get(id)!.struckThrough !== true)) {
+        if (strike && range.every((node) => node.struckThrough !== true)) {
           expect(toggleStrikethrough(result, anchor.id, focus.id)).toEqual(document)
-        }
-        for (const node of allNodes(result)) {
-          if (node.children.length > 0)
-            expect(node.struckThrough === true).toBe(node.children.every((child) => child.struckThrough === true))
         }
         assertDocument(result)
         expect(
@@ -951,7 +930,7 @@ describe('document invariants', () => {
     )
   })
 
-  it('preserves attachment multiplicity and derived completion after every editing operation', () => {
+  it('preserves attachment multiplicity and every other node state after every editing operation', () => {
     fc.assert(
       fc.property(forest, fc.nat(), fc.integer({ min: -2, max: 40 }), fc.string(), (rawForest, seed, cursor, text) => {
         const document = materialize(rawForest)
@@ -990,13 +969,16 @@ describe('document invariants', () => {
           ensureRoot(document, 'new-root'),
         ]
 
+        const before = new Map(allNodes(document).map((entry) => [entry.id, entry.struckThrough === true]))
+        const toggled = results[results.length - 2]!
         for (const result of results) {
           expect([...attachmentSummary(result).entries()].sort()).toEqual(reference(result))
           for (const candidate of allNodes(result)) {
-            if (candidate.children.length > 0)
-              expect(candidate.struckThrough === true).toBe(
-                candidate.children.every((child) => child.struckThrough === true),
-              )
+            const original = before.get(candidate.id)
+            if (original === undefined) continue
+            const expected = result === toggled && candidate.id === node.id ? !original : original
+
+            expect(candidate.struckThrough === true).toBe(expected)
           }
         }
       }),

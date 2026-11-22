@@ -17,7 +17,6 @@ import { normalizeLinks } from './document-links'
 import { isValidAttachmentId } from './document-attachments'
 import { isValidAttachmentDimensions } from './attachment-dimensions'
 import { MAX_DOCUMENT_DEPTH_ERROR } from './product-messages'
-import { deriveStruckThrough } from './node-struck-through'
 import { buildNodeIndex, locateNode } from './document-index'
 import { dayNumberOf, weekdayOf } from './calendar-date'
 
@@ -329,11 +328,6 @@ function walkNodes(
   while (stack.length > 0) {
     const frame = stack[stack.length - 1]!
     if (frame.index >= frame.input.length) {
-      if (frame.output !== undefined) {
-        for (let index = 0; index < frame.output.length; index += 1) {
-          frame.output[index] = deriveStruckThrough(frame.output[index]!) as BuildNode
-        }
-      }
       stack.pop()
       continue
     }

@@ -149,7 +149,8 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
     await input.focus()
     await window.keyboard.press('Meta+Enter')
     await expect(input).not.toHaveClass(/node-input-struck/)
-    await expect(heading).not.toHaveClass(/node-input-struck/)
+    // The heading keeps its own state when its only child returns to normal.
+    await expect(heading).toHaveClass(/node-input-struck/)
     await expect(input.locator('a')).toHaveCSS('text-decoration-line', 'underline')
     await window.keyboard.press('Meta+Enter')
     await expect(input).toHaveClass(/node-input-struck/)

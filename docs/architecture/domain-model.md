@@ -79,7 +79,7 @@ Attachment references may contain the optional image size `width` and `height`; 
 
 ### 5.1 Completion State
 
-`struckThrough` is present, and `true`, only on a complete node (PRODUCT.md §2.5); an incomplete node omits it rather than storing `false`. Leaves own their state; parents materialize the conjunction of their children's states. `node-struck-through.ts` derives a rebuilt parent's state and applies a uniform state to a subtree. Structural operations recalculate rebuilt nodes and affected ancestor paths; a parent losing its last child keeps its previous state. Content-only edits keep completion without scanning children. `toggleStrikethrough` changes the selected sibling subtrees and their ancestor paths in one history edit (§11), preserving text, links, attachments, and identities.
+`struckThrough` is present, and `true`, only on a struck-through node (PRODUCT.md §2.5); a normal node omits it rather than storing `false`. It belongs to the node alone and never changes its parent or children. Every domain operation that rebuilds a node keeps it, and every operation that creates a node leaves it absent, which gives the split, join, copy, and move rules in §2.5. `toggleStrikethrough` changes one sibling range with `withStruckThrough` from `node-struck-through.ts` and path-copies only the route to it, like any other edit (§11), preserving text, links, attachments, children, and identities.
 
 ### 5.2 Attachment Search Text
 

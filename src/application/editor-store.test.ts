@@ -1334,7 +1334,7 @@ describe('EditorStore', () => {
       return ids
     }
 
-    it('toggles a subtree as one undoable change that keeps the location and caret', async () => {
+    it('toggles only the selected node as one undoable change that keeps the location and caret', async () => {
       const clock = new FakeClock()
       const services = loadedState(tasks, { currentParentId: null, selectedNodeId: 'a' })
       const store = new EditorStore(services, ids('unused'), clock)
@@ -1345,14 +1345,14 @@ describe('EditorStore', () => {
       if (before.status !== 'ready') throw new Error('Expected a ready editor.')
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
-      expect(struck(store)).toEqual(['a', 'a1', 'b'])
+      expect(struck(store)).toEqual(['a', 'b'])
 
       const after = store.getSnapshot()
       if (after.status !== 'ready') throw new Error('Expected a ready editor.')
 
       expect(after.location).toEqual(before.location)
       expect(after.focus).toBe(before.focus)
-      expect(after.document.roots[0]!.children).toEqual([{ id: 'a1', text: 'Step', struckThrough: true, children: [] }])
+      expect(after.document.roots[0]!.children).toBe(before.document.roots[0]!.children)
       expect(after.document.roots[0]).toMatchObject({ id: 'a', text: 'Alpha' })
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
@@ -1360,7 +1360,7 @@ describe('EditorStore', () => {
 
       store.undo()
 
-      expect(struck(store)).toEqual(['a', 'a1', 'b'])
+      expect(struck(store)).toEqual(['a', 'b'])
 
       const undone = store.getSnapshot()
 
@@ -1372,7 +1372,7 @@ describe('EditorStore', () => {
 
       store.redo()
 
-      expect(struck(store)).toEqual(['a', 'a1', 'b'])
+      expect(struck(store)).toEqual(['a', 'b'])
     })
 
     it('marks a pending change saved by the idle trigger rather than saving immediately', async () => {
@@ -1405,26 +1405,26 @@ describe('EditorStore', () => {
       await store.initialize()
 
       expect(store.toggleStrikethrough('c', 'a')).toBe(true)
-      expect(struck(store)).toEqual(['a', 'a1', 'b', 'c'])
+      expect(struck(store)).toEqual(['a', 'b', 'c'])
       expect(store.toggleStrikethrough('a', 'b')).toBe(true)
       expect(struck(store)).toEqual(['c'])
 
       store.undo()
 
-      expect(struck(store)).toEqual(['a', 'a1', 'b', 'c'])
+      expect(struck(store)).toEqual(['a', 'b', 'c'])
 
       const undone = store.getSnapshot()
 
       expect(undone.status === 'ready' && undone.focus).toMatchObject({ nodeId: 'a', cursor: 0 })
     })
 
-    it('strikes the editable current-parent heading and its children', async () => {
+    it('strikes only the editable current-parent heading', async () => {
       const store = new EditorStore(loadedState(tasks, { currentParentId: 'a', selectedNodeId: 'a' }), ids('unused'))
 
       await store.initialize()
 
       expect(store.toggleStrikethrough('a', 'a')).toBe(true)
-      expect(struck(store)).toEqual(['a', 'a1', 'b'])
+      expect(struck(store)).toEqual(['a', 'b'])
 
       const state = store.getSnapshot()
 

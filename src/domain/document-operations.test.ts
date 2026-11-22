@@ -466,7 +466,7 @@ describe('strikethrough across node operations', () => {
 
     const child = createFirstChild(struck, 'task', 'child')
 
-    expect(child.roots[0]!.struckThrough).toBeUndefined()
+    expect(child.roots[0]!.struckThrough).toBe(true)
     expect(child.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
   })
 

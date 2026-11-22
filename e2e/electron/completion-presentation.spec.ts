@@ -40,7 +40,9 @@ test('keeps completion after toggling a node and searching for its person marker
 
   await expect(title).toHaveCSS('text-decoration-line', 'line-through')
   await expect(window.locator('[data-result-id="open"] .recent-node-text')).toHaveCSS('text-decoration-line', 'none')
-  await expect(window.locator('[data-result-id="done"] .recent-node-path .node-text-struck')).toHaveText('#standup')
+  // Striking the only child leaves its parent, and the parent's path label, normal.
+  await expect(window.locator('[data-result-id="done"] .recent-node-path')).toContainText('#standup')
+  await expect(window.locator('[data-result-id="done"] .recent-node-path .node-text-struck')).toHaveCount(0)
   for (const appearance of ['light', 'dark'] as const) {
     await window.emulateMedia({ colorScheme: appearance })
     await window.screenshot({ path: testInfo.outputPath(`person-search-${appearance}.png`) })

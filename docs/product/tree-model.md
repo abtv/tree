@@ -201,21 +201,21 @@ A node can be struck through, for example to mark a task as done. A struck-throu
 
 This presentation applies to Tree, Agenda, location breadcrumbs, the marked and starred list of global Search, global search results, and each node label in their parent paths; path separators remain unstruck. Search-match emphasis remains visible under the line.
 
-* A leaf has its own completion state. A node with children is struck through exactly when all of its direct children are struck through; this rule applies recursively up to the roots. A partially completed parent is not struck through.
-* `Cmd+Enter` toggles the selected node and its entire subtree, including collapsed descendants. If the branch is complete, every node in it returns to normal; otherwise every node becomes struck through. It works on every node, including the editable current-parent heading, in every Vim mode and in the same way whether or not Vim mode is enabled. An ordinary click still only places focus or the caret.
-* In whole-node Visual mode it acts on all selected subtrees: when every selected branch is complete, they all return to normal; otherwise they all become complete. Ancestors outside the range are recalculated from their children. It then returns to Normal mode, as the other whole-node Visual commands do.
+* Every node has its own state, independent of its parent and children. Striking a node through, returning it to normal, or changing its children never changes another node's state.
+* `Cmd+Enter` toggles the selected node between struck through and normal. It changes only that node: its children keep their own state. It works on every node, including the editable current-parent heading, in every Vim mode and in the same way whether or not Vim mode is enabled. An ordinary click still only places focus or the caret.
+* In whole-node Visual mode it acts on the selected sibling nodes instead: when every one of them is already struck through, they all return to normal; otherwise they all become struck through. Their descendants keep their own state. It then returns to Normal mode, as the other whole-node Visual commands do.
 * In character Visual mode it acts on the current node, keeps character Visual mode, and clears the selection endpoints like the other `Cmd` commands. It never moves the caret, does not end Insert mode, and, like the other `Cmd` commands, discards an unfinished Normal-mode command. A pending Replace edit is completed as one edit first and Replace mode ends in Normal mode, as for the other application commands in §20.2.
 * `Cmd+Enter` is not repeated by `.` and leaves the Vim register unchanged; `Cmd+Shift+Enter` and `Cmd+Option+Enter` do nothing. It is not part of Apple's standard keyboard shortcuts, so it conflicts with none of them (§1.3).
 
-Each toggle, including its descendant and ancestor changes, is one undoable change. Undo restores the exact previous mixture of completed and incomplete nodes. Undo or redo places the caret at the beginning of the first node it changes (§10), which can be an ancestor whose completion changed. It is a pending change saved by the idle, volume, and quit triggers in §16.1; it does not save immediately. In the locked save-failure state (§16.2) it is rejected like any other document change.
+Each toggle is one undoable change, and undo or redo places the caret at the beginning of the first node it changes (§10). It is a pending change saved by the idle, volume, and quit triggers in §16.1; it does not save immediately. In the locked save-failure state (§16.2) it is rejected like any other document change.
 
 The state belongs to the node and travels with it:
 
-* Splitting a node with `Enter` or a multiline paste keeps the state on the part that keeps the node's identity; the new part starts normal. Every newly created leaf starts normal, including the nodes `Enter`, `o`, and `O` create. Adding an incomplete child reopens its parent and any completed ancestors.
-* Joining nodes with `gJ` derives the result's state from its combined children. When the result has no children, it keeps the first node's state.
-* Moving a node, by dragging or by `>` and `<`, keeps the moved subtree's state, and a node or subtree put with `p` or `P` copies the state of every copied node. Insertions, deletions, replacements, and moves recalculate all affected ancestors in the same history change. If a parent loses its last child, it becomes a leaf and keeps its state immediately before that removal.
+* Splitting a node with `Enter` or a multiline paste keeps the state on the part that keeps the node's identity; the new part starts normal. Every newly created node starts normal, including the nodes `Enter`, `o`, and `O` create.
+* Joining nodes with `gJ` keeps the state of the first node, as it keeps its identity.
+* Moving a node, by dragging or by `>` and `<`, keeps the state of every moved node, and a node or subtree put with `p` or `P` copies the state of every copied node.
 * The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
-* Saving and reopening the application keeps completion. Existing documents preserve every leaf's state and recalculate parents from children when loaded, even if their old independent parent states disagree. A document saved before struck-through nodes existed opens with every node normal.
+* Saving and reopening the application keeps every node's state, including the parent states that earlier versions derived from their children. A document saved before struck-through nodes existed opens with every node normal.
 
 Struck-through nodes are always shown: Tree, Agenda, local Find, and global Search, including marked and starred results and marker suggestions, list them like any other node. The Agenda `Overdue` group still lists only nodes that are not struck through (§23.3).
 

@@ -61,7 +61,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
 
     expect(persisted.version).toBe(6)
     expect(persisted.document.roots[0]).toMatchObject({ id: 'a', text: 'AlXpha', struckThrough: true })
-    expect(persisted.document.roots[0]!.children[0]).toHaveProperty('struckThrough', true)
+    expect(persisted.document.roots[0]!.children[0]).not.toHaveProperty('struckThrough')
     expect(persisted.document.roots[1]).not.toHaveProperty('struckThrough')
 
     const second = await launchTree(userDataDir)
@@ -94,7 +94,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     await expect(node(window, 2)).toHaveValue('Bravo')
   })
 
-  test('strikes the editable current-parent heading and its children', async ({ userDataDir }) => {
+  test('strikes only the editable current-parent heading', async ({ userDataDir }) => {
     seedDocument(userDataDir, tasksSeed('a'))
     const { window } = await launchTree(userDataDir)
     await parent(window).focus()
@@ -103,7 +103,7 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
 
     await expect(parent(window)).toHaveClass(/node-input-struck/)
     await expect(node(window, 1)).toHaveValue('Alpha step')
-    await expect(node(window, 1)).toHaveClass(/node-input-struck/)
+    await expect(node(window, 1)).not.toHaveClass(/node-input-struck/)
   })
 
   test('draws the line through muted text in the light and dark appearance', async ({ userDataDir }) => {
@@ -145,15 +145,13 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
     await window.emulateMedia({ colorScheme: 'light' })
   })
 
-  test('derives the heading from children and restores a mixed branch with one Undo', async ({ userDataDir }) => {
+  test('keeps parent and child states independent and restores them with one Undo', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
           {
             id: 'shopping',
             text: 'Shopping',
-            // Legacy independent parent state is recalculated when the document opens.
-            struckThrough: true,
             children: [
               { id: 'milk', text: 'Milk', struckThrough: true, children: [] },
               { id: 'bread', text: 'Bread', children: [] },
@@ -163,29 +161,41 @@ describeForEachEditingMode('struck-through nodes', ({ mode, screenshotName }) =>
       },
       location: { currentParentId: 'shopping', selectedNodeId: 'bread' },
     })
-    const { window } = await launchTree(userDataDir)
+    const { app, window } = await launchTree(userDataDir)
 
-    await expect(parent(window)).not.toHaveClass(/node-input-struck/)
     await node(window, 2).focus()
     await window.keyboard.press('Meta+Enter')
 
-    await expect(parent(window)).toHaveClass(/node-input-struck/)
+    // Every child is struck through, and the parent keeps its own normal state.
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
+    await expect(node(window, 2)).toHaveClass(/node-input-struck/)
+    await expect(parent(window)).not.toHaveClass(/node-input-struck/)
+
+    await parent(window).focus()
+    await window.keyboard.press('Meta+Enter')
+    await node(window, 1).focus()
+    await window.keyboard.press('Meta+Enter')
+
+    // Striking the parent and then returning a child to normal changes only those two nodes.
+    await expect(parent(window)).toHaveClass(/node-input-struck/)
+    await expect(node(window, 1)).not.toHaveClass(/node-input-struck/)
     await expect(node(window, 2)).toHaveClass(/node-input-struck/)
 
     await window.keyboard.press('Meta+z')
 
-    await expect(parent(window)).not.toHaveClass(/node-input-struck/)
-    await expect(parent(window)).toBeFocused()
+    await expect(node(window, 1)).toBeFocused()
     await expect(node(window, 1)).toHaveClass(/node-input-struck/)
-    await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
+    await expect(parent(window)).toHaveClass(/node-input-struck/)
 
-    await window.keyboard.press('Meta+Enter')
-    await window.keyboard.press('Meta+Enter')
+    await closeApp(app)
+    const persisted = readPersisted(userDataDir)
 
-    await expect(parent(window)).not.toHaveClass(/node-input-struck/)
-    await expect(node(window, 1)).not.toHaveClass(/node-input-struck/)
-    await expect(node(window, 2)).not.toHaveClass(/node-input-struck/)
+    expect(persisted.document.roots[0]).toHaveProperty('struckThrough', true)
+    expect(persisted.document.roots[0]!.children.map((child) => child.struckThrough)).toEqual([true, true])
+
+    const reopened = await launchTree(userDataDir)
+
+    await expect(parent(reopened.window)).toHaveClass(/node-input-struck/)
   })
 })
 

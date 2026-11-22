@@ -114,12 +114,11 @@ export function materialize(rawForest: RawNode[]): Document {
   const build = (raw: RawNode): TreeNode => {
     const id = `n${counter++}`
     const children = raw.children.map(build)
-    const complete = children.length === 0 ? raw.struckThrough : children.every((child) => child.struckThrough)
     return {
       id,
       text: raw.text,
       ...(raw.hasAttachment ? { attachment: { id: `a${id}`, mimeType: 'image/png' as const } } : {}),
-      ...(complete ? { struckThrough: true as const } : {}),
+      ...(raw.struckThrough ? { struckThrough: true as const } : {}),
       children,
     }
   }
