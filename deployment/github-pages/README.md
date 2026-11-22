@@ -233,12 +233,17 @@ retry timeouts and Git failures twice, after one and two seconds; a missing
 branch fails immediately. Failures are reported without Git diagnostics, and
 the existing entry, size and digest checks then apply. The authenticated
 transfer still uses the target-only token.
-Deployment polling reads the hosting repository's public Actions runs with the
-source `GITHUB_TOKEN`, which has its own per-repository quota. GitHub does not
-document that token for another owner's public Actions data. If GitHub refuses
-it with HTTP 401, 403 or 404, that poll is repeated anonymously and the
-remaining polls stay anonymous, still at most 20 polls. Rate limits and other
-failures stop polling instead.
+Each side reads the other repository's public REST data with its own
+`GITHUB_TOKEN`, which has its own per-repository quota and grants no access to
+the other repository. Source deployment polling reads the hosting repository's
+public Actions runs, at most 20 polls. The hosting verify job reads the source
+head, validation run and job list for the source gate; an earlier anonymous
+version of these reads stopped a deployment on the shared rate limit. GitHub
+does not document a token for another owner's public data. If GitHub refuses it
+with HTTP 401, 403 or 404, that read is repeated anonymously and the remaining
+reads stay anonymous. Rate limits and other failures stop the job instead. The
+hosting workflow passes its token to the verifier that it checks out from
+source main, so a verifier change needs no workflow reinstallation.
 
 After a transient branch-update error, transfer reads main before repeating the
 same non-forced update. The expected new SHA means the write already succeeded;

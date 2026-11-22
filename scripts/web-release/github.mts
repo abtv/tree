@@ -71,6 +71,28 @@ async function singleRequest(path: string, { token, method = 'GET', body }: ApiO
   return response.status === 204 ? undefined : response.json()
 }
 
+// Reads another repository's public data with this job's token, which has its own
+// quota, instead of the anonymous budget shared by runner addresses. GitHub does
+// not document such a token for another owner's public data, so after it refuses
+// the token the remaining reads are anonymous. Only for public GET reads: callers'
+// options are ignored. Rate limits and other failures are not treated as refusals.
+export function publicReads(request: Request, token: string | undefined): Request {
+  let options = token ? { token } : undefined
+  return async (path) => {
+    if (options) {
+      try {
+        return await request(path, options)
+      } catch (error) {
+        const failure = error as ApiError
+        if (failure.rateLimited || ![401, 403, 404].includes(failure.status ?? 0)) throw error
+        options = undefined
+      }
+    }
+
+    return request(path)
+  }
+}
+
 export async function verifySource(
   input: unknown,
   { token, request = api }: { token?: string | undefined; request?: Request } = {},

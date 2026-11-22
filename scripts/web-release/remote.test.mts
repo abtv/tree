@@ -1,8 +1,8 @@
-import type { ApiError, ApiOptions } from './types.mts'
+import type { ApiError, ApiOptions, Request } from './types.mts'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, verifySource } from './github.mts'
+import { api, publicReads, verifySource } from './github.mts'
 import { createManifest, verifyPackage } from './package.mts'
 import { transferPackage, verifyIdentity } from './publish.mts'
 import { probeRejection, verifyHosted, verifyTarget } from './verify-target.mts'
@@ -150,6 +150,40 @@ describe('GitHub release trust', () => {
     ]) {
       await expect(verifySource(manifest, { request: sourceRequest({ jobs }) })).rejects.toThrow('gate')
     }
+  })
+  it.each([401, 403, 404])('reads public data anonymously after a refused foreign token (%s)', async (status) => {
+    const request = vi.fn<Request>(async (_path, options) => {
+      if (options?.token) throw Object.assign(new Error('refused'), { status })
+      return 'public'
+    })
+    const read = publicReads(request, 'foreign')
+
+    await expect(read('/repos/abtv/tree/a', { token: 'ignored' })).resolves.toBe('public')
+    await expect(read('/repos/abtv/tree/b')).resolves.toBe('public')
+
+    expect(request.mock.calls).toEqual([
+      ['/repos/abtv/tree/a', { token: 'foreign' }],
+      ['/repos/abtv/tree/a'],
+      ['/repos/abtv/tree/b'],
+    ])
+  })
+  it.each([
+    ['a rate limit', { status: 403, rateLimited: true }],
+    ['a server failure', { status: 502 }],
+  ])('does not hide %s behind anonymous public reads', async (_name, failure) => {
+    const error = Object.assign(new Error('failed'), failure)
+    const request = vi.fn<Request>().mockRejectedValue(error)
+
+    await expect(publicReads(request, 'foreign')('/repos/abtv/tree/a')).rejects.toBe(error)
+
+    expect(request).toHaveBeenCalledOnce()
+  })
+  it('reads public data anonymously without a token', async () => {
+    const request = vi.fn<Request>().mockResolvedValue('public')
+
+    await expect(publicReads(request, undefined)('/repos/abtv/tree/a')).resolves.toBe('public')
+
+    expect(request).toHaveBeenCalledExactlyOnceWith('/repos/abtv/tree/a')
   })
   it('rejects identity changes and unsigned retained assets even with the obsolete retention option', async () => {
     const { dir, manifest } = await fixture()
@@ -338,7 +372,7 @@ describe('atomic package transfer', () => {
     await expect(transferPackage(dir, manifest, { ...auth, targetToken: 'target', request })).rejects.toThrow('422')
     expect(request.mock.calls.filter(([, opts]) => opts?.method === 'PATCH')).toHaveLength(1)
   })
-  it('target rechecks current target and source heads before permitting deployment without a source token', async () => {
+  it('target rechecks current target and source heads with only its own token before permitting deployment', async () => {
     const { dir, manifest, attest } = await fixture()
     const file = `${dir}-provenance.json`
 
@@ -349,11 +383,14 @@ describe('atomic package transfer', () => {
     )
 
     await expect(
-      verifyTarget({ directory: dir, manifestFile: file, sha: 'b'.repeat(40), request, attest }),
+      verifyTarget({ directory: dir, manifestFile: file, sha: 'b'.repeat(40), request, attest, token: 'target' }),
     ).resolves.toEqual(manifest)
-    expect(source.mock.calls.every(([, options]) => !options?.token)).toBe(true)
+
+    // Public source reads use the target token's quota, not the anonymous budget shared by runner addresses.
+    expect(source).toHaveBeenCalledTimes(3)
+    expect(source.mock.calls.every(([, options]) => options?.token === 'target')).toBe(true)
     await expect(
-      verifyTarget({ directory: dir, manifestFile: file, sha: 'c'.repeat(40), request, attest }),
+      verifyTarget({ directory: dir, manifestFile: file, sha: 'c'.repeat(40), request, attest, token: 'target' }),
     ).rejects.toThrow('stale')
   })
 

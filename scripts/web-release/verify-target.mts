@@ -3,7 +3,7 @@ import { appendFile, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { setTimeout } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
-import { api, verifySource } from './github.mts'
+import { api, publicReads, verifySource } from './github.mts'
 import { verifyPackage } from './package.mts'
 import { validateManifest } from './policy.mts'
 import { verifyAttestation } from './attestation.mts'
@@ -85,7 +85,8 @@ export async function verifyTarget({
   const manifest = await attest(manifestFile, bundleFile)
   if (toolsSha && toolsSha !== manifest.sourceSha) throw new Error('Trusted tools and release source differ')
   await verifyPackage(directory, manifest)
-  await verifySource(manifest, { request })
+  // The target token never grants source access; it only gives these public reads its quota.
+  await verifySource(manifest, { request: publicReads(request, token) })
   return manifest
 }
 

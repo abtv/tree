@@ -1,12 +1,12 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
-import { api } from './github.mts'
+import { api, publicReads } from './github.mts'
 import { withHostingRepository } from './hosting.mts'
 import { verifyAttestation } from './attestation.mts'
 import { currentVersion, isNewWebVersion } from './version.mts'
 import { dispatchedSource } from '../publication.mts'
 import { requireReleaseSource } from '../release-source.mts'
-import type { ApiError, Blob, Reference, Request, WorkflowRun } from './types.mts'
+import type { Blob, Reference, Request, WorkflowRun } from './types.mts'
 
 const root = '/repos/tree-editor/tree-editor.github.io'
 
@@ -21,22 +21,11 @@ export async function publicationHead(transferredSha: string | undefined, reques
 }
 
 export async function waitForDeployment(sha: string, request: Request = api, wait = setTimeout, token?: string) {
-  // Target Actions are public. The source token gives this read its own quota
-  // instead of the anonymous budget shared by runner addresses. GitHub does not
-  // document that token for another owner's public Actions data, so a refusal
-  // falls back to anonymous reads, which stay bounded below the hourly budget.
+  // Target Actions are public; anonymous fallback polls stay below the hourly budget.
   const path = `${root}/actions/workflows/deploy-web-app.yml/runs?head_sha=${sha}&per_page=100`
-  let options = token ? { token } : undefined
+  const read = publicReads(request, token)
   for (let attempt = 0; attempt < 20; attempt++) {
-    let data: { workflow_runs: WorkflowRun[] }
-    try {
-      data = (await request(path, options)) as { workflow_runs: WorkflowRun[] }
-    } catch (error) {
-      const failure = error as ApiError
-      if (!options || failure.rateLimited || ![401, 403, 404].includes(failure.status ?? 0)) throw error
-      options = undefined
-      data = (await request(path)) as { workflow_runs: WorkflowRun[] }
-    }
+    const data = (await read(path)) as { workflow_runs: WorkflowRun[] }
     if (!Array.isArray(data.workflow_runs)) throw new Error('Invalid hosting run list')
     const runs = data.workflow_runs.filter(
       (run) =>
