@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document describes the technical architecture of the application, the responsibilities of its major parts, and the boundaries between them.
+The architecture description, which `docs/ARCHITECTURE.md` indexes, states the technical architecture of the application, the responsibilities of its major parts, and the boundaries between them.
 
 The architecture should make the application easy to evolve over a long period of agent-driven development.
 
@@ -28,30 +28,21 @@ The application uses:
 
 Do not change the core technology stack without explicit Product Owner approval.
 
-Platform entry points live in `src/electron/main/`, `src/electron/preload/`
-and `src/web/`. Shared domain, application, renderer, contracts and infrastructure
-remain directly under `src/`. Browser build and server tools live in `scripts/web/`.
+### 2.1 Platform Entry Points and Browser Build
 
-The browser entry detects Apple device identity through `src/web/device.ts` and
-injects the existing Apple or non-Apple shortcut profile into `App`.
+Platform entry points live in `src/electron/main/`, `src/electron/preload/` and `src/web/`. Shared domain, application, renderer, contracts and infrastructure are directly under `src/`. Browser build and server tools live in `scripts/web/`.
 
-The owner-reviewed local browser implementation under `src/web/` reuses the
-React renderer, application store and domain
-through a browser `TreeApi` adapter, using IndexedDB and Web Locks. The Electron
-build preserves its existing output paths. A separate Vite build writes a standalone
-static package to `out/web/`; the host serves files without a Node.js runtime.
-It preserves the same browser adapter and storage identity. The package is published
-at <https://tree-editor.github.io> through the verified release pipeline below;
-its browser compatibility and storage constraints are in
-[Browser version](../../src/web/README.md).
+The browser entry detects Apple device identity through `src/web/device.ts` and injects the Apple or non-Apple shortcut profile (§8.7) into `App`.
 
-The browser composition opts into `App.deferRichEditing`. App derives native
-editing availability from the Vim preference and mode and passes it to Tree,
-current-parent and Agenda inputs. `NodeInput` changes `contenteditable` on the
-existing rich field and keeps a non-editable field focusable with `tabindex`.
-Electron keeps the default native-editing path; plain textareas are unaffected.
-This adds no document writes, syncs, retained snapshots or document traversal.
-Mode changes update attributes on the bounded set of mounted inputs.
+The browser implementation under `src/web/` reuses the React renderer, application store and domain through a browser `TreeApi` adapter, using IndexedDB and Web Locks. A separate Vite build writes a standalone static package to `out/web/` with the same browser adapter and storage identity; the host serves files without a Node.js runtime. The package is published at <https://tree-editor.github.io> through the verified release pipeline (§2.3); its browser compatibility and storage constraints are in [Browser version](../../src/web/README.md).
+
+### 2.2 Browser Deferred Rich Editing
+
+The browser composition opts into `App.deferRichEditing`. App derives native editing availability from the Vim preference and mode and passes it to Tree, current-parent and Agenda inputs. `NodeInput` changes `contenteditable` on the rich field and keeps a non-editable field focusable with `tabindex`. Electron keeps the default native-editing path, and the option does not apply to plain textareas.
+
+Performance assessment (PRODUCT.md §22.1): deferred rich editing causes no document writes, syncs, retained snapshots or document traversal. Mode changes update attributes on the bounded set of mounted inputs.
+
+### 2.3 Validation and Release Pipeline
 
 The validation workflow's jobs and release gate are listed under
 [GitHub Actions](../DEVELOPMENT_REFERENCE.md#github-actions). Its successful
@@ -241,11 +232,13 @@ src/
 
 `test/` directories under `src/`, `src/application/` and `src/renderer/` hold shared test support. Add a subdirectory when a group of modules needs its own boundary, not in advance.
 
-The domain currently isolates shared document types, hyperlink normalization, the derived node index, attachment accounting, tree operations, and persisted-state parsing in `document-types.ts`, `document-links.ts`, `document-index.ts`, `document-attachments.ts`, `document-operations.ts`, and `document-serialization.ts`. `document.ts` remains the public domain entry point and re-exports the domain API from those modules.
+The domain isolates shared document types, hyperlink normalization, the derived node index, attachment accounting, tree operations, and persisted-state parsing in `document-types.ts`, `document-links.ts`, `document-index.ts`, `document-attachments.ts`, `document-operations.ts`, and `document-serialization.ts`. `document.ts` is the public domain entry point and re-exports the domain API from those modules.
 
 `document-links.ts` offers two link-preserving text edits with different contracts. `replaceLinkedText` recovers the changed region by diffing the text before and after, for callers that observe only the resulting string, such as a native `contenteditable` mutation. `replaceLinkedTextRanges` takes an ordered list of disjoint edits and remaps link offsets by position, for callers that know their edit positions and change more than one place at once; `EditorStore.replaceTextRanges` applies it through the same single-history-entry path as `replaceTextRange`. See ADR [0013](../decisions/0013-position-based-multi-edit-text-changes.md).
 
-The application layer currently isolates the editor store's shared types, pure content-change helpers, whole-node Visual transitions, runtime snapshot and focus bookkeeping, text-session boundary state, the pure undo/redo change-site comparison, and save scheduling and watermark accounting in `editor-store-types.ts`, `editor-content-changes.ts`, `editor-node-visual-transitions.ts`, `editor-runtime-state.ts`, `editor-text-session.ts`, `editor-undo-focus.ts`, and `editor-save-scheduler.ts`. `editor-store.ts` remains the public application entry point: it assembles those collaborators, coordinates command side effects, and re-exports the public API.
+The application layer isolates the editor store's shared types, pure content-change helpers, whole-node Visual transitions, runtime snapshot and focus bookkeeping, text-session boundary state, the pure undo/redo change-site comparison, and save scheduling and watermark accounting in `editor-store-types.ts`, `editor-content-changes.ts`, `editor-node-visual-transitions.ts`, `editor-runtime-state.ts`, `editor-text-session.ts`, `editor-undo-focus.ts`, and `editor-save-scheduler.ts`. `editor-store.ts` is the public application entry point: it assembles those collaborators, coordinates command side effects, and re-exports the public API.
+
+§21.1 lists the renderer modules that isolate DOM, caret and Vim behavior.
 
 Do not create empty architectural layers solely to match this diagram.
 

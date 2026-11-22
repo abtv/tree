@@ -123,8 +123,8 @@ Proof for each task, with the task's starting commit as `<base>`:
 | T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Done |
 | R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Done |
 | R1b | Rework of the two pilot files under the Rework Method. They are the reference example for R2–R13 | `command-panel.md`, `completion-and-tags.md` | Rework proof | Minimal Risk | Done |
-| R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Ready |
-| R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
+| R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Done |
+| R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Ready |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Planned |
 | R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Planned |
 | R6 | Rewrite | `list-rendering.md`, `appearance.md` | Rewrite proof | Minimal Risk | Planned |
@@ -177,7 +177,11 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * A sentence that states a write count, a complexity bound or a negative constraint stays byte-identical when it moves or when another sentence merges into it. Merge the weaker sentence into the stronger one, not the reverse.
   * An assessment stays in the subsection of the owner that produces the cost. A cross-reference is added only to a section that states the cited fact.
   * To read the comparison reports, filter the moved lines: `npm run check:docs -- --verbatim <base> --file <path> | grep -vE "^(Moved|Literal moved|Reference moved)"`.
+  * A base sentence of the form "this adds no writes, syncs or scans to the existing paths" is relative to earlier code. Before stating it in absolute form ("causes no ..."), read the owning module. When the module does such work, state what it does and when, with the code evidence in the ledger.
+* R2 result (base `7b7d30d5`): subsections 2.1–2.3, 16.1–16.3 and 17.1 added; 22 clauses left or changed, each with a disposition. The four security paragraphs now in §16.1 are byte-identical to the base. The Reviewer found one absolute cost claim that the code contradicts (corrected, below) and two wording points (applied). Recovery: 2 of the 12 pooled fix cycles are used.
 * Decisions made under D5, for the final acceptance:
+  * R2: §17.1 states that the image-to-text queue traverses the document only to admit a reindex and to find the new owner of a reindex job whose node lost its image (`src/application/image-to-text-queue.ts:38-62`, `:102-118`). The base said that the queue "adds no ... document scans to the existing paths".
+  * R2: the sentence "The Electron build preserves its existing output paths" is removed from §2 as a statement about a past change.
   * R1b: §7.2.1 names image-to-text availability as the third input of the command panel's available registry (`src/renderer/use-command-panel.ts:68-77`). The base sentence named two inputs. The code does not contradict it; the sentence was incomplete, so this is a correction with code evidence and not a reserved case.
 
 ## Questions for the Product Owner
@@ -186,4 +190,4 @@ None so far.
 
 ## Next Task
 
-R2. Record its starting commit as `<base>` before editing. Continue with R3–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
+R3. Record its starting commit as `<base>` before editing. Continue with R4–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.

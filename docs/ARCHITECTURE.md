@@ -16,7 +16,7 @@ Each section number is listed once, with the file that holds its heading.
 
 | Sections | File |
 | --- | --- |
-| 1, 2, 3, 12, 18, 19, 20, 21, 22, 23 | [overview.md](architecture/overview.md) |
+| 1, 2, 2.1, 2.2, 2.3, 3, 12, 18, 19, 20, 21, 22, 23 | [overview.md](architecture/overview.md) |
 | 4, 5, 6, 10, 11 | [domain-model.md](architecture/domain-model.md) |
 | 7, 7.1 | [application.md](architecture/application.md) |
 | 8, 8.7, 8.9, 8.10, 9, 13.2 | [interaction.md](architecture/interaction.md) |
@@ -30,7 +30,7 @@ Each section number is listed once, with the file that holds its heading.
 | 13, 13.5, 13.9, 13.10, 13.11 | [persistence.md](architecture/persistence.md) |
 | 13.8 | [save-scheduling.md](architecture/save-scheduling.md) |
 | 13.7, 14, 15 | [attachments-and-clipboard.md](architecture/attachments-and-clipboard.md) |
-| 16, 17 | [electron.md](architecture/electron.md) |
+| 16, 16.1, 16.2, 16.3, 17, 17.1 | [electron.md](architecture/electron.md) |
 | 13.12, 13.13 | [desktop-data.md](architecture/desktop-data.md) |
 | 13.14, 13.15, 13.16, 13.17 | [browser.md](architecture/browser.md) |
 
