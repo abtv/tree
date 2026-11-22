@@ -509,8 +509,9 @@ This local command runs `npm run check`, the serial timing guards, the Electron 
 Neither `check` nor `check:full` establishes parity with GitHub Actions. `check`
 does not run smoke or E2E tests; `check:full` adds local Electron E2E but not the
 browser E2E suite, smoke checks, or the Linux Electron container subset. For a
-changed shared UI flow, select its smoke and browser scenarios as well as its
-Electron coverage under procedure §9. Use `make test-smoke` for all smoke targets,
+changed shared UI flow, select its smoke scenarios and Electron coverage under
+procedure §9, and run the full browser suite as required under
+[Local affected-spec E2E validation](#local-affected-spec-e2e-validation). Use `make test-smoke` for all smoke targets,
 `npm run test:web:chromium` for browser E2E and `npm run test:e2e:linux` for the
 Linux Electron subset when those targets are required. Record the source revision,
 uncommitted changes and actual targets checked; a green aggregate command alone
@@ -540,6 +541,8 @@ For selected Electron performance scenarios, use `npm run test:perf -- <specs>` 
 For contained changes below High Risk, run affected E2E specs locally and leave the complete suite to the weekly/manual Linux and macOS CI jobs. `npm run test:e2e:changed` builds the application and runs Playwright with `--only-changed=HEAD`; it includes staged, unstaged and untracked nonignored changes before commit, then follows test imports. Preview its selection with `npm run test:e2e:changed -- --list`. After committing, compare with the task's starting commit using `npm run test:e2e:changed -- --only-changed=<starting-commit>`; the referenced commit must exist locally. Additional spec arguments restrict the selected set rather than adding missing specs.
 
 The selector does not infer test coverage through the Electron production build, preload/IPC or product-requirement mapping. For each affected behavior, explicitly select its owning specs with `npm run test:e2e -- <specs>` when they are absent from the changed selection. Record the actual specs/cases exercised. Playwright can exit successfully with no selected cases; this is a selection result, not a passing boundary test. Documentation-only tasks do not acquire an E2E requirement merely because this command exists.
+
+Browser E2E has no affected-spec selection. A change to `src/web/`, `e2e/web/`, or shared interface code that the browser build displays requires the full browser suite before the commit: run `npm run test:web:chromium`. When it is unclear whether the browser build is affected, run the suite. The suite is short enough that selection saves little, and a selected subset cannot detect a stale expectation in a spec that the change did not edit.
 
 Shared fixture or interaction infrastructure, startup/shutdown, process/IPC, filesystem/persistence, clipboard/attachments, native shortcuts, security, dependencies/toolchain and scale-sensitive changes still require full local functional validation under the High Risk row. Unbounded functional impact also requires broader coverage. Electron performance scope is selected separately. Weekly/manual CI covers every regression case through the Linux/macOS union; this command does not filter CI or the serial visible performance suite. Regressions outside the locally exercised scope may first appear in the next weekly or manual run.
 
