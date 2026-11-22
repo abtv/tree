@@ -216,6 +216,7 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 
 - 2026-11-21 — Repository fact: a removed section's number is retired, not reused (`docs/PRODUCT.md`), and tests cite sections through `@requirement` markers that `npm run check:requirements` checks.
 - 2026-11-21 — Repository fact: with empty input, the Search popup lists marked and starred nodes before up to eight recent nodes (§20.14).
+- 2026-11-22 — Repository fact: Recent nodes was removed in `317143c4`. The table above describes `bba6aa1`: its Recent nodes row and the Recent Nodes dependents in the Search and node-state rows no longer exist. With empty input, the Search popup now lists only marked and starred nodes (§20.14).
 
 ### Decision and rationale
 
@@ -319,7 +320,7 @@ Status: Deferred
 
 ### Question
 
-Should `docs/ARCHITECTURE.md` §8 UI Layer (50,956 bytes) and §13 Persistence (65,001 bytes) be regrouped? §13 also holds search, emoji, command-history, recent-node and finished-task text beside persistence, so a reader looking for one subject loads the others.
+Should `docs/ARCHITECTURE.md` §8 UI Layer and §13 Persistence, the two largest sections (sizes under Evidence), be regrouped? §13 also holds search, emoji, command-history and finished-task text beside persistence, so a reader looking for one subject loads the others.
 
 ### What we are watching
 
@@ -333,4 +334,5 @@ A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004'
 
 - 2026-11-21 — Repository fact: at `bba6aa1`, §8 is 50,956 bytes and §13 is 68,067 bytes, 56% of the file (`grep -b -n '^## '`).
 - 2026-11-21 — Repository fact: other sections also hold unrelated subjects. §4 "Domain Layer" describes search modules of `src/application/` and `src/renderer/`; §7 "Application Layer" opens with main-process desktop updates; §21 "Module Structure" holds Vim and caret owner mechanics.
+- 2026-11-22 — Repository fact: at `22a7ac35`, after Recent nodes was removed, §8 is 50,986 bytes and §13 is 67,168 bytes (`grep -b -n '^## '`). §13 keeps only a short note that earlier recent-node files are no longer read, written or deleted.
 - 2026-11-21 — Agent inference (independent audit, byte split not re-checked): Agenda, the browser version and the notes archives hold a large part of §8 and §13, so a decision to remove features would change what there is to regroup.
