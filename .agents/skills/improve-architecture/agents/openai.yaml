@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Improve Architecture'
+  short_description: 'Find architecture changes that lower change cost'
+  default_prompt: 'Use $improve-architecture to find architectural changes that would lower change cost, starting from Git history, and rank behavior-preserving proposals without modifying the repository. Default to the whole repository and a maximum of 15 minutes including the report, unless I specify a different scope or a different time limit. Report actual coverage and unfinished investigation.'
