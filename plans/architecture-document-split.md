@@ -127,8 +127,8 @@ Proof for each task, with the task's starting commit as `<base>`:
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Done |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Done |
 | R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Done |
-| R6 | Rewrite | `list-rendering.md`, `appearance.md` | Rewrite proof | Minimal Risk | Ready |
-| R7 | Rewrite; add subsections to §21.1 | `vim.md` | Rewrite proof | Minimal Risk | Planned |
+| R6 | Rewrite | `list-rendering.md`, `appearance.md` | Rewrite proof | Minimal Risk | Done |
+| R7 | Rewrite; add subsections to §21.1 | `vim.md` | Rewrite proof | Minimal Risk | Ready |
 | R8 | Rewrite | `search.md` | Rewrite proof | Minimal Risk | Planned |
 | R9 | Rewrite; add subsections to §8.1 | `agenda.md` | Rewrite proof | Minimal Risk | Planned |
 | R10 | Rewrite | `persistence.md` | Rewrite proof | Minimal Risk | Planned |
@@ -180,13 +180,18 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * A base sentence of the form "this adds no writes, syncs or scans to the existing paths" is relative to earlier code. Before stating it in absolute form ("causes no ..."), read the owning module. When the module does such work, state what it does and when, with the code evidence in the ledger.
   * The same holds for a count: "the change adds one call per event" is the added cost, not the total. State the cost of one use of the mechanism, or keep the relative scope with "of its own".
   * A negative constraint keeps the path it constrains as its subject. A sentence that says a pure module performs no writes is true and constrains nothing.
+  * A sentence with "these", "this" or "that" keeps its position after the text it names. Moving it after another paragraph widens or changes its scope.
+  * When two cost sentences merge, the survivor keeps every item of both lists (writes, syncs, reads).
+  * When a sentence moves to another section, search the architecture files for references to its old section and retarget them.
 * R2 result (base `7b7d30d5`): subsections 2.1–2.3, 16.1–16.3 and 17.1 added; 22 clauses left or changed, each with a disposition. The four security paragraphs now in §16.1 are byte-identical to the base. The Reviewer found one absolute cost claim that the code contradicts (corrected, below) and two wording points (applied). Recovery: 2 of the 12 pooled fix cycles are used.
 * R3 result (base `a710f42c`): subsections 5.1–5.5 and 11.1–11.3 added; 19 clauses changed, each with a disposition; none removed without a restatement. The structural-sharing paragraph of §11 is byte-identical. The Reviewer verified the five reworded cost claims against the code and reported one non-blocking wording point (an "also" that lost its antecedent), which is applied. The recovery count stays at 2 of 12: it counts a repair that a blocking finding or a failed check requires.
 * R4 result (base `6599a738`): subsections 7.4–7.6 added (7.2 and 7.3 are in other files); §7.1 split into six paragraphs in base order; 9 clauses changed, one removed. The security sentences of §7.4 and §7.5 are byte-identical apart from the citation form. The Reviewer verified the four reworded claims against the code and found no meaningful issue.
 * R5 result (base `ce686800`): subsections 9.1–9.4 added; §8.9 reordered with the application owners first; §8.10 split into six paragraphs with every sentence byte-identical; 19 clauses changed. The single-owner paragraph (ADR 0014) is §9.1 and differs in one word. The Reviewer found two cost sentences whose scope had changed (§8.7, §9.3); both are corrected with code evidence. Recovery: 3 of the 12 pooled fix cycles are used.
+* R6 result (base `1c52b349`): subsections 8.2.1–8.2.2, 8.4.1–8.4.5 and 8.11.1–8.11.5 added; the 13 paragraphs of §8.4 are regrouped by mechanism; 43 clauses changed. The Reviewer found a sentence whose scope widened when it moved (screenshot baselines), a merged assessment that had dropped "no sync", and one relative cost sentence stated absolutely; all three are corrected. It also found that "(§13)" in §8.11.3 pointed to the appearance IPC sentence that R1b moved from §13.4 to §7.2.1; the reference is retargeted. Recovery: 4 of the 12 pooled fix cycles are used.
 * Decisions made under D5, for the final acceptance:
   * R2: §17.1 states that the image-to-text queue traverses the document only to admit a reindex and to find the new owner of a reindex job whose node lost its image (`src/application/image-to-text-queue.ts:38-62`, `:102-118`). The base said that the queue "adds no ... document scans to the existing paths".
   * R2: the sentence "The Electron build preserves its existing output paths" is removed from §2 as a statement about a past change.
+  * R6: §8.11.3 states "An appearance change performs one preference write and no sync" (`src/electron/main/index.ts:110-117`, `src/infrastructure/main/window-state.ts:125-132`); the base said that Gray and White need "no additional disk writes, syncs, or startup reads".
   * R4: the sentence "This changes no IPC contracts, timers, persistence operations or runtime growth" is removed from the `quit-handshake.ts` paragraph (now §7.6) as a statement about a past change. §7.1 says that `AppUpdates` does not use the ordinary `QuitHandshake` (base: "the ordinary QuitHandshake is unchanged"; `src/electron/main/app-updates.ts` has no reference to it).
   * R1b: §7.2.1 names image-to-text availability as the third input of the command panel's available registry (`src/renderer/use-command-panel.ts:68-77`). The base sentence named two inputs. The code does not contradict it; the sentence was incomplete, so this is a correction with code evidence and not a reserved case.
 
@@ -196,4 +201,4 @@ None so far.
 
 ## Next Task
 
-R6. Record its starting commit as `<base>` before editing. Continue with R7–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
+R7. Record its starting commit as `<base>` before editing. Continue with R8–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
