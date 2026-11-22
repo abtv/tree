@@ -169,65 +169,6 @@ Support requires at least one important scenario that current persistence and sy
 - 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
 - 2026-11-03 — Repository fact: PRODUCT §§24–25 and the browser/desktop archive implementations supersede the original absence-of-export premise. The recorded status is unchanged; any further experiment must assess the existing workflows first.
 
-## PD-008: Which features to remove
-
-Kind: product
-Status: Idea
-
-### Question
-
-Which features should leave the product? Each feature costs specification text, code, tests, CI time and agent reading, and some are used rarely or not at all. Removing a used feature, or one that others depend on, costs more than it saves.
-
-### What we are watching
-
-Which features the Product Owner actually uses in ordinary work, and which ones go unused.
-
-### What would settle it
-
-The Product Owner's decision for each feature: keep, remove, or keep and simplify. A removal then needs its own product change; this entry does not authorize one.
-
-### Evidence
-
-- 2026-11-21 — Repository fact (measured at `bba6aa1`; summary of the full map in Appendix A of `git show 1d20944:plans/documentation-consistency-and-policy-load.md`, which also lists dependents and infrastructure per feature). "Code by name" counts non-test files whose path names the feature and is a lower bound; "Shared files" counts other non-test files that mention it. Rows overlap and must not be summed. Totals: 36,974 lines of non-test `.ts`/`.tsx` under `src`, 45,783 lines in `e2e` without images, 284 screenshot baselines.
-
-| Feature | Specification | Code by name (lines) | Shared files | Unit test lines | E2E | Main dependents and infrastructure |
-| --- | --- | --- | --- | --- | --- | --- |
-| Vim mode | 45,347 B, plus `VIM_CONFORMANCE.md` 85,928 B | 4,111 | 42 | 7,971 | 10,179 lines, 224 tests, 71 baselines | Agenda keyboard code and 10 shared modules; Summarize selection; `check:e2e-modes`; fixtures default to Vim |
-| Agenda | 26,257 B | 3,266 | 43 | 8,873 | 4,729 lines, 68 tests, 37 baselines | Persisted `agendaFolds`; marked nodes under Today; shared date recognition |
-| Browser version | 27,763 B, plus 3 dedicated documents of 49,674 B | 2,631 | 28 (upper bound) | 10,624 | 6,059 lines, 82 tests | Web E2E workflow, web publication jobs, 5,939 lines of scripts; the Chromium container also runs Linux Electron tests |
-| Search | 24,070 B | 2,746 | 38 | 4,670 | 1,843 lines, 36 tests, 10 baselines | Popup shared with Recent Nodes; smoke scenario |
-| Desktop export and import | 6,360 B | 1,680 | 7 | 3,847 | 1,372 lines, 19 tests, 10 baselines | 11 IPC channels; archive core shared with the browser |
-| Browser export, import, backup | 14,931 B | 1,304 | inside `src/web` | 3,360 | 1,559 lines, 21 tests | Archive core shared with the desktop |
-| Shared notes-archive core | none | 857 | both data features | 1,666 | with the two above | `fflate` runtime dependency |
-| Image to Text | 4,723 B | 238 (one Swift) | 10 | 914 | 253 lines | Swift build step; image search uses its channel |
-| Summarize | 2,937 B | 375 (one Swift) | 10 | 1,172 | 255 lines | Xcode 26.2 step in 4 workflows; 5 IPC channels |
-| Command panel and registry | 13,035 B | 692 | 13 | 1,015 | 757 lines, 14 tests | Holds the commands of most features |
-| Images and attachments | 7,504 B | 910 | 67 | 1,956 | 1,047 lines, 27 tests | Archive, clipboard, serialization |
-| Clipboard, paste, links | 7,430 B | 803 | 35 | 2,298 | 1,825 lines, 52 tests | Links are part of the stored document |
-| Node states (struck, starred, marked) | 9,297 B | 247 | 52 (upper bound) | 2,357 | 818 lines, 18 tests, 30 baselines | Schema version 6; search, Agenda, Recent Nodes |
-| Drag and drop | 5,203 B | 777 | 13 | 1,259 | 1,649 lines, 37 tests | Move transitions shared with keyboard moves |
-| Dates and date completion | 12,054 B | 389 | with completion | 1,365 | 456 lines, 7 tests | Shared with Agenda |
-| Recent nodes | about 4,057 B | 237 | 20 (upper bound) | 738 | 1,236 lines, 19 tests | Search popup |
-| Inline expansion | 4,983 B | 212 | n/a | 345 | 1,244 lines, 30 tests | Starred views |
-| Desktop updates | 4,210 B | 368 | n/a | 907 | 670 lines, 15 tests | `electron-updater` runtime dependency |
-| Appearance | 6,250 B | 165 | n/a | 68 | 588 lines, 10 tests | 118 dark-variant baselines across features |
-| Tags | 4,869 B | 302 | with completion | 746 | 285 lines, 3 tests | Search and completion |
-| Emoji completion | 4,499 B | 127, plus a 1,915-line catalog | 13 | 498 | 768 lines, 9 tests | Smoke scenario |
-
-- 2026-11-21 — Repository fact: a removed section's number is retired, not reused (`docs/PRODUCT.md`), and tests cite sections through `@requirement` markers that `npm run check:requirements` checks.
-- 2026-11-21 — Repository fact: with empty input, the Search popup lists marked and starred nodes before up to eight recent nodes (§20.14).
-- 2026-11-22 — Repository fact: Recent nodes was removed in `317143c4`. The table above describes `bba6aa1`: its Recent nodes row and the Recent Nodes dependents in the Search and node-state rows no longer exist. With empty input, the Search popup now lists only marked and starred nodes (§20.14).
-
-### Decision and rationale
-
-- 2026-11-21 — Remove Summarize (§15.2): the Product Owner does not use it. Removed under [ADR 0031](decisions/0031-remove-on-device-summarization.md).
-- 2026-11-21 — Remove the `image-to-text` command, which inserts recognized text as child nodes: the Product Owner does not use it. Keep automatic recognition of pasted images, `reindex-all-images` and the hidden search text, which the Product Owner uses through Search (§15.1).
-- 2026-11-21 — Keep Vim mode complete: the Product Owner uses every command family, including case changes, surround, node operations and `Ctrl+A`/`Ctrl+X`.
-- 2026-11-21 — Keep the browser version, Search, desktop and browser export, import and backup, Image to Text, the command panel, images and attachments, clipboard and links, node states, drag and drop, inline expansion, desktop updates, Appearance, emoji completion and Agenda. Improvements are open in PD-009 (Agenda), PD-011 (Search), PD-012 (command panel) and PD-014 (Image to Text in the browser).
-- 2026-11-22 — PD-012 (command panel prompt) answered: in standard editing the input line has no `:` prefix and shows the placeholder `Run Command`; Vim editing keeps `:` (§20.2.28).
-- 2026-11-22 — Remove Recent nodes (§20.14.1 retired). Empty global Search keeps the marked and starred lists without the recent part. Saved history from earlier versions is left untouched, neither read nor deleted.
-- Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.
-
 ## PD-009: How to improve Agenda
 
 Kind: product
@@ -294,7 +235,7 @@ Whether `#` and `&` are typed or searched in ordinary use.
 
 ### What would settle it
 
-A period of ordinary use. An unused marker kind becomes a removal candidate under PD-008; a used one stays.
+A period of ordinary use. An unused marker kind becomes a removal candidate for a Product Owner decision; a used one stays.
 
 ## PD-014: Image to Text in the browser version
 
@@ -335,4 +276,5 @@ A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004'
 - 2026-11-21 — Repository fact: at `bba6aa1`, §8 is 50,956 bytes and §13 is 68,067 bytes, 56% of the file (`grep -b -n '^## '`).
 - 2026-11-21 — Repository fact: other sections also hold unrelated subjects. §4 "Domain Layer" describes search modules of `src/application/` and `src/renderer/`; §7 "Application Layer" opens with main-process desktop updates; §21 "Module Structure" holds Vim and caret owner mechanics.
 - 2026-11-22 — Repository fact: at `22a7ac35`, after Recent nodes was removed, §8 is 50,986 bytes and §13 is 67,168 bytes (`grep -b -n '^## '`). §13 keeps only a short note that earlier recent-node files are no longer read, written or deleted.
+- 2026-11-22 — Repository fact: the feature-removal question (PD-008) was closed. Summarize, the `image-to-text` command and Recent nodes were removed; every other feature was kept. Dates (PD-010) and the `#` and `&` markers (PD-013) remain open and could still remove content from §8 or §13.
 - 2026-11-21 — Agent inference (independent audit, byte split not re-checked): Agenda, the browser version and the notes archives hold a large part of §8 and §13, so a decision to remove features would change what there is to regroup.

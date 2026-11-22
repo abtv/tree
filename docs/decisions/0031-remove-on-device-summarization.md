@@ -5,7 +5,7 @@ Date: 2026-11-21
 
 ## Context
 
-ADR 0026 added English summarization through a Foundation Models Swift helper. On 2026-11-21 the Product Owner decided to remove the feature because they do not use it (PD-008 in `docs/OPEN_QUESTIONS.md`). It cost a second native helper, five IPC channels, an asynchronous application job, a packaged executable, an Xcode 26 SDK selection in four macOS CI workflows, and real-model tests whose inference check depends on local Apple Intelligence readiness.
+ADR 0026 added English summarization through a Foundation Models Swift helper. On 2026-11-21 the Product Owner decided to remove the feature because they do not use it (PD-008, formerly in `docs/OPEN_QUESTIONS.md`; closed on 2026-11-22). It cost a second native helper, five IPC channels, an asynchronous application job, a packaged executable, an Xcode 26 SDK selection in four macOS CI workflows, and real-model tests whose inference check depends on local Apple Intelligence readiness.
 
 ## Decision
 
