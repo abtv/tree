@@ -13,7 +13,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { TextMatch } from '../domain/text-search'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
-import { GlobalSearchSession, startsSearchGroup } from './global-search-session'
+import { GlobalSearchSession, hasGroupHeading, startsSearchGroup } from './global-search-session'
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
@@ -22,6 +22,7 @@ import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
 import { initialSearchHeading } from './node-flags'
+import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
 
 const RESULT_EDGE_INSET = 12
 const RESULT_KEYS = '↑↓ Select   ↵ Open   Esc Close'
@@ -171,8 +172,7 @@ export function GlobalSearchPopup({
     () =>
       computeOffsets(
         items?.map((item, index) => {
-          const startsGroup = startsSearchGroup(items, index)
-          const heading = startsGroup && item.path !== null ? ROW_HEIGHT_ESTIMATE : 0
+          const heading = hasGroupHeading(items, index) ? ROW_HEIGHT_ESTIMATE : 0
           return heights.get(item.id) ?? ROW_HEIGHT_ESTIMATE + heading
         }) ?? [],
       ),
@@ -196,14 +196,7 @@ export function GlobalSearchPopup({
   }, [])
   const restore = useRef<() => void>(() => undefined)
 
-  const resultWindow = computeListWindow({
-    count: items?.length ?? 0,
-    offsets: layout.offsets,
-    viewportStart: windowTop,
-    viewportEnd: windowTop + viewportHeight,
-    overscan: 2,
-    focusedIndex: selected,
-  })
+  const resultWindow = computeSearchResultWindow(items ?? [], layout.offsets, windowTop, viewportHeight, selected)
   const renderedIndices = Array.from(
     { length: resultWindow.end - resultWindow.start },
     (_, offset) => resultWindow.start + offset,
@@ -592,7 +585,10 @@ export function GlobalSearchPopup({
         aria-label={query === '' ? 'Marked and starred nodes' : 'Search results'}
         aria-busy={pending}
         className="node-search-results"
-        style={{ flexBasis: items.length > 0 ? layout.total : undefined }}
+        style={{
+          flexBasis: items.length > 0 ? layout.total : undefined,
+          maxHeight: `calc(${SEARCH_RESULT_VIEWPORT_ROWS} * var(--node-row-min-height))`,
+        }}
         onScroll={(event) => {
           updateResultEdges(event.currentTarget)
           // Retained paint and replacement rows must move together in this external scroll event.

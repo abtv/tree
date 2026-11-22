@@ -220,6 +220,78 @@ test('Search paints continuous results during arrows, wheel reversal, refinement
   await expect(window.locator('.node-input:focus')).toContainText('Result node 0')
 })
 
+for (const grouped of [false, true]) {
+  // @requirement PRODUCT.md §20.14
+  test(`Search bounds mounted rows in a tall viewport with ${grouped ? 'grouped' : 'root'} results`, async ({
+    userDataDir,
+  }, info) => {
+    const matches = Array.from({ length: 100 }, (_, index) => ({
+      id: `match${index}`,
+      text: `Needle ${index}`,
+      children: [],
+    }))
+    seedDocument(userDataDir, {
+      document: {
+        roots: grouped
+          ? matches.map((match, index) => ({ id: `parent${index}`, text: `Parent ${index}`, children: [match] }))
+          : matches,
+      },
+      location: { currentParentId: null, selectedNodeId: grouped ? 'parent0' : 'match0' },
+    })
+    const { window } = await launchTree(userDataDir, { appearance: grouped ? 'dark' : 'light' })
+    await window.keyboard.press('Meta+;')
+    const input = window.getByRole('searchbox')
+    const results = window.getByRole('listbox', { name: 'Search results' })
+    const position = window.getByLabel('Result position')
+    await input.fill('Needle')
+    await expect(position).toHaveText('1 / 100')
+
+    // Give the real renderer a stable CSS viewport independent of the test machine's display height.
+    await window.setViewportSize({ width: 1000, height: 1600 })
+    await expect.poll(() => results.evaluate((element) => element.clientHeight)).toBe(875)
+    await results.hover({ position: { x: 100, y: 100 } })
+    await window.mouse.wheel(0, 326)
+    await expect.poll(() => results.evaluate((element) => element.scrollTop)).toBe(326)
+
+    const windowed = await results.evaluate((element) => {
+      const { top, bottom } = element.getBoundingClientRect()
+      const options = [...element.querySelectorAll('[role="option"]')]
+      const visible = options.filter((option) => {
+        const rect = option.getBoundingClientRect()
+        return rect.bottom > top && rect.top < bottom
+      })
+      const selected = element.querySelector('[aria-selected="true"]')
+      return {
+        count: options.length,
+        visible: visible.length,
+        selected: selected?.textContent,
+        selectedInView: selected !== null && visible.includes(selected),
+        coversStart: (visible[0]?.getBoundingClientRect().top ?? Infinity) <= top,
+        coversEnd: (visible.at(-1)?.getBoundingClientRect().bottom ?? -Infinity) >= bottom,
+      }
+    })
+    expect(windowed.count).toBeLessThanOrEqual(40)
+    expect(windowed).toMatchObject({
+      visible: 36,
+      selected: 'Needle 0',
+      selectedInView: false,
+      coversStart: true,
+      coversEnd: true,
+    })
+    await expect(position).toHaveText('1 / 100')
+    await expect(input).toBeFocused()
+    await window.screenshot({ path: info.outputPath('search-tall-wheel.png') })
+
+    await window.keyboard.press('ArrowUp')
+    if (grouped) {
+      await expect(results.getByRole('option', { selected: true })).toHaveText('Parent 0')
+      await window.keyboard.press('ArrowUp')
+    }
+    await expect(position).toHaveText('100 / 100')
+    await expect(results.getByRole('option', { selected: true })).toHaveText('Needle 99')
+  })
+}
+
 for (const view of ['Tree', 'Agenda'] as const) {
   // @requirement PRODUCT.md §20.1
   // @requirement PRODUCT.md §23.6

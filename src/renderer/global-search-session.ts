@@ -39,7 +39,7 @@ export function startsSearchGroup(items: readonly NodeResult[], index: number): 
   return item.path !== previous?.path || item.parentId !== previous?.parentId
 }
 
-function hasGroupHeading(items: readonly NodeResult[], index: number): boolean {
+export function hasGroupHeading(items: readonly NodeResult[], index: number): boolean {
   return items[index]!.path !== null && startsSearchGroup(items, index)
 }
 

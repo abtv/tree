@@ -302,6 +302,38 @@ it('reveals an already highlighted selection without scheduling a second layout 
   expect(geometry).toHaveBeenCalledTimes(1)
 })
 
+// @requirement PRODUCT.md §20.14
+it('trims spare entries before dropping a visible heading or the offscreen selection', () => {
+  const { store } = setup()
+  const list = screen.getByRole('listbox')
+  Object.defineProperty(list, 'clientHeight', { value: 875 })
+  vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
+    publish(
+      Array.from({ length: 100 }, (_, index) => ({
+        id: String(index),
+        text: `Needle ${index}`,
+        path: `Parent ${index}`,
+        parentId: `parent${index}`,
+      })),
+    )
+    return vi.fn()
+  })
+  const input = screen.getByRole('searchbox')
+  fireEvent.change(input, { target: { value: 'Needle' } })
+
+  list.scrollTop = 326
+  fireEvent.scroll(list)
+
+  expect(list.querySelectorAll('[role="option"]').length).toBeLessThanOrEqual(40)
+  expect(list.querySelector('[aria-selected="true"]')).toHaveTextContent('Needle 0')
+  for (let index = 6; index <= 24; index++) {
+    const entry = list.querySelector(`[data-result-id="${index}"]`)
+    expect(entry?.querySelector('.recent-node-group-path')).toHaveTextContent(`Parent ${index}`)
+    expect(entry?.querySelector('.recent-node-row')).toHaveTextContent(`Needle ${index}`)
+  }
+  expect(input).toHaveFocus()
+})
+
 it('reveals a distant match when its highlights finish after the initial selection', () => {
   vi.useFakeTimers()
   const { store } = setup()
