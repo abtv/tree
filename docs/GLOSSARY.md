@@ -84,6 +84,8 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Global search** (product) — The search over every node of the document, shown as a list of results. `PRODUCT.md §20.14`, `ARCHITECTURE.md §13.3`. *Avoid:* Search with only a capital letter, node search. *UI:* `Search All Nodes…`. *In code:* `GlobalSearchSession`, `node-search.ts`.
 
+**Head** (architecture) — The single record in browser storage that holds the saved editor state. It is the browser counterpart of the desktop `document.json`. `ARCHITECTURE.md §13.16.1`. *In code:* `HEAD_KEY`.
+
 **History entry** (domain) — One unit of undo: one text-editing session or one structural command. `PRODUCT.md §10`. *Avoid:* undo entry, history transaction, snapshot. *In code:* `HistoryEntry`.
 
 **Inline expansion** (product) — The display of the descendants of a node beneath it in the current location, without entering the node. `PRODUCT.md §2.4`.
