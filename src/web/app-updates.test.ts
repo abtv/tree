@@ -211,7 +211,7 @@ async function controller(
   }
   vi.stubGlobal('navigator', { serviceWorker: container, locks })
   document.body.innerHTML =
-    '<div id="root"></div><button id="tree-menu-button"></button><div id="tree-menu"></div><button id="app-update"></button><button id="data-export"></button><span id="offline-status"></span>'
+    '<div id="root"></div><button id="tree-menu-button"></button><div id="tree-menu"><span id="offline-status"></span><button id="app-update"></button></div><button id="data-export"></button><div id="data-activity"></div>'
   Object.assign(document.getElementById('tree-menu')!, { showPopover: vi.fn() })
   const resume = vi.fn()
   const suspendWrites = vi.fn(() => resume)
@@ -495,7 +495,8 @@ describe('update save boundary', () => {
       vi.stubEnv('PROD', environment !== 'development')
       const register = vi.fn()
       vi.stubGlobal('navigator', environment === 'development' ? { serviceWorker: { register } } : {})
-      document.body.innerHTML = '<button id="app-update" hidden></button><span id="offline-status" hidden></span>'
+      document.body.innerHTML =
+        '<span id="offline-status" hidden></span><button id="app-update" hidden></button><div id="data-activity"></div>'
       const flushPersistence = vi.fn()
       const suspendWrites = vi.fn()
 

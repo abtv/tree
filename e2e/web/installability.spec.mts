@@ -62,7 +62,7 @@ test('serves an installable manifest with icons', async ({ newContext, baseURL }
   expect(manifestErrors).toEqual([])
 })
 
-test('asks once for persistent storage and shows the result in the status bar', async ({ newContext, baseURL }) => {
+test('asks once for persistent storage and shows the result in the Tree menu', async ({ newContext, baseURL }) => {
   const context = await newContext()
 
   await stubPersistence(context, { persisted: false, persist: true })
@@ -71,9 +71,10 @@ test('asks once for persistent storage and shows the result in the status bar', 
   page.setDefaultTimeout(5000)
   await page.goto(baseURL!)
   await ready(page)
-  const status = page.locator('#storage-status')
+  const status = page.locator('#tree-menu #storage-status')
 
   await expect(status).toHaveText('Storage is protected from automatic clearing.')
+  await expect(status).toBeHidden()
   expect(await page.evaluate(() => window.persistCalls)).toBe(1)
 
   await page.locator('#tree-menu-button').click()

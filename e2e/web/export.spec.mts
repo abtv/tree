@@ -84,11 +84,11 @@ test('exports the saved notes and referenced images from a worker', async ({ new
   await expect(menu.locator('.folder-actions-separator')).toBeVisible()
 
   // PRODUCT §24.1: the browser decides the storage line; installability.spec.mts covers both texts.
-  const storage = page.locator('#storage-status')
+  const storage = menu.locator('#storage-status')
 
   await expect(storage).toHaveText(/^Storage is (?:not )?protected from automatic clearing\.$/)
 
-  await expect(page.locator('.status-bar #storage-status')).toBeVisible()
+  await expect(storage).toBeVisible()
 
   expect(
     await menu.evaluate((element) =>
@@ -113,6 +113,8 @@ test('exports the saved notes and referenced images from a worker', async ({ new
     'Import Notes…',
     'Back Up to Folder…',
     'Restore from Folder…',
+    'Saved locally in this browser',
+    await storage.textContent(),
     'About Tree',
   ])
 

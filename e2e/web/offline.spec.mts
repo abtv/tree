@@ -117,9 +117,31 @@ test('starts offline after a full browser restart and loads archive workers from
   const server = await releaseServer()
   let context = await launch()
   try {
+    await context.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { value: undefined }))
     let page = context.pages()[0]!
     await page.goto(server.url)
     await ready(page)
+
+    const treeMenu = page.getByRole('dialog', { name: 'Tree menu' })
+    const messages = ['Saved locally in this browser', /^Storage is (?:not )?protected/, 'Ready to work offline']
+    const statusBar = page.locator('.status-bar')
+
+    await page.keyboard.press(`${primaryKey}+Shift+p`)
+    const command = page.getByRole('combobox', { name: 'Command' })
+    await expect(command).toBeFocused()
+    await command.fill('ab')
+    await expect(page.getByRole('option', { name: /about-tree/i })).toBeVisible()
+    for (const message of messages) await expect(statusBar.getByText(message)).toHaveCount(0)
+    const left = await page.locator('.command-input-line').evaluate((line) => line.getBoundingClientRect().left)
+    expect(left).toBe(12)
+    await capture(page, 'browser-command-without-passive-status.png')
+
+    await page.keyboard.press('Escape')
+    await menu(page)
+    for (const message of messages) await expect(treeMenu.getByText(message)).toBeVisible()
+    await capture(page, 'browser-passive-status-menu.png')
+    await page.keyboard.press('Escape')
+
     await input(page).click()
     await input(page).fill('Offline notes survive restart')
     await seedImageNodes(page, [{ id: 'offline-image', bytes: await noisePng(page, 16) }])

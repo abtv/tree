@@ -182,8 +182,8 @@ test('renders browser menu icons, aligned labels, check marks and disabled actio
       await showUpdate(true)
       const action = (await page.locator('#app-update').boundingBox())!
       const status = (await page.locator('#offline-status').boundingBox())!
-      expect(action.y + action.height).toBeLessThanOrEqual(status.y)
-      expect(await page.locator('.status-bar #offline-status').count()).toBe(1)
+      expect(status.y + status.height).toBeLessThanOrEqual(action.y)
+      await expect(menu.locator('#offline-status')).toBeVisible()
       await expect(page).toHaveScreenshot(`browser-update-${appearance}.png`)
       await showUpdate(false)
     }

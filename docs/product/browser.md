@@ -112,7 +112,7 @@ The browser's window color follows the Appearance choice (§20.5), including whe
 
 After the editor opens, Tree asks the browser once per page load to keep its storage when space runs low, unless the browser already reports persistent storage. The request never delays startup and shows no prompt of Tree's own. A refusal or an error changes nothing else. Persistent storage does not protect against clearing site data or deleting the profile, so export and folder backup remain the independent copies.
 
-The bottom status bar shows the result alongside the save status: `Storage is protected from automatic clearing.` or `Storage is not protected from automatic clearing.` Browsers without the storage API show no line.
+The ellipsis menu shows the result below the save status: `Storage is protected from automatic clearing.` or `Storage is not protected from automatic clearing.` Browsers without the storage API show no line.
 
 ### 24.2 Notes Archive
 
@@ -232,7 +232,7 @@ Cancel and failures reported before storage replacement keep the current notes u
 ### 24.7 Offline Access and App Updates
 
 The hosted browser version downloads its complete application package on the first online
-visit. The bottom status bar says **Ready to work offline** only after installation succeeds.
+visit. The ellipsis menu says **Ready to work offline** only after installation succeeds.
 After that, Tree can open after a browser restart without Internet, edit and save local notes,
 display stored images, and run its local archive operations. External links still require
 their destination to be reachable. The first visit and restoring a removed application cache

@@ -179,6 +179,9 @@ body:has(.image-preview-overlay) #tree-menu-button {
   display: none;
 }
 
+.status-notifications:has(> .browser-status-slot:only-child):not(:has(#browser-status > :not([hidden]))) {
+  display: none;
+}
 #browser-status:not([hidden]) {
   display: flex;
   align-items: center;

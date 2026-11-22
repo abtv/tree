@@ -127,6 +127,7 @@ export function installAppUpdates(
   const button = document.getElementById('app-update') as HTMLButtonElement
   const trigger = document.getElementById('tree-menu-button')!
   const status = document.getElementById('offline-status')!
+  const activity = document.getElementById('data-activity')!
   const lockInput = createRendererInputLock(document.getElementById('root')!)
   let registration: ServiceWorkerRegistration | undefined
   let application: 'idle' | 'applying' | 'retry' = 'idle'
@@ -145,7 +146,8 @@ export function installAppUpdates(
       (requestedWorker && ['activating', 'activated'].includes(requestedWorker.state) ? requestedWorker : undefined)
     )
   }
-  const show = (text: string) => {
+  const show = (text: string, before = activity) => {
+    if (status.nextElementSibling !== before) before.before(status)
     status.hidden = false
     status.textContent = text
   }
@@ -163,7 +165,10 @@ export function installAppUpdates(
       const ready = (await readOfflineStatus(worker))?.ready === true
       if (!current()) return
       mismatchedWorker = ready ? undefined : worker
-      if (application === 'idle') show(ready ? 'Ready to work offline' : 'Update App to enable offline access')
+      if (application === 'idle') {
+        if (ready) show('Ready to work offline', button)
+        else show('Update App to enable offline access')
+      }
       render()
     } catch {
       if (current() && application === 'idle') show('Offline setup incomplete — reconnect to try again')

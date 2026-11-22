@@ -6,7 +6,8 @@
 * The indicator sits at the right end of a status bar fixed at the bottom of the window, immediately to the left of the always-on-top pin toggle (§2.2). It remains visible while the command input or feedback occupies the left side (§20.2.28).
 * The indicator is not editable text, so the pointer over it shows the default arrow cursor (§20).
 * The content scrolls above the status bar, which never covers it, and the scrollbar ends where the status bar begins.
-* Operation status messages, including save failures, export/import, browser storage, offline readiness and folder backup, appear in the bottom status bar. Messages share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. The status-bar placement of operation status messages does not apply to confirmation dialogs. App update feedback follows the priority rules of §26.
+* Operation status messages, including save failures, export/import and folder backup, appear in the bottom status bar. Messages in the bar share one row with the controls on the right; the ordinary bar height stays 27px when they fit. Persistent save, operation and backup failures remain visible alongside other operations and while the command panel is open. Messages and actions may wrap when space is insufficient, increasing the bar height; the content and popups remain above it. The status-bar placement of operation status messages does not apply to confirmation dialogs. App update feedback follows the priority rules of §26.
+* The browser ellipsis menu shows routine save status, storage protection and successful offline setup (§24.1, §24.7).
 
 #### 20.2.28 Command Panel
 
