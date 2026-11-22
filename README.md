@@ -72,6 +72,7 @@ Its source, checks and current limitations are in [Browser version](src/web/READ
 ## Documentation
 
 * [Product Requirements](docs/PRODUCT.md) — user-visible product behavior and requirements.
+* [Glossary](docs/GLOSSARY.md) — the canonical project terms, their rejected synonyms and their code identifiers.
 * [Open Questions](docs/OPEN_QUESTIONS.md) — non-normative product and technical questions that are still open, with their evidence and decisions.
 * [Architecture](docs/ARCHITECTURE.md) — technology stack, technical architecture, boundaries, and design principles.
 * [Development Guide](docs/DEVELOPMENT.md) — development environment, commands, testing, validation, and repository conventions.

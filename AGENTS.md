@@ -66,7 +66,7 @@ Stay in the coding tool selected by the owner. Codex uses OpenAI and Claude Code
 
 ## 2. Source of Truth
 
-Read the relevant sources before changes: `docs/PRODUCT.md` for behavior; `docs/ARCHITECTURE.md` for architecture; `docs/DEVELOPMENT.md` for validation mechanics; `docs/AGENT_ROLES.md` for roles; this core and its procedures for workflow. `docs/OPEN_QUESTIONS.md` is non-normative and never authorizes implementation. If code and documentation conflict, determine whether the defect is in implementation or documentation; ask when intended behavior remains unclear.
+Read the relevant sources before changes: `docs/PRODUCT.md` for behavior; `docs/ARCHITECTURE.md` for architecture; `docs/GLOSSARY.md` for terms and their rules; `docs/DEVELOPMENT.md` for validation mechanics; `docs/AGENT_ROLES.md` for roles; this core and its procedures for workflow. `docs/OPEN_QUESTIONS.md` is non-normative and never authorizes implementation. If code and documentation conflict, determine whether the defect is in implementation or documentation; ask when intended behavior remains unclear.
 
 ## 3. Language
 

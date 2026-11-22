@@ -347,8 +347,6 @@ For a major new capability or a separate screen, such as an Agenda module, ask t
 
 Capture only from the committed synthetic demo document, in a new isolated application data directory. Never use a personal document or the normal application profile. The overview and focused-branch images must show the same node identities, text, order, and expansion state within the focused branch; navigation, appearance, and editing mode may differ. The capture and publication are described in `docs/DEVELOPMENT_REFERENCE.md` under README Screenshot Maintenance.
 
-Keep documentation consistent with the implementation.
-
 Update documentation when a change affects:
 
 * product behavior;

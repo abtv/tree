@@ -731,8 +731,10 @@ describe('agent instruction routing', () => {
     writeFile(root, 'AGENTS.md', routes)
     writeFile(root, 'docs/AGENT_WORKFLOW.md', procedureContent + '\n[Missing](MISSING.md)')
     writeFile(root, 'docs/WORKING_WITH_AGENT.md', '[Missing](MISSING.md)')
+    writeFile(root, 'docs/GLOSSARY.md', '[Missing](MISSING.md)')
 
     expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      expect.stringContaining('docs/GLOSSARY.md: link target not found'),
       expect.stringContaining('docs/AGENT_WORKFLOW.md: link target not found'),
       expect.stringContaining('docs/WORKING_WITH_AGENT.md: link target not found'),
     ])

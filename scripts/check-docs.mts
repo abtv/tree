@@ -800,6 +800,7 @@ function collectLiveDocuments(rootDirectory: string) {
     'PRODUCT.md',
     'OPEN_QUESTIONS.md',
     'ARCHITECTURE.md',
+    'GLOSSARY.md',
     'DEVELOPMENT.md',
     'DEVELOPMENT_REFERENCE.md',
     'SECURITY.md',
