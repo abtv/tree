@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Architecture document split](architecture-document-split.md) | Awaiting owner acceptance | Final owner acceptance; four questions for the owner (Q1–Q4 in the plan) |
+| [Architecture document split](architecture-document-split.md) | Awaiting owner acceptance | Final owner acceptance of the result, including the correction of the four sentences (Q1–Q4); one new question for the owner (Q5 in the plan) |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

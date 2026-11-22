@@ -215,17 +215,31 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
 
 ## Questions for the Product Owner
 
-Each question names a base sentence that the code contradicts (reserved decision). The sentence is unchanged in the architecture file. The recommendation is the correction that the code and the product specification support. Ask all questions in one batch.
+Each question names a base sentence that the code contradicts (reserved decision). The questions were asked in one batch and are answered; the answers follow the list. The quoted sentences are the text before the correction.
 
 * **Q1.** `search.md` §13.3.2: "The query matcher collects starred and unstarred matches separately during its depth-first traversal and returns the starred matches first." The code returns marked matches first, then starred matches, then the rest (`src/application/node-search.ts:36-37`, `:79`, `:103-105`), as `docs/product/search.md` and `docs/product/tree-model.md` state. Recommendation: correct the sentence to "collects marked, starred and other matches separately ... and returns marked matches first, then starred matches".
 * **Q2.** `agenda.md` §7.3.1: "Performance assessment for Agenda state (`docs/PRODUCT.md` §22.1): opening, selection, day folds, and focused presentation changes cause no document writes or syncs and add no undo snapshots." An explicit timeline fold command marks a persisted change (`src/application/editor-store.ts:383-387`, `src/application/agenda-fold-memory.ts:23-44`), as ADR 0030 and §8.1.5 state; focused-day folds do not. Recommendation: "Opening, selection, focused presentation changes and focused-day folds cause no document writes or syncs; an explicit timeline fold choice marks a persisted change for the idle autosave (§8.1.5); none causes an undo snapshot."
 * **Q3.** `agenda.md` §7.3.1: "Rows are rebuilt only when that projection, Today, displayed week, day folds, or focused day change." A change of the active occurrence also runs the row build (`src/application/agenda-rows.ts:306`, `:326-348`); the published array keeps its identity when the rows compare equal. The sentence is wrong if "rebuilt" means that the build runs, and right if it means that a new array is published. Recommendation: "The row build runs only when that projection, Today, displayed week, day folds, focused day or the active occurrence change; equal rows keep the published array."
 * **Q4.** `persistence.md` §13.5.1: "Serialization filters the expanded ids against the id set the existing validation walk already builds, which adds `O(E)` for `E` remembered ids to a save that is already `O(N)`." `serializeState` discards the id set of the validation walk and filters against the derived node index (`src/domain/document-serialization.ts:71-81`, `src/domain/document-index.ts:32-42`), as §13.9.3 of the same file states. The two bounds are correct. Recommendation: "Serialization filters the expanded ids against the document's derived node index (§13.9.3), which adds `O(E)` for `E` remembered ids to a save that is `O(N)`."
 
+### Owner answers (2026-11-22)
+
+The Product Owner approved the split and the decisions made under D5, and answered the four questions in one batch. The four sentences are corrected in one documentation commit (base `0aa95d95`). The owner has not yet given the final acceptance; the plan stays open until then.
+
+* Q1: yes. §13.3.2 states the three result groups and their order (`src/application/node-search.ts:36-38`, `:79`, `:103-105`).
+* Q2: yes, with one addition from the owner: the text must say that a save is scheduled only when the remembered timeline choice changes. §7.3.1 states that an explicit timeline fold command marks a persisted change only when it changes the remembered timeline choice (`src/application/agenda-fold-memory.ts:23-44`, `src/application/editor-store.ts:387`), and that focused-day folds cause no writes.
+* Q3: the owner asked to correct both parts and to name `overdueChanged` as a separate cause. §7.3.1 states every cause of the row build, including a document change while the projection holds a day before the displayed week (`src/application/agenda-rows.ts:305`, `:326-334`; the Overdue group reads the finished state from the document, `:151`), and states that the cache keeps the previous array only when the projection is unchanged and the built rows compare equal (`:336-347`).
+* Q4: yes. §13.5.1 names the derived node index and cites §13.9.3 (`src/domain/document-serialization.ts:78-81`).
+
+The Reviewer checked the four corrected sentences against the code and confirmed each one. Its one clarity note is applied (§7.3.1 says "After a row build"). It reported one more base sentence that the code contradicts, outside the four corrections:
+
+* **Q5 (open).** `agenda.md` §7.3.1: "It preserves semantically unchanged projected day objects and reuses each day's node row objects while its projection remains unchanged." and "A date edit that affects one day therefore does not allocate fresh node rows for unchanged days." Only the days of the displayed week use the per-day row cache (`src/application/agenda-rows.ts:201-206`). Every row build creates new node rows and path rows for the Overdue group, including for unchanged overdue days (`:175-192`). The sentences are unchanged in the file (reserved decision). Recommendation: limit both sentences to the days of the displayed week and add "The Overdue group's rows are created on every row build."
+
 ## Next Task
 
-Final owner acceptance (`AGENTS.md` §8). All tasks are done. The Product Owner answers Q1–Q4 in one batch and accepts or rejects the result.
+Final owner acceptance (`AGENTS.md` §8). All tasks are done and Q1–Q4 are answered. The Product Owner answers Q5 and accepts or rejects the result, including the correction commit.
 
-* After the answers: correct the four sentences as decided, in one documentation commit, with the proof of the Rework Method for the touched files.
+* After the answer to Q5: correct the two sentences as decided, with the proof of the Rework Method for `agenda.md`.
+
 * After explicit acceptance: remove this plan and its row in `plans/README.md` in the retirement commit. The lasting rules are already in `docs/ARCHITECTURE.md` (Writing Rules) and `docs/DEVELOPMENT.md` §9 and §12.
 * After a rejection: record the reported issues here and repair them within the closure allowance of 2 fix cycles.
