@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { dayNumberOf } from '../domain/calendar-date'
 import type { Location, TreeNode } from '../domain/document'
+import { EditorSaveScheduler } from './editor-save-scheduler'
 import { EditorStore, type EditorServices } from './editor-store'
 
 const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
@@ -11,6 +12,16 @@ const task = (id: string, finished = false): TreeNode => ({
   ...(finished ? { struckThrough: true, starred: true } : {}),
   children: [],
 })
+
+function deferred() {
+  let resolve!: () => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<void>((accept, fail) => {
+    resolve = accept
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
 
 async function harness(roots: TreeNode[], location: Location) {
   let preference = false
@@ -58,6 +69,70 @@ it('ascends from a completed branch, preserves notes, and restarts with the same
   expect(saveHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(true)
   expect(save).not.toHaveBeenCalled()
   expect((await start()).getVisibleRows().map((row) => row.node.id)).toEqual(['before', 'next'])
+})
+
+// @requirement PRODUCT.md §16.1
+it.each([true, false])('waits for a preference queued during the final document drain (saved: %s)', async (saved) => {
+  const { store, save, saveHideFinishedTasks, start } = await harness([task('note')], {
+    currentParentId: null,
+    selectedNodeId: 'note',
+  })
+  const finalDrain = deferred()
+  const releaseDrain = deferred()
+  const nextPass = deferred()
+  const preferenceStarted = deferred()
+  const releasePreference = deferred()
+  const writeError = new Error('Preference storage unavailable')
+  const writePreference = saveHideFinishedTasks.getMockImplementation()!
+  let writeSettled = false
+  saveHideFinishedTasks.mockImplementationOnce(async (value) => {
+    preferenceStarted.resolve()
+    try {
+      await releasePreference.promise
+      await writePreference(value)
+    } finally {
+      writeSettled = true
+    }
+  })
+  const flush = EditorSaveScheduler.prototype.flush
+  let calls = 0
+  const scheduler = vi.spyOn(EditorSaveScheduler.prototype, 'flush').mockImplementation(async function (
+    this: EditorSaveScheduler,
+  ) {
+    if (++calls === 2) {
+      finalDrain.resolve()
+      await releaseDrain.promise
+    }
+    if (calls === 3) nextPass.resolve()
+    await flush.call(this)
+  })
+
+  try {
+    const quit = store.flushPersistence({ sealEditsUntil: new AbortController().signal }).then(() => writeSettled)
+    await finalDrain.promise
+    const change = store.setHideFinishedTasks(true)
+    const outcome = change.then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    await preferenceStarted.promise
+    releaseDrain.resolve()
+
+    expect(await Promise.race([nextPass.promise.then(() => 'next pass'), quit.then(() => 'quit completed')])).toBe(
+      'next pass',
+    )
+    if (saved) releasePreference.resolve()
+    else releasePreference.reject(writeError)
+    expect(await outcome).toBe(saved ? undefined : writeError)
+    expect(await quit).toBe(true)
+    expect((await start()).getSnapshot()).toMatchObject({ hideFinishedTasks: saved })
+    expect(saveHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(true)
+    expect(save).not.toHaveBeenCalled()
+  } finally {
+    releaseDrain.resolve()
+    releasePreference.resolve()
+    scheduler.mockRestore()
+  }
 })
 
 it('keeps Agenda occurrence navigation, focused-day rows, and search on the same unfinished tasks', async () => {

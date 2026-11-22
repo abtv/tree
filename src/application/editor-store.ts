@@ -554,6 +554,7 @@ export class EditorStore {
     const resumeImageRecognition = options.cancelImageRecognition ? this.imageToTextQueue.suspend() : undefined
     try {
       let committed: boolean
+      let awaitedFinishedTasksWrite: Promise<void>
       do {
         this.finishPendingEdits()
         await Promise.all(this.pendingEdits)
@@ -561,7 +562,8 @@ export class EditorStore {
         if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave('flush')
         await this.saveScheduler.flush()
         await this.emojiHistory.flush()
-        await this.finishedTasksWrite
+        awaitedFinishedTasksWrite = this.finishedTasksWrite
+        await awaitedFinishedTasksWrite
         // Metadata writes leave editing available. An immediate save started meanwhile has
         // already cleared the dirty flag; drain it, including its failure, before another pass.
         await this.saveScheduler.flush()
@@ -570,7 +572,8 @@ export class EditorStore {
         committed ||
         this.pendingEdits.size > 0 ||
         this.saveScheduler.hasPendingChanges() ||
-        this.emojiHistory.hasPendingChanges()
+        this.emojiHistory.hasPendingChanges() ||
+        awaitedFinishedTasksWrite !== this.finishedTasksWrite
       )
       const seal = options.sealEditsUntil
       if (seal && !seal.aborted && !this.editSeals.has(seal)) {

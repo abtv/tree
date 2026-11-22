@@ -25,7 +25,7 @@ Only inserted words count toward the volume threshold. Deletions and other chang
 
 Every pending change is flushed before a normal quit completes. A pending Replace-mode replacement counts as a pending change: it is completed as one edit before that flush, so quitting or closing the window saves it.
 
-Editing remains available while a normal quit waits for saves. Edits made while emoji history is being saved also finish saving before quit completes. A failure saving those late edits keeps the application open under the same rules as any other save failure.
+Editing remains available while a normal quit waits for saves. Edits made while emoji history is being saved also finish saving before quit completes. A failure saving those late edits keeps the application open under the same rules as any other save failure. A finished-task visibility command accepted during this wait (§2.5) finishes its preference write attempt before the application confirms quit.
 
 After the final save, the desktop editor stops accepting edits before confirming quit to the main process. It stays closed to input while archive cleanup finishes. If the current quit request fails or times out, its input lock is released.
 

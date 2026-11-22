@@ -353,6 +353,111 @@ test.describe('persistence reliability regressions', () => {
     await expect(node(restarted.window, 1)).toHaveValue(`${before} late`)
   })
 
+  // @requirement PRODUCT.md §2.5
+  // @requirement PRODUCT.md §16.1
+  test('waits for a finished-task preference requested during the final quit save', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'root', text: '', children: [] },
+          { id: 'done', text: 'Finished task', struckThrough: true, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'root' },
+    })
+    const { app, window } = await launchTree(userDataDir, { vimPreference: false })
+    const gates = await app.evaluateHandle(() => {
+      const pause = () => {
+        let release!: () => void
+        const promise = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return { promise, release }
+      }
+      const emoji = pause()
+      const document = pause()
+      const preference = pause()
+      const events: string[] = []
+      let saves = 0
+      let preferenceSaved = false
+
+      globalThis.__treeIpc.wrap('tree:set-emoji-history', async (original, ...args) => {
+        events.push('emoji started')
+        await emoji.promise
+        const result = await original(...args)
+        events.push('emoji saved')
+        return result
+      })
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        const save = ++saves
+        events.push(`document ${save} started`)
+        if (save === 2) await document.promise
+        const result = await original(...args)
+        events.push(`document ${save} saved`)
+        return result
+      })
+      globalThis.__treeIpc.wrap('tree:set-hide-finished-tasks', async (original, ...args) => {
+        events.push('preference started')
+        await preference.promise
+        const result = await original(...args)
+        preferenceSaved = true
+        return result
+      })
+      globalThis.__treeIpc.wrap('tree:quit', (original, ...args) => {
+        if (typeof args[1] === 'string' && !preferenceSaved) {
+          events.push('quit confirmed early')
+          return
+        }
+        return original(...args)
+      })
+      return {
+        events,
+        releaseEmoji: emoji.release,
+        releaseDocument: document.release,
+        releasePreference: preference.release,
+      }
+    })
+    const waitFor = (event: string) =>
+      expect
+        .poll(() => gates.evaluate(({ events }) => events, undefined), { intervals: [10, 20, 40, 80] })
+        .toContain(event)
+    const entry = node(window, 1)
+    await expect(window.locator('[data-node-id="done"] .node-input')).toBeVisible()
+    await typeInto(entry, ':rocket')
+    await window.keyboard.press('Enter')
+    await expect(entry).toHaveValue(/🚀/)
+    await waitFor('emoji started')
+    await clickApplicationMenuQuit(app)
+    await waitFor('document 1 saved')
+
+    const text = `${await entry.inputValue()} one two three four five six seven eight nine ten eleven twelve`
+    await entry.fill(text)
+    await waitFor('document 2 started')
+    await gates.evaluate(({ releaseEmoji }) => releaseEmoji(), undefined)
+    await waitFor('emoji saved')
+    // A renderer IPC round trip lets the earlier emoji response reach the quit flush.
+    await window.evaluate(() => globalThis.window.treeApi.getEmojiHistory?.())
+    await window.keyboard.press('Meta+Shift+p')
+    await window.getByRole('combobox', { name: 'Command' }).fill('toggle-finished-tasks')
+    await window.keyboard.press('Enter')
+    await waitFor('preference started')
+
+    await gates.evaluate(({ releaseDocument }) => releaseDocument(), undefined)
+    await waitFor('document 2 saved')
+    await window.evaluate(() => globalThis.window.treeApi.load())
+    expect(await gates.evaluate(({ events }) => events, undefined)).not.toContain('quit confirmed early')
+
+    const child = app.process()
+    const exited = new Promise<number | null>((resolve) => child.once('exit', resolve))
+    await gates.evaluate(({ releasePreference }) => releasePreference(), undefined)
+    expect(await exited).toBe(0)
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
+
+    const restarted = await launchTree(userDataDir, { vimPreference: false })
+    await expect(restarted.window.locator('[data-node-id="done"] .node-input')).toHaveCount(0)
+    expect(await restarted.window.evaluate(() => globalThis.window.treeApi.getHideFinishedTasks?.())).toBe(true)
+  })
+
   test('keeps the saved selection when a Find repeat starts during the final quit save', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
