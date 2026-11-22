@@ -136,39 +136,6 @@ Support requires repeated mouse transitions for sibling moves and a shortcut tha
 - 2026-10-04 — Product Owner request: "move nodes from one parent to another, it's not working now with drag and drop". This asked for cross-parent moves by mouse; the initiative was completed and its plan retired in `e7d392f`. Current behavior is specified in PRODUCT §11. This request did not authorize keyboard moves.
 - 2026-09-21 — Repository fact: `docs/PRODUCT.md` defines drag-and-drop as the only sibling-reordering interaction.
 
-## PD-004: User-controlled export and backup
-
-Kind: product
-Status: Exploring
-
-### Observation
-
-The original observation predates the data-portability features. Browser export, import, Chromium folder backup and folder restore are defined in `docs/PRODUCT.md` §24; desktop export, import and Replaced Notes recovery are defined in §25. Desktop persistence retains recovery generations, while browser storage does not. The remaining question is which personal recovery and portability scenarios these facilities cover adequately.
-
-### Hypothesis
-
-A personal note store needs a user-controlled way to preserve and leave with its data even when internal persistence is reliable.
-
-### Counter-hypotheses and tradeoffs
-
-- Existing local files and retained generations may be sufficient for one person's use.
-- A readable export and a lossless backup solve different problems and should not be conflated.
-- Import, attachments, and restoration could create substantial complexity beyond the immediate need.
-
-### Experiment
-
-List the concrete recovery and portability scenarios that matter in personal use—machine replacement, accidental deletion, corruption, application abandonment, and reading notes elsewhere—then test which are already covered by current storage and ordinary system backup tools.
-
-### Decision criteria
-
-Support requires at least one important scenario that current persistence and system backups do not cover adequately. The experiment should determine whether the need is readable export, lossless backup and restore, or both before behavior is specified.
-
-### Evidence
-
-- 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies automatic persistence and retained generations but no user-facing data-portability workflow.
-- 2026-09-21 — Agent inference: portability is commonly important for long-lived personal notes; the Product Owner's actual scenarios remain to be established.
-- 2026-11-03 — Repository fact: PRODUCT §§24–25 and the browser/desktop archive implementations supersede the original absence-of-export premise. The recorded status is unchanged; any further experiment must assess the existing workflows first.
-
 ## PD-009: How to improve Agenda
 
 Kind: product
