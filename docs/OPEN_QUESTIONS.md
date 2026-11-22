@@ -253,28 +253,3 @@ Browser use with images whose text should be searchable.
 ### What would settle it
 
 The Product Owner decides when to start. A browser recognition approach then needs research and an architecture decision, since it may add a dependency or a service.
-
-## TD-003: Regrouping `docs/ARCHITECTURE.md` §8 and §13
-
-Kind: technical
-Status: Deferred
-
-### Question
-
-Should `docs/ARCHITECTURE.md` §8 UI Layer and §13 Persistence, the two largest sections (sizes under Evidence), be regrouped? §13 also holds search, emoji, command-history and finished-task text beside persistence, so a reader looking for one subject loads the others.
-
-### What we are watching
-
-Whether agents and the Product Owner read the whole of §8 or §13 for a task that needs only one of its subjects, and how much each section grows.
-
-### What would settle it
-
-A Product Owner choice of section boundaries. Any regrouping must keep ADR 0004's §13 citation valid. The Product Owner deferred the question on 2026-11-21 (Q4 in `git show c4c4821:plans/documentation-load-and-ownership.md`), and kept it deferred until the decision about removing features (Q8 in `git show 1d20944:plans/documentation-consistency-and-policy-load.md`).
-
-### Evidence
-
-- 2026-11-21 — Repository fact: at `bba6aa1`, §8 is 50,956 bytes and §13 is 68,067 bytes, 56% of the file (`grep -b -n '^## '`).
-- 2026-11-21 — Repository fact: other sections also hold unrelated subjects. §4 "Domain Layer" describes search modules of `src/application/` and `src/renderer/`; §7 "Application Layer" opens with main-process desktop updates; §21 "Module Structure" holds Vim and caret owner mechanics.
-- 2026-11-22 — Repository fact: at `22a7ac35`, after Recent nodes was removed, §8 is 50,986 bytes and §13 is 67,168 bytes (`grep -b -n '^## '`). §13 keeps only a short note that earlier recent-node files are no longer read, written or deleted.
-- 2026-11-22 — Repository fact: the feature-removal question (PD-008) was closed. Summarize, the `image-to-text` command and Recent nodes were removed; every other feature was kept. Dates (PD-010) and the `#` and `&` markers (PD-013) remain open and could still remove content from §8 or §13.
-- 2026-11-21 — Agent inference (independent audit, byte split not re-checked): Agenda, the browser version and the notes archives hold a large part of §8 and §13, so a decision to remove features would change what there is to regroup.

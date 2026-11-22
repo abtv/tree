@@ -1,0 +1,166 @@
+# Search
+
+### 4.2 Search Modules
+
+`text-search.ts` provides incremental literal matching and query preparation. Unicode simple
+case equivalence preserves original UTF-16 spans without text normalization or full-text
+case conversion. Comparisons between two ASCII characters fold letter codes directly;
+any non-ASCII character retains Unicode regular-expression equivalence, including folds
+across the ASCII boundary. A streaming prefix matcher emits a forward, nonoverlapping match stream;
+reverse navigation selects from that same stream. `search-scope.ts` traverses Tree with a
+depth-sized stack, including the current-parent heading. Agenda traversal consumes an
+immutable projection supplied before fold filtering and keeps day/node occurrence identity.
+It builds a temporary node-reference map incrementally; it neither copies node text nor
+retains a text index. Projection derivation remains the Agenda owner's responsibility.
+
+`search-executor.ts` schedules bounded work slices through an injected macrotask scheduler.
+Count stops at match 101. A completed exact local count retains up to 100 ordered
+match spans with occurrence identities, row ranks and references to the existing
+text, plus the captured origin's row if present. The search session releases them
+when its count is invalidated or hidden. Confirmation reuses a completed count for
+the same query. Jumps from the captured origin, a match or a day heading resolve
+from the saved positions. A manual move to another row may require an incremental
+occurrence walk to locate its rank. Pending or capped results retain the full rank
+pass and second destination pass. Both paths use the same modular count rules. Only the selected
+destination invokes native grapheme segmentation. JavaScript matching and traversal have
+explicit checkpoints; a native ICU segmentation call is indivisible, so oversized ordinary,
+combining and emoji text have measured performance guards rather than a claimed universal
+time bound. Cancellation releases its generator, captured document and queued callback.
+The default scheduler uses cancellable `scheduler.postTask` tasks at `user-visible` priority
+where supported, with zero-delay timers as the fallback. This avoids nested timer delays
+without changing the fixed checkpoint limit. Integrated Electron measurements on large
+documents confirmed lower completed-search CPU time and elapsed time; rapid cancellation
+can consume more CPU because more work runs before cancellation. These measurements do not
+establish improved input latency or power consumption. Search adds no persistence
+work. `perf/electron/node-search.spec.ts` guards complete scans of large ASCII
+and Cyrillic documents. `perf/electron/search.spec.ts` guards repeated navigation, deep and
+wide scopes, long mounted text, cancellation retention and current-result latency separately
+from animation-frame scheduling latency. Its task probe includes native posted tasks and
+all zero-delay timer callbacks in the measured phase, without attributing every callback
+to search. Animation-frame timings do not establish physical display presentation.
+
+`search-session.ts` owns memory-only query recall, draft entry, feedback and request validity.
+Its local mode is hidden, editing (with the captured origin and cancellation visibility),
+or confirmed. The public snapshot is a cached projection of that mode and count feedback.
+Count and navigation have independent idle/running jobs and separate request IDs, and
+share context invalidation. These bounded runtime records add no traversal or disk work. The caller
+must replace context before publishing a new document revision or presentation scope.
+Late callbacks are rejected even if an executor ignores cancellation. A pending navigation
+can be superseded; the input owner must serialize repeated user intents after applying
+the previous destination, and retry canceled navigation only against a fresh context. Raw
+match offsets and grapheme caret offsets are separate; subsequent navigation can preserve
+the raw match anchor while the caret remains at its containing grapheme.
+
+`use-local-search.ts` coordinates shared Find shortcuts and pointer controls with
+the existing application search session. Agenda exposes its current read-only caret
+through its renderer owner; `EditorStore.searchOrigin` resolves occurrence or synthetic
+origins. Native Find menu commands use a validated main-to-renderer notification;
+command-panel actions call the same renderer entry points. These controls retain
+bounded session-only references and add no document-scale work or persistence.
+The renderer presents the same session as a Find panel in standard editing and a
+bottom status-bar prompt in Vim. Vim confirmation returns focus through the existing
+search-focus owner; confirmed feedback contains no editable field.
+While Find owns focus, navigation updates selection and reveal without focusing
+an editor or writing its native caret. The input bindings delegate search focus policy
+to the DOM-independent `SearchFocusController`, supplying live search and DOM focus
+observations without changing their ordered commit pipeline. The controller retains one
+deferred focus intent for close/Escape; genuine editor focus invalidates that intent so a
+later restoration cannot replace a newer manual selection.
+
+`editor-search.ts` connects Tree and Agenda input through `EditorStore`. Runtime publication updates
+its monotonic document revision, including Undo/Redo, before notifying subscribers.
+Scope identity stays stable across ordinary selection and folds. The controller serializes
+navigation and retains the raw match anchor separately from the grapheme caret.
+Repeated jumps belong to the active navigation queue. An interruption or a jump
+without a destination discards its remaining repeats. If a subscriber starts a
+new jump while search becomes visible, only the new jump can move the caret.
+`EditorSearch` resolves origins, reveals ancestors and restores search-owned folds,
+including manual Tree/Agenda fold ownership transfers. Search-owned Tree folds belong
+to the active expansion view; when a star change switches the view, search releases
+their ownership, so closing Find never closes a fold of another view. It returns explicit Tree or
+Agenda view changes with a target location and token-free focus for a reveal.
+`EditorStore` publishes those changes, creates focus tokens, ends the text session
+before Agenda reveal, and schedules Tree view persistence. Search disposal cancels
+work without changing the view. This keeps fold policy with its ownership set and
+publication effects in the store. The transition adds only a short-lived result;
+ancestor walks, projection-cache calls, retained state, writes and syncs are unchanged.
+Query entry suppresses document focus projection while keeping
+ordinary selection authority current underneath. For local search, mounted inputs
+compute ordinary highlights with the query during render. A bounded text-plus-query
+length keeps oversized work on the cancellable incremental path. The renderer
+composes these ranges with link, date and caret intervals.
+Agenda reuses the store-owned direct-match projection cache before day-fold filtering. Scope keys
+include the Agenda root and focused day and displayed week. Projection changes, including leaving a pinned
+item without a document edit, invalidate results. The editor store reports a committed focus
+token to the search owner. Its jump notification lets the renderer finish the active editing
+session even when the same move starts a recount. Manual input interrupts the pending navigation
+before native selection or composition changes, with constant work on an idle search. Origins and anchors retain occurrence
+day; synthetic headers use a position before their day. Read-only rows consume the
+existing focus token for same-row caret arrivals and its optional line-reveal hint
+to reveal a search destination within wrapped text. Agenda reveal/cleanup uses day-fold keys
+without changing Tree expansion. Inactive search adds no corpus scans. Query entry,
+counting and highlighting perform zero writes or syncs; navigation and revealed folds use
+existing view-state persistence in Tree; Agenda search navigation and temporary fold reveals remain runtime-only
+and add no writes or syncs. Per execution, memory scales with query length and traversal depth;
+Agenda additionally holds one temporary node-reference map proportional to document size.
+Session replacement and cancellation release obsolete work; memory does not grow with edit
+history or completed request count. No persistence fields, IPC, Worker or dependency are added.
+
+---
+
+### 13.3 Search Results and Sessions
+
+`node-result.ts` owns the Search result shape and its label, path and presentation helpers, which Search, the marked and starred list and Agenda paths share. The Search popup borrows editor focus and dispatches the store's `openSearchResult` navigation command; it does not mutate document content. The application keeps no history of edited or visited nodes. Earlier versions saved such a history in `data/recent-nodes.json` and the browser key `preferences/recent-nodes`; the application no longer reads, writes or deletes them, so an existing file or key stays as it was.
+
+`node-search.ts` owns complete-document result enumeration for Search. The domain `node-search-query.ts` prepares whitespace-separated terms with independent smart case, reuses streaming KMP for ordinary substring terms, and matches complete recognized marker names excluding links. A depth-first traversal tracks per-term match counts on the current ancestor chain and the terms matched by each entered node; leaving a branch removes only that branch's contributions. A result requires every term to be covered and at least one term to match locally. Ancestor text is not rescanned for descendant eligibility, and no document-wide text index or normalized text copy is retained. Matching costs scale with query terms and scanned node text; transient coverage storage is bounded by query size and traversal depth, in addition to results and existing recognized-tag caches.
+
+The store forwards every nonempty query to that matcher. The popup session requests catalog suggestions for the marker term at the caret, including within a multi-term query; accepting a suggestion replaces only that term. Global suggestions require continuous case-folded name matches; inline completion keeps its separate fuzzy matching. `tag-search.ts` shares Unicode folding and source-offset projection with suggestion highlighting. Scheduled batches yield to input; cancellation releases obsolete generators and their snapshots. Result titles retain the original full text by reference. The application projection supplies recognized marker-match ranges excluding links, including mapped offsets in bounded, whitespace-normalized ancestor labels. The renderer combines those ranges with ordinary-term matches through `nodeSearchHighlights`, applying independent smart case and merging overlapping ranges. Hidden image text affects eligibility but supplies no visible highlight ranges. The input/completion session stays separate from Vim search and document undo. Searching adds no persistence operations; confirming a result uses the `openSearchResult` navigation transition. Application scale guards cover inherited multi-term queries, alongside the real Electron node-search scenarios.
+
+The popup windows measured, variable-height rows using the shared list-offset helpers,
+with the selected row pinned when outside the visible range. Unknown heights use an
+estimate; ResizeObserver measures mounted rows and width changes invalidate offscreen
+measurements. Offset changes preserve the current scroll anchor. A zero-height sticky
+anchor retains painted results until the native scroll handler synchronously replaces
+rows and their relative offset. The total-height container clips overflow. Query,
+completion, composition, refresh and opening reset scrolling; selection reveals the row
+or its first match when oversized, without changing result-session ownership. Mounted
+rows remain bounded to 40, while measured heights and offset arrays scale with current
+results. Highlight scanning reuses the yielding literal-decoration hook; tag ranges
+come from the application projection. No document writes, syncs or animation-frame
+polling are added. Search scale scenarios and native scroll/frame regressions
+guard the affected costs.
+
+The query matcher collects starred and unstarred matches separately during its depth-first
+traversal and returns the starred matches first. The renderer groups consecutive nested
+results by parent ID and displayed path. A measured entry contains the node and its optional
+group heading. Either can receive the selection frame. The counter uses the node's index
+for both positions, so headings add no results to the total. Each node option exposes its path
+as an accessible description even when the heading is outside the rendered window.
+The list's flex basis uses
+the measured entries without the conditional trailing inset, so adding scroll space
+cannot resize the viewport and repeatedly toggle its own overflow condition. The
+node-search scale scenario covers the changed measurement and scrolling cost.
+
+`global-search-session.ts` is the pure renderer-local owner of that popup's current
+query, completed results, pending work, selection, tags and composition. One subscribed
+snapshot replaces parallel React state. It invalidates obsolete callbacks and closes
+before returning a chosen result, so finishing a buffered edit cannot reopen Search
+through document publication. Keyboard and pointer visits share that transition.
+`GlobalSearchPopup` adapts input and document notifications, restores focus, and owns
+DOM measurement, scrolling and the rendered row window. The session reuses the
+existing store's marked and starred list, tag and search functions; it adds no index, document scan,
+history or persistence write. Retained memory is bounded by the current displayed
+results and one active request, released on close.
+
+`starred-nodes.ts` derives empty Search entries on demand: marked nodes, then starred nodes that are not marked. It sorts each part by complete ancestor text and node name and caches results by immutable document in a weak map. Weak node summaries prune unchanged branches after edits; this preparation never runs on text input. Memory follows reachable documents/nodes and their marked and starred results. No other entries are added and no history is stored. Search retains consecutive parent-ID grouping and its existing nonempty-query executor.
+
+---
+
+### 21.2 Editor Store Search Interface
+
+`EditorStore.search` exposes search commands and read-only session observation, while
+context replacement and fold ownership remain private store operations. Renderer
+unmount calls `disposeSearch` to retire search without changing folds; the user
+close command remains `hideSearch`, which also releases search-owned folds.
+This typed view shares the existing owner and adds no subscriptions, document scans,
+writes or retained snapshots.

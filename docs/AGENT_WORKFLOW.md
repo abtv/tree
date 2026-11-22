@@ -363,9 +363,8 @@ Before adding a rule after a defect or a process failure, check whether a test, 
 Keep each document focused on its responsibility:
 
 * `README.md` — the project identity and documentation index.
-* `PRODUCT.md` — the index of what the product does. The requirements are in the files under `docs/product/`; a requirement keeps its `PRODUCT.md §N` identifier in every file.
+* `PRODUCT.md` and `ARCHITECTURE.md` — the indexes of what the product does and how the software is structured. Their text is in `docs/product/` and `docs/architecture/`; a section keeps its `§N` identifier in every file.
 * `OPEN_QUESTIONS.md` — product and technical questions that are still open, with their evidence and Product Owner decisions, none of which are requirements yet.
-* `ARCHITECTURE.md` — how the software is structured.
 * `DEVELOPMENT.md` — how the software is developed and validated.
 * `DEVELOPMENT_REFERENCE.md` — development reference material read on demand: CI, containers, README media, tool configuration, and historical measurements.
 * `AGENT_ROLES.md` — the formal definition of each agent role, shared by every coding-agent tool's config.

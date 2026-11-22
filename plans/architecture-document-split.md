@@ -5,7 +5,7 @@ Status: In progress
 ## Objective
 
 1. Split `docs/ARCHITECTURE.md` (209,630 bytes at `e85fed30`) into per-area files under `docs/architecture/`, with `docs/ARCHITECTURE.md` as the index, the same way `docs/PRODUCT.md` indexes `docs/product/`.
-2. Give §4, §7, §8, §13 and §21 numbered subsections by subject, so that each subject is stored in the file of its area. This answers TD-003 of `docs/OPEN_QUESTIONS.md`.
+2. Give §4, §7, §8, §13 and §21 numbered subsections by subject, so that each subject is stored in the file of its area. This answered the open question TD-003, which T2 removed from `docs/OPEN_QUESTIONS.md`.
 3. Rewrite the wording of every file as present-state statements without losing an architectural fact.
 
 ## Scope Limits
@@ -107,8 +107,8 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 | ID | Outcome | Files | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
 | T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Done |
-| T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Ready |
-| R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Planned |
+| T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Done |
+| R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Ready |
 | R2 | Rewrite | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless they hold change-history phrasing. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rewrite proof | Minimal Risk | Planned |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Planned |
@@ -123,7 +123,7 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 | R13 | Rewrite | `browser.md` | Rewrite proof | Minimal Risk | Planned |
 | R14 | Lasting wording rules in the index; size limit D2 | `docs/ARCHITECTURE.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Every file is within the limit; `npm run check` passes | Low Risk: `npm run check` | Planned |
 
-T2 writes each file once with the file-editing tool from the line ranges above, then writes the index. It keeps a `WORKING_PLAN.md` that lists the files already written, because the task can cross a context boundary. T1 must not change `docs/ARCHITECTURE.md`.
+T2 wrote each file once with the file-editing tool from the line ranges above, then wrote the index.
 
 ## Owner Involvement
 
@@ -143,7 +143,14 @@ T2 writes each file once with the file-editing tool from the line ranges above, 
 * `PRODUCT_LIMITS` is not applied to the architecture in Phase 1: many paragraphs are single blocks of 1–4.6 KB, and the limit would force rewording during a mechanical move.
 * T1 added `--spec` only to `--regrouped`. Rewrite tasks use `--verbatim` and `--details` with `--file`, which accept any path.
 * In this Claude Code session the sandbox denied writes to the temporary directory, so test runs that create temporary directories (`npm test`, `npm run check`) ran outside the sandbox. `npm run check:docs` ran inside it.
+* T2 result: `npm run check:docs -- --regrouped 60160df5 --spec architecture` reported 384 blocks, removed 0, added 0, structural problems 0, 29 headings added and 6 renumbered. The Reviewer reported no meaningful issues. To inspect the split, compare any file with `git show 60160df5:docs/ARCHITECTURE.md`.
+* Findings from the T2 review, for the rewrite tasks:
+  * R2: §1 in `overview.md` says "This document describes"; after the split it must name the architecture description, not one file. §21 in `overview.md` lists the domain and application modules; the matching renderer list ("The renderer currently isolates DOM/caret behavior") is in §21.1 in `vim.md`, because most of it names Vim and caret modules. Add a reference to §21.1.
+  * R6: `list-rendering.md` §8.4 says "the same sticky-anchor arrangement as Agenda"; cite §8.1.
+  * R8 and R9: the last two sentences of the "Agenda parent paths" paragraph of §8.1 in `agenda.md` describe Global Search. Moving them to `search.md` needs a separate commit proven by `--regrouped`; otherwise keep them and cite §13.3.
+  * `--regrouped` does not fail for text added before the first numbered heading. `npm run check:docs` rejects such text in the files under `docs/architecture/`, but not in the index. Check the index by reading it when `--regrouped` is used again.
+  * `--regrouped` also resolves link targets inside code spans and fenced blocks. The architecture files have no link inside code.
 
 ## Next Task
 
-T2. Its base for `--regrouped` is the T1 commit, whose subject is `build(docs): check the architecture index and prove exact regrouping`.
+R1. Record its starting commit as `<base>` before editing.
