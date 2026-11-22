@@ -233,13 +233,13 @@ The Product Owner approved the split and the decisions made under D5, and answer
 
 The Reviewer checked the four corrected sentences against the code and confirmed each one. Its one clarity note is applied (§7.3.1 says "After a row build"). It reported one more base sentence that the code contradicts, outside the four corrections:
 
-* **Q5 (open).** `agenda.md` §7.3.1: "It preserves semantically unchanged projected day objects and reuses each day's node row objects while its projection remains unchanged." and "A date edit that affects one day therefore does not allocate fresh node rows for unchanged days." Only the days of the displayed week use the per-day row cache (`src/application/agenda-rows.ts:201-206`). Every row build creates new node rows and path rows for the Overdue group, including for unchanged overdue days (`:175-192`). The sentences are unchanged in the file (reserved decision). Recommendation: limit both sentences to the days of the displayed week and add "The Overdue group's rows are created on every row build."
+* **Q5.** `agenda.md` §7.3.1 (text before the correction): "It preserves semantically unchanged projected day objects and reuses each day's node row objects while its projection remains unchanged." and "A date edit that affects one day therefore does not allocate fresh node rows for unchanged days." The Overdue group does not use the per-day row cache (`src/application/agenda-rows.ts:170-194`).
+
+The Product Owner then accepted the corrections for Q1–Q4 (commit `c3df22db`) and answered Q5: state in §7.3.1 that the per-day row cache serves the week days of the timeline and the day of the focused-day presentation; describe the Overdue group separately (a build of the group creates its node rows again and creates its parent-path rows only for an expanded group); cite that rule from §8.1.4. The correction (base `c3df22db`) changes two sentences and adds one in §7.3.1 and changes one sentence in §8.1.4 (`src/application/agenda-rows.ts:167-168`, `:175-193`, `:195-224`). The Reviewer checked the changed sentences against the code and found no meaningful issue. The owner has not yet given the final acceptance; the plan stays open until then.
 
 ## Next Task
 
-Final owner acceptance (`AGENTS.md` §8). All tasks are done and Q1–Q4 are answered. The Product Owner answers Q5 and accepts or rejects the result, including the correction commit.
-
-* After the answer to Q5: correct the two sentences as decided, with the proof of the Rework Method for `agenda.md`.
+Final owner acceptance (`AGENTS.md` §8). All tasks are done and Q1–Q5 are answered. The Product Owner accepts or rejects the result, including the Q5 correction commit.
 
 * After explicit acceptance: remove this plan and its row in `plans/README.md` in the retirement commit. The lasting rules are already in `docs/ARCHITECTURE.md` (Writing Rules) and `docs/DEVELOPMENT.md` §9 and §12.
 * After a rejection: record the reported issues here and repair them within the closure allowance of 2 fix cycles.
