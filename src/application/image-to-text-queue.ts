@@ -11,7 +11,11 @@ export type ImageToTextJob = Readonly<QueuedImage>
 
 type DrainState = { phase: 'idle' } | { phase: 'draining'; active: QueuedImage | undefined }
 
-/** Owns recognition scheduling; the store executes native work and applies its results. */
+/**
+ * Owns recognition scheduling; the store executes native work and applies its results.
+ * Cancellation removes pending jobs at once, so only the active job, whose native request is
+ * already in flight, can be observed with `canceled` set.
+ */
 export class ImageToTextQueue {
   private readonly pending: QueuedImage[] = []
   private drain: DrainState = { phase: 'idle' }
@@ -22,7 +26,7 @@ export class ImageToTextQueue {
   }
 
   public get size(): number {
-    return this.pending.length + (this.drain.phase === 'draining' && this.drain.active !== undefined ? 1 : 0)
+    return this.pending.length + (this.activeJob === undefined ? 0 : 1)
   }
 
   public enqueueIndex(nodeId: NodeId, attachmentId: AttachmentId): boolean {
@@ -33,8 +37,9 @@ export class ImageToTextQueue {
 
   public enqueueReindex(document: Document): void {
     if (this.suspended) return
-    const pending = new Set<AttachmentId>()
-    for (const job of this.jobs()) if (!job.canceled) pending.add(job.attachmentId)
+    const pending = new Set<AttachmentId>(this.pending.map((job) => job.attachmentId))
+    const active = this.activeJob
+    if (active !== undefined && !active.canceled) pending.add(active.attachmentId)
     const visit = (nodes: readonly TreeNode[]): void => {
       for (const node of nodes) {
         const attachmentId = node.attachment?.id
@@ -49,21 +54,18 @@ export class ImageToTextQueue {
   }
 
   public reconcile(document: Document): void {
-    for (const job of this.jobs()) {
-      if (job.canceled || locateNode(document, job.nodeId)?.node.attachment?.id === job.attachmentId) continue
-      const owner = job.kind === 'reindex' ? findOwner(document.roots, job.attachmentId) : undefined
-      if (owner === undefined) job.canceled = true
-      else job.nodeId = owner.id
-    }
-    for (let index = this.pending.length - 1; index >= 0; index--) {
-      const job = this.pending[index]!
-      if (job.canceled) this.pending.splice(index, 1)
-    }
+    const active = this.activeJob
+    if (active !== undefined && !active.canceled && !retainSource(document, active)) active.canceled = true
+    let kept = 0
+    for (const job of this.pending) if (retainSource(document, job)) this.pending[kept++] = job
+    this.pending.length = kept
   }
 
   public suspend(): () => void {
     this.suspensions++
-    for (const job of this.jobs()) job.canceled = true
+    this.pending.length = 0
+    const active = this.activeJob
+    if (active !== undefined) active.canceled = true
     let resumed = false
     return () => {
       if (resumed) return
@@ -92,10 +94,18 @@ export class ImageToTextQueue {
     if (this.drain.phase === 'draining' && this.drain.active === undefined) this.drain = { phase: 'idle' }
   }
 
-  private *jobs(): Iterable<QueuedImage> {
-    if (this.drain.phase === 'draining' && this.drain.active !== undefined) yield this.drain.active
-    yield* this.pending
+  private get activeJob(): QueuedImage | undefined {
+    return this.drain.phase === 'draining' ? this.drain.active : undefined
   }
+}
+
+/** Keeps a job's source current: a reindex job follows its image to another node. */
+function retainSource(document: Document, job: QueuedImage): boolean {
+  if (locateNode(document, job.nodeId)?.node.attachment?.id === job.attachmentId) return true
+  const owner = job.kind === 'reindex' ? findOwner(document.roots, job.attachmentId) : undefined
+  if (owner === undefined) return false
+  job.nodeId = owner.id
+  return true
 }
 
 function findOwner(nodes: readonly TreeNode[], attachmentId: AttachmentId): TreeNode | undefined {

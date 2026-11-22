@@ -85,10 +85,12 @@ it('keeps admission suspended until all flush owners resume without reviving can
   queue.enqueueIndex('source', 'source')
   queue.start()
   const active = queue.next()!
+  queue.enqueueIndex('pending', 'pending')
   const resumeFirst = queue.suspend()
   const resumeSecond = queue.suspend()
 
   expect(active.canceled).toBe(true)
+  expect(queue.size).toBe(1)
   expect(queue.enqueueIndex('hidden', 'hidden')).toBe(false)
   queue.enqueueReindex({ roots: [image('reindex')] })
   expect(queue.size).toBe(1)
@@ -104,6 +106,10 @@ it('keeps admission suspended until all flush owners resume without reviving can
   expect(queue.suspended).toBe(false)
   expect(active.canceled).toBe(true)
   expect(queue.enqueueIndex('hidden', 'hidden')).toBe(true)
+
+  queue.complete(active)
+
+  expect(queue.next()).toMatchObject({ nodeId: 'hidden', canceled: false })
 })
 
 // @requirement PRODUCT.md §22.1

@@ -612,7 +612,6 @@ export class EditorStore {
     try {
       for (let job = this.imageToTextQueue.next(); job !== undefined; job = this.imageToTextQueue.next()) {
         try {
-          if (job.canceled) continue
           const paragraphs = await this.services.imageToText!(job.attachmentId)
           if (job.canceled || this.runtime.snapshot.status !== 'ready' || this.isPersistenceLocked()) continue
 
