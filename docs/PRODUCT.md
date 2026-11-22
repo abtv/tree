@@ -21,7 +21,7 @@ Each section number is listed once, with the file that holds its heading.
 | 15, 15.1, 17, 17.1 | [images.md](product/images.md) |
 | 16, 16.1, 16.2 | [persistence.md](product/persistence.md) |
 | 9, 9.1, 9.2, 9.3, 9.4, 21, 26 | [application.md](product/application.md) |
-| 20, 20.1, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8 | [interaction.md](product/interaction.md) |
+| 20, 20.1, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8, 20.15 | [interaction.md](product/interaction.md) |
 | 20.2, 20.2.1, 20.2.2, 20.2.3, 20.2.4, 20.2.5, 20.2.6, 20.2.8, 20.2.9, 20.2.10, 20.2.11, 20.2.12, 20.2.13, 20.2.14, 20.2.15, 20.2.16, 20.2.17, 20.2.18, 20.2.19, 20.2.20, 20.2.21, 20.2.22, 20.2.23, 20.2.24, 20.2.25, 20.2.27 | [vim.md](product/vim.md) |
 | 20.2.7, 20.2.28, 20.2.29, 20.2.30 | [command-panel.md](product/command-panel.md) |
 | 20.2.26, 20.14, 20.14.2, 20.14.3, 20.14.4 | [search.md](product/search.md) |

@@ -120,7 +120,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Occurrence** (domain) — One node shown under one day in Agenda. A node with several dates has several occurrences. `PRODUCT.md §23.4`, `PRODUCT.md §23.7`. *Avoid:* item, entry. *In code:* `AgendaOccurrence`.
 
-**Operation error** (product) — The message that reports a rejected or failed command. It is separate from a save error. `PRODUCT.md §2.3`. *In code:* `operationError`.
+**Operation error** (product) — The message that reports a rejected or failed command. It is separate from a save error. `PRODUCT.md §20.15`. *In code:* `operationError`.
 
 **Overdue** (product) — The Agenda group of the nodes that are not struck through and have a date before the current week. `PRODUCT.md §23.3`.
 

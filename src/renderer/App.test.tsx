@@ -2957,6 +2957,7 @@ describe('App', () => {
     expect(screen.getByText(/Retry Restart and Install, or quit and reopen Tree/)).toBeVisible()
   })
 
+  // @requirement PRODUCT.md §20.15
   it('shows operation failures in the visible red error message', async () => {
     const store = createStore()
 

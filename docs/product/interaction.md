@@ -149,3 +149,9 @@ A click or press that selects a node does not move a node that is fully visible,
 #### `H`, `M`, and `L`
 
 **`H`, `M`, and `L`** (§20.2) choose among the nodes that lie wholly outside the contexts, except at an edge where the content is scrolled to its start or end, which keeps no context. They do not scroll, including during later geometry changes. When no node lies outside the contexts, they choose among the nodes in the whole content area as §20.2 describes; this fallback may select a node within a context or a clipped node and preserves the scroll position.
+
+### 20.15 Operation Errors
+
+An operation error is the message that reports a command or a platform operation that the application rejected or could not complete. The requirement that reports an operation error states its reason text and what happens to the document.
+
+The message appears in the bottom status bar as `Operation failed:` followed by the reason. It uses the error colors of §20.5 and is announced as an alert. It stays until the next successful command. A save error (§16.1) is a separate message, and both can be visible together.

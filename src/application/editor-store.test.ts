@@ -4728,6 +4728,7 @@ describe('EditorStore', () => {
     expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ text: '' }] } })
   })
 
+  // @requirement PRODUCT.md §20.15
   it('surfaces operation errors until the next successful command', async () => {
     const store = new EditorStore(createServices(), ids('root'))
 
