@@ -108,8 +108,8 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 | --- | --- | --- | --- | --- | --- |
 | T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Done |
 | T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Done |
-| R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Ready |
-| R2 | Rewrite | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless they hold change-history phrasing. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rewrite proof | Minimal Risk | Planned |
+| R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Done |
+| R2 | Rewrite | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless they hold change-history phrasing. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rewrite proof | Minimal Risk | Blocked: owner checkpoint D4 |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Planned |
 | R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Planned |
@@ -151,6 +151,13 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * `--regrouped` does not fail for text added before the first numbered heading. `npm run check:docs` rejects such text in the files under `docs/architecture/`, but not in the index. Check the index by reading it when `--regrouped` is used again.
   * `--regrouped` also resolves link targets inside code spans and fenced blocks. The architecture files have no link inside code.
 
+* R1 result (base `e5225f51`): 53 of 178 clauses changed in the two files; every other clause is byte-identical. `--details` shows no changed name, number or table cell; the only changed literals and references are the citation form. The Reviewer found no lost, changed or added fact; its three low-severity wording findings are applied. The ledger stays in `.scratch/architecture-split-R1/ledger.md` until the owner checkpoint D4; the session that records D4 removes it with `npm run retire:scratch -- architecture-split-R1`.
+* Style choices of the pilot that D4 confirms or corrects, and that R2–R13 then apply the same way:
+  * Citations of the product specification use the plain form `PRODUCT.md §N`, replacing `docs/PRODUCT.md` in a code span, `PRODUCT §N` and `§N of PRODUCT`. Citations inside ADRs and other documents are not changed.
+  * An assessment that only said "this adds no …" becomes a sentence with a named subject, and starts with "Performance assessment (PRODUCT.md §22.1):" when it states costs.
+  * A sentence that compared the mechanism with an earlier state ("remains unchanged", "retains its existing …") states the present fact. When the present fact is that one mechanism does not affect another, the sentence says so ("The adapters do not change …") instead of being removed.
+  * A long paragraph is split at sentence boundaries when it describes several mechanisms; no sentence moves to another subsection.
+
 ## Next Task
 
-R1. Record its starting commit as `<base>` before editing.
+Owner checkpoint D4: the Product Owner reads `docs/architecture/command-panel.md` and `docs/architecture/completion-and-tags.md` (compare with `git show e5225f51:docs/architecture/command-panel.md`) and confirms or corrects the style. After that, R2. Record its starting commit as `<base>` before editing.
