@@ -1,61 +1,58 @@
 // @editing-modes: vim
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Page } from '@playwright/test'
+import type { ElectronApplication, Locator } from '@playwright/test'
 import { attachmentPath, expect, launchTree, seedDocument, test } from './fixtures'
 import { solidPng } from './solid-png'
 
 const ROWS = 600
 
-interface Sample {
-  readonly top: number | null
-  /** Animation frames in which the value was on screen; zero means it was never painted. */
-  frames: number
-}
-
-/**
- * Records every distinct top of a row at each DOM mutation, image load and animation frame, as in the
- * TD-002 survey. The first sample is the position before the command.
- */
-async function startProbe(window: Page, rowId: string): Promise<void> {
-  await window.evaluate((id) => {
-    const probe = { samples: [] as Sample[], stopped: false }
-    const sample = (frame: boolean): void => {
-      const top = document.querySelector(`[data-node-id="${id}"]`)?.getBoundingClientRect().top
-      const value = top === undefined ? null : Math.round(top)
-      const last = probe.samples[probe.samples.length - 1]
-      if (last === undefined || last.top !== value) probe.samples.push({ top: value, frames: frame ? 1 : 0 })
-      else if (frame) last.frames += 1
-    }
-    sample(false)
-    new MutationObserver(() => sample(false)).observe(document.body, {
-      attributes: true,
-      characterData: true,
-      childList: true,
-      subtree: true,
+async function holdAttachmentRead(app: ElectronApplication): Promise<() => Promise<void>> {
+  await app.evaluate(() => {
+    const control = globalThis as typeof globalThis & { releaseAttachmentRead?: () => void }
+    const pending = new Promise<void>((resolve) => {
+      control.releaseAttachmentRead = resolve
     })
-    document.addEventListener('load', () => sample(false), true)
-    const frame = (): void => {
-      if (probe.stopped) return
-      sample(true)
-      requestAnimationFrame(frame)
-    }
-    requestAnimationFrame(frame)
-    ;(globalThis as unknown as { __rowProbe: typeof probe }).__rowProbe = probe
-  }, rowId)
+    globalThis.__treeIpc.wrap('tree:read-attachment', async (read, ...args) => {
+      await pending
+      return read(...args)
+    })
+  })
+  return () =>
+    app.evaluate(() =>
+      (globalThis as typeof globalThis & { releaseAttachmentRead: () => void }).releaseAttachmentRead(),
+    )
 }
 
-/** The painted positions after the command, in order. */
-async function paintedTops(window: Page): Promise<number[]> {
-  const samples = await window.evaluate(() => {
-    const probe = (globalThis as unknown as { __rowProbe: { samples: Sample[]; stopped: boolean } }).__rowProbe
-    probe.stopped = true
-    return probe.samples
+async function startProbe(row: Locator) {
+  await expect(row).toBeVisible()
+  // Take explicit samples while loading and after it finishes. Hidden windows
+  // may skip animation frames under load, but any frames they deliver also count.
+  return row.evaluateHandle((element) => {
+    const top = () => (element.isConnected ? Math.round(element.getBoundingClientRect().top) : null)
+    const initial = top()
+    const positions = new Set([initial])
+    let frame: number
+    const sampleFrame = () => {
+      positions.add(top())
+      frame = requestAnimationFrame(sampleFrame)
+    }
+    frame = requestAnimationFrame(sampleFrame)
+    return {
+      finish: () => {
+        cancelAnimationFrame(frame)
+        positions.add(top())
+        return { initial, positions: [...positions] }
+      },
+    }
   })
-  return samples
-    .slice(1)
-    .filter((sample) => sample.top !== null && sample.frames > 0)
-    .map((sample) => sample.top!)
+}
+
+async function expectStableTop(probe: Awaited<ReturnType<typeof startProbe>>): Promise<void> {
+  const { initial, positions } = await probe.evaluate((probe) => probe.finish())
+
+  expect(initial).not.toBeNull()
+  expect(positions).toEqual([initial])
 }
 
 function rows(image: { index: number; id: string; parent?: boolean }) {
@@ -77,12 +74,10 @@ function seedPicture(userDataDir: string): void {
   writeFileSync(attachmentPath(userDataDir, 'picture'), solidPng(160, 160))
 }
 
-async function settledImage(window: Page, nodeId: string): Promise<void> {
-  const image = window.locator(`[data-node-id="${nodeId}"] img.attachment-image`)
+async function expectLoadedImage(row: Locator): Promise<void> {
+  const image = row.locator('img.attachment-image')
   await expect(image).toHaveJSProperty('complete', true)
   await expect(image).toHaveJSProperty('naturalWidth', 160)
-  // Let several animation frames paint the loaded image.
-  await window.waitForTimeout(300)
 }
 
 test.describe('Image space reserved from the stored size', () => {
@@ -95,19 +90,22 @@ test.describe('Image space reserved from the stored size', () => {
       document: { roots: rows({ index: 2, id: 'picture-node', parent: true }) },
       location: { currentParentId: null, selectedNodeId: 'row-2' },
     })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const release = await holdAttachmentRead(app)
+    const picture = window.locator('[data-node-id="picture-node"]')
 
     await expect(window.locator('[data-node-id="row-3"]')).toBeVisible()
+    await expect(picture).toHaveCount(0)
 
-    await startProbe(window, 'row-3')
     await window.keyboard.press('z')
     await window.keyboard.press('o')
-    await settledImage(window, 'picture-node')
+    await expect(picture).toBeVisible()
+    const probe = await startProbe(window.locator('[data-node-id="row-3"]'))
 
-    const tops = await paintedTops(window)
+    await release()
+    await expectLoadedImage(picture)
 
-    expect(tops.length).toBeGreaterThan(0)
-    expect(tops).toEqual([tops[0]])
+    await expectStableTop(probe)
   })
 
   // @requirement PRODUCT.md §17.1
@@ -117,21 +115,22 @@ test.describe('Image space reserved from the stored size', () => {
       document: { roots: rows({ index: 2, id: 'picture-node', parent: true }) },
       location: { currentParentId: null, selectedNodeId: 'row-2' },
     })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const release = await holdAttachmentRead(app)
+    const picture = window.locator('[data-node-id="picture-node"]')
 
     await expect(window.locator('[data-node-id="row-3"]')).toBeVisible()
+    await expect(picture).toHaveCount(0)
 
-    await startProbe(window, 'row-3')
     await window.keyboard.press('z')
     await window.keyboard.press('o')
-    await expect(window.locator('[data-node-id="picture-node"]')).toContainText('Image could not be loaded.')
-    // Let several animation frames paint the message.
-    await window.waitForTimeout(300)
+    await expect(picture).toBeVisible()
+    const probe = await startProbe(window.locator('[data-node-id="row-3"]'))
 
-    const tops = await paintedTops(window)
+    await release()
+    await expect(picture).toContainText('Image could not be loaded.')
 
-    expect(tops.length).toBeGreaterThan(0)
-    expect(tops).toEqual([tops[0]])
+    await expectStableTop(probe)
   })
 
   // @requirement PRODUCT.md §17.1
@@ -141,18 +140,21 @@ test.describe('Image space reserved from the stored size', () => {
       document: { roots: rows({ index: ROWS - 10, id: 'picture-node' }) },
       location: { currentParentId: null, selectedNodeId: 'row-0' },
     })
-    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const release = await holdAttachmentRead(app)
+    const picture = window.locator('[data-node-id="picture-node"]')
+    const lastRow = window.locator(`[data-node-id="row-${ROWS - 1}"]`)
 
     await expect(window.locator('[data-node-id="row-0"]')).toBeVisible()
-    await expect(window.locator('[data-node-id="picture-node"]')).toHaveCount(0)
+    await expect(picture).toHaveCount(0)
 
-    await startProbe(window, `row-${ROWS - 1}`)
     await window.keyboard.press('G')
-    await settledImage(window, 'picture-node')
+    await expect(lastRow).toBeInViewport()
+    const probe = await startProbe(lastRow)
 
-    const tops = await paintedTops(window)
+    await release()
+    await expectLoadedImage(picture)
 
-    expect(tops.length).toBeGreaterThan(0)
-    expect(tops).toEqual([tops[0]])
+    await expectStableTop(probe)
   })
 })

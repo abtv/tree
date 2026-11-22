@@ -9,6 +9,7 @@ import {
   setCursor,
   setMainWindowContentSize,
   test,
+  unlockSystemClipboard,
   writeClipboardImageSized,
 } from './fixtures'
 
@@ -498,9 +499,15 @@ describeForEachEditingMode('image-only active row', ({ mode, screenshotName }) =
     const row = window.locator('.node-row[data-node-id="image"]')
     const input = row.locator('.node-input')
     const neighbor = window.locator('.node-row[data-node-id="neighbor"] .node-input')
+    // The solid image has no text. Keep the recognition indicator out of the layout snapshot.
+    await app.evaluate(() => {
+      globalThis.__treeIpc.wrap('tree:image-to-text', () => [])
+    })
     await writeClipboardImageSized(app, 160, 100)
     await window.keyboard.press('Meta+v')
     await expect(row.locator('.attachment-image')).toBeVisible()
+    unlockSystemClipboard()
+    await expect(row.locator('.attachment-button')).not.toHaveAttribute('data-recognition-incomplete', 'true')
 
     await neighbor.focus()
     const imageTop = () =>

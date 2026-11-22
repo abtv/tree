@@ -193,7 +193,8 @@ for (const [profile, modifier, otherModifier, label] of [
     const commandInput = page.getByRole('combobox', { name: 'Command', exact: true })
     await expect(commandInput).toBeVisible()
     await expect(commandInput).toBeFocused()
-    await expect(page.locator('#storage-status')).toBeVisible()
+    await expect(commandInput).toBeInViewport()
+    await expect(page.locator('#storage-status')).toBeHidden()
     await expect(page.getByLabel('Vim mode')).toBeInViewport()
 
     await commandInput.fill('toggle-always-on-top')
