@@ -134,8 +134,8 @@ Proof for each task, with the task's starting commit as `<base>`:
 | R10 | Rewrite | `persistence.md` | Rewrite proof | Minimal Risk | Done |
 | R11 | Rewrite | `save-scheduling.md`, `attachments-and-clipboard.md` | Rewrite proof | Minimal Risk | Done |
 | R12 | Rewrite | `desktop-data.md`. Keep the crash-safety step order (ADR 0024) | Rewrite proof | Minimal Risk | Done |
-| R13 | Rewrite | `browser.md` | Rewrite proof | Minimal Risk | Ready |
-| R14 | Lasting writing rules in the index; size limit D2; a check that every source file name cited under `docs/architecture/` exists in the repository | `docs/ARCHITECTURE.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Every file is within the limit; the name check passes and has tests; `npm run check` passes | Low Risk: `npm run check` | Planned |
+| R13 | Rewrite | `browser.md` | Rewrite proof | Minimal Risk | Done |
+| R14 | Lasting writing rules in the index; size limit D2; a check that every source file name cited under `docs/architecture/` exists in the repository | `docs/ARCHITECTURE.md`, `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` | Every file is within the limit; the name check passes and has tests; `npm run check` passes | Low Risk: `npm run check` | Ready |
 
 T2 wrote each file once with the file-editing tool from the line ranges above, then wrote the index.
 
@@ -199,6 +199,7 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
 * R10 result (base `f145c023`): subsections 13.5.1–13.5.5, 13.9.1–13.9.3 and 13.10.1–13.10.2 added as headings before existing paragraphs; no sentence moved; 25 clauses changed, none removed. The durable-write, cleanup and recovery rules are byte-identical. The Reviewer verified six reworded claims against the code and found that one reworded base sentence is contradicted by the code; the base sentence is restored unchanged and recorded as Q4. Recovery: 8 of the 12 pooled fix cycles are used.
 * R11 result (base `f804761e`): subsections 13.8.1–13.8.5, 14.1–14.2 and 15.1–15.2 added; the 12 paragraphs of §13.8 are regrouped; 34 clauses changed. The save, flush, lock and attachment-limit rules and the clipboard ownership rules are intact. The Reviewer found two "unchanged" narrations restated as absolute claims that the code contradicts (§13.8.1 timing, §13.8.4 coordinator); both are corrected. Recovery: 9 of the 12 pooled fix cycles are used.
 * R12 result (base `6732750b`): subsections 13.12.1–13.12.3 and 13.13.1–13.13.5 added as headings before existing paragraphs; no sentence moved; 12 clauses changed, none removed. The crash-safety text of §13.12 (ADR 0024) is byte-identical apart from the citation form. The Reviewer verified the reworded claims against the code and found no blocking issue; its two wording points are applied. The recovery count stays at 9 of 12.
+* R13 result (base `25bbc673`): subsections 13.15.1–13.15.6, 13.16.1–13.16.2 and 13.17.1–13.17.4 added as headings before existing paragraphs; no sentence moved; 15 clauses changed, none removed. The update protocol, the import journal and phase rules and the backup rules are byte-identical. The Reviewer verified the reworded claims against the code and found no meaningful issue; its wording suggestions are applied. The recovery count stays at 9 of 12.
 * Decisions made under D5, for the final acceptance:
   * R2: §17.1 states that the image-to-text queue traverses the document only to admit a reindex and to find the new owner of a reindex job whose node lost its image (`src/application/image-to-text-queue.ts:38-62`, `:102-118`). The base said that the queue "adds no ... document scans to the existing paths".
   * R2: the sentence "The Electron build preserves its existing output paths" is removed from §2 as a statement about a past change.
@@ -221,4 +222,4 @@ Each question names a base sentence that the code contradicts (reserved decision
 
 ## Next Task
 
-R13. Record its starting commit as `<base>` before editing. Continue with R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
+R14. After R14, ask the Product Owner the questions Q1–Q4 in one batch and request the final acceptance.
