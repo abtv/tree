@@ -126,8 +126,8 @@ Proof for each task, with the task's starting commit as `<base>`:
 | R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Done |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Done |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Done |
-| R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Ready |
-| R6 | Rewrite | `list-rendering.md`, `appearance.md` | Rewrite proof | Minimal Risk | Planned |
+| R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Done |
+| R6 | Rewrite | `list-rendering.md`, `appearance.md` | Rewrite proof | Minimal Risk | Ready |
 | R7 | Rewrite; add subsections to §21.1 | `vim.md` | Rewrite proof | Minimal Risk | Planned |
 | R8 | Rewrite | `search.md` | Rewrite proof | Minimal Risk | Planned |
 | R9 | Rewrite; add subsections to §8.1 | `agenda.md` | Rewrite proof | Minimal Risk | Planned |
@@ -178,9 +178,12 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * An assessment stays in the subsection of the owner that produces the cost. A cross-reference is added only to a section that states the cited fact.
   * To read the comparison reports, filter the moved lines: `npm run check:docs -- --verbatim <base> --file <path> | grep -vE "^(Moved|Literal moved|Reference moved)"`.
   * A base sentence of the form "this adds no writes, syncs or scans to the existing paths" is relative to earlier code. Before stating it in absolute form ("causes no ..."), read the owning module. When the module does such work, state what it does and when, with the code evidence in the ledger.
+  * The same holds for a count: "the change adds one call per event" is the added cost, not the total. State the cost of one use of the mechanism, or keep the relative scope with "of its own".
+  * A negative constraint keeps the path it constrains as its subject. A sentence that says a pure module performs no writes is true and constrains nothing.
 * R2 result (base `7b7d30d5`): subsections 2.1–2.3, 16.1–16.3 and 17.1 added; 22 clauses left or changed, each with a disposition. The four security paragraphs now in §16.1 are byte-identical to the base. The Reviewer found one absolute cost claim that the code contradicts (corrected, below) and two wording points (applied). Recovery: 2 of the 12 pooled fix cycles are used.
 * R3 result (base `a710f42c`): subsections 5.1–5.5 and 11.1–11.3 added; 19 clauses changed, each with a disposition; none removed without a restatement. The structural-sharing paragraph of §11 is byte-identical. The Reviewer verified the five reworded cost claims against the code and reported one non-blocking wording point (an "also" that lost its antecedent), which is applied. The recovery count stays at 2 of 12: it counts a repair that a blocking finding or a failed check requires.
 * R4 result (base `6599a738`): subsections 7.4–7.6 added (7.2 and 7.3 are in other files); §7.1 split into six paragraphs in base order; 9 clauses changed, one removed. The security sentences of §7.4 and §7.5 are byte-identical apart from the citation form. The Reviewer verified the four reworded claims against the code and found no meaningful issue.
+* R5 result (base `ce686800`): subsections 9.1–9.4 added; §8.9 reordered with the application owners first; §8.10 split into six paragraphs with every sentence byte-identical; 19 clauses changed. The single-owner paragraph (ADR 0014) is §9.1 and differs in one word. The Reviewer found two cost sentences whose scope had changed (§8.7, §9.3); both are corrected with code evidence. Recovery: 3 of the 12 pooled fix cycles are used.
 * Decisions made under D5, for the final acceptance:
   * R2: §17.1 states that the image-to-text queue traverses the document only to admit a reindex and to find the new owner of a reindex job whose node lost its image (`src/application/image-to-text-queue.ts:38-62`, `:102-118`). The base said that the queue "adds no ... document scans to the existing paths".
   * R2: the sentence "The Electron build preserves its existing output paths" is removed from §2 as a statement about a past change.
@@ -193,4 +196,4 @@ None so far.
 
 ## Next Task
 
-R5. Record its starting commit as `<base>` before editing. Continue with R6–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
+R6. Record its starting commit as `<base>` before editing. Continue with R7–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.

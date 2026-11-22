@@ -19,7 +19,7 @@ Each section number is listed once, with the file that holds its heading.
 | 1, 2, 2.1, 2.2, 2.3, 3, 12, 18, 19, 20, 21, 22, 23 | [overview.md](architecture/overview.md) |
 | 4, 5, 5.1, 5.2, 5.3, 5.4, 5.5, 6, 10, 11, 11.1, 11.2, 11.3 | [domain-model.md](architecture/domain-model.md) |
 | 7, 7.1, 7.4, 7.5, 7.6 | [application.md](architecture/application.md) |
-| 8, 8.7, 8.9, 8.10, 9, 13.2 | [interaction.md](architecture/interaction.md) |
+| 8, 8.7, 8.9, 8.10, 9, 9.1, 9.2, 9.3, 9.4, 13.2 | [interaction.md](architecture/interaction.md) |
 | 8.2, 8.4, 8.5, 13.6 | [list-rendering.md](architecture/list-rendering.md) |
 | 8.11 | [appearance.md](architecture/appearance.md) |
 | 8.3, 21.1 | [vim.md](architecture/vim.md) |
