@@ -10,8 +10,30 @@ import {
   type AgendaOccurrence,
 } from './agenda-state'
 import { buildNodeIndex, locateNode, type Document, type NodeId, type TreeNode } from '../domain/document'
-import { projectAgenda, type AgendaProjectionDay, type AgendaProjectionRow } from '../domain/agenda-projection'
+import {
+  agendaDaysOf,
+  projectAgenda,
+  type AgendaProjectionDay,
+  type AgendaProjectionRow,
+} from '../domain/agenda-projection'
 import type { DayNumber } from '../domain/calendar-date'
+
+/**
+ * Whether an Agenda occurrence owns an editor (`docs/PRODUCT.md` §23.9): a direct match does when it is
+ * the active occurrence or when its node occupies at most one day. A mark adds Today to the node's days
+ * (`docs/PRODUCT.md` §2.7), so a marked node dated on another day occupies two days.
+ */
+export function isEditableOccurrence(
+  row: { readonly role: AgendaProjectionRow['role']; readonly nodeId: NodeId; readonly day: DayNumber },
+  node: TreeNode,
+  active: AgendaOccurrence | undefined,
+  today: DayNumber,
+): boolean {
+  return (
+    row.role === 'match' &&
+    ((active?.nodeId === row.nodeId && active.day === row.day) || new Set(agendaDaysOf(node, today)).size <= 1)
+  )
+}
 
 /** The projected ancestor path, excluding the destination itself. */
 export function agendaAncestorKeys(

@@ -1,20 +1,12 @@
-import {
-  activeAgendaOccurrence,
-  type AgendaOccurrence,
-  focusedAgendaDay,
-  dayKey,
-  type AgendaState,
-} from '../application/agenda-state'
+import { activeAgendaOccurrence, focusedAgendaDay, dayKey, type AgendaState } from '../application/agenda-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
-import type { AgendaRow as AgendaRowModel } from '../application/agenda-rows'
+import { isEditableOccurrence, type AgendaRow as AgendaRowModel } from '../application/agenda-rows'
 import { agendaPath } from '../application/agenda-path'
 import { agendaLineNumbers } from '../application/line-numbers'
-import type { Document, TreeNode } from '../domain/document'
+import type { Document } from '../domain/document'
 import { requireNode } from '../domain/document'
-import { agendaDaysOf } from '../domain/agenda-projection'
-import type { DayNumber } from '../domain/calendar-date'
 import type { VimTextCommandState } from './vim-session-finish'
 import { clearCommandAssembly } from './vim-command-state'
 import { createAgendaKeyDownHandler, type AgendaRowText } from './agenda-row-keyboard'
@@ -47,22 +39,6 @@ import { createAgendaFocusHandlers } from './agenda-row-focus'
 import { AgendaViewportState } from './agenda-viewport-state'
 import { selectedAgendaDay } from '../application/agenda-reconcile'
 import { agendaCaret, arriveAgendaCaret, moveAgendaCaret } from './agenda-caret-state'
-
-/**
- * A direct match owns an editor when it is the active occurrence or occupies at most one day. A mark
- * adds Today to the node's dates (`docs/PRODUCT.md` §2.7).
- */
-function isEditableOccurrence(
-  row: Pick<Extract<AgendaRowModel, { kind: 'node' }>, 'role' | 'nodeId' | 'day'>,
-  node: TreeNode,
-  active: AgendaOccurrence | undefined,
-  today: DayNumber,
-): boolean {
-  return (
-    row.role === 'match' &&
-    ((active?.nodeId === row.nodeId && active.day === row.day) || new Set(agendaDaysOf(node, today)).size <= 1)
-  )
-}
 
 export function AgendaView({
   lineNumbers = false,

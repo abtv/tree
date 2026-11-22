@@ -1,11 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dayNumberOf } from '../domain/calendar-date'
+import { dayNumberOf, type DayNumber } from '../domain/calendar-date'
 import { projectAgenda } from '../domain/agenda-projection'
 import * as projectionModule from '../domain/agenda-projection'
-import { editNodeText, type Document } from '../domain/document'
+import { editNodeText, type Document, type TreeNode } from '../domain/document'
 import * as recognition from '../domain/date-recognition'
-import { agendaAncestorKeys, agendaProjection, AgendaRowsCache, buildAgendaRows } from './agenda-rows'
-import { openAgendaState, focusAgendaState, applyAgendaCommand, dayKey, overdueKey } from './agenda-state'
+import {
+  agendaAncestorKeys,
+  agendaProjection,
+  AgendaRowsCache,
+  buildAgendaRows,
+  isEditableOccurrence,
+} from './agenda-rows'
+import {
+  openAgendaState,
+  focusAgendaState,
+  applyAgendaCommand,
+  dayKey,
+  overdueKey,
+  type AgendaOccurrence,
+} from './agenda-state'
 import { reconcileAgenda } from './agenda-reconcile'
 import { EditorRuntimeState, type ReadySnapshot } from './editor-runtime-state'
 import { COLLAPSED_EXPANSION_STATE } from './expansion-state'
@@ -934,4 +947,127 @@ describe('Agenda rows', () => {
       }
     },
   )
+})
+
+describe('Agenda editor ownership', () => {
+  const tomorrow = dayNumberOf({ year: 2026, month: 10, day: 9 })
+  const oneDate: TreeNode = { id: 'node', text: '2026-10-09 One date', children: [] }
+  const twoDates: TreeNode = { id: 'node', text: '2026-10-08 2026-10-09 Two dates', children: [] }
+  const markedWithAnotherDate: TreeNode = { id: 'node', text: '2026-10-09 Marked', children: [], marked: true }
+  const markedWithTodayDate: TreeNode = { id: 'node', text: '2026-10-08 Marked', children: [], marked: true }
+  const cases: readonly {
+    name: string
+    node: TreeNode
+    role: 'match' | 'context'
+    day: DayNumber
+    active: AgendaOccurrence | undefined
+    editable: boolean
+  }[] = [
+    {
+      name: 'a single-date node without an active occurrence',
+      node: oneDate,
+      role: 'match',
+      day: tomorrow,
+      active: undefined,
+      editable: true,
+    },
+    {
+      name: 'a single-date node while another node is active on its day',
+      node: oneDate,
+      role: 'match',
+      day: tomorrow,
+      active: { nodeId: 'other', day: tomorrow },
+      editable: true,
+    },
+    {
+      name: 'the active occurrence of a node on several days',
+      node: twoDates,
+      role: 'match',
+      day: tomorrow,
+      active: { nodeId: 'node', day: tomorrow },
+      editable: true,
+    },
+    {
+      name: 'an inactive occurrence of the active node on several days',
+      node: twoDates,
+      role: 'match',
+      day: today,
+      active: { nodeId: 'node', day: tomorrow },
+      editable: false,
+    },
+    {
+      name: 'an occurrence of a node on several days while another node is active on its day',
+      node: twoDates,
+      role: 'match',
+      day: tomorrow,
+      active: { nodeId: 'other', day: tomorrow },
+      editable: false,
+    },
+    {
+      name: 'an occurrence of a node on several days without an active occurrence',
+      node: twoDates,
+      role: 'match',
+      day: tomorrow,
+      active: undefined,
+      editable: false,
+    },
+    {
+      name: 'a context row of a single-date node',
+      node: oneDate,
+      role: 'context',
+      day: tomorrow,
+      active: undefined,
+      editable: false,
+    },
+    {
+      name: 'a context row at the active occurrence',
+      node: twoDates,
+      role: 'context',
+      day: tomorrow,
+      active: { nodeId: 'node', day: tomorrow },
+      editable: false,
+    },
+    {
+      name: 'the Today occurrence of a marked node dated on another day',
+      node: markedWithAnotherDate,
+      role: 'match',
+      day: today,
+      active: undefined,
+      editable: false,
+    },
+    {
+      name: 'the dated occurrence of a marked node dated on another day',
+      node: markedWithAnotherDate,
+      role: 'match',
+      day: tomorrow,
+      active: undefined,
+      editable: false,
+    },
+    {
+      name: 'the active Today occurrence of a marked node dated on another day',
+      node: markedWithAnotherDate,
+      role: 'match',
+      day: today,
+      active: { nodeId: 'node', day: today },
+      editable: true,
+    },
+    {
+      name: 'a marked node whose only date is Today',
+      node: markedWithTodayDate,
+      role: 'match',
+      day: today,
+      active: undefined,
+      editable: true,
+    },
+  ]
+
+  // @requirement PRODUCT.md §23.9
+  // @requirement PRODUCT.md §2.7
+  it.each(cases)('decides whether $name owns an editor', ({ node, role, day, active, editable }) => {
+    const row = { role, nodeId: node.id, day }
+
+    const result = isEditableOccurrence(row, node, active, today)
+
+    expect(result).toBe(editable)
+  })
 })
