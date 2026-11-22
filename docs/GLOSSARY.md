@@ -44,7 +44,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Command panel** (product) — The input at the bottom of the window that lists and runs application commands. `PRODUCT.md §20.2.28`, `ARCHITECTURE.md §8.6.1`. *Avoid:* command palette, command line. *In code:* `CommandPanel.tsx`.
 
-**Completion** (product) — A popup suggestion that replaces the text the user is typing: a date, an emoji or a marker. `PRODUCT.md §20.9`, `PRODUCT.md §20.12`, `PRODUCT.md §20.13`, `ARCHITECTURE.md §8.8.1`. *Avoid:* completion for the state of a struck-through node. *In code:* `completion-controller.ts`; `node-completion.ts` belongs to struck-through nodes.
+**Completion** (product) — A popup suggestion that replaces the text the user is typing: a date, an emoji or a marker. `PRODUCT.md §20.9`, `PRODUCT.md §20.12`, `PRODUCT.md §20.13`, `ARCHITECTURE.md §8.8.1`. *Avoid:* completion for the state of a struck-through node. *In code:* `completion-controller.ts`.
 
 **Current parent** (domain) — The node that the user has entered. Tree displays its children. `PRODUCT.md §2`, `ARCHITECTURE.md §10`. *Avoid:* zoomed node, focused parent. *In code:* `currentParentId`.
 
@@ -160,7 +160,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Structural sharing** (architecture) — The invariant that a domain operation returns a new document that shares every unchanged subtree with its input by reference. `ARCHITECTURE.md §11`, ADR 0004.
 
-**Struck-through node** (domain) — A node in the struck-through state, which the user sets for a finished task. Its text has a line through it. `PRODUCT.md §2.5`, `ARCHITECTURE.md §5.1`, ADR 0018. *Avoid:* complete, completed, done or finished node; completion state. *UI:* `finished tasks`. *In code:* `struckThrough`, `node-completion.ts`, `hideFinishedTasks`.
+**Struck-through node** (domain) — A node in the struck-through state, which the user sets for a finished task. Its text has a line through it. `PRODUCT.md §2.5`, `ARCHITECTURE.md §5.1`, ADR 0018. *Avoid:* complete, completed, done or finished node; completion state. *UI:* `finished tasks`. *In code:* `struckThrough`, `node-struck-through.ts`, `hideFinishedTasks`.
 
 **Subtree** (domain) — A node together with all its descendants. `PRODUCT.md §2.4`. *Avoid:* branch. *In code:* `moveSubtree`.
 

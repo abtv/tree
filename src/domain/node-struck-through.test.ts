@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { completeSubtree } from './node-completion'
+import { setSubtreeStruckThrough } from './node-struck-through'
 import {
   createFirstChild,
   deleteNode,
@@ -62,11 +62,11 @@ describe('hierarchical completion', () => {
     const done = branch('done', [leaf('done-leaf', true)])
     const root = branch('root', [done, leaf('open')])
 
-    const result = completeSubtree(root, true)
+    const result = setSubtreeStruckThrough(root, true)
 
     expect(result.children[0]).toBe(done)
     expect(result.children[1]!.struckThrough).toBe(true)
-    expect(completeSubtree(result, true)).toBe(result)
+    expect(setSubtreeStruckThrough(result, true)).toBe(result)
     expect(root.children[1]!.struckThrough).toBeUndefined()
   })
 
