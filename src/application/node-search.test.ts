@@ -108,7 +108,7 @@ it('puts matching stars first and preserves traversal order within each group', 
 })
 
 // @requirement PRODUCT.md §20.14.3
-it('puts matching marked nodes before matching stars, with a marked star among the marked', () => {
+it('puts matching marked stars, then marked nodes, then stars before other matches', () => {
   const work = searchNodes(
     {
       roots: [
@@ -120,6 +120,8 @@ it('puts matching marked nodes before matching stars, with a marked star among t
           marked: true,
           children: [{ id: 'both', text: 'Both note', starred: true, marked: true, children: [] }],
         },
+        { id: 'mark-root', text: 'Second marked note', marked: true, children: [] },
+        { id: 'both-root', text: 'Second both note', starred: true, marked: true, children: [] },
         { id: 'unmatched', text: 'Meeting', marked: true, children: [] },
       ],
     },
@@ -129,8 +131,8 @@ it('puts matching marked nodes before matching stars, with a marked star among t
   let next = work.next()
   while (!next.done) next = work.next()
 
-  expect(next.value.map(({ id }) => id)).toEqual(['mark-parent', 'both', 'star', 'plain'])
-  expect(next.value[1]).toMatchObject({ starred: true, marked: true })
+  expect(next.value.map(({ id }) => id)).toEqual(['both', 'both-root', 'mark-parent', 'mark-root', 'star', 'plain'])
+  expect(next.value[0]).toMatchObject({ starred: true, marked: true })
 })
 
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {

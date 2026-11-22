@@ -115,7 +115,7 @@ not supported.
 
 `Cmd+;` opens global Search in Tree or Agenda, in standard editing and every Vim mode. `Cmd+F` opens local search (§20.2). Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
 
-* The input receives focus and starts empty on every opening. Empty input shows marked and starred nodes as below.
+* The input receives focus and starts empty on every opening. Empty input shows marked and starred nodes (§20.14.5).
 * Valid `#tag`, `@person` and `&event` terms in the query use the same color, bold weight and transparent background as search suggestion and result matches. Ordinary terms and invalid marker terms stay plain. Native text editing, selection, horizontal scrolling, clearing and composition remain available. Result highlighting still marks query matches independently of query-term styling and retains its match underline.
 * Every nonempty query searches required terms using the ancestor-context and per-term smart-case rules in §20.14.3. Results update as the input changes.
 * Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope. Each matching node appears once with its text and parent path, in the order specified in §20.14.3.
@@ -130,11 +130,7 @@ not supported.
 * The counter does not move while the popup is open. The position and the total each reserve one digit place per digit of the document's node count; the position is right-aligned and the total left-aligned around a fixed ` / ` separator. No digit, separator or counter edge moves as selection moves between nodes and group headings, wraps, or as the query changes the total. For example, a document of 3,200 nodes shows `   1 / 5   ` and `3200 / 3200`. The reserved width can change only when the document's node count gains or loses a digit.
 * The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
 
-Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search follows §20.2.26. Resource constraints are in §20.14.3.
-
-With empty input the popup lists all marked nodes (§2.7), then all starred nodes (§2.6) that are not marked. Each of these two parts is sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. No other nodes appear, and editing or visiting a node does not add it to this list.
-
-Both parts use the consecutive-parent grouping of §20.14.2. The first result is selected. The heading names the parts that are present: `Marked and starred`, `Marked`, or `Starred`. An empty list keeps the heading `Marked and starred` and displays `No marked or starred nodes`. Typing replaces the heading text with `Results` in the same heading row, so the list does not shift. Clearing the query restores this list. Titles and paths follow edits and moves.
+Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search follows §20.2.26. Resource constraints are in §20.14.3. The list for empty input is specified in §20.14.5.
 
 * Without tag suggestions, Up and Down cycle through group headings and node results in display order. The first node is initially selected.
 * Arrow navigation keeps visible results in place and scrolls only far enough to reveal the next selected row. If that row exceeds the available list height, reveal its first highlighted match, or its beginning when no match exists. Late-arriving highlights also reveal that match for the active selection. Ordinary manual scrolling does not repeatedly return to the match. Crossing the list boundary wraps to the opposite end. Selection changes the highlight, not the text size or row geometry. Resizing invalidates measured row heights and preserves correct navigation and scrolling.
@@ -166,7 +162,7 @@ Both parts use the consecutive-parent grouping of §20.14.2. The first result is
 
 #### 20.14.3 Query Terms and Ancestor Context
 
-* Search lists matching marked nodes first, then matching starred nodes that are not marked, followed by all other matches. Each group keeps document order.
+* Search lists matching nodes that are both marked and starred first, then the other matching marked nodes, then matching starred nodes that are not marked, followed by all other matches. Each node appears in one group only, and each group keeps document order.
 * Every nonempty query starts search, including one- and two-character terms. Whitespace separates required terms; repeated and leading/trailing whitespace is ignored. A whitespace-only query has no results. Term order is irrelevant, and repeating a term does not require multiple occurrences. Quotes and regular-expression syntax have no special meaning.
 * Every term must match somewhere in the result node or its complete ancestor chain up to the root, regardless of depth or the displayed parent-path cutoff. At least one term must match the result node itself. Intermediate ancestors need not match; siblings and other branches never contribute. A matching ancestor and its matching descendant may both appear.
 * Ordinary terms match literal substrings. Terms beginning with `#`, `@` or `&` match complete recognized tags, people or events, excluding hyperlinks and embedded markers (§20.13); incomplete names and bare markers do not match nodes. Different terms may match different ancestors. For example, `@alex #k8s opensearch` can find a node containing `opensearch-dashboards` under ancestors containing `@Alex` and `#K8s`.
@@ -182,3 +178,13 @@ Query preparation and matching retain only the current terms, result list and an
 * Up/Down and Ctrl+N/Ctrl+P wrap suggestions; Enter, Tab or a click accepts a full tag into the search input. Escape closes the entire Search popup on the first press, including when tag suggestions are open, and restores the originating editor selection and mode.
 * A manually typed complete marker name searches immediately, including one-character names and case variants accepted by smart case; a fragment or unknown name has no node results. Search matches complete recognized names, excluding hyperlink ranges, and never creates tags.
 * Completion acceptance replaces only the active term, preserves all text and whitespace before and after it, leaves the caret immediately after the inserted name and retains focus in the search input without jumping to a node. Suggestions remain dismissed until the next edit or caret movement. IME composition owns its keys and suspends suggestions until commitment.
+
+#### 20.14.5 Marked and Starred List
+
+* With empty input the popup lists three parts: nodes that are both marked (§2.7) and starred (§2.6), then the other marked nodes, then the starred nodes that are not marked. Each node appears once. No other nodes appear, and editing or visiting a node does not add it to this list.
+* Each part is sorted alphabetically by its ancestor path and node name, one level at a time from the top, without the display preview cutoff. Equal paths keep document order.
+* A name that equals the start of a longer path sorts first, so a node's descendants follow it before a sibling whose name only begins with the same text.
+* Runs of digits compare by numeric value, so `Release 0.9` precedes `Release 0.11` and `Item 2` precedes `Item 10`.
+* All parts use the consecutive-parent grouping of §20.14.2. The first result is selected.
+* The heading names the flags that the listed nodes carry: `Marked and starred`, `Marked`, or `Starred`; a list that contains only nodes with both flags uses `Marked and starred`. An empty list keeps the heading `Marked and starred` and displays `No marked or starred nodes`.
+* Typing replaces the heading text with `Results` in the same heading row, so the list does not shift. Clearing the query restores this list. Titles and paths follow edits and moves.

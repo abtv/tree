@@ -1,7 +1,6 @@
 import type { Document, TreeNode } from '../domain/document'
 
 const subtreeCounts = new WeakMap<TreeNode, number>()
-const documentCounts = new WeakMap<Document, number>()
 
 function subtreeCount(node: TreeNode): number {
   const cached = subtreeCounts.get(node)
@@ -13,12 +12,9 @@ function subtreeCount(node: TreeNode): number {
 
 /**
  * The number of nodes in the document, an upper bound on Search results (`docs/PRODUCT.md` §20.14).
- * Unchanged branches reuse their counts, so repeated calls after an edit only revisit its path.
+ * Unchanged branches reuse their counts, so a repeated call visits only top-level nodes and the
+ * path of an edit.
  */
 export function countDocumentNodes(document: Document): number {
-  const cached = documentCounts.get(document)
-  if (cached !== undefined) return cached
-  const value = document.roots.reduce((total, root) => total + subtreeCount(root), 0)
-  documentCounts.set(document, value)
-  return value
+  return document.roots.reduce((total, root) => total + subtreeCount(root), 0)
 }

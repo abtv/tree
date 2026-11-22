@@ -10,12 +10,12 @@ export function nodeFlagsLabel(node: NodeFlags): string | undefined {
 }
 
 /**
- * The heading of the empty-query Search list (§20.14): it names the parts that are present, and both
- * parts when the list is empty.
+ * The heading of the empty-query Search list (§20.14): it names the flags that listed nodes carry, and
+ * both when the list is empty.
  */
 export function initialSearchHeading(items: readonly NodeFlags[]): string {
   const marked = items.some((item) => item.marked)
-  const starred = items.some((item) => item.starred && !item.marked)
+  const starred = items.some((item) => item.starred)
   if (marked !== starred) return marked ? 'Marked' : 'Starred'
   return 'Marked and starred'
 }

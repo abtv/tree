@@ -26,3 +26,24 @@ it('counts a new document that shares an unchanged branch with an earlier one', 
   expect(countDocumentNodes(after)).toBe(5)
   expect(countDocumentNodes(before)).toBe(4)
 })
+
+it('reuses the counts of a document and of unchanged branches', () => {
+  let reads = 0
+  const childList = [node('leaf')]
+  const unchanged: TreeNode = {
+    id: 'unchanged',
+    text: 'unchanged',
+    get children() {
+      reads++
+      return childList
+    },
+  }
+  const document: Document = { roots: [unchanged] }
+  expect(countDocumentNodes(document)).toBe(2)
+  reads = 0
+
+  expect(countDocumentNodes(document)).toBe(2)
+  expect(countDocumentNodes({ roots: [unchanged, node('added')] })).toBe(3)
+
+  expect(reads).toBe(0)
+})

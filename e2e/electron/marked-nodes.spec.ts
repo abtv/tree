@@ -92,7 +92,7 @@ test.describe('Mark presentation', () => {
 
       await window.keyboard.press('Meta+;')
       const popup = window.getByRole('dialog', { name: 'Search' })
-      await expect(popup.locator('.node-search-results-heading > span')).toHaveText('Marked')
+      await expect(popup.locator('.node-search-results-heading > span')).toHaveText('Marked and starred')
       await expect(popup.getByLabel('Result position')).toHaveText('1 / 3')
       await expect(popup.locator('.recent-node-text')).toHaveText([
         'Review budget',
@@ -156,6 +156,7 @@ test.describe('Mark presentation', () => {
 describeForEachEditingMode('Marked nodes @linux', () => {
   // @requirement PRODUCT.md §2.7
   // @requirement PRODUCT.md §20.14
+  // @requirement PRODUCT.md §20.14.5
   // @requirement PRODUCT.md §23.2
   test('runs the command and keeps the node first in Search and under Today across restarts', async ({
     userDataDir,

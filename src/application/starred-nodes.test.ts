@@ -73,21 +73,22 @@ it('lists completed stars and reuses the prepared list', () => {
   expect(markedAndStarredNodes(source)).toBe(visible)
 })
 
-// @requirement PRODUCT.md §20.14
-it('lists marked nodes before starred ones, each group by path, and a marked star once', () => {
+// @requirement PRODUCT.md §20.14.5
+it('lists marked stars, then marked nodes, then stars, each group by path, and each node once', () => {
   const document: Document = {
     roots: [
       node('star-a', 'Alpha', [], true),
       { ...node('mark-z', 'Zulu'), marked: true },
       node('plain', 'Plain', [{ ...node('both', 'Both', [], true), marked: true }]),
       { ...node('mark-b', 'Bravo'), marked: true },
+      { ...node('both-a', 'Able', [], true), marked: true },
       node('star-c', 'Charlie', [], true),
     ],
   }
 
   const results = markedAndStarredNodes(document)
 
-  expect(results.map((item) => item.id)).toEqual(['mark-b', 'both', 'mark-z', 'star-a', 'star-c'])
+  expect(results.map((item) => item.id)).toEqual(['both-a', 'both', 'mark-b', 'mark-z', 'star-a', 'star-c'])
   expect(results[1]).toEqual({
     id: 'both',
     text: 'Both',
@@ -98,7 +99,43 @@ it('lists marked nodes before starred ones, each group by path, and a marked sta
   })
 })
 
-// @requirement PRODUCT.md §20.14
+// @requirement PRODUCT.md §20.14.5
+it('compares numbers in names by value, so version 0.9 precedes 0.11 and 0.14', () => {
+  const marked = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({
+    ...node(id, text, children),
+    marked: true,
+  })
+  const document: Document = {
+    roots: [
+      node('r14', 'Release 0.14', [marked('deps', 'Do we need all deps')]),
+      node('r11', 'Release 0.11 - improved agentic flow', [marked('copy', '1 - Copy text and images')]),
+      marked('r9', 'Release 0.9 - perfect global search'),
+      marked('item10', 'Item 10'),
+      marked('item2', 'Item 2'),
+    ],
+  }
+
+  expect(markedAndStarredNodes(document).map((item) => item.id)).toEqual(['item2', 'item10', 'r9', 'copy', 'deps'])
+})
+
+// @requirement PRODUCT.md §20.14.5
+it('compares paths one ancestor at a time, keeping children next to their parent', () => {
+  const marked = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({
+    ...node(id, text, children),
+    marked: true,
+  })
+  const document: Document = {
+    roots: [
+      marked('trash', 'Release 0.11 - Trash feature'),
+      node('release', 'Release 0.11', [marked('child', 'Alpha child')]),
+      marked('plain-release', 'Release 0.11'),
+    ],
+  }
+
+  expect(markedAndStarredNodes(document).map((item) => item.id)).toEqual(['plain-release', 'child', 'trash'])
+})
+
+// @requirement PRODUCT.md §20.14.5
 it('omits unmarked, unstarred nodes and drops a node when its mark is removed', () => {
   const document: Document = {
     roots: [{ ...node('0', 'Zero'), marked: true }, node('1', 'One'), node('2', 'Two')],
