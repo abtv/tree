@@ -474,7 +474,6 @@ export function GlobalSearchPopup({
     if (!open) return
     const initial = store.getSnapshot()
     let document = initial.status === 'ready' ? initial.document : undefined
-    let hideFinishedTasks = initial.status === 'ready' && Boolean(initial.hideFinishedTasks)
     return store.subscribe(() => {
       if (session.getSnapshot().items === undefined) return
       const state = store.getSnapshot()
@@ -482,10 +481,8 @@ export function GlobalSearchPopup({
         session.close()
         return
       }
-      const nextHideFinishedTasks = Boolean(state.hideFinishedTasks)
-      if (state.document === document && nextHideFinishedTasks === hideFinishedTasks) return
+      if (state.document === document) return
       document = state.document
-      hideFinishedTasks = nextHideFinishedTasks
       resetScroll()
       session.refresh()
     })

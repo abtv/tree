@@ -6,7 +6,7 @@ import { createJsonPreferenceStore } from './json-preference'
 
 it('retains the last preference across a failed write and loads the acknowledged retry', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'tree-json-preference-'))
-  const path = join(directory, 'data', 'hide-finished-tasks.json')
+  const path = join(directory, 'data', 'preference.json')
   const normalize = (value: unknown) => value === true
   const store = createJsonPreferenceStore(path, normalize)
 

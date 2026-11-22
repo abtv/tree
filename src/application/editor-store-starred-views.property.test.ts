@@ -77,8 +77,7 @@ const keepsEveryView = new Set<CommandAction['kind']>([
 function assertViews(store: EditorStore, before: ReadyState, action: CommandAction, dropped: Set<NodeId>): void {
   const after = store.getSnapshot() as ReadyState
 
-  // With finished tasks hidden, a location without a visible row keeps a hidden save anchor selected.
-  if (!after.hideFinishedTasks) expect(isDisplayed(store)).toBe(true)
+  expect(isDisplayed(store)).toBe(true)
   expect(after.expansion.viewOwnerId).toBe(governingViewOwner(after.document, after.location.currentParentId))
 
   const previous = views(before.expansion)
@@ -121,13 +120,9 @@ function assertUnrestorable(store: EditorStore, dropped: ReadonlySet<NodeId>): v
 async function checkViews(
   document: Document,
   commands: readonly CommandAction[],
-  hideFinishedTasks: boolean,
 ): Promise<{ store: EditorStore; dropped: ReadonlySet<NodeId> }> {
   const clipboard: ClipboardRef = { current: { kind: 'text', text: '' } }
-  const services = (initial: unknown, clipboard: () => ClipboardRef['current']) => ({
-    ...createServices(initial, clipboard),
-    loadHideFinishedTasks: async () => hideFinishedTasks,
-  })
+  const services = createServices
   const store = new EditorStore(
     services(
       { version: 5, document, location: firstLocation(document), view: { expandedIds: [] } },
@@ -178,9 +173,8 @@ describe('EditorStore expansion views of starred nodes', () => {
         deepForest,
         fc.array(fc.boolean(), { minLength: 1, maxLength: 7 }),
         fc.array(starCommand, { minLength: 1, maxLength: 30 }),
-        fc.boolean(),
-        async (rawForest, flags, commands, hideFinishedTasks) => {
-          await checkViews(withStars(materialize(rawForest), flags), commands, hideFinishedTasks)
+        async (rawForest, flags, commands) => {
+          await checkViews(withStars(materialize(rawForest), flags), commands)
         },
       ),
       { numRuns: propertyRuns(300) },
@@ -199,7 +193,7 @@ describe('EditorStore expansion views of starred nodes', () => {
     const fold = (a: number): CommandAction => ({ kind: 'toggleExpansion', a, b: 0, text: '' })
 
     // Opens the project in the root view, enters it and opens the phase in the project's view.
-    const { store } = await checkViews(document, [fold(0), { kind: 'enter', a: 0, b: 0, text: '' }, fold(0)], false)
+    const { store } = await checkViews(document, [fold(0), { kind: 'enter', a: 0, b: 0, text: '' }, fold(0)])
     const state = store.getSnapshot() as ReadyState
 
     expect(state.expansion.viewOwnerId).toBe('project')
@@ -215,19 +209,15 @@ describe('EditorStore expansion views of starred nodes', () => {
     const action = (kind: CommandAction['kind'], a = 0, text = ''): CommandAction => ({ kind, a, b: 0, text })
 
     // Creates `x0` after `home`, stars and enters it, leaves, undoes the star and the creation, then edits.
-    const { dropped } = await checkViews(
-      document,
-      [
-        action('split', 4),
-        action('star'),
-        action('enter'),
-        action('leave'),
-        action('undo'),
-        action('undo'),
-        action('edit', 0, 'Home'),
-      ],
-      false,
-    )
+    const { dropped } = await checkViews(document, [
+      action('split', 4),
+      action('star'),
+      action('enter'),
+      action('leave'),
+      action('undo'),
+      action('undo'),
+      action('edit', 0, 'Home'),
+    ])
 
     expect([...dropped]).toEqual(['x0'])
   })

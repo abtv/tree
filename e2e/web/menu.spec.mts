@@ -288,8 +288,8 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     await device.keyboard.press('Meta+Shift+p')
     await device.locator('.command-panel').waitFor()
 
-    await expect(device.locator('.command-panel [role="option"]')).toHaveCount(21)
-    await expect(device.locator('.command-count')).toHaveText('21 of 21')
+    await expect(device.locator('.command-panel [role="option"]')).toHaveCount(20)
+    await expect(device.locator('.command-count')).toHaveText('20 of 20')
     await expect(device.locator('#command-toggle-star-node')).toBeVisible()
     await expect(device.locator('#command-toggle-mark-node')).toBeVisible()
     expect(await device.locator('#command-toggle-always-on-top').count()).toBe(0)

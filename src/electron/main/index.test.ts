@@ -6,7 +6,6 @@ import { ipcEvents } from '../../shared/ipc'
 import type { AppUpdates } from './app-updates'
 import type { NotesArchiveControllerDependencies } from './notes-archive-controller'
 import type { WindowBounds } from '../../infrastructure/main/window-state'
-import type { createJsonPreferenceStore } from '../../infrastructure/main/json-preference'
 
 const mocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
@@ -27,11 +26,6 @@ const mocks = vi.hoisted(() => ({
   boundsStore: { load: vi.fn<() => WindowBounds | null>(() => null), save: vi.fn() },
   boundsSaver: { save: vi.fn(), flush: vi.fn() },
   history: { load: vi.fn(() => []), save: vi.fn() },
-  finishedTasks: {
-    load: vi.fn(async () => true),
-    save: vi.fn<(value: unknown) => Promise<void>>(async () => undefined),
-  },
-  jsonPreference: vi.fn<typeof createJsonPreferenceStore<boolean>>(),
   security: vi.fn(),
   sessionSecurity: vi.fn(),
   scheme: vi.fn(),
@@ -70,7 +64,6 @@ vi.mock('../../infrastructure/main/emoji-history', () => ({
     return mocks.history
   },
 }))
-vi.mock('../../infrastructure/main/json-preference', () => ({ createJsonPreferenceStore: mocks.jsonPreference }))
 vi.mock('../../infrastructure/main/window-state', () => ({
   createBooleanPreferenceStore: (path: string) => {
     mocks.preferencePath('boolean', path)
@@ -231,7 +224,6 @@ beforeEach(async () => {
   vi.mocked(electron.Menu.getApplicationMenu).mockReturnValue(null)
   vi.mocked(electron.BrowserWindow.fromWebContents).mockReturnValue(null)
   mocks.createFiles.mockReturnValue(mocks.fileServices)
-  mocks.jsonPreference.mockReturnValue(mocks.finishedTasks)
   mocks.createArchive.mockReturnValue(mocks.archive)
   mocks.createOcr.mockReturnValue(mocks.ocr)
   mocks.menu.mockReturnValue([])
@@ -938,24 +930,6 @@ describe('desktop entry wiring', () => {
       ['appearance', '/profile/userData/data/appearance.json'],
       ['bounds', '/profile/userData/data/window-bounds.json'],
     ])
-  })
-
-  it('connects the finished-task preference in the profile to the main-process IPC ports', async () => {
-    const { ipc } = await setup()
-    expect(mocks.jsonPreference).toHaveBeenCalledExactlyOnceWith(
-      '/profile/userData/data/hide-finished-tasks.json',
-      expect.any(Function),
-    )
-    const [, normalize] = mocks.jsonPreference.mock.calls[0]!
-
-    expect(normalize(true)).toBe(true)
-    expect(normalize(false)).toBe(false)
-    expect(normalize('true')).toBe(false)
-    await expect(ipc.getHideFinishedTasks!()).resolves.toBe(true)
-
-    await ipc.setHideFinishedTasks!(false)
-
-    expect(mocks.finishedTasks.save).toHaveBeenCalledExactlyOnceWith(false)
   })
 
   it('forwards native clipboard reads and preserves native failures', async () => {

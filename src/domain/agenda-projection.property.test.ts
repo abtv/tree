@@ -74,7 +74,6 @@ it('includes exactly the matching nodes and proper ancestors in scoped preorder'
           { roots },
           scope === nodes.length ? null : String(scope),
           undefined,
-          false,
           today === undefined ? undefined : day(today),
         ),
       ).toEqual(expected)

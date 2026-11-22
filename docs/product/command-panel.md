@@ -68,7 +68,6 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
 | `toggle-vim-editing` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
-| `toggle-finished-tasks` | — | Show finished tasks | Finished tasks visible | — | Toggle finished-task visibility across views and search (§2.5) |
 | `toggle-star-node` | — | Star or unstar the selected node | Selected node starred | — | Toggle the star of the selected real node (§2.6) |
 | `toggle-mark-node` | — | Mark or unmark the selected node for Today | Selected node marked | — | Toggle the mark of the selected real node (§2.7) |
 | `set-appearance-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |

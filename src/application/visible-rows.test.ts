@@ -28,23 +28,6 @@ describe('buildVisibleRows', () => {
     expect(buildVisibleRows([], () => true)).toEqual([])
   })
 
-  it('shows completed branches by default and preserves physical sibling positions when hiding them', () => {
-    const completed = (id: string): TreeNode => ({ ...node(id), struckThrough: true })
-    const nodes = [
-      { ...node('archived', [completed('archived-child')]), struckThrough: true as const },
-      node('project', [completed('finished'), node('open')]),
-    ]
-
-    const visible = buildVisibleRows(nodes, () => true)
-    const filtered = buildVisibleRows(nodes, () => true, null, 0, true)
-
-    expect(visible.map(({ node }) => node.id)).toEqual(['archived', 'archived-child', 'project', 'finished', 'open'])
-    expect(filtered.map(({ node, ...position }) => ({ id: node.id, ...position }))).toEqual([
-      { id: 'project', depth: 0, parentId: null, siblingIndex: 1, siblingCount: 2 },
-      { id: 'open', depth: 1, parentId: 'project', siblingIndex: 1, siblingCount: 2 },
-    ])
-  })
-
   it('does not ask whether a leaf is expanded', () => {
     const asked: string[] = []
 

@@ -309,36 +309,6 @@ describe('main IPC handlers', () => {
     expect(() => set(event, false)).toThrow('Disk full')
   })
 
-  it('accepts only the trusted finished-task preference request and reports failed writes', async () => {
-    const save = vi.fn(async () => undefined)
-    const { handlers } = createHarness((dependencies) => {
-      dependencies.getHideFinishedTasks = async () => true
-      dependencies.setHideFinishedTasks = save
-    })
-    const event = { senderFrame: { url: rendererUrl } }
-    const get = handlers.get(ipcChannels.getHideFinishedTasks)!
-    const set = handlers.get(ipcChannels.setHideFinishedTasks)!
-
-    expect(() => get(event, 'extra')).toThrow()
-    expect(() => set(event, 'true')).toThrow('Invalid finished tasks setting.')
-    expect(() => set(event, true, 'extra')).toThrow()
-    expect(() => set({ senderFrame: { url: 'https://example.com' } }, true)).toThrow('Untrusted')
-    await expect(get(event)).resolves.toBe(true)
-    await set(event, false)
-    expect(save).toHaveBeenCalledExactlyOnceWith(false)
-
-    save.mockRejectedValueOnce(new Error('Disk full'))
-    await expect(set(event, true)).rejects.toThrow('Disk full')
-  })
-
-  it('defaults finished tasks to visible when no preference adapter is installed', () => {
-    const { handlers } = createHarness()
-    const event = { senderFrame: { url: rendererUrl } }
-
-    expect(handlers.get(ipcChannels.getHideFinishedTasks)!(event)).toBe(false)
-    expect(handlers.get(ipcChannels.setHideFinishedTasks)!(event, true)).toBeUndefined()
-  })
-
   it('cancels only a named quit request from the trusted renderer', () => {
     const { handlers, quitHandshake } = createHarness()
     const cancel = handlers.get(ipcChannels.cancelQuit)!

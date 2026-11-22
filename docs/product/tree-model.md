@@ -217,9 +217,7 @@ The state belongs to the node and travels with it:
 * The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
 * Saving and reopening the application keeps completion. Existing documents preserve every leaf's state and recalculate parents from children when loaded, even if their old independent parent states disagree. A document saved before struck-through nodes existed opens with every node normal.
 
-`toggle-finished-tasks` in the command panel shows or hides struck-through nodes throughout Tree, the Agenda timeline and focused days, local Find, and global Search, including marked and starred results and marker suggestions. Find and Search include unfinished nodes in folded branches. Finished tasks are visible by default. The desktop and browser each remember the choice in their local application preferences across restarts. The choice is independent of notes and Undo history.
-
-If the selected Tree row is hidden, select the next visible row, or the preceding row if there is no next row. In an open branch with no visible child, select its heading. If the open branch itself is finished, first move to its nearest unfinished parent or the root. If the root has no visible rows, keep it empty with no selected task. The command remains available there. In Agenda, a hidden selected occurrence moves to the next visible occurrence in its day or Overdue group, then the preceding occurrence, then the ordinary nearest day heading. A selection that remains visible keeps focus and its caret.
+Struck-through nodes are always shown: Tree, Agenda, local Find, and global Search, including marked and starred results and marker suggestions, list them like any other node. The Agenda `Overdue` group still lists only nodes that are not struck through (§23.3).
 
 ---
 
@@ -237,7 +235,7 @@ The star is document content. A toggle is one undoable change, keeps selection a
 
 `toggle-mark-node` in the command panel adds or removes a mark on the current real node. It targets the same node as `toggle-star-node` (§2.6), including the editable Tree parent heading and real Agenda nodes; synthetic Agenda rows cannot be marked. It has no default keyboard shortcut. The command shows its active state when the current node is marked.
 
-A mark has no date. Agenda lists every marked node under Today, on every day, until the mark is removed (§23.2). Striking a marked node through keeps its mark; finished-task visibility (§2.5) applies to it as to any other node. Search lists marked nodes first (§20.14).
+A mark has no date. Agenda lists every marked node under Today, on every day, until the mark is removed (§23.2). Striking a marked node through keeps its mark. Search lists marked nodes first (§20.14).
 
 A marked node's circular marker is drawn in a calm teal in Tree and Agenda: `#4a9b8f` in the light appearance, `#6aa99b` in the dark appearance, and `#4c9a93` in Gray and White.
 

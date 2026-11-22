@@ -91,11 +91,11 @@ export function agendaProjection(
   state: AgendaState,
   previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
 ): readonly AgendaProjectionDay[] {
-  const projection = projectAgenda(document, state.scopeParentId, previous, state.hideFinishedTasks, state.today)
+  const projection = projectAgenda(document, state.scopeParentId, previous, state.today)
   const pin = pinnedAgendaOccurrence(state)
   if (pin === undefined) return projection
   const located = locateNode(document, pin.nodeId)
-  if (located === undefined || (state.hideFinishedTasks && located.node.struckThrough)) return projection
+  if (located === undefined) return projection
   const start =
     state.scopeParentId === null ? 0 : located.ancestors.findIndex((node) => node.id === state.scopeParentId) + 1
   if (state.scopeParentId !== null && start === 0) return projection
@@ -284,13 +284,11 @@ export class AgendaRowsCache {
 
   public get(document: Document, state: AgendaState): readonly AgendaRow[] {
     const documentChanged = document !== this.document
-    const filterChanged = Boolean(state.hideFinishedTasks) !== Boolean(this.state?.hideFinishedTasks)
     // Marked nodes are listed under Today, so a projection belongs to the Today it was built for.
     const todayChanged = state.today !== this.state?.today
     let changed = false
     if (
       document !== this.document ||
-      filterChanged ||
       todayChanged ||
       state.scopeParentId !== this.scope ||
       // The document/scope guards run first; an equal cached document always has cached state.
@@ -299,7 +297,6 @@ export class AgendaRowsCache {
       const previous = new Map(this.projection.map((day) => [day.day, day]))
       const reusable =
         this.document !== undefined &&
-        !filterChanged &&
         !todayChanged &&
         state.scopeParentId === this.scope &&
         pinnedAgendaOccurrence(state) === undefined &&

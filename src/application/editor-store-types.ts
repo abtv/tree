@@ -8,8 +8,6 @@ import type { AgendaState } from './agenda-state'
 export type ClipboardValue = ClipboardPayload
 
 export interface EditorServices {
-  loadHideFinishedTasks?(): Promise<boolean>
-  saveHideFinishedTasks?(value: boolean): Promise<void>
   /** A cut or paste can still change the document after its platform I/O finishes. */
   onPendingEditsChanged?(pending: boolean): void
   imageToText?(attachmentId: AttachmentId): Promise<string[]>
@@ -52,7 +50,6 @@ export type EditorSnapshot =
       focus: FocusIntent
       structuralVersion: number
       expansion: ExpansionState
-      hideFinishedTasks?: boolean
       agenda?: AgendaState
       saveError?: string
       operationError?: string

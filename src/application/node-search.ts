@@ -23,11 +23,7 @@ function* pathTagMatches(
   return matches
 }
 
-export function* searchNodes(
-  document: Document,
-  query: string,
-  hideFinishedTasks = false,
-): Generator<undefined, readonly NodeResult[]> {
+export function* searchNodes(document: Document, query: string): Generator<undefined, readonly NodeResult[]> {
   const terms = yield* prepareNodeSearch(query)
   if (terms.length === 0) return []
   const tagTerms = terms.filter((term) => term.prefix !== undefined)
@@ -51,7 +47,6 @@ export function* searchNodes(
       continue
     }
     yield undefined
-    if (hideFinishedTasks && node.struckThrough) continue
     const own: number[] = []
     for (let index = 0; index < terms.length; index++) {
       yield undefined
@@ -111,9 +106,8 @@ export function runNodeSearch(
   query: string,
   publish: (results: readonly NodeResult[]) => void,
   scheduler: SearchScheduler = searchScheduler,
-  hideFinishedTasks = false,
 ): () => void {
-  let work: ReturnType<typeof searchNodes> | undefined = searchNodes(document, query, hideFinishedTasks)
+  let work: ReturnType<typeof searchNodes> | undefined = searchNodes(document, query)
   let cancel: (() => void) | undefined
   const run = (): void => {
     for (let step = 0; step < 8192 && work !== undefined; step++) {

@@ -59,8 +59,6 @@ export function useCommandPanel(options: {
   }, [])
   const running = useRef(false)
   const snapshot = store.getSnapshot()
-  const ready = snapshot.status === 'ready'
-  const hideFinishedTasks = ready && Boolean(snapshot.hideFinishedTasks)
   const starTarget = store.starTarget
   const starred = starTarget?.starred === true
   const marked = starTarget?.marked === true
@@ -77,13 +75,11 @@ export function useCommandPanel(options: {
         }).map((command) =>
           command.name === 'toggle-star-node' || command.name === 'toggle-mark-node'
             ? { ...command, enabled: canStar }
-            : command.name === 'toggle-finished-tasks'
-              ? { ...command, enabled: ready }
-              : command,
+            : command,
         ),
         ...menuEntries,
       ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canStar, ready],
+    [vimAvailable, alwaysOnTopAvailable, imageToTextAvailable, menuEntries, canStar],
   )
   const matches = useMemo(() => matchCommands(input, history, commands), [input, history, commands])
   useEffect(() => {
@@ -167,7 +163,6 @@ export function useCommandPanel(options: {
             quit: () => window.treeApi.quit(),
             setVimEnabled: applyVimEnabled,
             setLineNumbers: applyLineNumbers,
-            setHideFinishedTasks: (value) => store.setHideFinishedTasks(value),
             showAgenda,
             showTree,
             setAlwaysOnTop: async (value) => {
@@ -179,7 +174,7 @@ export function useCommandPanel(options: {
               setAppearance(value)
             },
           },
-          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked, hideFinishedTasks },
+          { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked },
         )
         if (command.name !== 'quit') {
           const next = rememberCommand(history, command.name)
@@ -196,7 +191,6 @@ export function useCommandPanel(options: {
       close,
       starred,
       marked,
-      hideFinishedTasks,
       searchCommand,
       showAbout,
       input,
@@ -345,7 +339,7 @@ export function useCommandPanel(options: {
     bindInput,
     matches,
     total: commands.length,
-    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked, hideFinishedTasks },
+    context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked },
     changeInput: (value: string) => {
       setInput(value)
       setSelected(0)

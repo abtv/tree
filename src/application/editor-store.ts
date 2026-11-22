@@ -136,7 +136,6 @@ export class EditorStore {
         document: Document
         parentId: NodeId | null
         expansion: ExpansionState
-        hideFinishedTasks: boolean | undefined
         rows: readonly VisibleRow[]
       }
     | undefined
@@ -170,7 +169,6 @@ export class EditorStore {
   private readonly history = new EditorHistory(attachmentSummary, (recorded, replacement) =>
     departedViewOwners(this.runtime.ready().expansion, recorded, replacement),
   )
-  private finishedTasksWrite = Promise.resolve()
   private readonly imageToTextQueue = new ImageToTextQueue()
   private readonly pendingAttachmentIds = new Set<AttachmentId>()
   // Decoded image sizes that differ from the stored ones, applied together after a short delay.
@@ -236,47 +234,12 @@ export class EditorStore {
 
   public initialSearchResults(): readonly NodeResult[] {
     const state = this.runtime.ready()
-    return markedAndStarredNodes(state.document, state.hideFinishedTasks)
-  }
-
-  public get treeSelectionHidden(): boolean {
-    const state = this.runtime.snapshot
-    return state.status === 'ready' && state.agenda === undefined && this.isTaskHidden(state.location.selectedNodeId)
-  }
-
-  public isTaskHidden(nodeId: NodeId): boolean {
-    const state = this.runtime.snapshot
-    return (
-      state.status === 'ready' &&
-      state.hideFinishedTasks === true &&
-      locateNode(state.document, nodeId)?.node.struckThrough === true
-    )
-  }
-
-  public setHideFinishedTasks(value: boolean): Promise<void> {
-    const change = this.finishedTasksWrite.then(async () => {
-      const current = this.runtime.snapshot
-      if (current.status !== 'ready' || Boolean(current.hideFinishedTasks) === value) return
-      await this.services.saveHideFinishedTasks?.(value)
-
-      this.finishPendingEdits()
-      this.hideSearch()
-      const state = this.runtime.ready()
-      const focus = this.treeSelectionHidden ? this.runtime.newFocus(state.location.selectedNodeId, 0) : state.focus
-      this.runtime.replaceReady({
-        ...state,
-        hideFinishedTasks: value,
-        focus,
-        ...(state.agenda === undefined ? {} : { agenda: { ...state.agenda, hideFinishedTasks: value } }),
-      })
-    })
-    this.finishedTasksWrite = change.catch(() => undefined)
-    return change
+    return markedAndStarredNodes(state.document)
   }
 
   public get starTarget(): TreeNode | undefined {
     const state = this.getSnapshot()
-    if (state.status !== 'ready' || this.isPersistenceLocked() || this.treeSelectionHidden) return undefined
+    if (state.status !== 'ready' || this.isPersistenceLocked()) return undefined
     const selected =
       state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda?.selectedKey)
     if (state.agenda !== undefined && selected?.kind !== 'node') return undefined
@@ -308,7 +271,7 @@ export class EditorStore {
   public searchNodeSuggestions(query: string): readonly string[] {
     const prefix = tagPrefix(query)
     if (prefix === undefined) return []
-    const suggestions = this.tags.get(prefix)!.searchSuggestions(query, this.runtime.ready().hideFinishedTasks)
+    const suggestions = this.tags.get(prefix)!.searchSuggestions(query)
     return suggestions.length === 1 && query === `${prefix}${suggestions[0]}` ? [] : suggestions
   }
 
@@ -318,7 +281,7 @@ export class EditorStore {
       return () => undefined
     }
     const state = this.runtime.ready()
-    return runNodeSearch(state.document, query, publish, undefined, state.hideFinishedTasks)
+    return runNodeSearch(state.document, query, publish)
   }
 
   public suggestTags(
@@ -349,7 +312,7 @@ export class EditorStore {
       })
     this.endTextSession()
     const agenda = openAgendaState(state.location, cursor ?? state.focus.cursor, today, this.agendaFoldMemory.collapsed)
-    this.runtime.replaceReady({ ...state, agenda: { ...agenda, hideFinishedTasks: Boolean(state.hideFinishedTasks) } })
+    this.runtime.replaceReady({ ...state, agenda })
   }
 
   public closeAgenda(): void {
@@ -419,7 +382,6 @@ export class EditorStore {
     if (
       cached?.document === state.document &&
       cached.parentId === state.location.currentParentId &&
-      cached.hideFinishedTasks === state.hideFinishedTasks &&
       cached.expansion === state.expansion
     )
       return cached.rows
@@ -427,13 +389,10 @@ export class EditorStore {
       displayedNodes(state.document, state.location.currentParentId),
       (id) => isNodeExpanded(state.expansion, id),
       state.location.currentParentId,
-      0,
-      state.hideFinishedTasks,
     )
     this.visibleRowsCache = {
       document: state.document,
       parentId: state.location.currentParentId,
-      hideFinishedTasks: state.hideFinishedTasks,
       expansion: state.expansion,
       rows,
     }
@@ -554,7 +513,6 @@ export class EditorStore {
     const resumeImageRecognition = options.cancelImageRecognition ? this.imageToTextQueue.suspend() : undefined
     try {
       let committed: boolean
-      let awaitedFinishedTasksWrite: Promise<void>
       do {
         this.finishPendingEdits()
         await Promise.all(this.pendingEdits)
@@ -562,8 +520,6 @@ export class EditorStore {
         if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave('flush')
         await this.saveScheduler.flush()
         await this.emojiHistory.flush()
-        awaitedFinishedTasksWrite = this.finishedTasksWrite
-        await awaitedFinishedTasksWrite
         // Metadata writes leave editing available. An immediate save started meanwhile has
         // already cleared the dirty flag; drain it, including its failure, before another pass.
         await this.saveScheduler.flush()
@@ -572,8 +528,7 @@ export class EditorStore {
         committed ||
         this.pendingEdits.size > 0 ||
         this.saveScheduler.hasPendingChanges() ||
-        this.emojiHistory.hasPendingChanges() ||
-        awaitedFinishedTasksWrite !== this.finishedTasksWrite
+        this.emojiHistory.hasPendingChanges()
       )
       const seal = options.sealEditsUntil
       if (seal && !seal.aborted && !this.editSeals.has(seal)) {
@@ -654,10 +609,7 @@ export class EditorStore {
 
   public async initialize(): Promise<void> {
     try {
-      const [loaded, hideFinishedTasks] = await Promise.all([
-        this.services.load(),
-        this.services.loadHideFinishedTasks?.().catch(() => false),
-      ])
+      const loaded = await this.services.load()
       this.emojiHistory.load(await this.services.loadEmojiHistory?.().catch(() => []))
       if (loaded === null) {
         const rootId = this.createId()
@@ -668,7 +620,6 @@ export class EditorStore {
           focus: this.runtime.newFocus(rootId, 0),
           structuralVersion: this.runtime.getStructuralVersion(),
           expansion: COLLAPSED_EXPANSION_STATE,
-          hideFinishedTasks: hideFinishedTasks === true,
         }
         this.runtime.emit()
         this.saveScheduler.requestSave()
@@ -693,7 +644,6 @@ export class EditorStore {
           parsed.view?.expandedIds ?? [],
           Object.entries(parsed.view?.starredExpandedIds ?? {}),
         ),
-        hideFinishedTasks: hideFinishedTasks === true,
       })
       this.queueAttachmentCleanup()
       // Startup does not wait for the image headers (`docs/PRODUCT.md` §17).
@@ -795,7 +745,6 @@ export class EditorStore {
 
   public selectNode(nodeId: NodeId, cursor: number): void {
     const state = this.runtime.ready()
-    if (state.hideFinishedTasks && locateNode(state.document, nodeId)?.node.struckThrough) return
     if (!isValidLocation(state.document, { ...state.location, selectedNodeId: nodeId })) {
       return
     }
@@ -989,7 +938,6 @@ export class EditorStore {
 
   public enter(): void {
     const state = this.runtime.ready()
-    if (this.treeSelectionHidden) return
     const selected =
       state.agenda === undefined ? undefined : this.getAgendaRows().find((row) => row.key === state.agenda?.selectedKey)
     if (state.agenda !== undefined && selected?.kind !== 'node') return
@@ -1021,7 +969,7 @@ export class EditorStore {
   public openSearchResult(nodeId: NodeId): void {
     const state = this.runtime.ready()
     const found = locateNode(state.document, nodeId)
-    if (found === undefined || (state.hideFinishedTasks && found.node.struckThrough)) return
+    if (found === undefined) return
     const location = found.node.children.length
       ? enteredNodeLocation(found.node)
       : { currentParentId: found.parent?.id ?? null, selectedNodeId: nodeId }
@@ -1468,13 +1416,9 @@ export class EditorStore {
         : rows
             .filter((row) => row.kind === 'node' && row.groupKey === group)
             .findIndex((row) => row.key === selected?.key)
-    const focus =
-      state.hideFinishedTasks && cursor !== undefined && locateNode(document, state.focus.nodeId)?.node.struckThrough
-        ? { ...state.focus, cursor }
-        : state.focus
     this.endTextSession()
-    this.applyStructural(document, state.location, focus)
-    if (index >= 0 && !state.hideFinishedTasks) {
+    this.applyStructural(document, state.location, state.focus)
+    if (index >= 0) {
       const remaining = this.getAgendaRows()
       if (!remaining.some((row) => row.key === selected?.key)) {
         const siblings = remaining.filter((row) => row.kind === 'node' && row.groupKey === group)
@@ -1593,7 +1537,7 @@ export class EditorStore {
 
   private clipboardTarget(nodeId: NodeId): ReadySnapshot | undefined {
     const state = this.runtime.snapshot
-    if (state.status !== 'ready' || state.location.selectedNodeId !== nodeId || this.treeSelectionHidden) return
+    if (state.status !== 'ready' || state.location.selectedNodeId !== nodeId) return
     const agenda = state.agenda
     if (agenda !== undefined) {
       // Synthetic Agenda rows retain the last real node in location; only the selected row

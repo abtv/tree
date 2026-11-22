@@ -94,25 +94,6 @@ describe('renderer Electron services', () => {
     await expect(services.readAttachmentDimensions!(['image-3'])).rejects.toBe(failure)
   })
 
-  it('forwards finished-task preferences and preserves write failures from the bridge', async () => {
-    const getHideFinishedTasks = vi.fn(async () => true)
-    const setHideFinishedTasks = vi.fn<NonNullable<TreeApi['setHideFinishedTasks']>>(async () => undefined)
-    window.treeApi = { ...window.treeApi, getHideFinishedTasks, setHideFinishedTasks }
-    const services = createElectronEditorServices()
-
-    await expect(services.loadHideFinishedTasks!()).resolves.toBe(true)
-    await services.saveHideFinishedTasks!(false)
-
-    expect(getHideFinishedTasks).toHaveBeenCalledExactlyOnceWith()
-    expect(setHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(false)
-    const failure = new Error('Preference storage unavailable')
-    const rejected = Promise.reject(failure)
-    void rejected.catch(() => undefined)
-    setHideFinishedTasks.mockReturnValueOnce(rejected)
-
-    await expect(services.saveHideFinishedTasks!(true)).rejects.toBe(failure)
-  })
-
   it('forwards emoji history values', async () => {
     const bridge = {
       ...window.treeApi,
@@ -128,18 +109,14 @@ describe('renderer Electron services', () => {
     expect(bridge.setEmojiHistory).toHaveBeenCalledExactlyOnceWith(['heart'])
   })
 
-  it('supports bridges without optional preferences, history or rich clipboard methods', async () => {
+  it('supports bridges without optional history or rich clipboard methods', async () => {
     const bridge = { ...window.treeApi }
-    delete bridge.getHideFinishedTasks
-    delete bridge.setHideFinishedTasks
     delete bridge.getEmojiHistory
     delete bridge.setEmojiHistory
     delete bridge.writeClipboardContent
     window.treeApi = bridge
     const services = createElectronEditorServices()
 
-    await expect(services.loadHideFinishedTasks!()).resolves.toBe(false)
-    await expect(services.saveHideFinishedTasks!(true)).resolves.toBeUndefined()
     await expect(services.loadEmojiHistory!()).resolves.toEqual([])
     await expect(services.saveEmojiHistory!(['smile'])).resolves.toBeUndefined()
     await expect(services.writeClipboardContent!({ kind: 'text', text: 'text' })).resolves.toBeUndefined()

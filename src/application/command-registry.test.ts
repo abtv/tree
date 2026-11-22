@@ -57,10 +57,10 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    [true, true, 19],
-    [false, true, 18],
-    [false, false, 17],
-    [true, false, 18],
+    [true, true, 18],
+    [false, true, 17],
+    [false, false, 16],
+    [true, false, 17],
   ])('filters capabilities before matching and history ordering (%s, %s)', (alwaysOnTop, vim, count) => {
     const commands = availableCommands({ alwaysOnTop, vim })
 
@@ -88,7 +88,6 @@ describe('command registry', () => {
       'set-appearance-white',
       'show-agenda',
       'show-tree',
-      'toggle-finished-tasks',
       'toggle-line-numbers',
       'toggle-mark-node',
       'toggle-star-node',
@@ -143,14 +142,7 @@ describe('command registry', () => {
     ['about', ['about-tree']],
     [
       'toggle',
-      [
-        'toggle-always-on-top',
-        'toggle-finished-tasks',
-        'toggle-line-numbers',
-        'toggle-mark-node',
-        'toggle-star-node',
-        'toggle-vim-editing',
-      ],
+      ['toggle-always-on-top', 'toggle-line-numbers', 'toggle-mark-node', 'toggle-star-node', 'toggle-vim-editing'],
     ],
     ['mark', ['toggle-mark-node']],
     ['q', ['quit']],
@@ -183,7 +175,6 @@ describe('command registry', () => {
       'show-agenda',
       'show-tree',
       'toggle-always-on-top',
-      'toggle-finished-tasks',
       'toggle-line-numbers',
       'toggle-mark-node',
       'toggle-star-node',
@@ -226,7 +217,6 @@ describe('command registry', () => {
       setAppearance: vi.fn(async () => undefined),
       setVimEnabled: vi.fn(async () => undefined),
       setLineNumbers: vi.fn(async () => undefined),
-      setHideFinishedTasks: vi.fn(async () => undefined),
       showAgenda: vi.fn(async () => undefined),
       showTree: vi.fn(async () => undefined),
     }
@@ -253,7 +243,6 @@ describe('command registry', () => {
     expect(services.setAlwaysOnTop).toHaveBeenCalledExactlyOnceWith(false)
     expect(services.setVimEnabled).toHaveBeenCalledExactlyOnceWith(false)
     expect(services.setLineNumbers).toHaveBeenCalledExactlyOnceWith(false)
-    expect(services.setHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(true)
 
     const toggleVim = commandRegistry.find((command) => command.name === 'toggle-vim-editing')!
 
@@ -273,14 +262,7 @@ describe('command registry', () => {
           command.active({ alwaysOnTop: true, appearance: 'dark', vimEnabled: true, lineNumbers: true, view: 'tree' }),
         )
         .map((command) => command.name),
-    ).toEqual([
-      'show-tree',
-      'toggle-always-on-top',
-      'toggle-vim-editing',
-      'toggle-line-numbers',
-      'toggle-finished-tasks',
-      'set-appearance-dark',
-    ])
+    ).toEqual(['show-tree', 'toggle-always-on-top', 'toggle-vim-editing', 'toggle-line-numbers', 'set-appearance-dark'])
     expect(
       commandRegistry
         .find((command) => command.name === 'show-agenda')!
@@ -331,10 +313,5 @@ describe('command registry', () => {
     const mark = commandRegistry.find((command) => command.name === 'toggle-mark-node')!
     expect(mark.active({ ...state, marked: true })).toBe(true)
     expect(mark.active({ ...state, starred: true })).toBe(false)
-
-    const finished = commandRegistry.find((command) => command.name === 'toggle-finished-tasks')!
-
-    expect(finished.active({ ...state, hideFinishedTasks: true })).toBe(false)
-    await expect(finished.run(services, state)).resolves.toBeUndefined()
   })
 })

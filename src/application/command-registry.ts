@@ -17,7 +17,6 @@ export interface CommandCapabilities {
 }
 
 export interface CommandServices {
-  setHideFinishedTasks?(value: boolean): Promise<void>
   toggleStarNode?(): Promise<void>
   toggleMarkNode?(): Promise<void>
   reindexAllImages?(): Promise<void>
@@ -36,7 +35,6 @@ export interface CommandServices {
 }
 
 export interface CommandContext {
-  hideFinishedTasks?: boolean
   starred?: boolean
   marked?: boolean
   alwaysOnTop: boolean
@@ -164,13 +162,6 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     shortcut: { key: 'L', control: true },
     active: (context) => context.lineNumbers,
     run: (services, context) => services.setLineNumbers(!context.lineNumbers),
-  },
-  {
-    name: 'toggle-finished-tasks',
-    aliases: [],
-    description: 'Show finished tasks',
-    active: (context) => !context.hideFinishedTasks,
-    run: async (services, context) => services.setHideFinishedTasks?.(!context.hideFinishedTasks),
   },
   ...appearanceCommands.map(([name, value, description]): ApplicationCommand => ({
     name: `set-appearance-${name}`,

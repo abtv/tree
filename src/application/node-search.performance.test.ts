@@ -75,24 +75,3 @@ it('scans long ancestor context once while matching many descendants', () => {
   expect(checkpoints).toBeLessThan(600_000)
   expect(performance.now() - start).toBeLessThan(2000)
 })
-
-it('yields between completed roots and skips their text and descendants', () => {
-  const completed = Array.from({ length: 10_000 }, (_, index) => ({
-    id: `done-${index}`,
-    text: 'needle',
-    struckThrough: true as const,
-    children: [{ id: `child-${index}`, text: 'needle', struckThrough: true as const, children: [] }],
-  }))
-  const work = searchNodes({ roots: [...completed, { id: 'open', text: 'needle', children: [] }] }, 'needle', true)
-
-  let checkpoints = 0
-  let step = work.next()
-  while (!step.done) {
-    checkpoints++
-    step = work.next()
-  }
-
-  expect(step.value.map((node) => node.id)).toEqual(['open'])
-  expect(checkpoints).toBeGreaterThanOrEqual(completed.length)
-  expect(checkpoints).toBeLessThan(completed.length + 100)
-})

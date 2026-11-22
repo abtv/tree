@@ -17,12 +17,7 @@ function hasFlag(node: TreeNode): boolean {
  * (`docs/PRODUCT.md` §20.14). Prepared only when opening/clearing Search; unchanged branches reuse
  * their summaries.
  */
-export function markedAndStarredNodes(document: Document, hideFinishedTasks = false): readonly NodeResult[] {
-  const all = allMarkedAndStarredNodes(document)
-  return hideFinishedTasks ? all.filter((node) => !node.struckThrough) : all
-}
-
-function allMarkedAndStarredNodes(document: Document): readonly NodeResult[] {
+export function markedAndStarredNodes(document: Document): readonly NodeResult[] {
   const cached = results.get(document)
   if (cached !== undefined) return cached
   const marked: { key: string; result: NodeResult }[] = []

@@ -98,14 +98,7 @@ it('short-circuits Agenda reconciliation in Tree and calls the seam once when Ag
 
     runtime.replaceReady({ ...state, agenda })
 
-    expect(reconcile).toHaveBeenCalledExactlyOnceWith(
-      state.document,
-      agenda,
-      false,
-      undefined,
-      state.document,
-      undefined,
-    )
+    expect(reconcile).toHaveBeenCalledExactlyOnceWith(state.document, agenda, false, undefined, state.document)
     expect(runtime.ready().agenda).toBe(agenda)
 
     runtime.replaceReady({ ...runtime.ready(), agenda: { ...agenda, selectedKey: 'day:101' } })

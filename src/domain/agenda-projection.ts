@@ -28,14 +28,9 @@ interface DateSummary {
 }
 
 const summaries = new WeakMap<TreeNode, DateSummary>()
-const unfinishedSummaries = new WeakMap<TreeNode, DateSummary>()
-const noDates = new Set<DayNumber>()
-const finishedSummary: DateSummary = { direct: noDates, subtree: noDates, marked: false, subtreeMarked: false }
 
-function summaryOf(node: TreeNode, hideFinishedTasks: boolean): DateSummary {
-  if (hideFinishedTasks && node.struckThrough) return finishedSummary
-  const cache = hideFinishedTasks ? unfinishedSummaries : summaries
-  const cached = cache.get(node)
+function summaryOf(node: TreeNode): DateSummary {
+  const cached = summaries.get(node)
   if (cached !== undefined) return cached
   const direct = new Set<DayNumber>()
   for (const match of findCanonicalDates(node.text, node.links)) direct.add(match.day)
@@ -43,7 +38,7 @@ function summaryOf(node: TreeNode, hideFinishedTasks: boolean): DateSummary {
   let subtreeMarked = marked
   let subtree: Set<DayNumber> | undefined
   for (const child of node.children) {
-    const childSummary = summaryOf(child, hideFinishedTasks)
+    const childSummary = summaryOf(child)
     if (childSummary.subtreeMarked) subtreeMarked = true
     for (const day of childSummary.subtree) {
       if ((subtree ?? direct).has(day)) continue
@@ -51,7 +46,7 @@ function summaryOf(node: TreeNode, hideFinishedTasks: boolean): DateSummary {
     }
   }
   const summary = { direct, subtree: subtree ?? direct, marked, subtreeMarked }
-  cache.set(node, summary)
+  summaries.set(node, summary)
   return summary
 }
 
@@ -71,7 +66,6 @@ export function projectAgenda(
   document: Document,
   scopeParentId: NodeId | null,
   previous?: { document: Document; projection: readonly AgendaProjectionDay[] },
-  hideFinishedTasks = false,
   today?: DayNumber,
 ): readonly AgendaProjectionDay[] {
   const isDirect = (summary: DateSummary, day: DayNumber): boolean =>
@@ -85,7 +79,7 @@ export function projectAgenda(
         : requireNode(previous.document, scopeParentId).node.children
   const days = new Set<DayNumber>()
   for (const root of roots) {
-    const summary = summaryOf(root, hideFinishedTasks)
+    const summary = summaryOf(root)
     for (const day of summary.subtree) days.add(day)
     if (today !== undefined && summary.subtreeMarked) days.add(today)
   }
@@ -106,9 +100,8 @@ export function projectAgenda(
     const same = (left: TreeNode, right: TreeNode): boolean => {
       if (left === right) return true
       if (left.id !== right.id || left.children.length !== right.children.length) return false
-      const leftSummary = summaryOf(left, hideFinishedTasks)
-      const rightSummary = summaryOf(right, hideFinishedTasks)
-      if (leftSummary === finishedSummary || rightSummary === finishedSummary) return leftSummary === rightSummary
+      const leftSummary = summaryOf(left)
+      const rightSummary = summaryOf(right)
       if (isDirect(leftSummary, day) !== isDirect(rightSummary, day)) return false
       return left.children.every((child, index) => same(child, right.children[index]!))
     }
@@ -125,7 +118,7 @@ export function projectAgenda(
   }
   if (fresh.size > 0) {
     const visit = (node: TreeNode, depth: number): void => {
-      const summary = summaryOf(node, hideFinishedTasks)
+      const summary = summaryOf(node)
       let included = false
       const include = (day: DayNumber): void => {
         const rows = fresh.get(day)

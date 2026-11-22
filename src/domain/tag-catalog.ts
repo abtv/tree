@@ -12,7 +12,6 @@ export interface TagMatch extends TagRange {
 export class TagCatalog {
   private document: Document | undefined
   private readonly counts = new Map<string, number>()
-  private readonly finishedCounts = new Map<string, number>()
   private readonly nodes = new Map<string, TreeNode>()
   private names: readonly string[] = []
   private readonly rankWorkspace = new CompletionRankWorkspace()
@@ -25,13 +24,12 @@ export class TagCatalog {
     return this.counts.has(name)
   }
 
-  public searchSuggestions(query: string, hideFinishedTasks = false): readonly string[] {
+  public searchSuggestions(query: string): readonly string[] {
     const fragment = tagFragment(query, query.length, this.prefix)
     if (fragment?.start !== 0) return []
     const needle = foldTagName(fragment.name)
     const groups: string[][] = [[], [], [], []]
     for (const name of this.names) {
-      if (hideFinishedTasks && this.counts.get(name) === this.finishedCounts.get(name)) continue
       const folded = foldTagName(name)
       if (!folded.includes(needle)) continue
       const rank = rankCompletionName(folded, needle, '_-', this.rankWorkspace)!
@@ -44,16 +42,12 @@ export class TagCatalog {
     if (this.document === document) return
     let membershipChanged = false
     const deltas = new Map<string, number>()
-    const finishedDeltas = new Map<string, number>()
     const removed = new Set<string>()
     const added = new Map<string, TreeNode>()
     const change = (node: TreeNode, delta: -1 | 1): void => {
       if (delta === 1) added.set(node.id, node)
       else removed.add(node.id)
-      for (const { name } of nodeTags(node, this.prefix)) {
-        deltas.set(name, (deltas.get(name) ?? 0) + delta)
-        if (node.struckThrough) finishedDeltas.set(name, (finishedDeltas.get(name) ?? 0) + delta)
-      }
+      for (const { name } of nodeTags(node, this.prefix)) deltas.set(name, (deltas.get(name) ?? 0) + delta)
     }
     const visit = (before: TreeNode | undefined, after: TreeNode | undefined): void => {
       if (before === after) return
@@ -77,11 +71,6 @@ export class TagCatalog {
     diff(this.document?.roots ?? [], document.roots)
     for (const id of removed) this.nodes.delete(id)
     for (const [id, node] of added) this.nodes.set(id, node)
-    for (const [name, delta] of finishedDeltas) {
-      const next = (this.finishedCounts.get(name) ?? 0) + delta
-      if (next === 0) this.finishedCounts.delete(name)
-      else this.finishedCounts.set(name, next)
-    }
     for (const [name, delta] of deltas) {
       if (delta === 0) continue
       const previous = this.counts.get(name) ?? 0

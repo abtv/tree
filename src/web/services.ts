@@ -147,8 +147,6 @@ export async function installBrowserPrototype(): Promise<{
     }
   }
   const services: EditorServices = {
-    loadHideFinishedTasks: async () => (await read<unknown>('preferences', 'hide-finished-tasks')) === true,
-    saveHideFinishedTasks: (value) => write('preferences', 'hide-finished-tasks', value),
     onPendingEditsChanged(pending) {
       pendingEdit = pending
       updateStatus()

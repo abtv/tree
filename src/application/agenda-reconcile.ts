@@ -27,7 +27,6 @@ export function reconcileAgenda(
   preservePresentation = false,
   cache?: AgendaRowsCache,
   previousDocument = document,
-  previousState = state,
 ): AgendaState | undefined {
   if (state.scopeParentId !== null && locateNode(document, state.scopeParentId) === undefined) return undefined
   let next = isValidLocation(document, state.origin.location)
@@ -72,28 +71,6 @@ export function reconcileAgenda(
         }
       }
     }
-  }
-  if (state.hideFinishedTasks && active !== undefined && locateNode(document, active.nodeId)?.node.struckThrough) {
-    const previousRows =
-      cache?.get(previousDocument, previousState) ??
-      buildAgendaRows(agendaProjection(previousDocument, previousState), previousState, undefined, previousDocument)
-    const rows =
-      cache?.get(document, next) ?? buildAgendaRows(agendaProjection(document, next), next, undefined, document)
-    const selected = previousRows.find((row) => row.key === previousState.selectedKey)
-    if (selected?.kind === 'node') {
-      const sameGroup = (row: AgendaRow): boolean =>
-        row.kind === 'node' &&
-        (selected.groupKey === undefined ? row.day === selected.day : row.groupKey === selected.groupKey)
-      const previousGroup = previousRows.filter(sameGroup)
-      const index = previousGroup.indexOf(selected)
-      const remaining = new Map(rows.filter(sameGroup).map((row) => [row.key, row]))
-      const nextKey = previousGroup.slice(index + 1).find((row) => remaining.has(row.key))?.key
-      const previousKey = previousGroup.slice(0, index).findLast((row) => remaining.has(row.key))?.key
-      const key = nextKey ?? previousKey
-      const target = key === undefined ? undefined : remaining.get(key)
-      if (target !== undefined) return selectAgendaRow(next, target)
-    }
-    return reconcileAgendaSelection(next, rows)
   }
   return reconcileAgendaSelection(
     next,

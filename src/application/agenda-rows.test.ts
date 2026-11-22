@@ -39,32 +39,24 @@ const document: Document = {
 }
 
 describe('Agenda rows', () => {
-  it.each([
-    [false, true, 1],
-    [true, false, 1],
-    [true, true, 0],
-  ] as const)(
-    'shows an undated pin according to finished-task visibility (%s, finished %s)',
-    (hide, finished, count) => {
-      const source: Document = {
-        roots: [{ id: 'parent', text: 'Undated', children: [], ...(finished ? { struckThrough: true } : {}) }],
-      }
-      const state = {
-        ...openAgendaState(location, 0, today),
-        hideFinishedTasks: hide,
-        selectedKey: `node:${today}:parent`,
-        activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'parent', day: today } },
-      }
-      const cache = new AgendaRowsCache()
+  it.each([false, true])('shows an undated pin (finished %s)', (finished) => {
+    const source: Document = {
+      roots: [{ id: 'parent', text: 'Undated', children: [], ...(finished ? { struckThrough: true } : {}) }],
+    }
+    const state = {
+      ...openAgendaState(location, 0, today),
+      selectedKey: `node:${today}:parent`,
+      activity: { kind: 'pinned-until-leave' as const, occurrence: { nodeId: 'parent', day: today } },
+    }
+    const cache = new AgendaRowsCache()
 
-      const rows = cache.get(source, state)
-      const projection = cache.getProjection(source, state)
+    const rows = cache.get(source, state)
+    const projection = cache.getProjection(source, state)
 
-      expect(rows.filter((row) => row.kind === 'node')).toHaveLength(count)
-      expect(projection.flatMap((day) => day.rows)).toHaveLength(count)
-      expect(rows.find((row) => row.key === dayKey(today))).toMatchObject({ content: count > 0 })
-    },
-  )
+    expect(rows.filter((row) => row.kind === 'node')).toHaveLength(1)
+    expect(projection.flatMap((day) => day.rows)).toHaveLength(1)
+    expect(rows.find((row) => row.key === dayKey(today))).toMatchObject({ content: true })
+  })
 
   // @requirement PRODUCT.md §23.2
   // @requirement PRODUCT.md §23.3

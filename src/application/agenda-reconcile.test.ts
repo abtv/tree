@@ -48,82 +48,14 @@ function selected(key = 'node:100:match'): AgendaState {
   return applyAgendaCommand(state, { kind: 'select', key }, buildAgendaRows(agendaProjection(document, state), state))
 }
 
-it.each([false, true])('prefers the first surviving item after hidden occurrences (cache %s)', (cached) => {
-  const source: Document = {
-    roots: ['before', 'active', 'hidden', 'next', 'later'].map((id) => ({
-      id,
-      text: `1970-04-11 ${id}`,
-      children: [],
-      ...(id === 'active' || id === 'hidden' ? { struckThrough: true } : {}),
-    })),
-  }
-  const cache = cached ? new AgendaRowsCache() : undefined
-  const opened = openAgendaState({ currentParentId: null, selectedNodeId: 'before' }, 3, 100)
-  const rows = buildAgendaRows(agendaProjection(source, opened), opened, undefined, source)
-  const active = applyAgendaCommand(opened, { kind: 'select', key: 'node:100:active' }, rows)
-
-  const next = reconcileAgenda(source, { ...active, hideFinishedTasks: true }, false, cache, source, active)
-
-  expect(next?.selectedKey).toBe('node:100:next')
-  expect(activeAgendaOccurrence(next)).toEqual({ day: 100, nodeId: 'next' })
-})
-
-it('falls back to the current day when the filter removes its only task', () => {
-  const source: Document = {
-    roots: [
-      { id: 'before', text: '1970-04-10 Before', children: [] },
-      { id: 'active', text: '1970-04-11 Active', children: [], struckThrough: true },
-      { id: 'after', text: '1970-04-12 After', children: [] },
-    ],
-  }
-  const open = openAgendaState({ currentParentId: null, selectedNodeId: 'before' }, 3, 100)
-  const rows = buildAgendaRows(agendaProjection(source, open), open, undefined, source)
-  const active = applyAgendaCommand(open, { kind: 'select', key: 'node:100:active' }, rows)
-
-  const next = reconcileAgenda(source, { ...active, hideFinishedTasks: true }, false, undefined, source, active)
-
-  expect(next?.selectedKey).toBe('day:100')
-  expect(activeAgendaOccurrence(next)).toBeUndefined()
-})
-
-it('skips the next group path when selecting a surviving Agenda occurrence', () => {
-  const source: Document = {
-    roots: [
-      {
-        id: 'first-parent',
-        text: 'First parent',
-        children: [
-          { id: 'active', text: '1970-04-11 Active', children: [], struckThrough: true },
-          { id: 'undated', text: 'Undated', children: [] },
-        ],
-      },
-      {
-        id: 'next-parent',
-        text: 'Next parent',
-        children: [{ id: 'next', text: '1970-04-11 Next', children: [] }],
-      },
-    ],
-  }
-  const open = openAgendaState({ currentParentId: null, selectedNodeId: 'first-parent' }, 3, 100)
-  const rows = buildAgendaRows(agendaProjection(source, open), open, undefined, source)
-  const active = applyAgendaCommand(open, { kind: 'select', key: 'node:100:active' }, rows)
-
-  const next = reconcileAgenda(source, { ...active, hideFinishedTasks: true }, false, undefined, source, active)
-
-  expect(next?.selectedKey).toBe('node:100:next')
-})
-
-it('falls back to the day when an active task is removed while the filter is on', () => {
+it('falls back to the day when the active task is deleted', () => {
   const source: Document = {
     roots: [
       { id: 'kept', text: '1970-04-10 Kept', children: [] },
       { id: 'active', text: '1970-04-11 Active', children: [] },
     ],
   }
-  const open = {
-    ...openAgendaState({ currentParentId: null, selectedNodeId: 'kept' }, 3, 100),
-    hideFinishedTasks: true,
-  }
+  const open = openAgendaState({ currentParentId: null, selectedNodeId: 'kept' }, 3, 100)
   const rows = buildAgendaRows(agendaProjection(source, open), open, undefined, source)
   const active = applyAgendaCommand(open, { kind: 'select', key: 'node:100:active' }, rows)
 
@@ -210,7 +142,7 @@ it.each([
     const active = applyAgendaCommand(opened, { kind: 'select', key: 'node:100:done' }, rows)
     const edited = removed === 'date' ? editNodeText(source, 'done', '1970-04-04 Done') : toggleMarkNode(source, 'done')
 
-    const next = reconcileAgenda(edited, active, false, cache, source, active)!
+    const next = reconcileAgenda(edited, active, false, cache, source)!
 
     expect(next.selectedKey).toBe('node:93:done')
     expect(activeAgendaOccurrence(next)).toEqual({ nodeId: 'done', day: 93 })

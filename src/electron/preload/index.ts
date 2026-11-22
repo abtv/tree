@@ -88,8 +88,6 @@ export const treeApi: TreeApi = {
   getCommandHistory: () => ipcRenderer.invoke(ipcChannels.getCommandHistory),
   getEmojiHistory: () => ipcRenderer.invoke(ipcChannels.getEmojiHistory),
   setEmojiHistory: (value) => ipcRenderer.invoke(ipcChannels.setEmojiHistory, value),
-  getHideFinishedTasks: () => ipcRenderer.invoke(ipcChannels.getHideFinishedTasks),
-  setHideFinishedTasks: (value) => ipcRenderer.invoke(ipcChannels.setHideFinishedTasks, value),
   setCommandHistory: (value) => ipcRenderer.invoke(ipcChannels.setCommandHistory, value),
   onAppearanceChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, value: AppearancePreference): void => listener(value)

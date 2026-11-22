@@ -745,25 +745,6 @@ describe('browser editing service contracts', () => {
     },
   )
 
-  it.each([undefined, 'true', true, false])(
-    'loads finished-task visibility from the profile and writes it separately from notes (%j)',
-    async (saved) => {
-      const f = fixture()
-      f.values.set('preferences:hide-finished-tasks', saved)
-      const { services } = await installBrowserPrototype()
-      const wasHidden = saved === true
-
-      expect(await services.loadHideFinishedTasks!()).toBe(wasHidden)
-
-      const write = services.saveHideFinishedTasks!(!wasHidden)
-
-      expect(f.db.transaction).toHaveBeenCalledExactlyOnceWith('preferences', 'readwrite', { durability: 'strict' })
-      expect(f.put).toHaveBeenCalledExactlyOnceWith(!wasHidden, 'hide-finished-tasks')
-      f.transactions[0]!.oncomplete!()
-      await write
-    },
-  )
-
   it('disables Vim on an iPad even with a saved enabled preference', async () => {
     const f = fixture()
     f.values.set('preferences:vim', true)

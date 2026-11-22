@@ -155,7 +155,7 @@ it('cancels the pending callback and does not reschedule an already queued stale
   expect(publish).not.toHaveBeenCalled()
 })
 
-it('includes finished branches by default and hides them when requested by the search caller', () => {
+it('includes finished branches', () => {
   const source: Document = {
     roots: [
       {
@@ -175,10 +175,8 @@ it('includes finished branches by default and hides them when requested by the s
     },
   }
   const visible = vi.fn()
-  const filtered = vi.fn()
 
   runNodeSearch(source, 'report', visible, scheduler)
-  runNodeSearch(source, 'report', filtered, scheduler, true)
   callbacks.forEach((callback) => callback())
 
   expect(visible).toHaveBeenCalledExactlyOnceWith([
@@ -186,7 +184,6 @@ it('includes finished branches by default and hides them when requested by the s
     expect.objectContaining({ id: 'archived' }),
     expect.objectContaining({ id: 'open' }),
   ])
-  expect(filtered).toHaveBeenCalledExactlyOnceWith([{ id: 'open', text: 'Report outline', path: null }])
 })
 
 function results(query: string) {

@@ -5,7 +5,7 @@ import { findTags } from './tags'
 import type { Document, TreeNode } from './document-types'
 
 // @requirement PRODUCT.md §20.13
-it('keeps full and unfinished marker membership correct across edits and undo/redo snapshots', () => {
+it('keeps marker membership correct across edits and undo/redo snapshots', () => {
   fc.assert(
     fc.property(
       fc.array(
@@ -27,9 +27,6 @@ it('keeps full and unfinished marker membership correct across edits and undo/re
           const expected = namesOf(document.roots)
           expect(catalog.suggest('draft', prefix, 1)?.suggestions ?? []).toEqual(expected)
           expect(catalog.searchSuggestions(prefix)).toEqual(expected)
-          expect(catalog.searchSuggestions(prefix, true)).toEqual(
-            namesOf(document.roots.filter((node) => !node.struckThrough)),
-          )
           expect(catalog.searchSuggestions(`${prefix}WORK`)).toEqual(
             expected.filter((name) => name.toLowerCase() === 'work'),
           )

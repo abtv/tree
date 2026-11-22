@@ -50,7 +50,7 @@ it('lists every starred node and reflects star removal', () => {
   expect(markedAndStarredNodes(changed).map((entry) => entry.id)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
 })
 
-it('filters completed stars while preserving the prepared list and complete parent paths', () => {
+it('lists completed stars and reuses the prepared list', () => {
   const source: Document = {
     roots: [
       { ...node('archive', 'Archived', [], true), struckThrough: true },
@@ -63,7 +63,6 @@ it('filters completed stars while preserving the prepared list and complete pare
   }
 
   const visible = markedAndStarredNodes(source)
-  const filtered = markedAndStarredNodes(source, true)
 
   expect(visible).toEqual([
     { id: 'active', text: 'Active', path: null, starred: true },
@@ -71,7 +70,6 @@ it('filters completed stars while preserving the prepared list and complete pare
     { id: 'empty', text: 'Empty node', path: null, starred: true },
     { id: 'report', text: 'Report', path: 'Workspace › Projects', parentId: 'projects', starred: true },
   ])
-  expect(filtered.map(({ id }) => id)).toEqual(['active', 'empty', 'report'])
   expect(markedAndStarredNodes(source)).toBe(visible)
 })
 
@@ -111,19 +109,6 @@ it('omits unmarked, unstarred nodes and drops a node when its mark is removed', 
   const changed = toggleMarkNode(document, '0')
 
   expect(markedAndStarredNodes(changed)).toEqual([])
-})
-
-// @requirement PRODUCT.md §2.5
-it('filters completed marked nodes with finished tasks hidden', () => {
-  const document: Document = {
-    roots: [
-      { ...node('done', 'Done'), marked: true, struckThrough: true },
-      { ...node('open', 'Open'), marked: true },
-    ],
-  }
-
-  expect(markedAndStarredNodes(document).map(({ id }) => id)).toEqual(['done', 'open'])
-  expect(markedAndStarredNodes(document, true).map(({ id }) => id)).toEqual(['open'])
 })
 
 it('reuses a star-free subtree summary across immutable document changes', () => {

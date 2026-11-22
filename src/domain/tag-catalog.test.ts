@@ -41,19 +41,16 @@ it('offers no global tag suggestions in a document without tags or after the las
   expect(catalog.searchSuggestions('#')).toEqual([])
 })
 
-it('releases marker counts and character buckets after the last completed tags are removed', () => {
+it('releases character buckets after the last tags are removed', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [{ ...node('done', '#archived #other'), struckThrough: true }] })
-  const finished = Reflect.get(catalog, 'finishedCounts') as ReadonlyMap<string, number>
   const characters = Reflect.get(catalog, 'characters') as ReadonlyMap<string, ReadonlySet<string>>
-  expect(finished.size).toBe(2)
   expect(characters.size).toBeGreaterThan(0)
 
   catalog.update({ roots: [node('next', 'No tags')] })
 
-  expect(finished.size).toBe(0)
   expect(characters.size).toBe(0)
-  expect(catalog.searchSuggestions('#', true)).toEqual([])
+  expect(catalog.searchSuggestions('#')).toEqual([])
 })
 
 it('restricts global suggestions to continuous matches while retaining inline fuzzy completion and ranking', () => {

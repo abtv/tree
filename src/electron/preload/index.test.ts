@@ -292,8 +292,6 @@ describe('preload bridge', () => {
     await treeApi.setVimEnabled(true)
     await treeApi.getLineNumbers()
     await treeApi.setLineNumbers(true)
-    await treeApi.getHideFinishedTasks?.()
-    await treeApi.setHideFinishedTasks?.(true)
     await treeApi.getAppearance()
     await treeApi.setAppearance('dark')
     await treeApi.getCommandHistory()
@@ -325,8 +323,6 @@ describe('preload bridge', () => {
       [ipcChannels.setVimEnabled, true],
       [ipcChannels.getLineNumbers],
       [ipcChannels.setLineNumbers, true],
-      [ipcChannels.getHideFinishedTasks],
-      [ipcChannels.setHideFinishedTasks, true],
       [ipcChannels.getAppearance],
       [ipcChannels.setAppearance, 'dark'],
       [ipcChannels.getCommandHistory],
