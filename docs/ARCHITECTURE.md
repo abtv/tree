@@ -23,9 +23,9 @@ Each section number is listed once, with the file that holds its heading.
 | 8.2, 8.4, 8.5, 13.6 | [list-rendering.md](architecture/list-rendering.md) |
 | 8.11 | [appearance.md](architecture/appearance.md) |
 | 8.3, 21.1 | [vim.md](architecture/vim.md) |
-| 7.2, 8.6, 13.4 | [command-panel.md](architecture/command-panel.md) |
+| 7.2, 7.2.1, 7.2.2, 7.2.3, 8.6, 8.6.1, 8.6.2, 13.4 | [command-panel.md](architecture/command-panel.md) |
 | 4.2, 13.3, 21.2 | [search.md](architecture/search.md) |
-| 8.8, 13.1 | [completion-and-tags.md](architecture/completion-and-tags.md) |
+| 8.8, 8.8.1, 8.8.2, 8.8.3, 8.8.4, 13.1 | [completion-and-tags.md](architecture/completion-and-tags.md) |
 | 4.1, 7.3, 8.1 | [agenda.md](architecture/agenda.md) |
 | 13, 13.5, 13.9, 13.10, 13.11 | [persistence.md](architecture/persistence.md) |
 | 13.8 | [save-scheduling.md](architecture/save-scheduling.md) |

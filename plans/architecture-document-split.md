@@ -122,8 +122,8 @@ Proof for each task, with the task's starting commit as `<base>`:
 | T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Done |
 | T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Done |
 | R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Done |
-| R1b | Rework of the two pilot files under the Rework Method. They are the reference example for R2–R13 | `command-panel.md`, `completion-and-tags.md` | Rework proof | Minimal Risk | Ready |
-| R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Planned |
+| R1b | Rework of the two pilot files under the Rework Method. They are the reference example for R2–R13 | `command-panel.md`, `completion-and-tags.md` | Rework proof | Minimal Risk | Done |
+| R2 | Rework | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless a rule of the method applies. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rework proof | Minimal Risk | Ready |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
 | R4 | Rewrite | `application.md` | Rewrite proof | Minimal Risk | Planned |
 | R5 | Rewrite | `interaction.md`. §9 holds the single-owner text (ADR 0014) | Rewrite proof | Minimal Risk | Planned |
@@ -172,6 +172,18 @@ T2 wrote each file once with the file-editing tool from the line ranges above, t
   * A sentence that compared the mechanism with an earlier state ("remains unchanged", "retains its existing …") states the present fact, or leaves under rule 3 of the Rework Method when it holds no lasting fact.
   * A long paragraph is split at sentence boundaries when it describes several mechanisms.
 
+* R1b result (base `57212de2`): the two files gained the subsections 7.2.1–7.2.3, 8.6.1–8.6.2 and 8.8.1–8.8.4, one per owner or mechanism. 19 clauses left or changed, each with a ledger disposition; no literal and no reference was removed. The Reviewer found one write bound that had left its owner and three wording changes that weakened a bound or a constraint; all four are corrected by restoring the base sentences. Recovery: 1 of the 12 pooled fix cycles is used.
+* Practice from R1b for R2–R13:
+  * A sentence that states a write count, a complexity bound or a negative constraint stays byte-identical when it moves or when another sentence merges into it. Merge the weaker sentence into the stronger one, not the reverse.
+  * An assessment stays in the subsection of the owner that produces the cost. A cross-reference is added only to a section that states the cited fact.
+  * To read the comparison reports, filter the moved lines: `npm run check:docs -- --verbatim <base> --file <path> | grep -vE "^(Moved|Literal moved|Reference moved)"`.
+* Decisions made under D5, for the final acceptance:
+  * R1b: §7.2.1 names image-to-text availability as the third input of the command panel's available registry (`src/renderer/use-command-panel.ts:68-77`). The base sentence named two inputs. The code does not contradict it; the sentence was incomplete, so this is a correction with code evidence and not a reserved case.
+
+## Questions for the Product Owner
+
+None so far.
+
 ## Next Task
 
-R1b. Record its starting commit as `<base>` before editing. Continue with R2–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
+R2. Record its starting commit as `<base>` before editing. Continue with R3–R14 in order without a further owner checkpoint; stop only under `AGENTS.md` §12.
