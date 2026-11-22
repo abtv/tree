@@ -80,7 +80,7 @@
   color: var(--color-text);
 }
 
-:root:is([data-appearance='gray'], [data-appearance='white']) .recent-nodes-popup {
+:root:is([data-appearance='gray'], [data-appearance='white']) .global-search-popup {
   color: var(--color-text);
 }
 

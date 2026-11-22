@@ -118,10 +118,10 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
   await window.keyboard.press('Meta+;')
   await window.getByRole('searchbox', { name: 'Search query', exact: true }).fill('gray')
   await expect(window.locator('.recent-node-row')).toHaveCount(1)
-  await expect(window.locator('.recent-nodes-popup')).toHaveScreenshot('gray-search.png')
+  await expect(window.locator('.global-search-popup')).toHaveScreenshot('gray-search.png')
 
   await window.getByRole('searchbox', { name: 'Search query', exact: true }).fill('#design')
-  const popup = window.locator('.recent-nodes-popup')
+  const popup = window.locator('.global-search-popup')
   await expect(popup.locator('.recent-node-row')).toHaveCount(1)
   await expect(popup.locator('.tag-text')).toHaveCount(0)
   await expect(popup.locator('.recent-node-text .node-search-match')).toHaveText('#design')

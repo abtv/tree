@@ -1053,7 +1053,7 @@ test.describe('Search popup geometry (mode-independent)', () => {
     const initialPopup = (await popup.boundingBox())!
     const initialInput = await input.boundingBox()
     await window.evaluate(() => {
-      const popup = document.querySelector('.recent-nodes-popup')!
+      const popup = document.querySelector('.global-search-popup')!
       const input = popup.querySelector('input')!
       const probe = { flashes: 0, lostFocus: false, detached: false, frames: 0, active: true }
       const sample = () => {
@@ -1168,7 +1168,7 @@ test.describe('Search popup geometry (mode-independent)', () => {
       .last()
       .evaluate((element) => {
         const row = element.getBoundingClientRect()
-        const popup = element.closest('.recent-nodes-popup')!.getBoundingClientRect()
+        const popup = element.closest('.global-search-popup')!.getBoundingClientRect()
         return { rowBottom: row.bottom, popupBottom: popup.bottom, rowTop: row.top, popupTop: popup.top }
       })
     expect(geometry.rowBottom).toBeLessThanOrEqual(geometry.popupBottom)

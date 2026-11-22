@@ -266,7 +266,7 @@ export async function happyPath(driver: SmokeDriver) {
       ${editorText}(input) === ${JSON.stringify(agendaText)})`)
   // The child also matches: "Smoke" is in its text,
   // while "parent" is supplied by its ancestor under the required-term search rules.
-  const popup = '.recent-nodes-popup'
+  const popup = '.global-search-popup'
   const query = 'input[aria-label="Search query"]'
   const selectedResult = (text: string) =>
     `return document.querySelector('${popup} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(text)}`

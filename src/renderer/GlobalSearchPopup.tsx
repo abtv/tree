@@ -330,7 +330,7 @@ export function GlobalSearchPopup({
       if (
         blocked ||
         items === undefined ||
-        (event.target instanceof Element && event.target.closest('.recent-nodes-popup'))
+        (event.target instanceof Element && event.target.closest('.global-search-popup'))
       )
         return
       event.preventDefault()
@@ -503,7 +503,7 @@ export function GlobalSearchPopup({
   const resultTotal = String(items.length)
 
   return (
-    <div ref={popup} className="recent-nodes-popup" role="dialog" aria-modal="true" aria-label="Search">
+    <div ref={popup} className="global-search-popup" role="dialog" aria-modal="true" aria-label="Search">
       <SearchQueryInput
         ref={input}
         type="search"
