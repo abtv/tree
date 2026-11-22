@@ -81,6 +81,7 @@ import { EditorSaveScheduler, type SaveSchedulerResult } from './editor-save-sch
 import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
 import { markedAndStarredNodes } from './starred-nodes'
+import { countDocumentNodes } from './node-count'
 import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
@@ -235,6 +236,11 @@ export class EditorStore {
   public initialSearchResults(): readonly NodeResult[] {
     const state = this.runtime.ready()
     return markedAndStarredNodes(state.document)
+  }
+
+  /** The largest possible Search result count, which sizes the stable result counter. */
+  public searchResultCapacity(): number {
+    return countDocumentNodes(this.runtime.ready().document)
   }
 
   public get starTarget(): TreeNode | undefined {

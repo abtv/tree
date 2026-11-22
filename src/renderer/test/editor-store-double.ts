@@ -72,6 +72,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     recordAttachmentDimensions: vi.fn(),
     emojiHistory: new EmojiHistory(undefined, () => undefined),
     initialSearchResults: vi.fn(() => []),
+    searchResultCapacity: vi.fn(() => 0),
     starTarget: undefined,
     toggleStarNode: vi.fn(() => false),
     toggleMarkNode: vi.fn(() => false),

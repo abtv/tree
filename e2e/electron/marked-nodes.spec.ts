@@ -92,12 +92,34 @@ test.describe('Mark presentation', () => {
 
       await window.keyboard.press('Meta+;')
       const popup = window.getByRole('dialog', { name: 'Search' })
-      await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked')
+      await expect(popup.locator('.node-search-results-heading > span')).toHaveText('Marked')
+      await expect(popup.getByLabel('Result position')).toHaveText('1 / 3')
       await expect(popup.locator('.recent-node-text')).toHaveText([
         'Review budget',
         'Write the report',
         'Collect figures\nSecond line',
       ])
+      // Each marked entry, including its path heading, carries a full-height stripe in the mark color.
+      const stripes = await popup.locator('.recent-node-entry').evaluateAll((entries) =>
+        entries.map((entry) => {
+          const stripe = getComputedStyle(entry, '::before')
+          return {
+            color: stripe.backgroundColor,
+            width: stripe.width,
+            height: stripe.height,
+            entryHeight: `${entry.getBoundingClientRect().height}px`,
+          }
+        }),
+      )
+      expect(stripes).toHaveLength(3)
+      for (const stripe of stripes) {
+        expect(stripe).toEqual({
+          color: markColor,
+          width: '3px',
+          height: stripe.entryHeight,
+          entryHeight: stripe.entryHeight,
+        })
+      }
       const textEdges = await popup
         .locator('.recent-node-text')
         .evaluateAll((texts) => texts.map((text) => Math.round(text.getBoundingClientRect().x)))
@@ -161,10 +183,20 @@ describeForEachEditingMode('Marked nodes @linux', () => {
     const second = await launchTree(userDataDir)
     await second.window.keyboard.press('Meta+;')
     const popup = second.window.getByRole('dialog', { name: 'Search' })
-    await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked and starred')
+    const heading = popup.locator('.node-search-results-heading')
+    const markedEntries = () =>
+      popup
+        .locator('.recent-node-entry')
+        .evaluateAll((entries) => entries.map((entry) => getComputedStyle(entry, '::before').content !== 'none'))
+    await expect(heading.locator('> span')).toHaveText('Marked and starred')
     await expect(popup.locator('.recent-node-text')).toHaveText(['Zulu', 'Alpha'])
+    expect(await markedEntries()).toEqual([true, false])
+    const headingBox = await heading.boundingBox()
     await popup.getByRole('searchbox').fill('l')
+    await expect(heading.locator('> span')).toHaveText('Results')
+    expect(await heading.boundingBox()).toEqual(headingBox)
     await expect(popup.locator('.recent-node-text')).toHaveText(['Zulu', 'Alpha'])
+    expect(await markedEntries()).toEqual([true, false])
     await second.window.keyboard.press('Escape')
     await second.window.keyboard.press('Meta+p')
     const occurrence = second.window.locator('.agenda-row[data-node-id="zulu"]')

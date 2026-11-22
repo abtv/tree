@@ -77,6 +77,12 @@ test.describe('Star presentation', () => {
         }),
       )
       expect(alignment.every((difference) => difference <= 3)).toBe(true)
+      expect(
+        await popup
+          .locator('.recent-node-entry')
+          .evaluateAll((entries) => entries.map((entry) => getComputedStyle(entry, '::before').content)),
+      ).toEqual(['none', 'none', 'none'])
+      await expect(popup.getByLabel('Result position')).toHaveText('1 / 3')
       await expect(popup).toHaveScreenshot(`star-search-${appearance}.png`)
       await window.keyboard.press('Escape')
 

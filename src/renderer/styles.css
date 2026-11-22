@@ -2098,8 +2098,13 @@ body.node-drag-invalid * {
   font-variant-numeric: tabular-nums;
 }
 
-.node-search-position-index {
+.node-search-position-index,
+.node-search-position-total {
   display: inline-block;
+}
+
+.node-search-position-index {
+  text-align: end;
 }
 
 .recent-node-empty {
@@ -2183,6 +2188,18 @@ body.node-drag-invalid * {
 
 .recent-node-entry {
   display: flow-root;
+}
+
+/* Consecutive marked entries join into one continuous teal stripe. */
+.recent-node-entry[data-marked]::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--color-node-mark);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .recent-node-group-divider {

@@ -377,7 +377,8 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
     await window.keyboard.press('Meta+;')
 
     const popup = window.getByRole('dialog', { name: 'Search' })
-    await expect(popup.locator('.node-search-results-heading')).toHaveText('Starred')
+    await expect(popup.locator('.node-search-results-heading > span')).toHaveText('Starred')
+    await expect(popup.getByLabel('Result position')).toHaveText('1 / 2')
     await expect(popup.locator('.recent-node-text')).toHaveText(['Alpha', 'Beta'])
     await expect(popup.getByRole('img', { name: 'Top level' })).toHaveCount(2)
     const fontSize = await node(window, 2).evaluate((element) => getComputedStyle(element).fontSize)
@@ -865,7 +866,7 @@ test.describe('Search popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('keeps the result counter in place while repeating arrows through grouped results @linux', async ({
+  test('keeps every result counter column in place through repeated arrows and query changes @linux', async ({
     userDataDir,
   }, testInfo) => {
     seedDocument(userDataDir, {
@@ -893,25 +894,40 @@ test.describe('Search popup geometry (mode-independent)', () => {
     const position = popup.getByLabel('Result position')
     await input.fill('Needle')
     await expect(position).toHaveText('1 / 144')
+    // Fixed columns: the counter box, the position's units digit, the separator and the total's leading digit.
     const counterGeometry = () =>
       position.evaluate((counter) => {
-        const { x, y, width, height } = counter.getBoundingClientRect()
-        const firstCharacter = document.createRange()
-        firstCharacter.setStart(counter.firstElementChild?.firstChild ?? counter.firstChild!, 0)
-        firstCharacter.setEnd(firstCharacter.startContainer, 1)
-        const separator = document.createRange()
-        const trailingText = counter.lastChild!
-        if (trailingText.textContent?.startsWith(' / ')) {
-          separator.setStart(trailingText, 1)
-          separator.setEnd(trailingText, 2)
+        const characterX = (node: Node, offset: number) => {
+          const range = document.createRange()
+          range.setStart(node, offset)
+          range.setEnd(node, offset + 1)
+          return range.getBoundingClientRect().x
         }
+        const { x, y, width, height } = counter.getBoundingClientRect()
+        const [index, separator, total] = Array.from(counter.childNodes)
+        const indexText = index!.firstChild!
         return {
           label: counter.textContent,
-          bounds: { x, y, width, height, textStart: firstCharacter.getBoundingClientRect().x },
-          separator: separator.collapsed ? null : separator.getBoundingClientRect().x,
+          geometry: {
+            x,
+            y,
+            width,
+            height,
+            unitsDigit: characterX(indexText, indexText.textContent!.length - 1),
+            separator: characterX(separator!, separator!.textContent!.indexOf('/')),
+            totalStart: characterX(total!.firstChild!, 0),
+          },
         }
       })
     const initial = await counterGeometry()
+    expect(initial.label).toBe('1 / 144')
+    // Text ranges can differ by one 1/64 px layout unit between glyphs; anything visible is a movement.
+    const offset = (geometry: typeof initial.geometry) =>
+      Math.max(
+        ...Object.entries(geometry).map(([key, value]) =>
+          Math.abs(value - initial.geometry[key as keyof typeof geometry]),
+        ),
+      )
 
     for (const direction of ['ArrowDown', 'ArrowUp']) {
       const samples = []
@@ -924,13 +940,26 @@ test.describe('Search popup geometry (mode-independent)', () => {
 
       const labels = samples.map(({ label }) => label)
       expect(labels).toContain('10 / 144')
+      expect(labels).toContain('9 / 144')
       expect(labels.filter((label) => label === '5 / 144')).toHaveLength(2)
-      expect.soft(samples.filter(({ bounds }) => JSON.stringify(bounds) !== JSON.stringify(initial.bounds))).toEqual([])
-      expect.soft(samples.filter(({ separator }) => separator !== null && separator !== initial.separator)).toEqual([])
+      const moved = samples.find(({ geometry }) => offset(geometry) > 0.1)
+      expect.soft(moved?.geometry, moved?.label).toBeUndefined()
       if (direction === 'ArrowDown') expect(await list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
     }
 
     await expect(position).toHaveText('1 / 144')
+    // The 180-node document reserves three digits, so totals with fewer digits leave every column in place.
+    for (const [query, label] of [
+      ['-0', '1 / 36'],
+      ['35-0', '1 / 1'],
+      ['Needle', '1 / 144'],
+    ] as const) {
+      await input.fill(query)
+      await expect(position).toHaveText(label)
+      await expect(list).toHaveAttribute('aria-busy', 'false')
+      expect.soft(offset((await counterGeometry()).geometry), query).toBeLessThanOrEqual(0.1)
+    }
+    await popup.screenshot({ path: testInfo.outputPath('search-counter-short-total.png') })
     await expect(input).toBeFocused()
     expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
   })

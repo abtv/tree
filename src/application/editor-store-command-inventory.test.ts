@@ -71,6 +71,7 @@ const exclusions: Record<string, string> = {
   moveSelectedTo: 'Convenience wrapper around moveNodeTo, which the generator drives directly.',
   suggestTags: 'Read-only derived lookup has tag catalog properties and focused store publication coverage.',
   searchNodeSuggestions: 'Read-only catalog lookup is covered by node-search and store nonmutation tests.',
+  searchResultCapacity: 'Read-only node count is covered by node-count tests and the Search counter E2E.',
   searchNodes: 'Cancellable read-only search is covered by node-search, store nonmutation and popup lifecycle tests.',
   searchOrigin: 'Read-only origin projection is covered by editor-search-agenda tests; it does not change state.',
 }

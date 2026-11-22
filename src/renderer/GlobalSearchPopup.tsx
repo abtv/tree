@@ -180,6 +180,11 @@ export function GlobalSearchPopup({
   )
   // The heading depends only on the listed items, so selection moves and scrolling do not rescan them.
   const initialHeading = useMemo(() => initialSearchHeading(items ?? []), [items])
+  // Both counter numbers reserve room for every node, so no digit or separator moves while typing or navigating.
+  const capacityDigits = useMemo(
+    () => (items === undefined ? 0 : String(store.searchResultCapacity()).length),
+    [items, store],
+  )
   const input = useRef<HTMLInputElement>(null)
   const open = items !== undefined
   const popup = useRef<HTMLDivElement>(null)
@@ -491,6 +496,7 @@ export function GlobalSearchPopup({
   if (items === undefined) return null
   const displayedQuery = pending ? completedQuery : query
   const resultTotal = String(items.length)
+  const counterWidth = `${Math.max(capacityDigits, resultTotal.length)}ch`
 
   return (
     <div ref={popup} className="global-search-popup" role="dialog" aria-modal="true" aria-label="Search">
@@ -562,16 +568,19 @@ export function GlobalSearchPopup({
       {(suggestions.length === 0 || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">
           <span>{query === '' ? initialHeading : 'Results'}</span>
-          {query !== '' && suggestions.length === 0 && items.length > 0 && (
+          {suggestions.length === 0 && items.length > 0 && (
             <output
               className="node-search-position"
               aria-label="Result position"
               title={`Result ${selected + 1} of ${items.length}`}
             >
-              <span className="node-search-position-index" style={{ inlineSize: `${resultTotal.length}ch` }}>
+              <span className="node-search-position-index" style={{ inlineSize: counterWidth }}>
                 {selected + 1}
               </span>
-              {` / ${resultTotal}`}
+              {' / '}
+              <span className="node-search-position-total" style={{ inlineSize: counterWidth }}>
+                {resultTotal}
+              </span>
             </output>
           )}
         </div>
@@ -620,6 +629,7 @@ export function GlobalSearchPopup({
                     key={item.id}
                     className="recent-node-entry"
                     data-result-id={item.id}
+                    data-marked={item.marked ? '' : undefined}
                     onMouseDown={(event) => event.preventDefault()}
                     style={{
                       position: 'absolute',
