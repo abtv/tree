@@ -182,18 +182,23 @@ signed package makes verification fail; it does not prune the authenticated mani
 
 ## Failures and ordering
 
-The hosting workflow's source-head resolution and pre-deployment head checks make
-at most four attempts for connection failures, timeouts and HTTP 500/502/503/504.
-They also retry HTTP 429 or HTTP 403 with explicit rate-limit headers, honoring
-`Retry-After` or the rate-limit reset with a two-minute total budget. Other access
-errors, malformed responses and superseded candidates stop immediately. Each
-request has a 15-second timeout; retries recheck both heads before deployment.
-Only `Retry #1`, `Retry #2` and `Retry #3` are logged for retries. Failures use a
-fixed message without remote response bodies, header values or exception details.
-The two checks share an inline workflow script through a YAML anchor; the deploy
-job still checks out and executes no repository code. Install the updated workflow
-in the hosting repository to enable these retries; updating this template alone
-does not change the installed workflow or rerun a failed deployment.
+The hosting workflow's source-head resolution and pre-deployment head checks read
+`main` of the public source and hosting repositories with `git ls-remote`, not
+the REST API. Git transport needs no credential and does not count against the
+anonymous REST budget described below. Earlier deployments stopped at the
+anonymous REST read of the source head; its HTTP status was not logged. Each
+read makes one attempt with a 15-second timeout, receives no token, follows no
+redirect and ignores user and system Git configuration. It accepts only output
+that is exactly one `refs/heads/main` line. A failed read, malformed output or a
+superseded candidate stops the job immediately; rerun the failed job after a
+temporary network failure. The deploy job reads the source head first and the
+hosting head last, immediately before deployment. Failures use a fixed message
+with only Git's exit status or the process error code, never Git or remote output.
+Each job carries its own copy of the inline reader, which a test keeps identical,
+and no check depends on a job name; the deploy job still checks out and executes
+no repository code. Install the updated workflow in the hosting repository to
+apply this change; updating this template alone does not change the installed
+workflow or rerun a failed deployment.
 
 The web GitHub API client retries reads and immutable Git blob/tree/commit creation
 at most three times after the initial request, only for HTTP 500, 502, 503, 504,
