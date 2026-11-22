@@ -26,7 +26,7 @@ Each section number is listed once, with the file that holds its heading.
 | 7.2, 7.2.1, 7.2.2, 7.2.3, 8.6, 8.6.1, 8.6.2, 13.4 | [command-panel.md](architecture/command-panel.md) |
 | 4.2, 4.2.1, 4.2.2, 4.2.3, 4.2.4, 4.2.5, 13.3, 13.3.1, 13.3.2, 13.3.3, 13.3.4, 21.2 | [search.md](architecture/search.md) |
 | 8.8, 8.8.1, 8.8.2, 8.8.3, 8.8.4, 13.1 | [completion-and-tags.md](architecture/completion-and-tags.md) |
-| 4.1, 7.3, 8.1 | [agenda.md](architecture/agenda.md) |
+| 4.1, 7.3, 7.3.1, 7.3.2, 7.3.3, 8.1, 8.1.1, 8.1.2, 8.1.3, 8.1.4, 8.1.5, 8.1.6, 8.1.7 | [agenda.md](architecture/agenda.md) |
 | 13, 13.5, 13.9, 13.10, 13.11 | [persistence.md](architecture/persistence.md) |
 | 13.8 | [save-scheduling.md](architecture/save-scheduling.md) |
 | 13.7, 14, 15 | [attachments-and-clipboard.md](architecture/attachments-and-clipboard.md) |
