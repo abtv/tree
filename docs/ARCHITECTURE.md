@@ -31,7 +31,7 @@ Each section number is listed once, with the file that holds its heading.
 | 13.8, 13.8.1, 13.8.2, 13.8.3, 13.8.4, 13.8.5 | [save-scheduling.md](architecture/save-scheduling.md) |
 | 13.7, 14, 14.1, 14.2, 15, 15.1, 15.2 | [attachments-and-clipboard.md](architecture/attachments-and-clipboard.md) |
 | 16, 16.1, 16.2, 16.3, 17, 17.1 | [electron.md](architecture/electron.md) |
-| 13.12, 13.13 | [desktop-data.md](architecture/desktop-data.md) |
+| 13.12, 13.12.1, 13.12.2, 13.12.3, 13.13, 13.13.1, 13.13.2, 13.13.3, 13.13.4, 13.13.5 | [desktop-data.md](architecture/desktop-data.md) |
 | 13.14, 13.15, 13.16, 13.17 | [browser.md](architecture/browser.md) |
 
 ## Retired Numbers
