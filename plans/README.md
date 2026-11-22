@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Architecture document split](architecture-document-split.md) | In progress | R7: rework of `vim.md` under the Rework Method |
+| [Architecture document split](architecture-document-split.md) | In progress | R8: rework of `search.md` under the Rework Method |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
