@@ -113,43 +113,19 @@ describe('renderer Electron services', () => {
     await expect(services.saveHideFinishedTasks!(true)).rejects.toBe(failure)
   })
 
-  it('propagates recent-node save failures from the bridge', async () => {
-    const failure = new Error('history storage unavailable')
-    window.treeApi = {
-      ...window.treeApi,
-      setRecentNodes: vi.fn(async () => {
-        throw failure
-      }),
-    }
-
-    await expect(createElectronEditorServices().saveRecentNodes!(['node-1'])).rejects.toBe(failure)
-  })
-
-  it('forwards history values and suppresses recent-node writes during replacement', async () => {
+  it('forwards emoji history values', async () => {
     const bridge = {
       ...window.treeApi,
       getEmojiHistory: vi.fn(async () => ['smile']),
       setEmojiHistory: vi.fn(async () => undefined),
-      getRecentNodes: vi.fn(async () => ['node-1']),
-      setRecentNodes: vi.fn(async () => undefined),
     }
     window.treeApi = bridge
     const services = createElectronEditorServices()
 
     await expect(services.loadEmojiHistory!()).resolves.toEqual(['smile'])
-    await expect(services.loadRecentNodes!()).resolves.toEqual(['node-1'])
     await services.saveEmojiHistory!(['heart'])
-    await services.saveRecentNodes!(['node-2'])
 
     expect(bridge.setEmojiHistory).toHaveBeenCalledExactlyOnceWith(['heart'])
-    expect(bridge.setRecentNodes).toHaveBeenCalledExactlyOnceWith(['node-2'])
-    suspendNotesWrites()
-    try {
-      await services.saveRecentNodes!(['stale'])
-      expect(bridge.setRecentNodes).toHaveBeenCalledTimes(1)
-    } finally {
-      resumeNotesWrites()
-    }
   })
 
   it('supports bridges without optional preferences, history or rich clipboard methods', async () => {
@@ -158,8 +134,6 @@ describe('renderer Electron services', () => {
     delete bridge.setHideFinishedTasks
     delete bridge.getEmojiHistory
     delete bridge.setEmojiHistory
-    delete bridge.getRecentNodes
-    delete bridge.setRecentNodes
     delete bridge.writeClipboardContent
     window.treeApi = bridge
     const services = createElectronEditorServices()
@@ -167,9 +141,7 @@ describe('renderer Electron services', () => {
     await expect(services.loadHideFinishedTasks!()).resolves.toBe(false)
     await expect(services.saveHideFinishedTasks!(true)).resolves.toBeUndefined()
     await expect(services.loadEmojiHistory!()).resolves.toEqual([])
-    await expect(services.loadRecentNodes!()).resolves.toEqual([])
     await expect(services.saveEmojiHistory!(['smile'])).resolves.toBeUndefined()
-    await expect(services.saveRecentNodes!(['root'])).resolves.toBeUndefined()
     await expect(services.writeClipboardContent!({ kind: 'text', text: 'text' })).resolves.toBeUndefined()
   })
 

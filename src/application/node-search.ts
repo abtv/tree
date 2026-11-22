@@ -1,6 +1,6 @@
 import type { Document, TreeNode } from '../domain/document'
 import { mergeSearchMatches, prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
-import { completionPresentation, label, resultText, type RecentNode } from './recent-nodes'
+import { completionPresentation, label, resultText, type NodeResult } from './node-result'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import type { TextMatch } from '../domain/text-search'
 
@@ -27,15 +27,15 @@ export function* searchNodes(
   document: Document,
   query: string,
   hideFinishedTasks = false,
-): Generator<undefined, readonly RecentNode[]> {
+): Generator<undefined, readonly NodeResult[]> {
   const terms = yield* prepareNodeSearch(query)
   if (terms.length === 0) return []
   const tagTerms = terms.filter((term) => term.prefix !== undefined)
   const counts = terms.map(() => 0)
   let covered = 0
-  const markedResults: RecentNode[] = []
-  const starredResults: RecentNode[] = []
-  const results: RecentNode[] = []
+  const markedResults: NodeResult[] = []
+  const starredResults: NodeResult[] = []
+  const results: NodeResult[] = []
   const ancestors: TreeNode[] = []
   const stack = [{ nodes: document.roots, index: 0, inherited: [] as number[] }]
   while (stack.length > 0) {
@@ -109,7 +109,7 @@ export function* searchNodes(
 export function runNodeSearch(
   document: Document,
   query: string,
-  publish: (results: readonly RecentNode[]) => void,
+  publish: (results: readonly NodeResult[]) => void,
   scheduler: SearchScheduler = searchScheduler,
   hideFinishedTasks = false,
 ): () => void {

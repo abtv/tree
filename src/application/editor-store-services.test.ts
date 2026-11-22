@@ -11,23 +11,26 @@ it('does not write an absent Vim register to an available clipboard service', as
   expect(writeClipboardContent).not.toHaveBeenCalled()
 })
 
-it.each(['recent', 'agenda-history'] as const)('invalidates renderer layout after %s navigation', async (command) => {
-  vi.useFakeTimers()
-  const store = await setup()
-  if (command === 'agenda-history') {
-    store.openAgenda()
-    store.editText('root', 'Changed')
-  }
-  const before = store.getSnapshot()
-  if (before.status !== 'ready') throw new Error('Expected ready editor')
+it.each(['search-result', 'agenda-history'] as const)(
+  'invalidates renderer layout after %s navigation',
+  async (command) => {
+    vi.useFakeTimers()
+    const store = await setup()
+    if (command === 'agenda-history') {
+      store.openAgenda()
+      store.editText('root', 'Changed')
+    }
+    const before = store.getSnapshot()
+    if (before.status !== 'ready') throw new Error('Expected ready editor')
 
-  if (command === 'recent') store.visitRecentNode('other')
-  else store.undo()
+    if (command === 'search-result') store.openSearchResult('other')
+    else store.undo()
 
-  const after = store.getSnapshot()
-  if (after.status !== 'ready') throw new Error('Expected ready editor')
-  expect(after.structuralVersion).toBeGreaterThan(before.structuralVersion)
-})
+    const after = store.getSnapshot()
+    if (after.status !== 'ready') throw new Error('Expected ready editor')
+    expect(after.structuralVersion).toBeGreaterThan(before.structuralVersion)
+  },
+)
 
 it('does not save the view when hiding search has no folds to close', async () => {
   vi.useFakeTimers()
@@ -245,24 +248,24 @@ async function setup(overrides: Partial<EditorServices> = {}) {
   return store
 }
 
-it('persists the location of a recent-node visit without requiring an edit', async () => {
+it('persists the location of an opened search result without requiring an edit', async () => {
   vi.useFakeTimers()
   const save = vi.fn<EditorServices['save']>(async () => undefined)
   const store = await setup({ save })
 
-  store.visitRecentNode('other')
+  store.openSearchResult('other')
   await store.flushPersistence()
 
   expect(save).toHaveBeenCalledOnce()
   expect(save.mock.calls[0]?.[0].location).toEqual({ currentParentId: null, selectedNodeId: 'other' })
 })
 
-it('starts a new typing undo entry after visiting the same recent node', async () => {
+it('starts a new typing undo entry after opening the same node from Search', async () => {
   vi.useFakeTimers()
   const store = await setup()
   store.editText('root', 'Typed')
 
-  store.visitRecentNode('root')
+  store.openSearchResult('root')
   store.editText('root', 'Later')
   store.undo()
 
@@ -387,32 +390,14 @@ it('reports failed emoji preference writes through the editor snapshot', async (
   expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: 'Emoji write failed' })
 })
 
-it('reports failed scheduled recent-node writes through the editor snapshot', async () => {
-  vi.useFakeTimers()
-  const store = await setup({
-    saveRecentNodes: async () => {
-      throw new Error('Recent write failed')
-    },
-  })
-
-  store.visitRecentNode('other')
-  await vi.advanceTimersByTimeAsync(30_000)
-
-  expect(store.getSnapshot()).toMatchObject({ status: 'ready', operationError: 'Recent write failed' })
-})
-
 it('keeps initialization available when optional preference reads fail', async () => {
   const store = await setup({
     loadEmojiHistory: async () => {
       throw new Error('Emoji read failed')
     },
-    loadRecentNodes: async () => {
-      throw new Error('Recent read failed')
-    },
   })
 
   expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'root' } })
-  expect(store.recentNodes.getIds()).toEqual([])
   expect(store.emojiHistory.suggestions.length).toBeGreaterThan(0)
 })
 

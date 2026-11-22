@@ -302,7 +302,7 @@ test.describe('persistence reliability regressions', () => {
   })
 
   // @requirement PRODUCT.md §16.1
-  test('saves typing during recent-history persistence before menu quit and restart', async ({ userDataDir }) => {
+  test('saves typing during emoji-history persistence before menu quit and restart', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'root', text: '', children: [] }] },
       location: { currentParentId: null, selectedNodeId: 'root' },
@@ -310,32 +310,47 @@ test.describe('persistence reliability regressions', () => {
     const { app, window } = await launchTree(userDataDir)
     await window.clock.install()
     await app.evaluate(() => {
-      const control = globalThis as typeof globalThis & { recentStarted?: boolean; releaseRecent?: () => void }
+      const control = globalThis as typeof globalThis & { emojiStarted?: boolean; releaseEmoji?: () => void }
       const gate = new Promise<void>((resolve) => {
-        control.releaseRecent = resolve
+        control.releaseEmoji = resolve
       })
-      globalThis.__treeIpc.wrap('tree:set-recent-nodes', async (original, ...args) => {
-        control.recentStarted = true
+      globalThis.__treeIpc.wrap('tree:set-emoji-history', async (original, ...args) => {
+        control.emojiStarted = true
         await gate
         return original(...args)
       })
     })
-    await typeInto(node(window, 1), 'before')
+    await typeInto(node(window, 1), ':rocket')
+    await window.keyboard.press('Enter')
+    await expect(node(window, 1)).toHaveValue(/🚀/)
+    const before = await node(window, 1).inputValue()
+    await expect
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { emojiStarted?: boolean }).emojiStarted))
+      .toBe(true)
+    // The renderer clock is installed, so only the quit flush can save the document from here on.
+    await app.evaluate(() => {
+      const control = globalThis as typeof globalThis & { quitSaved?: boolean }
+      globalThis.__treeIpc.wrap('tree:save', async (original, ...args) => {
+        const result = await original(...args)
+        control.quitSaved = true
+        return result
+      })
+    })
 
     await clickApplicationMenuQuit(app)
     await expect
-      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { recentStarted?: boolean }).recentStarted))
+      .poll(() => app.evaluate(() => (globalThis as typeof globalThis & { quitSaved?: boolean }).quitSaved))
       .toBe(true)
     await typeInto(node(window, 1), ' late')
     const closed = new Promise<void>((resolve) => app.once('close', resolve))
-    await app.evaluate(() => (globalThis as typeof globalThis & { releaseRecent?: () => void }).releaseRecent?.())
+    await app.evaluate(() => (globalThis as typeof globalThis & { releaseEmoji?: () => void }).releaseEmoji?.())
     await closed
 
-    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('before late')
+    expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(`${before} late`)
 
     const restarted = await launchTree(userDataDir)
 
-    await expect(node(restarted.window, 1)).toHaveValue('before late')
+    await expect(node(restarted.window, 1)).toHaveValue(`${before} late`)
   })
 
   test('keeps the saved selection when a Find repeat starts during the final quit save', async ({ userDataDir }) => {

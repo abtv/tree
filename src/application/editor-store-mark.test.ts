@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
 import type { PersistedEditorState } from '../domain/document'
 import { locateChangeSite } from './editor-undo-focus'
@@ -59,21 +59,20 @@ it('toggles, undoes, redoes and restores marks through the persistence service',
 })
 
 // @requirement PRODUCT.md §20.14
-it('lists marked nodes before starred and recent nodes when Search opens', async () => {
+it('lists only marked, then starred nodes when Search opens', async () => {
   const services: EditorServices = {
     load: async () => ({
       version: 6,
       document: {
         roots: [
-          { id: 'recent', text: 'Recent', children: [] },
+          { id: 'plain', text: 'Plain', children: [] },
           { id: 'star', text: 'Star', starred: true, children: [] },
           { id: 'mark', text: 'Mark', marked: true, children: [] },
         ],
       },
-      location: { currentParentId: null, selectedNodeId: 'recent' },
+      location: { currentParentId: null, selectedNodeId: 'plain' },
       view: { expandedIds: [] },
     }),
-    loadRecentNodes: async () => ['recent', 'mark', 'star'],
     save: async () => undefined,
     readClipboard: async () => ({ kind: 'text', text: '' }),
     writeAttachment: async () => undefined,
@@ -82,5 +81,13 @@ it('lists marked nodes before starred and recent nodes when Search opens', async
   const store = new EditorStore(services, () => 'unused')
   await store.initialize()
 
-  expect(store.initialSearchResults().map((entry) => entry.id)).toEqual(['mark', 'star', 'recent'])
+  store.editText('plain', 'Edited')
+  store.enter()
+
+  expect(store.initialSearchResults().map((entry) => entry.id)).toEqual(['mark', 'star'])
+
+  const publish = vi.fn()
+  store.searchNodes('', publish)
+
+  expect(publish).toHaveBeenCalledExactlyOnceWith([])
 })

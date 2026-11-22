@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { RecentNode } from '../application/recent-nodes'
+import type { NodeResult } from '../application/node-result'
 import { GlobalSearchSession } from './global-search-session'
 
-const recent: readonly RecentNode[] = [
+const initial: readonly NodeResult[] = [
   { id: 'first', text: 'First', path: null },
   { id: 'second', text: 'Second', path: null },
 ]
@@ -10,13 +10,13 @@ const recent: readonly RecentNode[] = [
 function fixture() {
   const requests: {
     query: string
-    publish: (items: readonly RecentNode[]) => void
+    publish: (items: readonly NodeResult[]) => void
     cancel: ReturnType<typeof vi.fn>
   }[] = []
   const source = {
-    recent: vi.fn(() => recent),
+    initial: vi.fn(() => initial),
     suggestions: vi.fn((): readonly string[] => []),
-    search: vi.fn((query: string, publish: (items: readonly RecentNode[]) => void) => {
+    search: vi.fn((query: string, publish: (items: readonly NodeResult[]) => void) => {
       const cancel = vi.fn()
       requests.push({ query, publish, cancel })
       return cancel
@@ -112,7 +112,7 @@ describe('global Search session', () => {
     (query) => {
       const { session, requests } = fixture()
       session.edit('first')
-      requests[0]!.publish([recent[0]!])
+      requests[0]!.publish([initial[0]!])
 
       session.edit(query)
       session.moveResult(1)
@@ -121,7 +121,7 @@ describe('global Search session', () => {
       expect(session.getSnapshot()).toMatchObject({
         query,
         completedQuery: 'first',
-        items: [recent[0]],
+        items: [initial[0]],
         pending: true,
         selected: 0,
       })
@@ -130,11 +130,11 @@ describe('global Search session', () => {
       requests[0]!.publish([])
 
       expect(session.getSnapshot().pending).toBe(true)
-      expect(session.getSnapshot().items).toEqual([recent[0]])
+      expect(session.getSnapshot().items).toEqual([initial[0]])
 
-      requests[1]!.publish([recent[1]!])
+      requests[1]!.publish([initial[1]!])
 
-      expect(session.getSnapshot()).toMatchObject({ completedQuery: query, items: [recent[1]], pending: false })
+      expect(session.getSnapshot()).toMatchObject({ completedQuery: query, items: [initial[1]], pending: false })
       expect(session.takeResult()).toBe('second')
       expect(session.getSnapshot().items).toBeUndefined()
     },
@@ -147,12 +147,12 @@ describe('global Search session', () => {
     session.edit('')
     requests[0]!.publish([])
 
-    expect(session.getSnapshot()).toMatchObject({ query: '', completedQuery: '', items: recent, pending: false })
+    expect(session.getSnapshot()).toMatchObject({ query: '', completedQuery: '', items: initial, pending: false })
 
     session.edit('second')
     expect(session.close()).toBe(true)
     expect(session.close()).toBe(false)
-    requests[1]!.publish(recent)
+    requests[1]!.publish(initial)
 
     expect(session.getSnapshot().items).toBeUndefined()
     expect(requests[1]!.cancel).toHaveBeenCalledOnce()
@@ -160,13 +160,13 @@ describe('global Search session', () => {
     session.open()
     requests[1]!.publish([])
 
-    expect(session.getSnapshot()).toMatchObject({ query: '', items: recent, pending: false, selected: 0 })
+    expect(session.getSnapshot()).toMatchObject({ query: '', items: initial, pending: false, selected: 0 })
   })
 
   it('makes cleared results selectable in one transition and keeps a resulting dismissal closed', () => {
     const { session, requests } = fixture()
     session.edit('second')
-    requests[0]!.publish([recent[1]!])
+    requests[0]!.publish([initial[1]!])
     const visited: string[] = []
     session.subscribe(() => {
       const state = session.getSnapshot()
@@ -229,7 +229,7 @@ describe('global Search session', () => {
     session.edit('first')
 
     session.refresh()
-    requests[0]!.publish(recent)
+    requests[0]!.publish(initial)
 
     expect(requests[0]!.cancel).toHaveBeenCalledOnce()
     expect(requests[1]!.query).toBe('first')

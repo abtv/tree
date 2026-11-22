@@ -5,7 +5,6 @@ import storeSource from './editor-store.ts?raw'
 import generatorSource from './test/editor-store-arbitraries.ts?raw'
 
 it('keeps context and ownership mutations outside the consumer interfaces', () => {
-  expectTypeOf<keyof EditorStore['recentNodes']>().toEqualTypeOf<'getIds' | 'getResults'>()
   expectTypeOf<keyof EditorStore['search']['session']>().toEqualTypeOf<'getSnapshot'>()
   expectTypeOf<keyof EditorStore['search']>().toEqualTypeOf<
     | 'subscribe'
@@ -23,7 +22,7 @@ it('keeps context and ownership mutations outside the consumer interfaces', () =
 
 // These omissions describe the current generator's scope, not claimed property coverage.
 const exclusions: Record<string, string> = {
-  initialSearchResults: 'Read-only starred/recent projection has focused ordering and exclusion tests.',
+  initialSearchResults: 'Read-only marked/starred projection has focused ordering and exclusion tests.',
   treeSelectionHidden: 'Read-only effective selection guard covered by finished-task visibility tests.',
   isTaskHidden: 'Read-only task visibility guard covered by finished-task visibility tests.',
   setHideFinishedTasks: 'Preference and cross-view transitions have focused tests and platform relaunch coverage.',
@@ -33,7 +32,7 @@ const exclusions: Record<string, string> = {
     'Derived image sizes change no text or structure; focused tests cover batching, history and saving.',
   imageToTextAvailable: 'Read-only platform capability covered by OCR store and preload tests.',
   disposeSearch: 'Renderer unmount retires search without document changes; editor-search.test.ts covers retirement.',
-  visitRecentNode: 'Recent-node navigation is covered by focused store properties and real popup navigation tests.',
+  openSearchResult: 'Search-result navigation is covered by focused store tests and real popup navigation tests.',
   hideSearch:
     'Search-owned folds require an active asynchronous search; editor-search.test.ts covers cleanup and manual ownership.',
   openAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',

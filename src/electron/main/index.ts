@@ -488,8 +488,6 @@ bootstrapApplication({
       getHideFinishedTasks: finishedTasks.load,
       setHideFinishedTasks: finishedTasks.save,
       setEmojiHistory: emojiHistory.save,
-      getRecentNodes: () => fileServices.loadRecentNodes!(),
-      setRecentNodes: (ids) => fileServices.saveRecentNodes!(ids),
       setCommandHistory: commandHistory.save,
       ipcMain,
       rendererUrl: resolvedRenderer.url,

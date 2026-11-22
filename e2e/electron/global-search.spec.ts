@@ -1,6 +1,5 @@
 // @editing-modes: both
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { writeFileSync } from 'node:fs'
 import {
   test,
   expect,
@@ -8,23 +7,27 @@ import {
   seedDocument,
   node,
   typeInto,
-  closeApp,
   describeForEachEditingMode,
   setMainWindowBounds,
 } from './fixtures'
 import { controlPostedTasksWithClock } from '../search-clock'
 
-describeForEachEditingMode('Recent nodes @linux', (mode) => {
+describeForEachEditingMode('Global Search @linux', (mode) => {
   // @requirement PRODUCT.md §20.14
   // @requirement PRODUCT.md §20.14.2
   test('uses the enlarged viewport limits while keeping short result lists compact', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
-      document: { roots: Array.from({ length: 80 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
+      document: {
+        roots: Array.from({ length: 80 }, (_, i) => ({
+          id: `n${i}`,
+          text: `Node ${i}`,
+          children: [],
+          ...(i < 8 ? { starred: true } : {}),
+        })),
+      },
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { app, window } = await launchTree(userDataDir)
-    await window.evaluate(() => globalThis.window.treeApi.setRecentNodes!(Array.from({ length: 8 }, (_, i) => `n${i}`)))
-    await window.reload()
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toBeVisible()
     await setMainWindowBounds(app, { width: 1156, height: 1000 })
     const treeRowHeight = (await window.locator('.node-row').first().boundingBox())!.height
@@ -356,54 +359,45 @@ describeForEachEditingMode('Recent nodes @linux', (mode) => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('promotes edits, cancels without navigation, visits a node and survives restart', async ({ userDataDir }) => {
+  test('lists only starred nodes for empty input, cancels without navigation and opens a node', async ({
+    userDataDir,
+  }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
-          { id: 'a', text: '', children: [{ id: 'child', text: 'Nested', children: [] }] },
-          { id: 'b', text: '', children: [] },
+          { id: 'a', text: 'Alpha', starred: true, children: [{ id: 'child', text: 'Nested', children: [] }] },
+          { id: 'b', text: 'Beta', starred: true, children: [] },
+          { id: 'c', text: '', children: [] },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'a' },
     })
-    const first = await launchTree(userDataDir)
-    await typeInto(node(first.window, 1), 'Alpha edited')
-    await typeInto(node(first.window, 2), 'Beta edited')
-    await first.window.keyboard.press('Meta+;')
+    const { window } = await launchTree(userDataDir)
+    await typeInto(node(window, 3), 'Edited')
+    await window.keyboard.press('Meta+;')
 
-    const popup = first.window.getByRole('dialog', { name: 'Search' })
-    await expect(popup.getByRole('option')).toHaveText(['Beta edited', 'Alpha edited'])
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    await expect(popup.locator('.node-search-results-heading')).toHaveText('Starred')
+    await expect(popup.locator('.recent-node-text')).toHaveText(['Alpha', 'Beta'])
     await expect(popup.getByRole('img', { name: 'Top level' })).toHaveCount(2)
-    const fontSize = await node(first.window, 2).evaluate((element) => getComputedStyle(element).fontSize)
+    const fontSize = await node(window, 2).evaluate((element) => getComputedStyle(element).fontSize)
     await expect(popup.locator('.recent-node-text').first()).toHaveCSS('font-size', fontSize)
-    await first.window.keyboard.press('ArrowUp')
+    await window.keyboard.press('ArrowUp')
     await expect(popup.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true')
-    await first.window.keyboard.press('Escape')
+    await window.keyboard.press('Escape')
 
     await expect(popup).toHaveCount(0)
-    await expect(node(first.window, 2)).toBeFocused()
+    await expect(node(window, 3)).toBeFocused()
 
-    await first.window.keyboard.press('Meta+;')
-    await first.window.keyboard.press('ArrowDown')
-    await first.window.screenshot({ path: `.scratch/recent-nodes/${mode.mode}-popup.png` })
-    await first.window.keyboard.press('Enter')
+    await window.keyboard.press('Meta+;')
+    await window.screenshot({ path: `test-results/search-starred-${mode.mode}.png` })
+    await window.keyboard.press('Enter')
 
-    await expect(first.window.locator('[data-node-id="child"] .node-input')).toBeFocused()
-    await closeApp(first.app)
-
-    expect(JSON.parse(readFileSync(join(userDataDir, 'data', 'recent-nodes.json'), 'utf8'))).toEqual(['a', 'b'])
-    const second = await launchTree(userDataDir, { appearance: 'dark' })
-    await second.window.evaluate(() => window.treeApi.setAppearance('dark'))
-    await second.window.emulateMedia({ colorScheme: 'dark' })
-    await second.window.keyboard.press('Meta+;')
-
-    await expect(second.window.getByRole('option')).toHaveText(['Alpha edited', 'Beta edited'])
-    await second.window.screenshot({ path: `.scratch/recent-nodes/${mode.mode}-dark-popup.png` })
-    await second.window.keyboard.press('Escape')
+    await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
   })
 })
 
-test.describe('Recent-node buffered editing', { tag: '@linux' }, () => {
+test.describe('Search buffered editing', { tag: '@linux' }, () => {
   test.use({ editingMode: 'vim' })
   // @requirement PRODUCT.md §20.14
   test('preserves Replace on cancel and finishes it before a nested jump', async ({ userDataDir }) => {
@@ -431,6 +425,7 @@ test.describe('Recent-node buffered editing', { tag: '@linux' }, () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
     await window.keyboard.type('Y')
     await window.keyboard.press('Meta+;')
+    await window.getByRole('searchbox').fill('Nested')
     await window.getByRole('option').filter({ hasText: 'Nested' }).click()
 
     await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
@@ -441,7 +436,7 @@ test.describe('Recent-node buffered editing', { tag: '@linux' }, () => {
   })
 })
 
-test.describe('Recent-node popup geometry (mode-independent)', () => {
+test.describe('Search popup geometry (mode-independent)', () => {
   for (const appearance of ['light', 'dark'] as const) {
     // @requirement PRODUCT.md §20.14
     // @requirement PRODUCT.md §20.14.2
@@ -560,7 +555,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.evaluate(() => globalThis.window.treeApi.setAppearance('gray'))
     await expect(window.locator('html')).toHaveAttribute('data-appearance', 'gray')
     await window.keyboard.press('Meta+;')
-    const list = window.getByRole('listbox', { name: 'Recent nodes' })
+    const list = window.getByRole('listbox', { name: 'Marked and starred nodes' })
     const selected = list.locator('[aria-selected="true"]')
 
     await expect(selected).toHaveText('★Starred item 0')
@@ -597,9 +592,10 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14.2
-  test('groups consecutive recent paths and remeasures grouped results through scroll and resize @linux', async ({
+  test('groups consecutive starred paths and remeasures grouped results through scroll and resize @linux', async ({
     userDataDir,
   }) => {
+    const starred = new Set(['p0-0', 'p0-1', 'p1-0', 'p0-2', 'p0-3'])
     seedDocument(userDataDir, {
       document: {
         roots: ['Project A', 'Project B'].map((text, group) => ({
@@ -609,22 +605,19 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
             id: `p${group}-${index}`,
             text: `Needle ${group}-${index}\n${'Full result text '.repeat(index % 3 === 0 ? 12 : 1)}`,
             children: [],
+            ...(starred.has(`p${group}-${index}`) ? { starred: true } : {}),
           })),
         })),
       },
       location: { currentParentId: null, selectedNodeId: 'p0' },
     })
-    writeFileSync(
-      join(userDataDir, 'data', 'recent-nodes.json'),
-      JSON.stringify(['p0-0', 'p0-1', 'p1-0', 'p0-2', 'p0-3']),
-    )
     const { window, app } = await launchTree(userDataDir)
     await setMainWindowBounds(app, { width: 700, height: 740 })
     await window.keyboard.press('Meta+;')
     const list = window.locator('.node-search-results')
     const input = window.getByRole('searchbox')
-    await expect(list.locator('.recent-node-group-path')).toHaveText(['Project A', 'Project B', 'Project A'])
-    await expect(list.getByRole('option')).toHaveCount(8)
+    await expect(list.locator('.recent-node-group-path')).toHaveText(['Project A', 'Project B'])
+    await expect(list.getByRole('option')).toHaveCount(7)
     const entries = await list.locator('.recent-node-entry').evaluateAll((elements) =>
       elements.map((element) => {
         const box = element.getBoundingClientRect()
@@ -634,7 +627,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     for (let index = 1; index < entries.length; index++) {
       expect(entries[index]!.top).toBe(entries[index - 1]!.bottom)
     }
-    await window.screenshot({ path: '.scratch/search-path-groups/recent-grouped.png' })
+    await window.screenshot({ path: '.scratch/search-path-groups/starred-grouped.png' })
 
     await list.locator('.recent-node-group-path').first().click()
     await expect(window.locator('[data-node-id="p0-0"] .node-input')).toBeFocused()
@@ -665,7 +658,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     await window.keyboard.press('Enter')
     await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
     await window.keyboard.press('Meta+;')
-    await expect(list.locator('[aria-selected="true"]')).toContainText('Needle 1-44')
+    await expect(list.locator('[aria-selected="true"]')).toContainText('Needle 0-0')
     await window.keyboard.press('Escape')
     await expect(window.locator('[data-node-id="p1-44"] .node-input')).toBeFocused()
   })
@@ -1139,16 +1132,12 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
-      document: { roots: Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, children: [] })) },
+      document: {
+        roots: Array.from({ length: 8 }, (_, i) => ({ id: `n${i}`, text: `Node ${i}`, starred: true, children: [] })),
+      },
       location: { currentParentId: null, selectedNodeId: 'n0' },
     })
     const { app, window } = await launchTree(userDataDir)
-    await window.evaluate(() =>
-      (
-        globalThis as typeof globalThis & { treeApi: { setRecentNodes(ids: string[]): Promise<void> } }
-      ).treeApi.setRecentNodes(Array.from({ length: 8 }, (_, i) => `n${i}`)),
-    )
-    await window.reload()
     await expect(node(window, 1)).toBeVisible()
     await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
@@ -1161,7 +1150,7 @@ test.describe('Recent-node popup geometry (mode-independent)', () => {
         )
       })
     await expect.poll(centerOffset).toBeLessThanOrEqual(1)
-    await window.screenshot({ path: 'test-results/recent-nodes-centered.png' })
+    await window.screenshot({ path: 'test-results/search-centered.png' })
     await setMainWindowBounds(app, { width: 900, height: 1000 })
     await expect.poll(centerOffset).toBeLessThanOrEqual(1)
     await window.screenshot({ path: 'test-results/search-centered-tall.png' })

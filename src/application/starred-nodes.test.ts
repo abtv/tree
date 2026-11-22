@@ -1,6 +1,5 @@
 import { expect, it } from 'vitest'
 import { markedAndStarredNodes } from './starred-nodes'
-import { RecentNodes } from './recent-nodes'
 import type { Document, TreeNode } from '../domain/document'
 import { toggleMarkNode, toggleStarNode } from '../domain/document'
 
@@ -28,22 +27,27 @@ it('sorts by the complete path including text beyond the displayed ancestor prev
   expect(markedAndStarredNodes(document)).toBe(results)
 })
 
-it('retains eight other recent nodes and reflects star removal', () => {
+it('lists every starred node and reflects star removal', () => {
   const document: Document = {
-    roots: Array.from({ length: 12 }, (_, i) => node(`${i}`, `${i}`, [], i < 3 ? true : undefined)),
+    roots: Array.from({ length: 12 }, (_, i) => node(`${i}`, `${i}`, [], i < 10 ? true : undefined)),
   }
-  const recent = new RecentNodes()
-  recent.load(
-    document.roots.map((entry) => entry.id),
-    document,
-  )
 
-  expect(recent.getResults().map((entry) => entry.id)).toEqual(['3', '4', '5', '6', '7', '8', '9', '10'])
+  expect(markedAndStarredNodes(document).map((entry) => entry.id)).toEqual([
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+  ])
+
   const changed = toggleStarNode(document, '0')
-  recent.update(changed)
 
-  expect(markedAndStarredNodes(changed).map((entry) => entry.id)).toEqual(['1', '2'])
-  expect(recent.getResults()[0]!.id).toBe('0')
+  expect(markedAndStarredNodes(changed).map((entry) => entry.id)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
 })
 
 it('filters completed stars while preserving the prepared list and complete parent paths', () => {
@@ -97,19 +101,16 @@ it('lists marked nodes before starred ones, each group by path, and a marked sta
 })
 
 // @requirement PRODUCT.md §20.14
-it('omits marked nodes from the recent part and returns them when the mark is removed', () => {
+it('omits unmarked, unstarred nodes and drops a node when its mark is removed', () => {
   const document: Document = {
     roots: [{ ...node('0', 'Zero'), marked: true }, node('1', 'One'), node('2', 'Two')],
   }
-  const recent = new RecentNodes()
-  recent.load(['0', '1', '2'], document)
 
-  expect(recent.getResults().map((entry) => entry.id)).toEqual(['1', '2'])
+  expect(markedAndStarredNodes(document).map((entry) => entry.id)).toEqual(['0'])
+
   const changed = toggleMarkNode(document, '0')
-  recent.update(changed)
 
   expect(markedAndStarredNodes(changed)).toEqual([])
-  expect(recent.getResults().map((entry) => entry.id)).toEqual(['0', '1', '2'])
 })
 
 // @requirement PRODUCT.md §2.5

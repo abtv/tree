@@ -1,6 +1,6 @@
 import { requireNode, type Document, type NodeId } from '../domain/document'
 import type { TextMatch } from '../domain/text-search'
-import { completionPresentation, label } from './recent-nodes'
+import { completionPresentation, label } from './node-result'
 
 export interface AgendaPath {
   readonly text: string

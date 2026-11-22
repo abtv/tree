@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { GlobalSearchPopup } from './GlobalSearchPopup'
 import { createEditorStoreDouble } from './test/editor-store-double'
 import { APPLE_SHORTCUTS } from './shortcut-profile'
-import { RecentNodes, type RecentNode } from '../application/recent-nodes'
+import type { NodeResult } from '../application/node-result'
 
 afterEach(() => {
   cleanup()
@@ -16,7 +16,7 @@ afterEach(() => {
 it('retains empty feedback and shows only one delayed pending label', () => {
   vi.useFakeTimers()
   const { store } = setup(true)
-  let publish: (results: readonly RecentNode[]) => void = () => undefined
+  let publish: (results: readonly NodeResult[]) => void = () => undefined
   vi.mocked(store.searchNodes).mockImplementation((_query, callback) => {
     publish = callback
     return vi.fn()
@@ -26,14 +26,14 @@ it('retains empty feedback and shows only one delayed pending label', () => {
   fireEvent.change(input, { target: { value: 'x' } })
   act(() => vi.advanceTimersByTime(199))
 
-  expect(screen.getByText('No recent nodes')).toBeInTheDocument()
+  expect(screen.getByText('No marked or starred nodes')).toBeInTheDocument()
   expect(screen.queryByText('Searching…')).toBeNull()
   expect(screen.getByText('↑↓ Select ↵ Open Esc Close')).toBeInTheDocument()
 
   act(() => vi.advanceTimersByTime(1))
 
   expect(screen.getAllByText('Searching…')).toHaveLength(1)
-  expect(screen.getByText('No recent nodes')).toBeInTheDocument()
+  expect(screen.getByText('No marked or starred nodes')).toBeInTheDocument()
 
   act(() => publish([]))
 
@@ -83,7 +83,7 @@ it('cancels pending feedback on clear, close and reopen', () => {
 // @requirement PRODUCT.md §20.14
 it('retains rows during refinement without allowing stale activation, then replaces them together', () => {
   const { store } = setup()
-  let publish: (results: readonly RecentNode[]) => void = () => undefined
+  let publish: (results: readonly NodeResult[]) => void = () => undefined
   vi.mocked(store.searchNodes).mockImplementation((_query, callback) => {
     publish = callback
     return vi.fn()
@@ -98,7 +98,7 @@ it('retains rows during refinement without allowing stale activation, then repla
   expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'true')
   fireEvent.keyDown(input, { key: 'Enter' })
   fireEvent.click(screen.getByRole('option'))
-  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(store.openSearchResult).not.toHaveBeenCalled()
 
   act(() => publish([]))
 
@@ -111,7 +111,7 @@ it('retains rows during refinement without allowing stale activation, then repla
 it('names the list parts once per result list instead of rescanning it while the selection moves', () => {
   HTMLElement.prototype.scrollIntoView = vi.fn()
   let markReads = 0
-  const starred = Array.from({ length: 2000 }, (_, index): RecentNode => ({
+  const starred = Array.from({ length: 2000 }, (_, index): NodeResult => ({
     id: `star-${index}`,
     text: `Star ${index}`,
     path: null,
@@ -121,7 +121,7 @@ it('names the list parts once per result list instead of rescanning it while the
       return undefined as unknown as true
     },
   }))
-  const store = createEditorStoreDouble({ snapshot: { status: 'ready' }, recentNodes: new RecentNodes() })
+  const store = createEditorStoreDouble({ snapshot: { status: 'ready' } })
   vi.mocked(store.initialSearchResults).mockReturnValue(starred)
   render(
     <>
@@ -139,7 +139,7 @@ it('names the list parts once per result list instead of rescanning it while the
   editor.focus()
   fireEvent.keyDown(editor, { key: ';', metaKey: true })
 
-  expect(screen.getByText('Starred and recent')).toBeInTheDocument()
+  expect(screen.getByText('Starred')).toBeInTheDocument()
 
   markReads = 0
   const input = screen.getByRole('searchbox')
@@ -152,12 +152,14 @@ it('names the list parts once per result list instead of rescanning it while the
 
 function setup(empty = false) {
   HTMLElement.prototype.scrollIntoView = vi.fn()
-  const recentNodes = new RecentNodes()
-  const store = createEditorStoreDouble({ snapshot: { status: 'ready' }, recentNodes })
-  const document = {
-    roots: Array.from({ length: 10 }, (_, id) => ({ id: String(id), text: `Node ${id}`, children: [] })),
-  }
-  recentNodes.load(empty ? [] : document.roots.map(({ id }) => id), document)
+  const store = createEditorStoreDouble({ snapshot: { status: 'ready' } })
+  const starred = Array.from({ length: 8 }, (_, id): NodeResult => ({
+    id: String(id),
+    text: `Node ${id}`,
+    path: null,
+    starred: true,
+  }))
+  vi.mocked(store.initialSearchResults).mockReturnValue(empty ? [] : starred)
   const beforeVisit = vi.fn()
   render(
     <>
@@ -214,7 +216,7 @@ it('navigates group headings in display order and visits the selected parent by 
   fireEvent.keyDown(input, { key: 'ArrowDown' })
   fireEvent.keyDown(input, { key: 'Enter' })
 
-  expect(store.visitRecentNode).toHaveBeenCalledWith('other')
+  expect(store.openSearchResult).toHaveBeenCalledWith('other')
 })
 
 // @requirement PRODUCT.md §20.14
@@ -231,7 +233,7 @@ it('borrows focus, wraps eight results and restores a directional selection with
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(input).toHaveFocus()
   expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([2, 7, 'backward'])
-  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(store.openSearchResult).not.toHaveBeenCalled()
 })
 
 it('keeps title and scrollbar interaction inside the popup and reveals arrow-selected rows', () => {
@@ -334,19 +336,19 @@ it('visits only on confirmation and permits dismissing an empty history', () => 
   fireEvent.keyDown(document, { key: 'Enter' })
 
   expect(beforeVisit).toHaveBeenCalledOnce()
-  expect(store.visitRecentNode).toHaveBeenCalledWith('1')
+  expect(store.openSearchResult).toHaveBeenCalledWith('1')
   expect(screen.queryByRole('dialog')).toBeNull()
 
   cleanup()
   const empty = setup(true)
   fireEvent.keyDown(document, { key: 'Enter' })
-  expect(screen.getByText('No recent nodes')).toBeInTheDocument()
-  expect(empty.store.visitRecentNode).not.toHaveBeenCalled()
+  expect(screen.getByText('No marked or starred nodes')).toBeInTheDocument()
+  expect(empty.store.openSearchResult).not.toHaveBeenCalled()
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(empty.input).toHaveFocus()
 })
 
-it('cancels obsolete searches, restores recent nodes on clear and starts empty with Cmd+;', () => {
+it('cancels obsolete searches, restores the initial list on clear and starts empty with Cmd+;', () => {
   const { store } = setup()
   const cancel = vi.fn()
   vi.mocked(store.searchNodes).mockImplementation((_query, publish) => {
@@ -382,7 +384,7 @@ it.each(['#', '#work'])('closes Search on the first Escape with %s tag suggestio
   expect(editor).toHaveFocus()
   expect([editor.selectionStart, editor.selectionEnd, editor.selectionDirection]).toEqual([2, 7, 'backward'])
   expect(cancel).toHaveBeenCalledOnce()
-  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(store.openSearchResult).not.toHaveBeenCalled()
   expect(beforeVisit).not.toHaveBeenCalled()
 
   fireEvent.keyDown(editor, { key: ';', metaKey: true })
@@ -411,7 +413,7 @@ it.each(['Enter', 'Tab', 'pointer'])(
     expect(input).toHaveFocus()
     expect([input.selectionStart, input.selectionEnd]).toEqual([10, 10])
     expect(screen.queryByRole('listbox', { name: 'People' })).toBeNull()
-    expect(store.visitRecentNode).not.toHaveBeenCalled()
+    expect(store.openSearchResult).not.toHaveBeenCalled()
   },
 )
 
@@ -423,7 +425,7 @@ it('accepts tag suggestions with ordinary completion keys and respects IME', () 
   fireEvent.keyDown(input, { key: 'n', ctrlKey: true })
   fireEvent.keyDown(input, { key: 'Enter' })
   expect(input).toHaveValue('#worker')
-  expect(store.visitRecentNode).not.toHaveBeenCalled()
+  expect(store.openSearchResult).not.toHaveBeenCalled()
   expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
   fireEvent.change(input, { target: { value: '#work' } })
   fireEvent.compositionStart(input)
@@ -466,6 +468,6 @@ it.each(['keyboard', 'pointer'])(
     else fireEvent.click(screen.getAllByRole('option')[0]!)
 
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(store.visitRecentNode).toHaveBeenCalledWith('0')
+    expect(store.openSearchResult).toHaveBeenCalledWith('0')
   },
 )

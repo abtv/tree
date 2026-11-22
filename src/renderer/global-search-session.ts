@@ -1,15 +1,16 @@
-import type { RecentNode } from '../application/recent-nodes'
+import type { NodeResult } from '../application/node-result'
 import { nodeSearchCompletionTerm } from '../domain/node-search-query'
 import { moveSuggestionIndex } from './completion-controller'
 
 interface SearchSource {
-  recent(): readonly RecentNode[]
+  /** The list shown for empty input: marked, then starred nodes. */
+  initial(): readonly NodeResult[]
   suggestions(query: string): readonly string[]
-  search(query: string, publish: (results: readonly RecentNode[]) => void): () => void
+  search(query: string, publish: (results: readonly NodeResult[]) => void): () => void
 }
 
 interface GlobalSearchSnapshot {
-  readonly items: readonly RecentNode[] | undefined
+  readonly items: readonly NodeResult[] | undefined
   readonly query: string
   readonly completedQuery: string
   readonly pending: boolean
@@ -32,13 +33,13 @@ const closed: GlobalSearchSnapshot = {
   suggestionIndex: 0,
 }
 
-export function startsSearchGroup(items: readonly RecentNode[], index: number): boolean {
+export function startsSearchGroup(items: readonly NodeResult[], index: number): boolean {
   const item = items[index]!
   const previous = items[index - 1]
   return item.path !== previous?.path || item.parentId !== previous?.parentId
 }
 
-function hasGroupHeading(items: readonly RecentNode[], index: number): boolean {
+function hasGroupHeading(items: readonly NodeResult[], index: number): boolean {
   return items[index]!.path !== null && startsSearchGroup(items, index)
 }
 
@@ -67,7 +68,7 @@ export class GlobalSearchSession {
     this.completionAccepted = false
     this.selectionStart = 0
     this.selectionEnd = 0
-    this.set({ ...closed, items: this.source.recent() })
+    this.set({ ...closed, items: this.source.initial() })
   }
 
   public close(): boolean {
@@ -85,7 +86,7 @@ export class GlobalSearchSession {
     this.selectionStart = selectionStart
     this.selectionEnd = selectionEnd
     if (query === '') {
-      this.set({ ...closed, items: this.source.recent() })
+      this.set({ ...closed, items: this.source.initial() })
       return
     }
 

@@ -264,26 +264,34 @@ export async function happyPath(driver: SmokeDriver) {
     ${textAt(focused)} === ${JSON.stringify(parentText)} &&
     Array.from(document.querySelectorAll('.node-row .node-input')).some(input =>
       ${editorText}(input) === ${JSON.stringify(agendaText)})`)
-  const recent = '.recent-nodes-popup'
+  // The child also matches: "Smoke" is in its text,
+  // while "parent" is supplied by its ancestor under the required-term search rules.
+  const popup = '.recent-nodes-popup'
+  const query = 'input[aria-label="Search query"]'
+  const selectedResult = (text: string) =>
+    `return document.querySelector('${popup} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(text)}`
   await restored.press(focused, 'Primary+;')
-  await restored.waitFor(
-    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(agendaText)}`,
-  )
-  await restored.press(':focus', 'ArrowDown')
-  await restored.waitFor(
-    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`,
-  )
+  await restored.fill(query, parentText)
+  await restored.waitFor(`return JSON.stringify(Array.from(document.querySelectorAll('${popup} [role="option"] .recent-node-text'),
+    node => node.textContent)) === ${JSON.stringify(JSON.stringify([parentText, agendaText]))}`)
+  await restored.waitFor(selectedResult(parentText))
+  // ArrowUp wraps from the first result to the child; ArrowDown wraps back. Moving down from the
+  // parent would first select the child's path heading.
   await restored.press(':focus', 'ArrowUp')
-  await restored.waitFor(
-    `return document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(agendaText)}`,
-  )
+  await restored.waitFor(selectedResult(agendaText))
+  await restored.press(':focus', 'ArrowDown')
+  await restored.waitFor(selectedResult(parentText))
   await restored.press(':focus', 'Escape')
   await restored.waitFor(
-    `return !document.querySelector('${recent}') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
+    `return !document.querySelector('${popup}') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
   )
   await restored.press(focused, 'Primary+;')
+  await restored.fill(query, parentText)
+  await restored.waitFor(selectedResult(parentText))
+  await restored.press(':focus', 'ArrowUp')
+  await restored.waitFor(selectedResult(agendaText))
   await restored.press(':focus', 'Enter')
-  await restored.waitFor(`return !document.querySelector('${recent}') &&
+  await restored.waitFor(`return !document.querySelector('${popup}') &&
     ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
     ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
 
@@ -293,17 +301,12 @@ export async function happyPath(driver: SmokeDriver) {
     `return !document.querySelector('.current-parent') && ${textAt(focused)} === ${JSON.stringify(parentText)}`,
   )
 
-  // The child also matches: "Smoke" is in its text,
-  // while "parent" is supplied by its ancestor under the required-term search rules.
-  const query = 'input[aria-label="Search query"]'
   await restored.press(focused, 'Primary+;')
   await restored.fill(query, parentText)
-  await restored.waitFor(`return JSON.stringify(Array.from(document.querySelectorAll('${recent} [role="option"] .recent-node-text'),
-    node => node.textContent)) === ${JSON.stringify(JSON.stringify([parentText, agendaText]))} &&
-    document.querySelector('${recent} [aria-selected="true"] .recent-node-text')?.textContent === ${JSON.stringify(parentText)}`)
+  await restored.waitFor(selectedResult(parentText))
   await restored.press(query, 'Enter')
 
-  await restored.waitFor(`return !document.querySelector('${recent}') &&
+  await restored.waitFor(`return !document.querySelector('${popup}') &&
     ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
     ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)

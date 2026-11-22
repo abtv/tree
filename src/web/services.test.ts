@@ -920,31 +920,22 @@ describe('browser editing service contracts', () => {
     const f = fixture()
     const { services } = await installBrowserPrototype()
     expect(await services.loadEmojiHistory!()).toEqual([])
-    expect(await services.loadRecentNodes!()).toEqual([])
     expect(await window.treeApi.getCommandHistory()).toEqual([])
     expect(await window.treeApi.getVimEnabled()).toBe(false)
     f.values.set('preferences:commands', ['find'])
     expect(await window.treeApi.getCommandHistory()).toEqual(['find'])
     f.values.set('preferences:emoji-history', ['cat'])
-    f.values.set('preferences:recent-nodes', ['root'])
     expect(await services.loadEmojiHistory!()).toEqual(['cat'])
-    expect(await services.loadRecentNodes!()).toEqual(['root'])
 
-    const saves = [
-      services.saveEmojiHistory!(['cat']),
-      services.saveRecentNodes!(['root']),
-      window.treeApi.setCommandHistory(['command']),
-    ]
+    const saves = [services.saveEmojiHistory!(['cat']), window.treeApi.setCommandHistory(['command'])]
     for (const tx of f.transactions) tx.oncomplete!()
     await Promise.all(saves)
 
     expect(f.put.mock.calls).toEqual([
       [['cat'], 'emoji-history'],
-      [['root'], 'recent-nodes'],
       [['command'], 'commands'],
     ])
     expect(f.db.transaction.mock.calls).toEqual([
-      ['preferences', 'readwrite', { durability: 'strict' }],
       ['preferences', 'readwrite', { durability: 'strict' }],
       ['preferences', 'readwrite', { durability: 'strict' }],
     ])

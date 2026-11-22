@@ -51,10 +51,8 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   const setAppearance = vi.fn()
   const getCommandHistory = vi.fn(() => ['set-theme-dark'])
   const setCommandHistory = vi.fn()
-  const getRecentNodes = vi.fn(async () => ['node-a'])
   const getEmojiHistory = vi.fn(async () => ['cat'])
   const setEmojiHistory = vi.fn<(names: readonly string[]) => Promise<void>>(async () => undefined)
-  const setRecentNodes = vi.fn<(ids: readonly string[]) => Promise<void>>(async () => undefined)
   const notesArchive = {
     chooseExportDestination: vi.fn(async () => ({ ok: true as const, fileName: 'Tree Notes 2026-10-23.zip' })),
     startExport: vi.fn(async () => ({
@@ -83,8 +81,6 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
     appUpdates,
     getEmojiHistory,
     setEmojiHistory,
-    getRecentNodes,
-    setRecentNodes,
     getAppearance,
     setAppearance,
     getCommandHistory,
@@ -116,8 +112,6 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
     appUpdates,
     getEmojiHistory,
     setEmojiHistory,
-    getRecentNodes,
-    setRecentNodes,
     setNotesMenuState,
     notesArchive,
     getAppearance,
@@ -222,8 +216,6 @@ describe('main IPC handlers', () => {
       delete dependencies.setAppUpdateBlocked
       delete dependencies.getEmojiHistory
       delete dependencies.setEmojiHistory
-      delete dependencies.getRecentNodes
-      delete dependencies.setRecentNodes
       delete dependencies.showEditorContextMenu
     })
     const event = { senderFrame: { url: rendererUrl } }
@@ -233,13 +225,11 @@ describe('main IPC handlers', () => {
       'update-app': false,
     })
     expect(handlers.get(ipcChannels.getEmojiHistory)!(event)).toEqual([])
-    expect(handlers.get(ipcChannels.getRecentNodes)!(event)).toEqual([])
     expect(handlers.get(ipcChannels.checkAppUpdate)!(event)).toBeUndefined()
     expect(handlers.get(ipcChannels.confirmAppUpdate)!(event, 'id', true)).toBeUndefined()
     expect(handlers.get(ipcChannels.setRendererModalOpen)!(event, true)).toBeUndefined()
     expect(handlers.get(ipcChannels.setAppUpdateBlocked)!(event, false)).toBeUndefined()
     expect(handlers.get(ipcChannels.setEmojiHistory)!(event, ['cat'])).toBeUndefined()
-    expect(handlers.get(ipcChannels.setRecentNodes)!(event, ['node'])).toBeUndefined()
     expect(handlers.get(ipcChannels.runUpdateCommand)!(event, 'check-for-updates')).toBeUndefined()
     expect(handlers.get(ipcChannels.showEditorContextMenu)!(event)).toBeNull()
     await expect(handlers.get(ipcChannels.chooseNotesExportDestination)!(event)).resolves.toMatchObject({ ok: true })
@@ -389,20 +379,6 @@ describe('main IPC handlers', () => {
     expect(setEmojiHistory).toHaveBeenCalledOnce()
   })
 
-  it('rejects a mixed recent-node history before storing its valid prefix', () => {
-    const { handlers, setRecentNodes } = createHarness()
-    const event = { senderFrame: { url: rendererUrl } }
-
-    expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, ['valid', ''])).toThrow(
-      'Invalid recent node history.',
-    )
-    expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, ['valid'], 'extra')).toThrow(
-      'This request takes no arguments.',
-    )
-
-    expect(setRecentNodes).not.toHaveBeenCalled()
-  })
-
   it('blocks notes operations during update application while allowing cancellation and a later retry', async () => {
     const { handlers, appUpdates, notesArchive } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
@@ -453,20 +429,14 @@ describe('main IPC handlers', () => {
     expect(appUpdates.confirm).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves maximum command and recent-node histories and rejects empty recent IDs', async () => {
-    const { handlers, setCommandHistory, setRecentNodes } = createHarness()
+  it('preserves the maximum command history', () => {
+    const { handlers, setCommandHistory } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
     const commands = Array.from({ length: 100 }, (_, i) => `${i}`.padEnd(100, 'x'))
-    const recent = Array.from({ length: 100 }, (_, i) => `node-${i}`)
 
     handlers.get(ipcChannels.setCommandHistory)!(event, commands)
-    await handlers.get(ipcChannels.setRecentNodes)!(event, recent)
 
     expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(commands)
-    expect(setRecentNodes).toHaveBeenCalledExactlyOnceWith(recent)
-    for (const value of [null, {}, ['']])
-      expect(() => handlers.get(ipcChannels.setRecentNodes)!(event, value)).toThrow('Invalid recent node history.')
-    expect(setRecentNodes).toHaveBeenCalledTimes(1)
   })
 
   it('validates update commands and rechecks availability before executing', () => {
@@ -564,25 +534,6 @@ describe('main IPC handlers', () => {
 
     await expect(get(event)).rejects.toThrow('read failure')
     await expect(set(event, ['cat'])).rejects.toThrow('write failure')
-  })
-  it('validates recent-node history, rejects untrusted calls and propagates write errors', async () => {
-    const { handlers, getRecentNodes, setRecentNodes } = createHarness()
-    const event = { senderFrame: { url: rendererUrl } }
-    const get = handlers.get(ipcChannels.getRecentNodes)!
-    const set = handlers.get(ipcChannels.setRecentNodes)!
-
-    await expect(get(event)).resolves.toEqual(['node-a'])
-    await set(event, ['node-b'])
-
-    expect(getRecentNodes).toHaveBeenCalledOnce()
-    expect(setRecentNodes).toHaveBeenCalledWith(['node-b'])
-    expect(() => set({ senderFrame: { url: 'https://untrusted.example' } }, ['node-b'])).toThrow('Untrusted')
-    expect(() => set(event, [null])).toThrow('Invalid recent')
-    expect(() => set(event, Array(101).fill('a'))).toThrow('Invalid recent')
-    expect(() => get(event, 'extra')).toThrow()
-    setRecentNodes.mockRejectedValueOnce(new Error('disk failure'))
-
-    await expect(set(event, ['node-b'])).rejects.toThrow('disk failure')
   })
   it('propagates oversized clipboard image errors without reading bytes or writing attachments', async () => {
     const { handlers, nativeClipboard, fileServices } = createHarness()

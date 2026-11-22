@@ -77,7 +77,7 @@ Status: Exploring
 
 ### Observation
 
-The original observation predates application search. The current application provides local Find, document-wide node and tag search, and recent-node navigation (`docs/PRODUCT.md` §20.14). The remaining question is whether these facilities resolve retrieval friction in ordinary use; their existence alone is not usage evidence.
+The original observation predates application search. The current application provides local Find, document-wide node and tag search, and marked and starred nodes listed by empty Search (`docs/PRODUCT.md` §20.14); recent-node navigation was removed on 2026-11-22. The remaining question is whether these facilities resolve retrieval friction in ordinary use; their existence alone is not usage evidence.
 
 ### Hypothesis
 
@@ -224,7 +224,8 @@ The Product Owner's decision for each feature: keep, remove, or keep and simplif
 - 2026-11-21 — Keep Vim mode complete: the Product Owner uses every command family, including case changes, surround, node operations and `Ctrl+A`/`Ctrl+X`.
 - 2026-11-21 — Keep the browser version, Search, desktop and browser export, import and backup, Image to Text, the command panel, images and attachments, clipboard and links, node states, drag and drop, inline expansion, desktop updates, Appearance, emoji completion and Agenda. Improvements are open in PD-009 (Agenda), PD-011 (Search), PD-012 (command panel) and PD-014 (Image to Text in the browser).
 - 2026-11-22 — PD-012 (command panel prompt) answered: in standard editing the input line has no `:` prefix and shows the placeholder `Run Command`; Vim editing keeps `:` (§20.2.28).
-- Still open: Recent nodes. Product Owner statement: probably not needed, given stars, marks and global search. Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.
+- 2026-11-22 — Remove Recent nodes (§20.14.1 retired). Empty global Search keeps the marked and starred lists without the recent part. Saved history from earlier versions is left untouched, neither read nor deleted.
+- Dates and date completion are open in PD-010, and the `#` and `&` markers in PD-013.
 
 ## PD-009: How to improve Agenda
 

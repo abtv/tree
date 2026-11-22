@@ -41,10 +41,8 @@ export const ipcChannels = {
   getEmojiHistory: 'tree:get-emoji-history',
   setEmojiHistory: 'tree:set-emoji-history',
   setCommandHistory: 'tree:set-command-history',
-  getRecentNodes: 'tree:get-recent-nodes',
   getHideFinishedTasks: 'tree:get-hide-finished-tasks',
   setHideFinishedTasks: 'tree:set-hide-finished-tasks',
-  setRecentNodes: 'tree:set-recent-nodes',
   chooseNotesExportDestination: 'tree:notes-choose-export-destination',
   startNotesExport: 'tree:notes-start-export',
   chooseNotesImportArchive: 'tree:notes-choose-import-archive',
@@ -167,10 +165,8 @@ export interface TreeApi {
   confirmAppUpdate?: (id: string, saved: boolean) => Promise<void>
   onAppUpdateRequested?: (listener: (id: string) => void) => () => void
   onAppUpdateFinished?: (listener: (message: string | null) => void) => () => void
-  getRecentNodes?: () => Promise<string[]>
   getHideFinishedTasks?: () => Promise<boolean>
   setHideFinishedTasks?: (value: boolean) => Promise<void>
-  setRecentNodes?: (value: readonly string[]) => Promise<void>
   getAppearance: () => Promise<AppearancePreference>
   setAppearance: (value: AppearancePreference) => Promise<void>
   getCommandHistory: () => Promise<string[]>

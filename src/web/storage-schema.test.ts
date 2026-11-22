@@ -98,7 +98,7 @@ describe('browser storage transaction contracts', () => {
     expect(completed).toHaveBeenCalledOnce()
   })
 
-  it('replaces the head and removes journal and recent-node state in the same transaction', async () => {
+  it('replaces the head and removes the journal in the same transaction', async () => {
     const f = fixture()
     const head = { document: 'incoming' }
     const pending = commitImportedHead(f.db, head)
@@ -107,7 +107,7 @@ describe('browser storage transaction contracts', () => {
       durability: 'strict',
     })
     expect(f.stores.document.put).toHaveBeenCalledExactlyOnceWith(head, 'head')
-    expect(f.stores.preferences.delete.mock.calls).toEqual([['recent-nodes'], [f.range]])
+    expect(f.stores.preferences.delete.mock.calls).toEqual([[f.range]])
     expect(IDBKeyRange.bound).toHaveBeenCalledWith('import-staged:', 'import-staged:￿')
     f.tx.oncomplete!()
     await pending

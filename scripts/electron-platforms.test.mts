@@ -68,7 +68,7 @@ it('allocates every discovered Electron case with only the declared platform ove
   const macosKeys = keys(macos)
 
   const searchPresentation = full.filter(
-    (spec) => basename(spec.file) === 'recent-nodes.spec.ts' && spec.title.startsWith('presents separated results'),
+    (spec) => basename(spec.file) === 'global-search.spec.ts' && spec.title.startsWith('presents separated results'),
   )
   expect(searchPresentation).toHaveLength(2)
   for (const spec of searchPresentation) {
@@ -76,7 +76,7 @@ it('allocates every discovered Electron case with only the declared platform ove
     expect(macosKeys.has(spec.key), spec.key).toBe(true)
   }
   for (const spec of full.filter(
-    (spec) => basename(spec.file) === 'recent-nodes.spec.ts' && !searchPresentation.includes(spec),
+    (spec) => basename(spec.file) === 'global-search.spec.ts' && !searchPresentation.includes(spec),
   )) {
     expect(linuxKeys.has(spec.key), spec.key).toBe(true)
     expect(macosKeys.has(spec.key), spec.key).toBe(false)

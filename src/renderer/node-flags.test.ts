@@ -15,13 +15,12 @@ it('names a mark before a star and nothing for a plain node', () => {
 
 // @requirement PRODUCT.md §20.14
 it.each([
-  [[], 'Recent'],
-  [[{}], 'Recent'],
-  [[star, {}], 'Starred and recent'],
-  [[mark, {}], 'Marked and recent'],
-  [[both, {}], 'Marked and recent'],
-  [[mark, star], 'Marked, starred and recent'],
-  [[both, star], 'Marked, starred and recent'],
-] as const)('names the marked and starred parts only when present: %j', (items, heading) => {
+  [[], 'Marked and starred'],
+  [[star], 'Starred'],
+  [[mark], 'Marked'],
+  [[both], 'Marked'],
+  [[mark, star], 'Marked and starred'],
+  [[both, star], 'Marked and starred'],
+] as const)('names the parts that are present, and both for an empty list: %j', (items, heading) => {
   expect(initialSearchHeading(items)).toBe(heading)
 })

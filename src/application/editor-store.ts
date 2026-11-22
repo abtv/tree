@@ -113,11 +113,9 @@ import {
 } from './agenda-reconcile'
 import { TagCatalog, type TagMatch } from '../domain/tag-catalog'
 import { TAG_PREFIXES, tagPrefix, type TagPrefix } from '../domain/tags'
-import { RecentNodes } from './recent-nodes'
-import { RecentNodePersistence } from './recent-node-persistence'
 import { EmojiHistory } from './emoji-history'
 import { runNodeSearch } from './node-search'
-import type { RecentNode } from './recent-nodes'
+import type { NodeResult } from './node-result'
 import { imageSearchTextEnrichment } from '../domain/image-search-text'
 import { ImageToTextQueue } from './image-to-text-queue'
 
@@ -129,9 +127,6 @@ const ATTACHMENT_SIZE_BATCH_DELAY_MS = 100
 
 export class EditorStore {
   public readonly emojiHistory: EmojiHistory
-  private readonly recentPersistence: RecentNodePersistence
-  private readonly recentNodesOwner = new RecentNodes(() => this.recentPersistence.changed())
-  public readonly recentNodes: Pick<RecentNodes, 'getIds' | 'getResults'> = this.recentNodesOwner
   private readonly tags = new Map<TagPrefix, TagCatalog>(TAG_PREFIXES.map((prefix) => [prefix, new TagCatalog(prefix)]))
   private readonly agendaRowsCache = new AgendaRowsCache()
   private readonly agendaFoldMemory = new AgendaFoldMemory()
@@ -167,7 +162,6 @@ export class EditorStore {
     this.imageToTextQueue.reconcile(state.document)
     for (const catalog of this.tags.values()) catalog.update(state.document)
     this.searchOwner.update(state)
-    this.recentNodesOwner.update(state.document, Boolean(state.hideFinishedTasks))
     // While Agenda is open, the Tree location it returns to is still the user's path.
     const treeLocation = state.agenda?.origin.location ?? state.location
     this.returnPositions.retainPath(state.document, treeLocation.currentParentId)
@@ -203,12 +197,6 @@ export class EditorStore {
   ) {
     this.clock = clock
     this.emojiHistory = new EmojiHistory(services.saveEmojiHistory?.bind(services), (error) => this.reportError(error))
-    this.recentPersistence = new RecentNodePersistence(
-      clock,
-      this.recentNodes.getIds,
-      services.saveRecentNodes?.bind(services),
-      (error) => this.reportError(error),
-    )
     this.textSession = new EditorTextSession(clock)
     this.saveScheduler = new EditorSaveScheduler(
       services,
@@ -246,9 +234,9 @@ export class EditorStore {
 
   public subscribe = this.runtime.subscribe
 
-  public initialSearchResults(): readonly RecentNode[] {
+  public initialSearchResults(): readonly NodeResult[] {
     const state = this.runtime.ready()
-    return [...markedAndStarredNodes(state.document, state.hideFinishedTasks), ...this.recentNodes.getResults()]
+    return markedAndStarredNodes(state.document, state.hideFinishedTasks)
   }
 
   public get treeSelectionHidden(): boolean {
@@ -324,7 +312,7 @@ export class EditorStore {
     return suggestions.length === 1 && query === `${prefix}${suggestions[0]}` ? [] : suggestions
   }
 
-  public searchNodes(query: string, publish: (results: readonly RecentNode[]) => void): () => void {
+  public searchNodes(query: string, publish: (results: readonly NodeResult[]) => void): () => void {
     if (query === '') {
       publish([])
       return () => undefined
@@ -572,7 +560,6 @@ export class EditorStore {
         // requestImmediateSave returns early without pending changes, so this guard only avoids the call.
         if (this.saveScheduler.hasPendingChanges()) this.saveScheduler.requestImmediateSave('flush')
         await this.saveScheduler.flush()
-        await this.recentPersistence.flush()
         await this.emojiHistory.flush()
         await this.finishedTasksWrite
         // Metadata writes leave editing available. An immediate save started meanwhile has
@@ -583,7 +570,6 @@ export class EditorStore {
         committed ||
         this.pendingEdits.size > 0 ||
         this.saveScheduler.hasPendingChanges() ||
-        this.recentPersistence.hasPendingChanges() ||
         this.emojiHistory.hasPendingChanges()
       )
       const seal = options.sealEditsUntil
@@ -671,7 +657,6 @@ export class EditorStore {
         this.services.loadHideFinishedTasks?.().catch(() => false),
       ])
       this.emojiHistory.load(await this.services.loadEmojiHistory?.().catch(() => []))
-      const recent = await this.services.loadRecentNodes?.().catch(() => [])
       if (loaded === null) {
         const rootId = this.createId()
         this.runtime.snapshot = {
@@ -683,7 +668,6 @@ export class EditorStore {
           expansion: COLLAPSED_EXPANSION_STATE,
           hideFinishedTasks: hideFinishedTasks === true,
         }
-        this.recentNodesOwner.load(recent, this.runtime.snapshot.document, hideFinishedTasks === true)
         this.runtime.emit()
         this.saveScheduler.requestSave()
         this.queueAttachmentCleanup()
@@ -696,7 +680,6 @@ export class EditorStore {
       this.selectedRowTop = parsed.view?.selectedRowTop
       this.restoredSelectedRowTop = parsed.view?.selectedRowTop
       this.agendaFoldMemory.restore(parsed.view?.agendaFolds)
-      this.recentNodesOwner.load(recent, parsed.document, hideFinishedTasks === true)
       // Publication activates the view of the displayed location and checks the selection against it.
       this.runtime.replaceReady({
         status: 'ready',
@@ -844,7 +827,6 @@ export class EditorStore {
       this.textSession.begin(nodeId)
     }
     const insertedWords = countInsertedWords(node.text, text)
-    this.recentNodesOwner.remember(nodeId, next)
     this.runtime.replaceReady({ ...state, document: next, expansion: this.retainedViews(state.expansion, next) })
     this.noteChange(insertedWords, createsNewLink)
     this.textSession.scheduleBoundary()
@@ -1013,7 +995,6 @@ export class EditorStore {
       selected?.kind === 'node' ? { currentParentId: null, selectedNodeId: selected.nodeId } : state.location
     const transition = enterTransition(state.document, location)
     if (transition === undefined) return
-    this.recentNodesOwner.remember(location.selectedNodeId, state.document)
     // Agenda's rows are not the list going back shows, so entering from Agenda records no position.
     const rowTop = state.agenda === undefined ? this.readSelectedRowTop?.() : undefined
     // An entry without a measurement must not leave an older position of the same node in place.
@@ -1034,7 +1015,8 @@ export class EditorStore {
     this.markPersistedChange()
   }
 
-  public visitRecentNode(nodeId: NodeId): void {
+  /** Shows a node chosen in global Search (`docs/PRODUCT.md` §20.14). */
+  public openSearchResult(nodeId: NodeId): void {
     const state = this.runtime.ready()
     const found = locateNode(state.document, nodeId)
     if (found === undefined || (state.hideFinishedTasks && found.node.struckThrough)) return
@@ -1045,7 +1027,6 @@ export class EditorStore {
     this.hideSearch()
     const tree = { ...this.runtime.ready() }
     delete tree.agenda
-    this.recentNodesOwner.remember(nodeId, state.document)
     this.runtime.replaceReady(
       {
         ...tree,
@@ -1785,7 +1766,6 @@ export class EditorStore {
   ): boolean {
     const state = this.runtime.ready()
     if (this.isPersistenceLocked()) return false
-    this.recentNodesOwner.recordChange(state.document, document, focus.nodeId)
     if (this.history.begin(state.document, document)) this.queueAttachmentCleanup()
     this.runtime.replaceReady(
       { ...state, document, location, focus, expansion: this.retainedViews(expansion, document) },

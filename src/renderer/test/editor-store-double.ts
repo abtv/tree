@@ -71,8 +71,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     reindexAllImages: vi.fn(),
     recordAttachmentDimensions: vi.fn(),
     emojiHistory: new EmojiHistory(undefined, () => undefined),
-    recentNodes: new RecentNodes(),
-    initialSearchResults: vi.fn(() => double.recentNodes.getResults()),
+    initialSearchResults: vi.fn(() => []),
     treeSelectionHidden: false,
     isTaskHidden: vi.fn(() => false),
     setHideFinishedTasks: vi.fn(async () => undefined),
@@ -85,7 +84,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
       publish([])
       return () => undefined
     }),
-    visitRecentNode: vi.fn(),
+    openSearchResult: vi.fn(),
     suggestTags: vi.fn(() => undefined),
     search: new EditorSearch(() => false, new AgendaRowsCache()),
     hideSearch: vi.fn(),
@@ -163,4 +162,3 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
 
   return double as EditorStore
 }
-import { RecentNodes } from '../../application/recent-nodes'

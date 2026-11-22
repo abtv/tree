@@ -1,8 +1,8 @@
 import type { Document, TreeNode } from '../domain/document'
-import { completionPresentation, label, resultText, type RecentNode } from './recent-nodes'
+import { completionPresentation, label, resultText, type NodeResult } from './node-result'
 
 const containsFlag = new WeakMap<TreeNode, boolean>()
-const results = new WeakMap<Document, readonly RecentNode[]>()
+const results = new WeakMap<Document, readonly NodeResult[]>()
 
 function hasFlag(node: TreeNode): boolean {
   const cached = containsFlag.get(node)
@@ -17,16 +17,16 @@ function hasFlag(node: TreeNode): boolean {
  * (`docs/PRODUCT.md` §20.14). Prepared only when opening/clearing Search; unchanged branches reuse
  * their summaries.
  */
-export function markedAndStarredNodes(document: Document, hideFinishedTasks = false): readonly RecentNode[] {
+export function markedAndStarredNodes(document: Document, hideFinishedTasks = false): readonly NodeResult[] {
   const all = allMarkedAndStarredNodes(document)
   return hideFinishedTasks ? all.filter((node) => !node.struckThrough) : all
 }
 
-function allMarkedAndStarredNodes(document: Document): readonly RecentNode[] {
+function allMarkedAndStarredNodes(document: Document): readonly NodeResult[] {
   const cached = results.get(document)
   if (cached !== undefined) return cached
-  const marked: { key: string; result: RecentNode }[] = []
-  const starred: { key: string; result: RecentNode }[] = []
+  const marked: { key: string; result: NodeResult }[] = []
+  const starred: { key: string; result: NodeResult }[] = []
   const visit = (nodes: readonly TreeNode[], ancestors: readonly TreeNode[]): void => {
     for (const node of nodes) {
       if (!hasFlag(node)) continue

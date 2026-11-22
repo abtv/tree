@@ -4237,7 +4237,7 @@ describe('EditorStore', () => {
     })
   })
 
-  describe.each(['recent', 'emoji'] as const)('late edits during %s persistence', (preference) => {
+  describe('late edits during emoji persistence', () => {
     // @requirement PRODUCT.md §16.1
     it.each(['text', 'buffered', 'pending-paste', 'immediate'] as const)(
       'waits for a late %s edit and its document save',
@@ -4247,9 +4247,7 @@ describe('EditorStore', () => {
           { currentParentId: null, selectedNodeId: 'root' },
         )
         const writePreference = vi.fn(async (): Promise<void> => undefined)
-        services.loadRecentNodes = async () => []
-        if (preference === 'recent') services.saveRecentNodes = writePreference
-        else services.saveEmojiHistory = writePreference
+        services.saveEmojiHistory = writePreference
         const store = new EditorStore(services, ids('new'), new FakeClock())
         await store.initialize()
         await store.flushPersistence()
@@ -4282,7 +4280,7 @@ describe('EditorStore', () => {
           return true
         })
         store.editText('root', 'before')
-        if (preference === 'emoji') store.emojiHistory.remember('smile')
+        store.emojiHistory.remember('smile')
         let flushed = false
         const flush = store.flushPersistence().then(() => {
           flushed = true
@@ -4340,14 +4338,9 @@ describe('EditorStore', () => {
     )
   })
 
-  it.each(['recent', 'emoji'] as const)('drains late %s changes after the final document save', async (preference) => {
+  it('drains late emoji changes after the final document save', async () => {
     const services = loadedState(
-      {
-        roots: [
-          { id: 'root', text: 'initial', children: [] },
-          { id: 'other', text: '', children: [] },
-        ],
-      },
+      { roots: [{ id: 'root', text: 'initial', children: [] }] },
       { currentParentId: null, selectedNodeId: 'root' },
     )
     let releaseSave!: () => void
@@ -4363,17 +4356,16 @@ describe('EditorStore', () => {
       services.saves.push(state)
       if (services.saves.length === 2) await pendingSave
     }
-    let recentWrites = 0
-    const recent = vi.fn(async () => {
-      if (++recentWrites === 1) store.editText('root', words)
+    let emojiWrites = 0
+    const emoji = vi.fn(async () => {
+      if (++emojiWrites === 1) store.editText('root', words)
       else await pendingPreference
     })
-    const emoji = vi.fn(async () => pendingPreference)
-    services.saveRecentNodes = recent
     services.saveEmojiHistory = emoji
     const store = new EditorStore(services, ids('new'), new FakeClock())
     await store.initialize()
     store.editText('root', 'before')
+    store.emojiHistory.remember('smile')
     let flushed = false
     const flush = store.flushPersistence().then(() => {
       flushed = true
@@ -4381,23 +4373,18 @@ describe('EditorStore', () => {
     await vi.waitFor(() => expect(services.saves).toHaveLength(2))
     await tick()
 
-    if (preference === 'emoji') store.emojiHistory.remember('heart')
-    else {
-      store.selectNode('other', 0)
-      store.editText('other', words)
-    }
+    store.emojiHistory.remember('heart')
     releaseSave()
     await tick()
 
     expect(flushed).toBe(false)
-    if (preference === 'emoji') expect(emoji).toHaveBeenCalledOnce()
-    else expect(recent).toHaveBeenCalledTimes(2)
+    expect(emoji).toHaveBeenCalledTimes(2)
 
     releasePreference()
     await flush
 
     expect(flushed).toBe(true)
-    expect(services.saves).toHaveLength(preference === 'emoji' ? 2 : 3)
+    expect(services.saves).toHaveLength(2)
   })
 
   it('reports a late immediate-save failure before retrying after metadata persistence', async () => {

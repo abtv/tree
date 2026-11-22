@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   bootstrap: vi.fn(),
   ipc: vi.fn(),
   menu: vi.fn(),
-  fileServices: { loadRecentNodes: vi.fn(), saveRecentNodes: vi.fn() },
+  fileServices: {},
   archive: {
     cancel: vi.fn(async () => undefined),
     shutdown: vi.fn((): Promise<void> | null => null),
@@ -1397,21 +1397,17 @@ describe('desktop entry wiring', () => {
     expect(quit).toHaveBeenCalledOnce()
   })
 
-  it('persists preferences and forwards history through IPC services', async () => {
+  it('persists preferences through IPC services', async () => {
     const { ipc, actions, window } = await setup()
     actions().setVimEnabled(true)
     actions().setAlwaysOnTop(true)
     ipc.setVimEnabled!(false)
     ipc.setAlwaysOnTop!(false)
-    ipc.setRecentNodes!(['node'])
-    ipc.getRecentNodes!()
 
     expect(mocks.booleanStore.save.mock.calls).toEqual([[true], [true], [false], [false]])
     expect(window.setAlwaysOnTop).toHaveBeenLastCalledWith(false)
     expect(window.webContents.send).toHaveBeenCalledWith(ipcEvents.vimEnabledChanged, true)
     expect(window.webContents.send).toHaveBeenCalledWith(ipcEvents.alwaysOnTopChanged, true)
-    expect(mocks.fileServices.saveRecentNodes).toHaveBeenCalledWith(['node'])
-    expect(mocks.fileServices.loadRecentNodes).toHaveBeenCalledOnce()
   })
 
   it('resets operation availability and the pending quit only for main-frame navigation and renderer loss', async () => {

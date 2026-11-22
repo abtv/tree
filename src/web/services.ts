@@ -155,8 +155,6 @@ export async function installBrowserPrototype(): Promise<{
     },
     loadEmojiHistory: async () => (await read<unknown>('preferences', 'emoji-history')) ?? [],
     saveEmojiHistory: (names) => write('preferences', 'emoji-history', names),
-    loadRecentNodes: async () => (await read<unknown>('preferences', 'recent-nodes')) ?? [],
-    saveRecentNodes: (ids) => write('preferences', 'recent-nodes', ids),
     async load() {
       const saved = await read<unknown>('document', 'head')
       if (saved !== undefined) {

@@ -48,7 +48,9 @@ test('keeps completion after toggling a node and searching for its person marker
 })
 
 // @requirement PRODUCT.md §2.5
-test('shows completion in breadcrumbs, recent nodes and searched parent paths', async ({ userDataDir }, testInfo) => {
+test('shows completion in breadcrumbs, starred Search entries and searched parent paths', async ({
+  userDataDir,
+}, testInfo) => {
   seedDocument(userDataDir, {
     document: {
       roots: [
@@ -60,9 +62,9 @@ test('shows completion in breadcrumbs, recent nodes and searched parent paths', 
               id: 'done',
               text: 'Done branch',
               struckThrough: true,
-              children: [{ id: 'leaf', text: 'Finished task', struckThrough: true, children: [] }],
+              children: [{ id: 'leaf', text: 'Finished task', struckThrough: true, starred: true, children: [] }],
             },
-            { id: 'other', text: 'Unfinished task', children: [] },
+            { id: 'other', text: 'Unfinished task', starred: true, children: [] },
           ],
         },
       ],
@@ -70,8 +72,6 @@ test('shows completion in breadcrumbs, recent nodes and searched parent paths', 
     location: { currentParentId: 'done', selectedNodeId: 'leaf' },
   })
   const { window } = await launchTree(userDataDir)
-  await window.evaluate(() => globalThis.window.treeApi.setRecentNodes!(['leaf', 'other']))
-  await window.reload()
   await expect(window.locator('.location-current')).toHaveText('Done branch')
 
   for (const appearance of ['light', 'dark'] as const) {
@@ -88,7 +88,7 @@ test('shows completion in breadcrumbs, recent nodes and searched parent paths', 
     await expect(title).toHaveCSS('text-decoration-line', 'line-through')
     await expect(title).toHaveCSS('color', muted)
     await expect(window.locator('[data-result-id="other"] .recent-node-text')).toHaveCSS('text-decoration-line', 'none')
-    await window.screenshot({ path: testInfo.outputPath(`recent-${appearance}.png`) })
+    await window.screenshot({ path: testInfo.outputPath(`initial-${appearance}.png`) })
 
     await window.getByRole('searchbox').fill('task')
     await expect(title).toHaveCSS('text-decoration-line', 'line-through')

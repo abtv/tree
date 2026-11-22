@@ -80,7 +80,7 @@ describe('return positions when leaving a node', () => {
     expect(snapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'a' })
     expect(returnRowTop(store)).toBe(300)
 
-    store.visitRecentNode('c')
+    store.openSearchResult('c')
     store.leave()
 
     expect(snapshot(store).location).toEqual({ currentParentId: 'b', selectedNodeId: 'c' })
@@ -97,7 +97,7 @@ describe('return positions when leaving a node', () => {
     enter(store, measure, 'a', 300)
     store.leave()
 
-    store.visitRecentNode('a')
+    store.openSearchResult('a')
     store.leave()
 
     expect(snapshot(store).location).toEqual({ currentParentId: null, selectedNodeId: 'a' })
@@ -108,7 +108,7 @@ describe('return positions when leaving a node', () => {
     const { store, measure } = await open()
     enter(store, measure, 'a', 300)
 
-    store.visitRecentNode('x')
+    store.openSearchResult('x')
     store.leave()
 
     expect(snapshot(store).location).toEqual({ currentParentId: 'a', selectedNodeId: 'x' })
@@ -119,8 +119,8 @@ describe('return positions when leaving a node', () => {
     expect(returnRowTop(store)).toBe(300)
 
     enter(store, measure, 'a', 250)
-    store.visitRecentNode('other')
-    store.visitRecentNode('x')
+    store.openSearchResult('other')
+    store.openSearchResult('x')
     store.leave()
     store.leave()
 

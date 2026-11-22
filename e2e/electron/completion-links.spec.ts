@@ -108,7 +108,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
             text: url,
             links,
             struckThrough: true,
-            children: [{ id: 'done', text, links, struckThrough: true, children: [] }],
+            children: [{ id: 'done', text, links, struckThrough: true, starred: true, children: [] }],
           },
           { id: 'open', text: `${url} 2026-10-09`, links, children: [] },
         ],
@@ -181,7 +181,7 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
         'color',
         await input.locator('a').evaluate((el) => getComputedStyle(el).color),
       )
-      await window.screenshot({ path: testInfo.outputPath(screenshotName(`links-recent-${appearance}.png`)) })
+      await window.screenshot({ path: testInfo.outputPath(screenshotName(`links-starred-${appearance}.png`)) })
       await window.getByRole('searchbox').fill('example')
     }
     await window.keyboard.press('Escape')

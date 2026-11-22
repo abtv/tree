@@ -15,8 +15,6 @@ export interface EditorServices {
   imageToText?(attachmentId: AttachmentId): Promise<string[]>
   loadEmojiHistory?(): Promise<unknown>
   saveEmojiHistory?(names: readonly string[]): Promise<void>
-  loadRecentNodes?(): Promise<unknown>
-  saveRecentNodes?(ids: readonly string[]): Promise<void>
   today?(): DayNumber
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>

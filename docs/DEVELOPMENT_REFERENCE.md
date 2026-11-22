@@ -152,14 +152,14 @@ hosted evidence justifies changing it.
 #### Scroll rendering regressions
 
 `tree-scroll-rendering.spec.ts`, `agenda-scroll-rendering.spec.ts`,
-`scroll-frames.spec.ts` and the search selection case in `recent-nodes.spec.ts`
+`scroll-frames.spec.ts` and the search selection case in `global-search.spec.ts`
 belong to the ordinary Electron E2E suite. Run them through `npm run test:e2e`
 or `make test-e2e`, or select a spec with `npm run test:e2e -- <spec>`.
 The existing full Electron CI workflow includes them for release candidates,
 weekly runs and manual dispatch. They have no separate PR/main invocation and
 are not included in `make test-smoke` or the `test:smoke:*` commands.
 The existing platform allocation keeps the Tree/Agenda and pixel-frame specs on
-macOS; `recent-nodes.spec.ts` runs on Linux. Browser smoke does not check scroll frames.
+macOS; `global-search.spec.ts` runs on Linux. Browser smoke does not check scroll frames.
 
 The first two check continuous row coverage after large scroll jumps and preserve
 the pinned editor/caret in both editing modes. Coverage sums the union of visible
@@ -177,7 +177,7 @@ This detects empty sampled regions; it does not prove glyph fidelity, observe ev
 presented frame, reproduce physical trackpad inertia, or enforce frame-time budgets.
 Timing checks remain local.
 
-The `recent-nodes.spec.ts` case matching
+The `global-search.spec.ts` case matching
 `keeps selection visible in every animation frame` is mode-independent and runs in both
 appearances. It checks selected-row geometry on animation-frame callbacks;
 the light-appearance pixel case complements that check. The ordinary Electron E2E
@@ -202,7 +202,7 @@ The shared happy path opens the production build with isolated synthetic data, t
 
 After the volume-triggered save, the scenario replaces the child's final punctuation in Vim Replace and verifies both the visible buffered text and the unchanged stored document. It quits without blurring or ending Replace and requires the replacement to survive reopening. Ordinary autosave cannot persist that renderer buffer, including with the browser's shorter save interval. Electron uses the application-menu Quit and requires a clean process exit before fixture cleanup. Chromium uses the primary-modifier Quit shortcut. Safari invokes the production `treeApi.quit()` adapter while keeping editor focus because SafariDriver does not deliver that shortcut to the application. Both browsers require the script-opened application window to close, then reopen the same origin through an isolated launcher window. This Safari check verifies the real save-and-close boundary, not native Quit shortcut delivery. There is no mocked persistence, explicit test flush, clock override or idle wait.
 
-The scenario edits the dated child in Agenda, undoes and redoes that text edit, and verifies the resulting text after returning to Tree. It also opens Search with `Cmd+;` (`Ctrl+;` outside Apple platforms), moves between the recent nodes with ArrowDown/ArrowUp, cancels with Escape and checks restored focus, then reopens and confirms the child with Enter, checking its real parent context and focused text. It then returns to the root, searches for the parent, checks the matching parent and child results, and confirms that opening the parent focuses its first child in Tree.
+The scenario edits the dated child in Agenda, undoes and redoes that text edit, and verifies the resulting text after returning to Tree. It also opens Search with `Cmd+;` (`Ctrl+;` outside Apple platforms), searches for the parent, checks the matching parent and child results, moves between them with ArrowUp/ArrowDown, cancels with Escape and checks restored focus, then searches again and confirms the child with Enter, checking its real parent context and focused text. It then returns to the root, searches for the parent again, and confirms that opening the parent focuses its first child in Tree.
 
 Build first with `npm run build` (Electron) or `npm run build:web` (browser), then run `npm run test:smoke:electron`, `npm run test:smoke:chromium`, or `npm run test:smoke:safari`. The Chromium command uses Chrome on macOS for local diagnosis and Playwright Chromium on Linux. The Safari command takes no arguments. On a local Mac, Safari Remote Automation must already be enabled by the owner; CI enables it only on its disposable runner. Linux Electron requires a display (CI supplies Xvfb), and disables Chromium's sandbox only in Linux CI.
 

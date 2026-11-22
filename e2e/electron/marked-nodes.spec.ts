@@ -92,7 +92,7 @@ test.describe('Mark presentation', () => {
 
       await window.keyboard.press('Meta+;')
       const popup = window.getByRole('dialog', { name: 'Search' })
-      await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked and recent')
+      await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked')
       await expect(popup.locator('.recent-node-text')).toHaveText([
         'Review budget',
         'Write the report',
@@ -161,7 +161,7 @@ describeForEachEditingMode('Marked nodes @linux', () => {
     const second = await launchTree(userDataDir)
     await second.window.keyboard.press('Meta+;')
     const popup = second.window.getByRole('dialog', { name: 'Search' })
-    await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked, starred and recent')
+    await expect(popup.locator('.node-search-results-heading')).toHaveText('Marked and starred')
     await expect(popup.locator('.recent-node-text')).toHaveText(['Zulu', 'Alpha'])
     await popup.getByRole('searchbox').fill('l')
     await expect(popup.locator('.recent-node-text')).toHaveText(['Zulu', 'Alpha'])

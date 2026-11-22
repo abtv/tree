@@ -141,7 +141,7 @@ export function GlobalSearchPopup({
   const session = useMemo(
     () =>
       new GlobalSearchSession({
-        recent: () => store.initialSearchResults(),
+        initial: () => store.initialSearchResults(),
         suggestions: (query) => store.searchNodeSuggestions(query),
         search: (query, publish) => store.searchNodes(query, publish),
       }),
@@ -232,7 +232,7 @@ export function GlobalSearchPopup({
     if (id === undefined) return
     restore.current()
     beforeVisit()
-    store.visitRecentNode(id)
+    store.openSearchResult(id)
   }
 
   useEffect(
@@ -589,7 +589,7 @@ export function GlobalSearchPopup({
       <div
         ref={panel}
         role="listbox"
-        aria-label={query === '' ? 'Recent nodes' : 'Search results'}
+        aria-label={query === '' ? 'Marked and starred nodes' : 'Search results'}
         aria-busy={pending}
         className="node-search-results"
         style={{ flexBasis: items.length > 0 ? layout.total : undefined }}
@@ -603,7 +603,9 @@ export function GlobalSearchPopup({
       >
         {items.length === 0 ? (
           suggestions.length > 0 ? null : (
-            <div className="recent-node-empty">{displayedQuery === '' ? 'No recent nodes' : 'No results'}</div>
+            <div className="recent-node-empty">
+              {displayedQuery === '' ? 'No marked or starred nodes' : 'No results'}
+            </div>
           )
         ) : (
           <div

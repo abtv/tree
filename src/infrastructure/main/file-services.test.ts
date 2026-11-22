@@ -1241,13 +1241,11 @@ describe('notes export and import support', () => {
     return staging
   }
 
-  it('identifies affected paths in recovery, history, cleanup, snapshot and replacement diagnostics', async () => {
+  it('identifies affected paths in recovery, cleanup, snapshot and replacement diagnostics', async () => {
     const logger = vi.fn()
     const { directory, services } = await archiveServicesForTest(logger)
 
     await services.load()
-    await services.saveRecentNodes!(['root'])
-    await services.loadRecentNodes!()
     await services.cleanupAttachments([])
     const snapshot = await services.snapshotDocuments()
     const staging = await stageImport(services, stateWithImage('new'), 'new')
@@ -1255,8 +1253,6 @@ describe('notes export and import support', () => {
 
     const operations = [
       ['load', [join(directory, 'document.json'), join(directory, 'document.json.tmp'), directory]],
-      ['recentNodes', [directory]],
-      ['recentNodes', [directory]],
       ['cleanupAttachments', [join(directory, 'attachments')]],
       ['snapshotDocuments', [directory, snapshot]],
       ['replaceNotes', [directory, staging]],

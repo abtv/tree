@@ -24,7 +24,7 @@ Each section number is listed once, with the file that holds its heading.
 | 20, 20.1, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8 | [interaction.md](product/interaction.md) |
 | 20.2, 20.2.1, 20.2.2, 20.2.3, 20.2.4, 20.2.5, 20.2.6, 20.2.8, 20.2.9, 20.2.10, 20.2.11, 20.2.12, 20.2.13, 20.2.14, 20.2.15, 20.2.16, 20.2.17, 20.2.18, 20.2.19, 20.2.20, 20.2.21, 20.2.22, 20.2.23, 20.2.24, 20.2.25, 20.2.27 | [vim.md](product/vim.md) |
 | 20.2.7, 20.2.28, 20.2.29, 20.2.30 | [command-panel.md](product/command-panel.md) |
-| 20.2.26, 20.14, 20.14.1, 20.14.2, 20.14.3, 20.14.4 | [search.md](product/search.md) |
+| 20.2.26, 20.14, 20.14.2, 20.14.3, 20.14.4 | [search.md](product/search.md) |
 | 20.9, 20.9.1, 20.9.2, 20.9.3, 20.10, 20.11, 20.12, 20.13 | [completion-and-tags.md](product/completion-and-tags.md) |
 | 22, 22.1, 22.2 | [non-functional.md](product/non-functional.md) |
 | 23, 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10, 23.11, 23.12, 23.13, 23.14, 23.15 | [agenda.md](product/agenda.md) |
@@ -38,4 +38,5 @@ A number whose content leaves the specification is listed here with the document
 | Number | Now owned by |
 | --- | --- |
 | 15.2 | Removed. Summarize left the product; see [ADR 0031](decisions/0031-remove-on-device-summarization.md). |
+| 20.14.1 | Removed. Recent nodes and their saved history left the product (2026-11-22); global Search lists marked and starred nodes for empty input (§20.14). |
 | 1.4.1 | [macOS releases](releasing.md): release identity, tag reservation, and retries. [Development Reference, GitHub Actions](DEVELOPMENT_REFERENCE.md#github-actions): validation gates before publication. [Security Policy](SECURITY.md#browser-publication): signed manifest and publisher trust. [Automatic browser publication](../deployment/github-pages/README.md): asset retention, limits, and the cancellation rule. |

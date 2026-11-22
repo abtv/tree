@@ -301,7 +301,6 @@ it.each([
   expect(seen[0]!.focus).toMatchObject({ nodeId: 'context', cursor: 0 })
   expect(seen[0]!.focus.token).not.toBe(before.focus.token)
   expect(seen[0]!.document).toBe(before.document)
-  expect(store.recentNodes.getIds()[0]).toBe('scope')
 
   await store.flushPersistence()
   await store.flushPersistence()

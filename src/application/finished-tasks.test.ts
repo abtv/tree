@@ -29,7 +29,6 @@ async function harness(roots: TreeNode[], location: Location) {
     load,
     loadHideFinishedTasks,
     saveHideFinishedTasks,
-    loadRecentNodes: async () => ['done', 'next'],
     save,
     today: () => today,
     readClipboard: async () => ({ kind: 'text', text: '' }),
@@ -62,7 +61,7 @@ it('ascends from a completed branch, preserves notes, and restarts with the same
 })
 
 it('keeps Agenda occurrence navigation, focused-day rows, and search on the same unfinished tasks', async () => {
-  const { store } = await harness([task('before', true), task('done', true), task('next')], {
+  const { store } = await harness([task('before', true), task('done', true), { ...task('next'), starred: true }], {
     currentParentId: null,
     selectedNodeId: 'before',
   })
@@ -191,7 +190,7 @@ it('still finds unfinished descendants in folded branches and rejects hidden des
 
   store.selectNode('missing', 0)
   store.selectNode('done', 0)
-  store.visitRecentNode('done')
+  store.openSearchResult('done')
 
   expect(store.getSnapshot()).toBe(before)
   expect(store.isTaskHidden('missing')).toBe(false)
@@ -312,14 +311,14 @@ it('updates cached rows when visibility changes and opens search results from th
   await store.setHideFinishedTasks(true)
 
   expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['next', 'start'])
-  store.visitRecentNode('next')
+  store.openSearchResult('next')
   expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'next' } })
 
   await store.setHideFinishedTasks(false)
 
   expect(store.getVisibleRows().map((row) => row.node.id)).toEqual(['done', 'next', 'start'])
   expect(store.isTaskHidden('done')).toBe(false)
-  store.visitRecentNode('done')
+  store.openSearchResult('done')
   expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'done' } })
   await store.flushPersistence()
 })

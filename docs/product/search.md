@@ -111,31 +111,29 @@ persisted in documents, view state, preferences or backups.
 Visual-mode search entry, backward `?` entry, regex and operator search motions are
 not supported.
 
-### 20.14 Search and Recent Nodes
+### 20.14 Search
 
 `Cmd+;` opens global Search in Tree or Agenda, in standard editing and every Vim mode. `Cmd+F` opens local search (§20.2). Outside Apple platforms they use Ctrl (§1.5). Cmd+; deliberately replaces macOS's check-spelling shortcut with the owner's frequently used navigation command (§1.3).
 
-* The input receives focus and starts empty on every opening. Empty input shows recent nodes as below.
+* The input receives focus and starts empty on every opening. Empty input shows marked and starred nodes as below.
 * Valid `#tag`, `@person` and `&event` terms in the query use the same color, bold weight and transparent background as search suggestion and result matches. Ordinary terms and invalid marker terms stay plain. Native text editing, selection, horizontal scrolling, clearing and composition remain available. Result highlighting still marks query matches independently of query-term styling and retains its match underline.
 * Every nonempty query searches required terms using the ancestor-context and per-term smart-case rules in §20.14.3. Results update as the input changes.
 * Search covers the entire document, including folded nodes and nodes outside the current Tree or Agenda scope, subject to finished-task visibility (§2.5). Each matching node appears once with its text and parent path, in the order specified in §20.14.3.
 * All results are reachable by scrolling and keyboard selection. Pending work lasting more than 200ms displays `Searching…` once in the footer; no matches displays `No results`. Typing does not navigate or edit the document.
 * While tag suggestions are visible, an empty node-result list does not display `No results`.
-* Pending searches retain rows, empty-state text and list height; stale rows cannot be activated or navigated. Without tag suggestions, the footer keeps its hint for 200ms, then shows `Searching…`. Results replace the list atomically, including short queries and queries with no matches. Clearing restores recent nodes. Completion, clearing and closing cancel the indicator timer.
+* Pending searches retain rows, empty-state text and list height; stale rows cannot be activated or navigated. Without tag suggestions, the footer keeps its hint for 200ms, then shows `Searching…`. Results replace the list atomically, including short queries and queries with no matches. Clearing restores the marked and starred list. Completion, clearing and closing cancel the indicator timer.
 * The popup is centered horizontally and vertically when opened, using its initial content height. Its top edge, width and input position then remain unchanged during query changes; only the bottom edge adapts to content, up to the available window height. Resizing the application window recenters the popup within the new available space. Lists scroll within the available space.
 * On small windows Search uses up to 92% of the window width with at least 12 px on each side. This width levels off at 960 px until 80% of the window exceeds it, then grows to a maximum of 1040 px. The height limit is 88% for windows up to 900 px tall and 80% otherwise, constrained by space below the fixed top edge. Short lists retain a compact height. The document and application chrome behind Search are dimmed without blur or animation.
-* The search field is the first visible element. Section headings identify recent nodes, marker suggestions and matching results. Section labels, field text, options, paths and keyboard hints share a left edge. Only the active list shows selection.
+* The search field is the first visible element. Section headings identify marked and starred nodes, marker suggestions and matching results. Section labels, field text, options, paths and keyboard hints share a left edge. Only the active list shows selection.
 * The 27 px footer displays `↑↓ Select`, `↵ Open` and `Esc Close`. During marker completion it displays `↵/Tab Apply` for the middle action. Accepting a suggestion returns focus to the completed query and activates result navigation.
 * When the node-result list is active and nonempty, the trailing edge of its `Results` heading shows the selected row and total as `3 / 24`. The total covers all matching nodes, including those outside the rendered scroll window. A selected group heading shows the position of its first matching node and the same total. The counter starts at the same position as selection moves between nodes and group headings. The separator in the row counter stays in place as the number of digits changes.
-* Recent nodes with empty input have no counter. The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
+* The marked and starred list with empty input has no counter. The indicator is hidden during tag completion or when there are no node results. The footer contains keyboard hints or the pending-search status, not the result counter.
 
 Search work yields between batches and obsolete queries are cancelled on refinement or dismissal. Result rendering is windowed. A document replacement refreshes the active query. Search text is not persisted or recalled; the independent Vim `/` search follows §20.2.26. Resource constraints are in §20.14.3.
 
-With empty input the popup first lists all marked nodes (§2.7), then all starred nodes (§2.6) that are not marked. Each of these two parts is sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. Then it lists up to eight distinct recent nodes that are neither marked nor starred, most recently used first.
+With empty input the popup lists all marked nodes (§2.7), then all starred nodes (§2.6) that are not marked. Each of these two parts is sorted alphabetically by the full ancestor path and node name, without the display preview cutoff. Equal names keep document order. No other nodes appear, and editing or visiting a node does not add it to this list.
 
-All parts use the consecutive-parent grouping of §20.14.2. The first result is selected. The heading names the marked and starred parts only when they are present, and always ends with the recent part: `Marked, starred and recent`, `Marked and recent`, `Starred and recent`, or `Recent`. An empty combined list displays `No recent nodes`. Clearing the query restores this list.
-
-Creating or changing a node's content, explicitly entering it, or confirming a recent-node jump moves it to the front. Repeated editing of the first entry does not reorder history. Mass edits/pastes record the resulting focused change-site once, rather than each affected descendant. Ordinary selection, folding, startup, and Undo/Redo do not count as use. Deleted nodes are omitted and titles and paths follow edits and moves.
+Both parts use the consecutive-parent grouping of §20.14.2. The first result is selected. The heading names the parts that are present: `Marked and starred`, `Marked`, or `Starred`. An empty list keeps the heading `Marked and starred` and displays `No marked or starred nodes`. Clearing the query restores this list. Titles and paths follow edits and moves.
 
 * Without tag suggestions, Up and Down cycle through group headings and node results in display order. The first node is initially selected.
 * Arrow navigation keeps visible results in place and scrolls only far enough to reveal the next selected row. If that row exceeds the available list height, reveal its first highlighted match, or its beginning when no match exists. Late-arriving highlights also reveal that match for the active selection. Ordinary manual scrolling does not repeatedly return to the match. Crossing the list boundary wraps to the opposite end. Selection changes the highlight, not the text size or row geometry. Resizing invalidates measured row heights and preserves correct navigation and scrolling.
@@ -144,25 +142,19 @@ Creating or changing a node's content, explicitly entering it, or confirming a r
 * Enter or clicking a result or group heading closes the popup and finishes buffered editing. A heading targets its parent node. If the target has children, Tree enters it as the current parent and applies the usual child selection (§6.1). For a leaf, Tree shows its parent, or the root list for a top-level leaf, and places the caret at the start of the leaf.
 * Escape, outside dismissal and window deactivation close without a jump and restore the originating editor selection and mode.
 * Opening borrows editing focus, clears unfinished Vim commands and cancels a pending search draft as the command panel does. Modal dialogs, IME composition and the open command panel retain their input.
-* Recent-node order stays fixed until the input changes or dismissal. There is no animation.
-
-#### 20.14.1 History Persistence
-
-History retains at most 100 IDs separately from document content, undo and notes export. Dirty history saves every 30 seconds and during normal persistence flush, including shutdown; an abrupt exit may lose the unsaved history interval. Writes are serialized and desktop replacement is atomic. Missing or unreadable history starts empty. Write failures use the operation-error surface; pending history can retry on the next flush. Notes replacement resets the history even when imported IDs coincide. Browser history uses the current profile's local storage and writer-session guards.
-
-Ready result retrieval, including text and paths, and the complete MRU update work must each measure p99 below 1 ms in the maintained scale scenarios. Rendering, initial history loading and disk writes are separate costs. Tests report their measured scale; this is not an unlimited-document or worst-case scheduling guarantee. History memory is bounded; input causes no per-keystroke history writes, and the getter performs no tree traversal or I/O (§22.1).
+* Opening, closing and list changes have no animation.
 
 #### 20.14.2 Result Presentation
 
 * Empty nodes use `Empty node`; image-only nodes use `Image`.
-* Both recent nodes and Search results display the complete node text with preserved line breaks and wrapping, without a character cutoff.
+* Both the marked and starred list and Search results display the complete node text with preserved line breaks and wrapping, without a character cutoff.
 * Ancestor labels in paths remain single-line previews bounded to their first 160 characters.
-* Consecutive entries with the same parent node share one path heading above them, in both Recent and Results. A different parent starts a new group; a path that recurs after another group is shown again. Grouping never reorders entries or shortens their text. Each option retains its own parent path as an accessible description. Top-level entries retain their root icon and have no path heading.
+* Consecutive entries with the same parent node share one path heading above them, in both the marked and starred list and Results. A different parent starts a new group; a path that recurs after another group is shown again. Grouping never reorders entries or shortens their text. Each option retains its own parent path as an accessible description. Top-level entries retain their root icon and have no path heading.
 * Selecting the first result reveals the start of the list when the result and its path heading fit. An oversized result can still scroll to its first match.
 * Nonempty whitespace text is preserved like other node content.
 * Top-level nodes show a small muted tree icon beside the title, with the accessible label `Top level`; they have no path line.
 * Titles use the 15 px tree font. Group headings use 12 px secondary text. Thin dividers mark group boundaries, including runs of top-level results. They span the selection width without adding height.
-* Single-line group headings, recent entries, search results and tag suggestions use the same 25 px height as Tree rows. Wrapped rows grow with their text and keep equal vertical padding. Nodes at the root reserve no heading space. Tag suggestions keep full-width separators between unselected neighbors.
+* Single-line group headings, marked and starred entries, search results and tag suggestions use the same 25 px height as Tree rows. Wrapped rows grow with their text and keep equal vertical padding. Nodes at the root reserve no heading space. Tag suggestions keep full-width separators between unselected neighbors.
 * Selected nodes, group headings and tag suggestions use a distinct fill with 4 px rounded corners. Light and Dark include a complete inset frame. Gray and White use the same muted gray-violet fill as the current Tree row, without a frame. Selection does not change row geometry or text alignment.
 * Trailing scroll space is reserved only for overflowing node results. A list that fits has no extra trailing space. Tags and node results use the same gap before the footer.
 * Literal title matches and matching tag suggestions use bold colored text without a separate background. Matches in every node title also have a visible underline, including unselected nodes and short fragments within a word. Path matches remain bold in the path's normal text color, without a separate background or underline.

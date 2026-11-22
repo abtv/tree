@@ -52,8 +52,6 @@ export function createElectronEditorServices(): EditorServices {
     saveHideFinishedTasks: (value) => window.treeApi.setHideFinishedTasks?.(value) ?? Promise.resolve(),
     loadEmojiHistory: () => window.treeApi.getEmojiHistory?.() ?? Promise.resolve([]),
     saveEmojiHistory: (names) => window.treeApi.setEmojiHistory?.(names) ?? Promise.resolve(),
-    loadRecentNodes: () => window.treeApi.getRecentNodes?.() ?? Promise.resolve([]),
-    saveRecentNodes: (ids) => notesWrite(() => window.treeApi.setRecentNodes?.(ids) ?? Promise.resolve()),
     save: async (state) => {
       if (notesWritesSuspended) return
       const encoded = await encodeJson(state)

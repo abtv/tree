@@ -13,7 +13,6 @@ import {
 import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
 import { PNG_DIMENSIONS_HEADER_BYTES, readPngDimensions } from '../../shared/png-validation'
 import type { AttachmentDimensions } from '../../domain/attachment-dimensions'
-import { createRecentNodesStore } from './recent-nodes'
 import {
   commitReplacement,
   isDocumentFileName,
@@ -25,8 +24,6 @@ import {
 } from './notes-replacement'
 
 export interface FileServices {
-  loadRecentNodes?(): Promise<string[]>
-  saveRecentNodes?(ids: readonly string[]): Promise<void>
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
@@ -77,7 +74,6 @@ export interface FileOperationEvent {
     | 'cleanupAttachments'
     | 'replaceNotes'
     | 'snapshotDocuments'
-    | 'recentNodes'
   paths: string[]
   phase: 'start' | 'success' | 'failure'
   error?: string
@@ -104,7 +100,6 @@ export function createFileServices(
   options?: FileServicesOptions,
 ): FileServices & NotesArchiveFileServices {
   const documentPath = join(dataDirectory, 'document.json')
-  const recentNodes = createRecentNodesStore(join(dataDirectory, 'recent-nodes.json'))
   const temporaryDocumentPath = join(dataDirectory, 'document.json.tmp')
   const attachmentsDirectory = join(dataDirectory, 'attachments')
   const layout = options === undefined ? undefined : notesLayout(options.userDataDirectory, dataDirectory)
@@ -130,12 +125,6 @@ export function createFileServices(
   }
 
   return {
-    loadRecentNodes: () => enqueue('recentNodes', [dataDirectory], () => recentNodes.load()),
-    saveRecentNodes: (ids) =>
-      enqueue('recentNodes', [dataDirectory], async () => {
-        rejectAfterReplacement()
-        await recentNodes.save(ids)
-      }),
     async load(): Promise<unknown | null> {
       return enqueue('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
         if (layout !== undefined) {
