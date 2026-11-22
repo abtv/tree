@@ -2591,7 +2591,7 @@ describe('App', () => {
         fireEvent.keyDown(root, { key: ':' })
       })
       await act(async () => {
-        fireEvent.change(screen.getByRole('combobox', { name: 'Command' }), { target: { value: 'toggle-vim-mode' } })
+        fireEvent.change(screen.getByRole('combobox', { name: 'Command' }), { target: { value: 'toggle-vim-editing' } })
         fireEvent.keyDown(screen.getByRole('combobox', { name: 'Command' }), { key: 'Enter' })
         await Promise.resolve()
       })

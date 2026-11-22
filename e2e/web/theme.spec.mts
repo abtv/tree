@@ -57,7 +57,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
 
   expect(await background()).toBe('#fbf8f1')
 
-  await command('set-theme-gray')
+  await command('set-appearance-gray')
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
   await assertShadows()
   await capture(page, 'theme-gray-explicit.png')
@@ -71,7 +71,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(221, 221, 221)')
   await page.emulateMedia({ colorScheme: 'light' })
 
-  await command('set-theme-dark')
+  await command('set-appearance-dark')
 
   await page.waitForFunction(
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#3f3f3f',
@@ -88,7 +88,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
   expect(await page.evaluate(() => window.treeApi.getAppearance())).toBe('dark')
 
   await page.emulateMedia({ colorScheme: 'dark' })
-  await command('set-theme-light')
+  await command('set-appearance-light')
   await page.waitForFunction(
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#fbf8f1',
   )
@@ -100,7 +100,7 @@ test('persists appearance and follows system changes', async ({ newContext, base
 
   expect(await background()).toBe('#fbf8f1')
 
-  await command('set-theme-auto')
+  await command('set-appearance-auto')
   await page.waitForFunction(
     () => getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim() === '#3f3f3f',
   )

@@ -115,7 +115,7 @@ The active editor retains focus, caret, selection and mode when its active day c
 
 Every other occurrence of the active node is a live mirror: it shows the current text, links and image, never owns an editor, and draws its bullet as a hollow ring in the gutter color. Selecting a mirror, by pointer or keyboard, makes it the active occurrence. Editing the active occurrence updates its mirrors immediately without moving focus or changing the scroll position. When a document change moves the active occurrence to another row, the scroll position adjusts so that the active row keeps its place in the viewport; selecting a row never takes this adjustment.
 
-While the last date is removed, the status bar shows `Add a date to keep this item in Agenda`. The message sits at the left edge, including during search entry (§20.2.26), while the mode indicator remains beside the pin on the right when Vim is enabled. It is announced as a status and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
+While the last date is removed, the status bar shows `Add a date to keep this node in Agenda`. The message sits at the left edge, including during search entry (§20.2.26), while the mode indicator remains beside the pin on the right when Vim is enabled. It is announced as a status and never changes any row height. It disappears when the item leaves Agenda or a recognized date returns.
 
 ### 23.8 Agenda History Focus
 

@@ -5,7 +5,7 @@
 #### 20.2.1 Toggle and Preference
 
 * Vim-inspired editing is optional.
-* Edit > Vim Editing switches it on and off. The command panel's `toggle-vim-mode` command also switches it off from Vim Normal mode (§20.2.28).
+* Edit > Vim Editing switches it on and off. The command panel's `toggle-vim-editing` command also switches it off from Vim Normal mode (§20.2.28).
 * The status bar shows the mode indicator while Vim editing is enabled, but has no `VIM` button or editing-preference toggle.
 * No keyboard shortcut switches it.
 * Switching the preference keeps editor focus and applies the caret behavior in §20.2.3.

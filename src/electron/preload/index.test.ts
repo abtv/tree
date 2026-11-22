@@ -297,7 +297,7 @@ describe('preload bridge', () => {
     await treeApi.getAppearance()
     await treeApi.setAppearance('dark')
     await treeApi.getCommandHistory()
-    await treeApi.setCommandHistory(['set-theme-dark'])
+    await treeApi.setCommandHistory(['set-appearance-dark'])
     await treeApi.chooseNotesExportDestination?.()
     await treeApi.startNotesExport?.()
     await treeApi.chooseNotesImportArchive?.()
@@ -330,7 +330,7 @@ describe('preload bridge', () => {
       [ipcChannels.getAppearance],
       [ipcChannels.setAppearance, 'dark'],
       [ipcChannels.getCommandHistory],
-      [ipcChannels.setCommandHistory, ['set-theme-dark']],
+      [ipcChannels.setCommandHistory, ['set-appearance-dark']],
       // Notes requests carry no arguments: the main process keeps every path.
       [ipcChannels.chooseNotesExportDestination],
       [ipcChannels.startNotesExport],
@@ -405,15 +405,15 @@ describe('preload bridge', () => {
 
     mocks.invoke.mockRejectedValueOnce(new Error('history failed'))
 
-    await expect(treeApi.setCommandHistory(['set-theme-dark'])).rejects.toThrow('history failed')
+    await expect(treeApi.setCommandHistory(['set-appearance-dark'])).rejects.toThrow('history failed')
 
     mocks.invoke.mockResolvedValueOnce('dark')
 
     await expect(treeApi.getAppearance()).resolves.toBe('dark')
 
-    mocks.invoke.mockResolvedValueOnce(['set-theme-dark'])
+    mocks.invoke.mockResolvedValueOnce(['set-appearance-dark'])
 
-    await expect(treeApi.getCommandHistory()).resolves.toEqual(['set-theme-dark'])
+    await expect(treeApi.getCommandHistory()).resolves.toEqual(['set-appearance-dark'])
 
     mocks.invoke.mockRejectedValueOnce(new Error('clipboard failed'))
 

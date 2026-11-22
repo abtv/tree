@@ -293,9 +293,9 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
     await expect(device.locator('#command-toggle-star-node')).toBeVisible()
     await expect(device.locator('#command-toggle-mark-node')).toBeVisible()
     expect(await device.locator('#command-toggle-always-on-top').count()).toBe(0)
-    expect(await device.locator('.command-panel').getByText('toggle-vim-mode', { exact: true }).count()).toBe(0)
+    expect(await device.locator('.command-panel').getByText('toggle-vim-editing', { exact: true }).count()).toBe(0)
 
-    await device.keyboard.type('toggle-vim-mode')
+    await device.keyboard.type('toggle-vim-editing')
 
     expect(await device.locator('.command-panel [role="option"]').count()).toBe(0)
 

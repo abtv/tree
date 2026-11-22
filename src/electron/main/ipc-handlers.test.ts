@@ -49,7 +49,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   const decodePng = vi.fn(decodePngWithZlib)
   const getAppearance = vi.fn(() => 'system' as const)
   const setAppearance = vi.fn()
-  const getCommandHistory = vi.fn(() => ['set-theme-dark'])
+  const getCommandHistory = vi.fn(() => ['set-appearance-dark'])
   const setCommandHistory = vi.fn()
   const getEmojiHistory = vi.fn(async () => ['cat'])
   const setEmojiHistory = vi.fn<(names: readonly string[]) => Promise<void>>(async () => undefined)
@@ -557,7 +557,7 @@ describe('main IPC handlers', () => {
     const event = { senderFrame: { url: rendererUrl } }
 
     expect(handlers.get(ipcChannels.getAppearance)!(event)).toBe('system')
-    expect(handlers.get(ipcChannels.getCommandHistory)!(event)).toEqual(['set-theme-dark'])
+    expect(handlers.get(ipcChannels.getCommandHistory)!(event)).toEqual(['set-appearance-dark'])
 
     for (const value of ['system', 'light', 'dark', 'gray', 'white']) {
       handlers.get(ipcChannels.setAppearance)!(event, value)
@@ -567,10 +567,10 @@ describe('main IPC handlers', () => {
     for (const value of [null, true, 'auto', {}])
       expect(() => handlers.get(ipcChannels.setAppearance)!(event, value)).toThrow('Invalid appearance')
 
-    handlers.get(ipcChannels.setCommandHistory)!(event, ['set-theme-dark'])
+    handlers.get(ipcChannels.setCommandHistory)!(event, ['set-appearance-dark'])
 
-    expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(['set-theme-dark'])
-    for (const value of [null, {}, [1], ['a'.repeat(101)], Array(101).fill('set-theme-dark')])
+    expect(setCommandHistory).toHaveBeenCalledExactlyOnceWith(['set-appearance-dark'])
+    for (const value of [null, {}, [1], ['a'.repeat(101)], Array(101).fill('set-appearance-dark')])
       expect(() => handlers.get(ipcChannels.setCommandHistory)!(event, value)).toThrow('Invalid command history')
     expect(setCommandHistory).toHaveBeenCalledTimes(1)
 

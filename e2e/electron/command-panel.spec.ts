@@ -123,14 +123,14 @@ test.describe('Normal command panel', () => {
 
     await expect(window.getByRole('option', { selected: true })).toContainText('about-tree')
 
-    await window.getByRole('combobox').pressSequentially('theme')
+    await window.getByRole('combobox').pressSequentially('appearance')
 
     expect(await names(window)).toEqual([
-      'set-theme-auto',
-      'set-theme-dark',
-      'set-theme-gray',
-      'set-theme-light',
-      'set-theme-white',
+      'set-appearance-auto',
+      'set-appearance-dark',
+      'set-appearance-gray',
+      'set-appearance-light',
+      'set-appearance-white',
     ])
 
     await window.keyboard.press('Escape')
@@ -243,9 +243,9 @@ test.describe('Normal command panel', () => {
 
     expect(await names(second.window)).toEqual([
       'toggle-always-on-top',
-      'set-theme-auto',
-      'set-theme-light',
-      'set-theme-dark',
+      'set-appearance-auto',
+      'set-appearance-light',
+      'set-appearance-dark',
       'about-tree',
       'check-for-updates',
       'export-notes',
@@ -256,22 +256,22 @@ test.describe('Normal command panel', () => {
       'quit',
       ...(process.platform === 'darwin' && process.arch === 'arm64' ? ['reindex-all-images'] : []),
       'search-all-nodes',
-      'set-theme-gray',
-      'set-theme-white',
+      'set-appearance-gray',
+      'set-appearance-white',
       'show-agenda',
       'show-tree',
       'toggle-finished-tasks',
       'toggle-line-numbers',
       'toggle-mark-node',
       'toggle-star-node',
-      'toggle-vim-mode',
+      'toggle-vim-editing',
       'update-app',
     ])
     expect(JSON.parse(readFileSync(join(userDataDir, 'data', 'command-history.json'), 'utf8'))).toEqual([
       'toggle-always-on-top',
-      'set-theme-auto',
-      'set-theme-light',
-      'set-theme-dark',
+      'set-appearance-auto',
+      'set-appearance-light',
+      'set-appearance-dark',
     ])
   })
 
@@ -312,7 +312,7 @@ test.describe('Normal command panel', () => {
 
     await expect
       .poll(() => JSON.parse(readFileSync(join(userDataDir, 'data', 'command-history.json'), 'utf8')))
-      .toEqual(['set-theme-light', 'set-theme-dark'])
+      .toEqual(['set-appearance-light', 'set-appearance-dark'])
   })
 
   // @requirement PRODUCT.md §20.2.28
@@ -344,7 +344,7 @@ test.describe('Normal command panel', () => {
     await editor.focus()
 
     await setCursor(editor, 2)
-    await open(first.window, 'toggle-vim-mode')
+    await open(first.window, 'toggle-vim-editing')
 
     await expect(first.window.locator('.command-state')).toHaveText('✓')
 
@@ -362,7 +362,7 @@ test.describe('Normal command panel', () => {
     expect(await applicationMenuItemChecked(first.app, 'Edit', 'Vim Editing')).toBe(false)
     await expect
       .poll(() => JSON.parse(readFileSync(join(userDataDir, 'data', 'command-history.json'), 'utf8')))
-      .toEqual(['toggle-vim-mode'])
+      .toEqual(['toggle-vim-editing'])
 
     await closeApp(first.app)
 
@@ -381,7 +381,7 @@ test.describe('Normal command panel', () => {
 
     await open(second.window)
 
-    await expect(second.window.getByRole('option').first()).toContainText('toggle-vim-mode')
+    await expect(second.window.getByRole('option').first()).toContainText('toggle-vim-editing')
     await expect(second.window.getByRole('option').first().locator('.command-state')).toHaveText('✓')
   })
 
@@ -397,7 +397,7 @@ test.describe('Normal command panel', () => {
     const row = window.locator('.agenda-row').first()
 
     await row.click()
-    await run(window, 'toggle-vim-mode')
+    await run(window, 'toggle-vim-editing')
 
     await expect(window.getByLabel('Vim mode')).toHaveCount(0)
     await expect(row).toBeFocused()
@@ -442,7 +442,7 @@ test.describe('Normal command panel', () => {
 
     expect(await applicationMenuItemChecked(app, 'Window', 'Always on Top')).toBe(true)
 
-    await run(window, 'toggle-vim-mode')
+    await run(window, 'toggle-vim-editing')
 
     await expect(window.getByLabel('Vim mode')).toHaveCount(0)
 
@@ -497,7 +497,7 @@ test.describe('Normal command panel', () => {
 
     await expect(row).toBeFocused()
 
-    await open(window, 'theme')
+    await open(window, 'appearance')
     await window.keyboard.press('Escape')
 
     await expect(row).toBeFocused()
@@ -596,10 +596,10 @@ test.describe('Command panel application shortcut', () => {
 
       await expect(window).toHaveScreenshot(`command-panel-standard-${appearance}.png`)
 
-      await input.pressSequentially('theme')
+      await input.pressSequentially('appearance')
 
       await expect(line).toHaveText('')
-      await expect(input).toHaveValue('theme')
+      await expect(input).toHaveValue('appearance')
     })
   }
 
@@ -666,7 +666,7 @@ test.describe('Command panel application shortcut', () => {
 
       await expect(window.locator('.agenda-list')).toHaveCount(0)
 
-      await shortcut('toggle-vim-mode')
+      await shortcut('toggle-vim-editing')
       await window.keyboard.press('Enter')
 
       if (mode === 'standard') await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')

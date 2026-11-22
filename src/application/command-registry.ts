@@ -68,7 +68,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
   {
     name: 'toggle-star-node',
     aliases: [],
-    description: 'Star or unstar the current node',
+    description: 'Star or unstar the selected node',
     active: (context) => context.starred === true,
     run: async (services) => {
       await services.toggleStarNode?.()
@@ -77,7 +77,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
   {
     name: 'toggle-mark-node',
     aliases: [],
-    description: 'Mark or unmark the current node for Today',
+    description: 'Mark or unmark the selected node for Today',
     active: (context) => context.marked === true,
     run: async (services) => {
       await services.toggleMarkNode?.()
@@ -150,7 +150,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     run: (services, context) => services.setAlwaysOnTop(!context.alwaysOnTop),
   },
   {
-    name: 'toggle-vim-mode',
+    name: 'toggle-vim-editing',
     requires: 'vim',
     aliases: [],
     description: 'Use Vim editing',
@@ -173,7 +173,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     run: async (services, context) => services.setHideFinishedTasks?.(!context.hideFinishedTasks),
   },
   ...appearanceCommands.map(([name, value, description]): ApplicationCommand => ({
-    name: `set-theme-${name}`,
+    name: `set-appearance-${name}`,
     aliases: [],
     description,
     active: (context) => context.appearance === value,

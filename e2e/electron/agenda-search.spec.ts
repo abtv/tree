@@ -174,7 +174,7 @@ test('keeps the invalid-date hint beside search and updates matches across mirro
   await window.locator(`${row(later, 'other')} .node-input`).click()
   await window.keyboard.type('0wD')
 
-  await expect(window.locator('.status-bar')).toContainText('Add a date to keep this item in Agenda')
+  await expect(window.locator('.status-bar')).toContainText('Add a date to keep this node in Agenda')
   await window.keyboard.press('/')
   await expect(window.locator('.search-status-message')).toContainText('Add a date')
 

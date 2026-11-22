@@ -176,7 +176,7 @@ describeForEachEditingMode('Marked nodes @linux', () => {
     await second.window.getByRole('combobox', { name: 'Command' }).fill('toggle-mark-node')
     await second.window.keyboard.press('Enter')
     await expect(second.window.locator('.command-panel')).toHaveCount(0)
-    await expect(second.window.getByText('Add a date to keep this item in Agenda')).toBeVisible()
+    await expect(second.window.getByText('Add a date to keep this node in Agenda')).toBeVisible()
     await closeApp(second.app)
 
     const third = await launchTree(userDataDir)

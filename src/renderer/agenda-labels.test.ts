@@ -19,7 +19,7 @@ describe('Agenda labels', () => {
     expect(agendaStatusMessage(undefined)).toBeUndefined()
     expect(agendaStatusMessage({ activity: { kind: 'inactive' } })).toBeUndefined()
     expect(agendaStatusMessage({ activity: { kind: 'pinned-until-leave' as const, occurrence: occurrence } })).toBe(
-      'Add a date to keep this item in Agenda',
+      'Add a date to keep this node in Agenda',
     )
   })
 

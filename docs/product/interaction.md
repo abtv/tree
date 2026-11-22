@@ -62,7 +62,7 @@ This does not govern motion the application does not itself decide to add: nativ
 
 The application has five appearance choices in the **View > Appearance** menu (§9.3): **Automatic**, **Light**, **Dark**, **Gray**, and **White**. Automatic follows the operating system's light or dark appearance and restyles the open window immediately when the system appearance changes. Each explicit choice keeps its appearance whatever the system uses. Gray and White use light native controls. Choosing an item restyles the open window immediately, including the native window surface, and the choice is saved and restored at the next start. When no choice has been saved, as at the first start, the appearance is Automatic.
 
-The command panel (§20.2.28) exposes the same five choices using `set-theme-auto`, `set-theme-light`, `set-theme-dark`, `set-theme-gray`, and `set-theme-white`.
+The command panel (§20.2.28) exposes the same five choices using `set-appearance-auto`, `set-appearance-light`, `set-appearance-dark`, `set-appearance-gray`, and `set-appearance-white`.
 
 Every appearance preserves the same semantic presentation rules across application surfaces. Palettes may change colors, but must not change completion, link operability, selection or search-match behavior. Struck-through nodes follow §2.5 everywhere, including hyperlinks and parent paths. Global Search query markers, suggestions and result matches follow §20.14; node-marker styling must not replace search emphasis. The palette-specific choices below apply only to their stated surfaces.
 

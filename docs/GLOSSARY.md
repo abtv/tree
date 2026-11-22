@@ -20,7 +20,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Agenda projection** (architecture) — The grouping of the document's nodes into days, derived from the immutable document and never persisted. `ARCHITECTURE.md §4.1`, ADR 0020. *In code:* `agenda-projection.ts`, `agenda-rows.ts`.
 
-**Appearance** (product) — The color scheme that the user chooses for the window. `PRODUCT.md §20.5`. *Avoid:* theme. *In code:* `src/shared/appearance.ts`; the commands are named `set-theme-*`.
+**Appearance** (product) — The color scheme that the user chooses for the window. `PRODUCT.md §20.5`. *Avoid:* theme. *In code:* `src/shared/appearance.ts`.
 
 **Application command** (product) — A named command of the command registry. The command panel, the menus and the shortcuts run the same commands. `PRODUCT.md §20.2.30`, `ARCHITECTURE.md §7.2.1`. *Avoid:* "command" alone where a Vim command is possible. *In code:* `ApplicationCommand`, `commandRegistry`.
 
@@ -184,7 +184,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Vim divergence** (product) — A deliberate difference from the behavior of Vim for the same key, recorded with its reason. `PRODUCT.md §1.1`, [Vim conformance](VIM_CONFORMANCE.md).
 
-**Vim editing** (product) — The optional editing preference that adds modes to text editing. `PRODUCT.md §20.2`. *Avoid:* Vim mode. *In code:* the command `toggle-vim-mode`.
+**Vim editing** (product) — The optional editing preference that adds modes to text editing. `PRODUCT.md §20.2`. *Avoid:* Vim mode.
 
 **Whole-node Visual mode** (product) — The Vim Visual mode that selects a range of sibling nodes with their subtrees. `PRODUCT.md §20.2.23`, `ARCHITECTURE.md §21.1.7`. *Avoid:* node Visual, linewise Visual. *UI:* `VISUAL NODE`.
 

@@ -14,7 +14,7 @@ export function agendaDateLabel(day: DayNumber, today: DayNumber, weekday = fals
   return `${weekday ? `${weekdays[weekdayOf(day)]} ` : ''}${months[date.month - 1]} ${date.day}${year}`
 }
 
-export const AGENDA_INVALID_ITEM_HINT = 'Add a date to keep this item in Agenda'
+export const AGENDA_INVALID_ITEM_HINT = 'Add a date to keep this node in Agenda'
 
 /** The invalid-item hint is runtime-only and does not alter row heights. */
 export function agendaStatusMessage(agenda: Pick<AgendaState, 'activity'> | undefined): string | undefined {

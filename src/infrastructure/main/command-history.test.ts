@@ -21,26 +21,31 @@ describe('command history preference', () => {
   it('writes normalized history once and restores it through a fresh store', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'tree-command-history-')), 'data', 'history.json')
 
-    createCommandHistoryStore(path).save(['set-theme-dark', 'set-theme-light', 'set-theme-dark', 'unknown'])
+    createCommandHistoryStore(path).save([
+      'set-appearance-dark',
+      'set-appearance-light',
+      'set-appearance-dark',
+      'unknown',
+    ])
 
-    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(['set-theme-dark', 'set-theme-light'])
-    expect(createCommandHistoryStore(path).load()).toEqual(['set-theme-dark', 'set-theme-light'])
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(['set-appearance-dark', 'set-appearance-light'])
+    expect(createCommandHistoryStore(path).load()).toEqual(['set-appearance-dark', 'set-appearance-light'])
   })
 
   it('propagates write failure instead of reporting a successful persisted history', () => {
     const directory = mkdtempSync(join(tmpdir(), 'tree-command-history-'))
 
-    expect(() => createCommandHistoryStore(directory).save(['set-theme-dark'])).toThrow()
+    expect(() => createCommandHistoryStore(directory).save(['set-appearance-dark'])).toThrow()
   })
 
   it('replaces persisted history when the preference directory already exists', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'tree-command-history-')), 'data', 'history.json')
     const store = createCommandHistoryStore(path)
-    store.save(['set-theme-dark'])
+    store.save(['set-appearance-dark'])
 
-    store.save(['set-theme-light'])
+    store.save(['set-appearance-light'])
 
-    expect(createCommandHistoryStore(path).load()).toEqual(['set-theme-light'])
-    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(['set-theme-light'])
+    expect(createCommandHistoryStore(path).load()).toEqual(['set-appearance-light'])
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(['set-appearance-light'])
   })
 })

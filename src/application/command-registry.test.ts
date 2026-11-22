@@ -66,26 +66,26 @@ describe('command registry', () => {
 
     expect(commands).toHaveLength(count)
 
-    const history = ['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark']
+    const history = ['toggle-always-on-top', 'toggle-vim-editing', 'set-appearance-dark']
     const matches = (query: string) => matchCommands(query, history, commands).map((command) => command.name)
 
     expect(matches('toggle-always-on-top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
     expect(matches('top')).toEqual(alwaysOnTop ? ['toggle-always-on-top'] : [])
-    expect(matches('vim')).toEqual(vim ? ['toggle-vim-mode'] : [])
+    expect(matches('vim')).toEqual(vim ? ['toggle-vim-editing'] : [])
     expect(matches('')).toEqual([
       ...(alwaysOnTop ? ['toggle-always-on-top'] : []),
-      ...(vim ? ['toggle-vim-mode'] : []),
-      'set-theme-dark',
+      ...(vim ? ['toggle-vim-editing'] : []),
+      'set-appearance-dark',
       'about-tree',
       'find',
       'find-next',
       'find-previous',
       'quit',
       'search-all-nodes',
-      'set-theme-auto',
-      'set-theme-gray',
-      'set-theme-light',
-      'set-theme-white',
+      'set-appearance-auto',
+      'set-appearance-gray',
+      'set-appearance-light',
+      'set-appearance-white',
       'show-agenda',
       'show-tree',
       'toggle-finished-tasks',
@@ -93,7 +93,7 @@ describe('command registry', () => {
       'toggle-mark-node',
       'toggle-star-node',
     ])
-    expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-mode', 'set-theme-dark'])
+    expect(history).toEqual(['toggle-always-on-top', 'toggle-vim-editing', 'set-appearance-dark'])
   })
 
   // @requirement PRODUCT.md §20.2.28
@@ -112,13 +112,31 @@ describe('command registry', () => {
 
   // @requirement PRODUCT.md §20.2.28
   it.each([
-    ['theme', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light', 'set-theme-white']],
-    ['set-th', ['set-theme-auto', 'set-theme-dark', 'set-theme-gray', 'set-theme-light', 'set-theme-white']],
-    ['gray', ['set-theme-gray']],
-    ['white', ['set-theme-white']],
-    ['dark', ['set-theme-dark']],
-    ['vim', ['toggle-vim-mode']],
-    ['mode', ['toggle-vim-mode']],
+    [
+      'appearance',
+      [
+        'set-appearance-auto',
+        'set-appearance-dark',
+        'set-appearance-gray',
+        'set-appearance-light',
+        'set-appearance-white',
+      ],
+    ],
+    [
+      'set-app',
+      [
+        'set-appearance-auto',
+        'set-appearance-dark',
+        'set-appearance-gray',
+        'set-appearance-light',
+        'set-appearance-white',
+      ],
+    ],
+    ['gray', ['set-appearance-gray']],
+    ['white', ['set-appearance-white']],
+    ['dark', ['set-appearance-dark']],
+    ['vim', ['toggle-vim-editing']],
+    ['editing', ['toggle-vim-editing']],
     ['show', ['show-agenda', 'show-tree']],
     ['agenda', ['show-agenda']],
     ['tree', ['about-tree', 'show-tree']],
@@ -131,13 +149,13 @@ describe('command registry', () => {
         'toggle-line-numbers',
         'toggle-mark-node',
         'toggle-star-node',
-        'toggle-vim-mode',
+        'toggle-vim-editing',
       ],
     ],
     ['mark', ['toggle-mark-node']],
     ['q', ['quit']],
     ['qui', ['quit']],
-    ['  dark  ', ['set-theme-dark']],
+    ['  dark  ', ['set-appearance-dark']],
     ['Dark', []],
     ['ark', []],
     ['quit now', []],
@@ -147,11 +165,11 @@ describe('command registry', () => {
   })
 
   it('ranks exact matches, unique history, then alphabetical remaining commands', () => {
-    const history = ['set-theme-light', 'set-theme-dark', 'set-theme-light', 'unknown']
+    const history = ['set-appearance-light', 'set-appearance-dark', 'set-appearance-light', 'unknown']
 
     expect(names('', history)).toEqual([
-      'set-theme-light',
-      'set-theme-dark',
+      'set-appearance-light',
+      'set-appearance-dark',
       'about-tree',
       'find',
       'find-next',
@@ -159,9 +177,9 @@ describe('command registry', () => {
       'quit',
       'reindex-all-images',
       'search-all-nodes',
-      'set-theme-auto',
-      'set-theme-gray',
-      'set-theme-white',
+      'set-appearance-auto',
+      'set-appearance-gray',
+      'set-appearance-white',
       'show-agenda',
       'show-tree',
       'toggle-always-on-top',
@@ -169,28 +187,28 @@ describe('command registry', () => {
       'toggle-line-numbers',
       'toggle-mark-node',
       'toggle-star-node',
-      'toggle-vim-mode',
+      'toggle-vim-editing',
     ])
-    expect(names('set-theme-dark', history)).toEqual(['set-theme-dark'])
-    expect(names('theme', history)).toEqual([
-      'set-theme-light',
-      'set-theme-dark',
-      'set-theme-auto',
-      'set-theme-gray',
-      'set-theme-white',
+    expect(names('set-appearance-dark', history)).toEqual(['set-appearance-dark'])
+    expect(names('appearance', history)).toEqual([
+      'set-appearance-light',
+      'set-appearance-dark',
+      'set-appearance-auto',
+      'set-appearance-gray',
+      'set-appearance-white',
     ])
   })
 
   it('normalizes malformed history and remembers successful non-quit commands once', () => {
     expect(normalizeCommandHistory(null)).toEqual([])
-    expect(normalizeCommandHistory(['unknown', 4, 'quit', 'set-theme-dark', 'set-theme-dark'])).toEqual([
-      'set-theme-dark',
+    expect(normalizeCommandHistory(['unknown', 4, 'quit', 'set-appearance-dark', 'set-appearance-dark'])).toEqual([
+      'set-appearance-dark',
     ])
-    expect(rememberCommand(['set-theme-light', 'set-theme-dark'], 'set-theme-dark')).toEqual([
-      'set-theme-dark',
-      'set-theme-light',
+    expect(rememberCommand(['set-appearance-light', 'set-appearance-dark'], 'set-appearance-dark')).toEqual([
+      'set-appearance-dark',
+      'set-appearance-light',
     ])
-    expect(rememberCommand(['set-theme-dark'], 'quit')).toEqual(['set-theme-dark'])
+    expect(rememberCommand(['set-appearance-dark'], 'quit')).toEqual(['set-appearance-dark'])
   })
 
   it('delegates all actions to existing services and queries their current state', async () => {
@@ -237,7 +255,7 @@ describe('command registry', () => {
     expect(services.setLineNumbers).toHaveBeenCalledExactlyOnceWith(false)
     expect(services.setHideFinishedTasks).toHaveBeenCalledExactlyOnceWith(true)
 
-    const toggleVim = commandRegistry.find((command) => command.name === 'toggle-vim-mode')!
+    const toggleVim = commandRegistry.find((command) => command.name === 'toggle-vim-editing')!
 
     await toggleVim.run(services, {
       alwaysOnTop: false,
@@ -258,10 +276,10 @@ describe('command registry', () => {
     ).toEqual([
       'show-tree',
       'toggle-always-on-top',
-      'toggle-vim-mode',
+      'toggle-vim-editing',
       'toggle-line-numbers',
       'toggle-finished-tasks',
-      'set-theme-dark',
+      'set-appearance-dark',
     ])
     expect(
       commandRegistry

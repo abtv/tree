@@ -15,7 +15,7 @@ import {
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const oct20 = dayNumberOf({ year: 2026, month: 10, day: 11 })
-const hint = 'Add a date to keep this item in Agenda'
+const hint = 'Add a date to keep this node in Agenda'
 
 function seed(userDataDir: string): void {
   // The trailing dated rows give the content room to scroll below the edited occurrence.

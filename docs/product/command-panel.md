@@ -15,7 +15,7 @@
 
 Opening also dismisses the current five-second export-success notice (§24.3, §25.2). Closing the panel does not restore it. Archive progress and results that require acknowledgement, including errors and missing-image warnings, remain visible under §20.2.7.
 
-`Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-mode` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
+`Escape`, `Backspace` with empty input, loss of focus, window deactivation, or a click outside close it without running a command. Closing restores the previous editor focus, node, mode and selection, except when the selected command defines a different result. `toggle-vim-editing` uses the caret behavior in §20.2.3. Modal dialogs and composition retain their own input; neither opening key interrupts them. `Cmd+P` continues to toggle Agenda (§23).
 
 * The status bar's left side becomes an input line. With Vim editing enabled, it starts with `:` followed by the typed text. In standard editing, it has no prefix and shows the placeholder `Run Command` while empty, as the standard Find panel shows `Find` (§20.2.26). The prompt follows the editing mode, not the opening key.
 * At narrow widths, status messages wrap above the command controls as needed to keep the input visible and editable alongside the count and mode indicator.
@@ -28,9 +28,9 @@ Opening also dismisses the current five-second export-success notice (§24.3, §
 * The selected row uses the shared selection highlight pair in each appearance.
 * Opening and closing have no animation (§20.4).
 
-Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `theme`, `dark`, and `set-th` match `set-theme-dark`. Aliases match only exactly. Text after an internal space matches nothing. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
+Input is case-sensitive; leading and trailing spaces are ignored. A command matches a prefix beginning at any hyphen-separated segment: `appearance`, `dark`, and `set-app` match `set-appearance-dark`. Aliases match only exactly. Text after an internal space matches nothing. Ordering is: exact name or alias match, matching history entries most recent first, then remaining matches alphabetically. Empty input lists every command in that order.
 
-Both opening keys use the same command list. Only platform-supported commands appear or count. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-mode` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
+Both opening keys use the same command list. Only platform-supported commands appear or count. `toggle-always-on-top` is desktop-only and never appears in the browser, including when its name is typed or stored in history. The browser retains `quit` with its save-and-close behavior (§1.4). iPhones and iPads also omit `toggle-vim-editing` (§1.4). Unavailable history entries cannot restore hidden commands; filtering does not erase saved history.
 
 Every action in the desktop menu bar or browser Tree menu must also be available in this panel. Headings, separators and status text are not actions. Platform support, availability, confirmations, cancellation and results must match the menu. State-dependent commands follow the current menu action, including backup start, stop and resume (§24–25).
 
@@ -66,16 +66,16 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the Agenda origin of §23; do nothing if already in Tree |
 | `about-tree` | — | About Tree | — | — | Open About (§9.4) |
 | `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
-| `toggle-vim-mode` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
+| `toggle-vim-editing` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
 | `toggle-finished-tasks` | — | Show finished tasks | Finished tasks visible | — | Toggle finished-task visibility across views and search (§2.5) |
-| `toggle-star-node` | — | Star or unstar the current node | Current node starred | — | Toggle the star of the current real node (§2.6) |
-| `toggle-mark-node` | — | Mark or unmark the current node for Today | Current node marked | — | Toggle the mark of the current real node (§2.7) |
-| `set-theme-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
-| `set-theme-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
-| `set-theme-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
-| `set-theme-gray` | — | Use the gray appearance | Gray | — | Same as View > Appearance > Gray |
-| `set-theme-white` | — | Use the white appearance | White | — | Same as View > Appearance > White |
+| `toggle-star-node` | — | Star or unstar the selected node | Selected node starred | — | Toggle the star of the selected real node (§2.6) |
+| `toggle-mark-node` | — | Mark or unmark the selected node for Today | Selected node marked | — | Toggle the mark of the selected real node (§2.7) |
+| `set-appearance-auto` | — | Follow the system appearance | Automatic | — | Same as View > Appearance > Automatic (§20.5) |
+| `set-appearance-light` | — | Use the light appearance | Light | — | Same as View > Appearance > Light |
+| `set-appearance-dark` | — | Use the dark appearance | Dark | — | Same as View > Appearance > Dark |
+| `set-appearance-gray` | — | Use the gray appearance | Gray | — | Same as View > Appearance > Gray |
+| `set-appearance-white` | — | Use the white appearance | White | — | Same as View > Appearance > White |
 | `export-notes` | — | Export Notes… | — | — | Same as Export Notes in the desktop File menu or browser Data block (§24–25) |
 | `import-notes` | — | Import Notes… | — | — | Same as Import Notes in the desktop File menu or browser Data block (§24–25) |
 | `back-up-to-folder` | — | Back Up to Folder… | — | — | Same as the browser Data action when folder backup is off (§24.5) |
@@ -87,11 +87,11 @@ Desktop also lists `check-for-updates` and `update-app` (§26).
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 
-`toggle-vim-mode` remains available while saving is locked and changes only the editing preference. Edit > Vim Editing remains available.
+`toggle-vim-editing` remains available while saving is locked and changes only the editing preference. Edit > Vim Editing remains available.
 
 View changes resolve editing sessions and selection as `Cmd+P` does; an already-active destination preserves them. Neither edits the document nor adds undo history. Both update command history.
 
-Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. `q` is the only alias. `theme` means Appearance; `auto` means Automatic.
+Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. `q` is the only alias. `auto` means Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 

@@ -237,7 +237,7 @@ test('preserves browser storage through restart and failure recovery', async ({
   await page.keyboard.press(`${primaryKey}+Shift+p`)
   await page.getByRole('combobox', { name: 'Command', exact: true }).waitFor()
 
-  await page.getByRole('combobox', { name: 'Command', exact: true }).fill('theme')
+  await page.getByRole('combobox', { name: 'Command', exact: true }).fill('appearance')
 
   expect(
     await page.locator('#prototype-save-status').textContent(),

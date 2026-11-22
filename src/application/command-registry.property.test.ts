@@ -17,10 +17,10 @@ it('keeps history bounded, unique and valid and matching stable under arbitrary 
         expect(normalizeCommandHistory(normalized)).toEqual(normalized)
         expect(normalized.every((name) => known.includes(name) && name !== 'quit')).toBe(true)
 
-        const remembered = rememberCommand(normalized, 'set-theme-dark')
+        const remembered = rememberCommand(normalized, 'set-appearance-dark')
 
-        expect(remembered[0]).toBe('set-theme-dark')
-        expect(remembered.slice(1)).toEqual(normalized.filter((name) => name !== 'set-theme-dark'))
+        expect(remembered[0]).toBe('set-appearance-dark')
+        expect(remembered.slice(1)).toEqual(normalized.filter((name) => name !== 'set-appearance-dark'))
 
         const matches = matchCommands(query, history)
 

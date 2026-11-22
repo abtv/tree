@@ -308,7 +308,7 @@ describe('command panel owner', () => {
     fireEvent.keyDown(editor, { key: ':' })
     fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'dark' } })
     fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
-    await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['set-theme-dark']))
+    await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['set-appearance-dark']))
     appearanceWrite.mockRejectedValueOnce(new Error('appearance write failed'))
 
     fireEvent.keyDown(editor, { key: ':' })

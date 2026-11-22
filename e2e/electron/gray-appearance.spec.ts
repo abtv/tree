@@ -53,7 +53,7 @@ test('restores Gray through startup and reload, switches commands and keeps Auto
   }
 
   await window.keyboard.press('Meta+Shift+p')
-  await window.getByRole('combobox', { name: 'Command', exact: true }).fill('set-theme-gray')
+  await window.getByRole('combobox', { name: 'Command', exact: true }).fill('set-appearance-gray')
   await expect(window.locator('.command-state')).toHaveText('✓')
   await window.keyboard.press('Enter')
   expect(await window.evaluate(() => globalThis.window.treeApi.getAppearance())).toBe('gray')
@@ -129,7 +129,7 @@ test('renders Gray tree, Visual selection, search and command surfaces consisten
   await window.keyboard.press('Escape')
 
   await window.keyboard.press('Meta+Shift+p')
-  await window.getByRole('combobox', { name: 'Command', exact: true }).fill('theme')
+  await window.getByRole('combobox', { name: 'Command', exact: true }).fill('appearance')
   await expect(window.locator('.command-row')).toHaveCount(5)
   await expect(window.locator('.command-panel')).toHaveScreenshot('gray-commands.png')
   await closeApp(app)
@@ -164,7 +164,7 @@ test('switches to White, keeps its native background through close and restores 
   await expect(html).toHaveCSS('background-color', 'rgb(221, 221, 221)')
   await window.keyboard.press('Meta+Shift+p')
   const command = window.getByRole('combobox', { name: 'Command', exact: true })
-  await command.fill('set-theme-white')
+  await command.fill('set-appearance-white')
   await command.press('Enter')
   await expect(html).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   expect(await checkedApplicationSubmenuItems(app, appearanceMenu)).toEqual(['White'])
