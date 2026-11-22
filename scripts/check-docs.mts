@@ -10,6 +10,9 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const PRODUCT_LIMITS = { block: 700, section: 8000 }
 
+// An architecture paragraph describes one mechanism, not one rule, so only the section limit applies.
+export const ARCHITECTURE_LIMITS = { block: Number.POSITIVE_INFINITY, section: PRODUCT_LIMITS.section }
+
 export const PRODUCT_INDEX = 'docs/PRODUCT.md'
 export const PRODUCT_DIRECTORY = 'docs/product'
 
@@ -142,6 +145,46 @@ export function findOversizedProductText({
     issues.push(
       `${displayPath} §${section.id}: ${size} characters of own text; the limit is ${limits.section}. Split it into numbered subsections (docs/DEVELOPMENT.md §12).`,
     )
+  }
+  return issues
+}
+
+// The directories whose files the architecture may name as owners.
+export const SOURCE_DIRECTORIES = ['src', 'scripts', 'perf', 'e2e', 'config'] as const
+
+const SOURCE_FILE_NAME = /^(?:[\w@.-]+\/)*[\w@.-]+\.(?:ts|tsx|mts|css)$/u
+
+// The architecture names its owners by source file, as a file name or as a path that ends a repository
+// path. A name that matches no source file describes a module that was renamed or removed.
+export function findMissingSourceFiles({
+  content,
+  displayPath,
+  sourcePaths,
+}: {
+  content: string
+  displayPath: string
+  sourcePaths: readonly string[]
+}) {
+  const issues: string[] = []
+  const reported = new Set<string>()
+  let fence = false
+  for (const [index, line] of stripProductComments(content).split(/\r?\n/u).entries()) {
+    if (/^\s*(?:`{3,}|~{3,})/u.test(line)) {
+      fence = !fence
+      continue
+    }
+    if (fence) continue
+
+    for (const match of line.matchAll(/`([^`]+)`/gu)) {
+      const name = match[1]!
+      if (!SOURCE_FILE_NAME.test(name) || reported.has(name)) continue
+      if (sourcePaths.some((path) => path === name || path.endsWith(`/${name}`))) continue
+
+      reported.add(name)
+      issues.push(
+        `${displayPath}:${index + 1}: names the source file \`${name}\`, which does not exist under ${SOURCE_DIRECTORIES.join(', ')}. Correct the name or remove the statement (docs/DEVELOPMENT.md §12).`,
+      )
+    }
   }
   return issues
 }
@@ -728,6 +771,25 @@ function listSpecificationFiles(rootDirectory: string, specification: Specificat
     .sort()
 }
 
+// Repository-relative paths of every file under the source directories.
+function listSourcePaths(rootDirectory: string) {
+  const paths: string[] = []
+  const walk = (directory: string) => {
+    for (const entry of readdirSync(join(rootDirectory, directory), { withFileTypes: true })) {
+      const path = `${directory}/${entry.name}`
+      if (entry.isDirectory()) {
+        if (!SKIPPED_DIRECTORIES.has(entry.name)) walk(path)
+      } else if (entry.isFile()) {
+        paths.push(path)
+      }
+    }
+  }
+  for (const directory of SOURCE_DIRECTORIES) {
+    if (existsSync(join(rootDirectory, directory))) walk(directory)
+  }
+  return paths
+}
+
 function collectLiveDocuments(rootDirectory: string) {
   const documents = new Set<string>()
   const addIfPresent = (filePath: string) => {
@@ -826,6 +888,7 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
     }
   }
   const liveDocuments = collectLiveDocuments(rootDirectory)
+  let sourcePaths: string[] | undefined
   for (const filePath of liveDocuments) {
     const displayPath = filePath.startsWith(`${rootDirectory}/`) ? filePath.slice(rootDirectory.length + 1) : filePath
     const content = readFileSync(filePath, 'utf8')
@@ -842,6 +905,11 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
     }
     if (include('structure') && (isProductFile(displayPath) || isArchitectureFile(displayPath))) {
       issues.push(...findTextBeforeFirstSection({ content, displayPath }))
+    }
+    if (include('structure') && isArchitectureFile(displayPath)) {
+      sourcePaths ??= listSourcePaths(rootDirectory)
+      issues.push(...findOversizedProductText({ content, displayPath, limits: ARCHITECTURE_LIMITS }))
+      issues.push(...findMissingSourceFiles({ content, displayPath, sourcePaths }))
     }
     if (include('tests') && displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))

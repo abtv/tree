@@ -10,6 +10,22 @@ This document is the index of the architecture description. It holds no architec
 
 ADR 0024 links to the former heading "Desktop notes replacement" of this file. That text is §13.12 in [desktop-data.md](architecture/desktop-data.md).
 
+## Writing Rules
+
+The files describe the present design. A reader who changes one area opens one file and finds, for each mechanism, which module owns it, which rules a change must keep, and what it costs.
+
+* Describe one owner or one mechanism in each numbered subsection, in this order where it applies: what the module owns and where it is; its states, transitions and ordering rules; the constraints a change must keep; costs and guards.
+* Keep the own text of a section within 8,000 characters. Split a longer section into numbered subsections with the next free numbers, and add them to the Section Map.
+* State each fact once, at its owner. Cite that section elsewhere.
+* State what the code does, in the present tense. Do not narrate a change: do not write "no longer", "the existing", "added", "as before", or "unchanged" about an earlier design, and do not record that a change left something else unaffected.
+* State a cost for the mechanism that produces it: the writes and syncs it performs or schedules, its complexity bound, its retained memory, and the guard that covers it. When a path marks a persisted change for the autosave, say so; do not write that the path adds no writes.
+* Make a negative statement about the path that it constrains. Keep it when breaking it would need a decision or a guard.
+* Keep the reason for a rejected alternative, and the conclusion and the stated limit of a measurement.
+* Cite user-visible behavior as `PRODUCT.md §N`. Do not restate it.
+* Name owners by source file and symbol. A cited source file must exist.
+
+`npm run check:docs` enforces the size limit, the Section Map and the existence of cited source files ([Development Guide §12](DEVELOPMENT.md#12-testing-strategy)).
+
 ## Section Map
 
 Each section number is listed once, with the file that holds its heading.

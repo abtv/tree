@@ -19,6 +19,7 @@ import {
   extractTestTitles,
   findBrokenLinks,
   findBrokenReferences,
+  findMissingSourceFiles,
   findScratchDependencies,
   findProductQuantityRestatements,
   findOversizedProductText,
@@ -1416,18 +1417,98 @@ describe('architecture files under docs/architecture', () => {
     ])
   })
 
-  it('applies no size limit but still rejects a restated product quantity', () => {
+  it('applies the section limit without a block limit and still rejects a restated product quantity', () => {
     const root = createTemporaryRoot()
+    const purpose = (size: number) => `# Overview\n\n## 1. Purpose\n${'x'.repeat(size)}\n`
 
-    writeArchitecture(root, { index, overview: overview + 'x'.repeat(701) + '\n', agenda })
+    writeArchitecture(root, { index, overview: purpose(8000), agenda })
+    const atLimit = runChecks({ rootDirectory: root }).issues
+
+    writeArchitecture(root, { index, overview: purpose(8001), agenda })
     const oversized = runChecks({ rootDirectory: root }).issues
 
     writeArchitecture(root, { index, overview: overview + 'Nodes remain at level 20.\n', agenda })
 
-    expect(oversized).toEqual([])
+    expect(atLimit).toEqual([])
+    expect(oversized).toEqual([
+      'docs/architecture/overview.md §1: 8001 characters of own text; the limit is 8000. Split it into numbered subsections (docs/DEVELOPMENT.md §12).',
+    ])
     expect(runChecks({ rootDirectory: root }).issues).toEqual([
       'docs/architecture/overview.md: restates the node-depth value ("level 20"); the owner is docs/PRODUCT.md',
     ])
+  })
+
+  it('counts the own text of a section without its numbered subsections', () => {
+    const root = createTemporaryRoot()
+    const parent = `# Agenda\n\n## 8. UI Layer\n${'x'.repeat(5000)}\n`
+    const child = `\n### 8.1 Agenda Rendering\n${'y'.repeat(5000)}\n`
+
+    writeArchitecture(root, { index, overview, agenda: parent + child })
+
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([])
+  })
+
+  it('accepts a source file named by its file name, by a path ending, or by its repository path', () => {
+    const sourcePaths = ['src/renderer/NodeList.tsx', 'src/shared/png-validation.ts', 'scripts/web/build.mts']
+    const content = [
+      '## 8. UI Layer',
+      '`NodeList.tsx` renders rows. `shared/png-validation.ts` owns the checks.',
+      '`scripts/web/build.mts` builds the package and `src/renderer/NodeList.tsx` is named in full.',
+    ].join('\n')
+
+    expect(findMissingSourceFiles({ content, displayPath: 'docs/architecture/a.md', sourcePaths })).toEqual([])
+  })
+
+  it('reports a source file name that no source file matches, once, with its line', () => {
+    const sourcePaths = ['src/renderer/NodeList.tsx', 'src/web/other/styles.css']
+    const content = [
+      '## 8. UI Layer',
+      '`NodeList.tsx` and `node-list.ts` render rows.',
+      'The rules are in `renderer/styles.css`; `node-list.ts` is named again.',
+    ].join('\n')
+
+    expect(findMissingSourceFiles({ content, displayPath: 'docs/architecture/a.md', sourcePaths })).toEqual([
+      'docs/architecture/a.md:2: names the source file `node-list.ts`, which does not exist under src, scripts, perf, e2e, config. Correct the name or remove the statement (docs/DEVELOPMENT.md §12).',
+      'docs/architecture/a.md:3: names the source file `renderer/styles.css`, which does not exist under src, scripts, perf, e2e, config. Correct the name or remove the statement (docs/DEVELOPMENT.md §12).',
+    ])
+  })
+
+  it('ignores code spans that are not source file names, fenced blocks, and comments', () => {
+    const content = [
+      '## 13. Persistence',
+      '`data/command-history.json`, `document.json.bak`, `sw.js`, `EditorStore.enter`, `tree:get-vim-enabled`,',
+      '`src/web/public/` and `*.property.test.ts` are not source file names.',
+      '<!-- `hidden.ts` -->',
+      '```text',
+      '`fenced.ts`',
+      '```',
+    ].join('\n')
+
+    expect(findMissingSourceFiles({ content, displayPath: 'docs/architecture/a.md', sourcePaths: [] })).toEqual([])
+  })
+
+  it('fails the repository check for a missing source file and passes when the file exists', () => {
+    const root = createTemporaryRoot()
+
+    writeArchitecture(root, { index, overview, agenda: agenda + '`agenda-rows.ts` owns the rows.\n' })
+    const missing = runChecks({ rootDirectory: root }).issues
+
+    writeFile(root, 'src/application/agenda-rows.ts', 'export {}\n')
+
+    expect(missing).toEqual([
+      'docs/architecture/agenda.md:7: names the source file `agenda-rows.ts`, which does not exist under src, scripts, perf, e2e, config. Correct the name or remove the statement (docs/DEVELOPMENT.md §12).',
+    ])
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([])
+    expect(runChecks({ rootDirectory: root, group: 'links' }).issues).toEqual([])
+  })
+
+  it('does not accept a source file that exists only in a skipped directory', () => {
+    const root = createTemporaryRoot()
+
+    writeArchitecture(root, { index, overview, agenda: agenda + '`agenda-rows.ts` owns the rows.\n' })
+    writeFile(root, 'src/node_modules/ignored/agenda-rows.ts', 'export {}\n')
+
+    expect(runChecks({ rootDirectory: root }).issues).toHaveLength(1)
   })
 })
 
