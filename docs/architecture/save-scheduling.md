@@ -2,46 +2,36 @@
 
 ### 13.8 Save Scheduling, Flush and Failure
 
-The quit flush, the reporting and clearing of save failures, and the quit confirmation of the locked save-failure state follow `docs/PRODUCT.md` §16.1 and §16.2.
+The quit flush, the reporting and clearing of save failures, and the quit confirmation of the locked save-failure state follow PRODUCT.md §16.1 and §16.2.
 
-The browser adapter derives its save status and native close warning from the acknowledged document, pending document writes, unfinished cut/paste operations, and buffered editor text. The editor store reports transitions into and out of its existing set of pending edits. This adds constant-size bookkeeping and no storage operations.
+#### 13.8.1 Automatic Save Policy and Scheduler
 
-`EditorStore` passes explicit `SaveTiming` to `EditorSaveScheduler`. Desktop uses
-the default idle and cleanup-retry intervals; browser composition supplies its
-existing shorter intervals. `Clock` only schedules time and never infers an
-operation from a duration, so text-session timing stays independent. This changes
-no save triggers, write or sync counts, document-scale work or retained history;
-the configuration retains only two scalar values per scheduler.
+The renderer applies the automatic save policy defined in PRODUCT.md §16.1. The store tracks whether changes are pending, counts inserted words against the volume threshold, and resets or arms the idle timer for each persisted change as that policy requires. Image insertion and hyperlink insertion request an immediate save. Inserted-word accounting uses two bounded scalar watermarks: a cumulative inserted-word count and the cumulative count acknowledged by the latest successfully persisted snapshot. When the coordinator captures the document state for an actual service save, the store records the watermark in that snapshot; only a successful document save advances the acknowledged watermark. A failed save, and a cleanup-only success, leave it unchanged, so an earlier successful save cannot acknowledge edits made after its snapshot was captured and a later failed save cannot lose its accounting. The volume trigger compares the cumulative and acknowledged watermarks.
 
-The store-owned scheduler also consumes persistence results and owns bounded failure
-accounting, retry timing and cancellation of pending saves. Its result tells
-`EditorStore` whether to publish success, an error, or the existing failure lock.
-The store retains the lock flag and rejects mutations; it no longer sequences retry
-primitives. A repeated prior error without a new save attempt does not increment the
-save counter. Cleanup failures retain their separate budget and do not postpone an
-already armed document save. Success clears failure accounting; explicit final flush
-still attempts saving while locked. This preserves ADR 0010 and the existing scalar
-state, queue, write limits and cleanup ordering.
+`EditorStore` passes explicit `SaveTiming` to `EditorSaveScheduler`. Desktop uses the default idle and cleanup-retry intervals; browser composition supplies its shorter intervals. `Clock` only schedules time and never infers an operation from a duration, so text-session timing stays independent. The timing configuration sets only the idle and cleanup-retry delays; it does not change which events trigger a save, and it retains only two scalar values per scheduler.
 
-Closing the main window is a quit request (`docs/PRODUCT.md` §9.2): the main process intercepts the window close, runs the same renderer flush handshake as `Cmd+Q`, and only allows the application to quit after the renderer confirms. A failed or timed-out flush follows `docs/PRODUCT.md` §16.1. Two exceptions hold no document that could be saved: a window whose renderer document never loaded quits on its load failure, and a window whose renderer process has ended quits without the handshake (§16 and the quit phase in §7).
+The store-owned scheduler also consumes persistence results and owns bounded failure accounting, retry timing and cancellation of pending saves. Its result tells `EditorStore` whether to publish success, an error, or the failure lock. The store retains the lock flag and rejects mutations; it does not sequence retry primitives. A repeated prior error without a new save attempt does not increment the save counter. Cleanup failures retain their separate budget and do not postpone an already armed document save. Success clears failure accounting; explicit final flush still attempts saving while locked. This follows ADR 0010: failure accounting is scalar state, saves and cleanups share the coordinator's queue, and the ADR's write limits and cleanup ordering hold.
 
-The renderer applies the automatic save policy defined in `docs/PRODUCT.md` §16.1. The store tracks whether changes are pending, counts inserted words against the volume threshold, and resets or arms the idle timer for each persisted change as that policy requires. Image insertion and hyperlink insertion request an immediate save. Inserted-word accounting uses two bounded scalar watermarks: a cumulative inserted-word count and the cumulative count acknowledged by the latest successfully persisted snapshot. When the coordinator captures the document state for an actual service save, the store records the watermark in that snapshot; only a successful document save advances the acknowledged watermark. A failed save, and a cleanup-only success, leave it unchanged, so an earlier successful save cannot acknowledge edits made after its snapshot was captured and a later failed save cannot lose its accounting. The volume trigger compares the cumulative and acknowledged watermarks.
+#### 13.8.2 Save Failure and Lock
+
+The store counts consecutive failed document saves. The coordinator reports whether a failed cycle was a document save or an attachment cleanup so the two are retried differently. After three consecutive document-save failures the store stops scheduling automatic save attempts, discards any save request already queued, and enters the locked save-failure state defined in PRODUCT.md §16.2: mutating commands are rejected in the application layer, navigation, selection, and copy remain available, and the renderer presents the failure with restart guidance. A successful save resets the failure count and releases the lock. Quit and window close still attempt a final save through the flush handshake; if that save fails while locked, the renderer asks for explicit confirmation and a dedicated trusted IPC operation quits without flushing.
+
+#### 13.8.3 Flush and Quit
+
+Closing the main window is a quit request (PRODUCT.md §9.2): the main process intercepts the window close, runs the same renderer flush handshake as `Cmd+Q`, and only allows the application to quit after the renderer confirms. A failed or timed-out flush follows PRODUCT.md §16.1. Two exceptions hold no document that could be saved: a window whose renderer document never loaded quits on its load failure, and a window whose renderer process has ended quits without the handshake (§16.1 and the quit phase in §7.6).
 
 `flushPersistence` forces a save of pending changes before awaiting the queue. Renderer-local pending edits that are not yet in the document — the Vim Replace buffer — are completed through a finisher the input bindings register with the store. The flush invokes finishers before capturing state and after draining document and preference writes. A finisher reports whether it committed a change, so the flush runs another pass and waits for that change to persist. Finishers run only while the store is ready and not locked, because a locked store rejects document changes; otherwise the session is retained instead of being consumed by a rejected commit.
-
-The store counts consecutive failed document saves. The coordinator reports whether a failed cycle was a document save or an attachment cleanup so the two are retried differently. After three consecutive document-save failures the store stops scheduling automatic save attempts, discards any save request already queued, and enters the locked save-failure state defined in `docs/PRODUCT.md` §16.2: mutating commands are rejected in the application layer, navigation, selection, and copy remain available, and the renderer presents the failure with restart guidance. A successful save resets the failure count and releases the lock. Quit and window close still attempt a final save through the flush handshake; if that save fails while locked, the renderer asks for explicit confirmation and a dedicated trusted IPC operation quits without flushing.
 
 The editor tracks pending asynchronous cut and paste operations. Shutdown flushing waits for those operations and their queued document saves, drains emoji history, then drains the document queue again before checking for additional pending work. The second document drain observes immediate saves started during metadata writes even when they have already cleared the scheduler's pending flag; a failed save rejects before another pass can retry it. Registered finishers run again after these drains. The emoji history owner exposes pending work through its saved/revision counters, excluding an absent optional writer. The flush repeats until finishers, asynchronous edits, document changes and metadata are all settled. Operation failures reject the active flush and prevent its quit acknowledgment. The persistence coordinator retains document-save failures separately from cleanup results so cleanup alone cannot authorize quit with unsaved changes.
 
 `EditorSaveScheduler` checks the persistence lock at every automatic save entry point. The flush supplies an explicit reason that permits the final save while locked. Paste rechecks the lock after waiting for prior clipboard work, reading the clipboard and writing an attachment. Save accounting and image recognition follow only an accepted structural change; a rejected image insertion releases its pending attachment reference and requests ordinary cleanup.
 
-Performance assessment (`docs/PRODUCT.md` §22.1): these completion and admission checks use bounded scalar state and add no document traversal, per-keystroke write or filesystem sync. The second document drain is a no-op when the queue has no work. Another flush pass writes only newly pending work; save-count regressions guard empty flushes and rejected pastes. Metadata pending checks reuse existing counters, so retained memory does not grow with document size or edit count.
+Performance assessment (PRODUCT.md §22.1): these completion and admission checks use bounded scalar state and cause no document traversal, per-keystroke write or filesystem sync. The second document drain is a no-op when the queue has no work. Another flush pass writes only newly pending work; save-count regressions guard empty flushes and rejected pastes. Metadata pending checks reuse the saved/revision counters, so retained memory does not grow with document size or edit count.
 
-`PersistenceCoordinator` explicitly separates execution (`idle`, `queued`, `running`,
-`saving`, `cleaning`), pending work (`none`, `save`, `cleanup`, `save-and-cleanup`,
-`deferred-cleanup`), and the latest operation/document-save outcomes. Deferred
-cleanup is retained without immediately scheduling another attempt; a save request
-merges it into the next batch, and an idle flush can wake it. The existing Promise
-queue serializes batches and flush waits for its identity to stabilize, including
-requests received during finalization. State transitions add only bounded metadata;
-capture timing, serialization, write/sync counts and document-scale work are unchanged.
+#### 13.8.4 Persistence Coordinator
+
+`PersistenceCoordinator` explicitly separates execution (`idle`, `queued`, `running`, `saving`, `cleaning`), pending work (`none`, `save`, `cleanup`, `save-and-cleanup`, `deferred-cleanup`), and the latest operation/document-save outcomes. Deferred cleanup is retained without immediately scheduling another attempt; a save request merges it into the next batch, and an idle flush can wake it. The Promise queue serializes batches and flush waits for its identity to stabilize, including requests received during finalization. State transitions keep only bounded metadata.
+
+#### 13.8.5 Browser Save Status
+
+The browser adapter derives its save status and native close warning from the acknowledged document, pending document writes, unfinished cut/paste operations, and buffered editor text. The editor store reports transitions into and out of its set of pending edits. The reporting uses constant-size bookkeeping and no storage operations.

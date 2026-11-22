@@ -28,8 +28,8 @@ Each section number is listed once, with the file that holds its heading.
 | 8.8, 8.8.1, 8.8.2, 8.8.3, 8.8.4, 13.1 | [completion-and-tags.md](architecture/completion-and-tags.md) |
 | 4.1, 7.3, 7.3.1, 7.3.2, 7.3.3, 8.1, 8.1.1, 8.1.2, 8.1.3, 8.1.4, 8.1.5, 8.1.6, 8.1.7 | [agenda.md](architecture/agenda.md) |
 | 13, 13.5, 13.5.1, 13.5.2, 13.5.3, 13.5.4, 13.5.5, 13.9, 13.9.1, 13.9.2, 13.9.3, 13.10, 13.10.1, 13.10.2, 13.11 | [persistence.md](architecture/persistence.md) |
-| 13.8 | [save-scheduling.md](architecture/save-scheduling.md) |
-| 13.7, 14, 15 | [attachments-and-clipboard.md](architecture/attachments-and-clipboard.md) |
+| 13.8, 13.8.1, 13.8.2, 13.8.3, 13.8.4, 13.8.5 | [save-scheduling.md](architecture/save-scheduling.md) |
+| 13.7, 14, 14.1, 14.2, 15, 15.1, 15.2 | [attachments-and-clipboard.md](architecture/attachments-and-clipboard.md) |
 | 16, 16.1, 16.2, 16.3, 17, 17.1 | [electron.md](architecture/electron.md) |
 | 13.12, 13.13 | [desktop-data.md](architecture/desktop-data.md) |
 | 13.14, 13.15, 13.16, 13.17 | [browser.md](architecture/browser.md) |
