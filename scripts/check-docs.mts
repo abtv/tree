@@ -1,6 +1,6 @@
 import type { ProductLine } from './product-sections.mts'
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, posix, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 import { productOwnText, scanProductBlocks, scanProductSections, stripProductComments } from './product-sections.mts'
@@ -13,7 +13,16 @@ export const PRODUCT_LIMITS = { block: 700, section: 8000 }
 export const PRODUCT_INDEX = 'docs/PRODUCT.md'
 export const PRODUCT_DIRECTORY = 'docs/product'
 
+// The documents stored as an index plus per-area files with stable section numbers.
+export const SPECIFICATIONS = {
+  product: { index: PRODUCT_INDEX, directory: PRODUCT_DIRECTORY },
+  architecture: { index: 'docs/ARCHITECTURE.md', directory: 'docs/architecture' },
+} as const
+export type SpecificationName = keyof typeof SPECIFICATIONS
+type Specification = (typeof SPECIFICATIONS)[SpecificationName]
+
 const isProductFile = (displayPath: string) => displayPath.startsWith(`${PRODUCT_DIRECTORY}/`)
+const isArchitectureFile = (displayPath: string) => displayPath.startsWith(`${SPECIFICATIONS.architecture.directory}/`)
 
 // A specification file may hold only its title before the first numbered heading, so that every
 // requirement sits inside a numbered section.
@@ -41,15 +50,21 @@ const SECTION_NUMBER = /\d+(?:\.\d+)*/gu
 
 // The index maps every section number to the file that holds its heading. Retired numbers stay listed
 // in a second table and never reappear as headings. The index lists numbers and no titles.
-export function validateProductIndex({
+export function validateSpecificationIndex({
   index,
   files,
-  displayPath = PRODUCT_INDEX,
+  specification = SPECIFICATIONS.product,
 }: {
   index: string
   files: { path: string; content: string }[]
-  displayPath?: string
+  specification?: Specification
 }) {
+  const displayPath = specification.index
+  const parent = dirname(specification.directory)
+  const fileLink = new RegExp(
+    String.raw`\]\((${specification.directory.slice(parent.length + 1)}\/[A-Za-z0-9_.-]+\.md)\)`,
+    'u',
+  )
   const issues: string[] = []
   const listed = new Map<string, string>()
   const retired = new Set<string>()
@@ -67,9 +82,9 @@ export function validateProductIndex({
       for (const number of numbers) retired.add(number)
       continue
     }
-    const target = /\]\((product\/[A-Za-z0-9_.-]+\.md)\)/u.exec(cells[1] ?? '')?.[1]
+    const target = fileLink.exec(cells[1] ?? '')?.[1]
     if (target === undefined) continue
-    const path = `docs/${target}`
+    const path = `${parent}/${target}`
     indexedFiles.add(path)
     for (const number of numbers) {
       if (listed.has(number)) issues.push(`${displayPath}: the index lists §${number} more than once`)
@@ -703,13 +718,13 @@ function unfinishedPlanPaths(rootDirectory: string) {
   return paths
 }
 
-// Repository-relative paths of the specification files under docs/product/, sorted by name.
-function listProductFiles(rootDirectory: string) {
-  const directory = join(rootDirectory, PRODUCT_DIRECTORY)
+// Repository-relative paths of the files of a specification, sorted by name.
+function listSpecificationFiles(rootDirectory: string, specification: Specification = SPECIFICATIONS.product) {
+  const directory = join(rootDirectory, specification.directory)
   if (!existsSync(directory)) return []
   return readdirSync(directory, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => `${PRODUCT_DIRECTORY}/${entry.name}`)
+    .map((entry) => `${specification.directory}/${entry.name}`)
     .sort()
 }
 
@@ -735,7 +750,9 @@ function collectLiveDocuments(rootDirectory: string) {
   ]) {
     addIfPresent(join(rootDirectory, 'docs', name))
   }
-  for (const path of listProductFiles(rootDirectory)) documents.add(join(rootDirectory, path))
+  for (const specification of Object.values(SPECIFICATIONS)) {
+    for (const path of listSpecificationFiles(rootDirectory, specification)) documents.add(join(rootDirectory, path))
+  }
   const decisions = join(rootDirectory, 'docs', 'decisions')
   if (existsSync(decisions)) {
     for (const entry of readdirSync(decisions, { withFileTypes: true })) {
@@ -823,22 +840,24 @@ export function runChecks({ rootDirectory = ROOT, group }: { rootDirectory?: str
     if (include('structure') && (displayPath === PRODUCT_INDEX || isProductFile(displayPath))) {
       issues.push(...findOversizedProductText({ content, displayPath }))
     }
-    if (include('structure') && isProductFile(displayPath)) {
+    if (include('structure') && (isProductFile(displayPath) || isArchitectureFile(displayPath))) {
       issues.push(...findTextBeforeFirstSection({ content, displayPath }))
     }
     if (include('tests') && displayPath === CONFORMANCE_DOCUMENT) {
       issues.push(...findStaleConformanceCitations({ content, rootDirectory, displayPath }))
     }
   }
-  const productIndexPath = join(rootDirectory, PRODUCT_INDEX)
-  if (include('structure') && existsSync(productIndexPath)) {
+  for (const specification of Object.values(SPECIFICATIONS)) {
+    const indexPath = join(rootDirectory, specification.index)
+    const paths = listSpecificationFiles(rootDirectory, specification)
+    // The architecture is one file until its directory exists; only then is that file an index.
+    const isIndex = specification === SPECIFICATIONS.product || paths.length > 0
+    if (!include('structure') || !existsSync(indexPath) || !isIndex) continue
     issues.push(
-      ...validateProductIndex({
-        index: readFileSync(productIndexPath, 'utf8'),
-        files: listProductFiles(rootDirectory).map((path) => ({
-          path,
-          content: readFileSync(join(rootDirectory, path), 'utf8'),
-        })),
+      ...validateSpecificationIndex({
+        index: readFileSync(indexPath, 'utf8'),
+        files: paths.map((path) => ({ path, content: readFileSync(join(rootDirectory, path), 'utf8') })),
+        specification,
       }),
     )
   }
@@ -1073,24 +1092,29 @@ function gitShow(rootDirectory: string, ref: string, file: string) {
   })
 }
 
-// The specification at a revision: the index plus every file under docs/product/ that exists there.
-// A revision before the split has the single old file.
-function readSpecificationAtRef(rootDirectory: string, ref: string) {
-  const names = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, '--', `${PRODUCT_DIRECTORY}/`], {
+// A specification at a revision: the index plus every file directly under its directory that exists
+// there. A revision before the split has the single old file.
+function readSpecificationAtRef(
+  rootDirectory: string,
+  ref: string,
+  specification: Specification = SPECIFICATIONS.product,
+) {
+  const prefix = `${specification.directory}/`
+  const names = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, '--', prefix], {
     cwd: rootDirectory,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
     .split('\n')
-    .filter((name) => /^docs\/product\/[^/]+\.md$/u.test(name))
+    .filter((name) => name.startsWith(prefix) && /^[^/]+\.md$/u.test(name.slice(prefix.length)))
     .sort()
-  return [PRODUCT_INDEX, ...names].map((path) => ({ path, content: gitShow(rootDirectory, ref, path) }))
+  return [specification.index, ...names].map((path) => ({ path, content: gitShow(rootDirectory, ref, path) }))
 }
 
 // The specification in the working tree, read the same way.
-function readSpecificationInWorkingTree(rootDirectory: string) {
-  return [PRODUCT_INDEX, ...listProductFiles(rootDirectory)].map((path) => ({
+function readSpecificationInWorkingTree(rootDirectory: string, specification: Specification = SPECIFICATIONS.product) {
+  return [specification.index, ...listSpecificationFiles(rootDirectory, specification)].map((path) => ({
     path,
     content: readWorkingFile(rootDirectory, path),
   }))
@@ -1279,6 +1303,286 @@ export function runOrdered({
     after: readSpecificationInWorkingTree(rootDirectory),
   })
   return { report, exitCode: report.problems.length === 0 && report.differingLines <= allowDifferences ? 0 : 1 }
+}
+
+// The regrouped comparison proves that a restructuring kept every character while it moved text
+// between files and under new numbered subsections of the same top-level section.
+export interface RegroupedBlock {
+  section: string
+  path: string
+  line: number
+  text: string
+}
+
+interface RegroupedHeading {
+  id: string
+  heading: string
+  title: string
+  path: string
+  line: number
+}
+
+const OUTSIDE_SECTIONS = '(outside sections)'
+const INLINE_LINK_TARGET = /\]\(([^)\s]+)\)/gu
+
+// A relative link target changes when its document moves. Resolve it against the document's
+// directory, so that the same destination compares equal from any file.
+function resolveLinkTargets(text: string, path: string) {
+  return text.replace(INLINE_LINK_TARGET, (link, target: string) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/iu.test(target)) return link
+    const anchorStart = target.indexOf('#')
+    const file = anchorStart === -1 ? target : target.slice(0, anchorStart)
+    const anchor = anchorStart === -1 ? '' : target.slice(anchorStart)
+    return `](${posix.normalize(posix.join(posix.dirname(path), file))}${anchor})`
+  })
+}
+
+// A block is a run of non-blank lines, compared character for character. Blank lines inside a fenced
+// block stay in the block. Separators and the blank lines between blocks carry no text.
+function scanExactBlocks(lines: ProductLine[], section: string, path: string) {
+  const blocks: RegroupedBlock[] = []
+  let current: ProductLine[] = []
+  let fence: { character: string; length: number } | undefined
+  const flush = () => {
+    if (current.length === 0) return
+    blocks.push({
+      section,
+      path,
+      line: current[0]!.number,
+      text: resolveLinkTargets(current.map(({ text }) => text).join('\n'), path),
+    })
+    current = []
+  }
+  for (const line of lines) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line.text)
+    if (fenceMatch) {
+      if (!fence) fence = { character: fenceMatch[1]![0]!, length: fenceMatch[1]!.length }
+      else if (fenceMatch[1]![0] === fence.character && fenceMatch[1]!.length >= fence.length) fence = undefined
+      current.push(line)
+      continue
+    }
+    if (!fence && ['', '---'].includes(line.text.trim())) flush()
+    else current.push(line)
+  }
+  flush()
+  return blocks
+}
+
+function scanRegroupedDocuments(documents: { path: string; content: string }[]) {
+  const blocks: RegroupedBlock[] = []
+  const headings: RegroupedHeading[] = []
+  for (const { path, content } of documents) {
+    const sections = scanProductSections(content)
+    const preamble = content
+      .split(/\r?\n/u)
+      .slice(0, sections[0] ? sections[0].startLine - 1 : undefined)
+      .map((text, index) => ({ number: index + 1, text }))
+    blocks.push(...scanExactBlocks(preamble, OUTSIDE_SECTIONS, path))
+    for (const section of sections) {
+      headings.push({ id: section.id, heading: section.heading, title: section.title, path, line: section.startLine })
+      blocks.push(...scanExactBlocks(section.lines, section.id, path))
+    }
+  }
+  return { blocks, headings }
+}
+
+const topLevelSection = (id: string) => (id === OUTSIDE_SECTIONS ? id : id.split('.')[0]!)
+
+export function compareRegrouped({
+  before,
+  after,
+}: {
+  before: { path: string; content: string }[]
+  after: { path: string; content: string }[]
+}) {
+  const oldSide = scanRegroupedDocuments(before)
+  const newSide = scanRegroupedDocuments(after)
+  const problems: string[] = []
+  const collectHeadings = (headings: RegroupedHeading[], side: string) => {
+    const result = new Map<string, RegroupedHeading>()
+    for (const heading of headings) {
+      if (result.has(heading.id)) problems.push(`§${heading.id}: more than one heading ${side}`)
+      else result.set(heading.id, heading)
+    }
+    return result
+  }
+  const oldHeadings = collectHeadings(oldSide.headings, 'in the base revision')
+  const newHeadings = collectHeadings(newSide.headings, 'in the working tree')
+  const headingsAdded: RegroupedHeading[] = []
+  for (const [id, heading] of oldHeadings) {
+    const current = newHeadings.get(id)
+    if (current === undefined) problems.push(`§${id}: missing in the working tree`)
+    else if (current.heading !== heading.heading) {
+      problems.push(`§${id}: heading changed from "${heading.heading}" to "${current.heading}"`)
+    }
+  }
+  for (const [id, heading] of newHeadings) {
+    if (!oldHeadings.has(id)) headingsAdded.push(heading)
+  }
+
+  // Blocks are matched as multisets inside each top-level section, so a block may move to any
+  // subsection of its section and to any file.
+  const keyOf = (block: RegroupedBlock) => JSON.stringify([topLevelSection(block.section), block.text])
+  const unmatchedOld = new Map<string, RegroupedBlock[]>()
+  for (const block of oldSide.blocks) unmatchedOld.set(keyOf(block), [...(unmatchedOld.get(keyOf(block)) ?? []), block])
+  const added: RegroupedBlock[] = []
+  const outsideAdded: RegroupedBlock[] = []
+  for (const block of newSide.blocks) {
+    const candidates = unmatchedOld.get(keyOf(block))
+    if (candidates?.length) candidates.shift()
+    else if (block.section === OUTSIDE_SECTIONS) outsideAdded.push(block)
+    else added.push(block)
+  }
+  const removed: RegroupedBlock[] = []
+  const renumbered: { from: RegroupedBlock; to: RegroupedHeading }[] = []
+  for (const block of [...unmatchedOld.values()].flat()) {
+    // An unnumbered heading may gain a number: its words then reappear as a new numbered heading.
+    const title = /^#{1,6}\s+(.+)$/u.exec(block.text)?.[1]
+    const target = headingsAdded.find(
+      (heading) =>
+        heading.title === title &&
+        topLevelSection(heading.id) === topLevelSection(block.section) &&
+        !renumbered.some(({ to }) => to === heading),
+    )
+    if (target) renumbered.push({ from: block, to: target })
+    // The level-one title of the single old file has no counterpart after a split.
+    else if (block.section !== OUTSIDE_SECTIONS || !/^#\s+\S/u.test(block.text)) removed.push(block)
+  }
+  removed.sort((left, right) => left.path.localeCompare(right.path) || left.line - right.line)
+
+  // A block that follows a different block than before may have lost the text it refers to.
+  const predecessors = (
+    blocks: RegroupedBlock[],
+    sameGroup: (left: RegroupedBlock, right: RegroupedBlock) => boolean,
+  ) => {
+    const result = new Map<string, string | undefined>()
+    for (const [index, block] of blocks.entries()) {
+      const previous = blocks[index - 1]
+      if (!result.has(keyOf(block))) {
+        result.set(keyOf(block), previous && sameGroup(previous, block) ? previous.text : undefined)
+      }
+    }
+    return result
+  }
+  const oldPredecessors = predecessors(
+    oldSide.blocks,
+    (left, right) => left.path === right.path && topLevelSection(left.section) === topLevelSection(right.section),
+  )
+  const newPredecessors = predecessors(
+    newSide.blocks,
+    (left, right) => left.path === right.path && left.section === right.section,
+  )
+  const predecessorChanges = newSide.blocks
+    .filter((block) => block.section !== OUTSIDE_SECTIONS && oldPredecessors.has(keyOf(block)))
+    .filter((block) => oldPredecessors.get(keyOf(block)) !== newPredecessors.get(keyOf(block)))
+    // A block that followed a renumbered heading now starts that numbered section.
+    .filter(
+      (block) =>
+        newPredecessors.get(keyOf(block)) !== undefined ||
+        !renumbered.some(({ from }) => from.text === oldPredecessors.get(keyOf(block))),
+    )
+    .map((block) => ({
+      block,
+      before: oldPredecessors.get(keyOf(block)),
+      after: newPredecessors.get(keyOf(block)),
+    }))
+
+  return {
+    sectionCount: new Set([...oldHeadings.keys()].map(topLevelSection)).size,
+    blockCount: oldSide.blocks.length,
+    removed,
+    added,
+    outsideAdded,
+    headingsAdded: headingsAdded.filter((heading) => !renumbered.some(({ to }) => to === heading)),
+    renumbered,
+    predecessorChanges,
+    problems,
+  }
+}
+
+const excerpt = (text: string | undefined, length = 80) => {
+  if (text === undefined) return '(the start of its section)'
+  const line = text.replace(/\s+/gu, ' ')
+  return JSON.stringify(line.length > length ? `${line.slice(0, length)}…` : line)
+}
+
+export function formatRegroupedReport(report: ReturnType<typeof compareRegrouped>) {
+  const lines = [
+    `Regrouped comparison: ${report.sectionCount} top-level sections, ${report.blockCount} blocks, removed ${report.removed.length}, added ${report.added.length}, headings added ${report.headingsAdded.length}, headings renumbered ${report.renumbered.length}, structural problems ${report.problems.length}, changed predecessors ${report.predecessorChanges.length}.`,
+  ]
+  for (const problem of report.problems) lines.push(`Problem ${problem}`)
+  for (const block of report.removed) {
+    lines.push(`Removed §${block.section} ${block.path}:${block.line}: ${JSON.stringify(block.text)}`)
+    // Show where the closest added block of the same section first differs.
+    let closest: { block: RegroupedBlock; shared: number } | undefined
+    for (const candidate of report.added) {
+      if (topLevelSection(candidate.section) !== topLevelSection(block.section)) continue
+      let shared = 0
+      while (shared < block.text.length && block.text[shared] === candidate.text[shared]) shared++
+      if (!closest || shared > closest.shared) closest = { block: candidate, shared }
+    }
+    if (closest && closest.shared >= 20) {
+      const start = Math.max(0, closest.shared - 30)
+      lines.push(
+        `  first difference at character ${closest.shared}, against ${closest.block.path}:${closest.block.line}: ${JSON.stringify(block.text.slice(start, closest.shared + 30))} became ${JSON.stringify(closest.block.text.slice(start, closest.shared + 30))}`,
+      )
+    }
+  }
+  for (const block of report.added) {
+    lines.push(`Added §${block.section} ${block.path}:${block.line}: ${JSON.stringify(block.text)}`)
+  }
+  for (const heading of report.headingsAdded) {
+    lines.push(`Heading added ${heading.path}:${heading.line}: ${heading.heading}`)
+  }
+  for (const { from, to } of report.renumbered) {
+    lines.push(`Heading renumbered ${to.path}:${to.line}: ${from.text} -> ${to.heading}`)
+  }
+  for (const block of report.outsideAdded) {
+    lines.push(`Outside sections ${block.path}:${block.line}: ${excerpt(block.text)}`)
+  }
+  for (const { block, before, after } of report.predecessorChanges) {
+    lines.push(
+      `Predecessor changed §${block.section} ${block.path}:${block.line}: ${excerpt(block.text)} follows ${excerpt(after)}; it followed ${excerpt(before)}`,
+    )
+  }
+  return lines.join('\n')
+}
+
+export function parseRegroupedArguments(args: string[]) {
+  const options: { ref: string | undefined; spec: SpecificationName } = { ref: undefined, spec: 'product' }
+  const seen = new Set()
+  for (let index = 0; index < args.length; index += 2) {
+    const option = args[index]!
+    const value = args[index + 1]
+    if (!['--regrouped', '--spec'].includes(option) || seen.has(option) || value === undefined) {
+      throw new Error(`Usage: --regrouped <git-ref> [--spec ${Object.keys(SPECIFICATIONS).join('|')}]`)
+    }
+    seen.add(option)
+    if (option === '--regrouped') options.ref = value
+    else if (Object.keys(SPECIFICATIONS).includes(value)) options.spec = value as SpecificationName
+    else throw new Error(`--spec must be one of ${Object.keys(SPECIFICATIONS).join(', ')}`)
+  }
+  assertValidRef(options.ref)
+  return { ...options, ref: options.ref }
+}
+
+export function runRegrouped({
+  ref,
+  spec = 'product',
+  rootDirectory = ROOT,
+}: {
+  ref: string
+  spec?: SpecificationName
+  rootDirectory?: string
+}) {
+  parseRegroupedArguments(['--regrouped', ref, '--spec', spec])
+  const specification = SPECIFICATIONS[spec]
+  const report = compareRegrouped({
+    before: readSpecificationAtRef(rootDirectory, ref, specification),
+    after: readSpecificationInWorkingTree(rootDirectory, specification),
+  })
+  const unchanged = report.removed.length === 0 && report.added.length === 0 && report.problems.length === 0
+  return { report, exitCode: unchanged ? 0 : 1 }
 }
 
 export function formatVerbatimReport(report: ReturnType<typeof compareVerbatim>) {
@@ -1727,6 +2031,15 @@ export function main(args = process.argv.slice(2)) {
       return result.exitCode
     } catch (error) {
       console.error(`Ordered comparison failed: ${error instanceof Error ? error.message : String(error)}`)
+      return 2
+    }
+  } else if (args[0] === '--regrouped') {
+    try {
+      const result = runRegrouped(parseRegroupedArguments(args))
+      console.log(formatRegroupedReport(result.report))
+      return result.exitCode
+    } catch (error) {
+      console.error(`Regrouped comparison failed: ${error instanceof Error ? error.message : String(error)}`)
       return 2
     }
   } else if (args[0] === '--details') {

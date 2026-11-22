@@ -106,8 +106,8 @@ Proof for each rewrite task, with the task's starting commit as `<base>`:
 
 | ID | Outcome | Files | Acceptance evidence | Tier | Status |
 | --- | --- | --- | --- | --- | --- |
-| T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Ready |
-| T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Planned |
+| T1 | The checker knows the architecture specification and can prove an exact regrouping | `scripts/check-docs.mts`, `scripts/check-docs.test.mts`, `docs/DEVELOPMENT.md` §9 and §12 | Tests for architecture index validation, live documents, link normalization and `--regrouped` (exact regrouping passes; a changed character, a dropped block and a dropped fence fail; a renumbered heading is reported). `npm run check:docs -- --regrouped HEAD --spec architecture` exits 0 on the unchanged tree | Low Risk: `npm run check` | Done |
+| T2 | Index plus 17 files; TD-003 removed from `docs/OPEN_QUESTIONS.md` | `docs/ARCHITECTURE.md`, `docs/architecture/*.md`, `docs/AGENT_WORKFLOW.md` §11 document list, `docs/OPEN_QUESTIONS.md`, this plan | `npm run check:docs -- --regrouped <T1 commit> --spec architecture` exits 0; its heading list matches Structure above; every listed adjacent pair is still adjacent; `npm run check:docs` passes. Reviewer on the heading list, section map and report | Minimal Risk: `npm run format:check:changed`, `npm run check:docs`, `npm run check:permissions` | Ready |
 | R1 | Pilot rewrite; owner checkpoint D4 | `command-panel.md`, `completion-and-tags.md` | Rewrite proof | Minimal Risk | Planned |
 | R2 | Rewrite | `overview.md`, `electron.md`. Leave §1, §3, §12, §18–20, §22, §23 and the §16 list unless they hold change-history phrasing. `docs/SECURITY.md` cites §15–17: do not weaken a control | Rewrite proof | Minimal Risk | Planned |
 | R3 | Rewrite | `domain-model.md`. §11 holds the structural-sharing invariant (ADR 0015) | Rewrite proof | Minimal Risk | Planned |
@@ -141,7 +141,9 @@ T2 writes each file once with the file-editing tool from the line ranges above, 
 
 * The planner (2026-11-22) could not read Git history. The rewrite rules above were checked against §7 of the retired product plan (`git show bb427a3:plans/product-spec-refactoring.md`).
 * `PRODUCT_LIMITS` is not applied to the architecture in Phase 1: many paragraphs are single blocks of 1–4.6 KB, and the limit would force rewording during a mechanical move.
+* T1 added `--spec` only to `--regrouped`. Rewrite tasks use `--verbatim` and `--details` with `--file`, which accept any path.
+* In this Claude Code session the sandbox denied writes to the temporary directory, so test runs that create temporary directories (`npm test`, `npm run check`) ran outside the sandbox. `npm run check:docs` ran inside it.
 
 ## Next Task
 
-T1.
+T2. Its base for `--regrouped` is the T1 commit, whose subject is `build(docs): check the architecture index and prove exact regrouping`.

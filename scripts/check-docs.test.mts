@@ -7,12 +7,14 @@ import {
   conformanceCitationMatches,
   compareDetails,
   compareOrderedSections,
+  compareRegrouped,
   compareVerbatim,
   detailChangeCount,
   extractDetailLiterals,
   extractDetailReferences,
   formatDetailsReport,
   formatOrderedReport,
+  formatRegroupedReport,
   formatVerbatimReport,
   extractTestTitles,
   findBrokenLinks,
@@ -25,21 +27,24 @@ import {
   parseConformanceCitations,
   parseDetailsArguments,
   parseOrderedArguments,
+  parseRegroupedArguments,
   parseVerbatimArguments,
   runChecks,
   runDetails,
   runOrdered,
+  runRegrouped,
   runVerbatim,
   main,
   validateAdr,
   validateAdrIndex,
   validateOpenQuestions,
-  validateProductIndex,
+  validateSpecificationIndex,
   validateWorkflowOwnership,
   validateAgentCore,
   validateAgentRuleBudget,
   AGENT_CORE_MAX_BYTES,
   AGENT_RULES_MAX_BYTES,
+  SPECIFICATIONS,
 } from './check-docs.mts'
 import { productOwnText, scanProductBlocks, scanProductSections } from './product-sections.mts'
 
@@ -944,7 +949,7 @@ describe('specification files under docs/product', () => {
   }
 
   it('accepts an index that matches the headings and lists no titles', () => {
-    expect(validateProductIndex({ index, files })).toEqual([])
+    expect(validateSpecificationIndex({ index, files })).toEqual([])
   })
 
   it('reports a number the index omits, maps to the wrong file, or lists without a heading', () => {
@@ -952,13 +957,13 @@ describe('specification files under docs/product', () => {
     const wrong = index.replace('1, 1.1', '1').replace('20, 20.2, 20.2.1', '1.1, 20, 20.2, 20.2.1')
     const phantom = index.replace('20, 20.2, 20.2.1', '20, 20.2, 20.2.1, 20.2.9')
 
-    expect(validateProductIndex({ index: omitted, files })).toEqual([
+    expect(validateSpecificationIndex({ index: omitted, files })).toEqual([
       'docs/PRODUCT.md: the index does not list §1.1 (docs/product/overview.md)',
     ])
-    expect(validateProductIndex({ index: wrong, files })).toEqual([
+    expect(validateSpecificationIndex({ index: wrong, files })).toEqual([
       'docs/PRODUCT.md: the index maps §1.1 to docs/product/vim.md, but its heading is in docs/product/overview.md',
     ])
-    expect(validateProductIndex({ index: phantom, files })).toEqual([
+    expect(validateSpecificationIndex({ index: phantom, files })).toEqual([
       'docs/PRODUCT.md: the index lists §20.2.9, which no file defines',
     ])
   })
@@ -967,10 +972,10 @@ describe('specification files under docs/product', () => {
     const twice = index.replace('20, 20.2, 20.2.1', '20, 20, 20.2, 20.2.1')
     const missing = index.replace('product/vim.md', 'product/other.md')
 
-    expect(validateProductIndex({ index: twice, files })).toEqual([
+    expect(validateSpecificationIndex({ index: twice, files })).toEqual([
       'docs/PRODUCT.md: the index lists §20 more than once',
     ])
-    expect(validateProductIndex({ index: missing, files })).toEqual([
+    expect(validateSpecificationIndex({ index: missing, files })).toEqual([
       'docs/PRODUCT.md: the index names docs/product/other.md, which does not exist',
       'docs/PRODUCT.md: the index does not list docs/product/vim.md',
       'docs/PRODUCT.md: the index maps §20 to docs/product/other.md, but its heading is in docs/product/vim.md',
@@ -978,7 +983,7 @@ describe('specification files under docs/product', () => {
       'docs/PRODUCT.md: the index maps §20.2.1 to docs/product/other.md, but its heading is in docs/product/vim.md',
     ])
     expect(
-      validateProductIndex({
+      validateSpecificationIndex({
         index,
         files: [...files, { path: 'docs/product/extra.md', content: '# Extra\n' }],
       }),
@@ -988,7 +993,7 @@ describe('specification files under docs/product', () => {
   it('reports a number that two files define', () => {
     const duplicate = [...files, { path: 'docs/product/extra.md', content: '# Extra\n\n## 1. Again\nRule.\n' }]
 
-    expect(validateProductIndex({ index, files: duplicate })).toEqual(
+    expect(validateSpecificationIndex({ index, files: duplicate })).toEqual(
       expect.arrayContaining(['docs/PRODUCT.md: §1 has a heading in more than one file']),
     )
   })
@@ -1000,8 +1005,8 @@ describe('specification files under docs/product', () => {
     )
     const withoutHeading = [{ ...files[0]!, content: '# Overview\n\n## 1. One\nRule.\n' }, files[1]!]
 
-    expect(validateProductIndex({ index: retired.replace('1, 1.1', '1'), files: withoutHeading })).toEqual([])
-    expect(validateProductIndex({ index: retired, files })).toEqual(
+    expect(validateSpecificationIndex({ index: retired.replace('1, 1.1', '1'), files: withoutHeading })).toEqual([])
+    expect(validateSpecificationIndex({ index: retired, files })).toEqual(
       expect.arrayContaining([
         'docs/PRODUCT.md: §1.1 is retired but a heading in docs/product/overview.md defines it',
         'docs/PRODUCT.md: §1.1 is both listed and retired',
@@ -1341,6 +1346,299 @@ describe('ordered comparison of numbered sections', () => {
 
     expect(result.status).toBe(2)
     expect(result.stderr).toContain('Ordered comparison failed:')
+  })
+})
+
+describe('architecture files under docs/architecture', () => {
+  const index = [
+    '# Architecture',
+    '',
+    '| Sections | File |',
+    '| --- | --- |',
+    '| 1 | [overview.md](architecture/overview.md) |',
+    '| 8, 8.1 | [agenda.md](architecture/agenda.md) |',
+    '',
+  ].join('\n')
+  const overview = '# Overview\n\n## 1. Purpose\nText.\n'
+  const agenda = '# Agenda\n\n## 8. UI Layer\n\n### 8.1 Agenda Rendering\nRows.\n'
+
+  function writeArchitecture(root: string, architecture = { index, overview, agenda }) {
+    writeFile(root, 'docs/ARCHITECTURE.md', architecture.index)
+    writeFile(root, 'docs/architecture/overview.md', architecture.overview)
+    writeFile(root, 'docs/architecture/agenda.md', architecture.agenda)
+  }
+
+  it('validates the index against the files of the named specification', () => {
+    const files = [
+      { path: 'docs/architecture/overview.md', content: overview },
+      { path: 'docs/architecture/agenda.md', content: agenda },
+    ]
+    const specification = SPECIFICATIONS.architecture
+
+    expect(validateSpecificationIndex({ index, files, specification })).toEqual([])
+    expect(validateSpecificationIndex({ index: index.replace('8, 8.1', '8'), files, specification })).toEqual([
+      'docs/ARCHITECTURE.md: the index does not list §8.1 (docs/architecture/agenda.md)',
+    ])
+  })
+
+  it('treats the architecture as one file while its directory does not exist', () => {
+    const root = createTemporaryRoot()
+
+    writeFile(root, 'docs/ARCHITECTURE.md', '# Architecture\n\n## 1. Purpose\nText.\n')
+    const result = runChecks({ rootDirectory: root })
+
+    expect(result.issues).toEqual([])
+    expect(result.liveDocumentCount).toBe(1)
+  })
+
+  it('passes a consistent index with its files and counts them as live documents', () => {
+    const root = createTemporaryRoot()
+
+    writeArchitecture(root)
+    const result = runChecks({ rootDirectory: root })
+
+    expect(result.issues).toEqual([])
+    expect(result.liveDocumentCount).toBe(3)
+  })
+
+  it('fails when text precedes the first numbered heading of a file or the index disagrees with the files', () => {
+    const root = createTemporaryRoot()
+
+    writeArchitecture(root, {
+      index: index.replace('8, 8.1', '8'),
+      overview: overview.replace('# Overview\n', '# Overview\nLoose text.\n'),
+      agenda,
+    })
+
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      'docs/architecture/overview.md:2: text before the first numbered heading; every requirement belongs to a numbered section',
+      'docs/ARCHITECTURE.md: the index does not list §8.1 (docs/architecture/agenda.md)',
+    ])
+  })
+
+  it('applies no size limit but still rejects a restated product quantity', () => {
+    const root = createTemporaryRoot()
+
+    writeArchitecture(root, { index, overview: overview + 'x'.repeat(701) + '\n', agenda })
+    const oversized = runChecks({ rootDirectory: root }).issues
+
+    writeArchitecture(root, { index, overview: overview + 'Nodes remain at level 20.\n', agenda })
+
+    expect(oversized).toEqual([])
+    expect(runChecks({ rootDirectory: root }).issues).toEqual([
+      'docs/architecture/overview.md: restates the node-depth value ("level 20"); the owner is docs/PRODUCT.md',
+    ])
+  })
+})
+
+describe('regrouped comparison of a restructured specification', () => {
+  const agendaText = 'Agenda rows render from the store projection.'
+  const before = [
+    '# Architecture',
+    '',
+    '## 1. Purpose',
+    '',
+    'Purpose text.',
+    '',
+    '---',
+    '',
+    '## 8. UI Layer',
+    '',
+    agendaText,
+    '',
+    'List paragraph with a [decision](decisions/0001-a.md) and a [site](https://example.invalid/a).',
+    '',
+    'The UI layer includes:',
+    '',
+    '* components;',
+    '* input.',
+    '',
+    '### Notes',
+    '',
+    'Notes paragraph.',
+    '',
+    '```json',
+    '{',
+    '',
+    '  "a": 1',
+    '}',
+    '```',
+    '',
+  ].join('\n')
+  const index =
+    '# Architecture\n\n| Sections | File |\n| --- | --- |\n| 1 | [overview.md](architecture/overview.md) |\n'
+  const agenda = [
+    '# Agenda',
+    '',
+    '### 8.1 Agenda Rendering',
+    '',
+    agendaText,
+    '',
+    '### 8.3 Notes',
+    '',
+    'Notes paragraph.',
+    '',
+    '```json',
+    '{',
+    '',
+    '  "a": 1',
+    '}',
+    '```',
+    '',
+  ].join('\n')
+  const interaction = [
+    '# Interaction',
+    '',
+    '## 8. UI Layer',
+    '',
+    'The UI layer includes:',
+    '',
+    '* components;',
+    '* input.',
+    '',
+    '---',
+    '',
+    '### 8.2 List Layout',
+    '',
+    'List paragraph with a [decision](../decisions/0001-a.md) and a [site](https://example.invalid/a).',
+    '',
+  ].join('\n')
+  const overview = '# Overview\n\n## 1. Purpose\n\nPurpose text.\n'
+  const after = { index, agenda, interaction, overview }
+  const compare = (files = after) =>
+    compareRegrouped({
+      before: [{ path: 'docs/ARCHITECTURE.md', content: before }],
+      after: [
+        { path: 'docs/ARCHITECTURE.md', content: files.index },
+        { path: 'docs/architecture/agenda.md', content: files.agenda },
+        { path: 'docs/architecture/interaction.md', content: files.interaction },
+        { path: 'docs/architecture/overview.md', content: files.overview },
+      ],
+    })
+
+  it('accepts text that moves to other files and under new subsections of its section', () => {
+    const result = compare()
+
+    expect(result.removed).toEqual([])
+    expect(result.added).toEqual([])
+    expect(result.problems).toEqual([])
+    expect(result.headingsAdded.map(({ id }) => id)).toEqual(['8.1', '8.2'])
+    expect(result.renumbered.map(({ from, to }) => [from.text, to.heading])).toEqual([['### Notes', '### 8.3 Notes']])
+    expect(result.predecessorChanges.map(({ block }) => block.text.slice(0, 14))).toEqual([
+      'The UI layer i',
+      'List paragraph',
+    ])
+    expect(formatRegroupedReport(result).split('\n')[0]).toBe(
+      'Regrouped comparison: 2 top-level sections, 9 blocks, removed 0, added 0, headings added 2, headings renumbered 1, structural problems 0, changed predecessors 2.',
+    )
+  })
+
+  it('reports one changed character with both locations and the first difference', () => {
+    const result = compare({ ...after, agenda: agenda.replace('projection.', 'projection!') })
+
+    expect(result.removed).toEqual([{ section: '8', path: 'docs/ARCHITECTURE.md', line: 11, text: agendaText }])
+    expect(result.added).toEqual([
+      { section: '8.1', path: 'docs/architecture/agenda.md', line: 5, text: agendaText.replace(/\.$/u, '!') },
+    ])
+    expect(formatRegroupedReport(result)).toContain(
+      'first difference at character 44, against docs/architecture/agenda.md:5',
+    )
+  })
+
+  it('reports a dropped block, a changed fenced block, and a block that leaves its top-level section', () => {
+    const dropped = compare({ ...after, interaction: interaction.replace('* components;\n* input.\n\n', '') })
+    const fence = compare({ ...after, agenda: agenda.replace('{\n\n  "a"', '{\n  "a"') })
+    const moved = compare({
+      ...after,
+      overview: overview.replace('Purpose text.\n', ''),
+      agenda: agenda + '\nPurpose text.\n',
+    })
+
+    expect(dropped.removed.map(({ text }) => text)).toEqual(['* components;\n* input.'])
+    expect(fence.removed.map(({ line }) => line)).toEqual([24])
+    expect(fence.added.map(({ line }) => line)).toEqual([11])
+    expect(moved.removed.map(({ section, text }) => [section, text])).toEqual([['1', 'Purpose text.']])
+    expect(moved.added.map(({ section, text }) => [section, text])).toEqual([['8.3', 'Purpose text.']])
+  })
+
+  it('resolves relative link targets from the directory of each file', () => {
+    const wrong = compare({ ...after, interaction: interaction.replace('../decisions/', 'decisions/') })
+
+    expect(wrong.removed).toHaveLength(1)
+    expect(wrong.added.map(({ text }) => text)).toEqual([
+      'List paragraph with a [decision](docs/architecture/decisions/0001-a.md) and a [site](https://example.invalid/a).',
+    ])
+  })
+
+  it('reports a changed heading, a missing section, and a duplicate as structural problems', () => {
+    const retitled = compare({ ...after, interaction: interaction.replace('## 8. UI Layer', '## 8. Interface') })
+    const missing = compare({ ...after, overview: '# Overview\n' })
+    const duplicate = compare({ ...after, overview: overview + '\n### 8.1 Again\n' })
+
+    expect(retitled.problems).toEqual(['§8: heading changed from "## 8. UI Layer" to "## 8. Interface"'])
+    expect(missing.problems).toEqual(['§1: missing in the working tree'])
+    expect(missing.removed.map(({ text }) => text)).toEqual(['Purpose text.'])
+    expect(duplicate.problems).toEqual(['§8.1: more than one heading in the working tree'])
+  })
+
+  it('parses its arguments strictly', () => {
+    expect(parseRegroupedArguments(['--regrouped', 'HEAD~1'])).toEqual({ ref: 'HEAD~1', spec: 'product' })
+    expect(parseRegroupedArguments(['--regrouped', 'abc123', '--spec', 'architecture'])).toEqual({
+      ref: 'abc123',
+      spec: 'architecture',
+    })
+    for (const args of [
+      [],
+      ['--regrouped'],
+      ['--regrouped', '-HEAD'],
+      ['--regrouped', 'HEAD', '--spec', 'other'],
+      ['--regrouped', 'HEAD', '--regrouped', 'HEAD'],
+      ['--regrouped', 'HEAD', '--file', 'docs/ARCHITECTURE.md'],
+    ])
+      expect(() => parseRegroupedArguments(args)).toThrow()
+  })
+
+  it('compares a Git revision of the named specification with the working tree', () => {
+    const root = createTemporaryRoot()
+    const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+
+    git(['init', '--quiet'])
+    writeFile(root, 'docs/ARCHITECTURE.md', before)
+    git(['add', '-A'])
+    git([
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '-m',
+      'docs(fixture): add the single file',
+    ])
+
+    expect(runRegrouped({ ref: 'HEAD', spec: 'architecture', rootDirectory: root }).exitCode).toBe(0)
+
+    writeFile(root, 'docs/ARCHITECTURE.md', index)
+    writeFile(root, 'docs/architecture/agenda.md', agenda)
+    writeFile(root, 'docs/architecture/interaction.md', interaction)
+    writeFile(root, 'docs/architecture/overview.md', overview)
+
+    expect(runRegrouped({ ref: 'HEAD', spec: 'architecture', rootDirectory: root }).exitCode).toBe(0)
+
+    writeFile(root, 'docs/architecture/overview.md', overview.replace('Purpose text.', 'Changed text.'))
+
+    expect(runRegrouped({ ref: 'HEAD', spec: 'architecture', rootDirectory: root }).exitCode).toBe(1)
+    expect(() => runRegrouped({ ref: 'HEAD', rootDirectory: root })).toThrow()
+  })
+
+  it('returns process exit 2 for bad regrouped arguments', () => {
+    const script = join(import.meta.dirname, 'check-docs.mts')
+    const result = spawnSync(process.execPath, [script, '--regrouped', '-HEAD'], { encoding: 'utf8' })
+
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('Regrouped comparison failed:')
   })
 })
 
