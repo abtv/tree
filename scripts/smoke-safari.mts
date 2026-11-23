@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
+import { assertFreshBuild } from './build-freshness.mts'
 import { runSafari, SAFARI_SMOKE_TIMEOUT_MS } from './web/safari.mts'
 
 assert.equal(process.argv.length, 2, 'Use npm run test:smoke:safari without arguments')
+await assertFreshBuild('web')
+
 const started = performance.now()
 await runSafari(true)
 const elapsed = performance.now() - started

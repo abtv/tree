@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { browserEditing, happyPath, type SmokeDriver } from './scenario.mts'
+import { assertFreshBuild } from '../../scripts/build-freshness.mts'
 import { createStaticServer } from '../../scripts/web/static-server.mts'
 import { clickApplicationMenuItem, clickApplicationMenuQuit, closeApp } from '../electron/fixtures.ts'
 import { imageToTextSmoke } from './image-to-text.mts'
@@ -18,6 +19,8 @@ test('edits, undoes, navigates, persists and searches Tree and Agenda', async ({
       console.log(`Smoke: finished ${name} after ${Math.round(performance.now() - started)}ms`)
     }
   }
+  await assertFreshBuild(testInfo.project.name === 'electron' ? 'electron' : 'web')
+
   const errors: string[] = []
   // Electron injects the Apple shortcut profile even in the Linux smoke container.
   const primaryKey = testInfo.project.name === 'electron' || process.platform === 'darwin' ? 'Meta' : 'Control'
