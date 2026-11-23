@@ -24,7 +24,7 @@ The same outline, focused on “Plan the first meetup”: the node text and expa
 
 <img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing dated nodes grouped by day.">
 
-The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, with Today marked. Move between weeks with `Cmd+[` and `Cmd+]`. Marked nodes also appear under Today. In the current week, Overdue lists nodes dated before Monday unless they are struck through. Populated groups fold. Consecutive entries with the same parent share a read-only path that you can select and copy.
+The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, and highlights Today. Use the command panel to mark a node for Today. It then appears under Today even if its text has no date. Move between weeks with `Cmd+[` and `Cmd+]`. In the current week, Overdue lists nodes dated before Monday unless they are struck through. Populated groups fold. Consecutive entries with the same parent share a read-only path that you can select and copy.
 
 <img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
 

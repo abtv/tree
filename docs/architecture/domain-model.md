@@ -79,7 +79,7 @@ Attachment references may contain the optional image size `width` and `height`; 
 
 ### 5.1 Struck-Through Nodes
 
-`struckThrough` is present, and `true`, only on a struck-through node (PRODUCT.md §2.5); a normal node omits it rather than storing `false`. It belongs to the node alone and never changes its parent or children. Text edits and moves preserve the field. A split leaves it on the original node, a join keeps the first node's state, and a subtree copy preserves the field on each copied node (PRODUCT.md §2.5). `toggleStrikethrough` changes one sibling range with `withStruckThrough` from `node-struck-through.ts` and path-copies only the route to it, like any other edit (§11), preserving text, links, attachments, children, and identities.
+`struckThrough` belongs to one node and has the value `true` when present (PRODUCT.md §2.5). Rebuilding an existing node preserves the field unless the operation toggles strikethrough. A node created from scratch omits the field. A split leaves it on the original node, a join keeps the first node's state, and a subtree copy preserves the field on each copied node. `toggleStrikethrough` changes one sibling range with `withStruckThrough` from `node-struck-through.ts` and path-copies only the route to it, like any other edit (§11), preserving text, links, attachments, children, and identities.
 
 ### 5.2 Attachment Search Text
 
@@ -125,7 +125,7 @@ undo
 redo
 ```
 
-At the depth limit, nodes can still be edited, split into siblings, and reordered within their sibling list. A subtree paste checks the depth of every incoming tree at its destination and rejects the entire paste if any tree exceeds the limit (PRODUCT.md §2.3). A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
+PRODUCT.md §2.3 defines behavior at the depth limit. Application transitions use `wouldExceedMaximumDepth` for subtree pastes at a sibling position. When pasting into a current parent with no children, `pasteNodeForestTransition` checks the child depth using `subtreeHeight`. A depth violation returns `{ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }` before the transition allocates IDs or changes editor state.
 
 `moveSubtree` moves a node with its subtree under any parent, or to the document root, at a given index counted after the node is removed from its old place. It reports `impossible` for an unknown ID or a destination inside the moved subtree, and `too-deep` when the subtree would exceed the maximum-depth limit. It copies only the two affected root-to-array paths and carries the attachment summary over, so a move shares every other subtree with the previous document.
 
