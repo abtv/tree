@@ -30,9 +30,10 @@ async function storedFolder(): Promise<FileSystemDirectoryHandle | undefined> {
   }
 }
 
-async function rememberFolder(folder: FileSystemDirectoryHandle | undefined): Promise<void> {
+async function rememberFolder(folder: FileSystemDirectoryHandle | undefined, disposed?: () => boolean): Promise<void> {
   const db = await openDatabase()
   try {
+    if (disposed?.()) return
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(PREFERENCE_STORE, 'readwrite', { durability: 'strict' })
       const store = tx.objectStore(PREFERENCE_STORE)
@@ -189,7 +190,7 @@ export function installFolderBackup(
     if ((await next.queryPermission({ mode: 'readwrite' })) !== 'granted') {
       throw new DOMException('Write permission was not granted.', 'NotAllowedError')
     }
-    await rememberFolder(next)
+    await rememberFolder(next, disposed)
     if (disposed()) return
     stopWorker()
     lifecycle = { phase: 'starting', folder: next }

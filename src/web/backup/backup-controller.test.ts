@@ -5,6 +5,7 @@ import { BrowserMenuCommands } from '../menu-commands'
 import type { BackupWorkerMessage } from '../workers/backup-protocol'
 
 const storage = vi.hoisted(() => ({
+  open: vi.fn(),
   read: vi.fn(),
   put: vi.fn(),
   delete: vi.fn(),
@@ -14,7 +15,7 @@ const storage = vi.hoisted(() => ({
 vi.mock('../storage-schema', () => ({
   PREFERENCE_STORE: 'preferences',
   readValue: storage.read,
-  openDatabase: async () => ({ transaction: storage.transaction, close: storage.close }),
+  openDatabase: storage.open,
 }))
 
 class BackupWorker {
@@ -119,6 +120,7 @@ async function fixture(stored?: ReturnType<typeof folder>, supported = true) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  storage.open.mockResolvedValue(storage)
   storage.read.mockReset()
   BackupWorker.instances = []
   vi.stubGlobal('Worker', BackupWorker)
@@ -394,6 +396,21 @@ describe('folder backup controller', () => {
     expect(f.unsubscribe).toHaveBeenCalledOnce()
   })
 
+  it('does not remember a folder if the page closes during its permission check', async () => {
+    const f = await fixture()
+    let grant!: (permission: string) => void
+    f.next.queryPermission.mockImplementationOnce(() => new Promise((resolve) => (grant = resolve)))
+    f.button('data-backup').click()
+    await vi.waitFor(() => expect(f.next.queryPermission).toHaveBeenCalledOnce())
+
+    window.dispatchEvent(new Event('pagehide'))
+    grant('granted')
+    await vi.waitFor(() => expect(f.isConfiguring()).toBe(false))
+
+    expect(storage.put).not.toHaveBeenCalled()
+    expect(BackupWorker.instances).toHaveLength(0)
+  })
+
   it('does not start a worker when pagehide occurs while remembering the selected folder', async () => {
     const f = await fixture()
     const tx = { objectStore: () => storage, oncomplete: null as (() => void) | null }
@@ -408,6 +425,28 @@ describe('folder backup controller', () => {
     expect(BackupWorker.instances).toEqual([])
     expect(f.status()).toBe('Folder backup is off.')
     expect(storage.close).toHaveBeenCalledTimes(2)
+  })
+
+  it('closes a late database connection without writing the folder choice after pagehide', async () => {
+    const f = await fixture()
+    let opened!: () => void
+    storage.open.mockImplementationOnce(
+      () =>
+        new Promise<typeof storage>((resolve) => {
+          opened = () => resolve(storage)
+        }),
+    )
+    storage.close.mockClear()
+    f.button('data-backup').click()
+    await vi.waitFor(() => expect(opened).toBeDefined())
+
+    window.dispatchEvent(new Event('pagehide'))
+    opened()
+    await vi.waitFor(() => expect(f.isConfiguring()).toBe(false))
+
+    expect(storage.transaction).not.toHaveBeenCalled()
+    expect(storage.close).toHaveBeenCalledOnce()
+    expect(BackupWorker.instances).toHaveLength(0)
   })
 
   it('reports folder inspection errors without treating the folder as empty', async () => {

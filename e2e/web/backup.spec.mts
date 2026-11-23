@@ -143,6 +143,32 @@ test('backs up saved notes and images, coalesces edits, resumes on reload, and s
   expect(await readBackup(page)).toEqual(files)
 })
 
+test('discards a folder selection if the page closes before its permission check returns', async ({ newContext }) => {
+  const context = await newContext()
+  await installBackupPicker(context)
+  const page = await context.newPage()
+  await page.goto('/')
+  await ready(page)
+  await page.evaluate(() => {
+    const query = FileSystemHandle.prototype.queryPermission
+    FileSystemHandle.prototype.queryPermission = async function (options) {
+      const permission = await query.call(this, options)
+      window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+      window.backupPermission = permission
+      return permission
+    }
+  })
+
+  await chooseMenuItem(page, 'Back Up to Folder…')
+  await expect.poll(() => page.evaluate(() => window.backupPermission)).toBe('granted')
+  await expect(page.locator('#data-backup')).toBeEnabled()
+
+  expect(await readStored(page, 'preferences', 'backup-folder')).toBeUndefined()
+  await page.reload()
+  await ready(page)
+  await expect(page.locator('#backup-status')).toHaveText('Folder backup is off.')
+})
+
 test('pauses without prompting on reload and requests permission only from the Resume click', async ({
   newContext,
 }) => {
