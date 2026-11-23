@@ -708,7 +708,7 @@ describe('whole-node Visual transitions', () => {
     })
 
     // @requirement PRODUCT.md §2.5
-    it('keeps the strikethrough and star of each node whose case changes', () => {
+    it('keeps each node’s strikethrough, star and mark when changing case', () => {
       const document: Document = {
         roots: [
           {
@@ -716,7 +716,7 @@ describe('whole-node Visual transitions', () => {
             text: 'ab',
             struckThrough: true,
             starred: true,
-            children: [{ id: 'kid', text: 'cd', struckThrough: true, starred: true, children: [] }],
+            children: [{ id: 'kid', text: 'cd', struckThrough: true, starred: true, marked: true, children: [] }],
           },
         ],
       }
@@ -728,7 +728,7 @@ describe('whole-node Visual transitions', () => {
         text: 'AB',
         struckThrough: true,
         starred: true,
-        children: [{ id: 'kid', text: 'CD', struckThrough: true, starred: true, children: [] }],
+        children: [{ id: 'kid', text: 'CD', struckThrough: true, starred: true, marked: true, children: [] }],
       })
     })
   })

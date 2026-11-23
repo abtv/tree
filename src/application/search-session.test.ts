@@ -357,6 +357,29 @@ it('cancels outstanding executor work when hiding and disposing', () => {
   expect(pending).toHaveBeenCalledOnce()
 })
 
+it.each(['confirm', 'repeat'] as const)('keeps Find hidden when a subscriber closes it during %s', (action) => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  if (action === 'repeat') {
+    session.confirm(jump)
+    session.hide()
+  }
+  const previousJobs = jobs.length
+  const stop = session.subscribe(() => {
+    stop()
+    session.hide()
+  })
+
+  if (action === 'confirm') session.confirm(jump)
+  else session.navigate(origin, 1, 1, jump)
+
+  expect(session.getSnapshot()).toEqual({ confirmed: 'aa', visible: false, pending: false })
+  expect(jobs).toHaveLength(previousJobs)
+})
+
 it('confirms a draft backward from its captured origin', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)

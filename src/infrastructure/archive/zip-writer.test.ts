@@ -100,8 +100,9 @@ describe('ZIP writer', () => {
     writer.addDeflated('document.json', document)
     writer.finish()
 
-    // Header, one output block per slice, descriptor and central directory.
+    // Desktop writes each output chunk to disk. This fixture emits seven; allow variation in the compressor.
     expect(chunks.length).toBeGreaterThan(4)
+    expect(chunks.length).toBeLessThanOrEqual(32)
     expect(sameBytes(readArchive(concat(chunks)).get('document.json'), document)).toBe(true)
   })
 

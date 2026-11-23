@@ -111,6 +111,28 @@ describe('attachment size backfill', () => {
     expect(attachmentOf(store, 150)).toEqual({ id: 'image-150', mimeType: 'image/png' })
   })
 
+  it('keeps the decoded size when a slower header lookup fills other images in the same batch', async () => {
+    vi.useFakeTimers()
+    let answer!: (sizes: AttachmentDimensions[]) => void
+    const headers = new Promise<AttachmentDimensions[]>((resolve) => {
+      answer = resolve
+    })
+    const { store, save } = setup({ roots: [image('a', 'decoded'), image('b', 'header-only')] }, () => headers)
+    await store.initialize()
+
+    store.recordAttachmentDimensions('decoded', 80, 20)
+    await vi.advanceTimersByTimeAsync(100)
+    answer([
+      { width: 8, height: 2 },
+      { width: 3, height: 5 },
+    ])
+    await headers
+
+    expect(attachmentOf(store, 0)).toMatchObject({ width: 80, height: 20 })
+    expect(attachmentOf(store, 1)).toMatchObject({ width: 3, height: 5 })
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('ignores invalid header results and does nothing without the service or legacy images', async () => {
     const read = vi.fn<ReadSizes>(async () => [{ width: 0, height: 3 }])
     const invalid = setup({ roots: [image('a', 'legacy')] }, read)
@@ -168,5 +190,25 @@ describe('decoded image size correction', () => {
     await vi.advanceTimersByTimeAsync(100)
 
     expect(ready(store).document).toBe(before)
+  })
+
+  it('discards a decoded size that arrives during quit and accepts fresh reports if quit is canceled', async () => {
+    vi.useFakeTimers()
+    const { store } = setup({ roots: [image('a', 'first'), image('b', 'second')] })
+    await store.initialize()
+    const quit = new AbortController()
+    await store.flushPersistence({ sealEditsUntil: quit.signal })
+
+    store.recordAttachmentDimensions('first', 20, 10)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(attachmentOf(store, 0)).toEqual({ id: 'first', mimeType: 'image/png' })
+
+    quit.abort()
+    store.recordAttachmentDimensions('second', 9, 3)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(attachmentOf(store, 0)).toEqual({ id: 'first', mimeType: 'image/png' })
+    expect(attachmentOf(store, 1)).toMatchObject({ width: 9, height: 3 })
   })
 })

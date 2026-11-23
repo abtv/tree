@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_DOCUMENT_DEPTH,
   assertDocument,
+  hasNewerDocumentVersion,
   MAX_DOCUMENT_DEPTH_ERROR,
   parsePersistedState,
   serializeState,
@@ -25,6 +26,30 @@ const validState = {
   document: { roots: [{ id: 'root', text: 'Root', children: [] }] },
   location: { currentParentId: null, selectedNodeId: 'root' },
 }
+
+// @requirement PRODUCT.md §16
+it('distinguishes a newer document version from malformed recovery metadata', () => {
+  const current = serializeState(validState.document, validState.location).version
+  const newer = current + 1
+
+  expect(hasNewerDocumentVersion({ version: newer })).toBe(true)
+  for (const value of [null, { version: current }, { version: newer + 0.5 }, { version: String(newer) }]) {
+    expect(hasNewerDocumentVersion(value)).toBe(false)
+  }
+})
+
+// @requirement PRODUCT.md §15.1
+it('opens a saved image with recognized text at the size limit', () => {
+  const searchText = 'x'.repeat(1_048_576)
+  const root = {
+    ...validState.document.roots[0]!,
+    attachment: { id: 'image', mimeType: 'image/png', searchText },
+  }
+  const state = { ...validState, document: { roots: [root] } }
+
+  expect(validatePersistedState(state)).toBe(state)
+  expect(parsePersistedState(state).document.roots[0]!.attachment?.searchText).toBe(searchText)
+})
 
 /**
  * `validatePersistedState` discards `normalizeLinks`' result and returns the caller's object, while
@@ -223,6 +248,12 @@ const cases: PersistedStateCase[] = [
   {
     name: 'rejects starred views stored as an array',
     state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: [['root', []]] } },
+    decision: 'reject',
+    error: 'The saved view state is invalid.',
+  },
+  {
+    name: 'rejects an unnamed starred view alongside a valid view',
+    state: { ...validState, version: 5, view: { expandedIds: [], starredExpandedIds: { root: [], '': ['root'] } } },
     decision: 'reject',
     error: 'The saved view state is invalid.',
   },

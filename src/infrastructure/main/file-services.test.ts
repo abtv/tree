@@ -148,6 +148,33 @@ describe('file services', () => {
     }
   })
 
+  it('reports a header open failure and closes the next image after reading its size', async () => {
+    const { directory } = await servicesForTest()
+    const log = vi.fn()
+    const services = createFileServices(directory, log)
+    const attachments = join(directory, 'attachments')
+    await services.writeAttachment('good', transparentPng)
+    const handle = await open(join(attachments, 'good.png'), 'r')
+    const deniedPath = join(attachments, 'denied.png')
+    const failure = Object.assign(new Error('permission denied'), { code: 'EACCES' })
+    vi.mocked(open).mockRejectedValueOnce(failure).mockResolvedValueOnce(handle)
+    log.mockClear()
+
+    try {
+      const sizes = await services.readAttachmentDimensions(['denied', 'good'])
+
+      expect(sizes).toEqual([null, { width: 2, height: 1 }])
+      expect(handle.fd).toBe(-1)
+      expect(log.mock.calls.map(([event]) => event)).toEqual([
+        { operation: 'readAttachmentDimensions', paths: [attachments], phase: 'start' },
+        { operation: 'readAttachmentDimensions', paths: [deniedPath], phase: 'failure', error: failure.message },
+        { operation: 'readAttachmentDimensions', paths: [attachments], phase: 'success' },
+      ])
+    } finally {
+      await handle.close()
+    }
+  })
+
   it('retains a generation strictly older than 30 seconds at the exact safety boundary', async () => {
     const { directory, services } = await servicesForTest()
     const now = new Date('2026-01-01T00:01:00Z').getTime()
@@ -179,7 +206,7 @@ describe('file services', () => {
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(stateWithoutImage())
   })
 
-  it('reads the primary only once while selecting a recovery document', async () => {
+  it('loads a valid primary once without renaming it', async () => {
     const { directory, services } = await servicesForTest()
     const path = join(directory, 'document.json')
     await writeFile(path, JSON.stringify(stateWithoutImage()))
@@ -188,6 +215,7 @@ describe('file services', () => {
     await expect(services.load()).resolves.toEqual(stateWithoutImage())
 
     expect(vi.mocked(readFile).mock.calls.filter(([file]) => file === path)).toHaveLength(1)
+    expect(rename).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -214,6 +242,24 @@ describe('file services', () => {
     vi.mocked(readFile).mockRejectedValueOnce(failure)
 
     await expect(findNewestValidDocument(directory)).resolves.toEqual({ error: failure })
+  })
+
+  it('ignores a vanished candidate and preserves the first remaining read failure', async () => {
+    const { directory } = await servicesForTest()
+    for (const [index, name] of ['document.json', 'document.2.json', 'document.1.json'].entries()) {
+      const path = join(directory, name)
+      await writeFile(path, JSON.stringify(stateWithoutImage()))
+      await ageFile(path, index * 60)
+    }
+    const denied = Object.assign(new Error('newer generation denied'), { code: 'EACCES' })
+    vi.mocked(readFile)
+      .mockRejectedValueOnce(Object.assign(new Error('primary removed'), { code: 'ENOENT' }))
+      .mockRejectedValueOnce(denied)
+      .mockRejectedValueOnce(new Error('older generation failed'))
+
+    const result = await findNewestValidDocument(directory)
+
+    expect(result).toEqual({ error: denied })
   })
 
   it.each(['document.1.json', 'document.json'])(
@@ -1244,11 +1290,12 @@ describe('save interruption recovery', () => {
 describe('notes export and import support', () => {
   const NOW = new Date(2026, 9, 23, 14, 5, 9)
 
-  async function archiveServicesForTest(logger: Parameters<typeof createFileServices>[1] = () => {}) {
+  async function archiveServicesForTest(logger: Parameters<typeof createFileServices>[1] = () => {}, fixedTime?: Date) {
     const userData = await mkdtemp(join(tmpdir(), 'tree-file-services-archive-'))
     temporaryDirectories.push(userData)
     const directory = join(userData, 'data')
-    const create = () => createFileServices(directory, logger, { userDataDirectory: userData, now: () => NOW })
+    const clock = fixedTime === undefined ? {} : { now: () => fixedTime }
+    const create = () => createFileServices(directory, logger, { userDataDirectory: userData, ...clock })
     return { userData, directory, services: create(), create }
   }
 
@@ -1288,7 +1335,7 @@ describe('notes export and import support', () => {
   })
 
   it('replaces the notes and blocks the old session until the next load', async () => {
-    const { userData, directory, services, create } = await archiveServicesForTest()
+    const { userData, directory, services, create } = await archiveServicesForTest(undefined, NOW)
 
     await services.load()
     await services.writeAttachment('old', new Uint8Array([1]))
@@ -1446,7 +1493,7 @@ describe('notes export and import support', () => {
   })
 
   it('blocks the old session after a failure past the journal until a load completes the replacement', async () => {
-    const { directory, services } = await archiveServicesForTest()
+    const { directory, services } = await archiveServicesForTest(undefined, NOW)
 
     await services.load()
     await services.save(stateWithoutImage('Old'))

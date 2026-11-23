@@ -29,6 +29,7 @@ describe('isValidWindowBounds', () => {
   })
 
   it('rejects malformed and undersized bounds', () => {
+    expect(isValidWindowBounds(undefined)).toBe(false)
     expect(isValidWindowBounds(null)).toBe(false)
     expect(isValidWindowBounds({ ...bounds, width: 639 })).toBe(false)
     expect(isValidWindowBounds({ ...bounds, x: Number.NaN })).toBe(false)

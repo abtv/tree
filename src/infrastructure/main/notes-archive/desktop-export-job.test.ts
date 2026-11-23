@@ -82,6 +82,34 @@ async function savedNotes(head: ReturnType<typeof headWithImages>, images: Recor
 
 // @requirement PRODUCT.md §24.3
 describe('desktop export job', () => {
+  it('waits for the main process to pin the images before opening the archive', async () => {
+    const { userData, data, snapshot } = await savedNotes(headWithImages(['a']), { a: onePixelPng })
+    const temporaryPath = join(userData, '.archive.tmp')
+    const channel = recordingChannel()
+    let acknowledge!: (reply: ArchiveWorkerReply) => void
+    const reply = new Promise<ArchiveWorkerReply>((resolve) => {
+      acknowledge = resolve
+    })
+    const request = vi.spyOn(channel, 'request').mockReturnValue(reply)
+
+    const exporting = runDesktopExport(
+      { type: 'export', snapshotDirectory: snapshot, attachmentsDirectory: join(data, 'attachments'), temporaryPath },
+      channel,
+    )
+    try {
+      await vi.waitFor(() => expect(request).toHaveBeenCalledWith({ type: 'pin', ids: ['a'] }))
+
+      await expect(readFile(temporaryPath)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(readFileSync).not.toHaveBeenCalled()
+      expect(channel.messages).toEqual([])
+    } finally {
+      acknowledge({ type: 'pinned' })
+      await exporting
+    }
+
+    expect(channel.messages.at(-1)).toMatchObject({ type: 'written', summary: { imageCount: 1 } })
+  })
+
   it('reports a failed archive flush instead of announcing a completed export', async () => {
     const { userData, data, snapshot } = await savedNotes(headWithImages([]), {})
     const temporaryPath = join(userData, '.archive.tmp')
@@ -222,7 +250,7 @@ describe('desktop export job', () => {
     expect(channel.messages.at(-1)).toMatchObject({ type: 'written' })
   })
 
-  it('writes the snapshot head and available images as the archive the browser writes', async () => {
+  it('writes the same archive as the browser even after a partial file write', async () => {
     // ZIP headers include wall-clock timestamps; both exports must use the same instant.
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-14T12:00:00Z'))
@@ -230,6 +258,11 @@ describe('desktop export job', () => {
     const { userData, data, snapshot } = await savedNotes(head, { a: onePixelPng })
     const temporaryPath = join(userData, '.archive.tmp')
     const channel = recordingChannel()
+    const real = await vi.importActual<typeof import('node:fs')>('node:fs')
+    vi.mocked(writeSync).mockImplementationOnce((fd, bytes: NodeJS.ArrayBufferView | string, offset) => {
+      if (typeof bytes === 'string') throw new Error('Expected archive bytes')
+      return real.writeSync(fd, bytes, offset, 1)
+    })
 
     await runDesktopExport(
       { type: 'export', snapshotDirectory: snapshot, attachmentsDirectory: join(data, 'attachments'), temporaryPath },

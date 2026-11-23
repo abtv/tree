@@ -89,6 +89,25 @@ describe('archive worker export job', () => {
     expect(sameBytes(readArchive(concat(chunks)).get('attachments/boundary.png'), image)).toBe(true)
   })
 
+  it('keeps each buffered image intact when the source reuses its read buffer', async () => {
+    const buffer = new Uint8Array(3)
+    const chunks: Uint8Array[] = []
+
+    await runExportJob(
+      {
+        readHead: async () => headWithImages(['a', 'b']),
+        readImage: async (id) => buffer.fill(id === 'a' ? 1 : 2),
+      },
+      (message) => {
+        if (message.type === 'chunk') chunks.push(new Uint8Array(message.chunk))
+      },
+    )
+
+    const entries = readArchive(concat(chunks))
+    expect(entries.get('attachments/a.png')).toEqual(new Uint8Array([1, 1, 1]))
+    expect(entries.get('attachments/b.png')).toEqual(new Uint8Array([2, 2, 2]))
+  })
+
   it('keeps the caller buffer intact when transferring a zero-offset partial view', async () => {
     const backing = new Uint8Array(CHUNK_FLUSH_BYTES + 100).fill(9)
     const image = backing.subarray(0, CHUNK_FLUSH_BYTES)

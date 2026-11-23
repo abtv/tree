@@ -152,6 +152,7 @@ describe('folder backup controller', () => {
 
     expect(document.getElementById('backup-status')!.hidden).toBe(true)
     expect(f.button('data-backup').hidden).toBe(true)
+    expect(f.isConfiguring()).toBe(false)
     expect(storage.read).not.toHaveBeenCalled()
     expect(f.picker).not.toHaveBeenCalled()
     expect(BackupWorker.instances).toEqual([])
@@ -502,6 +503,24 @@ describe('folder backup controller', () => {
     expect(worker.postMessage).toHaveBeenLastCalledWith({ type: 'saved' })
   })
 
+  it('keeps a late Stop completion from changing the disposed page or terminating its worker twice', async () => {
+    const f = await fixture(folder())
+    const worker = BackupWorker.instances[0]!
+    const tx = { objectStore: () => storage, oncomplete: null as (() => void) | null }
+    storage.transaction.mockReturnValueOnce(tx)
+    f.button('data-backup').click()
+    await vi.waitFor(() => expect(storage.delete).toHaveBeenCalledWith('backup-folder'))
+
+    window.dispatchEvent(new Event('pagehide'))
+    tx.oncomplete!()
+    await vi.waitFor(() => expect(f.isConfiguring()).toBe(false))
+
+    expect(f.button('data-backup').textContent).toBe('Stop Backing Up')
+    expect(f.status()).toBe('Backing up to “Backup”…')
+    expect(worker.terminate).toHaveBeenCalledOnce()
+    expect(f.unsubscribe).toHaveBeenCalledOnce()
+  })
+
   it('pauses and allows retry when posting a saved notification to the worker fails', async () => {
     const f = await fixture(folder())
     const worker = BackupWorker.instances[0]!
@@ -746,6 +765,7 @@ describe('folder backup controller', () => {
     const f = await fixture(folder())
     const worker = BackupWorker.instances[0]!
 
+    window.dispatchEvent(new Event('pagehide'))
     window.dispatchEvent(new Event('pagehide'))
     worker.send({ state: 'saved', missingImages: 0 })
 

@@ -162,7 +162,7 @@ describe('shared PNG structural validation', () => {
     wrongSignature[1] = 0
     const wrongLength = onePixelPng.slice()
     wrongLength[11] = 14
-    const wrongType = pngWith([['tEXt', pngIhdr(1, 1)]])
+    const wrongType = pngWith([['IDAT', pngIhdr(1, 1)]])
 
     expect(readPngDimensions(onePixelPng.subarray(0, PNG_DIMENSIONS_HEADER_BYTES - 1))).toBeUndefined()
     expect(readPngDimensions(wrongSignature)).toBeUndefined()

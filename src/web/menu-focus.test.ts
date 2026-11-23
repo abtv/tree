@@ -210,6 +210,7 @@ it('restores and blurs the borrowed editor before a Tab destination retains focu
   const events: string[] = []
   const focusEditor = vi.spyOn(f.editor, 'focus')
   const focusDestination = vi.spyOn(outside, 'focus')
+  outside.addEventListener('focusin', (event) => event.stopPropagation())
   f.editor.addEventListener('focus', () => events.push('editor focus'))
   f.editor.addEventListener('blur', () => events.push('editor blur'))
 
@@ -275,6 +276,7 @@ it('restores before an outside press and leaves its explicit destination focused
   setSelectionRange(f.editor, 6, 6)
   f.open()
 
+  outside.addEventListener('pointerdown', (event) => event.stopPropagation())
   outside.dispatchEvent(new Event('pointerdown', { bubbles: true }))
 
   expect(f.menu.hidePopover).toHaveBeenCalledOnce()

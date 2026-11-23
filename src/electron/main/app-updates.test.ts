@@ -490,7 +490,7 @@ describe('desktop app updates', () => {
         }),
     )
     const pending = updates.check()
-    const duplicate = updates.check()
+    const duplicate = updates.check('online')
 
     expect(duplicate).toBe(pending)
 
@@ -499,6 +499,7 @@ describe('desktop app updates', () => {
     finish()
     await pending
     await duplicate
+    expect(ports.check).toHaveBeenCalledOnce()
     ports.check.mockRejectedValueOnce(new Error('offline'))
     await updates.check()
     await updates.check()
@@ -526,6 +527,38 @@ describe('desktop app updates', () => {
 
     await vi.waitFor(() => expect(ports.check).toHaveBeenCalledTimes(2))
     expect(ports.notifyCheck).not.toHaveBeenCalled()
+  })
+
+  it('reports a shared failed check without retrying when the connection has not changed', async () => {
+    const { updates, ports } = harness()
+    ports.check.mockRejectedValueOnce(new Error('offline'))
+
+    await Promise.all([updates.check(), updates.checkManually()])
+
+    expect(ports.check).toHaveBeenCalledOnce()
+    expect(ports.notifyCheck).toHaveBeenCalledExactlyOnceWith('failed')
+  })
+
+  it('shows the failed manual result before retrying on a restored connection', async () => {
+    const { updates, ports } = harness()
+    ports.check.mockRejectedValueOnce(new Error('offline'))
+    let close!: () => void
+    ports.notifyCheck.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        close = resolve
+      }),
+    )
+
+    const manual = updates.checkManually()
+    await updates.check('online')
+    await vi.waitFor(() => expect(ports.notifyCheck).toHaveBeenCalledExactlyOnceWith('failed'))
+    expect(ports.check).toHaveBeenCalledOnce()
+
+    close()
+    await manual
+
+    expect(ports.check).toHaveBeenCalledTimes(2)
+    expect(ports.notifyCheck).toHaveBeenCalledOnce()
   })
 
   it('revokes quit permission if the native quit never completes', () => {

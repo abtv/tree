@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, open, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { openSync, closeSync, truncateSync } from 'node:fs'
+import { openSync, closeSync, readSync, truncateSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'fflate'
@@ -24,9 +24,14 @@ vi.mock('node:fs/promises', async (original) => {
   const actual = await original<typeof import('node:fs/promises')>()
   return { ...actual, open: vi.fn(actual.open) }
 })
+vi.mock('node:fs', async (original) => {
+  const actual = await original<typeof import('node:fs')>()
+  return { ...actual, readSync: vi.fn(actual.readSync) }
+})
 
 afterEach(async () => {
   vi.mocked(open).mockReset()
+  vi.mocked(readSync).mockReset()
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -139,6 +144,22 @@ describe('desktop import job', () => {
       message: expect.stringContaining('Attachment data is not a decodable PNG image.'),
     })
     expect(await readdir(staging)).toEqual(['attachments'])
+  })
+
+  it('reports a document flush failure without announcing that staging is complete', async () => {
+    const archive = await browserArchive(headWithImages(['a']), { a: onePixelPng })
+    const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
+    vi.mocked(open).mockImplementation(async (path, flags, mode) => {
+      const file = await real.open(path, flags, mode)
+      if (String(path).endsWith('document.json')) vi.spyOn(file, 'sync').mockRejectedValue(new Error('disk full'))
+      return file
+    })
+
+    const { messages, staging } = await runImport({ archive })
+
+    expect(finalMessage(messages)).toEqual({ type: 'error', message: 'The archive could not be imported: disk full' })
+    expect(messages.some((message) => message.type === 'staged' || message.type === 'prepared')).toBe(false)
+    expect(new Uint8Array(await readFile(join(staging, 'attachments', 'a.png')))).toEqual(onePixelPng)
   })
 
   it('refuses a mismatched current-note count reply instead of reporting prepared notes', async () => {
@@ -266,13 +287,18 @@ describe('desktop import job', () => {
     ])
   })
 
-  it('reads exact ranges and detects a file that shrinks while it is read', async () => {
+  it('fills an exact range after a short read and detects a file that shrinks', async () => {
     const directory = await temporaryDirectory()
     const path = join(directory, 'archive.zip')
     await writeFile(path, new Uint8Array([1, 2, 3, 4, 5, 6]))
     const descriptor = openSync(path, 'r')
     try {
       const file = descriptorArchiveFile(descriptor)
+      const real = await vi.importActual<typeof import('node:fs')>('node:fs')
+      type RangeRead = (fd: number, bytes: Uint8Array, offset: number, length: number, position: number) => number
+      vi.mocked<RangeRead>(readSync).mockImplementationOnce((fd, bytes, offset, _length, position) =>
+        real.readSync(fd, bytes, offset, 1, position),
+      )
 
       expect(file.size).toBe(6)
       expect(await file.read(2, 3)).toEqual(new Uint8Array([3, 4, 5]))

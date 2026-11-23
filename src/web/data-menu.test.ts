@@ -858,7 +858,7 @@ describe('browser data operations', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date(2026, 9, 23, 14, 5))
       const NativeURL = URL
-      const createObjectURL = vi.fn(() => 'blob:https://tree.test/archive')
+      const createObjectURL = vi.fn<(_archive: Blob) => string>(() => 'blob:https://tree.test/archive')
       const revokeObjectURL = vi.fn()
       vi.stubGlobal(
         'URL',
@@ -886,6 +886,8 @@ describe('browser data operations', () => {
       expect(createObjectURL).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({ size: 3, type: 'application/zip' }),
       )
+      const archive = createObjectURL.mock.calls[0]![0]
+      expect(new Uint8Array(await archive.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]))
       expect(document.querySelector('a[download]')).toBeNull()
       expect(worker.terminate).toHaveBeenCalledOnce()
       expect(f.isRunning()).toBe(false)
@@ -959,7 +961,7 @@ describe('browser data operations', () => {
     'reports a failed save before %s without starting a worker',
     async (operation) => {
       const f = fixture()
-      f.flushPersistence.mockRejectedValueOnce(new Error('disk full'))
+      f.flushPersistence.mockRejectedValueOnce(operation === 'export' ? 'disk full' : new Error('disk full'))
 
       if (operation === 'export') f.button('data-export').click()
       else f.choose()

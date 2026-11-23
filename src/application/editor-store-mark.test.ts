@@ -40,6 +40,12 @@ it('toggles, undoes, redoes and restores marks through the persistence service',
 
   expect(store.toggleMarkNode()).toBe(true)
   expect(store.starTarget?.marked).toBe(true)
+
+  store.editText('root', 'Typed after marking')
+  store.undo()
+
+  expect(store.starTarget).toMatchObject({ text: 'Finished replacement', marked: true })
+
   store.undo()
   expect(store.starTarget?.marked).toBeUndefined()
   expect(store.starTarget?.text).toBe('Finished replacement')
@@ -65,7 +71,7 @@ it('lists only marked, then starred nodes when Search opens', async () => {
       version: 6,
       document: {
         roots: [
-          { id: 'plain', text: 'Plain', children: [] },
+          { id: 'plain', text: 'Plain', children: [{ id: 'child', text: 'Child', children: [] }] },
           { id: 'star', text: 'Star', starred: true, children: [] },
           { id: 'mark', text: 'Mark', marked: true, children: [] },
         ],
@@ -85,6 +91,7 @@ it('lists only marked, then starred nodes when Search opens', async () => {
   store.enter()
 
   expect(store.initialSearchResults().map((entry) => entry.id)).toEqual(['mark', 'star'])
+  expect(store.searchResultCapacity()).toBe(4)
 
   const publish = vi.fn()
   store.searchNodes('', publish)

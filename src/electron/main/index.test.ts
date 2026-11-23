@@ -493,6 +493,20 @@ describe('packaged desktop update wiring', () => {
     expect(f.prepare).not.toHaveBeenCalled()
   })
 
+  it('keeps an installation in progress when a late staging result reports no update', async () => {
+    const f = await packagedSetup()
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    f.electron.autoUpdater.emit('update-downloaded')
+
+    f.electron.autoUpdater.emit('update-not-available')
+
+    expect(f.updates.isInstalling()).toBe(true)
+    expect(f.release).not.toHaveBeenCalled()
+    expect(f.electron.autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+  })
+
   it('keeps packaged update checks disabled outside macOS', async () => {
     vi.stubGlobal('process', { ...process, platform: 'win32' })
     const f = await setup(true)

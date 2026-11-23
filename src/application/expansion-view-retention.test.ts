@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { editNodeText, type Document, type NodeId, type TreeNode } from '../domain/document'
-import { COLLAPSED_EXPANSION_STATE, expansionFromViews, type ExpansionState } from './expansion-state'
+import {
+  activateExpansionView,
+  COLLAPSED_EXPANSION_STATE,
+  expansionFromViews,
+  type ExpansionState,
+} from './expansion-state'
 import { departedViewOwners, releaseViews } from './expansion-view-retention'
 
 function tree(id: string, children: TreeNode[] = []): TreeNode {
@@ -69,6 +74,25 @@ describe('releaseViews', () => {
     expect(released.viewOwnerId).toBeNull()
     expect(released.expandedIds).toEqual(new Set(['root-fold']))
     expect(owners(released)).toEqual(['present'])
+  })
+
+  it('keeps the active starred view when history releases a different owner', () => {
+    const current: Document = { roots: [{ ...tree('work', [tree('task')]), starred: true }] }
+    const root = expansionFromViews(
+      ['work'],
+      [
+        ['work', ['task']],
+        ['removed', []],
+      ],
+    )
+    const active = activateExpansionView(root, current, 'work')
+
+    const released = releaseViews(active, current, ['removed'])
+
+    expect(released.viewOwnerId).toBe('work')
+    expect(released.expandedIds).toBe(active.expandedIds)
+    expect(released.otherViews.get(null)).toEqual(new Set(['work']))
+    expect(released.otherViews.has('removed')).toBe(false)
   })
 
   it('returns the same state when no released view can be dropped', () => {

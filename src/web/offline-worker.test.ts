@@ -14,11 +14,12 @@ function fixture() {
     delete: vi.fn(async (name: string) => entries.delete(name)),
     open: async (name: string) => {
       if (!entries.has(name)) entries.set(name, new Map())
+      const contents = entries.get(name)!
       return {
         put: async (request: Request, response: Response) => {
-          entries.get(name)!.set(key(request), response)
+          contents.set(key(request), response)
         },
-        match: async (request: RequestInfo) => entries.get(name)!.get(key(request))?.clone(),
+        match: async (request: RequestInfo) => contents.get(key(request))?.clone(),
       }
     },
   }
@@ -161,6 +162,31 @@ describe('offline package lifecycle', () => {
     }
   })
 
+  it('refuses a window that opens after preparation and before the commit reply', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
+    reply.postMessage.mockImplementation((message) => {
+      if (message !== 'prepared') return
+      f.scope.clients.matchAll.mockResolvedValue([
+        { id: 'writer', url: base },
+        { id: 'new-tab', url: base },
+      ])
+      reply.onmessage!({ data: 'commit' })
+    })
+
+    await f.emit('message', {
+      data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(reply.postMessage.mock.calls).toEqual([['prepared'], ['other-windows']])
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+    expect(reply.onmessage).toBeNull()
+  })
+
   it('counts delayed commit delivery against the final window check deadline even before cancel arrives', async () => {
     const f = fixture()
     f.install()
@@ -171,7 +197,7 @@ describe('offline package lifecycle', () => {
       .mockResolvedValueOnce(writer)
       .mockResolvedValueOnce(writer)
       .mockImplementationOnce(async () => {
-        clock.mockReturnValue(15_001)
+        clock.mockReturnValue(15_000)
         return writer
       })
     const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
@@ -222,6 +248,59 @@ describe('offline package lifecycle', () => {
     expect(await metadata.clone().json()).toMatchObject({ active: `${prefix}running`, runtime: `${prefix}old-page` })
     expect(f.entries.get(`${prefix}running`)?.has(`${base}index.html`)).toBe(true)
     expect(f.entries.get(`${prefix}old-page`)?.has(`${base}assets/old.js`)).toBe(true)
+  })
+
+  it('cancels a confirmed update during the final window check and restores the previous metadata', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
+    reply.postMessage.mockImplementation((message) => {
+      if (message === 'prepared') {
+        reply.onmessage!({ data: 'commit' })
+        f.scope.clients.matchAll.mockImplementationOnce(async () => {
+          reply.onmessage!({ data: 'cancel' })
+          return [{ id: 'writer', url: base }]
+        })
+      }
+    })
+
+    await f.emit('message', {
+      data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(reply.postMessage.mock.calls).toEqual([['prepared'], ['activation-failed']])
+    expect(reply.onmessage).toBeNull()
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+    const metadata = f.entries.get(`tree-offline-state:${base}`)!.get(`${base}__offline_state__`)!
+    expect(await metadata.clone().json()).toEqual({ waiting: `${prefix}v1` })
+  })
+
+  it('abandons preparation when the requesting page never confirms', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fixture()
+      f.install()
+      await f.emit('install')
+      const reply = { onmessage: null, postMessage: vi.fn() }
+      const attempt = f.emit('message', {
+        data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
+        source: { id: 'writer' },
+        ports: [reply],
+      })
+      await vi.waitFor(() => expect(reply.postMessage).toHaveBeenCalledWith('prepared'))
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      await attempt
+
+      expect(reply.postMessage).toHaveBeenLastCalledWith('activation-failed')
+      expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+      expect(reply.onmessage).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('preserves the running offline package when reinstallation of the same version fails', async () => {
@@ -503,6 +582,35 @@ describe('offline package lifecycle', () => {
     expect(respondWith).not.toHaveBeenCalled()
   })
 
+  it('refuses navigation and legacy activation immediately while the update owns page admission', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const request = vi.spyOn(f.scope.locks, 'request').mockImplementation(async (_name, _options, run) => run!(null))
+    const reply = { postMessage: vi.fn() }
+    const respondWith = vi.fn()
+
+    f.handlers.get('fetch')!({ request: { method: 'GET', mode: 'navigate', url: base }, respondWith })
+    const response: Response = await respondWith.mock.calls[0]![0]
+    await f.emit('message', {
+      data: { type: 'tree-activate-update', assets: [`${base}assets/app.js`] },
+      source: { id: 'writer' },
+      ports: [reply],
+    })
+
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      `${prefix}page-admission`,
+      { mode: 'shared', ifAvailable: true },
+      expect.any(Function),
+    )
+    expect(request).toHaveBeenNthCalledWith(2, `${prefix}page-admission`, { ifAvailable: true }, expect.any(Function))
+    expect(await response.text()).toBe('Tree is updating. Reload this tab after the update.')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(reply.postMessage).toHaveBeenCalledExactlyOnceWith('other-windows')
+    expect(f.scope.skipWaiting).not.toHaveBeenCalled()
+  })
+
   it.each(['http-error', 'redirect'] as const)(
     'rejects an incomplete package after %s and retains the active version',
     async (failure) => {
@@ -751,5 +859,26 @@ describe('offline package lifecycle', () => {
 
     expect(f.entries.get(`${prefix}v3`)!.has(`${base}index.html`)).toBe(true)
     expect(f.entries.get(`${prefix}v3`)!.has(`${base}assets/app.js`)).toBe(true)
+  })
+
+  it('does not publish an older download that finishes after its replacement installed', async () => {
+    const f = fixture()
+    f.install('running')
+    await f.emit('install')
+    await f.emit('activate')
+    f.install('interrupted')
+    let finish!: (response: Response) => void
+    f.scope.fetch.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+    const earlier = f.emit('install')
+    await vi.waitFor(() => expect(finish).toBeDefined())
+
+    f.install('newer')
+    await f.emit('install')
+    finish(new Response('old file'))
+
+    await expect(earlier).rejects.toThrow('Offline package superseded')
+    const metadata = f.entries.get(`tree-offline-state:${base}`)!.get(`${base}__offline_state__`)!
+    expect(await metadata.clone().json()).toMatchObject({ active: `${prefix}running`, waiting: `${prefix}newer` })
+    expect(f.entries.get(`${prefix}newer`)?.has(`${base}index.html`)).toBe(true)
   })
 })

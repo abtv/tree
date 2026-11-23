@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest'
-import { nodeSearchCompletionTerm, nodeSearchHighlights, prepareNodeSearch, searchNodeTerm } from './node-search-query'
+import {
+  nodeSearchCompletionTerm,
+  nodeSearchHighlights,
+  prepareNodeSearch,
+  searchNodeTerm,
+  validNodeSearchMarker,
+} from './node-search-query'
 import type { TreeNode } from './document-types'
 
 // @requirement PRODUCT.md §20.14.4
@@ -24,6 +30,12 @@ function matches(query: string, node: TreeNode) {
   while (!next.done) next = preparation.next()
   return next.value.map((term) => [...searchNodeTerm(node, term)].filter((match) => match !== undefined))
 }
+
+// @requirement PRODUCT.md §20.14.3
+it('highlights a complete marker term and leaves a term with two markers plain', () => {
+  expect(validNodeSearchMarker('@Été')).toBe('@')
+  expect(validNodeSearchMarker('#@Été')).toBeUndefined()
+})
 
 // @requirement PRODUCT.md §20.14.3
 it('keeps literal punctuation and original UTF-16 offsets with Unicode smart case', () => {

@@ -63,7 +63,12 @@ it('restores ancestor paths after leaving nested branches and separates breadcru
           id: 'root',
           text: 'needle root',
           children: [
-            { id: 'branch', text: 'Branch', children: [{ id: 'deep', text: 'needle deep', children: [] }] },
+            {
+              id: 'branch',
+              text: '  Done\n  branch ',
+              struckThrough: true,
+              children: [{ id: 'deep', text: 'needle deep', children: [] }],
+            },
             { id: 'sibling', text: 'needle sibling', children: [] },
           ],
         },
@@ -77,7 +82,13 @@ it('restores ancestor paths after leaving nested branches and separates breadcru
 
   expect(next.value).toEqual([
     { id: 'root', text: 'needle root', path: null },
-    { id: 'deep', text: 'needle deep', path: 'needle root › Branch', parentId: 'branch' },
+    {
+      id: 'deep',
+      text: 'needle deep',
+      path: 'needle root › Done branch',
+      parentId: 'branch',
+      pathStruckMatches: [{ start: 14, end: 25 }],
+    },
     { id: 'sibling', text: 'needle sibling', path: 'needle root', parentId: 'root' },
     { id: 'outside', text: 'needle outside', path: null },
   ])
@@ -161,10 +172,10 @@ it('carries the image of a matching node, with its natural size when stored', ()
   let next = work.next()
   while (!next.done) next = work.next()
 
-  expect(next.value.map(({ id, attachment }) => ({ id, attachment }))).toEqual([
-    { id: 'sized', attachment: { id: 'a1', width: 800, height: 240 } },
-    { id: 'unsized', attachment: { id: 'a2' } },
-    { id: 'plain', attachment: undefined },
+  expect(next.value.map(({ id, text, attachment }) => ({ id, text, attachment }))).toEqual([
+    { id: 'sized', text: 'Plan', attachment: { id: 'a1', width: 800, height: 240 } },
+    { id: 'unsized', text: 'Image', attachment: { id: 'a2' } },
+    { id: 'plain', text: 'release notes', attachment: undefined },
   ])
 })
 

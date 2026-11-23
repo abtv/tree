@@ -229,6 +229,28 @@ describe('expansion views of starred nodes', () => {
     expect(rows(store)).toEqual(['project', 'notes'])
   })
 
+  it('selects the visible ancestor when Undo in Agenda moves the original row behind a closed fold', async () => {
+    const store = await open(
+      persistence({
+        version: 5,
+        document: document(),
+        location: { currentParentId: 'work', selectedNodeId: 'work' },
+        view: { expandedIds: [] },
+      }),
+    )
+    expect(store.moveNodeToParent('task', 'work', 1)).toBe(true)
+    store.selectNode('task', 2)
+
+    store.openAgenda()
+    store.undo()
+    store.closeAgenda()
+
+    expect(snapshot(store).expansion.viewOwnerId).toBe('work')
+    expect(snapshot(store).location).toEqual({ currentParentId: 'work', selectedNodeId: 'project' })
+    expect(snapshot(store).focus).toMatchObject({ nodeId: 'project', cursor: 0 })
+    expect(rows(store)).toEqual(['project', 'notes'])
+  })
+
   it('keeps the selected task and its caret when Agenda closes into a view that shows it', async () => {
     const store = await open(
       persistence({

@@ -23,6 +23,8 @@ import {
   replaceSiblingRange,
   shiftSiblingRange,
   splitNode,
+  toggleMarkNode,
+  toggleStarNode,
   toggleStrikethrough,
   type Document,
   type TreeNode,
@@ -134,6 +136,8 @@ describe('document operation content and retention outcomes', () => {
       pasteText(document, 'root', 0, '!'),
       pasteMultilineText(document, 'root', 0, ['a', 'b'], ['new']),
       attachImage(document, 'root', attachment),
+      toggleMarkNode(document, 'nested'),
+      toggleStarNode(document, 'nested'),
       insertSubtreeSibling(document, 'root', 'after', { id: 'source', text: '', children: [] }, () => 'copy'),
       toggleStrikethrough(document, 'root', 'other')!,
       ...structural.map((result) => {
@@ -182,10 +186,11 @@ describe('document operation content and retention outcomes', () => {
   })
 
   it('clones all nested content without sharing mutable copies', () => {
-    const leaf: TreeNode = { id: 'leaf', text: url, links: [link], attachment, children: [] }
+    const leaf: TreeNode = { id: 'leaf', text: url, links: [link], attachment, starred: true, children: [] }
     const document: Document = {
-      roots: [{ id: 'root', text: url, links: [link], attachment, children: [leaf] }],
+      roots: [{ id: 'root', text: url, links: [link], attachment, marked: true, children: [leaf] }],
     }
+
     const cloned = cloneDocument(document)
 
     expect(cloned).toEqual(document)

@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_SIZE_BATCH,
   MAX_CONTEXT_MENU_SELECTION_CODE_POINTS,
   isTrustedRendererUrl,
   validateAttachmentBytes,
   validateAttachmentId,
   validateAttachmentIds,
+  validateAttachmentSizeBatch,
   validateClipboardWritePayload,
   validateClipboardContent,
   validateEditorContextMenuRequest,
@@ -22,6 +24,12 @@ const state = {
 const validIhdr = [0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 describe('IPC security validation', () => {
+  it('accepts a full batch of attachment IDs for image size lookup', () => {
+    const ids = Array.from({ length: MAX_ATTACHMENT_SIZE_BATCH }, (_, index) => `image-${index}`)
+
+    expect(validateAttachmentSizeBatch(ids)).toEqual(ids)
+  })
+
   it('validates an encoded save using the same document rules as an object payload', () => {
     expect(validatePersistedEditorState(JSON.stringify(state))).toEqual(state)
     expect(() => validatePersistedEditorState(JSON.stringify({ ...state, document: { roots: [] } }))).toThrow(

@@ -63,6 +63,17 @@ it('yields before a large snapshot finishes and resumes the same immutable input
   expect(await encoded).toBe(JSON.stringify(state))
 })
 
+it('finishes a small snapshot without scheduling a continuation', async () => {
+  const snapshot = { document: { roots: [] }, location: { currentParentId: null, selectedNodeId: null } }
+  const yieldWork = vi.fn(async () => undefined)
+  let tick = 0
+
+  const encoded = await encodeJson(snapshot, yieldWork, () => (tick += 3))
+
+  expect(encoded).toBe(JSON.stringify(snapshot))
+  expect(yieldWork).not.toHaveBeenCalled()
+})
+
 it('propagates encoding and scheduling failures instead of returning a partial save', async () => {
   const circular: unknown[] = []
   circular.push(circular)

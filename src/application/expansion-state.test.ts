@@ -283,6 +283,22 @@ describe('expansion views', () => {
     expect(ids(restored)).toEqual(['notes'])
   })
 
+  it('inherits the nearest currently starred view when a descendant first opens its own view', () => {
+    const nested: Document = {
+      roots: [starred('outer', [starred('middle', [starred('inner', [tree('task', [tree('step')])])])])],
+    }
+    const outer = activateExpansionView(expansionFromIds(['task']), nested, 'outer')
+    const middle = collapseNode(activateExpansionView(outer, nested, 'middle'), 'task')
+    const unstarred = toggleStarNode(nested, 'middle')
+
+    const beforeUnstarring = activateExpansionView(middle, nested, 'inner')
+    const afterUnstarring = activateExpansionView(middle, unstarred, 'inner')
+
+    expect(ids(beforeUnstarring)).toEqual([])
+    expect(ids(afterUnstarring)).toEqual(['task'])
+    expect(ids(activateExpansionView(afterUnstarring, nested, 'middle'))).toEqual([])
+  })
+
   it('saves the root view and every starred view, whichever view is active', () => {
     const atRoot = expansionFromViews(['work'], [['garden', ['bed']]])
     const inWork = expandNode(activateExpansionView(atRoot, document, 'work'), 'project')

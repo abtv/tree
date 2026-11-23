@@ -11,13 +11,16 @@ describe('attachment size enrichment', () => {
   it('lists each attachment without a stored size once, in tree order', () => {
     const document: Document = {
       roots: [
-        { ...image('a', 'second'), children: [image('b', 'first'), image('c', 'sized', { width: 2, height: 3 })] },
+        {
+          ...image('a', 'second'),
+          children: [image('b', 'first'), image('c', 'sized', { width: 2, height: 3 }), image('f', 'third')],
+        },
         image('d', 'first'),
         { id: 'e', text: '', children: [] },
       ],
     }
 
-    expect(attachmentIdsWithoutDimensions(document)).toEqual(['second', 'first'])
+    expect(attachmentIdsWithoutDimensions(document)).toEqual(['second', 'first', 'third'])
     expect(attachmentIdsWithoutDimensions({ roots: [{ id: 'x', text: '', children: [] }] })).toEqual([])
   })
 
@@ -29,7 +32,12 @@ describe('attachment size enrichment', () => {
     const summary = attachmentSummary(document)
     const before = JSON.stringify(document)
 
-    const result = attachmentSizeEnrichment(new Map([['image', { width: 640, height: 480 }]]), 'fill')(document)
+    const sizes = new Map([
+      ['absent', { width: 2, height: 3 }],
+      ['image', { width: 640, height: 480 }],
+    ])
+
+    const result = attachmentSizeEnrichment(sizes, 'fill')(document)
 
     expect(JSON.stringify(document)).toBe(before)
     expect(result.roots[0]!.attachment).toEqual({ id: 'image', mimeType: 'image/png', width: 640, height: 480 })
@@ -43,16 +51,19 @@ describe('attachment size enrichment', () => {
     expect(attachmentSummary(result)).toBe(summary)
   })
 
-  it('fills only missing sizes, while replace also corrects a different size', () => {
+  it.each([
+    { width: 20, height: 20 },
+    { width: 10, height: 30 },
+  ])('preserves the stored size during fill and corrects a single changed dimension to %j during replace', (size) => {
     const document: Document = { roots: [image('a', 'image', { width: 10, height: 20 })] }
-    const size = new Map([['image', { width: 20, height: 10 }]])
+    const sizes = new Map([['image', size]])
 
-    const filled = attachmentSizeEnrichment(size, 'fill')(document)
-    const replaced = attachmentSizeEnrichment(size, 'replace')(document)
+    const filled = attachmentSizeEnrichment(sizes, 'fill')(document)
+    const replaced = attachmentSizeEnrichment(sizes, 'replace')(document)
     const same = attachmentSizeEnrichment(new Map([['image', { width: 10, height: 20 }]]), 'replace')(document)
 
     expect(filled).toBe(document)
-    expect(replaced.roots[0]!.attachment).toMatchObject({ width: 20, height: 10 })
+    expect(replaced.roots[0]!.attachment).toMatchObject(size)
     expect(same).toBe(document)
   })
 
@@ -67,6 +78,24 @@ describe('attachment size enrichment', () => {
 
     expect(previous.roots[0]).toBe(next.roots[0])
     expect(enrich(current)).toBe(next)
+  })
+
+  it('skips tree traversal when the cached snapshot contains no images', () => {
+    const roots: TreeNode[] = [{ id: 'plain', text: '', children: [] }]
+    let rootReads = 0
+    const document: Document = {
+      get roots() {
+        rootReads++
+        return roots
+      },
+    }
+    attachmentSummary(document)
+    rootReads = 0
+    const enrich = attachmentSizeEnrichment(new Map([['image', { width: 1, height: 1 }]]), 'replace')
+
+    expect(enrich(document)).toBe(document)
+    expect(attachmentIdsWithoutDimensions(document)).toEqual([])
+    expect(rootReads).toBe(0)
   })
 
   it('returns a document that references none of the attachments unchanged', () => {

@@ -768,13 +768,14 @@ describe('notes archive controller: import', () => {
     await expect(fileServices.load()).resolves.toEqual(headWithImages([], 'Incoming'))
   })
 
-  it('refuses another import choice while a prepared import waits behind a chosen export, so no staging is orphaned', async () => {
+  it('refuses another import choice before and after choosing an export for a prepared import', async () => {
     const { controller, destinations, userData } = await setup()
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
-    await controller.chooseExportDestination()
 
+    await expect(controller.chooseImportArchive()).rejects.toThrow(BUSY_MESSAGE)
+    await controller.chooseExportDestination()
     await expect(controller.chooseImportArchive()).rejects.toThrow(BUSY_MESSAGE)
     await controller.chooseExportDestination()
     await controller.cancel()

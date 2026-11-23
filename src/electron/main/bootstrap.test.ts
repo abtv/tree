@@ -311,6 +311,21 @@ describe('bootstrapApplication', () => {
     expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith('tree:quit-requested', expect.any(String))
   })
 
+  it('ignores a load from an earlier window after the current renderer has gone', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const replacement: MainWindowReference = { ...f.window, webContents: { send: vi.fn() } }
+    f.dependencies.getMainWindow.mockReturnValue(replacement)
+    f.quitControl.rendererGone(replacement)
+
+    f.quitControl.rendererLoaded(f.window)
+    const quit = { preventDefault: vi.fn() }
+    f.listeners.beforeQuit!(quit)
+
+    expect(quit.preventDefault).not.toHaveBeenCalled()
+    expect(replacement.webContents.send).not.toHaveBeenCalled()
+  })
+
   it('asks a new main window to save, and an earlier window cannot end its waiting quit', async () => {
     const f = createHarness()
     await Promise.resolve()

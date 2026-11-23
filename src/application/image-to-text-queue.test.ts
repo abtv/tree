@@ -36,13 +36,19 @@ it('keeps one drain and one active job while accepting later work in order', () 
 
 it.each(['index', 'reindex'] as const)('reconciles the source of an active %s job without reviving it', (kind) => {
   const queue = new ImageToTextQueue()
-  const original: Document = { roots: [image('first', 'shared'), image('other', 'shared')] }
+  const original: Document = {
+    roots: [
+      image('first', 'shared'),
+      { id: 'unrelated', text: '', children: [] },
+      { id: 'album', text: '', children: [image('other', 'shared')] },
+    ],
+  }
   if (kind === 'index') queue.enqueueIndex('first', 'shared')
   else queue.enqueueReindex(original)
   queue.start()
   const active = queue.next()!
 
-  queue.reconcile({ roots: [original.roots[1]!] })
+  queue.reconcile({ roots: original.roots.slice(1) })
 
   expect(active.canceled).toBe(kind !== 'reindex')
   expect(active.nodeId).toBe(kind === 'reindex' ? 'other' : 'first')
@@ -78,6 +84,23 @@ it('prunes canceled pending jobs without removing the active job or surviving wo
   queue.finish()
 
   expect(queue.size).toBe(0)
+})
+
+it('queues recognition for a restored image while its canceled request is still running', () => {
+  const queue = new ImageToTextQueue()
+  queue.enqueueIndex('old', 'picture')
+  queue.start()
+  const canceled = queue.next()!
+  queue.reconcile({ roots: [] })
+  const restored: Document = { roots: [image('restored', 'picture')] }
+
+  queue.enqueueReindex(restored)
+  queue.enqueueReindex(restored)
+  queue.complete(canceled)
+
+  expect(canceled.canceled).toBe(true)
+  expect(queue.size).toBe(1)
+  expect(queue.next()).toEqual({ kind: 'reindex', nodeId: 'restored', attachmentId: 'picture', canceled: false })
 })
 
 it('keeps admission suspended until all flush owners resume without reviving canceled work', () => {
