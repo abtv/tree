@@ -306,9 +306,12 @@ export async function happyPath(driver: SmokeDriver) {
   await restored.waitFor(selectedResult(parentText))
   await restored.press(query, 'Enter')
 
+  // A Search target with children is entered and selected as the parent heading, not its first child.
   await restored.waitFor(`return !document.querySelector('${popup}') &&
-    ${textAt('.current-parent .node-input')} === ${JSON.stringify(parentText)} &&
-    ${textAt(focused)} === ${JSON.stringify(agendaText)}`)
+    !!document.querySelector('.current-parent .node-input:focus') &&
+    ${textAt(focused)} === ${JSON.stringify(parentText)} &&
+    Array.from(document.querySelectorAll('.node-row .node-input')).some(input =>
+      ${editorText}(input) === ${JSON.stringify(agendaText)})`)
   await restored.waitFor(`return !document.querySelector('.save-error, .error-boundary')`)
   return restored
 }

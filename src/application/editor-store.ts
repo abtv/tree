@@ -970,7 +970,6 @@ export class EditorStore {
     this.markPersistedChange()
   }
 
-  /** Shows a node chosen in global Search (`docs/PRODUCT.md` §20.14). */
   /**
    * Shows and selects a Search target (`docs/PRODUCT.md` §20.14): a target with children is entered and
    * selected as the editable parent heading; a leaf is selected within its parent.
