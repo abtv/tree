@@ -260,6 +260,37 @@ it('persists the location of an opened search result without requiring an edit',
   expect(save.mock.calls[0]?.[0].location).toEqual({ currentParentId: null, selectedNodeId: 'other' })
 })
 
+// @requirement PRODUCT.md §20.14
+it('enters an opened search result with children and selects it as the parent heading', async () => {
+  vi.useFakeTimers()
+  const store = await setup({
+    load: async () => ({
+      version: 1,
+      document: {
+        roots: [
+          { id: 'parent', text: 'Parent', children: [{ id: 'child', text: 'Child', children: [] }] },
+          { id: 'leaf', text: 'Leaf', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'leaf' },
+    }),
+  })
+
+  store.openSearchResult('parent')
+
+  expect(store.getSnapshot()).toMatchObject({
+    location: { currentParentId: 'parent', selectedNodeId: 'parent' },
+    focus: { nodeId: 'parent', cursor: 0 },
+  })
+
+  store.openSearchResult('child')
+
+  expect(store.getSnapshot()).toMatchObject({
+    location: { currentParentId: 'parent', selectedNodeId: 'child' },
+    focus: { nodeId: 'child', cursor: 0 },
+  })
+})
+
 it('starts a new typing undo entry after opening the same node from Search', async () => {
   vi.useFakeTimers()
   const store = await setup()

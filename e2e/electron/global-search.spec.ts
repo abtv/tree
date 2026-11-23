@@ -394,7 +394,10 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
     await window.screenshot({ path: `test-results/search-starred-${mode.mode}.png` })
     await window.keyboard.press('Enter')
 
-    await expect(window.locator('[data-node-id="child"] .node-input')).toBeFocused()
+    const heading = window.getByRole('textbox', { name: 'Current parent', exact: true })
+    await expect(heading).toBeFocused()
+    await expect(heading).toHaveValue('Alpha')
+    await expect(window.locator('[data-node-id="child"] .node-input')).toBeVisible()
   })
 })
 
@@ -588,8 +591,10 @@ test.describe('Search popup geometry (mode-independent)', () => {
 
     await window.keyboard.press('ArrowUp')
     await window.keyboard.press('Enter')
-    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Project 00')
-    await expect(window.locator('[data-node-id="star-0"] .node-input')).toBeFocused()
+    const parentHeading = window.getByRole('textbox', { name: 'Current parent', exact: true })
+    await expect(parentHeading).toHaveValue('Project 00')
+    await expect(parentHeading).toBeFocused()
+    await expect(window.locator('[data-node-id="star-0"] .node-input')).toBeVisible()
   })
 
   // @requirement PRODUCT.md §20.14.2
@@ -631,7 +636,9 @@ test.describe('Search popup geometry (mode-independent)', () => {
     await window.screenshot({ path: '.scratch/search-path-groups/starred-grouped.png' })
 
     await list.locator('.recent-node-group-path').first().click()
-    await expect(window.locator('[data-node-id="p0-0"] .node-input')).toBeFocused()
+    const parentHeading = window.getByRole('textbox', { name: 'Current parent', exact: true })
+    await expect(parentHeading).toHaveValue('Project A')
+    await expect(parentHeading).toBeFocused()
     await window.keyboard.press('Meta+;')
     await expect(input).toBeFocused()
     await window.keyboard.type('Needle')

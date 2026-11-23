@@ -48,7 +48,6 @@ import {
   deleteSelectedTransition,
   deleteSiblingRangeTransition,
   enterTransition,
-  enteredNodeLocation,
   leaveTransition,
   moveHorizontalTransition,
   moveNodeToParentTransition,
@@ -972,12 +971,16 @@ export class EditorStore {
   }
 
   /** Shows a node chosen in global Search (`docs/PRODUCT.md` §20.14). */
+  /**
+   * Shows and selects a Search target (`docs/PRODUCT.md` §20.14): a target with children is entered and
+   * selected as the editable parent heading; a leaf is selected within its parent.
+   */
   public openSearchResult(nodeId: NodeId): void {
     const state = this.runtime.ready()
     const found = locateNode(state.document, nodeId)
     if (found === undefined) return
     const location = found.node.children.length
-      ? enteredNodeLocation(found.node)
+      ? { currentParentId: nodeId, selectedNodeId: nodeId }
       : { currentParentId: found.parent?.id ?? null, selectedNodeId: nodeId }
     this.endTextSession()
     this.hideSearch()
