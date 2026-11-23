@@ -152,6 +152,7 @@ export function createEditorStoreDouble(options: EditorStoreDoubleOptions = {}):
     moveNodeTo: vi.fn(),
     moveNodeToParent: vi.fn(() => false),
     paste: vi.fn(async () => {}),
+    interruptPendingPastes: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
   }

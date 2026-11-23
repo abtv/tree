@@ -13,6 +13,7 @@ const noop = (): void => undefined
 const bindings: NodeInputBindings = {
   selectedAll: false,
   disabled: false,
+  readReplaceDraft: () => undefined,
   inputRef: noop,
   onBlur: noop,
   onTextChange: noop,
@@ -53,6 +54,29 @@ describe('native rich editing', () => {
 
     expect(input.textContent).toBe('due 2026-10-14 note')
     expect(document.activeElement).toBe(input)
+  })
+
+  it.each(['plain text', 'due 2026-10-14'])('projects a live Replace draft on rerender of %s', (original) => {
+    const value = node(original)
+    const field = (draft?: string) => (
+      <NodeInput
+        {...bindings}
+        node={value}
+        label="Node 1"
+        decorations={treeDecorations(value)}
+        readReplaceDraft={() => draft}
+      />
+    )
+    const { rerender } = render(field())
+    const input = screen.getByLabelText('Node 1')
+    const text = () => (input instanceof HTMLTextAreaElement ? input.value : input.textContent)
+
+    rerender(field('<X>' + original.slice(3)))
+    expect(text()).toBe('<X>' + original.slice(3))
+    expect(input.childElementCount).toBe(0)
+
+    rerender(field())
+    expect(text()).toBe(original)
   })
 
   it('retains native editing by default and locks either rich editing policy', () => {

@@ -4,6 +4,8 @@ export const JOIN_ATTACHMENTS_ERROR = 'Cannot join nodes that both have attachme
 
 export const CUT_CONFLICT_ERROR = 'The cut could not finish because the text changed.'
 
+export const PASTE_CONFLICT_ERROR = 'The paste could not finish because editing continued.'
+
 export const IMAGE_LOAD_ERROR = 'Image could not be loaded.'
 
 export const SAVE_ERROR_PREFIX = 'Changes could not be saved:'

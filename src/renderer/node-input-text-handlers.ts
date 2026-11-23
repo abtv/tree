@@ -7,7 +7,8 @@ import type { PendingCaret } from './node-input-types'
 import { getCaret, readEditableContent } from './editor-dom'
 import { currentLinkDraft } from './link-caret'
 import { clearPending, type VimCommandState } from './vim-command-state'
-import { beginReplaceSession, type VimEditSessionState } from './vim-edit-session'
+import type { VimEditSessionState } from './vim-edit-session'
+import { startVimReplace } from './vim-session-finish'
 import type { VimMode } from './vim-editing'
 
 interface TextEditHandlerDeps {
@@ -129,7 +130,7 @@ export function createTextEditHandlers(
         })
       setComposing(false)
       if (getMode() === 'replace') {
-        beginReplaceSession(session, {
+        startVimReplace(store, session, {
           nodeId: node.id,
           baseline: normalized.text,
           position: normalized.cursor,

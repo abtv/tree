@@ -23,6 +23,7 @@ import { nodeFlagsLabel } from './node-flags'
 export interface NodeInputBindings {
   selectedAll: boolean
   disabled: boolean
+  readReplaceDraft: () => string | undefined
   inputRef: (input: HTMLElement | null) => void
   onBlur: (event?: FocusEvent<HTMLElement>) => void
   onTextChange: (event: ChangeEvent<HTMLTextAreaElement>) => void
@@ -65,6 +66,7 @@ export function NodeInput({
   richEditingEnabled = true,
   selectedAll,
   disabled,
+  readReplaceDraft,
   inputRef,
   onBlur,
   onTextChange,
@@ -82,6 +84,7 @@ export function NodeInput({
   onPaste,
   onSelect,
 }: NodeInputProps): React.JSX.Element {
+  const draft = readReplaceDraft()
   const matches = useSearchDecorations(node.text, searchQuery)
   const decorations =
     matches.length === 0
@@ -123,11 +126,16 @@ export function NodeInput({
     element.current = input
     // Commit the projection before registration/row measurement. Native input often already made
     // exactly this edit; replacing its DOM would discard selection and disturb scroll anchoring.
-    if (input !== null && !plain && !composing)
-      syncRichTextHtml(
-        input,
-        richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
-      )
+    if (input !== null && !plain && !composing) {
+      if (draft === undefined) {
+        syncRichTextHtml(
+          input,
+          richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
+        )
+      } else if (input.textContent !== draft) {
+        input.textContent = draft
+      }
+    }
     inputRef(input)
   }
   const className = [
@@ -173,7 +181,14 @@ export function NodeInput({
 
   if (plain) {
     return (
-      <textarea {...commonProps} ref={attach} readOnly={disabled} rows={1} value={node.text} onChange={onTextChange} />
+      <textarea
+        {...commonProps}
+        ref={attach}
+        readOnly={disabled}
+        rows={1}
+        value={draft ?? node.text}
+        onChange={onTextChange}
+      />
     )
   }
 

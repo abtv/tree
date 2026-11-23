@@ -25,7 +25,7 @@ import {
   type NodeId,
   type TreeNode,
 } from '../domain/document'
-import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR } from '../domain/product-messages'
+import { CUT_CONFLICT_ERROR, GENERIC_OPERATION_ERROR, PASTE_CONFLICT_ERROR } from '../domain/product-messages'
 import type { ClipboardContent } from '../shared/ipc'
 import { readPngDimensions } from '../shared/png-validation'
 import { MAX_ATTACHMENT_SIZE_BATCH } from '../shared/attachment-limits'
@@ -131,6 +131,18 @@ export type { NodeForest, NodeVisualCommand } from './editor-node-visual-transit
 // Long enough to gather the images of one screen as they finish decoding.
 const ATTACHMENT_SIZE_BATCH_DELAY_MS = 100
 
+// Document nodes are immutable. Retain their text and links without retaining the subtree.
+function pasteContent({ text, links = [] }: TreeNode) {
+  return { text, links }
+}
+
+interface PendingPaste {
+  readonly nodeId: NodeId
+  readonly order: number
+  // Starting a local editing draft invalidates the original target even before its text is committed.
+  expected: ReturnType<typeof pasteContent> | undefined
+}
+
 export class EditorStore {
   public readonly emojiHistory: EmojiHistory
   private readonly tags = new Map<TagPrefix, TagCatalog>(TAG_PREFIXES.map((prefix) => [prefix, new TagCatalog(prefix)]))
@@ -185,6 +197,8 @@ export class EditorStore {
   private readonly saveScheduler: EditorSaveScheduler
   private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
+  private readonly pendingPastes = new Set<PendingPaste>()
+  private clipboardEditOrder = 0
   private readonly pendingEdits = new Set<Promise<void>>()
   private readonly editSeals = new Set<AbortSignal>()
   // Where the selected row sits in the window lives outside the snapshot: it changes on every scroll
@@ -884,6 +898,7 @@ export class EditorStore {
     if (transition === undefined || this.services.writeClipboard === undefined) return false
     this.endTextSession()
     const expectedContent = nodeContent(requireNode(state.document, nodeId).node)
+    const order = ++this.clipboardEditOrder
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
       const target = this.clipboardTarget(nodeId)
@@ -897,11 +912,10 @@ export class EditorStore {
         this.reportError(new Error(CUT_CONFLICT_ERROR))
         return
       }
-      this.applyStructural(
-        removeTextRange(target.document, nodeId, transition.from, transition.to),
-        target.location,
-        this.runtime.newFocus(nodeId, transition.from),
-      )
+      const next = removeTextRange(target.document, nodeId, transition.from, transition.to)
+      if (this.applyStructural(next, target.location, this.runtime.newFocus(nodeId, transition.from))) {
+        this.advancePendingPastes(order, current, next)
+      }
     })()
     this.pendingClipboardOperation = operation
     try {
@@ -1539,7 +1553,41 @@ export class EditorStore {
 
   public async paste(nodeId: NodeId, cursor: number, readClipboard?: EditorServices['readClipboard']): Promise<void> {
     if (this.isPersistenceLocked()) return
-    await this.trackEdit(this.pasteFromClipboard(nodeId, cursor, readClipboard))
+    this.runtime.ready()
+    const state = this.clipboardTarget(nodeId)
+    if (state === undefined) return
+    const paste = {
+      nodeId,
+      order: ++this.clipboardEditOrder,
+      expected: pasteContent(requireNode(state.document, nodeId).node),
+    }
+    this.pendingPastes.add(paste)
+    try {
+      await this.trackEdit(this.pasteFromClipboard(paste, cursor, readClipboard))
+    } finally {
+      this.pendingPastes.delete(paste)
+    }
+  }
+
+  public interruptPendingPastes(nodeId: NodeId): void {
+    for (const paste of this.pendingPastes) {
+      if (paste.nodeId === nodeId) paste.expected = undefined
+    }
+  }
+
+  // A clipboard edit requested before this paste belongs to its starting content.
+  // Preserve rapid cut/paste and repeated paste without accepting an unrelated text edit.
+  private advancePendingPastes(order: number, before: TreeNode, next: Document): void {
+    for (const paste of this.pendingPastes) {
+      if (
+        paste.order > order &&
+        paste.nodeId === before.id &&
+        paste.expected !== undefined &&
+        sameNodeContent(before, paste.expected)
+      ) {
+        paste.expected = pasteContent(requireNode(next, before.id).node)
+      }
+    }
   }
 
   private async trackEdit(operation: Promise<void>): Promise<void> {
@@ -1566,18 +1614,30 @@ export class EditorStore {
     return state
   }
 
+  private pasteTarget(paste: PendingPaste): ReadySnapshot | undefined {
+    const state = this.clipboardTarget(paste.nodeId)
+    if (state === undefined || this.isPersistenceLocked()) return
+    const node = requireNode(state.document, paste.nodeId).node
+    if (paste.expected === undefined || !sameNodeContent(node, paste.expected)) {
+      this.reportError(new Error(PASTE_CONFLICT_ERROR))
+      return
+    }
+    return state
+  }
+
   private async pasteFromClipboard(
-    nodeId: NodeId,
+    paste: PendingPaste,
     cursor: number,
     readClipboard?: EditorServices['readClipboard'],
   ): Promise<void> {
-    this.runtime.ready()
+    const { nodeId } = paste
     this.endTextSession()
     await this.pendingClipboardOperation
     if (this.isPersistenceLocked()) return
     const clipboard = await (readClipboard === undefined ? this.services.readClipboard() : readClipboard())
-    const current = this.clipboardTarget(nodeId)
-    if (current === undefined || this.isPersistenceLocked()) return
+    if (clipboard.kind === 'text' && clipboard.text === '' && !clipboard.links?.length) return
+    const current = this.pasteTarget(paste)
+    if (current === undefined) return
     if (clipboard.kind === 'image') {
       if (current.agenda !== undefined && requireNode(current.document, nodeId).node.attachment !== undefined) return
       // The stored size lets the image reserve its space before its bytes load (`docs/PRODUCT.md` §17.1).
@@ -1589,11 +1649,12 @@ export class EditorStore {
       this.pendingAttachmentIds.add(attachment.id)
       try {
         await this.services.writeAttachment(attachment.id, clipboard.png)
-        const latest = this.clipboardTarget(nodeId)
-        if (latest === undefined || this.isPersistenceLocked()) return
+        const latest = this.pasteTarget(paste)
+        if (latest === undefined) return
         // Another paste can attach an image while this write is pending.
         if (latest.agenda !== undefined && requireNode(latest.document, nodeId).node.attachment !== undefined) return
         const transition = imagePasteTransition(latest.document, latest.location, nodeId, attachment, this.createId)
+        this.endTextSession()
         const applied = this.applyStructural(
           transition.document,
           transition.location,
@@ -1611,11 +1672,6 @@ export class EditorStore {
       return
     }
 
-    // Link ranges must be non-empty and lie inside the text, so empty text with a nonempty link
-    // list is not a supported clipboard value; the list check is equivalent to the empty-list check.
-    if (clipboard.text === '' && (clipboard.links === undefined || clipboard.links.length === 0)) {
-      return
-    }
     const transition = textPasteTransition(
       current.document,
       current.location,
@@ -1629,12 +1685,16 @@ export class EditorStore {
     const position = Math.max(0, Math.min(cursor, node.text.length))
     // At position 0 the index -1 also reads as undefined, so the position guard only documents intent.
     const insertedWords = countPastedWords(clipboard.text, position > 0 ? node.text[position - 1] : undefined)
+    this.endTextSession()
     const applied = this.applyStructural(
       transition.document,
       transition.location,
       this.runtime.newFocus(transition.focus.nodeId, transition.focus.cursor),
     )
-    if (applied) this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
+    if (applied) {
+      this.advancePendingPastes(paste.order, node, transition.document)
+      this.noteChange(insertedWords, clipboardIntroducesLink(clipboard))
+    }
   }
 
   public undo(): void {

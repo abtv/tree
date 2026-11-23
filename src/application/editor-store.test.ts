@@ -6631,6 +6631,159 @@ describe('EditorStore', () => {
       return state.status === 'ready' ? state.document.roots[0]!.text : undefined
     }
 
+    it.each(['clipboard read', 'attachment write', 'preceding copy'] as const)(
+      'preserves newer typing when paste waits for %s',
+      async (stage) => {
+        const pending = gate()
+        const services = textState('abc')
+        services.writeClipboard = () => pending.promise
+        services.readClipboard = async () => {
+          if (stage === 'attachment write') return { kind: 'image', png: new Uint8Array([1]) }
+          if (stage === 'clipboard read') await pending.promise
+          return { kind: 'text', text: 'P' }
+        }
+        services.writeAttachment = vi.fn(() => pending.promise)
+        const store = new EditorStore(services, ids('image'), new FakeClock())
+        await store.initialize()
+
+        const copying = stage === 'preceding copy' ? store.copy('root', 0, 1) : undefined
+        const pasting = store.paste('root', 3)
+        if (stage === 'attachment write') await vi.waitFor(() => expect(services.writeAttachment).toHaveBeenCalled())
+        else await tick()
+        store.editText('root', 'Xabc')
+        pending.open()
+        await copying
+        await pasting
+
+        expect(store.getSnapshot()).toMatchObject({
+          document: { roots: [{ text: 'Xabc' }] },
+          operationError: 'The paste could not finish because editing continued.',
+        })
+        const state = store.getSnapshot()
+        if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+        expect(state.document.roots[0]!.attachment).toBeUndefined()
+        store.undo()
+        expect(rootText(store)).toBe('abc')
+      },
+    )
+
+    it('keeps a successful delayed paste separate from typing that restored the original text', async () => {
+      const pending = gate()
+      const store = new EditorStore(textState('abc'), ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const pasting = store.paste('root', 3, async () => {
+        await pending.promise
+        return { kind: 'text', text: 'P' }
+      })
+      store.editText('root', 'Xabc')
+      store.editText('root', 'abc')
+      pending.open()
+      await pasting
+      expect(rootText(store)).toBe('abcP')
+
+      store.editText('root', 'abcPY')
+      store.undo()
+      expect(rootText(store)).toBe('abcP')
+      store.undo()
+      expect(rootText(store)).toBe('abc')
+    })
+
+    it('protects a hyperlink change even when the text returns to its original value', async () => {
+      const pending = gate()
+      const text = 'https://example.com'
+      const links = [{ start: 0, end: text.length, url: text }]
+      const services = loadedState({ roots: [{ id: 'root', text, links, children: [] }] }, rootAt)
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+      expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ links }] } })
+
+      const pasting = store.paste('root', text.length, async () => {
+        await pending.promise
+        return { kind: 'text', text: 'P' }
+      })
+      store.editText('root', '')
+      store.editText('root', text)
+      pending.open()
+      await pasting
+
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(state.document.roots[0]).toEqual({ id: 'root', text, children: [] })
+      expect(state.operationError).toBe('The paste could not finish because editing continued.')
+    })
+
+    it('accepts an unchanged target after its metadata or another node is edited', async () => {
+      const pending = gate()
+      const services = loadedState(
+        { roots: [{ id: 'root', text: 'abc', children: [{ id: 'child', text: 'other', children: [] }] }] },
+        rootAt,
+      )
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const pasting = store.paste('root', 3, async () => {
+        await pending.promise
+        return { kind: 'text', text: 'P' }
+      })
+      store.toggleStarNode()
+      store.interruptPendingPastes('child')
+      store.editText('child', 'changed')
+      pending.open()
+      await pasting
+
+      expect(store.getSnapshot()).toMatchObject({
+        document: { roots: [{ text: 'abcP', starred: true, children: [{ text: 'changed' }] }] },
+      })
+    })
+
+    it('pastes after an already requested cut finishes on the same node', async () => {
+      const pending = gate()
+      const services = textState('abc')
+      services.writeClipboard = () => pending.promise
+      services.readClipboard = async () => ({ kind: 'text', text: 'a' })
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const cutting = store.cut('root', 0, 1)
+      const pasting = store.paste('root', 3)
+      pending.open()
+      await cutting
+      await pasting
+
+      expect(rootText(store)).toBe('bca')
+      store.undo()
+      expect(rootText(store)).toBe('bc')
+    })
+
+    it.each(['first', 'second'] as const)(
+      'handles overlapping pastes when the %s request finishes first',
+      async (winner) => {
+        const gates = [gate(), gate()] as const
+        const store = new EditorStore(textState('abc'), ids('unused'), new FakeClock())
+        await store.initialize()
+
+        const pastes = gates.map((pending, index) =>
+          store.paste('root', index, async () => {
+            await pending.promise
+            return { kind: 'text', text: index === 0 ? 'P' : 'Q' }
+          }),
+        )
+        const first = winner === 'first' ? 0 : 1
+        gates[first].open()
+        await pastes[first]
+        gates[1 - first]!.open()
+        await Promise.all(pastes)
+
+        expect(rootText(store)).toBe(winner === 'first' ? 'PQabc' : 'aQbc')
+        const state = store.getSnapshot()
+        if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+        expect(state.operationError).toBe(
+          winner === 'first' ? undefined : 'The paste could not finish because editing continued.',
+        )
+      },
+    )
+
     it('skips empty or unavailable Vim copies and tracks a pending write before paste', async () => {
       const services = textState('copy me')
       const store = new EditorStore(services, ids('unused'))

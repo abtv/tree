@@ -41,6 +41,7 @@ const exclusions: Record<string, string> = {
   registerSelectedRowTopReader: 'Renderer measurement registration requires a viewport harness.',
   noteViewportChange: 'Scroll persistence accounting is covered by save-scheduler tests.',
   registerPendingEditFinisher: 'Renderer edit lifecycle registration requires an input harness.',
+  interruptPendingPastes: 'Starting a renderer draft during a paste is exercised in the Electron clipboard suite.',
   flushPersistence: 'Shutdown persistence lifecycle is covered by dedicated persistence tests.',
   reportError: 'Failure injection is covered by error and persistence-lock tests.',
   requestQuitWithoutSavingPrompt: 'Quit prompt lifecycle is covered by dedicated shutdown tests.',

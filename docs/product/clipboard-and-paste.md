@@ -6,6 +6,8 @@
 
 Paste uses the current clipboard item created by the most recent copy operation. It does not use older clipboard history.
 
+When paste must wait for the clipboard or an image attachment write, it keeps the original insertion point. If the selected target's text or hyperlinks differ when the paste returns, or a new Vim Replace session has started on that target, Tree cancels the paste and reports “The paste could not finish because editing continued.” The user's edits and active Replace session are preserved. An earlier cut or paste may finish in its requested order. Each successful paste is a separate undo step.
+
 Malformed break tags in clipboard HTML must not stall paste through superlinear matching or prevent extraction of valid hyperlink metadata that follows the closed tag.
 
 If the current clipboard item exposes both image and text representations, the image takes precedence. Paste the image and do not also paste the text representation.

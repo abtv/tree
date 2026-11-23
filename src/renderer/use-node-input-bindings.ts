@@ -1,9 +1,9 @@
 import {
   replaceClickAgendaKey,
   replaceClickMoved,
+  resolveReplaceCommit,
   settleReplaceClick,
   beginReplaceClick,
-  beginReplaceSession,
   createVimEditSessionState,
   takeReplaceClick,
 } from './vim-edit-session'
@@ -838,7 +838,7 @@ export function useNodeInputBindings({
         const selection = getSelectionRange(focused)
         if (selection.start === selection.end && takeReplaceClick(vimSession.current)) {
           const baseline = focused instanceof HTMLTextAreaElement ? focused.value : readEditableContent(focused).text
-          beginReplaceSession(vimSession.current, {
+          sessionFinish.startVimReplace(store, vimSession.current, {
             nodeId: focusedRow.dataset.nodeId,
             baseline,
             position: selection.start,
@@ -867,7 +867,7 @@ export function useNodeInputBindings({
           if (entry === undefined) return // A read-only row retains the mode without an edit session.
           const [nodeId, editor] = entry
           const baseline = editor instanceof HTMLTextAreaElement ? editor.value : readEditableContent(editor).text
-          beginReplaceSession(vimSession.current, { nodeId, baseline, position: getCaret(editor) })
+          sessionFinish.startVimReplace(store, vimSession.current, { nodeId, baseline, position: getCaret(editor) })
         })
       }
       if (pointerPhase !== 'held') return
@@ -899,13 +899,17 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [changeVimMode, finishVimReplace, shortcuts])
+  }, [changeVimMode, finishVimReplace, shortcuts, store])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>
       decorateCompletionBindings(node, {
         selectedAll: selectAllNodeId === node.id,
         disabled: persistenceLocked,
+        readReplaceDraft: () => {
+          const draft = vimSession.current.replace
+          return draft?.nodeId === node.id ? resolveReplaceCommit(draft)?.finalText : undefined
+        },
         inputRef: (input: HTMLElement | null) => {
           if (input === null) {
             const previous = inputs.current.get(node.id)
@@ -1097,7 +1101,11 @@ export function useNodeInputBindings({
         if (authority.nodeId === id) applyCaretState(id, authority.caret)
       }
       if (caretProjection.current.mode === 'replace' && vimSession.current.replace === undefined) {
-        beginReplaceSession(vimSession.current, { nodeId: id, baseline: nodeText(input), position: getCaret(input) })
+        sessionFinish.startVimReplace(store, vimSession.current, {
+          nodeId: id,
+          baseline: nodeText(input),
+          position: getCaret(input),
+        })
       }
     },
     bindings,

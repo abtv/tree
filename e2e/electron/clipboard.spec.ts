@@ -5,6 +5,7 @@ import {
   attachmentFiles,
   clickApplicationMenuQuit,
   describeForEachEditingMode,
+  exactMessage,
   expect,
   fireIdleSave,
   firePaste,
@@ -13,7 +14,9 @@ import {
   lockSystemClipboard,
   node,
   nodeTexts,
+  parent,
   readPersisted,
+  seedDocument,
   setCursor,
   test,
   typeInto,
@@ -24,23 +27,57 @@ import {
   writeClipboardText,
 } from './fixtures'
 
-// Wrap the registered handler so a delayed write still exercises the real
+// Wrap the registered handler so a delayed operation still exercises the real
 // validation and native clipboard path. Injection is confined to the owned test app.
-async function holdClipboardWrite(app: ElectronApplication): Promise<void> {
-  await app.evaluate(() => {
-    const control = globalThis as typeof globalThis & { clipboardStarted?: boolean; releaseClipboard?: () => void }
+type ClipboardGate = typeof globalThis & { clipboardStarted?: boolean; releaseClipboard?: () => void }
+
+async function holdClipboard(app: ElectronApplication, channel: 'tree:read-clipboard' | 'tree:write-clipboard') {
+  await app.evaluate((_, name) => {
+    const control = globalThis as ClipboardGate
     const gate = new Promise<void>((resolve) => {
       control.releaseClipboard = resolve
     })
-    globalThis.__treeIpc.wrap('tree:write-clipboard', async (original, ...args) => {
+    globalThis.__treeIpc.wrap(name, async (original, ...args) => {
       control.clipboardStarted = true
       await gate
       return original(...args)
     })
-  })
+  }, channel)
+  return {
+    waitForStart: () =>
+      expect.poll(() => app.evaluate(() => (globalThis as ClipboardGate).clipboardStarted)).toBe(true),
+    release: () => app.evaluate(() => (globalThis as ClipboardGate).releaseClipboard?.()),
+  }
 }
 
 describeForEachEditingMode('clipboard (paste at the cursor)', () => {
+  // @requirement PRODUCT.md §12
+  test('keeps typing and its undo step when a delayed paste is canceled', async ({ userDataDir }) => {
+    const { app, window } = await launchTree(userDataDir)
+    const field = node(window, 1)
+    const error = 'Operation failed: The paste could not finish because editing continued.'
+    allowRendererError(exactMessage(error))
+    await typeInto(field, 'abc')
+    await setCursor(field, 3)
+    const gate = await holdClipboard(app, 'tree:read-clipboard')
+    await writeClipboardText(app, 'P')
+
+    await firePaste(field)
+    await gate.waitForStart()
+    await setCursor(field, 0)
+    await window.keyboard.type('X')
+    await gate.release()
+
+    await expect(window.getByText(error)).toBeVisible()
+    unlockSystemClipboard()
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue('Xabc')
+    await window.keyboard.type('Y')
+    await expect(field).toHaveValue('XYabc')
+    await window.keyboard.press('Meta+z')
+    await expect(field).toHaveValue('abc')
+  })
+
   // @requirement PRODUCT.md §14
   for (const count of [3, 160]) {
     test(`keeps native paste focus on the final decorated node (${count} lines)`, async ({ userDataDir }) => {
@@ -497,21 +534,16 @@ test.describe('clipboard (mode-independent, second part)', () => {
         true,
       )
     })
-    await holdClipboardWrite(app)
+    const gate = await holdClipboard(app, 'tree:write-clipboard')
     await window.keyboard.press('Meta+x')
-
-    await expect
-      .poll(() =>
-        app.evaluate(() => (globalThis as typeof globalThis & { clipboardStarted?: boolean }).clipboardStarted),
-      )
-      .toBe(true)
+    await gate.waitForStart()
 
     await setCursor(editor, 0)
     await editor.pressSequentially('X')
 
     await expect(editor).toHaveValue('Xabc')
 
-    await app.evaluate(() => (globalThis as typeof globalThis & { releaseClipboard?: () => void }).releaseClipboard?.())
+    await gate.release()
 
     await expect(editor).toHaveValue('Xabc')
     await expect(window.getByText('Operation failed: The cut could not finish because the text changed.')).toBeVisible()
@@ -524,4 +556,52 @@ test.describe('clipboard (mode-independent, second part)', () => {
 
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Xabc')
   })
+})
+
+test.describe('clipboard in Vim Replace', () => {
+  for (const editor of ['plain row', 'decorated parent'] as const) {
+    // @requirement PRODUCT.md §12
+    test(`preserves a new Replace session when a delayed paste returns to a ${editor}`, async ({ userDataDir }) => {
+      const heading = editor === 'decorated parent'
+      const original = heading ? 'abc 2026-10-08' : 'abc'
+      seedDocument(userDataDir, {
+        document: {
+          roots: [{ id: 'target', text: original, children: [{ id: 'child', text: 'Child', children: [] }] }],
+        },
+        location: { currentParentId: heading ? 'target' : null, selectedNodeId: 'target' },
+      })
+      const { app, window } = await launchTree(userDataDir, { vimPreference: true, initialMode: 'normal' })
+      await window.clock.install()
+      const field = heading ? parent(window) : node(window, 1)
+      const textProperty = heading ? 'textContent' : 'value'
+      await setCursor(field, 0)
+      const error = 'Operation failed: The paste could not finish because editing continued.'
+      allowRendererError(exactMessage(error))
+      const gate = await holdClipboard(app, 'tree:read-clipboard')
+      await writeClipboardText(app, 'P')
+
+      await firePaste(field)
+      await gate.waitForStart()
+      await field.press('R')
+      await window.keyboard.type('X')
+      const draft = 'X' + original.slice(1)
+      await expect(field).toHaveJSProperty(textProperty, draft)
+      await gate.release()
+
+      await expect(window.getByText(error)).toBeVisible()
+      unlockSystemClipboard()
+      await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+      await expect(field).toHaveJSProperty(textProperty, draft)
+      await window.screenshot({ path: test.info().outputPath('paste-conflict-replace.png') })
+      await window.keyboard.type('Y')
+      await field.press('Escape')
+      const committed = 'XY' + original.slice(2)
+      await expect(field).toHaveJSProperty(textProperty, committed)
+      await fireIdleSave(window)
+      await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, idleSavePoll).toBe(committed)
+
+      await field.press('u')
+      await expect(field).toHaveJSProperty(textProperty, original)
+    })
+  }
 })

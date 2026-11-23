@@ -1,7 +1,6 @@
 import {
   replaceClickAgendaKey,
   replaceClickMoved,
-  beginReplaceSession,
   takeReplaceClick,
   type VimEditSessionState,
 } from './vim-edit-session'
@@ -11,6 +10,7 @@ import {
   finishVimBlur,
   prepareVimCommand,
   prepareVimPointerPress,
+  startVimReplace,
   type VimTextCommandState,
 } from './vim-session-finish'
 import type { NodeInputBindings } from './NodeInput'
@@ -222,7 +222,7 @@ export function createPointerHandlers(
           'preserve-selection',
         )
         const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-        beginReplaceSession(session, {
+        startVimReplace(store, session, {
           nodeId: node.id,
           baseline,
           position: cursor,

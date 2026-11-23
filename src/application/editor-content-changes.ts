@@ -10,8 +10,12 @@ export function nodeContent(node: { text: string; links?: readonly LinkRange[] }
   return { text: node.text, links: (node.links ?? []).map((link) => ({ ...link })) }
 }
 
-export function sameNodeContent(node: { text: string; links?: readonly LinkRange[] }, expected: NodeContent): boolean {
+export function sameNodeContent(
+  node: { text: string; links?: readonly LinkRange[] },
+  expected: { text: string; links: readonly LinkRange[] },
+): boolean {
   if (node.text !== expected.text) return false
+  if (node.links === expected.links) return true
   const links = node.links ?? []
   return (
     links.length === expected.links.length &&

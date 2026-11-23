@@ -2,10 +2,10 @@ import {
   replaceClickAgendaKey,
   applyReplaceKey,
   beginInsertSession,
-  beginReplaceSession,
   takeReplaceClick,
   type VimEditSessionState,
 } from './vim-edit-session'
+import { startVimReplace } from './vim-session-finish'
 import type { EditorStore } from '../application/editor-store'
 import { moveSelectionBoundaryTransition } from '../application/editor-command-transitions'
 import { requireNode, type TreeNode } from '../domain/document'
@@ -91,7 +91,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
     },
     finishInsert: finishVimInsert,
     beginReplace: (nodeId, _input, baseline, position) => {
-      beginReplaceSession(session, { nodeId, baseline, position })
+      startVimReplace(store, session, { nodeId, baseline, position })
     },
     handleReplaceKey: (input, key) => {
       // A key can arrive before the row-click release timer. Start from the now-focused editor
@@ -104,7 +104,7 @@ export function createVimKeyboardState(deps: VimKeyboardStateDeps, node: TreeNod
       ) {
         takeReplaceClick(session)
         const baseline = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
-        beginReplaceSession(session, { nodeId: node.id, baseline, position: getCaret(input) })
+        startVimReplace(store, session, { nodeId: node.id, baseline, position: getCaret(input) })
       }
       if (session.replace?.nodeId !== node.id) return false
       const result = applyReplaceKey(session.replace, key)

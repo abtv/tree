@@ -12,6 +12,7 @@ import {
 } from './vim-command-state'
 import {
   beginReplaceClick,
+  beginReplaceSession,
   continueReplaceClickAfterBlur,
   insertRepeatChange,
   resolveReplaceCommit,
@@ -19,6 +20,7 @@ import {
   takeReplaceSession,
   takeReplaceClick,
   type VimEditSessionState,
+  type VimReplaceSession,
 } from './vim-edit-session'
 import type { VimMode } from './vim-editing'
 import type { NodeVisualSelection } from './node-input-types'
@@ -197,6 +199,15 @@ export function finishStructuralInsertSession(deps: { commandState: VimCommandSt
   if (session === undefined) return
   const text = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
   recordRepeatChange(commandState, structuralRepeatChange(session, text))
+}
+
+export function startVimReplace(
+  store: EditorStore,
+  session: VimEditSessionState,
+  draft: Omit<VimReplaceSession, 'typed'>,
+): void {
+  beginReplaceSession(session, draft)
+  store.interruptPendingPastes(draft.nodeId)
 }
 
 export function finishReplaceSession(
