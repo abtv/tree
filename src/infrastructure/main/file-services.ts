@@ -436,8 +436,13 @@ async function readAttachmentHeader(path: string): Promise<AttachmentDimensions 
   }
   try {
     const header = new Uint8Array(PNG_DIMENSIONS_HEADER_BYTES)
-    const { bytesRead } = await handle.read(header, 0, header.length, 0)
-    return readPngDimensions(header.subarray(0, bytesRead)) ?? null
+    let offset = 0
+    while (offset < header.length) {
+      const { bytesRead } = await handle.read(header, offset, header.length - offset, offset)
+      if (bytesRead === 0) return null
+      offset += bytesRead
+    }
+    return readPngDimensions(header) ?? null
   } finally {
     await handle.close()
   }

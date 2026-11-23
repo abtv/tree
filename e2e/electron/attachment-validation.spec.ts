@@ -1,9 +1,10 @@
 // @editing-modes: both
-import { rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { pngIhdr, pngWith } from '../../src/electron/main/png-test-utils'
 import {
   attachmentFiles,
+  attachmentPath,
   clickApplicationMenuQuit,
   describeForEachEditingMode,
   expect,
@@ -11,12 +12,14 @@ import {
   launchTree,
   node,
   readPersisted,
+  seedDocument,
   test,
   tryReadPersisted,
   typeInto,
   writeClipboardImage,
   writeClipboardImageSized,
 } from './fixtures'
+import { solidPng } from './solid-png'
 
 const invalidPng = [
   137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -24,6 +27,29 @@ const invalidPng = [
 ]
 
 test.describe('attachment validation and image failures (mode-independent)', () => {
+  // @requirement PRODUCT.md §17
+  test('reads legacy image sizes from disk and preserves the order of missing or incomplete headers', async ({
+    userDataDir,
+  }) => {
+    const png = solidPng(173, 61)
+    const ids = ['incomplete', 'complete', 'missing']
+    seedDocument(userDataDir, {
+      document: {
+        roots: ids.map((id) => ({ id, text: id, children: [], attachment: { id, mimeType: 'image/png' } })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'complete' },
+    })
+    const path = attachmentPath(userDataDir, 'complete')
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, png)
+    writeFileSync(attachmentPath(userDataDir, 'incomplete'), png.subarray(0, 20))
+    const { window: page } = await launchTree(userDataDir)
+
+    const sizes = await page.evaluate((ids) => window.treeApi.readAttachmentDimensions!(ids), ids)
+
+    expect(sizes).toEqual([null, { width: 173, height: 61 }, null])
+  })
+
   test('rejects invalid attachment bytes at the preload boundary without writing a file', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

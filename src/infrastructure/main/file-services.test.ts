@@ -102,6 +102,28 @@ describe('file services', () => {
     }
   })
 
+  it('reads a complete PNG header across short file reads', async () => {
+    const { directory, services } = await servicesForTest()
+    await services.writeAttachment('complete', transparentPng)
+    const handle = await open(join(directory, 'attachments', 'complete.png'), 'r')
+    const read = handle.read.bind(handle)
+    vi.spyOn(handle, 'read')
+    type HeaderRead = (bytes: Uint8Array, offset: number, length: number, position: number) => ReturnType<typeof read>
+    vi.mocked<HeaderRead>(handle.read).mockImplementation((bytes, offset, length, position) =>
+      read(bytes, offset, Math.min(length, 7), position),
+    )
+    vi.mocked(open).mockResolvedValueOnce(handle)
+
+    try {
+      const sizes = await services.readAttachmentDimensions(['complete'])
+
+      expect(sizes).toEqual([{ width: 2, height: 1 }])
+      expect(handle.fd).toBe(-1)
+    } finally {
+      await handle.close()
+    }
+  })
+
   it('logs the original filesystem failure even when persistence debugging is disabled', async () => {
     const { directory, services } = await servicesForTest()
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
