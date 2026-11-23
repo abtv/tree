@@ -7,8 +7,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -c 'if ((.tool_input.command // \"\") | test(\"^[[:space:]]*cd[[:space:]].*(&&|;)\")) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: \"Do not start a command with cd ... && or cd ... ;. Run one simple command with absolute paths instead (AGENTS.md section 4). Prefer the Read and Grep tools for reading and searching.\"}} else empty end'",
+            "command": "jq -c 'if ((.tool_input.command // \"\") | test(\"^[[:space:]]*cd[[:space:]].*(&&|;)\")) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: \"Do not start a command with cd ... && or cd ... ;. The working directory is already the repository root: run one simple command there, exactly as the permission rules name it, with absolute paths only as file arguments (AGENTS.md section 4). Prefer the Read and Grep tools for reading and searching.\"}} else empty end'",
             "statusMessage": "Checking for cd chains"
+          },
+          {
+            "type": "command",
+            "command": "jq -c 'if ((.tool_input.command // \"\") | test(\"^[[:space:]]*(npm|npx)[[:space:]].*--prefix\")) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"deny\", permissionDecisionReason: \"Do not add --prefix to npm or npx: it changes the command prefix, so the permission rules and sandbox exclusions stop matching and the Product Owner is prompted. The working directory is already the repository root; run the command exactly as .claude/settings.json names it (docs/AGENT_WORKFLOW.md section 4).\"}} else empty end'",
+            "statusMessage": "Checking for npm --prefix"
           },
           {
             "type": "command",
