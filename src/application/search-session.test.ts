@@ -39,6 +39,39 @@ it('reuses an exact draft count for confirmation and repeats across folded text'
   expect(harness.slices() - initialSlices).toBeLessThanOrEqual(2)
 })
 
+it.each([false, true])(
+  'drops retained capped match positions when an edit replaces the context (recount settled: %s)',
+  (settled) => {
+    const harness = searchHarness(64)
+    const session = new SearchSession(harness.executor)
+    const roots = Array.from({ length: 120 }, (_, i) => ({ id: `n${i}`, text: 'a', children: [] }))
+    const jump = vi.fn()
+    session.replaceContext({ ...context, document: { roots } })
+    session.begin({ nodeId: 'n0', offset: 0 })
+    session.edit('a')
+    harness.flush()
+    session.confirm(jump)
+    harness.flush()
+    const beforeRetainedRepeat = harness.slices()
+    session.navigate({ nodeId: 'n1', offset: 0 }, 1, 1, jump)
+    harness.flush()
+
+    // One delivery slice shows that the repeat used retained positions, including n3 at offset 0.
+    expect(harness.slices() - beforeRetainedRepeat).toBe(1)
+
+    const edited = roots.map((node) => (node.id === 'n3' ? { ...node, text: 'xa' } : node))
+    session.replaceContext({ ...context, revision: 2, document: { roots: edited } })
+    if (settled) harness.flush()
+
+    session.navigate({ nodeId: 'n3', offset: 0 }, 1, 1, jump)
+    harness.flush()
+
+    expect(jump).toHaveBeenLastCalledWith(
+      expect.objectContaining({ ordinal: 4, destination: expect.objectContaining({ nodeId: 'n3', start: 1 }) }),
+    )
+  },
+)
+
 function controlledSession() {
   const jobs: { request: SearchRequest; publish: (result: SearchResult) => void; cancel: ReturnType<typeof vi.fn> }[] =
     []

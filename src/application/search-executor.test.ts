@@ -132,6 +132,40 @@ describe('incremental executor', () => {
     }
   })
 
+  it('yields to a task before a cached repeat started while publishing a cached result', () => {
+    const neighborhood: SearchNeighborhood = {}
+    const request: SearchRequest = {
+      ...base,
+      operation: { kind: 'navigate', origin: { nodeId: 'a', offset: 0 }, direction: 1, count: 1, neighborhood },
+    }
+    searchHarness().run(request)
+    const tasks: (() => void)[] = []
+    const microtasks: (() => void)[] = []
+    const executor = createSearchExecutor({
+      schedule(callback) {
+        tasks.push(callback)
+        return () => undefined
+      },
+      scheduleCached(callback) {
+        microtasks.push(callback)
+        return () => undefined
+      },
+    })
+    const repeat = vi.fn()
+    executor.execute(request, () => executor.execute(request, repeat))
+
+    microtasks.shift()!()
+
+    expect(microtasks).toHaveLength(0)
+    expect(tasks).toHaveLength(1)
+
+    tasks.shift()!()
+    executor.execute(request, vi.fn())
+
+    expect(repeat).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ordinal: 2 }))
+    expect(microtasks).toHaveLength(1)
+  })
+
   it('publishes a small completed search within its scheduled work budget', () => {
     const callbacks: (() => void)[] = []
     const publish = vi.fn()
