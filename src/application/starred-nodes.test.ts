@@ -10,19 +10,28 @@ const node = (id: string, text: string, children: TreeNode[] = [], starred?: tru
   ...(starred ? { starred } : {}),
 })
 
-it('sorts by the complete path including text beyond the displayed ancestor preview', () => {
+// @requirement PRODUCT.md §20.14.5
+it('keeps document order, with each node before its descendants, regardless of names', () => {
   const prefix = 'a'.repeat(160)
   const document = {
     roots: [
       node('z', `${prefix}z`, [node('z-child', 'Alpha', [], true)]),
-      node('same-prefix', `${prefix}aa`, [], true),
+      node('release-14', 'Release 0.14', [], true),
+      node('release-9', 'Release 0.9', [node('release-9-child', 'Zulu', [], true)], true),
       node('a', `${prefix}a`, [node('a-child', 'Zulu', [], true), node('a-child2', 'Beta', [], true)]),
     ],
   }
 
   const results = markedAndStarredNodes(document)
 
-  expect(results.map((item) => item.id)).toEqual(['a-child2', 'a-child', 'same-prefix', 'z-child'])
+  expect(results.map((item) => item.id)).toEqual([
+    'z-child',
+    'release-14',
+    'release-9',
+    'release-9-child',
+    'a-child',
+    'a-child2',
+  ])
   expect(results[0]!.path).toBe(prefix)
   expect(markedAndStarredNodes(document)).toBe(results)
 })
@@ -65,16 +74,16 @@ it('lists completed stars and reuses the prepared list', () => {
   const visible = markedAndStarredNodes(source)
 
   expect(visible).toEqual([
-    { id: 'active', text: 'Active', path: null, starred: true },
     { id: 'archive', text: 'Archived', path: null, starred: true, struckThrough: true },
     { id: 'empty', text: 'Empty node', path: null, starred: true },
     { id: 'report', text: 'Report', path: 'Workspace › Projects', parentId: 'projects', starred: true },
+    { id: 'active', text: 'Active', path: null, starred: true },
   ])
   expect(markedAndStarredNodes(source)).toBe(visible)
 })
 
 // @requirement PRODUCT.md §20.14.5
-it('lists marked stars, then marked nodes, then stars, each group by path, and each node once', () => {
+it('lists marked stars, then marked nodes, then stars, each group in document order, and each node once', () => {
   const document: Document = {
     roots: [
       node('star-a', 'Alpha', [], true),
@@ -88,8 +97,8 @@ it('lists marked stars, then marked nodes, then stars, each group by path, and e
 
   const results = markedAndStarredNodes(document)
 
-  expect(results.map((item) => item.id)).toEqual(['both-a', 'both', 'mark-b', 'mark-z', 'star-a', 'star-c'])
-  expect(results[1]).toEqual({
+  expect(results.map((item) => item.id)).toEqual(['both', 'both-a', 'mark-z', 'mark-b', 'star-a', 'star-c'])
+  expect(results[0]).toEqual({
     id: 'both',
     text: 'Both',
     path: 'Plain',
@@ -97,42 +106,6 @@ it('lists marked stars, then marked nodes, then stars, each group by path, and e
     starred: true,
     marked: true,
   })
-})
-
-// @requirement PRODUCT.md §20.14.5
-it('compares numbers in names by value, so version 0.9 precedes 0.11 and 0.14', () => {
-  const marked = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({
-    ...node(id, text, children),
-    marked: true,
-  })
-  const document: Document = {
-    roots: [
-      node('r14', 'Release 0.14', [marked('deps', 'Do we need all deps')]),
-      node('r11', 'Release 0.11 - improved agentic flow', [marked('copy', '1 - Copy text and images')]),
-      marked('r9', 'Release 0.9 - perfect global search'),
-      marked('item10', 'Item 10'),
-      marked('item2', 'Item 2'),
-    ],
-  }
-
-  expect(markedAndStarredNodes(document).map((item) => item.id)).toEqual(['item2', 'item10', 'r9', 'copy', 'deps'])
-})
-
-// @requirement PRODUCT.md §20.14.5
-it('compares paths one ancestor at a time, keeping children next to their parent', () => {
-  const marked = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({
-    ...node(id, text, children),
-    marked: true,
-  })
-  const document: Document = {
-    roots: [
-      marked('trash', 'Release 0.11 - Trash feature'),
-      node('release', 'Release 0.11', [marked('child', 'Alpha child')]),
-      marked('plain-release', 'Release 0.11'),
-    ],
-  }
-
-  expect(markedAndStarredNodes(document).map((item) => item.id)).toEqual(['plain-release', 'child', 'trash'])
 })
 
 // @requirement PRODUCT.md §20.14.5

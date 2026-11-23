@@ -62,7 +62,7 @@ The renderer groups consecutive nested results by parent ID and displayed path. 
 
 #### 13.3.4 Marked and Starred Entries
 
-`starred-nodes.ts` derives empty Search entries on demand: marked starred nodes, then the other marked nodes, then starred nodes that are not marked. It sorts each part by ancestor and node names compared one level at a time with one shared numeric `Intl.Collator`, and caches results by immutable document in a weak map. Sorting costs O(k log k) comparisons for k flagged nodes; a timing guard sorts 6000 flagged nodes. Weak node summaries prune unchanged branches after edits; this preparation never runs on text input. Memory follows reachable documents/nodes and their marked and starred results. No other entries are added and no history is stored. Search keeps consecutive parent-ID grouping and its nonempty-query executor.
+`starred-nodes.ts` derives empty Search entries on demand: marked starred nodes, then the other marked nodes, then starred nodes that are not marked. Each part keeps document order from one depth-first traversal, without sorting, and results are cached by immutable document in a weak map. A timing guard groups 6000 flagged nodes. Weak node summaries prune unchanged branches after edits; this preparation never runs on text input. Memory follows reachable documents/nodes and their marked and starred results. No other entries are added and no history is stored. Search keeps consecutive parent-ID grouping and its nonempty-query executor.
 
 ---
 

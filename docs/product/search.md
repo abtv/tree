@@ -183,9 +183,7 @@ Query preparation and matching retain only the current terms, result list and an
 #### 20.14.5 Marked and Starred List
 
 * With empty input the popup lists three parts: nodes that are both marked (§2.7) and starred (§2.6), then the other marked nodes, then the starred nodes that are not marked. Each node appears once. No other nodes appear, and editing or visiting a node does not add it to this list.
-* Each part is sorted alphabetically by its ancestor path and node name, one level at a time from the top, without the display preview cutoff. Equal paths keep document order.
-* A name that equals the start of a longer path sorts first, so a node's descendants follow it before a sibling whose name only begins with the same text.
-* Runs of digits compare by numeric value, so `Release 0.9` precedes `Release 0.11` and `Item 2` precedes `Item 10`.
+* Each part keeps document order, the order in which Tree shows the nodes when every branch is expanded: a node precedes its descendants, and siblings keep their order. Names do not affect the order.
 * All parts use the consecutive-parent grouping of §20.14.2. The first result is selected.
 * The heading names the flags that the listed nodes carry: `Marked and starred`, `Marked`, or `Starred`; a list that contains only nodes with both flags uses `Marked and starred`. An empty list keeps the heading `Marked and starred` and displays `No marked or starred nodes`.
 * Typing replaces the heading text with `Results` in the same heading row, so the list does not shift. Clearing the query restores this list. Titles and paths follow edits and moves.
