@@ -101,9 +101,7 @@ function richInput(text: string, cursor = text.length, hasAttachment = false) {
   return input
 }
 
-async function fixture(
-  options: { mode?: VimMode; selectedNodeId?: string | undefined; node?: Partial<TreeNode> } = {},
-) {
+async function fixture(options: { mode?: VimMode; node?: Partial<TreeNode> } = {}) {
   const other: TreeNode = { id: 'other', text: 'other', children: [] }
   const node: TreeNode = { id: 'node', text: 'hello', children: [], ...options.node }
   const harness = await createRealStoreHarness({
@@ -126,7 +124,6 @@ async function fixture(
   }
   const deps = {
     store: harness.store,
-    selectedNodeId: 'selectedNodeId' in options ? options.selectedNodeId : 'node',
     persistenceLocked: false as boolean,
     vimMode: mode,
     commandState,
@@ -595,8 +592,19 @@ describe('mouse up', () => {
 })
 
 describe('focus', () => {
-  it.each(['other', 'node'])('selects a node the store has not selected, with a rendered %s prop', async (prop) => {
-    const f = await fixture({ selectedNodeId: prop })
+  it('ignores focus from a mounted editor while the store is loading', async () => {
+    const f = await fixture()
+    const handlers = f.handlers()
+    const selectNode = vi.spyOn(f.store, 'selectNode')
+    vi.spyOn(f.store, 'getSnapshot').mockReturnValue({ status: 'loading' })
+
+    handlers.onFocus({ currentTarget: textarea('hello') } as never)
+
+    expect(selectNode).not.toHaveBeenCalled()
+  })
+
+  it('selects a node the store has not selected when the handler receives focus', async () => {
+    const f = await fixture()
     const handlers = f.handlers()
     f.store.selectNode('other', 0)
 
@@ -610,7 +618,6 @@ describe('focus', () => {
   it('keeps the focus token when a caret placement focuses an editor the store already selected', async () => {
     const f = await fixture({
       mode: 'normal',
-      selectedNodeId: 'other',
       node: { attachment: { id: 'image', mimeType: 'image/png' } },
     })
     const selectNode = vi.spyOn(f.store, 'selectNode')

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSearchExecutor, searchCaret, searchScheduler, type SearchRequest } from './search-executor'
+import {
+  createSearchExecutor,
+  searchCaret,
+  searchScheduler,
+  type SearchNeighborhood,
+  type SearchRequest,
+} from './search-executor'
 import { searchHarness } from './test/search-harness'
 import type { DayNumber } from '../domain/calendar-date'
 
@@ -78,6 +84,31 @@ describe('native search scheduling', () => {
 })
 
 describe('incremental executor', () => {
+  it('defers cached caret calculation and skips it when a repeat is canceled', async () => {
+    const neighborhood: SearchNeighborhood = {}
+    const request: SearchRequest = {
+      ...base,
+      operation: { kind: 'navigate', origin: { nodeId: 'a', offset: 0 }, direction: 1, count: 1, neighborhood },
+    }
+    searchHarness().run(request)
+    const executor = createSearchExecutor()
+    const publish = vi.fn()
+    const segment = vi.spyOn(Intl.Segmenter.prototype, 'segment')
+
+    try {
+      executor.execute(request, publish)()
+      executor.execute(request, publish)
+
+      expect(segment).not.toHaveBeenCalled()
+      await Promise.resolve()
+
+      expect(segment).toHaveBeenCalledOnce()
+      expect(publish).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ordinal: 2 }))
+    } finally {
+      segment.mockRestore()
+    }
+  })
+
   it('publishes a small completed search within its scheduled work budget', () => {
     const callbacks: (() => void)[] = []
     const publish = vi.fn()

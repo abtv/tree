@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
+import type { TextMatch } from '../domain/text-search'
 import { TouchDragSurface } from './TouchDragSurface'
 import { nodeFlagsLabel } from './node-flags'
 
@@ -10,7 +11,8 @@ interface NodeRowProps {
   index: number
   depth?: number
   colorDepth?: number
-  renderInput: (node: TreeNode, label: string) => ReactNode
+  renderInput: (node: TreeNode, label: string, match?: TextMatch) => ReactNode
+  currentMatch?: TextMatch | undefined
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onToggleExpansion?: (node: TreeNode) => void
@@ -36,6 +38,7 @@ export const NodeRow = memo(function NodeRow({
   depth = 0,
   colorDepth = depth,
   renderInput,
+  currentMatch,
   onActivate,
   onEnter,
   onToggleExpansion,
@@ -137,7 +140,7 @@ export const NodeRow = memo(function NodeRow({
           type="button"
         />
       ) : null}
-      {renderInput(node, `Node ${index + 1}`)}
+      {renderInput(node, `Node ${index + 1}`, currentMatch)}
     </div>
   )
 })

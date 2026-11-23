@@ -940,7 +940,6 @@ export function useNodeInputBindings({
           {
             store,
             capturePasteClipboard,
-            selectedNodeId,
             persistenceLocked,
             vimMode,
             commandState: vimCommandState.current,
@@ -1024,7 +1023,6 @@ export function useNodeInputBindings({
       onPreviewAttachment,
       persistenceLocked,
       selectAllNodeId,
-      selectedNodeId,
       repeatStructural,
       nodeVisualSelection,
       onFoldCommand,

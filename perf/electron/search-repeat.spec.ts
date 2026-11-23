@@ -118,10 +118,8 @@ for (const matches of [80, 5000]) {
         metrics,
       })
       expect(metrics.sendIntervalMs).toBeLessThan(25)
-      // Guard today's measured baseline (up to 0.86 s of backlog on capped search).
-      // Tighten the capped budget when repeat navigation reuses nearby matches.
-      expect(metrics.highlightP95Ms).toBeLessThan(matches === 80 ? 120 : 1500)
-      expect(metrics.afterReleaseMs).toBeLessThan(matches === 80 ? 100 : 1500)
+      expect(metrics.highlightP95Ms).toBeLessThan(120)
+      expect(metrics.afterReleaseMs).toBeLessThan(100)
       await expect(window.locator(`[data-node-id="${backwards ? 1 : steps + 1}"] .node-input`)).toBeFocused()
     }
   })

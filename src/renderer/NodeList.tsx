@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { flushSync } from 'react-dom'
 import type { ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
+import type { TextMatch } from '../domain/text-search'
+import type { SearchDestination } from '../application/search-executor'
 import { buildVisibleRows, selectedSubtreeRowRange, type VisibleRow } from '../application/visible-rows'
 import { NodeRow } from './NodeRow'
 import type { NodeDragCaretFreeze } from './drag-caret-freeze'
@@ -31,7 +33,8 @@ interface NodeListProps {
   nodes: readonly TreeNode[]
   visibleRows?: readonly VisibleRow[]
   colorDepthOffset?: number
-  renderInput: (node: TreeNode, label: string) => ReactNode
+  renderInput: (node: TreeNode, label: string, match?: TextMatch) => ReactNode
+  currentMatch?: SearchDestination | undefined
   onActivate?: (node: TreeNode) => void
   onEnter: (node: TreeNode) => void
   onDrop: (nodeId: string, target: DropTarget) => void
@@ -54,6 +57,7 @@ export function NodeList({
   visibleRows: suppliedVisibleRows,
   colorDepthOffset = 0,
   renderInput,
+  currentMatch,
   onActivate,
   onEnter,
   onDrop,
@@ -331,6 +335,7 @@ export function NodeList({
       pinned={pinned}
       pinnedOffset={pinnedOffset}
       renderInput={renderInput}
+      currentMatch={currentMatch?.nodeId === node.id ? currentMatch : undefined}
       rowRef={measureRow}
     />
   )

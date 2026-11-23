@@ -3,6 +3,7 @@ import {
   type SearchContext,
   type SearchExecutor,
   type SearchPosition,
+  type SearchNeighborhood,
   type SearchRequest,
   type SearchResult,
 } from './search-executor'
@@ -34,6 +35,7 @@ export class SearchSession {
   private countJob: SearchJob = { kind: 'idle' }
   private navigationJob: SearchJob = { kind: 'idle' }
   private completedCount: CompletedCount | undefined
+  private neighborhood: SearchNeighborhood | undefined
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly executor: SearchExecutor = createSearchExecutor()) {}
@@ -153,6 +155,7 @@ export class SearchSession {
         direction,
         count,
         ...(this.completedCount?.exact && { exact: this.completedCount.exact }),
+        ...(this.neighborhood && { neighborhood: this.neighborhood }),
       },
     }
     const cancel = this.executor.execute(request, (result) => {
@@ -167,6 +170,7 @@ export class SearchSession {
     this.invalidate()
     this.context = undefined
     this.completedCount = undefined
+    this.neighborhood = undefined
     this.mode = { kind: 'hidden', confirmed: '' }
     this.listeners.clear()
     this.snapshot = { confirmed: '', visible: false, pending: false }
@@ -206,6 +210,7 @@ export class SearchSession {
   }
 
   private set(mode: SearchMode, pending: boolean, count?: CompletedCount): void {
+    if (count !== this.completedCount) this.neighborhood = count?.capped ? {} : undefined
     this.mode = mode
     this.completedCount = count
     this.snapshot = {

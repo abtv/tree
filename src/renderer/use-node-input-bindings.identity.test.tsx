@@ -62,10 +62,19 @@ describe('input bindings callback identity', () => {
     expectStableControls(before, f.result.current)
   })
 
+  it('keeps bindings and controls stable when selection moves to another row', async () => {
+    const f = await fixture()
+    const before = f.result.current
+
+    f.rerender({ ...f.options, selectedNodeId: 'second' })
+
+    expect(f.result.current.bindings).toBe(before.bindings)
+    expectStableControls(before, f.result.current)
+  })
+
   const changes: { name: keyof Options; patch: Partial<Options> }[] = [
     { name: 'vimMode', patch: { vimMode: 'insert' } },
     { name: 'vimEnabled', patch: { vimEnabled: false } },
-    { name: 'selectedNodeId', patch: { selectedNodeId: 'second' } },
     { name: 'persistenceLocked', patch: { persistenceLocked: true } },
     { name: 'nodeVisualSelection', patch: { nodeVisualSelection: { anchorId: 'first', focusId: 'second' } } },
     { name: 'onPreviewAttachment', patch: { onPreviewAttachment: () => undefined } },

@@ -33,7 +33,6 @@ export function preventReadOnlyLinkFocus(event: MouseEvent<HTMLElement>): void {
 interface PointerHandlerDeps {
   store: EditorStore
   capturePasteClipboard?: ((data: DataTransfer) => EditorServices['readClipboard']) | undefined
-  selectedNodeId: string | undefined
   persistenceLocked: boolean
   vimMode: VimMode
   commandState: VimCommandState
@@ -65,7 +64,6 @@ export function createPointerHandlers(
   const {
     store,
     capturePasteClipboard,
-    selectedNodeId,
     persistenceLocked,
     vimMode,
     commandState,
@@ -164,8 +162,8 @@ export function createPointerHandlers(
       }
       // Placing a caret in a contenteditable focuses it before React re-renders this handler, so the
       // store's live selection, not the rendered prop, decides whether focus selects another node.
-      const liveSelectedNodeId = snapshot.status === 'ready' ? snapshot.location.selectedNodeId : selectedNodeId
-      if (liveSelectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
+      if (snapshot.status !== 'ready') return
+      if (snapshot.location.selectedNodeId !== node.id) store.selectNode(node.id, getCaret(event.currentTarget))
       else if (
         getMode() === 'normal' &&
         node.attachment !== undefined &&

@@ -34,12 +34,20 @@ interface ExactMatches {
   reference?: { occurrence: SearchOccurrence; row: number }
 }
 
+export interface SearchNeighborhood {
+  block?: { first: number; total: number; matches: (TextMatch & { occurrence: SearchText })[] }
+  previous?: NonNullable<SearchNeighborhood['block']>
+}
+
+const blockSize = 64
+
 type Navigation = {
   readonly kind: 'navigate'
   readonly origin: SearchPosition
   readonly direction: -1 | 1
   readonly count: number
   readonly exact?: ExactMatches
+  readonly neighborhood?: SearchNeighborhood
 }
 
 export type SearchOperation = { readonly kind: 'count'; readonly collect?: { origin?: SearchPosition } } | Navigation
@@ -67,9 +75,19 @@ export interface SearchExecutor {
 
 export interface SearchScheduler {
   schedule(callback: () => void): () => void
+  scheduleCached?(callback: () => void): () => void
 }
 
 export const searchScheduler: SearchScheduler = {
+  scheduleCached(callback) {
+    let canceled = false
+    queueMicrotask(() => {
+      if (!canceled) callback()
+    })
+    return () => {
+      canceled = true
+    }
+  },
   schedule(callback) {
     if (typeof globalThis.scheduler?.postTask === 'function') {
       const controller = new AbortController()
@@ -169,6 +187,32 @@ function* navigateExact(
   }
 }
 
+function cachedNavigation(operation: SearchOperation): (() => SearchResult) | undefined {
+  if (operation.kind === 'navigate' && operation.neighborhood && operation.origin.nodeId !== undefined) {
+    const blocks = [operation.neighborhood.block, operation.neighborhood.previous]
+    for (const block of blocks) {
+      if (!block) continue
+      const origin = operation.origin
+      const local = block.matches.findIndex((m) => sameOccurrence(m.occurrence, origin) && m.start === origin.offset)
+      if (local >= 0) {
+        const before = block.first + local
+        const { index, wrapped } = targetOrdinal(operation, block.total, before, before + 1)
+        const hit = blocks.map((part) => part?.matches[index - part.first]).find(Boolean)
+        if (hit)
+          return () => ({
+            kind: 'navigate',
+            destination: destination(hit.occurrence, hit),
+            ordinal: index + 1,
+            total: block.total,
+            wrapped,
+            missingOrigin: false,
+          })
+      }
+    }
+  }
+  return undefined
+}
+
 function* executeSearch(request: SearchRequest): Generator<undefined, SearchResult> {
   const operation = request.operation
   if (operation.kind === 'navigate' && operation.exact) return yield* navigateExact(request, operation, operation.exact)
@@ -183,7 +227,10 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
   let through = 0
   const boundary = operation.kind === 'navigate' ? operation.origin.beforeDay : undefined
   let foundOrigin = boundary !== undefined && request.scope.kind === 'agenda'
-  for (const occurrence of searchScope(request.document, request.scope)) {
+  const nearby: (TextMatch & { occurrence: SearchText })[] = []
+  let collected = 0
+  const knownTotal = operation.kind === 'navigate' ? operation.neighborhood?.block?.total : undefined
+  scan: for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
     if (occurrence === undefined) continue
     row++
@@ -216,6 +263,15 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
         if (match.start < operation.origin.offset) before++
         if (match.start <= operation.origin.offset) through++
       }
+      if (operation.kind === 'navigate' && operation.neighborhood && total <= through + blockSize / 2) {
+        nearby[collected++ % blockSize] = { occurrence, ...match }
+        // An earlier navigation counted this immutable scope. Once past the
+        // origin and its neighbors, the remaining matches cannot change rank.
+        if (knownTotal !== undefined && boundary === undefined && foundOrigin && total === through + blockSize / 2) {
+          total = knownTotal
+          break scan
+        }
+      }
     }
   }
   if (operation.kind === 'count') return { kind: 'count', total, capped: false, ...(exact && { exact }) }
@@ -223,6 +279,21 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
     return { kind: 'navigate', total, wrapped: false, missingOrigin: !foundOrigin }
   }
   const { index: target, wrapped } = targetOrdinal(operation, total, before, through)
+  const first = collected - nearby.length
+  if (operation.neighborhood && target >= first && target < collected) {
+    const matches = Array.from({ length: nearby.length }, (_, i) => nearby[(first + i) % blockSize]!)
+    if (operation.neighborhood.block) operation.neighborhood.previous = operation.neighborhood.block
+    operation.neighborhood.block = { first, matches, total }
+    const hit = matches[target - first]!
+    return {
+      kind: 'navigate',
+      destination: destination(hit.occurrence, hit),
+      ordinal: target + 1,
+      total,
+      wrapped,
+      missingOrigin: false,
+    }
+  }
   let ordinal = 0
   for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
@@ -234,7 +305,7 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
         return {
           kind: 'navigate',
           destination: destination(occurrence, match),
-          ordinal,
+          ordinal: target + 1,
           total,
           wrapped,
           missingOrigin: false,
@@ -252,8 +323,23 @@ export function createSearchExecutor(
   workPerSlice = 8192,
 ): SearchExecutor {
   if (!Number.isSafeInteger(workPerSlice) || workPerSlice < 1) throw new Error('Invalid search slice budget.')
+  let publishing = false
   return {
     execute(request, publish) {
+      const cached = cachedNavigation(request.operation)
+      if (cached) {
+        // A held key can queue jumps behind a scan. Yield between queued results
+        // so input and paint can interrupt the backlog.
+        const deliver = () => {
+          publishing = true
+          try {
+            publish(cached())
+          } finally {
+            publishing = false
+          }
+        }
+        return !publishing && scheduler.scheduleCached ? scheduler.scheduleCached(deliver) : scheduler.schedule(deliver)
+      }
       let work: ReturnType<typeof executeSearch> | undefined = executeSearch(request)
       let cancelScheduled: (() => void) | undefined
       const run = (): void => {

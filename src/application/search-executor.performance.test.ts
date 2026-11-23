@@ -1,6 +1,33 @@
 import { expect, it } from 'vitest'
 import { searchHarness } from './test/search-harness'
-import { searchCaret, type SearchRequest } from './search-executor'
+import { searchCaret, type SearchNeighborhood, type SearchRequest } from './search-executor'
+
+it('refills nearby matches without recounting the rest of a wide tree', () => {
+  const document = {
+    roots: Array.from({ length: 5000 }, (_, i) => ({ id: String(i), text: 'a' + 'x'.repeat(100), children: [] })),
+  }
+  const scope = { kind: 'tree' as const, parentId: null }
+  const neighborhood: SearchNeighborhood = {}
+  const harness = searchHarness(8192)
+  const next = (nodeId: string) =>
+    harness.run({
+      document,
+      scope,
+      scopeKey: 'root',
+      revision: 1,
+      id: 1,
+      query: 'a',
+      operation: { kind: 'navigate', origin: { nodeId, offset: 0 }, direction: 1, count: 1, neighborhood },
+    })
+  expect(next('0')).toMatchObject({ destination: { nodeId: '1' }, total: 5000 })
+  const beforeRefill = harness.slices()
+
+  const result = next('32')
+
+  expect(result).toMatchObject({ destination: { nodeId: '33' }, ordinal: 34, total: 5000 })
+  // Measured one work slice for this refill and 63 for a full scan.
+  expect(harness.slices() - beforeRefill).toBeLessThanOrEqual(2)
+})
 
 it('yields on wide scopes and oversized text with bounded total scan time', () => {
   const request: SearchRequest = {

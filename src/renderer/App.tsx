@@ -1,8 +1,9 @@
 import { activeAgendaOccurrence, focusedAgendaDay } from '../application/agenda-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CommandServices } from '../application/command-registry'
+import type { TextMatch } from '../domain/text-search'
 import { EditorStore } from '../application/editor-store'
-import { displayedNodes, nodePath, requireNode, type TreeNode } from '../domain/document'
+import { displayedNodes, locateNode, nodePath, requireNode, type TreeNode } from '../domain/document'
 import { COLLAPSED_EXPANSION_STATE, isNodeExpanded } from '../application/expansion-state'
 import { OPERATION_ERROR_PREFIX, SAVE_ERROR_PREFIX, SAVE_LOCKED_MESSAGE } from '../domain/product-messages'
 import { AttachmentImage, ImagePreview } from './AttachmentPreview'
@@ -165,14 +166,15 @@ export function App({
       state.status === 'ready' && isNodeExpanded(state.expansion ?? COLLAPSED_EXPANSION_STATE, nodeId),
     [state],
   )
-  const isImageCaretActive = useCallback(
-    (node: TreeNode): boolean =>
-      vimMode === 'normal' &&
-      node.attachment !== undefined &&
-      selectedNodeId === node.id &&
-      (imageCaretNodeId === node.id || node.text.length === 0),
-    [imageCaretNodeId, selectedNodeId, vimMode],
-  )
+  const selectedImage =
+    state.status === 'ready' && vimMode === 'normal'
+      ? locateNode(state.document, state.location.selectedNodeId)?.node
+      : undefined
+  const activeImageId =
+    selectedImage?.attachment && (selectedImage.id === imageCaretNodeId || !selectedImage.text)
+      ? selectedImage.id
+      : undefined
+  const isImageCaretActive = useCallback((node: TreeNode): boolean => node.id === activeImageId, [activeImageId])
   const toggleAlwaysOnTop = useCallback((): void => {
     const nextValue = !alwaysOnTop
     setAlwaysOnTop(nextValue)
@@ -434,7 +436,7 @@ export function App({
     [store],
   )
   const renderInput = useCallback(
-    (node: TreeNode, label: string): React.JSX.Element => (
+    (node: TreeNode, label: string, match?: TextMatch): React.JSX.Element => (
       <>
         <NodeInput
           imageCaretActive={isImageCaretActive(node)}
@@ -443,7 +445,7 @@ export function App({
           label={label}
           decorations={treeDecorations(node, treeToday)}
           searchQuery={searchQuery}
-          currentMatch={searchResult?.destination?.nodeId === node.id ? searchResult.destination : undefined}
+          currentMatch={match}
           richEditingEnabled={richEditingEnabled}
           {...nodeInputBindings(node)}
         />
@@ -468,7 +470,6 @@ export function App({
       recordImageSize,
       richEditingEnabled,
       searchQuery,
-      searchResult,
       treeToday,
     ],
   )
@@ -767,6 +768,7 @@ export function App({
                 onDrop={moveNode}
                 onToggleExpansion={onToggleExpansion}
                 renderInput={renderInput}
+                currentMatch={searchResult?.destination}
                 structuralVersion={state.structuralVersion}
               />
             </>
