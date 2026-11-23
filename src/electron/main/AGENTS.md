@@ -4,7 +4,7 @@ Layer-specific rules for `src/electron/main/`, `src/electron/preload/`, and `src
 
 ## Rules
 
-* Treat every IPC payload as untrusted. Validate with the domain validators before any filesystem, clipboard, shell, or application operation, and restrict callers to the configured renderer (`docs/ARCHITECTURE.md` §7).
+* Treat every IPC payload as untrusted. Validate with the domain validators before any filesystem, clipboard, shell, or application operation, and restrict callers to the configured renderer ([Architecture §16.1](../../../docs/architecture/electron.md#161-renderer-origin-session-and-navigation-guards), [Desktop runtime](../../../docs/SECURITY.md#desktop-runtime)).
 * Keep the secure window configuration: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and the production content security policy.
 * Serve the packaged renderer only through the `app://tree/` handler in `renderer-protocol.ts`; never load it from `file://` or allow `file:` requests from the renderer session.
 * Serialize persistence and attachment work through the file-service operation queue; cleanup runs after the save that persists the new referenced set.

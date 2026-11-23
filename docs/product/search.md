@@ -10,8 +10,8 @@ Regular expressions and Vim's `?` backward-search command are not supported.
 These are deliberate product limitations; backward navigation through matches remains available.
 
 `Cmd+F`
-opens the local search in either editing mode; `/` also opens it in Vim Normal.
-`Cmd+;` remains the separate global node search (§20.14). A nonmodal Find panel
+opens local search in either editing mode. `/` also opens it in Vim Normal.
+`Cmd+;` opens global search (§20.14). In standard editing, a nonmodal Find panel
 opens at the upper right without moving the document layout. It selects the last confirmed query for
 replacement, or starts empty. Smart case ignores case unless the query contains an
 uppercase character. Matches do not overlap and do not cross node boundaries.
@@ -47,9 +47,9 @@ Enter confirms and moves strictly after the captured origin, wrapping if necessa
 An empty confirmation reuses the last confirmed query, or does nothing if none exists.
 In Vim Normal, `n` and `N` navigate forward/backward from the current position, with numeric prefixes.
 
-In either editing mode, `Cmd+G` and `Cmd+Shift+G` repeat forward and backward;
-previous/next buttons beside the count provide the same actions. `Shift+Enter`
-confirms backward. Focus remains in the input after confirmation; repeated Enter
+In either editing mode, `Cmd+G` and `Cmd+Shift+G` repeat forward and backward.
+`Shift+Enter` confirms backward. In the standard Find panel, the previous/next
+buttons beside the count also navigate matches. Focus stays in the input. Repeated Enter
 or Shift+Enter moves to the next or previous match. The query remains editable.
 Escape or the close button hides the panel and restores editor focus at the last
 match, or preserves the original selection if no jump occurred. The compact panel

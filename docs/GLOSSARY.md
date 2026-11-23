@@ -16,7 +16,7 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 ## Terms
 
-**Agenda** (product) — The view that lists nodes by day, under the dates in their text. `PRODUCT.md §23`. *In code:* `AgendaState`, `AgendaView.tsx`.
+**Agenda** (product) — The view that groups nodes by date and also lists marked nodes under Today. `PRODUCT.md §23`. *In code:* `AgendaState`, `AgendaView.tsx`.
 
 **Agenda projection** (architecture) — The grouping of the document's nodes into days, derived from the immutable document and never persisted. `ARCHITECTURE.md §4.1`, ADR 0020. *In code:* `agenda-projection.ts`, `agenda-rows.ts`.
 
@@ -76,9 +76,9 @@ The kind is `product` (user-visible), `domain` or `architecture`.
 
 **Focused day** (product) — The Agenda presentation that shows the occurrences of one day, opened from its day heading. `PRODUCT.md §23.15`. *In code:* `focused-day`.
 
-**Fold** (product) — A group that can be hidden: the children of a node in Tree, or the occurrences of a day in Agenda. A fold is expanded or collapsed. `PRODUCT.md §20.2.15`, `PRODUCT.md §23.5`. *Avoid:* open and close, except for the Vim keys. *In code:* `NodeFoldCommand`, `AgendaState.collapsed`.
+**Fold** (product) — A group that can be hidden: the children of a node in Tree, or the occurrences under a populated day heading or Overdue in Agenda. A fold is expanded or collapsed. `PRODUCT.md §20.2.15`, `PRODUCT.md §23.5`. *Avoid:* open and close, except for the Vim keys. *In code:* `NodeFoldCommand`, `AgendaState.collapsed`.
 
-**Fold choice** (product) — The remembered expanded or collapsed state of one Agenda day. `PRODUCT.md §23.5`, ADR 0030. *Avoid:* fold memory, fold preference. *In code:* `AgendaFoldMemory`, `agendaFolds`.
+**Fold choice** (product) — The remembered expanded or collapsed state of a day in the Agenda timeline or the Overdue group for a particular week. `PRODUCT.md §23.5`, ADR 0030. *Avoid:* fold memory, fold preference. *In code:* `AgendaFoldMemory`, `agendaFolds`.
 
 **Folder backup** (product) — The automatic copy of the notes that the browser version keeps in a folder the user chose. `PRODUCT.md §24.5`, `ARCHITECTURE.md §13.17`, ADR 0023. *Avoid:* "backup" alone. *In code:* `FolderBackup`.
 

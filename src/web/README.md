@@ -156,8 +156,9 @@ saved page with the browser's own controls. A failed save keeps the editor open.
 Data stays in the browser unless the user exports it or chooses a backup folder. There is no device
 synchronization. Clearing site data or deleting the profile removes the
 notes stored in the browser and the offline package. The first visit needs Internet.
-This version has no recovery generations. It requests persistent storage once per page
-load, which only reduces eviction under storage pressure. Browser/OS force
+This version has no recovery generations. Once per page load, Tree checks whether storage
+is already persistent. If needed and supported, it asks the browser to protect the notes
+from eviction under storage pressure. Browser/OS force
 termination can lose uncommitted work. Full Safari and Dock-app compatibility
 remains unverified; native Safari clipboard interaction still needs verification.
 
@@ -173,7 +174,10 @@ Playwright's Chromium in new headless mode; install it with
 `npx playwright install --with-deps chromium`. CI runs the suite on Linux arm64.
 The suite requires headless mode so its clipboard checks use the browser's
 virtual clipboard rather than the machine clipboard.
-In Codex, browser launch uses the normal outside-sandbox approval mechanism.
+For the full built-browser suite in Codex, run `npm run test:web:chromium` without
+arguments. It uses the prepared Linux container described in the
+[Development Reference](../../docs/DEVELOPMENT_REFERENCE.md#chromium-container-tests).
+Local browser launches use the normal outside-sandbox approval mechanism.
 
 `test:web` starts and stops the local development server automatically, or reuses
 an existing server at the documented development URL outside CI. Tests use

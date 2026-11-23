@@ -24,11 +24,11 @@ The same outline, focused on “Plan the first meetup”: the node text and expa
 
 <img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing dated nodes grouped by day.">
 
-The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, with Today marked. Move between weeks with `Cmd+[` and `Cmd+]`. In the current week, an Overdue group collects unfinished nodes dated before Monday. Populated groups fold. Consecutive entries with the same parent share a read-only path that you can select and copy.
+The Agenda gathers dated nodes from the entire outline into a Monday–Sunday week, including empty days, with Today marked. Move between weeks with `Cmd+[` and `Cmd+]`. Marked nodes also appear under Today. In the current week, Overdue lists nodes dated before Monday unless they are struck through. Populated groups fold. Consecutive entries with the same parent share a read-only path that you can select and copy.
 
 <img src="https://abtv.github.io/tree/tree-search.png" width="860" alt="Tree search in the dark appearance, with two matches for book highlighted in the meetup branch.">
 
-Press `Cmd+F` to find text in the current view. While Find has focus, `Enter` / `Shift+Enter` moves between matches; `Escape` closes Find at the last match. `Cmd+G` / `Cmd+Shift+G` and the arrow buttons also navigate matches. `Cmd+;` searches node text, tags (`#`), people (`@`) and events (`&`) throughout the document. Vim Normal also supports `/`, `n` and `N` for local search.
+Press `Cmd+F` to find text in the current view. In standard editing, `Enter` and `Shift+Enter` move between matches while Find has focus. The arrow buttons do the same. `Escape` closes Find at the last match. In either editing mode, `Cmd+G` and `Cmd+Shift+G` repeat the search. `Cmd+;` searches node text, tags (`#`), people (`@`) and events (`&`) throughout the document. Vim Normal also supports `/`, `n` and `N` for local search.
 
 <img src="https://abtv.github.io/tree/tree-commands.png" width="860" alt="Tree command panel in the dark appearance, showing application commands and their keyboard shortcuts.">
 

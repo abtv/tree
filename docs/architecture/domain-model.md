@@ -77,9 +77,9 @@ The public `Document`, `TreeNode`, `LinkRange`, and `AttachmentReference` types 
 
 Attachment references may contain the optional image size `width` and `height`; §13 owns their validation, sources and persistence.
 
-### 5.1 Completion State
+### 5.1 Struck-Through Nodes
 
-`struckThrough` is present, and `true`, only on a struck-through node (PRODUCT.md §2.5); a normal node omits it rather than storing `false`. It belongs to the node alone and never changes its parent or children. Every domain operation that rebuilds a node keeps it, and every operation that creates a node leaves it absent, which gives the split, join, copy, and move rules in §2.5. `toggleStrikethrough` changes one sibling range with `withStruckThrough` from `node-struck-through.ts` and path-copies only the route to it, like any other edit (§11), preserving text, links, attachments, children, and identities.
+`struckThrough` is present, and `true`, only on a struck-through node (PRODUCT.md §2.5); a normal node omits it rather than storing `false`. It belongs to the node alone and never changes its parent or children. Text edits and moves preserve the field. A split leaves it on the original node, a join keeps the first node's state, and a subtree copy preserves the field on each copied node (PRODUCT.md §2.5). `toggleStrikethrough` changes one sibling range with `withStruckThrough` from `node-struck-through.ts` and path-copies only the route to it, like any other edit (§11), preserving text, links, attachments, children, and identities.
 
 ### 5.2 Attachment Search Text
 
@@ -125,7 +125,7 @@ undo
 redo
 ```
 
-Sibling creation, splitting, pasting, editing, and reordering do not increase node depth and remain available at the maximum depth defined in PRODUCT.md §2.3. A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
+At the depth limit, nodes can still be edited, split into siblings, and reordered within their sibling list. A subtree paste checks the depth of every incoming tree at its destination and rejects the entire paste if any tree exceeds the limit (PRODUCT.md §2.3). A rejected child creation is an explicit application transition result, so callers can present the operation error without changing the document, location, focus, history, generated IDs, or persistence queue.
 
 `moveSubtree` moves a node with its subtree under any parent, or to the document root, at a given index counted after the node is removed from its old place. It reports `impossible` for an unknown ID or a destination inside the moved subtree, and `too-deep` when the subtree would exceed the maximum-depth limit. It copies only the two affected root-to-array paths and carries the attachment summary over, so a move shares every other subtree with the previous document.
 

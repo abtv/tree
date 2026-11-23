@@ -211,10 +211,10 @@ Each toggle is one undoable change, and undo or redo places the caret at the beg
 
 The state belongs to the node and travels with it:
 
-* Splitting a node with `Enter` or a multiline paste keeps the state on the part that keeps the node's identity; the new part starts normal. Every newly created node starts normal, including the nodes `Enter`, `o`, and `O` create.
+* Splitting a node with `Enter` or a multiline paste keeps the state on the part that keeps the node's identity; the new part starts normal. Nodes created from scratch start normal, including those created with `Enter`, `o`, or `O`.
 * Joining nodes with `gJ` keeps the state of the first node, as it keeps its identity.
 * Moving a node, by dragging or by `>` and `<`, keeps the state of every moved node, and a node or subtree put with `p` or `P` copies the state of every copied node.
-* The system clipboard carries text only, so copying text and pasting it creates no struck-through node.
+* Copying and pasting text through the system clipboard does not transfer the node's struck-through state.
 * Saving and reopening the application keeps every node's state, including the parent states that earlier versions derived from their children. A document saved before struck-through nodes existed opens with every node normal.
 
 Struck-through nodes are always shown: Tree, Agenda, local Find, and global Search, including marked and starred results and marker suggestions, list them like any other node. The Agenda `Overdue` group still lists only nodes that are not struck through (§23.3).

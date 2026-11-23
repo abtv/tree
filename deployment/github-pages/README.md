@@ -55,8 +55,8 @@ The `cli.mjs`, `publish.mjs`, and `verify-target.mjs` entry points remain as sma
 compatibility launchers for previously installed workflows. Updating the target
 workflow to the current template is not required for this filename migration.
 
-The protected target workflow resolves `abtv/tree` main through GitHub's API,
-then checks out verifier code at that immutable SHA. The signed manifest must
+The protected target workflow reads `refs/heads/main` from `abtv/tree` with
+`git ls-remote`, then checks out the verifier at that exact commit. The signed manifest must
 name the same source SHA. It never executes target scripts, local Actions or
 target dependency metadata. Source main maintainers are the explicit trust root;
 a target-only publisher cannot choose the tool SHA. No publisher-selected ref or
