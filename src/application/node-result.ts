@@ -13,6 +13,8 @@ export interface NodeResult {
   readonly starred?: true
   readonly marked?: true
   readonly pathStruckMatches?: readonly TextMatch[]
+  /** The node's image, so Search can show a thumbnail; its natural size reserves the thumbnail box. */
+  readonly attachment?: { readonly id: string; readonly width?: number; readonly height?: number }
 }
 
 export function label(node: TreeNode): string {
@@ -39,5 +41,14 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
     ...(node.starred ? { starred: true as const } : {}),
     ...(node.marked ? { marked: true as const } : {}),
     ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
+    ...(node.attachment === undefined
+      ? {}
+      : {
+          attachment: {
+            id: node.attachment.id,
+            ...(node.attachment.width === undefined ? {} : { width: node.attachment.width }),
+            ...(node.attachment.height === undefined ? {} : { height: node.attachment.height }),
+          },
+        }),
   }
 }

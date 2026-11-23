@@ -22,6 +22,7 @@ import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
 import { initialSearchHeading } from './node-flags'
+import { AttachmentThumbnail } from './AttachmentPreview'
 import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
 
 const RESULT_EDGE_INSET = 12
@@ -686,6 +687,13 @@ export function GlobalSearchPopup({
                             active={nodeSelected && !pending}
                             onReveal={requestReveal}
                           />
+                          {item.attachment !== undefined && (
+                            <AttachmentThumbnail
+                              attachmentId={item.attachment.id}
+                              width={item.attachment.width}
+                              height={item.attachment.height}
+                            />
+                          )}
                         </span>
                         {item.path === null && (
                           <span

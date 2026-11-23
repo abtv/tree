@@ -1,10 +1,14 @@
 // @editing-modes: both
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   test,
   expect,
+  attachmentPath,
   describeForEachEditingMode,
   launchTree,
   closeApp,
+  setMainWindowBounds,
   seedDocument,
   lockSystemClipboard,
   firePaste,
@@ -14,6 +18,7 @@ import {
   writeClipboardImageSized,
   typeInto,
 } from './fixtures'
+import { solidPng } from './solid-png'
 
 describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
   // @requirement PRODUCT.md §15.1
@@ -125,6 +130,77 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
     await reopened.window.keyboard.press('Meta+;')
     await reopened.window.getByRole('searchbox', { name: 'Search query' }).fill('secret zebra')
     await expect(reopened.window.getByText('No results', { exact: true })).toBeVisible()
+  })
+})
+
+test.describe('image thumbnails in Search', () => {
+  // @requirement PRODUCT.md §20.14.2
+  test('shows a fitted image thumbnail under the text of a result found through its image', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'wide',
+            text: 'Plan screenshot',
+            attachment: { id: 'wide-image', mimeType: 'image/png', width: 800, height: 240, searchText: 'release' },
+            children: [],
+          },
+          {
+            id: 'tall',
+            text: '',
+            attachment: { id: 'tall-image', mimeType: 'image/png', width: 100, height: 300, searchText: 'release' },
+            children: [],
+          },
+          { id: 'plain', text: 'Release notes', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'plain' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(attachmentPath(userDataDir, 'wide-image'), solidPng(800, 240))
+    writeFileSync(attachmentPath(userDataDir, 'tall-image'), solidPng(100, 300))
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 700, height: 600 })
+    await window.keyboard.press('Meta+;')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    await popup.getByRole('searchbox').fill('release')
+    const rows = popup.locator('.recent-node-row')
+    await expect(rows.locator('.recent-node-text')).toHaveText(['Plan screenshot', 'Image', 'Release notes'])
+    const thumbnails = popup.locator('img.search-thumbnail')
+    await expect(thumbnails).toHaveCount(2)
+    await expect
+      .poll(() => thumbnails.evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete)))
+      .toBe(true)
+
+    const geometry = await rows.evaluateAll((elements) =>
+      elements.map((row) => {
+        const image = row.querySelector('img.search-thumbnail')?.getBoundingClientRect()
+        const text = row.querySelector('.recent-node-text')!
+        const range = document.createRange()
+        range.selectNodeContents(text.firstChild ?? text)
+        const line = range.getClientRects()[0]!
+        return image === undefined
+          ? null
+          : { width: image.width, height: image.height, left: image.left - line.left, gap: image.top - line.bottom }
+      }),
+    )
+    expect(geometry).toEqual([
+      { width: 120, height: 36, left: 0, gap: expect.any(Number) },
+      { width: 16, height: 48, left: 0, gap: expect.any(Number) },
+      null,
+    ])
+    expect(geometry[0]!.gap).toBeGreaterThanOrEqual(0)
+    await expect(popup.getByRole('button', { name: 'Open image preview' })).toHaveCount(0)
+
+    for (const appearance of ['light', 'dark'] as const) {
+      await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
+      await window.emulateMedia({ colorScheme: appearance })
+      await expect(popup).toHaveScreenshot(`search-image-thumbnails-${appearance}.png`)
+    }
+
+    await window.keyboard.press('ArrowDown')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('[data-node-id="tall"] .node-input')).toBeFocused()
   })
 })
 

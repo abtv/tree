@@ -99,6 +99,42 @@ function ImageErrorMessage({ box }: { box?: ImageBox | undefined }): React.JSX.E
   )
 }
 
+const MAX_THUMBNAIL_WIDTH = 120 // Keep in sync with `.search-thumbnail` in styles.css.
+const MAX_THUMBNAIL_HEIGHT = 48
+
+/** A small, non-interactive copy of a node's image for Search results. */
+export function AttachmentThumbnail({
+  attachmentId,
+  width,
+  height,
+  images = attachmentImageCache,
+}: {
+  attachmentId: string
+  width?: number | undefined
+  height?: number | undefined
+  images?: AttachmentImageCache
+}): React.JSX.Element | null {
+  const { state, onImageError } = useAttachmentImage(images, attachmentId)
+  // The stored natural size reserves the box, so a row does not grow when the bytes arrive.
+  const scale =
+    width === undefined || height === undefined
+      ? undefined
+      : Math.min(1, MAX_THUMBNAIL_WIDTH / width, MAX_THUMBNAIL_HEIGHT / height)
+  const size =
+    scale === undefined ? undefined : { width: Math.round(width! * scale), height: Math.round(height! * scale) }
+  if (state.status === 'error') {
+    return (
+      <span className="attachment-error search-thumbnail-error" role="status">
+        {IMAGE_LOAD_ERROR}
+      </span>
+    )
+  }
+  if (state.status === 'loading') {
+    return size === undefined ? null : <span aria-hidden="true" className="search-thumbnail" style={size} />
+  }
+  return <img className="search-thumbnail" src={state.url} alt="Attached image" {...size} onError={onImageError} />
+}
+
 export function AttachmentImage({
   attachmentId,
   width,

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
 import './test/setup'
-import { AttachmentImage, ImagePreview } from './AttachmentPreview'
+import { AttachmentImage, AttachmentThumbnail, ImagePreview } from './AttachmentPreview'
 import { OTHER_SHORTCUTS } from './shortcut-profile'
 
 afterEach(cleanup)
@@ -330,6 +330,37 @@ describe('AttachmentImage', () => {
     await screen.findByAltText('Attached image preview')
 
     expect(read).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AttachmentThumbnail', () => {
+  // @requirement PRODUCT.md §20.14.2
+  it.each([
+    [800, 240, '120', '36'],
+    [100, 300, '16', '48'],
+    [40, 20, '40', '20'],
+  ])('fits a %ix%i image into 120x48 without enlarging it', async (width, height, boxWidth, boxHeight) => {
+    const { container } = render(<AttachmentThumbnail attachmentId="image" width={width} height={height} />)
+
+    expect(container.querySelector('span.search-thumbnail')).toHaveStyle({
+      width: `${boxWidth}px`,
+      height: `${boxHeight}px`,
+    })
+
+    const image = await screen.findByAltText('Attached image')
+
+    expect(image).toHaveAttribute('width', boxWidth)
+    expect(image).toHaveAttribute('height', boxHeight)
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  // @requirement PRODUCT.md §20.14.2
+  it('shows the image error message in place of a thumbnail that cannot be loaded', async () => {
+    mockTreeApi({ readAttachment: async () => null })
+    render(<AttachmentThumbnail attachmentId="lost" width={400} height={300} />)
+
+    expect(await screen.findByText('Image could not be loaded.')).toHaveClass('search-thumbnail-error')
+    expect(screen.queryByAltText('Attached image')).not.toBeInTheDocument()
   })
 })
 

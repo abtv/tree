@@ -135,6 +135,39 @@ it('puts matching marked stars, then marked nodes, then stars before other match
   expect(next.value[0]).toMatchObject({ starred: true, marked: true })
 })
 
+// @requirement PRODUCT.md §20.14.2
+it('carries the image of a matching node, with its natural size when stored', () => {
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'sized',
+          text: 'Plan',
+          attachment: { id: 'a1', mimeType: 'image/png', width: 800, height: 240, searchText: 'release' },
+          children: [],
+        },
+        {
+          id: 'unsized',
+          text: '',
+          attachment: { id: 'a2', mimeType: 'image/png', searchText: 'release' },
+          children: [],
+        },
+        { id: 'plain', text: 'release notes', children: [] },
+      ],
+    },
+    'release',
+  )
+
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value.map(({ id, attachment }) => ({ id, attachment }))).toEqual([
+    { id: 'sized', attachment: { id: 'a1', width: 800, height: 240 } },
+    { id: 'unsized', attachment: { id: 'a2' } },
+    { id: 'plain', attachment: undefined },
+  ])
+})
+
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {
   const callbacks: (() => void)[] = []
   const cancelled = vi.fn()

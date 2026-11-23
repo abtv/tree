@@ -144,6 +144,7 @@ Search work yields between batches and obsolete queries are cancelled on refinem
 #### 20.14.2 Result Presentation
 
 * Empty nodes use `Empty node`; image-only nodes use `Image`.
+* A node with an image shows a thumbnail under its text, in the marked and starred list and in Results, so a result found through hidden image text (§15.1) shows why it matched. The thumbnail keeps the image's proportions within 120×48 px and is never enlarged. It starts at the text's leading edge. A stored natural size reserves its box before the image loads, so the row does not grow later. The thumbnail is not a separate control: clicking it opens the result like the rest of the row. An image that cannot be loaded shows the image load error message (§17.1) in its place.
 * Both the marked and starred list and Search results display the complete node text with preserved line breaks and wrapping, without a character cutoff.
 * Ancestor labels in paths remain single-line previews bounded to their first 160 characters.
 * Consecutive entries with the same parent node share one path heading above them, in both the marked and starred list and Results. A different parent starts a new group; a path that recurs after another group is shown again. Grouping never reorders entries or shortens their text. Each option retains its own parent path as an accessible description. Top-level entries retain their root icon and have no path heading.
