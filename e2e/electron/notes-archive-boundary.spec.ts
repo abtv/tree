@@ -1,5 +1,5 @@
 // @editing-modes: independent
-import { existsSync, mkdirSync, readFileSync, readdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { serializeState } from '../../src/domain/document'
@@ -112,6 +112,61 @@ const entries = (directory: string) => (existsSync(directory) ? readdirSync(dire
 
 test.describe('desktop notes archive boundary', () => {
   configureHiddenParallelTests()
+
+  // @requirement PRODUCT.md §25.1
+  // @requirement PRODUCT.md §25.4
+  test('protects a confirmed import after startup recovery fails and finishes it on reload', async ({
+    userDataDir,
+  }, testInfo) => {
+    seedNotesWithImage(userDataDir, 'Previous notes', 'old')
+    const previous = readFileSync(documentPath(userDataDir))
+    const directory = join(userDataDir, '.notes-import')
+    const staging = join(directory, 'confirmed')
+    const journal = JSON.stringify({ staging: 'confirmed', replaced: 'previous', archive: 'Confirmed.zip' })
+    const backup = join(userDataDir, 'Replaced Notes', 'previous')
+    const obstruction = join(backup, 'document.json')
+
+    mkdirSync(join(staging, 'attachments'), { recursive: true })
+    writeFileSync(join(staging, 'attachments', 'new.png'), onePixelPng)
+    writeFileSync(join(staging, 'document.json'), JSON.stringify(importedHead))
+    writeFileSync(join(directory, 'commit.json'), journal)
+    mkdirSync(obstruction, { recursive: true })
+
+    const { app, window } = await launchTree(userDataDir, { expectReady: false })
+    await expect(window.getByRole('alert')).toContainText('The notes import could not be completed:')
+    await expect(window.getByRole('alert')).toContainText('Restart Tree to complete the notes import.')
+    rmdirSync(obstruction)
+
+    const importEnabled = () =>
+      app.evaluate(
+        ({ Menu }) =>
+          Menu.getApplicationMenu()!
+            .items.find((item) => item.label === 'File')!
+            .submenu!.items.find((item) => item.label === 'Import Notes…')!.enabled,
+      )
+    await window.keyboard.press('Meta+Shift+p')
+    await window.getByRole('combobox', { name: 'Command' }).fill('import-notes')
+    await expect(window.locator('#command-import-notes')).toHaveAttribute('aria-disabled', 'true')
+    await window.screenshot({ path: testInfo.outputPath('recovery-command.png') })
+    expect(await importEnabled()).toBe(false)
+    await window.keyboard.press('Enter')
+    await expect(window.getByRole('combobox', { name: 'Command' })).toBeVisible()
+    await stubPanels(app, { open: join(userDataDir, 'Another.zip') })
+    await expect(callNotes(window, 'chooseNotesImportArchive')).rejects.toThrow('Restart Tree')
+    expect(readFileSync(join(directory, 'commit.json'), 'utf8')).toBe(journal)
+    expect(readFileSync(join(staging, 'document.json'), 'utf8')).toBe(JSON.stringify(importedHead))
+
+    await window.reload()
+
+    await expect(node(window, 1)).toHaveValue('Imported notes')
+    await expect(window.getByRole('complementary', { name: 'Notes activity' })).toContainText('Confirmed.zip')
+    await expect.poll(importEnabled).toBe(true)
+    expect(entries(directory)).toEqual([])
+    expect(readFileSync(join(backup, 'document.json'))).toEqual(previous)
+    expect(entries(join(backup, 'attachments'))).toEqual(['old.png'])
+    expect(entries(join(userDataDir, 'data', 'attachments'))).toEqual(['new.png'])
+    await closeApp(app)
+  })
 
   // @requirement PRODUCT.md §25
   // @requirement PRODUCT.md §25.2

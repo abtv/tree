@@ -10,11 +10,12 @@ import {
   type AttachmentId,
   type PersistedEditorState,
 } from '../../domain/document'
-import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
+import { NOTES_RECOVERY_REQUIRED_MESSAGE, NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
 import { PNG_DIMENSIONS_HEADER_BYTES, readPngDimensions } from '../../shared/png-validation'
 import type { AttachmentDimensions } from '../../domain/attachment-dimensions'
 import {
   commitReplacement,
+  hasReplacementJournal,
   isDocumentFileName,
   nodeReplacementFileSystem,
   notesLayout,
@@ -24,6 +25,7 @@ import {
 } from './notes-replacement'
 
 export interface FileServices {
+  isNotesRecoveryRequired(): boolean
   load(): Promise<unknown | null>
   save(state: PersistedEditorState): Promise<void>
   writeAttachment(id: string, png: Uint8Array): Promise<void>
@@ -106,8 +108,7 @@ export function createFileServices(
   const now = options?.now ?? (() => new Date())
   let operationQueue: Promise<void> = Promise.resolve()
   let nextGeneration: number | undefined
-  // Set once a replacement reached its journal: the old session must not write over the new notes.
-  let replaced = false
+  let replacementState: 'unchecked' | 'idle' | 'replaced' | 'recovery-required' = layout ? 'unchecked' : 'idle'
   let recovered: RecoveredNotesReplacement | undefined
   // Staging and snapshot directory names that recovery must not sweep.
   const active = new Set<string>()
@@ -121,10 +122,11 @@ export function createFileServices(
     return layout
   }
   const rejectAfterReplacement = () => {
-    if (replaced) throw new Error(NOTES_REPLACED_MESSAGE)
+    if (replacementState !== 'idle') throw new Error(NOTES_REPLACED_MESSAGE)
   }
 
   return {
+    isNotesRecoveryRequired: () => replacementState === 'recovery-required',
     async load(): Promise<unknown | null> {
       return enqueue('load', [documentPath, temporaryDocumentPath, dataDirectory], async () => {
         if (layout !== undefined) {
@@ -137,10 +139,11 @@ export function createFileServices(
               }
             }
           } catch (error) {
+            if (error instanceof ReplacementIncompleteError) replacementState = 'recovery-required'
             throw new Error(`The notes import could not be completed: ${messageOf(error)}`, { cause: error })
           }
           nextGeneration = undefined
-          replaced = false
+          replacementState = 'idle'
         }
         const newest = await findNewestValidDocument(dataDirectory)
         if (newest === null) return null
@@ -152,14 +155,14 @@ export function createFileServices(
       })
     },
     save(state) {
-      return enqueue('save', [dataDirectory, documentPath, temporaryDocumentPath], async () => {
+      return enqueueNotesMutation('save', [dataDirectory, documentPath, temporaryDocumentPath], async () => {
         rejectAfterReplacement()
         await saveDocument(state)
       })
     },
     writeAttachment(id, png) {
       const logPath = join(attachmentsDirectory, `${id}.png`)
-      return enqueue('writeAttachment', [logPath], async () => {
+      return enqueueNotesMutation('writeAttachment', [logPath], async () => {
         rejectAfterReplacement()
         const path = attachmentPath(attachmentsDirectory, id)
         await prepare()
@@ -198,9 +201,9 @@ export function createFileServices(
       })
     },
     cleanupAttachments(referencedIds) {
-      return enqueue('cleanupAttachments', [attachmentsDirectory], async () => {
+      return enqueueNotesMutation('cleanupAttachments', [attachmentsDirectory], async () => {
         // The replaced session's references describe the old notes, not the imported images.
-        if (replaced) return
+        if (replacementState !== 'idle') return
         await prepare()
         const keep = new Set<AttachmentId>(referencedIds)
         for (const ids of pinned) for (const id of ids) keep.add(id)
@@ -237,14 +240,15 @@ export function createFileServices(
       await removeOwnedDirectory(archiveLayout().importDirectory, path)
     },
     replaceNotes(stagingPath, archiveName) {
-      return enqueue('replaceNotes', [dataDirectory, stagingPath], async () => {
+      return enqueueNotesMutation('replaceNotes', [dataDirectory, stagingPath], async () => {
         const archive = archiveLayout()
         const staging = ownedName(archive.importDirectory, stagingPath)
+        if (replacementState === 'recovery-required') throw new Error(NOTES_RECOVERY_REQUIRED_MESSAGE)
         rejectAfterReplacement()
         try {
           const folder = await commitReplacement(nodeReplacementFileSystem, archive, staging, now(), archiveName)
           // Set inside the queued operation, so no save queued behind it can write the old notes.
-          replaced = true
+          replacementState = 'replaced'
           nextGeneration = undefined
           active.delete(staging)
           return folder
@@ -252,7 +256,7 @@ export function createFileServices(
           // After the journal only roll-forward is possible: keep the old session from writing,
           // and keep the staging directory, which the next start completes from.
           if (error instanceof ReplacementIncompleteError) {
-            replaced = true
+            replacementState = 'recovery-required'
             nextGeneration = undefined
             active.delete(staging)
           }
@@ -338,6 +342,30 @@ export function createFileServices(
       () => undefined,
     )
     return result
+  }
+
+  /** A fresh process may receive a mutation before load has inspected the previous process's journal. */
+  function enqueueNotesMutation<T>(
+    operation: 'save' | 'writeAttachment' | 'cleanupAttachments' | 'replaceNotes',
+    paths: string[],
+    action: () => Promise<T>,
+  ): Promise<T> {
+    return enqueue(operation, paths, async () => {
+      if (
+        layout &&
+        (replacementState === 'unchecked' || (operation === 'replaceNotes' && replacementState === 'idle'))
+      ) {
+        try {
+          replacementState = (await hasReplacementJournal(nodeReplacementFileSystem, layout))
+            ? 'recovery-required'
+            : 'idle'
+        } catch (error) {
+          replacementState = 'recovery-required'
+          throw error
+        }
+      }
+      return action()
+    })
   }
 
   async function runOperation<T>(

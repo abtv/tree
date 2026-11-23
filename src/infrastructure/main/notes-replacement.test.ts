@@ -161,7 +161,13 @@ describe('notes replacement', () => {
       },
     }
 
-    await expect(recoverReplacement(fs, layout, new Set())).rejects.toBe(failure)
+    const recovery = recoverReplacement(fs, layout, new Set())
+    if (operation === 'journal') {
+      await expect(recovery).rejects.toBeInstanceOf(ReplacementIncompleteError)
+      await expect(recovery).rejects.toHaveProperty('cause', failure)
+    } else {
+      await expect(recovery).rejects.toBe(failure)
+    }
 
     expect(await readFile(join(layout.importDirectory, 'staged', 'document.json'), 'utf8')).toBe('new document')
   })

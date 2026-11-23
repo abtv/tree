@@ -71,7 +71,7 @@ export function applicationMenuTemplate(
             !state.modalOpen &&
             !state.updateApplying &&
             !state.updateBlocked &&
-            state.notes.canImport,
+            state.notes.canInstallUpdate,
           click: () => actions.updateApp?.(),
         },
         { type: 'separator' },

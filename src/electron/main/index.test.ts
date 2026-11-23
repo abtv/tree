@@ -274,7 +274,7 @@ async function packagedSetup() {
   const f = await setup(true)
   const { autoUpdater } = await import('electron-updater')
   await vi.advanceTimersByTimeAsync(0)
-  f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
+  f.ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
   const release = vi.fn()
   const prepare = f.quitControl.prepareUpdateQuit.mockImplementation(() => {
     f.setQuitting(true)
@@ -346,7 +346,7 @@ describe('packaged desktop update wiring', () => {
     mocks.archive.isIdle.mockReturnValue(false)
     f.downloaded()
     f.window.webContents.emit('did-start-navigation', {}, 'url', false, true)
-    f.ipc.setNotesMenuState!({ canImport: true, canExport: false })
+    f.ipc.setNotesMenuState!({ canImport: true, canExport: false, canInstallUpdate: true })
     f.window.webContents.emit('did-stop-loading')
     expect(f.state().updateReady).toBe(false)
 
@@ -370,7 +370,7 @@ describe('packaged desktop update wiring', () => {
   it('offers the downloaded package when the error screen finishes loading', async () => {
     const f = await packagedSetup()
     vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
-    f.ipc.setNotesMenuState!({ canImport: true, canExport: false })
+    f.ipc.setNotesMenuState!({ canImport: true, canExport: false, canInstallUpdate: true })
     f.downloaded()
 
     expect(f.state().updateReady).toBe(false)
@@ -784,7 +784,7 @@ describe('packaged desktop update wiring', () => {
       if (reason === 'about') f.ipc.setRendererModalOpen!(true)
       if (reason === 'data') f.ipc.setAppUpdateBlocked!(true)
       if (reason === 'archive') mocks.archive.isIdle.mockReturnValueOnce(false)
-      if (reason === 'import') f.ipc.setNotesMenuState!({ canExport: true, canImport: false })
+      if (reason === 'import') f.ipc.setNotesMenuState!({ canExport: true, canImport: false, canInstallUpdate: false })
       if (reason === 'loading') vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
       if (reason === 'destroyed') vi.mocked(f.window.isDestroyed).mockReturnValue(true)
       if (reason === 'missing') f.lifecycle.setMainWindow(null)
@@ -875,7 +875,7 @@ describe('desktop entry wiring', () => {
     const f = await setup()
 
     expect((f.window as unknown as { options: unknown }).options).toMatchObject(bounds)
-    expect(f.state().notes).toEqual({ canExport: false, canImport: false })
+    expect(f.state().notes).toEqual({ canExport: false, canImport: false, canInstallUpdate: false })
     f.ipc.setVimEnabled!(true)
 
     expect(vi.mocked(f.electron.nativeImage.createMenuSymbol).mock.calls).toEqual([
@@ -926,8 +926,8 @@ describe('desktop entry wiring', () => {
     const f = await setup()
     mocks.menu.mockClear()
 
-    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
-    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
 
     expect(mocks.menu).toHaveBeenCalledOnce()
   })
@@ -1053,7 +1053,7 @@ describe('desktop entry wiring', () => {
       expect(mocks.report).toHaveBeenCalledExactlyOnceWith('Could not cancel notes operation', failure),
     )
 
-    expect(f.state().notes).toEqual({ canExport: false, canImport: false })
+    expect(f.state().notes).toEqual({ canExport: false, canImport: false, canInstallUpdate: false })
   })
 
   it('rebuilds the native menu after preference changes without sending to a destroyed window', async () => {
@@ -1073,7 +1073,7 @@ describe('desktop entry wiring', () => {
   it('keeps menu commands safe when no main window exists and restores appearance through IPC', async () => {
     const f = await setup()
     const actions = f.actions()
-    f.ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    f.ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
     f.lifecycle.setMainWindow(null)
     vi.mocked(f.window.webContents.send).mockClear()
     mocks.menu.mockClear()
@@ -1228,7 +1228,11 @@ describe('desktop entry wiring', () => {
 
   it.each(['export', 'import'] as const)('checks the independent availability of %s', async (command) => {
     const f = await setup()
-    f.ipc.setNotesMenuState!({ canExport: command === 'export', canImport: command === 'import' })
+    f.ipc.setNotesMenuState!({
+      canExport: command === 'export',
+      canImport: command === 'import',
+      canInstallUpdate: false,
+    })
     vi.mocked(f.window.webContents.send).mockClear()
 
     f.actions().notesCommand('export')
@@ -1343,7 +1347,7 @@ describe('desktop entry wiring', () => {
 
   it('dispatches view, find, notes and About to the ready renderer', async () => {
     const { ipc, window, actions } = await setup()
-    ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
 
     actions().findCommand('next')
     actions().viewCommand('agenda')
@@ -1360,7 +1364,7 @@ describe('desktop entry wiring', () => {
 
   it('blocks main-window actions while About is modal and still permits appearance and quit', async () => {
     const { ipc, window, actions, quit, electron } = await setup()
-    ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
     ipc.setRendererModalOpen!(true)
     expect((mocks.menu.mock.lastCall![0] as ApplicationMenuState).modalOpen).toBe(true)
     vi.mocked(window.webContents.send).mockClear()
@@ -1400,16 +1404,16 @@ describe('desktop entry wiring', () => {
 
   it('resets operation availability and the pending quit only for main-frame navigation and renderer loss', async () => {
     const { ipc, window, state, quitControl } = await setup()
-    ipc.setNotesMenuState!({ canExport: true, canImport: true })
+    ipc.setNotesMenuState!({ canExport: true, canImport: true, canInstallUpdate: true })
     window.webContents.emit('did-start-navigation', {}, 'url', true, true)
     window.webContents.emit('did-start-navigation', {}, 'url', false, false)
-    expect(state().notes).toEqual({ canExport: true, canImport: true })
+    expect(state().notes).toEqual({ canExport: true, canImport: true, canInstallUpdate: true })
     expect(mocks.archive.cancel).not.toHaveBeenCalled()
     expect(quitControl.rendererReplaced).not.toHaveBeenCalled()
 
     window.webContents.emit('did-start-navigation', {}, 'url', false, true)
 
-    expect(state().notes).toEqual({ canExport: false, canImport: false })
+    expect(state().notes).toEqual({ canExport: false, canImport: false, canInstallUpdate: false })
     expect(mocks.archive.cancel).toHaveBeenCalledOnce()
     expect(quitControl.rendererReplaced).toHaveBeenCalledExactlyOnceWith(window)
     expect(quitControl.rendererGone).not.toHaveBeenCalled()

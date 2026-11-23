@@ -69,7 +69,7 @@ let appearanceStore: AppearancePreferenceStore | null = null
 let selectedAppearance: AppearancePreference = 'system'
 let requestQuitFromMenu: () => void = () => undefined
 let notesArchive: NotesArchiveController | null = null
-let notesMenuState: NotesMenuState = { canExport: false, canImport: false }
+let notesMenuState: NotesMenuState = { canExport: false, canImport: false, canInstallUpdate: false }
 const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 let rendererModalOpen = false
@@ -238,7 +238,7 @@ function createMainWindow(quitWithoutSave: () => void): void {
     rendererModalOpen = false
     appUpdateBlocked = false
     appUpdates?.cancelBeforeNativeQuit()
-    notesMenuState = { canExport: false, canImport: false }
+    notesMenuState = { canExport: false, canImport: false, canInstallUpdate: false }
     rebuildApplicationMenu()
     void notesArchive
       ?.cancel()
@@ -334,7 +334,7 @@ bootstrapApplication({
           !rendererModalOpen &&
           !appUpdateBlocked &&
           notesArchive?.isIdle?.() === true &&
-          notesMenuState.canImport,
+          notesMenuState.canInstallUpdate,
         prepareQuit: () => quitControl.prepareUpdateQuit(),
         requestSave: (id) => mainWindow?.webContents.send(ipcEvents.appUpdateRequested, id),
         finished: (message) => mainWindow?.webContents.send(ipcEvents.appUpdateFinished, message),
@@ -516,7 +516,12 @@ bootstrapApplication({
       },
       notesArchive,
       setNotesMenuState: (value) => {
-        if (notesMenuState.canExport === value.canExport && notesMenuState.canImport === value.canImport) return
+        if (
+          notesMenuState.canExport === value.canExport &&
+          notesMenuState.canImport === value.canImport &&
+          notesMenuState.canInstallUpdate === value.canInstallUpdate
+        )
+          return
         notesMenuState = value
         rebuildApplicationMenu()
       },

@@ -81,7 +81,13 @@ import { changeSiteFocus } from './editor-undo-focus'
 import { EditorTextSession } from './editor-text-session'
 import { markedAndStarredNodes } from './starred-nodes'
 import { countDocumentNodes } from './node-count'
-import { systemClock, type Clock, type EditorServices, type FocusIntent } from './editor-store-types'
+import {
+  NotesRecoveryRequiredError,
+  systemClock,
+  type Clock,
+  type EditorServices,
+  type FocusIntent,
+} from './editor-store-types'
 import { countInsertedWords, countPastedWords, DEFAULT_SAVE_TIMING, type SaveTiming } from './save-policy'
 import {
   applyNodeFold,
@@ -654,7 +660,11 @@ export class EditorStore {
       // Startup does not wait for the image headers (`docs/PRODUCT.md` §17).
       void this.backfillAttachmentSizes()
     } catch (error) {
-      this.runtime.snapshot = { status: 'error', message: messageOf(error) }
+      this.runtime.snapshot = {
+        status: 'error',
+        message: messageOf(error),
+        ...(error instanceof NotesRecoveryRequiredError && { notesRecoveryRequired: true }),
+      }
       this.runtime.emit()
     }
   }

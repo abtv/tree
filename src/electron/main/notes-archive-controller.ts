@@ -14,6 +14,7 @@ import type {
   ArchiveWorkerTask,
 } from '../../infrastructure/main/notes-archive/archive-worker-protocol'
 import { ReplacementIncompleteError } from '../../infrastructure/main/notes-replacement'
+import { NOTES_RECOVERY_REQUIRED_MESSAGE } from '../../shared/ipc'
 import type {
   NotesArchiveProgress,
   NotesExportResult,
@@ -54,6 +55,7 @@ export interface NotesArchiveDialogs {
 export interface NotesArchiveControllerDependencies {
   readonly fileServices: Pick<
     FileServices & NotesArchiveFileServices,
+    | 'isNotesRecoveryRequired'
     | 'createStagingDirectory'
     | 'discardStagingDirectory'
     | 'replaceNotes'
@@ -88,7 +90,6 @@ export interface NotesArchiveController {
 
 export const WORKER_STOPPED_MESSAGE = 'The notes archive worker stopped unexpectedly.'
 export const BUSY_MESSAGE = 'Another notes export or import is running.'
-export const RESTART_REQUIRED_MESSAGE = 'Restart Tree to complete the notes import.'
 
 const ZIP_FILTERS: FileDialogFilter[] = [{ name: 'ZIP Archive', extensions: ['zip'] }]
 const CANCELED: NotesOperationCanceled = { ok: false, canceled: true }
@@ -130,14 +131,13 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
   const now = dependencies.now ?? (() => new Date())
   let state: State = IDLE
   let closing = false
-  let restartRequired = false
   let notice: { fileName?: string; folder: string | null } | undefined
   let replacedFolder: string | null = null
 
   /** Opens a native panel; an export choice keeps a prepared import, while an import choice requires none. */
   const beginChoice = (purpose: 'export' | 'import'): void => {
     if (closing) throw new Error('Tree is quitting.')
-    if (restartRequired) throw new Error(RESTART_REQUIRED_MESSAGE)
+    if (fileServices.isNotesRecoveryRequired()) throw new Error(NOTES_RECOVERY_REQUIRED_MESSAGE)
     const current = state
     if (purpose === 'export' && current.kind === 'prepared') {
       state = { kind: 'choosing', suspended: current }
@@ -447,13 +447,14 @@ export function createNotesArchiveController(dependencies: NotesArchiveControlle
           notice = { fileName, folder }
           return { ok: true }
         } catch (error) {
-          if (error instanceof ReplacementIncompleteError) {
-            // The journal exists: only the next start can finish this replacement (ADR 0024).
-            restartRequired = true
-            return { ok: false, restartRequired: true, message: `Your notes could not be replaced: ${reason(error)}` }
+          // Keep this staging only if its own replacement committed. An older journal owns other files.
+          if (!(error instanceof ReplacementIncompleteError))
+            await fileServices.discardStagingDirectory(staging).catch(ignore)
+          return {
+            ok: false,
+            restartRequired: fileServices.isNotesRecoveryRequired(),
+            message: `Your notes could not be replaced: ${reason(error)}`,
           }
-          await fileServices.discardStagingDirectory(staging).catch(ignore)
-          return { ok: false, restartRequired: false, message: `Your notes could not be replaced: ${reason(error)}` }
         } finally {
           state = IDLE
         }

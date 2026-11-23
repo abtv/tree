@@ -94,6 +94,10 @@ const DOCUMENT_FILE_PATTERN = /^document\.(?:json|json\.tmp|json\.bak|\d+\.json)
 // A single path segment that the layout created; rejects separators and dot segments.
 const SEGMENT_PATTERN = /^(?!\.{1,2}$)[^/\\\0]+$/
 
+export function hasReplacementJournal(fs: ReplacementFileSystem, layout: NotesLayout): Promise<boolean> {
+  return fs.exists(join(layout.importDirectory, JOURNAL_NAME))
+}
+
 /** The primary document, an interrupted save, a legacy backup, or a retained generation. */
 export function isDocumentFileName(name: string): boolean {
   return DOCUMENT_FILE_PATTERN.test(name)
@@ -228,10 +232,15 @@ export async function recoverReplacement(
   layout: NotesLayout,
   active: ReadonlySet<string>,
 ): Promise<RecoveredReplacement> {
-  const journal = await readJournal(fs, layout)
-  if (journal !== undefined) {
-    const replacedFolder = await completeReplacement(fs, layout, journal)
-    return { completed: true, replacedFolder, ...(journal.archive === undefined ? {} : { archive: journal.archive }) }
+  try {
+    const journal = await readJournal(fs, layout)
+    if (journal !== undefined) {
+      const replacedFolder = await completeReplacement(fs, layout, journal)
+      return { completed: true, replacedFolder, ...(journal.archive === undefined ? {} : { archive: journal.archive }) }
+    }
+  } catch (error) {
+    // An unreadable journal may also represent a committed import.
+    throw new ReplacementIncompleteError(error)
   }
   for (const directory of [layout.importDirectory, layout.exportDirectory]) {
     for (const name of await readdirOrEmpty(fs, directory)) {

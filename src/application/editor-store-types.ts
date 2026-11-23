@@ -7,6 +7,9 @@ import type { AgendaState } from './agenda-state'
 
 export type ClipboardValue = ClipboardPayload
 
+/** Opening the notes must finish a committed replacement before another archive can replace them. */
+export class NotesRecoveryRequiredError extends Error {}
+
 export interface EditorServices {
   /** A cut or paste can still change the document after its platform I/O finishes. */
   onPendingEditsChanged?(pending: boolean): void
@@ -42,7 +45,7 @@ export interface FocusIntent {
 
 export type EditorSnapshot =
   | { status: 'loading' }
-  | { status: 'error'; message: string; operationError?: string }
+  | { status: 'error'; message: string; notesRecoveryRequired?: true; operationError?: string }
   | {
       status: 'ready'
       document: Document

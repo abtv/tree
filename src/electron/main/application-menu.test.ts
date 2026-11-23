@@ -44,7 +44,7 @@ function state(
     vimEnabled: false,
     alwaysOnTop: false,
     appearance: 'system' as AppearancePreference,
-    notes: { canExport: false, canImport: false },
+    notes: { canExport: false, canImport: false, canInstallUpdate: false },
     ...overrides,
   }
 }
@@ -89,7 +89,7 @@ describe('application menu template', () => {
     [true, true, true],
   ])('gates available notes actions during modal display (%s, %s, %s)', (canExport, canImport, modalOpen) => {
     const template = applicationMenuTemplate(
-      { ...state({ modalOpen }), notes: { canExport, canImport } },
+      { ...state({ modalOpen }), notes: { canExport, canImport, canInstallUpdate: false } },
       createActions(),
     )
 
@@ -132,8 +132,9 @@ describe('application menu template', () => {
     [{ updateApplying: true }, false, false],
     [{ updateBlocked: true }, false, false],
     [{ modalOpen: true }, false, false],
-    [{ notes: { canExport: false, canImport: true } }, true, true],
-    [{ notes: { canExport: true, canImport: false } }, true, false],
+    [{ notes: { canExport: false, canImport: true, canInstallUpdate: true } }, true, true],
+    [{ notes: { canExport: false, canImport: false, canInstallUpdate: true } }, true, true],
+    [{ notes: { canExport: true, canImport: false, canInstallUpdate: false } }, true, false],
   ] as const)('applies independent update availability guards for %j', (overrides, canCheck, canUpdate) => {
     const actions = createActions()
     const template = applicationMenuTemplate(
@@ -141,7 +142,7 @@ describe('application menu template', () => {
         ...state(),
         updatesSupported: true,
         updateReady: true,
-        notes: { canExport: true, canImport: true },
+        notes: { canExport: true, canImport: true, canInstallUpdate: true },
         ...overrides,
       },
       actions,
@@ -192,7 +193,7 @@ describe('application menu template', () => {
           updatesSupported: true,
           updateReady: true,
           updateVersion: '1.2.4',
-          notes: { canExport: true, canImport: true },
+          notes: { canExport: true, canImport: true, canInstallUpdate: true },
         },
         actions,
       ),
@@ -218,7 +219,10 @@ describe('application menu template', () => {
   // @requirement PRODUCT.md §25.1
   it('orders notes commands, applies availability and dispatches without shortcuts', () => {
     const actions = createActions()
-    const template = applicationMenuTemplate({ ...state(), notes: { canExport: true, canImport: false } }, actions)
+    const template = applicationMenuTemplate(
+      { ...state(), notes: { canExport: true, canImport: false, canInstallUpdate: false } },
+      actions,
+    )
     const items = submenuItems(template, 'File')
 
     expect(items.map((item) => [item.label, item.enabled, item.accelerator])).toEqual([

@@ -7,6 +7,7 @@ import type { AppearancePreference } from './appearance'
 
 /** Rejects saves and image writes after the notes were replaced, until the window reloads them. */
 export const NOTES_REPLACED_MESSAGE = 'The notes were replaced. Reload the window to continue.'
+export const NOTES_RECOVERY_REQUIRED_MESSAGE = 'Restart Tree to complete the notes import.'
 
 export const ipcChannels = {
   imageToText: 'tree:image-to-text',
@@ -20,6 +21,7 @@ export const ipcChannels = {
   quitWithoutSaving: 'tree:quit-without-saving',
   cancelQuit: 'tree:cancel-quit',
   load: 'tree:load',
+  isNotesRecoveryRequired: 'tree:notes-recovery-required',
   save: 'tree:save',
   readClipboard: 'tree:read-clipboard',
   writeClipboard: 'tree:write-clipboard',
@@ -122,6 +124,7 @@ export interface NotesImportNotice {
 export type { NotesArchiveProgress }
 
 export interface NotesMenuState {
+  readonly canInstallUpdate: boolean
   readonly canExport: boolean
   readonly canImport: boolean
 }
@@ -176,6 +179,7 @@ export interface TreeApi {
   onQuitRequested(listener: (requestId: string) => void): () => void
   onQuitFailed(listener: (requestId: string, message: string) => void): () => void
   load(): Promise<unknown | null>
+  isNotesRecoveryRequired?: () => Promise<boolean>
   /** Electron services send encoded JSON to avoid copying a large object graph through contextBridge. */
   save(state: PersistedEditorState | string): Promise<void>
   readClipboard(): Promise<ClipboardPayload>

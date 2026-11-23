@@ -117,6 +117,7 @@ export const treeApi: TreeApi = {
     return () => ipcRenderer.removeListener('tree:quit-failed', handler)
   },
   load: () => ipcRenderer.invoke(ipcChannels.load),
+  isNotesRecoveryRequired: () => ipcRenderer.invoke(ipcChannels.isNotesRecoveryRequired),
   save: (state) => ipcRenderer.invoke(ipcChannels.save, state),
   readClipboard: () => ipcRenderer.invoke(ipcChannels.readClipboard),
   writeClipboard: (payload) => ipcRenderer.invoke(ipcChannels.writeClipboard, payload),

@@ -1407,8 +1407,42 @@ describe('notes export and import support', () => {
       JSON.stringify({ staging: basename(staging), replaced: 'damaged' }),
     )
 
-    await expect(create().load()).rejects.toThrow(SyntaxError)
+    const restarted = create()
+    await expect(restarted.load()).rejects.toThrow(SyntaxError)
+    expect(restarted.isNotesRecoveryRequired()).toBe(false)
   })
+
+  it.each(['replace', 'save', 'image write', 'cleanup'] as const)(
+    'protects moved images when %s reaches a restarted file service before its first load',
+    async (first) => {
+      const { userData, directory, services, create } = await archiveServicesForTest()
+      await services.load()
+      await services.save(stateWithoutImage('Old'))
+      const imported = stateWithImage('new')
+      const staging = await stageImport(services, imported, 'new')
+      const folder = join(userData, 'Replaced Notes', 'previous')
+      await mkdir(folder, { recursive: true })
+      await rename(join(directory, 'document.json'), join(folder, 'document.json'))
+      await rename(join(directory, 'attachments'), join(folder, 'attachments'))
+      await rename(join(staging, 'attachments'), join(directory, 'attachments'))
+      const journal = JSON.stringify({ staging: basename(staging), replaced: 'previous' })
+      await writeFile(join(userData, '.notes-import', 'commit.json'), journal)
+      const restarted = create()
+      const second = await stageImport(restarted, stateWithImage('second'), 'second')
+
+      if (first === 'replace') await expect(restarted.replaceNotes(second)).rejects.toThrow('Restart Tree')
+      if (first === 'save') await expect(restarted.save(stateWithoutImage('Stale'))).rejects.toThrow()
+      if (first === 'image write') await expect(restarted.writeAttachment('new', new Uint8Array())).rejects.toThrow()
+      await restarted.cleanupAttachments([])
+
+      expect(await readFile(join(directory, 'attachments', 'new.png'), 'utf8')).toBe('imported image')
+      expect(await readFile(join(userData, '.notes-import', 'commit.json'), 'utf8')).toBe(journal)
+      expect(restarted.isNotesRecoveryRequired()).toBe(true)
+      await restarted.discardStagingDirectory(second)
+      await expect(restarted.load()).resolves.toEqual(imported)
+      expect(restarted.isNotesRecoveryRequired()).toBe(false)
+    },
+  )
 
   it('fails the load without changing files when the journal is damaged', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
@@ -1419,10 +1453,24 @@ describe('notes export and import support', () => {
     await mkdir(join(userData, '.notes-import'), { recursive: true })
     await writeFile(join(userData, '.notes-import', 'commit.json'), '{')
 
-    await expect(create().load()).rejects.toMatchObject({
+    const restarted = create()
+    const second = await stageImport(restarted, stateWithImage('second'), 'second')
+    await writeFile(join(directory, 'attachments', 'keep.png'), 'previous image')
+    const load = restarted.load()
+    const replace = restarted.replaceNotes(second, 'second.zip')
+
+    await expect(load).rejects.toMatchObject({
       message: 'The notes import could not be completed: The import journal is damaged.',
       cause: expect.objectContaining({ message: 'The import journal is damaged.' }),
     })
+    await expect(replace).rejects.toThrow('Restart Tree')
+    expect(restarted.isNotesRecoveryRequired()).toBe(true)
+    await expect(restarted.save(stateWithoutImage('Stale'))).rejects.toThrow()
+    await expect(restarted.writeAttachment('keep', new Uint8Array())).rejects.toThrow()
+    await restarted.cleanupAttachments([])
+
+    expect(await readFile(join(userData, '.notes-import', 'commit.json'), 'utf8')).toBe('{')
+    expect(await readFile(join(directory, 'attachments', 'keep.png'), 'utf8')).toBe('previous image')
     expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(saved)
   })
 

@@ -582,7 +582,11 @@ export function App({
         <main className="app-shell error-state" role="alert">
           <h1>Tree could not open this document</h1>
           <p>{state.message}</p>
-          <p>The existing data was left unchanged.</p>
+          <p>
+            {state.notesRecoveryRequired
+              ? 'Restart Tree to complete the notes import.'
+              : 'The existing data was left unchanged.'}
+          </p>
         </main>
         {commandList}
         <StatusBar>

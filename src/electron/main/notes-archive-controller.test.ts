@@ -939,15 +939,34 @@ describe('notes archive controller: import', () => {
     await expect(controller.chooseExportDestination()).resolves.toMatchObject({ ok: true })
   })
 
+  it('discards only the new preparation and requires a restart when another import owns the journal', async () => {
+    const { controller, destinations, userData } = await setup()
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    await controller.chooseImportArchive()
+    await controller.prepareImport()
+    const directory = join(userData, '.notes-import')
+    const journal = JSON.stringify({ staging: 'earlier', replaced: 'previous' })
+    await mkdir(join(directory, 'earlier', 'attachments'), { recursive: true })
+    await writeFile(join(directory, 'earlier', 'document.json'), JSON.stringify(headWithImages([])))
+    await writeFile(join(directory, 'commit.json'), journal)
+
+    await expect(controller.commitImport()).resolves.toMatchObject({ ok: false, restartRequired: true })
+
+    expect((await readdir(directory)).sort()).toEqual(['commit.json', 'earlier'])
+    expect(await readFile(join(directory, 'commit.json'), 'utf8')).toBe(journal)
+    await expect(controller.chooseImportArchive()).rejects.toThrow('Restart Tree')
+  })
+
   it('requires a restart after a replacement fails past its journal', async () => {
     const { controller, destinations, fileServices } = await setup()
 
     await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
-    vi.spyOn(fileServices, 'replaceNotes').mockRejectedValueOnce(
-      new ReplacementIncompleteError(new Error('interrupted')),
-    )
+    vi.spyOn(fileServices, 'replaceNotes').mockImplementationOnce(async () => {
+      vi.spyOn(fileServices, 'isNotesRecoveryRequired').mockReturnValue(true)
+      throw new ReplacementIncompleteError(new Error('interrupted'))
+    })
 
     await expect(controller.commitImport()).resolves.toEqual({
       ok: false,

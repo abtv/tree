@@ -23,7 +23,7 @@ const success: NotesExportResult = {
 }
 
 function harness(notice: import('../../shared/ipc').NotesImportNotice | null = null) {
-  let snapshot: { status: string; persistenceLocked?: boolean } = { status: 'ready' }
+  let snapshot: { status: string; persistenceLocked?: boolean; notesRecoveryRequired?: true } = { status: 'ready' }
   let changed = () => {}
   let progress: (value: NotesArchiveProgress) => void = () => {}
   let command: (value: NotesMenuCommand) => void = () => {}
@@ -193,7 +193,11 @@ describe('desktop notes operations', () => {
       await h.operations.exportNotes()
 
       expect(h.operations.getSnapshot()).toEqual({ phase: 'idle' })
-      expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: true, canImport: true })
+      expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+        canExport: true,
+        canImport: true,
+        canInstallUpdate: true,
+      })
 
       h.operations.dispose()
     },
@@ -250,11 +254,34 @@ describe('desktop notes operations', () => {
   it('changes only import availability between loading and load error', () => {
     const h = harness()
     h.change({ status: 'loading' })
-    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: false,
+    })
 
     h.change({ status: 'error' })
 
-    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: true })
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: true,
+      canInstallUpdate: true,
+    })
+    h.operations.dispose()
+  })
+
+  it('blocks another import during recovery but permits installing a downloaded update', async () => {
+    const h = harness()
+    h.change({ status: 'error', notesRecoveryRequired: true })
+
+    await h.operations.importNotes()
+
+    expect(h.api.chooseNotesImportArchive).not.toHaveBeenCalled()
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: true,
+    })
     h.operations.dispose()
   })
 
@@ -388,7 +415,11 @@ describe('desktop notes operations', () => {
   it('keeps both menus unavailable throughout confirmation and replacement', async () => {
     const h = harness()
     await h.operations.importNotes()
-    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: false,
+    })
     const gate = deferred<void>()
     h.store.flushPersistence.mockReturnValueOnce(gate.promise)
     const job = h.operations.replaceNotes()
@@ -809,7 +840,11 @@ describe('desktop notes operations', () => {
 
     change({ status: 'error' })
 
-    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: true })
+    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: true,
+      canInstallUpdate: true,
+    })
 
     await operations.importNotes()
 
@@ -913,7 +948,11 @@ describe('desktop notes operations', () => {
   it('updates menu availability only when it changes, and rejects unavailable exports', async () => {
     const { operations, api, change } = harness()
 
-    expect(api.setNotesMenuState).toHaveBeenCalledExactlyOnceWith({ canExport: true, canImport: true })
+    expect(api.setNotesMenuState).toHaveBeenCalledExactlyOnceWith({
+      canExport: true,
+      canImport: true,
+      canInstallUpdate: true,
+    })
 
     change({ status: 'ready' })
 
@@ -925,7 +964,11 @@ describe('desktop notes operations', () => {
     }
 
     expect(api.chooseNotesExportDestination).not.toHaveBeenCalled()
-    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: false,
+    })
 
     operations.dispose()
   })
@@ -947,7 +990,11 @@ describe('desktop notes operations', () => {
     command('import')
 
     expect(api.chooseNotesExportDestination).toHaveBeenCalledTimes(1)
-    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({ canExport: false, canImport: false })
+    expect(api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: false,
+    })
 
     progress({ imagesDone: 1, imageCount: 2 })
 

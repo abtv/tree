@@ -29,7 +29,7 @@ export interface DesktopNotesApi {
 }
 
 interface NotesStore {
-  getSnapshot(): { status: string; persistenceLocked?: boolean }
+  getSnapshot(): { status: string; persistenceLocked?: boolean; notesRecoveryRequired?: true }
   subscribe(listener: () => void): () => void
   flushPersistence(): Promise<void>
   reportError(error: unknown): void
@@ -139,9 +139,11 @@ export class DesktopDataOperations {
     if (this.lifecycle === 'disposed') return
     const state = this.store.getSnapshot()
     const available = !state.persistenceLocked && !this.busy()
+    const canInstallUpdate = (state.status === 'ready' || state.status === 'error') && available
     const next = {
       canExport: state.status === 'ready' && available,
-      canImport: (state.status === 'ready' || state.status === 'error') && available,
+      canImport: canInstallUpdate && !state.notesRecoveryRequired,
+      canInstallUpdate,
     }
     this.menuCommands.update([
       {
@@ -163,7 +165,12 @@ export class DesktopDataOperations {
       this.noticeTaken = true
       void this.showImportNotice()
     }
-    if (next.canExport === this.lastMenu?.canExport && next.canImport === this.lastMenu.canImport) return
+    if (
+      next.canExport === this.lastMenu?.canExport &&
+      next.canImport === this.lastMenu.canImport &&
+      next.canInstallUpdate === this.lastMenu.canInstallUpdate
+    )
+      return
     this.lastMenu = next
     void this.api.setNotesMenuState(next).catch((error: unknown) => this.store.reportError(error))
   }
@@ -261,6 +268,7 @@ export class DesktopDataOperations {
       this.lifecycle === 'disposed' ||
       this.busy() ||
       !['ready', 'error'].includes(state.status) ||
+      state.notesRecoveryRequired ||
       state.persistenceLocked
     )
       return

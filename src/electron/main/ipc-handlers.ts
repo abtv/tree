@@ -226,6 +226,11 @@ export function registerIpcHandlers({
     requireTrustedRenderer(event)
     return fileServices.load()
   })
+  ipcMain.handle(ipcChannels.isNotesRecoveryRequired, (event, ...args) => {
+    requireTrustedRenderer(event)
+    requireNoArguments(args)
+    return fileServices.isNotesRecoveryRequired()
+  })
   ipcMain.handle(ipcChannels.save, (event, state) => {
     requireTrustedRenderer(event)
     return fileServices.save(validatePersistedEditorState(state))
@@ -316,11 +321,17 @@ export function registerIpcHandlers({
       typeof value.canExport !== 'boolean' ||
       !('canImport' in value) ||
       typeof value.canImport !== 'boolean' ||
-      Object.keys(value).some((key) => key !== 'canExport' && key !== 'canImport')
+      !('canInstallUpdate' in value) ||
+      typeof value.canInstallUpdate !== 'boolean' ||
+      Object.keys(value).some((key) => key !== 'canExport' && key !== 'canImport' && key !== 'canInstallUpdate')
     ) {
       throw new Error('Invalid notes menu state.')
     }
-    setNotesMenuState({ canExport: value.canExport, canImport: value.canImport })
+    setNotesMenuState({
+      canExport: value.canExport,
+      canImport: value.canImport,
+      canInstallUpdate: value.canInstallUpdate,
+    })
   })
 
   // Notes export and import (PRODUCT §25): the renderer sends commands only, never a path.

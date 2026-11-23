@@ -23,6 +23,7 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
       handlers.set(channel, listener),
   }
   const fileServices: FileServices = {
+    isNotesRecoveryRequired: vi.fn(() => false),
     load: vi.fn(async () => null),
     save: vi.fn(async () => undefined),
     writeAttachment: vi.fn(async () => undefined),
@@ -845,7 +846,7 @@ describe('main IPC handlers', () => {
       (channel) => channel.startsWith('tree:notes-') && channel !== ipcChannels.setNotesMenuState,
     )
 
-    expect(notesChannels).toHaveLength(8)
+    expect(notesChannels).toHaveLength(9)
 
     for (const channel of notesChannels) {
       for (const args of [['/Users/someone/Desktop/notes.zip'], [undefined], [{ path: '/' }]]) {
@@ -1058,6 +1059,10 @@ describe('main IPC handlers', () => {
     const { handlers, fileServices } = createHarness()
     const event = { senderFrame: { url: rendererUrl } }
 
+    expect(handlers.get(ipcChannels.isNotesRecoveryRequired)!(event)).toBe(false)
+    vi.mocked(fileServices.isNotesRecoveryRequired).mockReturnValue(true)
+    expect(handlers.get(ipcChannels.isNotesRecoveryRequired)!(event)).toBe(true)
+
     await expect(handlers.get(ipcChannels.load)!(event)).resolves.toBeNull()
 
     vi.mocked(fileServices.load).mockResolvedValueOnce(validState)
@@ -1085,8 +1090,12 @@ it('validates notes menu availability and forwards it only for a trusted caller'
   const invoke = handlers.get(ipcChannels.setNotesMenuState)!
   const event = { senderFrame: { url: rendererUrl } }
 
-  expect(invoke(event, { canExport: true, canImport: false })).toBeUndefined()
-  expect(setNotesMenuState).toHaveBeenCalledExactlyOnceWith({ canExport: true, canImport: false })
+  expect(invoke(event, { canExport: true, canImport: false, canInstallUpdate: false })).toBeUndefined()
+  expect(setNotesMenuState).toHaveBeenCalledExactlyOnceWith({
+    canExport: true,
+    canImport: false,
+    canInstallUpdate: false,
+  })
   for (const value of [
     undefined,
     null,
@@ -1094,19 +1103,26 @@ it('validates notes menu availability and forwards it only for a trusted caller'
     true,
     {},
     { canExport: true },
-    { canExport: 1, canImport: false },
-    { canExport: true, canImport: false, path: '/' },
+    { canExport: 1, canImport: false, canInstallUpdate: false },
+    { canExport: true, canImport: false },
+    { canExport: true, canImport: false, canInstallUpdate: 1 },
+    { canExport: true, canImport: false, canInstallUpdate: false, path: '/' },
   ]) {
     expect(() => invoke(event, value)).toThrow('Invalid notes menu state.')
   }
-  expect(() => invoke(event, { canExport: true, canImport: true }, 'extra')).toThrow('This request takes no arguments.')
+  expect(() => invoke(event, { canExport: true, canImport: true, canInstallUpdate: true }, 'extra')).toThrow(
+    'This request takes no arguments.',
+  )
   expect(() =>
-    invoke({ senderFrame: { url: 'https://untrusted.test/' } }, { canExport: true, canImport: true }),
+    invoke(
+      { senderFrame: { url: 'https://untrusted.test/' } },
+      { canExport: true, canImport: true, canInstallUpdate: true },
+    ),
   ).toThrow('Untrusted renderer IPC call.')
 
   setNotesMenuState.mockImplementationOnce(() => {
     throw new Error('Menu failed')
   })
 
-  expect(() => invoke(event, { canExport: false, canImport: false })).toThrow('Menu failed')
+  expect(() => invoke(event, { canExport: false, canImport: false, canInstallUpdate: false })).toThrow('Menu failed')
 })

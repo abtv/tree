@@ -275,6 +275,7 @@ describe('preload bridge', () => {
     const bytes = new Uint8Array([1, 2, 3])
 
     await treeApi.load()
+    await treeApi.isNotesRecoveryRequired!()
     await treeApi.save(state)
     await treeApi.readClipboard()
 
@@ -304,10 +305,11 @@ describe('preload bridge', () => {
     await treeApi.cancelNotesOperation?.()
     await treeApi.takeNotesImportNotice?.()
     await treeApi.showReplacedNotesFolder?.()
-    await treeApi.setNotesMenuState?.({ canExport: true, canImport: false })
+    await treeApi.setNotesMenuState?.({ canExport: true, canImport: false, canInstallUpdate: false })
 
     expect(mocks.invoke.mock.calls).toEqual([
       [ipcChannels.load],
+      [ipcChannels.isNotesRecoveryRequired],
       [ipcChannels.save, state],
       [ipcChannels.readClipboard],
       [ipcChannels.writeClipboard, payload],
@@ -336,7 +338,7 @@ describe('preload bridge', () => {
       [ipcChannels.cancelNotesOperation],
       [ipcChannels.takeNotesImportNotice],
       [ipcChannels.showReplacedNotesFolder],
-      [ipcChannels.setNotesMenuState, { canExport: true, canImport: false }],
+      [ipcChannels.setNotesMenuState, { canExport: true, canImport: false, canInstallUpdate: false }],
     ])
   })
 
@@ -479,7 +481,9 @@ it('delivers notes menu commands and preserves menu-state errors', async () => {
 
   mocks.invoke.mockRejectedValueOnce(new Error('Menu failed'))
 
-  await expect(treeApi.setNotesMenuState?.({ canExport: false, canImport: false })).rejects.toThrow('Menu failed')
+  await expect(
+    treeApi.setNotesMenuState?.({ canExport: false, canImport: false, canInstallUpdate: false }),
+  ).rejects.toThrow('Menu failed')
 })
 
 it('validates search menu commands and disposes their listener', async () => {

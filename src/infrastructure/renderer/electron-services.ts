@@ -1,4 +1,5 @@
 import type { EditorServices } from '../../application/editor-store'
+import { NotesRecoveryRequiredError } from '../../application/editor-store-types'
 import { createAttachmentImageCache, decodeAttachmentImage } from './attachment-image-cache'
 import { dayNumberOf } from '../../domain/calendar-date'
 import { NOTES_REPLACED_MESSAGE } from '../../shared/ipc'
@@ -47,7 +48,16 @@ export function createElectronEditorServices(): EditorServices {
       const date = new Date()
       return dayNumberOf({ year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
     },
-    load: () => window.treeApi.load(),
+    async load() {
+      try {
+        return await window.treeApi.load()
+      } catch (error) {
+        if (await window.treeApi.isNotesRecoveryRequired?.().catch(() => true)) {
+          throw new NotesRecoveryRequiredError(error instanceof Error ? error.message : String(error), { cause: error })
+        }
+        throw error
+      }
+    },
     loadEmojiHistory: () => window.treeApi.getEmojiHistory?.() ?? Promise.resolve([]),
     saveEmojiHistory: (names) => window.treeApi.setEmojiHistory?.(names) ?? Promise.resolve(),
     save: async (state) => {
