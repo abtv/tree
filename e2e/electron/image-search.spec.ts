@@ -135,6 +135,53 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
 
 test.describe('image thumbnails in Search', () => {
   // @requirement PRODUCT.md §20.14.2
+  test('reads only nearby image results on the first query', async ({ userDataDir }) => {
+    const images = Array.from({ length: 48 }, (_, index) => ({
+      id: `result-${index}`,
+      text: `Picture ${index}`,
+      attachment: { id: `image-${index}`, mimeType: 'image/png', width: 320, height: 240, searchText: 'release' },
+      children: [],
+    }))
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'branch', text: 'Pictures', children: images }] },
+      location: { currentParentId: null, selectedNodeId: 'branch' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    const png = solidPng(320, 240)
+    for (const result of images) writeFileSync(attachmentPath(userDataDir, result.attachment.id), png)
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 700, height: 600 })
+    await app.evaluate(() => {
+      const probe = { ids: [] as string[] }
+      Object.assign(globalThis, { searchThumbnailReads: probe })
+      globalThis.__treeIpc.wrap('tree:read-attachment', (original, event, id) => {
+        probe.ids.push(String(id))
+        return original(event, id)
+      })
+    })
+
+    await window.keyboard.press('Meta+;')
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    await popup.getByRole('searchbox').fill('release')
+    await expect(popup.getByLabel('Result position')).toHaveText('1 / 48')
+    await expect
+      .poll(() =>
+        popup
+          .locator('img.search-thumbnail')
+          .first()
+          .evaluate((image: HTMLImageElement) => image.naturalWidth),
+      )
+      .toBe(320)
+    const ids = await app.evaluate(
+      () => (globalThis as unknown as { searchThumbnailReads: { ids: string[] } }).searchThumbnailReads.ids,
+    )
+
+    expect(ids).toContain('image-0')
+    expect(ids).not.toContain('image-12')
+    expect(ids.length).toBeLessThanOrEqual(12)
+  })
+
+  // @requirement PRODUCT.md §20.14.2
   test('shows a fitted image thumbnail under the text of a result found through its image', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {

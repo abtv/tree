@@ -2190,7 +2190,7 @@ body.node-drag-invalid * {
   display: flow-root;
 }
 
-/* Keep the maximum box in sync with MAX_THUMBNAIL_WIDTH/HEIGHT in AttachmentPreview.tsx. */
+/* Keep the box limits and block margins in sync with search-thumbnail-layout.ts. */
 .search-thumbnail {
   display: block;
   max-width: 120px;

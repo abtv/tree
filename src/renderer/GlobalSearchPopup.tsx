@@ -24,6 +24,7 @@ import { SearchQueryInput } from './SearchQueryInput'
 import { initialSearchHeading } from './node-flags'
 import { AttachmentThumbnail } from './AttachmentPreview'
 import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
+import { SEARCH_THUMBNAIL_BLOCK_MARGIN, searchThumbnailSize } from './search-thumbnail-layout'
 
 const RESULT_EDGE_INSET = 12
 const RESULT_KEYS = '↑↓ Select   ↵ Open   Esc Close'
@@ -173,8 +174,13 @@ export function GlobalSearchPopup({
     () =>
       computeOffsets(
         items?.map((item, index) => {
+          const measured = heights.get(item.id)
+          if (measured !== undefined) return measured
           const heading = hasGroupHeading(items, index) ? ROW_HEIGHT_ESTIMATE : 0
-          return heights.get(item.id) ?? ROW_HEIGHT_ESTIMATE + heading
+          // The first window should load images for the rows that actually fit in it.
+          const thumbnail = searchThumbnailSize(item.attachment?.width, item.attachment?.height)
+          const thumbnailHeight = thumbnail === undefined ? 0 : thumbnail.height + SEARCH_THUMBNAIL_BLOCK_MARGIN
+          return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight
         }) ?? [],
       ),
     [items, heights],
