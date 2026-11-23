@@ -351,13 +351,12 @@ export function GlobalSearchPopup({
       close()
     }
     document.addEventListener('keydown', keydown, true)
+    // Switching to another application keeps Search open; returning restores the input focus.
     document.addEventListener('pointerdown', outside, true)
-    window.addEventListener('blur', close)
     return () => {
       if (openRef !== undefined) openRef.current = undefined
       document.removeEventListener('keydown', keydown, true)
       document.removeEventListener('pointerdown', outside, true)
-      window.removeEventListener('blur', close)
     }
   })
 

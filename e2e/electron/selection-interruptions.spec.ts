@@ -88,6 +88,73 @@ test('continues a rich Visual selection after native window blur', async ({ user
   await expect(editor.locator('a')).toHaveAttribute('href', 'https://example.com')
 })
 
+// @requirement PRODUCT.md §20.14
+// @requirement PRODUCT.md §20.2.28
+test('keeps Search and the command panel open while another application is active', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'one', text: 'alpha', children: [] },
+        { id: 'two', text: 'beta', children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  // As above, only a visible native window loses real focus to another window.
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', windows: 'visible' })
+  const nativeFocus = await window.context().newCDPSession(window)
+  await nativeFocus.send('Emulation.setFocusEmulationEnabled', { enabled: false })
+  const main = await app.browserWindow(window)
+  await main.evaluate((browserWindow) => browserWindow.focus())
+  await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(true)
+  const editor = node(window, 1)
+  await editor.focus()
+  const leaveAndReturn = async (): Promise<void> => {
+    const other = await app.evaluateHandle(({ BrowserWindow }) => {
+      const window = new BrowserWindow({ width: 200, height: 100, show: true })
+      window.focus()
+      return window
+    })
+    await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(false)
+    await expect(window.locator('.global-search-popup, .command-panel')).toHaveCount(1)
+    await main.evaluate((browserWindow) => browserWindow.focus())
+    await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(true)
+    await other.evaluate(
+      (browserWindow) =>
+        new Promise<void>((resolve) => {
+          browserWindow.once('closed', () => resolve())
+          browserWindow.close()
+        }),
+    )
+    await other.dispose()
+  }
+
+  await window.keyboard.press('Meta+;')
+  const query = window.getByRole('searchbox', { name: 'Search query' })
+  await query.fill('alp')
+  await expect(window.getByLabel('Result position')).toHaveText('1 / 1')
+  await leaveAndReturn()
+
+  await expect(query).toBeFocused()
+  await expect(query).toHaveValue('alp')
+  await window.keyboard.type('ha')
+  await expect(query).toHaveValue('alpha')
+  await window.keyboard.press('Escape')
+  await expect(window.locator('.global-search-popup')).toHaveCount(0)
+  await expect(editor).toBeFocused()
+
+  await window.keyboard.press('Meta+Shift+p')
+  const command = window.getByRole('combobox', { name: 'Command' })
+  await command.fill('toggle')
+  await leaveAndReturn()
+
+  await expect(command).toBeFocused()
+  await expect(command).toHaveValue('toggle')
+  await window.keyboard.press('Escape')
+  await expect(window.locator('.command-panel')).toHaveCount(0)
+  await expect(editor).toBeFocused()
+})
+
 // @requirement PRODUCT.md §17.1
 // @requirement PRODUCT.md §20.2.20
 test('continues a rich Visual selection after keyboard and pointer preview round trips @linux', async ({

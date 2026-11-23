@@ -315,14 +315,14 @@ export function useCommandPanel(options: {
     const focusout = (event: FocusEvent): void => {
       if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.command-panel, .command-input-line'))
         return
+      // Switching to another application blurs the input too; the panel stays open and regains focus on return.
+      if (!document.hasFocus()) return
       close()
     }
-    window.addEventListener('blur', close)
     document.addEventListener('pointerdown', outside, true)
     inputRef.current?.addEventListener('blur', focusout)
     const inputElement = inputRef.current
     return () => {
-      window.removeEventListener('blur', close)
       document.removeEventListener('pointerdown', outside, true)
       inputElement?.removeEventListener('blur', focusout)
     }

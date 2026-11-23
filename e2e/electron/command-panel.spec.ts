@@ -186,6 +186,8 @@ test.describe('Normal command panel', () => {
     await open(window)
     await window.evaluate(() => globalThis.dispatchEvent(new Event('blur')))
 
+    await expect(window.locator('.command-panel')).toHaveCount(1)
+    await window.keyboard.press('Escape')
     await expect(window.locator('.command-panel')).toHaveCount(0)
     await expect(editor).toBeFocused()
   })
