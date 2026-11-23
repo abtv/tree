@@ -84,6 +84,29 @@ describe('native search scheduling', () => {
 })
 
 describe('incremental executor', () => {
+  it.each([8192, 8193])('preserves wrapped jumps in both directions at the retention limit (%i matches)', (total) => {
+    const harness = searchHarness(128)
+    const neighborhood: SearchNeighborhood = {}
+    const document = { roots: [{ id: 'a', text: 'a '.repeat(total), children: [] }] }
+    const jump = (index: number, direction: 1 | -1, count: number) =>
+      harness.run({
+        ...base,
+        document,
+        query: 'a',
+        operation: { kind: 'navigate', origin: { nodeId: 'a', offset: index * 2 }, direction, count, neighborhood },
+      })
+    expect(jump(total - 2, 1, 1)).toMatchObject({ ordinal: total, total })
+    const before = harness.slices()
+
+    const forward = jump(total - 1, 1, 34)
+    const reverse = jump(33, -1, 34)
+
+    expect(forward).toMatchObject({ ordinal: 34, destination: { start: 66 }, total, wrapped: true })
+    expect(reverse).toMatchObject({ ordinal: total, destination: { start: (total - 1) * 2 }, total, wrapped: true })
+    if (total === 8192) expect(harness.slices() - before).toBe(2)
+    else expect(neighborhood.complete).toBeNull()
+  })
+
   it('defers cached caret calculation and skips it when a repeat is canceled', async () => {
     const neighborhood: SearchNeighborhood = {}
     const request: SearchRequest = {

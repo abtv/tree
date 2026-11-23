@@ -34,12 +34,17 @@ interface ExactMatches {
   reference?: { occurrence: SearchOccurrence; row: number }
 }
 
+type LocatedMatch = TextMatch & { occurrence: SearchText }
+
 export interface SearchNeighborhood {
-  block?: { first: number; total: number; matches: (TextMatch & { occurrence: SearchText })[] }
+  block?: { first: number; total: number; matches: LocatedMatch[] }
   previous?: NonNullable<SearchNeighborhood['block']>
+  // null means the current query exceeded the retention limit on its first scan.
+  complete?: LocatedMatch[] | null
 }
 
 const blockSize = 64
+const retainedMatchLimit = 8192
 
 type Navigation = {
   readonly kind: 'navigate'
@@ -187,9 +192,36 @@ function* navigateExact(
   }
 }
 
+function selectBlock(
+  neighborhood: SearchNeighborhood,
+  matches: LocatedMatch[],
+  first: number,
+  index: number,
+  total: number,
+  wrapped: boolean,
+): SearchResult {
+  if (neighborhood.block) neighborhood.previous = neighborhood.block
+  neighborhood.block = { first, matches, total }
+  const hit = matches[index - first]!
+  return {
+    kind: 'navigate',
+    destination: destination(hit.occurrence, hit),
+    ordinal: index + 1,
+    total,
+    wrapped,
+    missingOrigin: false,
+  }
+}
+
+function selectComplete(neighborhood: SearchNeighborhood, matches: LocatedMatch[], index: number, wrapped: boolean) {
+  const first = Math.max(0, index - blockSize / 2)
+  return selectBlock(neighborhood, matches.slice(first, first + blockSize), first, index, matches.length, wrapped)
+}
+
 function cachedNavigation(operation: SearchOperation): (() => SearchResult) | undefined {
   if (operation.kind === 'navigate' && operation.neighborhood && operation.origin.nodeId !== undefined) {
-    const blocks = [operation.neighborhood.block, operation.neighborhood.previous]
+    const neighborhood = operation.neighborhood
+    const blocks = [neighborhood.block, neighborhood.previous]
     for (const block of blocks) {
       if (!block) continue
       const origin = operation.origin
@@ -207,6 +239,8 @@ function cachedNavigation(operation: SearchOperation): (() => SearchResult) | un
             wrapped,
             missingOrigin: false,
           })
+        const complete = neighborhood.complete
+        if (complete) return () => selectComplete(neighborhood, complete, index, wrapped)
       }
     }
   }
@@ -227,9 +261,14 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
   let through = 0
   const boundary = operation.kind === 'navigate' ? operation.origin.beforeDay : undefined
   let foundOrigin = boundary !== undefined && request.scope.kind === 'agenda'
-  const nearby: (TextMatch & { occurrence: SearchText })[] = []
+  const nearby: LocatedMatch[] = []
   let collected = 0
-  const knownTotal = operation.kind === 'navigate' ? operation.neighborhood?.block?.total : undefined
+  const neighborhood = operation.kind === 'navigate' ? operation.neighborhood : undefined
+  const knownTotal = neighborhood?.complete?.length ?? neighborhood?.block?.total
+  let complete: LocatedMatch[] | undefined =
+    neighborhood && neighborhood.complete === undefined && request.scope.kind === 'tree' && knownTotal === undefined
+      ? []
+      : undefined
   scan: for (const occurrence of searchScope(request.document, request.scope)) {
     yield undefined
     if (occurrence === undefined) continue
@@ -247,6 +286,13 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
       yield undefined
       if (match === undefined) continue
       total++
+      if (complete) {
+        if (total <= retainedMatchLimit) complete.push({ occurrence, ...match })
+        else {
+          complete = undefined
+          neighborhood!.complete = null
+        }
+      }
       if (operation.kind === 'count') {
         if (total === 101) return { kind: 'count', total: 100, capped: true }
         exact?.matches.push({ occurrence, row, ...match })
@@ -275,24 +321,16 @@ function* executeSearch(request: SearchRequest): Generator<undefined, SearchResu
     }
   }
   if (operation.kind === 'count') return { kind: 'count', total, capped: false, ...(exact && { exact }) }
+  if (neighborhood && complete) neighborhood.complete = complete
   if (!foundOrigin || total === 0) {
     return { kind: 'navigate', total, wrapped: false, missingOrigin: !foundOrigin }
   }
   const { index: target, wrapped } = targetOrdinal(operation, total, before, through)
+  if (neighborhood?.complete) return selectComplete(neighborhood, neighborhood.complete, target, wrapped)
   const first = collected - nearby.length
   if (operation.neighborhood && target >= first && target < collected) {
     const matches = Array.from({ length: nearby.length }, (_, i) => nearby[(first + i) % blockSize]!)
-    if (operation.neighborhood.block) operation.neighborhood.previous = operation.neighborhood.block
-    operation.neighborhood.block = { first, matches, total }
-    const hit = matches[target - first]!
-    return {
-      kind: 'navigate',
-      destination: destination(hit.occurrence, hit),
-      ordinal: target + 1,
-      total,
-      wrapped,
-      missingOrigin: false,
-    }
+    return selectBlock(operation.neighborhood, matches, first, target, total, wrapped)
   }
   let ordinal = 0
   for (const occurrence of searchScope(request.document, request.scope)) {

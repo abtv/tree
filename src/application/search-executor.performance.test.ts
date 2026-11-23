@@ -2,9 +2,10 @@ import { expect, it } from 'vitest'
 import { searchHarness } from './test/search-harness'
 import { searchCaret, type SearchNeighborhood, type SearchRequest } from './search-executor'
 
-it('refills nearby matches without recounting the rest of a wide tree', () => {
+it('refills nearby matches without recounting a tree above the retention limit', () => {
+  const total = 10_000
   const document = {
-    roots: Array.from({ length: 5000 }, (_, i) => ({ id: String(i), text: 'a' + 'x'.repeat(100), children: [] })),
+    roots: Array.from({ length: total }, (_, i) => ({ id: String(i), text: 'a' + 'x'.repeat(100), children: [] })),
   }
   const scope = { kind: 'tree' as const, parentId: null }
   const neighborhood: SearchNeighborhood = {}
@@ -19,13 +20,13 @@ it('refills nearby matches without recounting the rest of a wide tree', () => {
       query: 'a',
       operation: { kind: 'navigate', origin: { nodeId, offset: 0 }, direction: 1, count: 1, neighborhood },
     })
-  expect(next('0')).toMatchObject({ destination: { nodeId: '1' }, total: 5000 })
+  expect(next('0')).toMatchObject({ destination: { nodeId: '1' }, total })
+  expect(neighborhood.complete).toBeNull()
   const beforeRefill = harness.slices()
 
   const result = next('32')
 
-  expect(result).toMatchObject({ destination: { nodeId: '33' }, ordinal: 34, total: 5000 })
-  // Measured one work slice for this refill and 63 for a full scan.
+  expect(result).toMatchObject({ destination: { nodeId: '33' }, ordinal: 34, total })
   expect(harness.slices() - beforeRefill).toBeLessThanOrEqual(2)
 })
 
