@@ -571,20 +571,40 @@ describe('useNodeInputBindings', () => {
     expect(f.node().text).toBe('')
   })
 
-  it.each(['outside', 'window'])('ends Replace when a read-only Agenda row loses focus to %s', async (path) => {
+  it.each(['an outside control', 'window'])(
+    'ends Replace when a read-only Agenda row loses focus to %s',
+    async (path) => {
+      const f = await fixture({ mode: 'replace' })
+      const row = document.createElement('div')
+      row.className = 'agenda-row'
+      row.tabIndex = 0
+      const control = document.createElement('button')
+      document.body.append(row, control)
+      row.focus()
+
+      act(() => {
+        if (path === 'window') globalThis.dispatchEvent(new Event('blur'))
+        else control.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      })
+
+      expect(f.result.current.vimMode).toBe('normal')
+    },
+  )
+
+  it('keeps Replace on a read-only Agenda row through a blank press', async () => {
     const f = await fixture({ mode: 'replace' })
     const row = document.createElement('div')
     row.className = 'agenda-row'
     row.tabIndex = 0
-    document.body.append(row)
+    const blank = document.createElement('div')
+    document.body.append(row, blank)
     row.focus()
 
     act(() => {
-      if (path === 'outside') document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
-      else globalThis.dispatchEvent(new Event('blur'))
+      blank.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     })
 
-    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.vimMode).toBe('replace')
   })
 
   it.each([false, true])(
@@ -4210,6 +4230,26 @@ describe('drag caret freeze', () => {
     fireEvent.pointerUp(window, { pointerId: 7 })
 
     expect(document.activeElement).not.toBe(input)
+  })
+
+  it('finishes another focused editor through blur and keeps its focus when a drag starts from a different row', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'alpha'), node('peer', 'beta')] } })
+    f.input('node')
+    const focused = f.input('peer')
+    focused.focus()
+    focused.setSelectionRange(1, 1)
+    let blurs = 0
+    focused.addEventListener('blur', () => blurs++)
+
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+
+    expect(blurs).toBe(1)
+    expect(document.activeElement).toBe(focused)
+    expect([focused.selectionStart, focused.selectionEnd]).toEqual([1, 1])
+
+    act(() => f.result.current.dragFreeze.end(7))
+
+    expect(document.activeElement).toBe(focused)
   })
 
   it('does not touch the caret when the source is not active or is missing', async () => {

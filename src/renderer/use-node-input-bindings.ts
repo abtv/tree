@@ -26,6 +26,7 @@ import {
   updateDateLikeUnderline,
   updateSelectedLinks,
 } from './editor-dom'
+import { keepsEditorFocusOnPress } from './blank-press-focus'
 import { createEditorKeyDownHandler } from './editor-input-handlers'
 import type { VimTextCommandState } from './vim-session-finish'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
@@ -223,7 +224,17 @@ export function useNodeInputBindings({
         frozenCaret.current = undefined
       }
       const input = inputs.current.get(nodeId)
-      if (input === undefined || document.activeElement !== input) return
+      if (input === undefined || document.activeElement !== input) {
+        // A press on a row's blank area keeps another editor's focus (PRODUCT §20) until the hold
+        // becomes a drag. The drag then finishes that editor's buffered session through its blur, as
+        // the press used to, and gives focus back, so a cancelled drag leaves the editor usable.
+        const active = document.activeElement
+        if (active instanceof HTMLElement && [...inputs.current.values()].includes(active)) {
+          active.blur()
+          active.focus({ preventScroll: true })
+        }
+        return
+      }
       caretProjection.current.invalidateCaret()
       collapseSelectionToAnchor(input)
       frozenCaret.current = freezeCaret(nodeId, pointerId, {
@@ -773,12 +784,14 @@ export function useNodeInputBindings({
           ? { key, down: event }
           : undefined
       // A read-only row has no input blur handler. Leaving its row surface must still end
-      // Replace, just as blur to an outside control does when an editor owns focus.
+      // Replace, just as blur to an outside control does when an editor owns focus. A blank press
+      // keeps the row's focus, and with it Replace, as it keeps an editor's.
       if (
         caretProjection.current.mode === 'replace' &&
         document.activeElement?.matches('.agenda-row') &&
         !row &&
-        !target?.closest('[data-editor-focus-borrow]')
+        !target?.closest('[data-editor-focus-borrow]') &&
+        !keepsEditorFocusOnPress(event, document.activeElement)
       ) {
         takeReplaceClick(vimSession.current)
         changeVimMode('normal')

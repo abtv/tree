@@ -28,6 +28,7 @@ import { prepareVimCommand } from './vim-session-finish'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { SearchPrompt } from './SearchPrompt'
+import { createBlankPressFocus } from './blank-press-focus'
 import { SearchCount } from './SearchCount'
 import { useLocalSearch } from './use-local-search'
 import { NodeList } from './NodeList'
@@ -278,6 +279,7 @@ export function App({
   })
   const searchCaret = useRef<(() => number | undefined) | undefined>(undefined)
   const activeLineRoot = useRef<HTMLElement | null>(null)
+  const blankPress = useMemo(() => createBlankPressFocus(), [])
   const refreshActiveLine = useActiveLineHighlight(activeLineRoot)
   const openGlobalSearch = useRef<(() => void) | undefined>(undefined)
   const readAgendaCaret = useCallback(() => {
@@ -632,6 +634,10 @@ export function App({
     <main
       ref={activeLineRoot}
       className={`tree-app vim-state-${vimMode}${leftCommandKeyPressed ? ' left-command-down' : ''}`}
+      onMouseDown={(event) => blankPress.press(event.nativeEvent)}
+      onContextMenu={() => blankPress.contextMenu()}
+      onMouseUp={() => blankPress.settle()}
+      onKeyDownCapture={() => blankPress.settle()}
       onKeyDown={(event) => {
         const target = event.target
         if (

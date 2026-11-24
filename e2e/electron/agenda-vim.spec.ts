@@ -661,7 +661,13 @@ test.describe('Agenda Vim commands', () => {
 
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
 
+    // A press on a blank area, such as the mode indicator, keeps the row's focus and its mode (PRODUCT §20).
     await window.getByLabel('Vim mode').click()
+
+    await expect(row(window, dayKey(10, 9))).toBeFocused()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+
+    await window.keyboard.press('Escape')
 
     await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   })

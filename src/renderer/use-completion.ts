@@ -9,6 +9,7 @@ import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { VimMode } from './vim-editing'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import { normalizeTypedInput } from './typed-marker-input'
+import { keepsEditorFocusOnPress } from './blank-press-focus'
 
 export function useCompletion(
   store: EditorStore,
@@ -86,13 +87,21 @@ export function useCompletion(
       )
         close()
     })
+    // A blank press keeps editor focus instead of blurring it, so it dismisses the popup here.
+    const closeOnBlankPress = (event: PointerEvent): void => {
+      if (owner.current.popup === undefined) return
+      if (event.target instanceof Element && event.target.closest('.date-popup') !== null) return
+      if (keepsEditorFocusOnPress(event, document.activeElement)) close()
+    }
     document.addEventListener('selectionchange', observe)
+    document.addEventListener('pointerdown', closeOnBlankPress, true)
     globalThis.addEventListener('blur', close)
     globalThis.addEventListener('resize', observe)
     document.addEventListener('scroll', observe, true)
     return () => {
       stop()
       document.removeEventListener('selectionchange', observe)
+      document.removeEventListener('pointerdown', closeOnBlankPress, true)
       globalThis.removeEventListener('blur', close)
       globalThis.removeEventListener('resize', observe)
       document.removeEventListener('scroll', observe, true)

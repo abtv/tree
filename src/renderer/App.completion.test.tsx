@@ -74,6 +74,27 @@ describe.each([false, true])('App completion (Vim %s)', (vimEnabled) => {
     expect(f.editor()).toHaveAttribute('contenteditable', 'true')
   })
 
+  // @requirement PRODUCT.md §20
+  // @requirement PRODUCT.md §20.9
+  it('dismisses on a blank press that keeps editor focus, but not on a press in the popup', async () => {
+    const f = await fixture('Tree', vimEnabled, 'Plan ')
+    await f.edit('next month')
+
+    fireEvent.pointerDown(f.container.querySelector('.date-popup-footer')!, { button: 0 })
+
+    expect(f.popup()).not.toBeNull()
+
+    const blank = f.container.querySelector('.editor-shell')!
+    fireEvent.pointerDown(blank, { button: 0 })
+    const pressDefault = fireEvent.mouseDown(blank, { button: 0 })
+    await settleApp()
+
+    expect(f.popup()).toBeNull()
+    expect(pressDefault).toBe(false)
+    expect(f.editor()).toHaveFocus()
+    if (vimEnabled) expect(screen.getByLabelText('Vim mode')).toHaveTextContent('INSERT')
+  })
+
   describe.each(['Tree', 'Agenda'] as const)('%s rich editor', (view) => {
     // @requirement PRODUCT.md §20.9.1
     it('retains a chosen weekday through refinement and one Undo', async () => {

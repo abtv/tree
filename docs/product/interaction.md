@@ -20,6 +20,8 @@ The tree hierarchy can be navigated by entering and leaving nodes or inspected a
 
 The pointer shows the text-editing cursor only over a node editor that has focus. Text the user cannot edit — the location path, the Vim mode indicator, tooltips, status and error messages, and dialog text — shows the default arrow cursor.
 
+A primary or secondary press on an area that is not an editor, a control, an Agenda row, a dialog or a message — the margins, the space beside and below the node text, the title bar, or the location and status bars around their controls — leaves keyboard focus, caret, selection and Vim mode in the node editor or Agenda row that has them, as the pin toggle does (§2.2). The next key acts on the editor. Such a press still dismisses an open suggestion popup outside it (§20.9). Status and error messages stay selectable text, and scrollbars keep their native behavior.
+
 The desktop app keeps the mouse pointer visible while typing and navigating with the keyboard, in both standard and Vim editing. This deliberately overrides automatic pointer hiding so users can locate the pointer without moving the mouse. It does not change the text caret or pointer shapes.
 
 ### 20.1 Very Wide Node Lists
