@@ -10,7 +10,7 @@ import { readPngDimensions } from '../shared/png-validation'
 import type { AttachmentDimensions } from '../domain/attachment-dimensions'
 import { applyAppearance } from './appearance'
 import { validatePngAttachment } from './attachment-validation'
-import { isIPhoneOrIPad } from './device'
+import { isAndroid, isIPhoneOrIPad } from './device'
 import { discardStagedImages, openDatabase, readValue, sweepStagedImages } from './storage-schema'
 
 const status = (text: string) => {
@@ -125,7 +125,7 @@ export async function installBrowserPrototype(): Promise<{
             : 'Saved locally in this browser',
     )
   }
-  const vimAvailable = !isIPhoneOrIPad(navigator)
+  const vimAvailable = !isIPhoneOrIPad(navigator) && !isAndroid(navigator)
   let vimEnabled = vimAvailable && ((await read<boolean>('preferences', 'vim')) ?? false)
   let lineNumbers = (await read<unknown>('preferences', 'line-numbers')) === true
   document.getElementById('prototype-vim-controls')!.hidden = !vimAvailable

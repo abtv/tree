@@ -31,11 +31,13 @@ control keeps that explicit destination. Without a connected previous editor, na
 control focus remains. Opening/cancelling the menu creates no document edit or extra
 save; buffered edits follow their ordinary commit rules when focus moves on.
 
-On iPhones and iPads, the browser version always uses standard editing and hides
-the Vim menu option, command-panel entry and mode indicator, even with an external
-keyboard attached. Detection uses the iPhone/iPad browser identity, including
-iPadOS's Mac identity with multiple touch points. A saved Vim preference is ignored
-on these devices without overwriting it. These rules apply only on iPhones and iPads.
+On iPhones, iPads and Android devices, the browser version always uses standard
+editing and hides the Vim menu option, command-panel entry and mode indicator, even
+with an external keyboard attached. Detection uses the iPhone/iPad browser identity,
+including iPadOS's Mac identity with multiple touch points, and an Android browser
+identity; an Android browser that requests the desktop site reports a desktop
+identity and keeps Vim. A saved Vim preference is ignored on these devices without
+overwriting it. These rules apply only on iPhones, iPads and Android devices.
 
 In the browser, rich text fields enable native editing in standard editing and
 Vim Insert/Replace modes. Normal and Visual modes keep the same focusable field

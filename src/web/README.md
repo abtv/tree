@@ -139,7 +139,7 @@ Both shortcut profiles passed the macOS Chrome and Linux arm64 Chromium checks.
 Chrome assigns Ctrl+N to a new window; if it does not reach a suggestion popup,
 use the arrow keys.
 
-On iPhones and iPads, Vim controls are hidden and standard editing is enforced;
+On iPhones, iPads and Android devices, Vim controls are hidden and standard editing is enforced;
 see [the browser requirements](../../docs/product/browser.md#14-browser-version).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text

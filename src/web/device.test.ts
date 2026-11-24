@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isApplePlatform, isIPhoneOrIPad } from './device'
+import { isAndroid, isApplePlatform, isIPhoneOrIPad } from './device'
 
 describe('iPhone and iPad identification', () => {
   it.each([
@@ -13,6 +13,21 @@ describe('iPhone and iPad identification', () => {
     ['Windows touch', 'Mozilla/5.0 (Windows NT 10.0)', 'Win32', 10, false],
   ])('%s', (_name, userAgent, platform, maxTouchPoints, expected) => {
     expect(isIPhoneOrIPad({ userAgent, platform, maxTouchPoints })).toBe(expected)
+  })
+})
+
+// @requirement PRODUCT.md §1.4
+describe('Android identification', () => {
+  it.each([
+    ['Android phone Chrome', 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130 Mobile', true],
+    ['Android tablet Chrome', 'Mozilla/5.0 (Linux; Android 14; SM-X910) AppleWebKit/537.36 Chrome/130', true],
+    ['Android Firefox', 'Mozilla/5.0 (Android 15; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0', true],
+    ['Android desktop site', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130', false],
+    ['ChromeOS', 'Mozilla/5.0 (X11; CrOS x86_64 16002.0.0) AppleWebKit/537.36 Chrome/130', false],
+    ['Windows', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', false],
+    ['iPhone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false],
+  ])('%s', (_name, userAgent, expected) => {
+    expect(isAndroid({ userAgent })).toBe(expected)
   })
 })
 

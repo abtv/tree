@@ -214,10 +214,11 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
   expect(errors).toEqual([])
 
   // Exercise the real adapter, saved preference, command panel and editor together.
-  for (const [name, userAgent, platform, maxTouchPoints, width] of [
-    ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone', 5, 390],
-    ['ipad-mobile', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', 'iPad', 5, 820],
-    ['ipad-desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 'MacIntel', 5, 820],
+  for (const [name, userAgent, platform, maxTouchPoints, width, primary] of [
+    ['iphone', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'iPhone', 5, 390, 'Meta'],
+    ['ipad-mobile', 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', 'iPad', 5, 820, 'Meta'],
+    ['ipad-desktop', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15)', 'MacIntel', 5, 820, 'Meta'],
+    ['android', 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Mobile', 'Linux armv8l', 5, 412, 'Control'],
   ] as const) {
     const mobile = await newContext({ userAgent, viewport: { width, height: 760 }, hasTouch: true })
 
@@ -285,7 +286,7 @@ test('uses the menu, previews and mobile editing policy', async ({ newContext, b
 
     expect(await editor.inputValue()).toBe('Standard editing on this device works')
 
-    await device.keyboard.press('Meta+Shift+p')
+    await device.keyboard.press(`${primary}+Shift+p`)
     await device.locator('.command-panel').waitFor()
 
     await expect(device.locator('.command-panel [role="option"]')).toHaveCount(20)

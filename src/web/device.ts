@@ -3,6 +3,11 @@ export function isIPhoneOrIPad(device: Pick<Navigator, 'userAgent' | 'platform' 
   return /iPhone|iPad/i.test(device.userAgent) || (device.platform === 'MacIntel' && device.maxTouchPoints > 1)
 }
 
+/** Android browsers name Android in the user agent unless the user requests the desktop site. */
+export function isAndroid(device: Pick<Navigator, 'userAgent'>): boolean {
+  return /Android/i.test(device.userAgent)
+}
+
 /** An unavailable platform preserves the existing Apple shortcut mapping. */
 export function isApplePlatform(device: Pick<Navigator, 'userAgent' | 'platform'>): boolean {
   return (

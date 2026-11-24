@@ -769,10 +769,14 @@ describe('browser editing service contracts', () => {
     },
   )
 
-  it('disables Vim on an iPad even with a saved enabled preference', async () => {
+  // @requirement PRODUCT.md §1.4
+  it.each([
+    ['an iPad', { platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 5 }],
+    ['Android', { platform: 'Linux armv8l', userAgent: 'Mozilla/5.0 (Linux; Android 15) Mobile', maxTouchPoints: 5 }],
+  ])('disables Vim on %s even with a saved enabled preference', async (_device, device) => {
     const f = fixture()
     f.values.set('preferences:vim', true)
-    vi.stubGlobal('navigator', { locks: f.locks, platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 5 })
+    vi.stubGlobal('navigator', { locks: f.locks, ...device })
     const installed = await installBrowserPrototype()
 
     await window.treeApi.setVimEnabled(true)
