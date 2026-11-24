@@ -942,6 +942,30 @@ describe('NodeList drag interaction', () => {
     expect(dragFreeze.end).toHaveBeenLastCalledWith(1)
   })
 
+  it.each([
+    { phase: 'pending hold', start: (row: Element) => pointerDownAt(row, 13), reaches: true },
+    { phase: 'active drag', start: (row: Element) => activate(row, 13), reaches: false },
+  ])('cancels a $phase on Escape and passes the key on only before the drag activates', ({ start, reaches }) => {
+    vi.useFakeTimers()
+    mockRowRects()
+    const { container } = renderRows()
+    const row = rowElements(container)[0]!
+    const documentOwner = vi.fn()
+    document.addEventListener('keydown', documentOwner, true)
+    start(row)
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    act(() => {
+      row.dispatchEvent(escape)
+    })
+    document.removeEventListener('keydown', documentOwner, true)
+
+    expect(documentOwner).toHaveBeenCalledTimes(reaches ? 1 : 0)
+    expect(escape.defaultPrevented).toBe(!reaches)
+    act(() => vi.advanceTimersByTime(HOLD_ACTIVATION_MS))
+    expect(container.querySelector('.node-row-dragging')).toBeNull()
+  })
+
   it('ends the visual freeze without releasing the caret when the source row disappears', () => {
     vi.useFakeTimers()
     mockRowRects()

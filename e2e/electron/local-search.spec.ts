@@ -494,6 +494,120 @@ test.describe('Manual selection during a Find repeat', () => {
   }
 })
 
+test.describe('Local search standard editing', () => {
+  test.use({ editingMode: 'standard' })
+
+  // @requirement PRODUCT.md §20.13
+  test('lets Escape dismiss tag suggestions before it hides visible Find', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'one', text: 'apple one', children: [] },
+          { id: 'two', text: 'apple two', children: [] },
+          { id: 'catalog', text: '#existing', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.search-count')).toHaveText('1 / 2')
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Meta+g')
+    const two = window.getByRole('textbox', { name: 'Node 3', exact: true })
+    await expect(two).toBeFocused()
+    await window.keyboard.press('End')
+    await window.keyboard.type(' #e')
+    const suggestions = window.getByRole('listbox', { name: 'Tag suggestions' })
+    await expect(suggestions).toHaveCount(1)
+
+    await window.keyboard.press('Escape')
+
+    await expect(suggestions).toHaveCount(0)
+    await expect(window.locator('.local-search-panel')).toHaveCount(1)
+    await expect(two).toBeFocused()
+    await expect(two).toHaveText('apple two #e')
+
+    await window.keyboard.press('Escape')
+
+    await expect(window.locator('.local-search-panel')).toHaveCount(0)
+    await expect(two).toBeFocused()
+    await expect(two).toHaveText('apple two #e')
+  })
+
+  // @requirement PRODUCT.md §20.2.26
+  test('returns focus to the last match when the command panel closes over focused Find', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'one', text: 'apple one', children: [] },
+          { id: 'two', text: 'apple two', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+    await prompt.fill('apple')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.search-count')).toHaveText('1 / 2')
+    await expect(prompt).toBeFocused()
+    await window.keyboard.press('Meta+Shift+p')
+    const command = window.getByRole('combobox', { name: 'Command' })
+    await expect(command).toBeFocused()
+
+    await window.keyboard.press('Escape')
+
+    await expect(command).toHaveCount(0)
+    await expect(window.locator('.local-search-panel')).toHaveCount(1)
+    const one = window.getByRole('textbox', { name: 'Node 2', exact: true })
+    await expect(one).toBeFocused()
+
+    await window.keyboard.type('X')
+
+    await expect(one).toContainText('X')
+  })
+
+  // @requirement PRODUCT.md §20.2.31
+  test('keeps search-opened branches after a text click while Vim is enabled and disabled', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'x', text: 'first branch', children: [{ id: 'x1', text: 'needle one', children: [] }] },
+          { id: 'y', text: 'second branch', children: [{ id: 'y1', text: 'needle two', children: [] }] },
+          { id: 'after', text: 'after row', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.search-count')).toHaveText('1 / 2')
+    await window.keyboard.press('Meta+g')
+    await expect(window.locator('.search-count')).toHaveText('2 / 2')
+    const after = window.locator('.node-row[data-node-id="after"] .node-input')
+    await after.click()
+    await expect(window.locator('.local-search-panel')).toHaveCount(0)
+
+    await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+
+    await expect(window.getByLabel('Vim mode')).toHaveCount(0)
+    await expect(window.locator('[data-node-id="x1"]')).toBeVisible()
+    await expect(window.locator('[data-node-id="y1"]')).toBeVisible()
+    await expect(after).toBeFocused()
+  })
+})
+
 test.describe('Local search Vim modes', () => {
   test.use({ editingMode: 'vim' })
 
@@ -575,6 +689,36 @@ test.describe('Local search Vim modes', () => {
     await expect(editor).toHaveValue('aZQha apple')
     await window.keyboard.press('Meta+z')
     await expect(editor).toHaveValue('aZpha apple')
+  })
+
+  // @requirement PRODUCT.md §20.2.26
+  test('returns focus to the editor when disabling Vim closes Find entry', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'one', text: 'apple one', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.press('/')
+    const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+    await prompt.fill('apple')
+    await expect(window.locator('.search-count')).toHaveText('1')
+    await expect(prompt).toBeFocused()
+
+    await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
+
+    await expect(window.getByLabel('Vim mode')).toHaveCount(0)
+    await expect(prompt).toHaveCount(0)
+    const start = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    await expect(start).toBeFocused()
+
+    await window.keyboard.type('Q')
+
+    await expect(start).toContainText('Q')
   })
 
   test('ends Replace when moving away from a pinned Agenda search result', async ({ userDataDir }) => {

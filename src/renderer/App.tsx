@@ -266,10 +266,13 @@ export function App({
       dataOperations?.dismissTransientStatus()
       dismissTransientStatus?.()
       store.search.interruptNavigation()
-      if (store.search.session.getSnapshot().draft !== undefined) {
-        store.search.cancelDraft()
-        restoreSearchFocus()
-      }
+      const active = document.activeElement
+      // The Find panel unmounts under the command panel, so its focus returns to the editor at the last match
+      // first, as Find's own restoration places it, and closing the command panel restores that editor.
+      const findFocused = active instanceof Element && active.closest('.local-search-panel') !== null
+      const drafting = store.search.session.getSnapshot().draft !== undefined
+      if (drafting) store.search.cancelDraft()
+      if (drafting || findFocused) restoreSearchFocus()
     },
     beforeViewChange,
   })
@@ -288,6 +291,7 @@ export function App({
   }, [store, readSearchCaret])
   const localSearch = useLocalSearch({
     vimEnabled,
+    completionOpen: completionPopup !== undefined,
     store,
     shortcuts,
     blocked: commandPanel.open || previewAttachmentId !== undefined,
@@ -339,7 +343,14 @@ export function App({
       const nextValue = preferences.vim.getSnapshot()
       if (appliedVim.current === nextValue) return
       appliedVim.current = nextValue
-      if (!nextValue) store.hideSearch()
+      // Disabling Vim hides visible search as Escape does; folds that a text click left to search stay open
+      // (§20.2.31). A focused `/` prompt unmounts with it, so the editor takes focus back first.
+      if (!nextValue && store.search.session.getSnapshot().visible) {
+        const active = document.activeElement
+        const prompted = active instanceof Element && active.closest('.search-input-line') !== null
+        store.hideSearch()
+        if (prompted) searchAction.current('restore-editor')
+      }
       setVimEditing(nextValue)
     }
     const remove = preferences.vim.subscribe(apply)

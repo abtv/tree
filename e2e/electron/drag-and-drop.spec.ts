@@ -231,6 +231,37 @@ describeForEachEditingMode('drag and drop', ({ mode }) => {
     expect(await nodeTexts(window)).toEqual(['A', 'B', 'C', 'D'])
   })
 
+  // @requirement PRODUCT.md §11
+  test('cancels an active drag with Escape while Find feedback stays visible', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: ['apple', 'B', 'C', 'D'].map((text) => ({ id: text, text, children: [] })) },
+      location: { currentParentId: null, selectedNodeId: 'D' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.press(mode === 'vim' ? '/' : 'Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('apple')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('.search-count')).toHaveText('1 / 1')
+    if (mode === 'standard') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('Meta+g')
+      await expect(window.locator('.local-search-panel')).toHaveCount(1)
+    }
+    await startRowDrag(window, window.locator('.node-row').nth(3).locator('.node-input'))
+    const target = await rowBox(window, 1)
+    await window.mouse.move(target.x + 8, target.y + 4, { steps: 5 })
+    await expect(window.locator('.node-row-drop-before, .node-row-drop-after')).toHaveCount(1)
+
+    await window.keyboard.press('Escape')
+
+    await expect(window.locator('.node-row-dragging')).toHaveCount(0)
+    await expect(window.locator('.search-count')).toHaveCount(1)
+
+    await window.mouse.up()
+
+    expect(await nodeTexts(window)).toEqual(['apple', 'B', 'C', 'D'])
+  })
+
   test('keeps a pressed drag as a text selection instead of starting a node drag', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
 

@@ -14,6 +14,7 @@ export function useLocalSearch({
   beforeOpen,
   beforeJump,
   vimEnabled,
+  completionOpen,
 }: {
   store: EditorStore
   shortcuts: ShortcutProfile
@@ -24,6 +25,8 @@ export function useLocalSearch({
   beforeOpen(): void
   beforeJump(): void
   vimEnabled: boolean
+  /** An open completion popup takes Escape before visible Find does (§20.9). */
+  completionOpen: boolean
 }) {
   const origin = useCallback(() => {
     const active = document.activeElement
@@ -85,6 +88,7 @@ export function useLocalSearch({
       if (
         event.key === 'Escape' &&
         !vimEnabled &&
+        !completionOpen &&
         store.search.session.getSnapshot().draft === undefined &&
         store.search.session.getSnapshot().visible
       ) {
@@ -106,7 +110,7 @@ export function useLocalSearch({
     return () => {
       document.removeEventListener('keydown', keydown, true)
     }
-  }, [blocked, shortcuts, open, navigate, vimEnabled, store, restoreEditor])
+  }, [blocked, shortcuts, open, navigate, vimEnabled, completionOpen, store, restoreEditor])
 
   return { open, navigate }
 }

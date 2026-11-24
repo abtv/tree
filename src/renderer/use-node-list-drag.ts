@@ -282,9 +282,14 @@ export function useNodeListDrag({
     const pointerId = resolved.source?.pointerId
     const outsideList = (event: PointerEvent): boolean =>
       event.target instanceof Node && !listRef.current?.contains(event.target)
+    // An active drag claims Escape before document-level owners, such as visible Find, can act on it. A pending
+    // hold only cancels, leaving Escape to the focused editor, its popups and Find.
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
-      event.preventDefault()
+      if (resolved.phase === 'dragging') {
+        event.preventDefault()
+        event.stopPropagation()
+      }
       cancelDrag()
     }
     const onBlur = (): void => cancelDrag()
@@ -300,7 +305,7 @@ export function useNodeListDrag({
       if (pointerId === undefined || event.pointerId !== pointerId) return
       if (outsideList(event)) onListPointerUp(event)
     }
-    globalThis.addEventListener('keydown', onKeyDown)
+    globalThis.addEventListener('keydown', onKeyDown, true)
     globalThis.addEventListener('blur', onBlur)
     globalThis.addEventListener('dragstart', onNativeDragStart)
     globalThis.addEventListener('pointermove', onPointerMove)
@@ -312,7 +317,7 @@ export function useNodeListDrag({
     // Inside-list releases continue through the list's React handler.
     globalThis.addEventListener('pointerup', onPointerUp, true)
     return () => {
-      globalThis.removeEventListener('keydown', onKeyDown)
+      globalThis.removeEventListener('keydown', onKeyDown, true)
       globalThis.removeEventListener('blur', onBlur)
       globalThis.removeEventListener('dragstart', onNativeDragStart)
       globalThis.removeEventListener('pointermove', onPointerMove)

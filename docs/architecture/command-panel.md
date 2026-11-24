@@ -14,7 +14,7 @@ Performance assessment (PRODUCT.md §22.1): alphabetical order is prepared when 
 
 #### 7.2.2 Focus Capture and Restoration
 
-`captureFocusRestoration` in `editor-dom.ts` owns the shared capture/restore mechanics for the command panel, About, global Search and browser menu. Editor selections use logical offsets, so text decoration can replace DOM nodes during borrowed focus. Native scopes support textarea, input and document selection for each caller. A disconnected origin is inert. Each caller decides when to restore, including browser popover microtask ordering and explicit new focus destinations. Each focus owner holds one bounded capture. The mechanism does no document traversal or writes, and it does not replace the editor's caret authority.
+`captureFocusRestoration` in `editor-dom.ts` owns the shared capture/restore mechanics for the command panel, About, global Search and browser menu. Editor selections use logical offsets, so text decoration can replace DOM nodes during borrowed focus. Native scopes support textarea, input and document selection for each caller. A disconnected origin is inert. Each caller decides when to restore, including browser popover microtask ordering and explicit new focus destinations. Each focus owner holds one bounded capture. The mechanism does no document traversal or writes, and it does not replace the editor's caret authority. The Find panel unmounts under the command panel, so opening from Find first calls the renderer's Find restoration handler, and the capture records the editor at the last match.
 
 The command-panel owner saves and restores native selection while borrowing focus; the input bindings forward the blur destination so that this temporary handoff preserves editing sessions.
 
