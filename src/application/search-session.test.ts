@@ -268,43 +268,198 @@ it('serves an early confirmation from the running count without another scan', (
   )
 })
 
-it.each(['begin', 'interrupt', 'subscriber', 'hide', 'revision', 'scope'] as const)(
-  'drops a jump waiting for its count after %s',
-  (action) => {
-    const harness = searchHarness()
-    const session = new SearchSession(harness.executor)
-    const jump = vi.fn()
-    session.replaceContext(context)
-    session.begin(origin)
-    session.edit('aa')
-    session.confirm(jump)
+it('serves a repeat from hidden search with its recount and no occurrence walk', () => {
+  const roots = [
+    ...Array.from({ length: 400 }, (_, index) => ({ id: `n${index}`, text: 'ordinary words only', children: [] })),
+    { id: 'target', text: 'needle', children: [] },
+  ]
+  const counting = searchHarness(64)
+  const reference = new SearchSession(counting.executor)
+  reference.replaceContext({ ...context, document: { roots } })
+  reference.begin({ nodeId: 'n399', offset: 0 })
+  reference.edit('needle')
+  counting.flush()
+  const harness = searchHarness(64)
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext({ ...context, document: { roots } })
+  session.begin({ nodeId: 'n0', offset: 0 })
+  session.edit('needle')
+  session.confirm(vi.fn())
+  harness.flush()
+  session.hide()
+  const before = harness.slices()
 
-    if (action === 'begin') session.begin(origin)
-    else if (action === 'interrupt') session.interruptNavigation()
-    else if (action === 'subscriber') session.subscribe(() => session.interruptNavigation())
-    else if (action === 'hide') session.hide()
-    else if (action === 'revision') session.replaceContext({ ...context, revision: 2 })
-    else session.replaceContext({ ...context, scopeKey: 'another-location' })
+  session.navigate({ nodeId: 'n399', offset: 0 }, 1, 1, jump)
+  harness.flush()
+
+  expect(counting.slices()).toBeGreaterThan(10)
+  expect(harness.slices() - before).toBeLessThanOrEqual(counting.slices() + 1)
+  expect(jump).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ ordinal: 1, destination: expect.objectContaining({ nodeId: 'target' }) }),
+  )
+})
+
+it('serves a repeat during the recount an edit starts without another scan', () => {
+  const roots = [
+    ...Array.from({ length: 400 }, (_, index) => ({ id: `n${index}`, text: 'ordinary words only', children: [] })),
+    { id: 'target', text: 'needle', children: [] },
+  ]
+  const counting = searchHarness(64)
+  const reference = new SearchSession(counting.executor)
+  reference.replaceContext({ ...context, document: { roots } })
+  reference.begin({ nodeId: 'n0', offset: 0 })
+  reference.edit('needle')
+  counting.flush()
+  const harness = searchHarness(64)
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext({ ...context, document: { roots } })
+  session.begin({ nodeId: 'n0', offset: 0 })
+  session.edit('needle')
+  session.confirm(vi.fn())
+  harness.flush()
+  session.replaceContext({ ...context, revision: 2, document: { roots } })
+  const before = harness.slices()
+
+  session.navigate({ nodeId: 'n0', offset: 0 }, 1, 1, jump)
+  harness.flush()
+
+  expect(counting.slices()).toBeGreaterThan(10)
+  expect(harness.slices() - before).toBeLessThanOrEqual(counting.slices() + 1)
+  expect(jump).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ ordinal: 1, destination: expect.objectContaining({ nodeId: 'target' }) }),
+  )
+})
+
+it.each(
+  (['confirm', 'repeat', 'recount'] as const).flatMap((entry) =>
+    (['begin', 'interrupt', 'subscriber', 'hide', 'revision', 'scope'] as const).map(
+      (action) => [entry, action] as const,
+    ),
+  ),
+)('drops a %s jump waiting for its count after %s', (entry, action) => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  if (entry === 'confirm') session.confirm(jump)
+  else {
+    session.confirm(vi.fn())
+    harness.flush()
+    // A hidden repeat restores feedback with a count; an edit restarts the count of visible feedback.
+    if (entry === 'repeat') session.hide()
+    else session.replaceContext({ ...context, revision: 3 })
+    session.navigate(origin, 1, 1, jump)
+  }
+
+  if (action === 'begin') session.begin(origin)
+  else if (action === 'interrupt') session.interruptNavigation()
+  else if (action === 'subscriber') session.subscribe(() => session.interruptNavigation())
+  else if (action === 'hide') session.hide()
+  else if (action === 'revision') session.replaceContext({ ...context, revision: 2 })
+  else session.replaceContext({ ...context, scopeKey: 'another-location' })
+  harness.flush()
+
+  expect(jump).not.toHaveBeenCalled()
+  expect(harness.pending()).toBe(0)
+  expect(session.getSnapshot()).toMatchObject(
+    action === 'begin'
+      ? { draft: 'aa', visible: true, count: { total: 2 } }
+      : action === 'hide' || action === 'scope'
+        ? { confirmed: 'aa', visible: false }
+        : { confirmed: 'aa', visible: true, pending: false, count: { total: 2 } },
+  )
+
+  if (action === 'interrupt' || action === 'subscriber' || action === 'revision') {
+    session.navigate(origin, 1, 1, jump)
     harness.flush()
 
-    expect(jump).not.toHaveBeenCalled()
-    expect(harness.pending()).toBe(0)
-    expect(session.getSnapshot()).toMatchObject(
-      action === 'begin'
-        ? { draft: 'aa', visible: true, count: { total: 2 } }
-        : action === 'hide' || action === 'scope'
-          ? { confirmed: 'aa', visible: false }
-          : { confirmed: 'aa', visible: true, pending: false, count: { total: 2 } },
-    )
+    expect(jump).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ordinal: 2 }))
+  }
+})
 
-    if (action === 'interrupt' || action === 'subscriber' || action === 'revision') {
-      session.navigate(origin, 1, 1, jump)
-      harness.flush()
+it('confirms an emptied draft with the recalled query instead of the empty draft’s count', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(vi.fn())
+  harness.flush()
+  session.begin(origin)
+  session.edit('')
+  harness.flush()
 
-      expect(jump).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ordinal: 2 }))
-    }
-  },
-)
+  expect(session.getSnapshot()).toMatchObject({ draft: '', count: { total: 0 } })
+
+  session.confirm(jump)
+  harness.flush()
+
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', visible: true, count: { total: 2 } })
+  expect(jump).toHaveBeenCalledOnce()
+})
+
+it('keeps a completed confirmation without a jump when a subscriber interrupts it', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  harness.flush()
+  const stop = session.subscribe(() => {
+    stop()
+    session.interruptNavigation()
+  })
+
+  session.confirm(jump)
+  harness.flush()
+
+  expect(jump).not.toHaveBeenCalled()
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', visible: true, count: { total: 2 } })
+})
+
+it('drops a hidden repeat that a subscriber interrupts as its feedback returns', () => {
+  const harness = searchHarness()
+  const session = new SearchSession(harness.executor)
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  session.confirm(vi.fn())
+  harness.flush()
+  session.hide()
+  const stop = session.subscribe(() => {
+    stop()
+    session.interruptNavigation()
+  })
+
+  session.navigate(origin, 1, 1, jump)
+  harness.flush()
+
+  expect(jump).not.toHaveBeenCalled()
+  expect(session.getSnapshot()).toMatchObject({ confirmed: 'aa', visible: true, count: { total: 2 } })
+})
+
+it('records the draft origin in its count and no origin in a recount of visible feedback', () => {
+  const { session, jobs } = controlledSession()
+  session.replaceContext(context)
+  session.begin(origin)
+
+  session.edit('aa')
+
+  expect(jobs.at(-1)!.request.operation).toStrictEqual({ kind: 'count', collect: { origin } })
+
+  session.confirm(vi.fn())
+  jobs.at(-1)!.publish({ kind: 'count', total: 2, capped: false })
+  session.replaceContext({ ...context, revision: 2 })
+
+  expect(jobs.at(-1)!.request.operation).toStrictEqual({ kind: 'count', collect: {} })
+})
 
 it('keeps a confirmation made by a subscriber waiting for its own count', () => {
   const { session, jobs } = controlledSession()
@@ -347,7 +502,7 @@ it('lets a newer jump replace a confirmation that waits for its count', () => {
   expect(session.getSnapshot()).toMatchObject({ pending: false, count: { total: 2 } })
 })
 
-it('navigates beyond a capped count that completes after confirmation', () => {
+it('navigates beyond a capped count that completes after confirmation or a hidden repeat', () => {
   const harness = searchHarness(64)
   const session = new SearchSession(harness.executor)
   const jump = vi.fn()
@@ -363,9 +518,21 @@ it('navigates beyond a capped count that completes after confirmation', () => {
   expect(jump).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ ordinal: 120, total: 150, destination: expect.objectContaining({ nodeId: 'n119' }) }),
   )
+
+  session.hide()
+  session.navigate({ nodeId: 'n10', offset: 0 }, 1, 1, jump)
+  harness.flush()
+  const beforeRetainedRepeat = harness.slices()
+  session.navigate({ nodeId: 'n11', offset: 0 }, 1, 1, jump)
+  harness.flush()
+
+  expect(jump).toHaveBeenNthCalledWith(2, expect.objectContaining({ ordinal: 12, total: 150 }))
+  expect(jump).toHaveBeenNthCalledWith(3, expect.objectContaining({ ordinal: 13, total: 150 }))
+  // The hidden repeat ran after its capped count, so Tree retained every position for the next repeat.
+  expect(harness.slices() - beforeRetainedRepeat).toBe(1)
 })
 
-it('starts the first Agenda jump from a day heading after its count completes', () => {
+it('starts Agenda jumps from day headings after their counts complete', () => {
   const harness = searchHarness()
   const session = new SearchSession(harness.executor)
   const jump = vi.fn()
@@ -394,6 +561,18 @@ it('starts the first Agenda jump from a day heading after its count completes', 
   expect(jump).toHaveBeenCalledExactlyOnceWith(
     expect.objectContaining({ ordinal: 2, destination: expect.objectContaining({ nodeId: 'a', day: 2 }) }),
   )
+
+  session.hide()
+  session.navigate({ beforeDay: 4 as DayNumber, offset: 0 }, 1, 1, jump)
+
+  expect(session.getSnapshot()).toMatchObject({ visible: true, pending: true })
+
+  harness.flush()
+
+  expect(jump).toHaveBeenCalledTimes(2)
+  expect(jump).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ordinal: 3, destination: expect.objectContaining({ nodeId: 'a', day: 4 }) }),
+  )
 })
 
 it('does not start a hidden count when canceling a draft opened from inactive search', () => {
@@ -421,9 +600,12 @@ it('recounts hidden confirmed queries on navigation but preserves a ready visibl
   session.navigate(origin, 1, 1, vi.fn())
 
   expect(session.getSnapshot()).toEqual({ confirmed: 'aa', visible: true, pending: true })
-  expect(jobs.map((job) => job.request.operation.kind)).toEqual(['count', 'navigate'])
+  expect(jobs.map((job) => job.request.operation)).toEqual([{ kind: 'count', collect: { origin } }])
 
   jobs[0]!.publish({ kind: 'count', total: 2, capped: false })
+
+  expect(jobs.map((job) => job.request.operation.kind)).toEqual(['count', 'navigate'])
+
   const ready = session.getSnapshot()
   jobs.length = 0
   session.navigate(origin, 1, 1, vi.fn())

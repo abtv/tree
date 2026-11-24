@@ -123,7 +123,8 @@ export class SearchSession {
     if (completed) jump?.()
     else {
       // A navigation scan running beside the count would compete with it and arrive about twice as late.
-      this.pendingJump = jump
+      // Without a jump of its own, keep one a subscriber may have queued for this count.
+      if (jump !== undefined) this.pendingJump = jump
       if (!counting) this.recount()
     }
   }
@@ -154,8 +155,16 @@ export class SearchSession {
     if (this.mode.kind === 'hidden') {
       this.set({ kind: 'confirmed', confirmed: this.mode.confirmed }, true)
       if (generation !== this.generation) return
-      this.recount()
-      if (generation !== this.generation || id !== this.navigationId) return
+      // The jump waits for the restored count; a navigation scan beside it would arrive about twice as late.
+      if (id === this.navigationId) this.pendingJump = () => this.navigate(origin, direction, count, publish)
+      this.recount(origin)
+      return
+    }
+    if (this.countJob.kind === 'running') {
+      // A recount, such as the one an edit starts, already scans this context and has no completed result
+      // yet; the jump waits for its positions instead of scanning beside it.
+      this.pendingJump = () => this.navigate(origin, direction, count, publish)
+      return
     }
     if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
     const context = this.context
@@ -190,7 +199,8 @@ export class SearchSession {
     this.snapshot = { confirmed: '', visible: false, pending: false }
   }
 
-  private recount(): void {
+  /** The origin's row is recorded so a jump waiting for this count needs no occurrence walk. */
+  private recount(origin = this.mode.kind === 'editing' ? this.mode.origin : undefined): void {
     const context = this.context
     if (context === undefined) return
     if (this.countJob.kind === 'running') this.countJob.cancel()
@@ -200,10 +210,7 @@ export class SearchSession {
         ...context,
         id,
         query: this.snapshot.draft ?? this.snapshot.confirmed,
-        operation: {
-          kind: 'count',
-          collect: this.mode.kind === 'editing' ? { origin: this.mode.origin } : {},
-        },
+        operation: { kind: 'count', collect: origin === undefined ? {} : { origin } },
       },
       (result) => {
         if (id !== this.countId || context !== this.context) return
