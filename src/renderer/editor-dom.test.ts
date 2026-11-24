@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TreeNode } from '../domain/document'
 import {
   collapseSelectionToAnchor,
+  getPointerSelectionEndpoints,
   hasMultiCharacterSelection,
   nodeTextLength,
   setEditableText,
@@ -15,6 +16,7 @@ import {
   selectAll,
   setCaret,
   setNormalCaret,
+  textAreaOffsetAtPoint,
   updateSelectedLinks,
   visualLineCursor,
   visualTextGeometry,
@@ -716,5 +718,88 @@ describe('editor DOM adapters', () => {
     expect(() => selectAll(element)).not.toThrow()
 
     getSelection.mockRestore()
+  })
+})
+
+// @requirement PRODUCT.md §20.2.6
+describe('pointer selection endpoints', () => {
+  const textArea = (direction: 'none' | 'backward' = 'none') => {
+    const input = document.createElement('textarea')
+    input.value = 'alpha beta'
+    document.body.append(input)
+    input.setSelectionRange(2, 6, direction)
+    vi.spyOn(input, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 100, y: 50, width: 200, height: 20 }),
+    )
+    return input
+  }
+  const pointAt = (offsetNode: Node, offset: number) =>
+    Object.defineProperty(document, 'caretPositionFromPoint', {
+      configurable: true,
+      value: () => ({ offsetNode, offset }),
+    })
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, 'caretPositionFromPoint')
+    document.body.replaceChildren()
+  })
+
+  it.each([
+    ['before the press, inside the first selected word', 3, 5, { anchor: 6, focus: 2 }],
+    ['after the press', 5, 3, { anchor: 2, focus: 6 }],
+    ['on the press of a multi-click at the word start', 2, 2, { anchor: 2, focus: 6 }],
+  ])('directs an undirected text area selection by a release %s', (_case, released, pressed, expected) => {
+    const input = textArea()
+    pointAt(input, released)
+
+    expect(getPointerSelectionEndpoints(input, { x: 150, y: 60, pressOffset: pressed, extending: false })).toEqual(
+      expected,
+    )
+  })
+
+  it.each([
+    ['the start', 2, { anchor: 6, focus: 2 }],
+    ['the end', 6, { anchor: 2, focus: 6 }],
+  ])('takes the focus of a Shift press from a release over %s', (_end, offset, expected) => {
+    const input = textArea()
+    pointAt(input, offset)
+
+    expect(getPointerSelectionEndpoints(input, { x: 150, y: 60, pressOffset: offset, extending: true })).toEqual(
+      expected,
+    )
+  })
+
+  it.each([
+    ['above', { x: 150, y: 40 }, { anchor: 6, focus: 2 }],
+    ['left of', { x: 90, y: 60 }, { anchor: 6, focus: 2 }],
+    ['below', { x: 90, y: 80 }, { anchor: 2, focus: 6 }],
+    ['right of', { x: 320, y: 60 }, { anchor: 2, focus: 6 }],
+  ])('takes the focus from the side of a release %s the text area', (_side, point, expected) => {
+    const input = textArea()
+    pointAt(document.body, 0)
+
+    expect(getPointerSelectionEndpoints(input, { ...point, pressOffset: 4, extending: false })).toEqual(expected)
+  })
+
+  it('keeps a reported direction and a collapsed caret', () => {
+    const input = textArea('backward')
+    const release = { x: 0, y: 0, pressOffset: 2, extending: false }
+
+    expect(getPointerSelectionEndpoints(input, release)).toEqual({ anchor: 6, focus: 2 })
+
+    input.setSelectionRange(3, 3)
+
+    expect(getPointerSelectionEndpoints(input, release)).toEqual({ anchor: 3, focus: 3 })
+  })
+
+  it('reads the text area offset under a point only when the point hits that text area', () => {
+    const input = textArea()
+    pointAt(input, 4)
+
+    expect(textAreaOffsetAtPoint(input, 150, 60)).toBe(4)
+
+    pointAt(document.body, 4)
+
+    expect(textAreaOffsetAtPoint(input, 150, 60)).toBeUndefined()
   })
 })

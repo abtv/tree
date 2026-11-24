@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import './test/setup'
 import { NodeInput, type NodeInputBindings } from './NodeInput'
 import { DATE_LIKE_CLASS, getSelectionRange, setSelectionRange } from './editor-dom'
@@ -154,6 +154,21 @@ describe('native rich editing', () => {
     expect(document.activeElement).toBe(input)
     expect(input.getAttribute('contenteditable')).toBe('false')
     expect(input.textContent).toBe(value.text)
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('leaves an unchanged selection alone when a render re-attaches the focused field', () => {
+    const { rerender } = render(view('Plain text'))
+    const input = screen.getByLabelText('Node 1') as HTMLTextAreaElement
+    input.focus()
+    input.setSelectionRange(2, 5, 'backward')
+    const write = vi.spyOn(input, 'setSelectionRange')
+
+    rerender(view('Plain text'))
+
+    // A native pointer drag in progress would restart from a rewritten anchor.
+    expect(write).not.toHaveBeenCalled()
+    expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([2, 5, 'backward'])
   })
 })
 

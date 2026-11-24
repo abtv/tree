@@ -115,7 +115,11 @@ export function NodeInput({
     if (input !== null && retainedSelection.current !== undefined) {
       const { anchor, focus } = retainedSelection.current
       retainedSelection.current = undefined
-      if (input.ownerDocument.activeElement === input) setSelectionRange(input, anchor, focus)
+      // A render re-attaches the same element. Rewriting an unchanged selection would reset a native
+      // pointer drag in progress, whose direction a macOS text area does not report until release.
+      const current = getSelectionEndpoints(input)
+      if (input.ownerDocument.activeElement === input && (current.anchor !== anchor || current.focus !== focus))
+        setSelectionRange(input, anchor, focus)
     }
   })
   const attach = (input: HTMLElement | null): void => {

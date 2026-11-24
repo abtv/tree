@@ -14,6 +14,7 @@ import {
   attachmentPath,
   setCursor,
 } from './fixtures'
+import { dragText } from './text-pointer'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const dayNumber = (month: number, day: number): number => Math.round(Date.UTC(2026, month - 1, day) / 86_400_000)
@@ -485,6 +486,41 @@ function seedPending(userDataDir: string): void {
     location: { currentParentId: null, selectedNodeId: 'context' },
   })
 }
+
+// @requirement PRODUCT.md §20.2.6
+test('enters character Visual from a pointer drag in an Agenda editor', async ({ userDataDir }) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: [node('first', '2026-10-10 alpha beta gamma'), node('second', '2026-10-10 delta epsilon zeta')],
+    },
+    location: { currentParentId: null, selectedNodeId: 'first' },
+  })
+  const { window } = await launchTree(userDataDir)
+  await openAndSelect(window, nodeKey(10, 10, 'first'))
+  const first = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+  const second = window.getByRole('textbox', { name: 'Agenda node second', exact: true })
+  const selected = () => window.evaluate(() => getSelection()?.toString())
+
+  await dragText(window, first, 21, 17)
+
+  await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+  expect(await selected()).toBe('beta')
+
+  await window.keyboard.press('h')
+
+  expect(await selected()).toBe(' beta')
+
+  await dragText(window, second, 17, 24)
+
+  await expect(second).toBeFocused()
+  await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+  expect(await selected()).toBe('epsilon')
+
+  await window.keyboard.press('d')
+
+  await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  await expect(second).toHaveText('2026-10-10 delta  zeta')
+})
 
 /** Open Agenda, put the focus in a direct match's editor and return to Normal. */
 async function openAndSelect(window: Page, key: string): Promise<void> {

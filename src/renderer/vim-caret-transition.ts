@@ -82,6 +82,25 @@ export function pointerCaretTransition(
   return focusCaretTransition(state, pointerCursor, textLength, hasAttachment, true)
 }
 
+/**
+ * The mode a released Normal or character Visual text press leaves (PRODUCT §20.2.6). A selection
+ * becomes character Visual mode, anchored where the press began and active where it ended; a
+ * collapsed caret is Normal mode. Native offsets are boundaries around the selected characters,
+ * while Visual endpoints name the first and last selected characters.
+ */
+export function pointerSelectionTransition(
+  text: string,
+  selection: { anchor: number; focus: number },
+): { mode: 'normal' } | { mode: 'visual'; anchor: number; focus: number } {
+  const { anchor, focus } = selection
+  if (anchor === focus) return { mode: 'normal' }
+
+  const lastCharacter = (end: number): number => moveCharacterOffset(text, end, -1)
+  return anchor < focus
+    ? { mode: 'visual', anchor, focus: lastCharacter(focus) }
+    : { mode: 'visual', anchor: lastCharacter(anchor), focus }
+}
+
 export function sameNodeImageTransition(
   state: VimCaretState,
   action: 'enter' | 'exit',

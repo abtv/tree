@@ -451,6 +451,40 @@ export function getSelectionEndpoints(element: HTMLElement): { anchor: number; f
   }
 }
 
+/** The text area offset nearest a viewport point, or undefined when the point hits other content. */
+export function textAreaOffsetAtPoint(element: HTMLTextAreaElement, x: number, y: number): number | undefined {
+  const document = element.ownerDocument
+  const position = 'caretPositionFromPoint' in document ? document.caretPositionFromPoint(x, y) : null
+  return position?.offsetNode === element ? position.offset : undefined
+}
+
+/**
+ * The selection endpoints a released pointer gesture left. A macOS text area reports no selection
+ * direction, so the release decides it: a press selects backward when it is released before the
+ * pressed offset, which also keeps a multi-click without movement forward, as in Vim; a Shift press
+ * extends to the end under the released pointer. Rich text keeps the native anchor and focus.
+ */
+export function getPointerSelectionEndpoints(
+  element: HTMLElement,
+  release: { x: number; y: number; pressOffset: number | undefined; extending: boolean },
+): { anchor: number; focus: number } {
+  if (!(element instanceof HTMLTextAreaElement) || element.selectionDirection !== 'none')
+    return getSelectionEndpoints(element)
+  const { selectionStart: start, selectionEnd: end } = element
+  if (start === end) return { anchor: start, focus: end }
+
+  const released = textAreaOffsetAtPoint(element, release.x, release.y)
+  const bounds = element.getBoundingClientRect()
+  // A release outside the text area extended the selection toward the side the pointer left by.
+  const focusAtStart =
+    released === undefined
+      ? release.y < bounds.top || (release.y <= bounds.bottom && release.x < bounds.left)
+      : !release.extending && release.pressOffset !== undefined
+        ? released < release.pressOffset
+        : released === start
+  return focusAtStart ? { anchor: end, focus: start } : { anchor: start, focus: end }
+}
+
 /**
  * Capture a temporary focus return without owning when it runs. Editor selections use logical
  * offsets so decoration can replace text nodes. Broader native scopes preserve each caller's

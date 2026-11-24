@@ -5,6 +5,7 @@ import {
   focusCaretTransition,
   horizontalCaretTransition,
   pointerCaretTransition,
+  pointerSelectionTransition,
   sameNodeImageTransition,
   verticalCaretTransition,
 } from './vim-caret-transition'
@@ -173,6 +174,21 @@ describe('Vim caret transitions', () => {
       imageTextReturnCursor: undefined,
     })
   })
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    ['forward drag', 'abcdef', { anchor: 1, focus: 4 }, { mode: 'visual', anchor: 1, focus: 3 }],
+    ['backward drag', 'abcdef', { anchor: 4, focus: 1 }, { mode: 'visual', anchor: 3, focus: 1 }],
+    ['one character', 'abcdef', { anchor: 2, focus: 3 }, { mode: 'visual', anchor: 2, focus: 2 }],
+    ['collapsed click', 'abcdef', { anchor: 2, focus: 2 }, { mode: 'normal' }],
+    ['emoji at the active end', 'A🚀b', { anchor: 0, focus: 3 }, { mode: 'visual', anchor: 0, focus: 1 }],
+    ['emoji at the anchored end', 'A🚀b', { anchor: 3, focus: 0 }, { mode: 'visual', anchor: 1, focus: 0 }],
+  ] as const)(
+    'turns the selection a pointer press leaves into Visual endpoints: %s',
+    (_case, text, selection, expected) => {
+      expect(pointerSelectionTransition(text, selection)).toEqual(expected)
+    },
+  )
 
   describe('editCaretTransition', () => {
     it('lands on text after an edit that leaves the caret on text', () => {

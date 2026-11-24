@@ -1,6 +1,7 @@
 // @editing-modes: vim
 import type { Page } from '@playwright/test'
 import { caretGeometry } from './caret-line-geometry'
+import { doubleClickDragText, dragText, textX } from './text-pointer'
 import {
   allowRendererError,
   clickApplicationMenuItem,
@@ -1687,7 +1688,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
   test.describe(() => {
     test.use({ sharedApplicationReset: 'off' })
-    test('uses the highlight pair for a deliberate Normal-mode text selection', async ({ userDataDir }) => {
+    test('uses the highlight pair for a pointer Visual selection and a Normal select-all', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -1706,12 +1707,12 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(first).not.toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
 
-      // A pointer drag wider than the block caret is a deliberate text selection and uses the
-      // highlight pair, in both appearances. The press starts on the block caret's character and stays
-      // still before moving: neither the block nor a later render may turn it into a native text drag
-      // or move its anchor.
+      // A pointer drag enters character Visual mode and uses the highlight pair, in both appearances.
+      // The press starts on the block caret's character and stays still before moving: neither the
+      // block nor a later render may turn it into a native text drag or move its anchor.
       await dragSelectText(window, first, 6, 70, 300)
 
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       expect(
         await first.evaluate((element) => [
           (element as HTMLTextAreaElement).selectionStart,
@@ -1729,26 +1730,236 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await window.emulateMedia({ colorScheme: 'light' })
 
-      // Moving focus keeps the unfocused selection on the highlight while the newly focused row
-      // shows its ink block caret.
+      // A click returns to Normal mode, and the block caret replaces the highlight.
+      await first.click({ position: { x: 20, y: 10 } })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(first).not.toHaveClass(/node-input-text-selected/)
+      expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+
+      // Select-all is a deliberate Normal-mode selection, not the one-character block caret.
+      await window.keyboard.press('Meta+a')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(first).toHaveClass(/node-input-text-selected/)
+      expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
+
+      // The highlight stays with the selecting row: the newly focused row shows its ink block caret.
       await second.focus()
 
       await expect(second).not.toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(second)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
-      expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
+    })
 
-      // Collapsing back to the block caret removes the deliberate-selection highlight.
-      await first.click({ position: { x: 20, y: 10 } })
+    test('enters character Visual mode from a pointer drag in either direction', async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
 
-      await expect(first).not.toHaveClass(/node-input-text-selected/)
-      expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
+      await dragText(window, editor, 6, 10)
 
-      // Select-all is also a deliberate selection, not the one-character block caret.
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('beta')
+
+      // Motions move the end where the drag stopped; `o` exchanges the ends, as in Vim.
+      await window.keyboard.press('l')
+      await window.keyboard.press('o')
+      await window.keyboard.press('h')
+
+      expect(await selectedText(editor)).toBe(' beta ')
+
+      await window.keyboard.press('d')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(editor).toHaveValue('alphagamma')
+
+      await window.keyboard.press('u')
+      await expect(editor).toHaveValue('alpha beta gamma')
+      await dragText(window, editor, 10, 6)
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('beta')
+
+      await window.keyboard.press('h')
+
+      expect(await selectedText(editor)).toBe(' beta')
+
+      await window.keyboard.press('Escape')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      expect(await caretOffset(editor)).toBe(5)
+    })
+
+    test('places the Normal caret where a click lands inside a select-all selection', async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
       await window.keyboard.press('Meta+a')
 
-      await expect(first).toHaveClass(/node-input-text-selected/)
-      expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
+      expect(await selectedText(editor)).toBe('alpha beta gamma')
+
+      const box = (await editor.boundingBox())!
+      await editor.click({ position: { x: (await textX(editor, 7)) - box.x, y: box.height / 2 } })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      expect(await caretOffset(editor)).toBe(7)
+
+      await window.keyboard.press('x')
+
+      await expect(editor).toHaveValue('alpha bta gamma')
     })
+
+    test('selects with Shift-click, drags to the end and by word, and a triple-click in character Visual mode', async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      const box = (await editor.boundingBox())!
+      await editor.click({
+        position: { x: (await textX(editor, 10)) - box.x, y: box.height / 2 },
+        modifiers: ['Shift'],
+      })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('alpha beta')
+
+      await window.keyboard.press('l')
+
+      expect(await selectedText(editor)).toBe('alpha beta ')
+
+      await window.keyboard.press('Escape')
+      await dragText(window, editor, 11, 16)
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('gamma')
+
+      await window.keyboard.press('l')
+
+      expect(await selectedText(editor)).toBe('gamma')
+
+      // A backward drag from a double-click selects whole words, with the active end at the release.
+      await window.keyboard.press('Escape')
+      await doubleClickDragText(window, editor, 13, 2)
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('alpha beta gamma')
+
+      await window.keyboard.press('l')
+
+      expect(await selectedText(editor)).toBe('lpha beta gamma')
+
+      await editor.click({ position: { x: (await textX(editor, 3)) - box.x, y: box.height / 2 }, clickCount: 3 })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('alpha beta gamma')
+
+      await window.keyboard.press('d')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(editor).toHaveValue('')
+    })
+
+    test('starts a new Visual selection from a press inside the current one and leaves it with a click', async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      await editor.dblclick({ position: { x: (await textX(editor, 8)) - (await editor.boundingBox())!.x, y: 10 } })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      expect(await selectedText(editor)).toBe('beta')
+
+      // A press on the selected word selects anew instead of dragging the word's text elsewhere.
+      await dragText(window, editor, 8, 15)
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      await expect(editor).toHaveValue('alpha beta gamma')
+      expect(await selectedText(editor)).toBe('ta gamm')
+
+      await window.keyboard.press('y')
+      await window.keyboard.press('$')
+      await window.keyboard.press('p')
+
+      await expect(editor).toHaveValue('alpha beta gammata gamm')
+
+      await window.keyboard.press('u')
+      await window.keyboard.press('v')
+      await window.keyboard.press('h')
+      await editor.click({ position: { x: (await textX(editor, 2)) - (await editor.boundingBox())!.x, y: 10 } })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+      await window.keyboard.press('x')
+
+      await expect(editor).toHaveValue('alha beta gamma')
+    })
+
+    for (const rich of [false, true]) {
+      test(`anchors a drag that begins in another ${rich ? 'rich' : 'plain'} node at the press`, async ({
+        userDataDir,
+      }) => {
+        const url = 'https://example.test'
+        const text = `delta epsilon zeta ${url}`
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              { id: 'first', text: 'alpha beta gamma', children: [] },
+              {
+                id: 'second',
+                text,
+                children: [],
+                ...(rich ? { links: [{ start: text.length - url.length, end: text.length, url }] } : {}),
+              },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'first' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const second = node(window, 2)
+
+        await dragText(window, second, 13, 6)
+
+        await expect(second).toBeFocused()
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(second)).toBe('epsilon')
+
+        await window.keyboard.press('h')
+
+        expect(await selectedText(second)).toBe(' epsilon')
+
+        // A click in another node leaves Visual mode with the caret where the click lands.
+        const first = node(window, 1)
+        const box = (await first.boundingBox())!
+        await first.click({ position: { x: (await textX(first, 6)) - box.x, y: box.height / 2 } })
+
+        await expect(first).toBeFocused()
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        expect(await caretOffset(first)).toBe(6)
+
+        // A drag that begins in another node from character Visual mode starts a new selection there.
+        await window.keyboard.press('v')
+        await window.keyboard.press('l')
+        await dragText(window, second, 6, 13)
+
+        await expect(second).toBeFocused()
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(second)).toBe('epsilon')
+      })
+    }
   })
 
   test('crosses a hyperlink one character at a time', async ({ userDataDir }) => {

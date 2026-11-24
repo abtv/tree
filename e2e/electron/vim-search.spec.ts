@@ -266,6 +266,8 @@ test('keeps a hidden logical origin through manual folding and cancels on text c
 
   await window.getByRole('button', { name: 'Expand node 1', exact: true }).click()
   await window.locator('[data-node-id="child"] .node-input').click()
+  // The click places the caret after the text; search forward from its start.
+  await window.keyboard.press('0')
   await window.keyboard.press('/')
   const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
 
