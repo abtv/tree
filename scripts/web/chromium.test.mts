@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { containerArguments, containerSourceFiles, run, runSmoke, runElectron, runMemory } from './chromium.mts'
 import { dependencyImage } from './chromium-image.mts'
 
@@ -131,6 +132,40 @@ it('streams smoke launch dependencies without baseline images, host output or cr
     false,
   )
 })
+
+it('streams every repository module the smoke specs import', () => {
+  const files = new Set(containerSourceFiles(true))
+  const pending = [...files].filter((path) => path.startsWith('e2e/smoke/'))
+  // Starting files count as visited, so a spec that another spec imports is read once.
+  const imported = new Set<string>(pending)
+  const unresolved: string[] = []
+  const extensions = ['', '.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.json', '/index.ts']
+
+  while (pending.length > 0) {
+    const file = pending.pop()!
+    const source = readFileSync(file, 'utf8')
+    // Static, side-effect, dynamic and require forms, in either quote style.
+    for (const [, , specifier] of source.matchAll(/\b(?:from|import|require)\s*\(?\s*(['"])(\.{1,2}\/[^'"]+)\1/g)) {
+      const base = join(dirname(file), specifier!)
+      const resolved = extensions.map((extension) => base + extension).find((path) => isFile(path))
+      if (resolved === undefined) {
+        unresolved.push(`${file}: ${specifier}`)
+        continue
+      }
+      if (imported.has(resolved)) continue
+      imported.add(resolved)
+      // The whole src tree enters the container; only modules outside it need their own entries.
+      if (!resolved.startsWith('src/')) pending.push(resolved)
+    }
+  }
+
+  expect(unresolved).toEqual([])
+  expect([...imported].filter((path) => !files.has(path))).toEqual([])
+})
+
+function isFile(path: string): boolean {
+  return existsSync(path) && statSync(path).isFile()
+}
 
 it('runs only a local immutable image with the fixed isolation settings', () => {
   const id = `sha256:${'a'.repeat(64)}`
