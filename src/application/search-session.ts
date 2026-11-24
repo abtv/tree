@@ -36,6 +36,8 @@ export class SearchSession {
   private navigationJob: SearchJob = { kind: 'idle' }
   private completedCount: CompletedCount | undefined
   private neighborhood: SearchNeighborhood | undefined
+  /** A confirmed jump that waits for the count, so one scan serves both. */
+  private pendingJump: (() => void) | undefined
   private readonly listeners = new Set<() => void>()
 
   public constructor(private readonly executor: SearchExecutor = createSearchExecutor()) {}
@@ -101,8 +103,11 @@ export class SearchSession {
   public confirm(publish: (result: Extract<SearchResult, { kind: 'navigate' }>) => void, direction: -1 | 1 = 1): void {
     const origin = this.mode.kind === 'editing' ? this.mode.origin : undefined
     const query = (this.mode.kind === 'editing' ? this.mode.draft : '') || this.mode.confirmed
-    const completed = query === (this.snapshot.draft ?? this.snapshot.confirmed) ? this.completedCount : undefined
-    this.invalidate()
+    const current = query === (this.snapshot.draft ?? this.snapshot.confirmed)
+    const completed = current ? this.completedCount : undefined
+    // A running count of the same query and context serves the confirmation; restarting it would discard its progress.
+    const counting = query.length > 0 && current && !completed && this.countJob.kind === 'running'
+    this.invalidate(counting)
     const generation = this.generation
     const navigationId = this.navigationId
     this.set(
@@ -111,9 +116,16 @@ export class SearchSession {
       query ? completed : undefined,
     )
     if (query.length === 0 || generation !== this.generation) return
-    if (!completed) this.recount()
-    if (origin !== undefined && generation === this.generation && navigationId === this.navigationId)
-      this.navigate(origin, direction, 1, publish)
+    const jump =
+      origin === undefined || navigationId !== this.navigationId
+        ? undefined
+        : () => this.navigate(origin, direction, 1, publish)
+    if (completed) jump?.()
+    else {
+      // A navigation scan running beside the count would compete with it and arrive about twice as late.
+      this.pendingJump = jump
+      if (!counting) this.recount()
+    }
   }
 
   public hide(): void {
@@ -123,6 +135,7 @@ export class SearchSession {
 
   public interruptNavigation(): void {
     this.navigationId++
+    this.pendingJump = undefined
     if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
     this.navigationJob = { kind: 'idle' }
   }
@@ -137,6 +150,7 @@ export class SearchSession {
     if (this.context === undefined || this.mode.confirmed.length === 0 || this.mode.kind === 'editing') return
     const generation = this.generation
     const id = ++this.navigationId
+    this.pendingJump = undefined
     if (this.mode.kind === 'hidden') {
       this.set({ kind: 'confirmed', confirmed: this.mode.confirmed }, true)
       if (generation !== this.generation) return
@@ -181,7 +195,6 @@ export class SearchSession {
     if (context === undefined) return
     if (this.countJob.kind === 'running') this.countJob.cancel()
     const id = ++this.countId
-    const generation = this.generation
     const cancel = this.executor.execute(
       {
         ...context,
@@ -193,20 +206,30 @@ export class SearchSession {
         },
       },
       (result) => {
-        if (generation !== this.generation || id !== this.countId || context !== this.context) return
+        if (id !== this.countId || context !== this.context) return
         this.countJob = { kind: 'idle' }
-        if (result.kind === 'count') this.set(this.mode, false, result)
+        if (result.kind !== 'count') return
+        this.set(this.mode, false, result)
+        // A subscriber may have interrupted the jump or started a newer count that owns its own jump.
+        if (id !== this.countId) return
+        const jump = this.pendingJump
+        this.pendingJump = undefined
+        jump?.()
       },
     )
     this.countJob = { kind: 'running', cancel }
   }
 
-  private invalidate(): void {
+  /** Confirmation keeps a running count of its own query; every other caller discards it. */
+  private invalidate(keepCount = false): void {
     this.generation++
-    if (this.countJob.kind === 'running') this.countJob.cancel()
+    this.pendingJump = undefined
     if (this.navigationJob.kind === 'running') this.navigationJob.cancel()
-    this.countJob = { kind: 'idle' }
     this.navigationJob = { kind: 'idle' }
+    if (keepCount) return
+    this.countId++ // Rejects a late count even from an executor that ignores cancellation.
+    if (this.countJob.kind === 'running') this.countJob.cancel()
+    this.countJob = { kind: 'idle' }
   }
 
   private set(mode: SearchMode, pending: boolean, count?: CompletedCount): void {

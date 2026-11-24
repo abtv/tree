@@ -540,7 +540,8 @@ it('releases scheduled corpus work when manual input interrupts navigation', asy
   await vi.runAllTimersAsync()
   apply.mockClear()
 
-  search.navigate({ nodeId: 'a', offset: 6 }, 1, 1500)
+  // The first jump retained the positions near `a`; a distant origin needs a scan.
+  search.navigate({ nodeId: 'b-1000', offset: 0 }, 1, 1500)
 
   expect(vi.getTimerCount()).toBe(1)
 
