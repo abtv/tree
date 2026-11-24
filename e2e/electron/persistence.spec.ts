@@ -29,7 +29,7 @@ import {
   writeClipboardText,
 } from './fixtures'
 import type { Page } from '@playwright/test'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 function rowsSeed(count: number, suffix = '') {
@@ -167,6 +167,8 @@ test.describe('persistence', () => {
 
   test('rejects unsafe persisted attachment ids and link destinations before writing', async ({ userDataDir }) => {
     const { window } = await launchTree(userDataDir)
+    // A new profile writes its first document after the window is ready.
+    await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     const before = readFileSync(documentPath(userDataDir))
     const invalidStates = [
       {
