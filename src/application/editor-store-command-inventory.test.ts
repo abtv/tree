@@ -31,9 +31,9 @@ const exclusions: Record<string, string> = {
   disposeSearch: 'Renderer unmount retires search without document changes; editor-search.test.ts covers retirement.',
   openSearchResult: 'Search-result navigation is covered by focused store tests and real popup navigation tests.',
   hideSearch:
-    'Search-owned folds require an active asynchronous search; editor-search.test.ts covers cleanup and manual ownership.',
+    'Search-owned folds require an active asynchronous search; editor-search-folds.property.test.ts generates it.',
   hideSearchAtPointer:
-    'Closing search on a text click changes no snapshot state; editor-search.test.ts covers the retained folds.',
+    'Closing search on a text click needs an active search; editor-search-folds.property.test.ts generates it.',
   openAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
   closeAgenda: 'Agenda lifecycle is generated in editor-store-agenda.property.test.ts.',
   applyAgenda: 'Agenda selection and presentation commands have dedicated property coverage.',
