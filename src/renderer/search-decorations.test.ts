@@ -58,7 +58,8 @@ it('updates a short mounted row independently of global counting and removes sta
 
 it('releases completed oversized ranges when a row moves to immediate highlighting', async () => {
   vi.useFakeTimers()
-  const long = 'ordinary '.repeat(1000) + 'target'
+  // Longer than one decoration slice, so the rescan after the row returns is still pending when it is observed.
+  const long = 'ordinary '.repeat(4000) + 'target'
   const hook = renderHook(({ text }) => useSearchDecorations(text, 'target'), { initialProps: { text: long } })
   await act(async () => {
     await vi.runAllTimersAsync()

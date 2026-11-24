@@ -28,6 +28,32 @@ it('agrees with forward literal nonoverlapping search for arbitrary ASCII text',
   )
 })
 
+it('agrees with Unicode regular-expression matching across scripts, case folds and astral characters', () => {
+  const characters = [
+    ...['a', 'A', 's', 'S', 'ſ', 'k', 'K', 'K', 'ß', 'ẞ', 'к', 'К', 'ё', 'Ё', 'σ', 'ς', 'Σ'],
+    ...['\u{10400}', '\u{10428}', '😀', '́', ' ', '.'],
+    // Lone surrogates, which adjacent draws can also join into a pair.
+    ...['\ud83d', '\ude00'],
+  ]
+  const text = (maxLength: number) =>
+    fc.array(fc.constantFrom(...characters), { maxLength }).map((parts) => parts.join(''))
+
+  fc.assert(
+    fc.property(text(60), text(4), (source, query) => {
+      const literal = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const expected =
+        query.length === 0
+          ? []
+          : [...source.matchAll(new RegExp(literal, /\p{Lu}/u.test(query) ? 'gu' : 'giu'))].map((match) => ({
+              start: match.index,
+              end: match.index + match[0].length,
+            }))
+
+      expect([...searchText(source, pattern(query))].filter((match) => match !== undefined)).toEqual(expected)
+    }),
+  )
+})
+
 it('keeps DFS identity and order after moving branches without mutating nodes', () => {
   fc.assert(
     fc.property(fc.array(fc.string(), { maxLength: 50 }), (texts) => {

@@ -170,7 +170,7 @@ Search work yields between batches and obsolete queries are cancelled on refinem
 * Smart case applies independently to each term: a term without uppercase letters ignores case; a term containing an uppercase letter requires that case. This applies equally to ordinary text and complete marker names. Local Cmd+F and Vim `/` retain their separate literal phrase-search rules (§20.2).
 * Ordinary terms also match hidden recognized image text (§15.1), including ancestor context. Results still display only the node's ordinary text and path; hidden matches never highlight unrelated visible text. Marker terms and completion catalogs use only ordinary node text.
 
-Query preparation and matching retain only the current terms, result list and ancestor traversal state, without earlier query snapshots or a persistent full-text index. Ancestor term matches are accumulated during traversal, rather than rescanning all ancestor text for each descendant. Query input causes no document/history writes or syncs.
+Query preparation and matching retain only the current terms, result list and ancestor traversal state, without earlier query snapshots or a persistent full-text index. A bounded table of character-pair case-equivalence results may outlive a query; it holds neither document text nor queries. Ancestor term matches are accumulated during traversal, rather than rescanning all ancestor text for each descendant. Query input causes no document/history writes or syncs.
 
 #### 20.14.4 Marker Completion
 

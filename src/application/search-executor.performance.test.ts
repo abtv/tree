@@ -39,7 +39,8 @@ it('yields on wide scopes and oversized text with bounded total scan time', () =
     query: 'absent',
     operation: { kind: 'count' },
     document: {
-      roots: Array.from({ length: 10_000 }, (_, index) => ({ id: String(index), text: 'ordinary text', children: [] })),
+      // A short row costs two checkpoints (its occurrence and one for its text), so 25,000 rows span 25 slices.
+      roots: Array.from({ length: 25_000 }, (_, index) => ({ id: String(index), text: 'ordinary text', children: [] })),
     },
   }
   for (const document of [
