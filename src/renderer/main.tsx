@@ -19,11 +19,14 @@ import { appearanceColorScheme, type AppearancePreference } from '../shared/appe
 import './styles.css'
 import { blockExternalDrops } from './external-drop'
 import { installAboutDialog } from './about-dialog'
+import { installWindowFocusReturn } from './window-focus-return'
 
 declare const __TREE_APP_VERSION__: string
 declare const __TREE_BUILD_DATE__: string
 
 blockExternalDrops(window)
+const stopWindowFocusReturn = installWindowFocusReturn(window)
+window.addEventListener('pagehide', () => stopWindowFocusReturn(), { once: true })
 
 const applyAppearance = (value: AppearancePreference): void => {
   document.documentElement.dataset.appearance = value

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { EditorStore } from '../application/editor-store'
 import type { SearchSessionSnapshot } from '../application/search-session'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
@@ -34,11 +34,20 @@ export function SearchPrompt({
     input.current?.focus({ preventScroll: true })
     input.current?.select()
   }, [editing])
+  // Deactivating the window cancels the draft. When that removes the prompt that held focus, the
+  // editor takes the page focus back, as Escape does, so returning to the window does not find focus
+  // on a removed element. Page focus set while the window is inactive does not activate the window.
+  const cancelOnDeactivation = useCallback((): void => {
+    const active = document.activeElement
+    const line = input.current?.closest('.local-search-panel, .vim-search-line') ?? input.current
+    const focusInSearch = active === null || active === document.body || (line?.contains(active) ?? false)
+    store.search.cancelDraft()
+    if (focusInSearch && (vim || !store.search.session.getSnapshot().visible)) restoreEditor()
+  }, [store, vim, restoreEditor])
   useEffect(() => {
-    const cancel = (): void => store.search.cancelDraft()
-    window.addEventListener('blur', cancel)
-    return () => window.removeEventListener('blur', cancel)
-  }, [store])
+    window.addEventListener('blur', cancelOnDeactivation)
+    return () => window.removeEventListener('blur', cancelOnDeactivation)
+  }, [cancelOnDeactivation])
   return (
     <label className="search-input-line" data-editor-focus-borrow>
       {vim ? <span aria-hidden="true">/</span> : null}
@@ -70,7 +79,9 @@ export function SearchPrompt({
             event.relatedTarget.closest('.search-controls, dialog[role="alertdialog"]')
           )
             return
-          store.search.cancelDraft()
+          // The prompt blurs before the window does when the window is deactivated.
+          if (!document.hasFocus()) cancelOnDeactivation()
+          else store.search.cancelDraft()
         }}
         onKeyDown={(event) => {
           event.stopPropagation()

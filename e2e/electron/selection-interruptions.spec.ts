@@ -155,6 +155,115 @@ test('keeps Search and the command panel open while another application is activ
   await expect(editor).toBeFocused()
 })
 
+// @requirement PRODUCT.md §9
+// @requirement PRODUCT.md §20.2.20
+test('returns Normal-mode focus after the application is hidden or the window is blurred', async ({ userDataDir }) => {
+  const text = 'alpha\nbeta https://example.com'
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'plain', text: 'alpha beta', children: [] },
+        { id: 'rich', text, links: [{ start: 11, end: text.length, url: 'https://example.com' }], children: [] },
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'plain' },
+  })
+  // As above, only a visible native window loses real focus.
+  const { app, window } = await launchTree(userDataDir, {
+    initialMode: 'normal',
+    windows: 'visible',
+    shortcut: 'stub',
+  })
+  const nativeFocus = await window.context().newCDPSession(window)
+  await nativeFocus.send('Emulation.setFocusEmulationEnabled', { enabled: false })
+  const main = await app.browserWindow(window)
+  await main.evaluate((browserWindow) => browserWindow.focus())
+  await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(true)
+  const plain = node(window, 1)
+  const rich = node(window, 2)
+  // Unlike another focused window, these deactivations make Chromium focus the first control on return.
+  const leaveAndReturn = async (leave: 'hide' | 'blur'): Promise<void> => {
+    if (leave === 'hide') await app.evaluate(({ app }) => app.hide())
+    else await main.evaluate((browserWindow) => browserWindow.blur())
+    await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(false)
+    // Cmd+0 surfaces the window with the same show and focus calls.
+    await main.evaluate((browserWindow) => {
+      browserWindow.show()
+      browserWindow.focus()
+    })
+    await expect.poll(() => window.evaluate(() => document.hasFocus())).toBe(true)
+  }
+  await setCursor(plain, 6)
+  // The substituted control must not run focus handlers before the editor gets focus back.
+  await window.getByRole('button', { name: 'Top level' }).evaluate((button) => {
+    const probe = globalThis as typeof globalThis & { topLevelFocusEvents?: number }
+    probe.topLevelFocusEvents = 0
+    button.addEventListener('focus', () => (probe.topLevelFocusEvents = (probe.topLevelFocusEvents ?? 0) + 1))
+  })
+
+  await leaveAndReturn('hide')
+
+  await expect(plain).toBeFocused()
+  expect(
+    await window.evaluate(
+      () => (globalThis as typeof globalThis & { topLevelFocusEvents?: number }).topLevelFocusEvents,
+    ),
+  ).toBe(0)
+
+  await window.keyboard.press('x')
+
+  await expect(plain).toHaveValue('alpha eta')
+
+  await window.keyboard.press('u')
+  await window.keyboard.press('j')
+  await setCursor(rich, 9)
+  await window.keyboard.press('v')
+  await window.keyboard.press('h')
+
+  await leaveAndReturn('blur')
+
+  await expect(rich).toBeFocused()
+
+  await window.keyboard.press('h')
+
+  expect(await window.evaluate(() => getSelection()?.toString())).toBe('eta')
+
+  await window.keyboard.press('d')
+
+  await expect(rich).toHaveText('alpha\nb https://example.com')
+  await expect(plain).toHaveValue('alpha beta')
+
+  await setCursor(rich, 0)
+  await window.keyboard.press('/')
+  const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+  await expect(prompt).toBeFocused()
+  await prompt.pressSequentially('alp')
+
+  // Leaving cancels the unconfirmed entry, which removes the focused prompt.
+  await leaveAndReturn('hide')
+
+  await expect(prompt).toHaveCount(0)
+  await expect(rich).toBeFocused()
+
+  await window.keyboard.press('x')
+
+  await expect(rich).toHaveText('lpha\nb https://example.com')
+
+  await window.keyboard.press('Meta+Shift+p')
+  const command = window.getByRole('combobox', { name: 'Command' })
+  await command.fill('toggle')
+
+  await leaveAndReturn('hide')
+
+  await expect(command).toBeFocused()
+  await expect(command).toHaveValue('toggle')
+
+  await window.keyboard.press('Escape')
+
+  await expect(window.locator('.command-panel')).toHaveCount(0)
+  await expect(rich).toBeFocused()
+})
+
 // @requirement PRODUCT.md §17.1
 // @requirement PRODUCT.md §20.2.20
 test('continues a rich Visual selection after keyboard and pointer preview round trips @linux', async ({

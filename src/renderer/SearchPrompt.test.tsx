@@ -74,7 +74,37 @@ it('leaves composition confirmation and cancellation to native input before acce
   expect(restoreEditor).not.toHaveBeenCalled()
 })
 
-it('cancels on window deactivation without stealing focus back from another window', () => {
+// Page focus set while the window is inactive does not activate it; the Electron spec
+// "returns Normal-mode focus after the application is hidden or the window is blurred" checks that.
+it.each([
+  { mode: 'Vim entry', vim: true, remainsVisible: true, restores: true },
+  { mode: 'a Find panel that closes', vim: false, remainsVisible: false, restores: true },
+  { mode: 'a Find panel that stays open', vim: false, remainsVisible: true, restores: false },
+])('cancels on window deactivation and returns page focus for $mode', ({ vim, remainsVisible, restores }) => {
+  const store = createEditorStoreDouble()
+  const cancel = vi.spyOn(store.search, 'cancelDraft')
+  vi.spyOn(store.search.session, 'getSnapshot').mockReturnValue({
+    confirmed: '',
+    visible: remainsVisible,
+    pending: false,
+  })
+  const restoreEditor = vi.fn()
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'new', visible: true, pending: false }}
+      restoreEditor={restoreEditor}
+      vim={vim}
+    />,
+  )
+
+  fireEvent.blur(window)
+
+  expect(cancel).toHaveBeenCalledOnce()
+  expect(restoreEditor).toHaveBeenCalledTimes(restores ? 1 : 0)
+})
+
+it('returns page focus when the prompt blurs because the window is deactivated', () => {
   const store = createEditorStoreDouble()
   const cancel = vi.spyOn(store.search, 'cancelDraft')
   const restoreEditor = vi.fn()
@@ -83,11 +113,54 @@ it('cancels on window deactivation without stealing focus back from another wind
       store={store}
       snapshot={{ confirmed: '', draft: 'new', visible: true, pending: false }}
       restoreEditor={restoreEditor}
+      vim
     />,
   )
+  vi.spyOn(document, 'hasFocus').mockReturnValue(false)
 
-  fireEvent.blur(window)
+  fireEvent.blur(screen.getByRole('textbox', { name: 'Search' }))
+
+  expect(cancel).toHaveBeenCalledOnce()
+  expect(restoreEditor).toHaveBeenCalledOnce()
+})
+
+it('leaves focus where the user moved it within the window', () => {
+  const store = createEditorStoreDouble()
+  const cancel = vi.spyOn(store.search, 'cancelDraft')
+  const restoreEditor = vi.fn()
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'new', visible: true, pending: false }}
+      restoreEditor={restoreEditor}
+      vim
+    />,
+  )
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+
+  fireEvent.blur(screen.getByRole('textbox', { name: 'Search' }))
 
   expect(cancel).toHaveBeenCalledOnce()
   expect(restoreEditor).not.toHaveBeenCalled()
+})
+
+it('does not take focus from outside the prompt on window deactivation', () => {
+  const store = createEditorStoreDouble()
+  const restoreEditor = vi.fn()
+  const outside = document.createElement('button')
+  document.body.append(outside)
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'new', visible: true, pending: false }}
+      restoreEditor={restoreEditor}
+      vim
+    />,
+  )
+  outside.focus()
+
+  fireEvent.blur(window)
+
+  expect(restoreEditor).not.toHaveBeenCalled()
+  outside.remove()
 })

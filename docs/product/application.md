@@ -27,6 +27,10 @@ window. Restoring a minimized main window must not dismiss About.
 * redo history;
 * navigation state.
 
+Returning to the main window by any means — `Cmd+0`, the Dock, the application switcher or another window — keeps keyboard focus on the element that had it when the window was left, including after the application was hidden or minimized. The editor keeps its caret, selection and Vim mode, so the next key acts on it. Becoming active again does not move focus to another control, such as the first button of the location path.
+
+When leaving the window closes the focused surface, as it cancels unconfirmed search entry (§20.2.26), the editor that the surface came from takes focus back, as with Escape. When the element that had focus no longer exists for another reason, the platform's default focus applies.
+
 ### 9.1 Cmd+Q
 
 `Cmd+Q` quits the application, including when focus is in an editable node.
