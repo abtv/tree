@@ -17,6 +17,11 @@ export class EditorRuntimeState {
     private readonly onAgendaClosed: () => void = () => undefined,
     private readonly agendaRowsCache?: AgendaRowsCache,
     private readonly beforePublish: (state: ReadySnapshot) => void = () => undefined,
+    /**
+     * Adjusts the next snapshot after Agenda reconciliation, which can move the displayed week, and before
+     * Tree view activation, which can copy expansion into a starred view.
+     */
+    private readonly beforeInstall: (next: ReadySnapshot, previous: EditorSnapshot) => void = () => undefined,
   ) {}
 
   public getSnapshot = (): EditorSnapshot => this.snapshot
@@ -82,6 +87,7 @@ export class EditorRuntimeState {
         }
       }
     }
+    this.beforeInstall(next, previous)
     if (next.agenda === undefined) this.showTreeLocation(next, previous)
     // Both branches install the same snapshot; the delete only drops an explicit `operationError: undefined` key.
     if (next.operationError === undefined) {

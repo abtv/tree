@@ -173,16 +173,21 @@ export class EditorStore {
     | 'interruptNavigation'
     | 'navigate'
   > & { readonly session: Pick<EditorSearch['session'], 'getSnapshot'> } = this.searchOwner
-  private readonly runtime = new EditorRuntimeState(undefined, this.agendaRowsCache, (state) => {
-    if (state.agenda === undefined) this.agendaRowsCache.releaseIfStale(state.document)
+  private readonly runtime = new EditorRuntimeState(
+    undefined,
+    this.agendaRowsCache,
+    (state) => {
+      if (state.agenda === undefined) this.agendaRowsCache.releaseIfStale(state.document)
 
-    this.imageToTextQueue.reconcile(state.document)
-    for (const catalog of this.tags.values()) catalog.update(state.document)
-    this.searchOwner.update(state)
-    // While Agenda is open, the Tree location it returns to is still the user's path.
-    const treeLocation = state.agenda?.origin.location ?? state.location
-    this.returnPositions.retainPath(state.document, treeLocation.currentParentId)
-  })
+      this.imageToTextQueue.reconcile(state.document)
+      for (const catalog of this.tags.values()) catalog.update(state.document)
+      this.searchOwner.update(state)
+      // While Agenda is open, the Tree location it returns to is still the user's path.
+      const treeLocation = state.agenda?.origin.location ?? state.location
+      this.returnPositions.retainPath(state.document, treeLocation.currentParentId)
+    },
+    (next, previous) => this.searchOwner.closeFoldsLeavingScope(next, previous),
+  )
   // History records only the published document, so departing owners come from the published views.
   private readonly history = new EditorHistory(attachmentSummary, (recorded, replacement) =>
     departedViewOwners(this.runtime.ready().expansion, recorded, replacement),
@@ -229,7 +234,7 @@ export class EditorStore {
           // Number.isFinite(undefined) is false too; the explicit check narrows the type.
           if (measured !== undefined && Number.isFinite(measured))
             this.selectedRowTop = Math.max(0, Math.round(measured))
-          const { expandedIds, starredExpandedIds } = savedExpansionViews(state.expansion)
+          const { expandedIds, starredExpandedIds } = savedExpansionViews(this.searchOwner.persistentExpansion(state))
           const selectedRowTop = this.selectedRowTop
           const agendaFolds = this.agendaFoldMemory.persisted
           const view = {
@@ -744,6 +749,15 @@ export class EditorStore {
     this.searchOwner.hide()
   }
 
+  /**
+   * A node-text click closes search without folding anything, so rows stay under the pointer for the rest
+   * of the click. The folds stay search-owned: saves leave them out, and the next change of location,
+   * presentation or expansion view closes them (§20.2.31).
+   */
+  public hideSearchAtPointer(): void {
+    this.searchOwner.hide()
+  }
+
   public hideSearch(): void {
     if (this.runtime.snapshot.status !== 'ready') return
     const state = this.runtime.ready()
@@ -751,6 +765,8 @@ export class EditorStore {
     if (view?.kind === 'agenda') this.runtime.replaceReady({ ...state, agenda: view.agenda })
     else if (view?.kind === 'tree') {
       this.runtime.replaceReady({ ...state, expansion: view.expansion })
+      // Saved folds already match (persistentExpansion), but closing rows moves the selected row,
+      // whose measured position each save records.
       this.markPersistedChange()
     }
   }

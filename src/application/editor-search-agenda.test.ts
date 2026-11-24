@@ -147,6 +147,188 @@ it('counts only folded direct matches and serializes same-node and cross-day jum
   expect(save).not.toHaveBeenCalled()
 })
 
+// @requirement PRODUCT.md §20.2.31
+it.each(['week', 'focused day'] as const)(
+  'closes search-opened day folds as Escape does when a %s change closes search',
+  async (change) => {
+    const { store, state, begin } = await setup()
+    store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+    begin()
+    await vi.runAllTimersAsync()
+    store.search.confirm()
+    store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
+    await vi.runAllTimersAsync()
+    store.search.navigate({ nodeId: 'b', day: first, offset: 6 }, 1, 1)
+    await vi.runAllTimersAsync()
+
+    expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
+    expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(false)
+
+    if (change === 'week') store.applyAgenda({ kind: 'shift-week', direction: 1 })
+    else store.applyAgenda({ kind: 'focus-day', key: `day:${second}`, scrollTop: 0 })
+
+    expect(store.search.session.getSnapshot().visible).toBe(false)
+    expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(true)
+
+    if (change === 'week') store.applyAgenda({ kind: 'shift-week', direction: -1 })
+    else store.applyAgenda({ kind: 'return-timeline', key: `day:${second}` })
+
+    expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(true)
+  },
+)
+
+// @requirement PRODUCT.md §20.2.31
+it('closes search-opened day folds when a week change also releases a pinned occurrence', async () => {
+  const { store, state, begin } = await setup()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+  begin()
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.applyAgenda({ kind: 'select', key: key(second, 'c') })
+  store.editText('c', 'apple')
+
+  expect(pinnedAgendaOccurrence(state().agenda!)?.nodeId).toBe('c')
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(false)
+
+  store.applyAgenda({ kind: 'shift-week', direction: 1 })
+
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(true)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('leaves the timeline a focused day returns to alone when Escape closes focused-day search folds', async () => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'focus-day', key: `day:${second}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${second}` })
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('apple')
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.hideSearch()
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${second}` })
+
+  // The user left this day open in the timeline before focusing it.
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('leaves the timeline a focused day returns to alone when the return closes focused-day search folds', async () => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'focus-day', key: `day:${second}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${second}` })
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('apple')
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${second}` })
+
+  expect(store.search.session.getSnapshot().visible).toBe(false)
+  // The user left this day open in the timeline before focusing it.
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.hideSearch()
+
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('keeps the search-opened day of the timeline selection open in the timeline a focused day returns to', async () => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${second}` })
+  store.search.begin({ beforeDay: second, offset: 0 })
+  store.search.edit('apple')
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.applyAgenda({ kind: 'focus-day', key: `day:${first}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'return-timeline', key: `day:${first}` })
+
+  expect(state().agenda!.selectedKey).toBe(key(second, 'b'))
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('closes search-opened day folds when a focused day moves to another week', async () => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'focus-day', key: `day:${second}`, scrollTop: 0 })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${second}` })
+  store.search.begin(store.searchOrigin(0))
+  store.search.edit('apple')
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.applyAgenda({ kind: 'shift-week', direction: 1 })
+  store.applyAgenda({ kind: 'shift-week', direction: -1 })
+
+  expect(state().agenda!.presentation).toMatchObject({ kind: 'focused-day', day: second })
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(true)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('closes search-opened days when a date edit carries the selected occurrence to another week', async () => {
+  const { store, state } = await setup()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${second}` })
+  store.search.begin({ beforeDay: first, offset: 0 })
+  store.search.edit('apple')
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'b', day: first, offset: 0 }, 1, 4)
+  await vi.runAllTimersAsync()
+
+  expect(state().agenda!.selectedKey).toBe(key(second, 'c'))
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(false)
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(false)
+
+  store.editText('c', 'apple 2026-11-05')
+
+  expect(state().agenda!.selectedKey).toBe(key(dayNumberOf({ year: 2026, month: 11, day: 5 }), 'c'))
+  expect(store.search.session.getSnapshot().visible).toBe(false)
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(true)
+  expect(state().agenda!.collapsed.has(`day:${second}`)).toBe(true)
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('discards search-owned Agenda folds when Agenda closes and leaves Tree expansion alone', async () => {
+  const { store, state, begin } = await setup()
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${first}` })
+  begin()
+  await vi.runAllTimersAsync()
+  store.search.confirm()
+  store.search.navigate({ beforeDay: first, offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  const expandedIds = state().expansion.expandedIds
+
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(false)
+
+  store.closeAgenda()
+
+  expect(state().agenda).toBeUndefined()
+  expect(state().expansion.expandedIds).toEqual(expandedIds)
+
+  store.openAgenda()
+
+  expect(state().agenda!.collapsed.has(`day:${first}`)).toBe(true)
+})
+
 it('retains manual folds and draft origin, closes feedback on focused-day changes and shares recall', async () => {
   const { store, state, begin } = await setup()
 

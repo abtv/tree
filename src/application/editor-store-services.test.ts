@@ -372,7 +372,7 @@ it.each(['open-all', 'open-recursive'] as const)('retains manual %s folds when h
   expect([...state.expansion.expandedIds]).toEqual(['root', 'child'])
 })
 
-it('persists search navigation and closing search-owned folds independently', async () => {
+it('persists search navigation without search-owned folds, then the same folds when Find closes', async () => {
   vi.useFakeTimers()
   const save = vi.fn<EditorServices['save']>(async () => undefined)
   const store = await setup({
@@ -398,12 +398,13 @@ it('persists search navigation and closing search-owned folds independently', as
   await store.flushPersistence()
 
   expect(save.mock.calls.at(-1)?.[0].location.selectedNodeId).toBe('other-child')
-  expect(save.mock.calls.at(-1)?.[0].view?.expandedIds).toEqual(['root', 'other'])
+  expect(save.mock.calls.at(-1)?.[0].view?.expandedIds).toEqual(['other'])
 
   save.mockClear()
   store.hideSearch()
   await store.flushPersistence()
 
+  // Closing rows moves the selected row, so Find closing saves its position with the same folds.
   expect(save).toHaveBeenCalledOnce()
   expect(save.mock.calls[0]?.[0].view?.expandedIds).toEqual(['other'])
 })

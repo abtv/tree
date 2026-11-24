@@ -663,6 +663,259 @@ it('disposes search without closing its revealed folds or publishing a new edito
   unsubscribe()
 })
 
+// @requirement PRODUCT.md §20.2.31
+it('saves search-opened folds as Escape would leave them while they stay open on screen', async () => {
+  const { store, services, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'b', offset: 0 }, 1, 2)
+  await vi.runAllTimersAsync()
+
+  await store.flushPersistence()
+
+  expect(state().location.selectedNodeId).toBe('d')
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+  expect(vi.mocked(services.save).mock.lastCall![0].view?.expandedIds).toEqual(['c'])
+
+  store.applyFold('open', 'a')
+  store.selectNode('d', 0)
+  await store.flushPersistence()
+
+  // An explicit fold command makes the branch the user's own choice.
+  expect(vi.mocked(services.save).mock.lastCall![0].view?.expandedIds).toEqual(['a', 'c'])
+})
+
+// @requirement PRODUCT.md §20.2.31
+it.each(['enter', 'agenda'] as const)(
+  'closes search-opened folds as Escape does when %s closes search',
+  async (action) => {
+    const { store, state } = await setup()
+    store.search.begin({ nodeId: 'a', offset: 0 })
+    store.search.edit('apple')
+    store.search.confirm()
+    store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+    await vi.runAllTimersAsync()
+    store.search.navigate({ nodeId: 'b', offset: 0 }, 1, 2)
+    await vi.runAllTimersAsync()
+
+    expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+
+    if (action === 'enter') store.enter()
+    else store.openAgenda()
+
+    expect(store.search.session.getSnapshot().visible).toBe(false)
+    expect(state().expansion.expandedIds).toEqual(new Set(['c']))
+
+    if (action === 'enter') store.leave()
+    else store.closeAgenda()
+
+    expect(state().expansion.expandedIds).toEqual(new Set(['c']))
+  },
+)
+
+// @requirement PRODUCT.md §20.2.31
+it('keeps search folds on screen after a text click, out of saves until a location change closes them', async () => {
+  const { store, services, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'b', offset: 0 }, 1, 2)
+  await vi.runAllTimersAsync()
+
+  store.hideSearchAtPointer()
+  store.selectNode('b', 0)
+  await store.flushPersistence()
+
+  expect(store.search.session.getSnapshot().visible).toBe(false)
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+  expect(vi.mocked(services.save).mock.lastCall![0].view?.expandedIds).toEqual(['a'])
+
+  store.enter()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a']))
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('closes search folds in the view a star change leaves before the starred view copies it', async () => {
+  vi.useFakeTimers()
+  const save = vi.fn<EditorServices['save']>(async () => undefined)
+  const branch = (id: string) => ({ id, text: id, children: [{ id: `${id}1`, text: 'needle', children: [] }] })
+  const store = new EditorStore(
+    {
+      load: async () => ({
+        version: 1,
+        document: { roots: [{ id: 'p', text: 'project', children: [branch('x'), branch('y')] }] },
+        location: { currentParentId: 'p', selectedNodeId: 'x' },
+      }),
+      save,
+      readClipboard: async () => ({ kind: 'text', text: '' }),
+      writeAttachment: async () => undefined,
+      cleanupAttachments: async () => undefined,
+    },
+    () => 'new',
+  )
+  await store.initialize()
+  const state = () => store.getSnapshot() as ReadySnapshot
+  store.search.begin({ nodeId: 'p', offset: 0 })
+  store.search.edit('needle')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'x1', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.selectNode('p', 0)
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['x', 'y']))
+
+  store.toggleStarNode()
+  await store.flushPersistence()
+
+  expect(state().expansion.viewOwnerId).toBe('p')
+  expect(state().expansion.expandedIds).toEqual(new Set())
+  expect(store.search.session.getSnapshot().visible).toBe(true)
+  const view = save.mock.lastCall![0].view
+  expect(view?.expandedIds).toEqual([])
+  expect(Object.values(view?.starredExpandedIds ?? {}).flat()).toEqual([])
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('closes the search-opened node a user enters, as Escape would before entering', async () => {
+  const { store, services, state } = await setup(1, true)
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'a', offset: 6 }, 1, 2)
+  await vi.runAllTimersAsync()
+
+  expect(state().location.selectedNodeId).toBe('nested')
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'b']))
+
+  store.selectNode('b', 0)
+  store.enter()
+  await store.flushPersistence()
+
+  expect(state().location.currentParentId).toBe('b')
+  expect(state().expansion.expandedIds).toEqual(new Set(['a']))
+  expect(vi.mocked(services.save).mock.lastCall![0].view?.expandedIds).toEqual(['a'])
+})
+
+it('keeps a fold the user took over from search when a location change closes search', async () => {
+  const { store, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'b', offset: 0 }, 1, 2)
+  await vi.runAllTimersAsync()
+  store.applyFold('open', 'a')
+
+  store.enter()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+})
+
+it('derives the saved expansion from Tree search folds only', async () => {
+  const { state } = await setup()
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const tree: ReadySnapshot = {
+    ...state(),
+    expansion: { ...state().expansion, expandedIds: new Set(['a', 'c']) },
+    location: { currentParentId: null, selectedNodeId: 'd' },
+  }
+  search.update(tree)
+
+  expect(search.persistentExpansion(tree)).toBe(tree.expansion)
+
+  search.recordOpenedFold('a')
+  search.recordOpenedFold('c')
+
+  expect(search.persistentExpansion(tree).expandedIds).toEqual(new Set(['c']))
+  expect(tree.expansion.expandedIds).toEqual(new Set(['a', 'c']))
+  // Under Agenda the recorded keys are Agenda folds; Tree expansion is saved as it is.
+  expect(search.persistentExpansion({ ...tree, agenda: {} as NonNullable<ReadySnapshot['agenda']> })).toBe(
+    tree.expansion,
+  )
+
+  search.recordOpenedFold('d')
+  search.manualFold('a')
+
+  expect(search.persistentExpansion(tree).expandedIds).toEqual(new Set(['a', 'c']))
+  // A location the runtime has not corrected yet keeps no path instead of throwing.
+  expect(
+    search.persistentExpansion({ ...tree, location: { currentParentId: null, selectedNodeId: 'missing' } }).expandedIds,
+  ).toEqual(new Set(['a']))
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('leaves the folds of a view that replaced the searched view before publication alone', async () => {
+  const { state } = await setup()
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const previous: ReadySnapshot = { ...state(), expansion: { ...state().expansion, expandedIds: new Set(['a']) } }
+  search.update(previous)
+  search.recordOpenedFold('a')
+  const next: ReadySnapshot = {
+    ...previous,
+    location: { currentParentId: 'c', selectedNodeId: 'd' },
+    expansion: { ...previous.expansion, viewOwnerId: 'c', expandedIds: new Set(['a']) },
+  }
+
+  search.closeFoldsLeavingScope(next, previous)
+
+  expect(next.expansion.expandedIds).toEqual(new Set(['a']))
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('closes Find without a save when every search fold shows the selection, and the kept fold is the user’s', async () => {
+  const { store, services, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'a', offset: 6 }, 1, 1)
+  await vi.runAllTimersAsync()
+  await store.flushPersistence()
+  vi.mocked(services.save).mockClear()
+
+  expect(state().location.selectedNodeId).toBe('b')
+  expect(state().expansion.expandedIds).toEqual(new Set(['a']))
+
+  store.hideSearch()
+  await vi.runAllTimersAsync()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a']))
+  expect(services.save).not.toHaveBeenCalled()
+
+  store.selectNode('c', 0)
+  await store.flushPersistence()
+
+  expect(vi.mocked(services.save).mock.lastCall![0].view?.expandedIds).toEqual(['a'])
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('keeps search folds open while text edits change the document', async () => {
+  const { store, state } = await setup()
+  store.search.begin({ nodeId: 'a', offset: 0 })
+  store.search.edit('apple')
+  store.search.confirm()
+  store.search.navigate({ nodeId: 'a', offset: 0 }, 1, 1)
+  await vi.runAllTimersAsync()
+  store.search.navigate({ nodeId: 'b', offset: 0 }, 1, 2)
+  await vi.runAllTimersAsync()
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+
+  store.editText('d', 'apple pie')
+
+  expect(state().expansion.expandedIds).toEqual(new Set(['a', 'c']))
+  expect(store.search.session.getSnapshot().visible).toBe(true)
+})
+
 it('does not save query entry and preserves only confirmed recall across presentation changes', async () => {
   const { store, services, state } = await setup()
 

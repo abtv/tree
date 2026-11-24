@@ -678,7 +678,7 @@ export function App({
               event.target instanceof Element &&
               event.target.closest('.node-input, .agenda-text')
             )
-              store.hideSearch()
+              store.hideSearchAtPointer()
           }}
           className={
             agenda !== undefined

@@ -7,7 +7,9 @@ import {
   setCursor,
   setAgendaToday,
   clickApplicationMenuItem,
+  clickApplicationMenuQuit,
   describeForEachEditingMode,
+  readPersisted,
 } from './fixtures'
 import { controlPostedTasksWithClock } from '../search-clock'
 
@@ -101,6 +103,102 @@ describeForEachEditingMode('Local search', ({ mode }) => {
     await expect(window.locator('.local-search-panel')).toHaveCount(0)
     await window.keyboard.press('Meta+g')
     await expect(window.locator('.search-count')).toHaveText('1 / 2')
+  })
+
+  // @requirement PRODUCT.md §20.2.31
+  test('does not save search-opened branches outside the selected path when quitting with Find open', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'x', text: 'first branch', children: [{ id: 'x1', text: 'needle one', children: [] }] },
+          { id: 'y', text: 'second branch', children: [{ id: 'y1', text: 'needle two', children: [] }] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await window.keyboard.press('Enter')
+    await expect(window.locator('[data-node-id="x1"] .search-match-current')).toBeVisible()
+    await window.keyboard.press('Meta+g')
+
+    await expect(window.locator('[data-node-id="y1"] .search-match-current')).toBeVisible()
+    await expect(window.locator('[data-node-id="x1"]')).toBeVisible()
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+
+    // Saved as if Find had closed: only the folds showing the selected match remain.
+    expect(readPersisted(userDataDir).view?.expandedIds).toEqual(['y'])
+
+    const reopened = await launchTree(userDataDir)
+
+    await expect(reopened.window.locator('[data-node-id="y1"]')).toBeVisible()
+    await expect(reopened.window.locator('[data-node-id="x1"]')).toHaveCount(0)
+  })
+
+  // @requirement PRODUCT.md §20.2.31
+  test('closes search-opened branches outside the selected path when Agenda closes Find', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'x', text: 'first branch', children: [{ id: 'x1', text: 'needle one', children: [] }] },
+          { id: 'y', text: 'second branch', children: [{ id: 'y1', text: 'needle two', children: [] }] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Meta+g')
+    await expect(window.locator('[data-node-id="y1"] .search-match-current')).toBeVisible()
+    await expect(window.locator('[data-node-id="x1"]')).toBeVisible()
+
+    await window.keyboard.press('Meta+p')
+    await expect(window.getByRole('grid', { name: 'Agenda timeline' })).toBeVisible()
+    await window.keyboard.press('Meta+p')
+
+    await expect(window.locator('[data-node-id="y1"]')).toBeVisible()
+    await expect(window.locator('[data-node-id="x1"]')).toHaveCount(0)
+  })
+
+  // @requirement PRODUCT.md §20.2.31
+  test('keeps a double-clicked row under the pointer when the first click closes Find', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'start', text: 'start', children: [] },
+          { id: 'x', text: 'first branch', children: [{ id: 'x1', text: 'needle one', children: [] }] },
+          { id: 'y', text: 'second branch', children: [{ id: 'y1', text: 'needle two', children: [] }] },
+          { id: 'after', text: 'after row', children: [] },
+          { id: 'tail', text: 'tail row', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'start' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+f')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('Meta+g')
+    await expect(window.locator('[data-node-id="y1"] .search-match-current')).toBeVisible()
+    const row = window.locator('.node-row[data-node-id="after"]')
+    const before = (await row.boundingBox())!
+
+    await row.locator('.node-input').dblclick()
+
+    await expect(window.locator('.search-count')).toHaveCount(0)
+    await expect(window.locator('[data-node-id="x1"]')).toBeVisible()
+    expect((await row.boundingBox())!.y).toBeCloseTo(before.y, 0)
+    await expect(row.locator('.node-input')).toBeFocused()
   })
 
   test('keeps Find focused through repeated Enter and restores the last match on Escape', async ({ userDataDir }) => {
@@ -420,6 +518,40 @@ test.describe('Local search Vim modes', () => {
     await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
     await window.keyboard.press('Escape')
     await expect(window.getByRole('textbox', { name: 'Node 1', exact: true })).toHaveText('aZQha needle')
+  })
+
+  // @requirement PRODUCT.md §20.2.31
+  test('saves no search-opened branch after a star switches the expansion view during Find', async ({
+    userDataDir,
+  }) => {
+    const branch = (id: string) => ({ id, text: id, children: [{ id: `${id}1`, text: 'needle', children: [] }] })
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'p', text: 'project', children: [branch('x'), branch('y')] }] },
+      location: { currentParentId: 'p', selectedNodeId: 'x' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await window.keyboard.press('/')
+    await window.getByRole('textbox', { name: 'Search', exact: true }).fill('needle')
+    await window.keyboard.press('Enter')
+    await window.keyboard.press('n')
+    await expect(window.locator('.search-count')).toHaveText('2 / 2')
+    await window.keyboard.press('g')
+    await window.keyboard.press('g')
+    await expect(window.getByRole('textbox', { name: 'Current parent' })).toBeFocused()
+    await window.keyboard.press('Meta+Shift+p')
+    await window.getByRole('combobox', { name: 'Command' }).fill('toggle-star-node')
+    await window.keyboard.press('Enter')
+
+    await expect(window.locator('[data-node-id="x1"]')).toHaveCount(0)
+    await expect(window.locator('.search-count')).toHaveCount(1)
+
+    const closed = new Promise<void>((resolve) => app.once('close', resolve))
+    await clickApplicationMenuQuit(app)
+    await closed
+
+    const view = readPersisted(userDataDir).view
+    expect(view?.expandedIds).toEqual([])
+    expect(Object.values(view?.starredExpandedIds ?? {}).flat()).toEqual([])
   })
 
   test('returns a no-match menu repeat to the Replace caret', async ({ userDataDir }) => {
