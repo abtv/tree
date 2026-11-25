@@ -216,6 +216,47 @@ describe('Normal-mode Leader assembly', () => {
 
     expect(advanceVimLeader(state, 't', false)).toBe('cycle-appearance')
   })
+
+  it('clears an expired Leader before classifying the next key', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+
+    const result = advanceVimLeader(state, 't', false, 2_001)
+
+    expect(result).toBeUndefined()
+    expect(state.pending).toBeUndefined()
+  })
+
+  it('accepts a continuation exactly two seconds later', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+
+    const result = advanceVimLeader(state, ' ', false, 2_000)
+
+    expect(result).toBe('global-search')
+  })
+
+  it('does not extend the Leader deadline on a repeated keydown', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+    const repeated = advanceVimLeader(state, ' ', true, 1_500)
+
+    const result = advanceVimLeader(state, 't', false, 2_001)
+
+    expect(repeated).toBe('consumed')
+    expect(result).toBeUndefined()
+    expect(state.pending).toBeUndefined()
+  })
+
+  it('restarts the interval after a valid continuation', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+    advanceVimLeader(state, 't', false, 1_500)
+
+    const result = advanceVimLeader(state, 's', false, 3_000)
+
+    expect(result).toBe('toggle-star')
+  })
 })
 
 describe('Visual memory for gv', () => {
