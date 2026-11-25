@@ -9,6 +9,8 @@ import {
   launchTree,
   closeApp,
   setMainWindowBounds,
+  setMainWindowContentSize,
+  titleStripHeight,
   seedDocument,
   lockSystemClipboard,
   firePaste,
@@ -207,7 +209,13 @@ test.describe('image thumbnails in Search', () => {
     writeFileSync(attachmentPath(userDataDir, 'wide-image'), solidPng(800, 240))
     writeFileSync(attachmentPath(userDataDir, 'tall-image'), solidPng(100, 300))
     const { app, window } = await launchTree(userDataDir)
-    await setMainWindowBounds(app, { width: 700, height: 600 })
+    // Center the initially odd-height popup on a whole pixel so the screenshot does not include
+    // a row of pixels from the outline behind its top edge.
+    const contentSize = { width: 700, height: 601 }
+    await setMainWindowContentSize(app, contentSize)
+    await expect
+      .poll(() => window.evaluate(() => [innerWidth, innerHeight]))
+      .toEqual([contentSize.width, contentSize.height + titleStripHeight])
     await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
     await popup.getByRole('searchbox').fill('release')
@@ -238,6 +246,7 @@ test.describe('image thumbnails in Search', () => {
     ])
     expect(geometry[0]!.gap).toBeGreaterThanOrEqual(0)
     await expect(popup.getByRole('button', { name: 'Open image preview' })).toHaveCount(0)
+    expect((await popup.boundingBox())!.y % 1, 'The screenshot must start on a whole pixel.').toBe(0)
 
     for (const appearance of ['light', 'dark'] as const) {
       await window.evaluate((value) => globalThis.window.treeApi.setAppearance(value), appearance)
