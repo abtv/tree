@@ -3594,6 +3594,7 @@ describe('EditorStore', () => {
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
 
     store.editText('other', 'changed')
+    store.interruptPendingClipboardEdits('other')
     release!()
 
     await expect(pending).resolves.toBe(true)
@@ -6727,13 +6728,51 @@ describe('EditorStore', () => {
         return { kind: 'text', text: 'P' }
       })
       store.toggleStarNode()
-      store.interruptPendingPastes('child')
+      store.interruptPendingClipboardEdits('child')
       store.editText('child', 'changed')
       pending.open()
       await pasting
 
       expect(store.getSnapshot()).toMatchObject({
         document: { roots: [{ text: 'abcP', starred: true, children: [{ text: 'changed' }] }] },
+      })
+    })
+
+    it('cancels only cuts requested before a new local draft starts on the target', async () => {
+      const pending = gate()
+      const services = textState('abcd')
+      services.writeClipboard = () => pending.promise
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const first = store.cut('root', 0, 1)
+      store.interruptPendingClipboardEdits('root')
+      const second = store.cut('root', 1, 2)
+      pending.open()
+      await Promise.all([first, second])
+
+      expect(rootText(store)).toBe('acd')
+
+      store.undo()
+
+      expect(rootText(store)).toBe('abcd')
+    })
+
+    it('cancels the second cut when the first cut changes its target', async () => {
+      const pending = gate()
+      const services = textState('abcd')
+      services.writeClipboard = () => pending.promise
+      const store = new EditorStore(services, ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const first = store.cut('root', 0, 1)
+      const second = store.cut('root', 1, 2)
+      pending.open()
+      await Promise.all([first, second])
+
+      expect(rootText(store)).toBe('bcd')
+      expect(store.getSnapshot()).toMatchObject({
+        operationError: 'The cut could not finish because the text changed.',
       })
     })
 

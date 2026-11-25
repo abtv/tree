@@ -207,7 +207,7 @@ export function startVimReplace(
   draft: Omit<VimReplaceSession, 'typed'>,
 ): void {
   beginReplaceSession(session, draft)
-  store.interruptPendingPastes(draft.nodeId)
+  store.interruptPendingClipboardEdits(draft.nodeId)
 }
 
 export function finishReplaceSession(

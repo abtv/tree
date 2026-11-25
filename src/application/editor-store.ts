@@ -136,7 +136,8 @@ function pasteContent({ text, links = [] }: TreeNode) {
   return { text, links }
 }
 
-interface PendingPaste {
+interface PendingClipboardEdit {
+  readonly kind: 'cut' | 'paste'
   readonly nodeId: NodeId
   readonly order: number
   // Starting a local editing draft invalidates the original target even before its text is committed.
@@ -202,7 +203,7 @@ export class EditorStore {
   private readonly saveScheduler: EditorSaveScheduler
   private readonly pendingEditFinishers = new Set<() => boolean>()
   private pendingClipboardOperation: Promise<void> | undefined
-  private readonly pendingPastes = new Set<PendingPaste>()
+  private readonly pendingClipboardEdits = new Set<PendingClipboardEdit>()
   private clipboardEditOrder = 0
   private readonly pendingEdits = new Set<Promise<void>>()
   private readonly editSeals = new Set<AbortSignal>()
@@ -913,8 +914,7 @@ export class EditorStore {
     const transition = clipboardSelectionTransition(state.document, nodeId, start, end)
     if (transition === undefined || this.services.writeClipboard === undefined) return false
     this.endTextSession()
-    const expectedContent = nodeContent(requireNode(state.document, nodeId).node)
-    const order = ++this.clipboardEditOrder
+    const cut = this.beginClipboardEdit('cut', requireNode(state.document, nodeId).node)
     const operation = (async (): Promise<void> => {
       await this.services.writeClipboard!(transition.payload)
       const target = this.clipboardTarget(nodeId)
@@ -924,13 +924,13 @@ export class EditorStore {
       // it is an internal defense and no supported input exercises it.
       const current = locateNode(target.document, nodeId)?.node
       if (current === undefined) return
-      if (!sameNodeContent(current, expectedContent)) {
+      if (cut.expected === undefined || !sameNodeContent(current, cut.expected)) {
         this.reportError(new Error(CUT_CONFLICT_ERROR))
         return
       }
       const next = removeTextRange(target.document, nodeId, transition.from, transition.to)
       if (this.applyStructural(next, target.location, this.runtime.newFocus(nodeId, transition.from))) {
-        this.advancePendingPastes(order, current, next)
+        this.advancePendingPastes(cut.order, current, next)
       }
     })()
     this.pendingClipboardOperation = operation
@@ -938,6 +938,7 @@ export class EditorStore {
       await this.trackEdit(operation)
       return true
     } finally {
+      this.pendingClipboardEdits.delete(cut)
       if (this.pendingClipboardOperation === operation) this.pendingClipboardOperation = undefined
     }
   }
@@ -1572,30 +1573,37 @@ export class EditorStore {
     this.runtime.ready()
     const state = this.clipboardTarget(nodeId)
     if (state === undefined) return
-    const paste = {
-      nodeId,
-      order: ++this.clipboardEditOrder,
-      expected: pasteContent(requireNode(state.document, nodeId).node),
-    }
-    this.pendingPastes.add(paste)
+    const paste = this.beginClipboardEdit('paste', requireNode(state.document, nodeId).node)
     try {
       await this.trackEdit(this.pasteFromClipboard(paste, cursor, readClipboard))
     } finally {
-      this.pendingPastes.delete(paste)
+      this.pendingClipboardEdits.delete(paste)
     }
   }
 
-  public interruptPendingPastes(nodeId: NodeId): void {
-    for (const paste of this.pendingPastes) {
-      if (paste.nodeId === nodeId) paste.expected = undefined
+  private beginClipboardEdit(kind: PendingClipboardEdit['kind'], node: TreeNode): PendingClipboardEdit {
+    const edit = {
+      kind,
+      nodeId: node.id,
+      order: ++this.clipboardEditOrder,
+      expected: kind === 'cut' ? nodeContent(node) : pasteContent(node),
+    }
+    this.pendingClipboardEdits.add(edit)
+    return edit
+  }
+
+  public interruptPendingClipboardEdits(nodeId: NodeId): void {
+    for (const edit of this.pendingClipboardEdits) {
+      if (edit.nodeId === nodeId) edit.expected = undefined
     }
   }
 
   // A clipboard edit requested before this paste belongs to its starting content.
   // Preserve rapid cut/paste and repeated paste without accepting an unrelated text edit.
   private advancePendingPastes(order: number, before: TreeNode, next: Document): void {
-    for (const paste of this.pendingPastes) {
+    for (const paste of this.pendingClipboardEdits) {
       if (
+        paste.kind === 'paste' &&
         paste.order > order &&
         paste.nodeId === before.id &&
         paste.expected !== undefined &&
@@ -1630,7 +1638,7 @@ export class EditorStore {
     return state
   }
 
-  private pasteTarget(paste: PendingPaste): ReadySnapshot | undefined {
+  private pasteTarget(paste: PendingClipboardEdit): ReadySnapshot | undefined {
     const state = this.clipboardTarget(paste.nodeId)
     if (state === undefined || this.isPersistenceLocked()) return
     const node = requireNode(state.document, paste.nodeId).node
@@ -1642,7 +1650,7 @@ export class EditorStore {
   }
 
   private async pasteFromClipboard(
-    paste: PendingPaste,
+    paste: PendingClipboardEdit,
     cursor: number,
     readClipboard?: EditorServices['readClipboard'],
   ): Promise<void> {

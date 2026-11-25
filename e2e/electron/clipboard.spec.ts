@@ -1,5 +1,5 @@
 // @editing-modes: both
-import type { ElectronApplication } from '@playwright/test'
+import type { ElectronApplication, Locator } from '@playwright/test'
 import {
   allowRendererError,
   attachmentFiles,
@@ -30,6 +30,25 @@ import {
 // Wrap the registered handler so a delayed operation still exercises the real
 // validation and native clipboard path. Injection is confined to the owned test app.
 type ClipboardGate = typeof globalThis & { clipboardStarted?: boolean; releaseClipboard?: () => void }
+
+async function selectForCut(field: Locator, start: number, end: number) {
+  await field.evaluate(
+    (element, range) => {
+      const input = element as HTMLTextAreaElement
+      input.focus()
+      input.setSelectionRange(range.start, range.end)
+      document.addEventListener(
+        'cut',
+        (event) => {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        },
+        true,
+      )
+    },
+    { start, end },
+  )
+}
 
 async function holdClipboard(app: ElectronApplication, channel: 'tree:read-clipboard' | 'tree:write-clipboard') {
   await app.evaluate((_, name) => {
@@ -519,21 +538,7 @@ test.describe('clipboard (mode-independent, second part)', () => {
     const editor = node(window, 1)
 
     await typeInto(editor, 'abc')
-    await editor.evaluate((element) => {
-      const field = element as HTMLTextAreaElement
-      field.focus()
-      field.setSelectionRange(1, 2)
-    })
-    await window.evaluate(() => {
-      document.addEventListener(
-        'cut',
-        (event) => {
-          event.preventDefault()
-          event.stopImmediatePropagation()
-        },
-        true,
-      )
-    })
+    await selectForCut(editor, 1, 2)
     const gate = await holdClipboard(app, 'tree:write-clipboard')
     await window.keyboard.press('Meta+x')
     await gate.waitForStart()
@@ -559,6 +564,45 @@ test.describe('clipboard (mode-independent, second part)', () => {
 })
 
 test.describe('clipboard in Vim Replace', () => {
+  // @requirement PRODUCT.md §13.1
+  test('preserves a new Replace session when a delayed cut finishes', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'target', text: 'abcdef', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'target' },
+    })
+    const { app, window } = await launchTree(userDataDir, { vimPreference: true, initialMode: 'normal' })
+    await window.clock.install()
+    const field = node(window, 1)
+    const error = 'Operation failed: The cut could not finish because the text changed.'
+    allowRendererError(exactMessage(error))
+    const gate = await holdClipboard(app, 'tree:write-clipboard')
+    await selectForCut(field, 0, 2)
+    await lockSystemClipboard()
+
+    await field.press('Meta+x')
+    await gate.waitForStart()
+    await setCursor(field, 3)
+    await field.press('R')
+    await window.keyboard.type('X')
+    await expect(field).toHaveValue('abcXef')
+    await gate.release()
+
+    await expect(window.getByText(error)).toBeVisible()
+    await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('ab')
+    unlockSystemClipboard()
+    await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+    await expect(field).toBeFocused()
+    await expect(field).toHaveJSProperty('selectionStart', 4)
+    await window.screenshot({ path: test.info().outputPath('cut-conflict-replace.png') })
+
+    await field.press('Escape')
+    await fireIdleSave(window)
+    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, idleSavePoll).toBe('abcXef')
+
+    await field.press('u')
+    await expect(field).toHaveValue('abcdef')
+  })
+
   for (const editor of ['plain row', 'decorated parent'] as const) {
     // @requirement PRODUCT.md §12
     test(`preserves a new Replace session when a delayed paste returns to a ${editor}`, async ({ userDataDir }) => {
