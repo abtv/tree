@@ -1,11 +1,24 @@
 import type { TreeNode } from './document-types'
+import { tagNameMatch } from './tag-search'
 import { nodeTags, tagPrefix, type TagPrefix } from './tags'
-import { prepareSearch, searchText, type SearchPattern, type SearchWork, type TextMatch } from './text-search'
+import {
+  prepareSearch,
+  searchText,
+  wholeSearchMatcher,
+  type SearchPattern,
+  type SearchWork,
+  type TextMatch,
+} from './text-search'
 
 export interface NodeSearchTerm {
   readonly pattern: SearchPattern
   readonly prefix: TagPrefix | undefined
   readonly valid: boolean
+}
+
+export interface InferredSearchMarker {
+  readonly fragment: string
+  readonly name: string
 }
 
 /** A complete marker term uses the same syntax for matching and query presentation. */
@@ -98,9 +111,11 @@ export function* nodeSearchHighlights(
   text: string,
   query: string,
   tagMatches: readonly TextMatch[],
+  markerFragments?: readonly InferredSearchMarker[],
 ): Generator<undefined, readonly TextMatch[]> {
   const terms = yield* prepareNodeSearch(query)
-  let ranges = tagMatches
+  let ranges =
+    markerFragments === undefined ? tagMatches : yield* fragmentMarkerRanges(text, terms, tagMatches, markerFragments)
   for (const term of terms) {
     if (term.prefix !== undefined) continue
     const matches: TextMatch[] = []
@@ -111,4 +126,66 @@ export function* nodeSearchHighlights(
     ranges = yield* mergeSearchMatches(ranges, matches)
   }
   return ranges
+}
+
+/** The search supplies recognized occurrences. Trim only ranges not matched by an explicit full term. */
+function* fragmentMarkerRanges(
+  text: string,
+  terms: readonly NodeSearchTerm[],
+  ranges: readonly TextMatch[],
+  fragments: readonly InferredSearchMarker[],
+): Generator<undefined, TextMatch[]> {
+  const markerTerms = terms.filter((term) => term.prefix !== undefined && term.valid)
+  const inferred = new Map<string, { fragment: string; matches: (name: string) => boolean }[]>()
+  for (const { fragment, name } of fragments) {
+    yield undefined
+    const prefix = fragment[0]!
+    const matchers = inferred.get(prefix) ?? []
+    matchers.push({ fragment: fragment.slice(1), matches: wholeSearchMatcher(name) })
+    inferred.set(prefix, matchers)
+  }
+  const highlights: TextMatch[] = []
+  marker: for (const range of ranges) {
+    yield undefined
+    const prefix = text[range.start]!
+    const matchers = inferred.get(prefix)
+    if (matchers === undefined) {
+      highlights.push(range)
+      continue
+    }
+    const name = text.slice(range.start + 1, range.end)
+    for (const term of markerTerms) {
+      if (term.prefix !== prefix) continue
+      for (const match of searchText(name, term.pattern)) {
+        yield undefined
+        if (match?.start !== 0 || match.end !== name.length) continue
+        highlights.push(range)
+        continue marker
+      }
+    }
+    const parts: TextMatch[] = []
+    for (const matcher of matchers) {
+      yield undefined
+      if (!matcher.matches(name)) continue
+      const match = tagNameMatch(name, matcher.fragment)
+      if (match !== undefined) {
+        parts.push({
+          start: range.start + (match.start === 0 ? 0 : 1 + match.start),
+          end: range.start + 1 + match.end,
+        })
+      }
+    }
+    if (parts.length === 1) highlights.push(parts[0]!)
+    else if (parts.length > 1) {
+      const merged = yield* mergeSearchMatches(
+        parts.sort((a, b) => a.start - b.start),
+        [],
+      )
+      for (const match of merged) {
+        yield undefined
+        highlights.push(match)
+      }
+    }
+  }
+  return highlights
 }

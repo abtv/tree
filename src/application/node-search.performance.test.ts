@@ -75,3 +75,36 @@ it('scans long ancestor context once while matching many descendants', () => {
   expect(checkpoints).toBeLessThan(600_000)
   expect(performance.now() - start).toBeLessThan(2000)
 })
+
+it('reuses long ancestor image evidence and a bounded set of highlights across descendants', () => {
+  const count = 2000
+  const document = {
+    roots: [
+      {
+        id: 'source',
+        text: 'Roadmap',
+        attachment: {
+          id: 'image',
+          mimeType: 'image/png' as const,
+          searchText: `${'x'.repeat(250_000)} release Version`,
+        },
+        children: Array.from({ length: count }, (_, index) => ({ id: String(index), text: 'Notes', children: [] })),
+      },
+    ],
+  }
+  const work = searchNodes(document, 'release Version notes')
+
+  let step = work.next()
+  let checkpoints = 0
+  while (!step.done) {
+    checkpoints++
+    step = work.next()
+  }
+
+  expect(step.value).toHaveLength(count)
+  expect(checkpoints).toBeLessThan(220_000)
+  const excerpt = step.value[0]!.imageExcerpt!
+  expect(excerpt.text.length).toBeLessThanOrEqual(98)
+  expect(excerpt.matches.map(({ start, end }) => excerpt.text.slice(start, end))).toEqual(['release', 'Version'])
+  expect(step.value.every((result) => result.imageExcerpt?.matches === excerpt.matches)).toBe(true)
+})

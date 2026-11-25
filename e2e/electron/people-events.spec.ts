@@ -123,9 +123,8 @@ describeForEachEditingMode('People and events', ({ mode, screenshotName }) => {
 
       await query.fill('&week')
 
-      await expect(window.getByRole('listbox', { name: 'Events', exact: true }).getByRole('option')).toHaveText([
-        '&weekly-review',
-      ])
+      await expect(window.getByRole('listbox', { name: 'Events', exact: true })).toHaveCount(0)
+      await expect(results.locator('.recent-node-text .node-search-match')).toHaveText('&week')
 
       await query.press('Tab')
 

@@ -200,16 +200,15 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
       location: { currentParentId: null, selectedNodeId: 'task' },
     })
     const { window } = await launchTree(userDataDir)
-    const treeRowHeight = (await window.locator('.node-row').first().boundingBox())!.height
     await window.keyboard.press('Meta+;')
     const input = window.getByRole('searchbox', { name: 'Search query' })
+    const results = window.getByRole('listbox', { name: 'Search results' })
 
     await input.fill('task @al later')
+    await expect(results.locator('.node-search-match')).toHaveText(['task', '@al', 'later'])
     await input.press('Home')
     for (let index = 0; index < 7; index++) await input.press('ArrowRight')
-    const person = window.getByRole('listbox', { name: 'People' }).getByRole('option')
-    await expect(person).toHaveText('@alex')
-    expect((await person.boundingBox())!.height).toBe(treeRowHeight)
+    await expect(window.getByRole('listbox', { name: 'People' })).toHaveCount(0)
     await input.press('Tab')
 
     await expect(input).toHaveValue('task @alex later')
@@ -222,15 +221,18 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
     await input.fill('#wo task')
     await input.press('Home')
     await input.press('ArrowRight')
-    await expect(window.getByRole('listbox', { name: 'Tags' }).getByRole('option')).toHaveText(['#work'])
-    await window.getByRole('listbox', { name: 'Tags' }).getByRole('option').click()
+    await expect(results.locator('.node-search-match')).toHaveText(['task', '#wo'])
+    await expect(window.getByRole('listbox', { name: 'Tags' })).toHaveCount(0)
+    await input.press('Tab')
 
     await expect(input).toHaveValue('#work task')
     expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(5)
 
+    await input.fill('task @al #wo &mee later')
+    await expect(results.locator('.node-search-match')).toHaveText(['task', '@al', '#wo', '&mee', 'later'])
     await input.fill('task &mee')
-    await expect(window.getByRole('listbox', { name: 'Events' }).getByRole('option')).toHaveText(['&meeting'])
-    await input.press('Enter')
+    await expect(window.getByRole('listbox', { name: 'Events' })).toHaveCount(0)
+    await input.press('Tab')
 
     await expect(input).toHaveValue('task &meeting')
     await expect(input).toBeFocused()
@@ -273,6 +275,7 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
           },
           { id: 'outside', text: 'opensearch', children: [] },
           { id: 'direct', text: '@Alex #K8s &Meeting Infrastructure opensearch', children: [] },
+          { id: 'longer-name', text: '@Alexander', children: [] },
           {
             id: 'images',
             text: 'Image recognition',
@@ -341,9 +344,7 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('opens a sole exact tag result with one Enter and restores suggestions for a fragment', async ({
-    userDataDir,
-  }) => {
+  test('opens an exact tag result with one Enter and previews a unique fragment', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
@@ -382,7 +383,10 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
     await window.keyboard.press('Backspace')
 
     await expect(input).toHaveValue('#p')
-    await expect(tags.getByRole('option')).toHaveText(['#p1'])
+    await expect(tags).toHaveCount(0)
+    await expect(results.locator('.node-search-match')).toHaveText(['#p', '#p'])
+    await window.keyboard.press('ArrowDown')
+    await expect(results.locator('.recent-node-row').last()).toHaveAttribute('aria-selected', 'true')
     await window.keyboard.press('Tab')
     await expect(tags).toHaveCount(0)
     await expect(input).toHaveValue('#p1')
@@ -450,7 +454,11 @@ describeForEachEditingMode('Global Search @linux', (mode) => {
     await expect(tags).toHaveCount(0)
     await expect(results.locator('.recent-node-text')).toHaveText(['Alpha #work #w', 'alpha #Work'])
     await input.fill('#w')
-    await expect(tags).toBeVisible()
+    await expect(tags).toHaveCount(0)
+    await expect(results.locator('.recent-node-row')).toHaveCount(1)
+    await input.fill('#w ')
+    await expect(tags).toHaveCount(0)
+    await expect(results.locator('.recent-node-row')).toHaveCount(1)
     await window.keyboard.press('Escape')
 
     await expect(window.getByRole('dialog', { name: 'Search' })).toHaveCount(0)
@@ -633,7 +641,15 @@ test.describe('Search popup geometry (mode-independent)', () => {
       for (const match of await results.locator('.recent-node-text .node-search-match').all()) {
         await expect(match).toHaveCSS('text-decoration-line', 'underline')
       }
-      await expect(results.locator('.recent-node-path .node-search-match')).toHaveCSS('text-decoration-line', 'none')
+      const pathMatch = results.locator('.recent-node-path .node-search-match')
+      await expect(pathMatch).toHaveCSS('text-decoration-line', 'underline')
+      await expect(pathMatch).toHaveCSS(
+        'color',
+        await results
+          .locator('.recent-node-text .node-search-match')
+          .first()
+          .evaluate((element) => getComputedStyle(element).color),
+      )
       await expect(popup).toHaveCSS('width', '644px')
       await expect(window).toHaveScreenshot(`search-results-presentation-${appearance}.png`)
 
@@ -1247,12 +1263,9 @@ test.describe('Search popup geometry (mode-independent)', () => {
         await window.screenshot({ path: 'test-results/search-stable-tags-light.png' })
       }
       if (query === '#p1') {
-        await expect(popup.getByText('Tags', { exact: true })).toBeVisible()
+        await expect(popup.getByText('Tags', { exact: true })).toHaveCount(0)
         await expect(popup.getByText('Results', { exact: true })).toBeVisible()
         await expect(popup.locator('[aria-selected="true"]')).toHaveCount(1)
-        await expect(popup.getByText('↑↓ Select ↵/Tab Apply Esc Close')).toBeVisible()
-        await window.keyboard.press('Tab')
-        await expect(popup.getByRole('listbox', { name: 'Tags' })).toHaveCount(0)
         await expect(popup.getByText('↑↓ Select ↵ Open Esc Close')).toBeVisible()
         await expect(input).toHaveValue('#p1')
         await expect(popup.getByLabel('Result position')).toHaveText('1 / 1')

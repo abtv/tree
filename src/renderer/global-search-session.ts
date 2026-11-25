@@ -1,18 +1,40 @@
 import type { NodeResult } from '../application/node-result'
-import { nodeSearchCompletionTerm } from '../domain/node-search-query'
+import { searchScheduler, type SearchScheduler } from '../application/search-executor'
+import { nodeSearchCompletionTerm, type InferredSearchMarker } from '../domain/node-search-query'
+import { tagPrefix } from '../domain/tags'
 import { moveSuggestionIndex } from './completion-controller'
 
 interface SearchSource {
   /** The list shown for empty input: marked, then starred nodes. */
   initial(): readonly NodeResult[]
-  suggestions(query: string): readonly string[]
+  suggestions(query: string, uniqueOnly?: boolean): readonly string[]
   search(query: string, publish: (results: readonly NodeResult[]) => void): () => void
 }
 
-interface GlobalSearchSnapshot {
+type CompletionTerm = NonNullable<ReturnType<typeof nodeSearchCompletionTerm>>
+
+function replaceCompletionTerm(query: string, term: CompletionTerm, name: string): string {
+  return `${query.slice(0, term.start)}${term.text[0]}${name}${query.slice(term.end)}`
+}
+
+interface ResultPresentation {
+  readonly completedQuery: string
+  readonly completedMarkerFragments: readonly InferredSearchMarker[] | undefined
+}
+
+interface CaretSuggestions {
+  readonly completionQuery: string
+  readonly suggestions: readonly string[]
+}
+
+interface ResolvedQuery extends ResultPresentation {
+  readonly effectiveQuery: string
+  readonly markerNames: Map<string, string | undefined>
+}
+
+interface GlobalSearchSnapshot extends ResultPresentation {
   readonly items: readonly NodeResult[] | undefined
   readonly query: string
-  readonly completedQuery: string
   readonly pending: boolean
   readonly selected: number
   readonly selectedPart: 'node' | 'heading'
@@ -25,6 +47,7 @@ const closed: GlobalSearchSnapshot = {
   items: undefined,
   query: '',
   completedQuery: '',
+  completedMarkerFragments: undefined,
   pending: false,
   selected: 0,
   selectedPart: 'node',
@@ -32,6 +55,9 @@ const closed: GlobalSearchSnapshot = {
   completionQuery: '',
   suggestionIndex: 0,
 }
+
+// One uncached term can scan a complete catalog. Yield between small groups of lookups.
+const markerLookupsPerSlice = 4
 
 export function startsSearchGroup(items: readonly NodeResult[], index: number): boolean {
   const item = items[index]!
@@ -50,10 +76,15 @@ export class GlobalSearchSession {
   private completionAccepted = false
   private selectionStart = 0
   private selectionEnd = 0
-  private request: { cancel?: () => void } | undefined
+  private markerNames = new Map<string, string | undefined>()
+  private cancelPreparation: (() => void) | undefined
+  private request: { query: string; presentation: ResultPresentation; cancel?: () => void } | undefined
   private readonly listeners = new Set<() => void>()
 
-  public constructor(private readonly source: SearchSource) {}
+  public constructor(
+    private readonly source: SearchSource,
+    private readonly scheduler: SearchScheduler = searchScheduler,
+  ) {}
 
   public getSnapshot = (): GlobalSearchSnapshot => this.snapshot
 
@@ -64,6 +95,7 @@ export class GlobalSearchSession {
 
   public open(): void {
     this.cancel()
+    this.markerNames.clear()
     this.composing = false
     this.completionAccepted = false
     this.selectionStart = 0
@@ -74,6 +106,7 @@ export class GlobalSearchSession {
   public close(): boolean {
     if (this.snapshot.items === undefined) return false
     this.cancel()
+    this.markerNames.clear()
     this.composing = false
     this.set(closed)
     return true
@@ -81,55 +114,33 @@ export class GlobalSearchSession {
 
   public edit(query: string, completedTag = false, selectionStart = query.length, selectionEnd = selectionStart): void {
     if (this.snapshot.items === undefined) return
-    this.cancel()
     this.completionAccepted = completedTag
     this.selectionStart = selectionStart
     this.selectionEnd = selectionEnd
     if (query === '') {
+      this.cancel()
+      this.markerNames.clear()
       this.set({ ...closed, items: this.source.initial() })
       return
     }
 
-    const completion = selectionStart === selectionEnd ? nodeSearchCompletionTerm(query, selectionStart) : undefined
-    const request: NonNullable<typeof this.request> = {}
-    this.request = request
-    this.set({
-      ...this.snapshot,
-      query,
-      selected: 0,
-      selectedPart: 'node',
-      suggestionIndex: 0,
-      completionQuery: completion?.text ?? '',
-      suggestions:
-        completedTag || this.composing || completion === undefined ? [] : this.source.suggestions(completion.text),
-      pending: true,
-    })
-    // Snapshot subscribers can close or replace the request during either publication.
-    if (this.request !== request) return
-    const cancel = this.source.search(query, (items) => {
-      if (this.request !== request) return
-      this.set({ ...this.snapshot, items, completedQuery: query, pending: false })
-    })
-    if (this.request === request) request.cancel = cancel
-    else cancel()
+    this.updateQuery(query, 'edit')
   }
 
   public refresh(): void {
-    this.edit(this.snapshot.query, this.completionAccepted, this.selectionStart, this.selectionEnd)
+    const { items, query } = this.snapshot
+    if (items === undefined) return
+    if (query === '') this.edit(query)
+    else this.updateQuery(query, 'refresh')
   }
 
   public updateSelection(start: number, end = start): void {
-    if (this.snapshot.items === undefined || (start === this.selectionStart && end === this.selectionEnd)) return
+    const { items, query } = this.snapshot
+    if (items === undefined || query === '' || (start === this.selectionStart && end === this.selectionEnd)) return
     this.completionAccepted = false
     this.selectionStart = start
     this.selectionEnd = end
-    const completion = start === end ? nodeSearchCompletionTerm(this.snapshot.query, start) : undefined
-    this.set({
-      ...this.snapshot,
-      completionQuery: completion?.text ?? '',
-      suggestionIndex: 0,
-      suggestions: this.composing || completion === undefined ? [] : this.source.suggestions(completion.text),
-    })
+    this.set({ ...this.snapshot, ...this.suggestionsAtCaret(query), suggestionIndex: 0 })
   }
 
   public beginComposition(): void {
@@ -157,13 +168,8 @@ export class GlobalSearchSession {
     const tag = this.snapshot.suggestions[index]
     const completion = nodeSearchCompletionTerm(this.snapshot.query, this.selectionStart)
     if (tag !== undefined && completion !== undefined) {
-      const replacement = `${completion.text[0]}${tag}`
-      const caret = completion.start + replacement.length
-      this.edit(
-        `${this.snapshot.query.slice(0, completion.start)}${replacement}${this.snapshot.query.slice(completion.end)}`,
-        true,
-        caret,
-      )
+      const caret = completion.start + 1 + tag.length
+      this.edit(replaceCompletionTerm(this.snapshot.query, completion, tag), true, caret)
       return caret
     }
   }
@@ -197,7 +203,126 @@ export class GlobalSearchSession {
     return target
   }
 
+  private suggestionsAtCaret(query: string): CaretSuggestions {
+    const completion =
+      this.selectionStart === this.selectionEnd ? nodeSearchCompletionTerm(query, this.selectionStart) : undefined
+    const suggestions =
+      this.completionAccepted || this.composing || completion === undefined
+        ? []
+        : this.source.suggestions(completion.text)
+    return { completionQuery: completion?.text ?? '', suggestions }
+  }
+
+  private *resolveMarkers(query: string, caret: CaretSuggestions): Generator<undefined, ResolvedQuery> {
+    const nextNames = new Map<string, string | undefined>()
+    const inferred: InferredSearchMarker[] = []
+    const terms = new Set<string>()
+    const composing = this.composing
+    const completionAccepted = this.completionAccepted
+    const previousNames = this.markerNames
+    let lookups = 0
+    for (const [term] of query.matchAll(/\S+/gu)) {
+      const prefix = tagPrefix(term)
+      if (prefix === undefined || composing) {
+        terms.add(term)
+        continue
+      }
+      if (nextNames.has(term)) continue
+      let name = previousNames.get(term)
+      if (!previousNames.has(term)) {
+        if (lookups === markerLookupsPerSlice) {
+          lookups = 0
+          yield undefined
+        }
+        const matches =
+          !completionAccepted && caret.completionQuery === term
+            ? caret.suggestions
+            : this.source.suggestions(term, true)
+        lookups++
+        if (matches.length === 1) name = matches[0]
+      }
+      nextNames.set(term, name)
+      const resolved = name === undefined ? term : `${prefix}${name}`
+      if (name !== undefined && resolved !== term) inferred.push({ fragment: term, name })
+      terms.add(resolved)
+    }
+    return {
+      effectiveQuery: [...terms].join(' '),
+      markerNames: nextNames,
+      completedQuery: query,
+      completedMarkerFragments: inferred.length > 0 ? inferred : undefined,
+    }
+  }
+
+  private updateQuery(query: string, change: 'edit' | 'refresh'): void {
+    this.stopPreparation()
+    if (change === 'refresh') this.markerNames.clear()
+    const completion = this.suggestionsAtCaret(query)
+    const next = {
+      ...this.snapshot,
+      ...completion,
+      query,
+      suggestionIndex: 0,
+      selected: 0,
+      selectedPart: 'node',
+    } as const
+
+    const preparation = this.resolveMarkers(query, completion)
+    const first = preparation.next()
+    if (first.done) {
+      this.searchPrepared(next, first.value, change)
+      return
+    }
+
+    this.cancel()
+    let cancelSlice: (() => void) | undefined
+    const cancel = (): void => cancelSlice?.()
+    this.cancelPreparation = cancel
+    const run = (): void => {
+      if (this.cancelPreparation !== cancel) return
+      const step = preparation.next()
+      if (!step.done) {
+        cancelSlice = this.scheduler.schedule(run)
+        return
+      }
+      this.cancelPreparation = undefined
+      this.searchPrepared(this.snapshot, step.value, change)
+    }
+    this.set({ ...next, pending: true })
+    if (this.cancelPreparation === cancel) cancelSlice = this.scheduler.schedule(run)
+  }
+
+  private searchPrepared(next: GlobalSearchSnapshot, resolved: ResolvedQuery, change: 'edit' | 'refresh'): void {
+    const { effectiveQuery, markerNames, ...presentation } = resolved
+    this.markerNames = markerNames
+    if (change !== 'refresh' && this.request?.query === effectiveQuery) {
+      this.request.presentation = presentation
+      this.set({ ...next, ...(!next.pending && presentation) })
+      return
+    }
+
+    this.cancel()
+    const request: NonNullable<typeof this.request> = { query: effectiveQuery, presentation }
+    this.request = request
+    this.set({ ...next, pending: true })
+    // Snapshot subscribers can close or replace the request during either publication.
+    if (this.request !== request) return
+    const cancel = this.source.search(effectiveQuery, (items) => {
+      if (this.request !== request) return
+      this.set({ ...this.snapshot, items, ...request.presentation, pending: false })
+    })
+    if (this.request === request) request.cancel = cancel
+    else cancel()
+  }
+
+  private stopPreparation(): void {
+    const cancel = this.cancelPreparation
+    this.cancelPreparation = undefined
+    cancel?.()
+  }
+
   private cancel(): void {
+    this.stopPreparation()
     const request = this.request
     this.request = undefined
     request?.cancel?.()

@@ -125,7 +125,10 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
     await reopened.window.getByRole('searchbox', { name: 'Search query' }).fill('secret zebra')
     await expect(reopened.window.getByRole('listbox', { name: 'Search results' }).getByRole('option')).toHaveCount(1)
     await expect(reopened.window.getByRole('listbox', { name: 'Search results' })).toContainText('Screenshot')
-    await expect(reopened.window.getByRole('listbox', { name: 'Search results' })).not.toContainText('Secret Zebra')
+    await expect(reopened.window.locator('.recent-node-image-excerpt .node-search-match')).toHaveText([
+      'Secret',
+      'Zebra',
+    ])
     await reopened.window.keyboard.press('Escape')
     await reopened.window.keyboard.press('Meta+Backspace')
     await expect(reopened.window.locator('.attachment-button')).toHaveCount(0)
@@ -184,23 +187,43 @@ test.describe('image thumbnails in Search', () => {
   })
 
   // @requirement PRODUCT.md §20.14.2
-  test('shows a fitted image thumbnail under the text of a result found through its image', async ({ userDataDir }) => {
+  test('shows a fitted image thumbnail under the text of a result found through its image', async ({
+    userDataDir,
+  }, testInfo) => {
     seedDocument(userDataDir, {
       document: {
         roots: [
           {
             id: 'wide',
             text: 'Plan screenshot',
-            attachment: { id: 'wide-image', mimeType: 'image/png', width: 800, height: 240, searchText: 'release' },
+            attachment: {
+              id: 'wide-image',
+              mimeType: 'image/png',
+              width: 800,
+              height: 240,
+              searchText: `Review the release Version and the ${'documented plan '.repeat(7)}`,
+            },
             children: [],
           },
           {
             id: 'tall',
             text: '',
-            attachment: { id: 'tall-image', mimeType: 'image/png', width: 100, height: 300, searchText: 'release' },
+            attachment: {
+              id: 'tall-image',
+              mimeType: 'image/png',
+              width: 100,
+              height: 300,
+              searchText: 'release Version',
+            },
             children: [],
           },
-          { id: 'plain', text: 'Release notes', children: [] },
+          { id: 'plain', text: 'Release Version notes', children: [] },
+          {
+            id: 'ancestor',
+            text: 'Roadmap',
+            attachment: { id: 'wide-image', mimeType: 'image/png', searchText: 'architecture notes' },
+            children: [{ id: 'milestone', text: 'Milestone', children: [] }],
+          },
         ],
       },
       location: { currentParentId: null, selectedNodeId: 'plain' },
@@ -218,9 +241,15 @@ test.describe('image thumbnails in Search', () => {
       .toEqual([contentSize.width, contentSize.height + titleStripHeight])
     await window.keyboard.press('Meta+;')
     const popup = window.getByRole('dialog', { name: 'Search' })
-    await popup.getByRole('searchbox').fill('release')
+    await popup.getByRole('searchbox').fill('release Version')
     const rows = popup.locator('.recent-node-row')
-    await expect(rows.locator('.recent-node-text')).toHaveText(['Plan screenshot', 'Image', 'Release notes'])
+    const excerpts = rows.locator('.recent-node-image-excerpt')
+    await expect(rows).toHaveCount(3)
+    await expect(excerpts).toHaveCount(2)
+    await expect(rows.first().getByText('Plan screenshot', { exact: true })).toBeVisible()
+    await expect(rows.nth(1).locator('[data-replaces-title]')).toHaveCount(1)
+    await expect(excerpts.locator('.node-search-match')).toHaveText(['release', 'Version', 'release', 'Version'])
+    await expect(excerpts.getByRole('img', { name: 'Text in image' })).toHaveCount(2)
     const thumbnails = popup.locator('img.search-thumbnail')
     await expect(thumbnails).toHaveCount(2)
     await expect
@@ -230,18 +259,29 @@ test.describe('image thumbnails in Search', () => {
     const geometry = await rows.evaluateAll((elements) =>
       elements.map((row) => {
         const image = row.querySelector('img.search-thumbnail')?.getBoundingClientRect()
-        const text = row.querySelector('.recent-node-text')!
+        const text = row.querySelector<HTMLElement>('.recent-node-text')!
+        const excerpt = row.querySelector<HTMLElement>('.recent-node-image-content')
+        const icon = row.querySelector('.recent-node-image-recognition')?.getBoundingClientRect()
+        if (image === undefined || excerpt === null || icon === undefined) return null
         const range = document.createRange()
-        range.selectNodeContents(text.firstChild ?? text)
-        const line = range.getClientRects()[0]!
-        return image === undefined
-          ? null
-          : { width: image.width, height: image.height, left: image.left - line.left, gap: image.top - line.bottom }
+        range.selectNodeContents(excerpt)
+        const lines = [...range.getClientRects()]
+        const first = lines[0]!
+        const second = lines.find((line) => line.y > first.y) ?? first
+        const lineHeight = Number.parseFloat(getComputedStyle(excerpt).lineHeight)
+        return {
+          width: image.width,
+          height: image.height,
+          left: image.left - text.getBoundingClientRect().left,
+          gap: image.top - excerpt.getBoundingClientRect().bottom,
+          iconOffset: icon.top + icon.height / 2 - excerpt.getBoundingClientRect().top - lineHeight / 2,
+          wrapIndent: second.left - first.left,
+        }
       }),
     )
     expect(geometry).toEqual([
-      { width: 120, height: 36, left: 0, gap: expect.any(Number) },
-      { width: 16, height: 48, left: 0, gap: expect.any(Number) },
+      { width: 120, height: 36, left: 0, gap: expect.any(Number), iconOffset: 0, wrapIndent: 0 },
+      { width: 16, height: 48, left: 0, gap: expect.any(Number), iconOffset: 0, wrapIndent: 0 },
       null,
     ])
     expect(geometry[0]!.gap).toBeGreaterThanOrEqual(0)
@@ -257,6 +297,22 @@ test.describe('image thumbnails in Search', () => {
     await window.keyboard.press('ArrowDown')
     await window.keyboard.press('Enter')
     await expect(window.locator('[data-node-id="tall"] .node-input')).toBeFocused()
+
+    await window.keyboard.press('Meta+Enter')
+    await window.keyboard.press('Meta+;')
+    await popup.getByRole('searchbox').fill('release Version')
+    const struckExcerpt = popup.locator('[data-result-id="tall"] .recent-node-image-content')
+    await expect(struckExcerpt).toHaveCSS('text-decoration-line', 'line-through')
+    await expect(popup.locator('[data-result-id="tall"] .search-thumbnail')).toHaveCSS('text-decoration-line', 'none')
+    await popup.screenshot({ path: testInfo.outputPath('search-struck-image-excerpt.png') })
+
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Meta+;')
+    await popup.getByRole('searchbox').fill('milestone architecture')
+    await expect(rows).toHaveCount(1)
+    await expect(rows.getByText('Ancestor image', { exact: true })).toBeVisible()
+    await expect(excerpts.locator('.node-search-match')).toHaveText('architecture')
+    await expect(thumbnails).toHaveCount(0)
   })
 })
 

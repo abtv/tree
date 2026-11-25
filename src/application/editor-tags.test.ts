@@ -45,6 +45,29 @@ it('routes global Search to independent marker catalogs and suppresses redundant
   expect(store.searchNodeSuggestions('&')).toEqual(['weekly-review'])
 })
 
+// @requirement PRODUCT.md §20.14.4
+it.each(['#', '@', '&'] as const)('uses a complete %s name before considering partial candidates', async (prefix) => {
+  const store = new EditorStore(
+    createServices(
+      serializeState(
+        { roots: [{ id: 'a', text: `${prefix}Me ${prefix}meeting ${prefix}member`, children: [] }] },
+        { currentParentId: null, selectedNodeId: 'a' },
+      ),
+      () => ({ kind: 'text', text: '' }),
+    ),
+    freshIds('marker-'),
+  )
+  await store.initialize()
+
+  expect(store.searchNodeSuggestions(`${prefix}Me`)).toEqual([])
+  expect(store.searchNodeSuggestions(`${prefix}me`)).toEqual([])
+  expect(store.searchNodeSuggestions(`${prefix}ME`)).toHaveLength(3)
+  expect(store.searchNodeSuggestions(`${prefix}ME`, true)).toEqual([])
+  expect(store.searchNodeSuggestions(`${prefix}meet`, true)).toEqual(['meeting'])
+  expect(store.searchNodeSuggestions(prefix)).toEqual(['Me', 'meeting', 'member'])
+  expect(store.searchNodeSuggestions(prefix, true)).toEqual([])
+})
+
 // @requirement PRODUCT.md §20.13
 it.each(['#', '@', '&'] as const)(
   'publishes whole-document %s names for edits, paste, deletion and history in Tree and Agenda',

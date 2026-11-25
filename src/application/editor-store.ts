@@ -299,11 +299,10 @@ export class EditorStore {
     return true
   }
 
-  public searchNodeSuggestions(query: string): readonly string[] {
+  public searchNodeSuggestions(query: string, uniqueOnly = false): readonly string[] {
     const prefix = tagPrefix(query)
     if (prefix === undefined) return []
-    const suggestions = this.tags.get(prefix)!.searchSuggestions(query)
-    return suggestions.length === 1 && query === `${prefix}${suggestions[0]}` ? [] : suggestions
+    return this.tags.get(prefix)!.searchSuggestions(query, { suppressExactMatch: true, uniqueOnly })
   }
 
   public searchNodes(query: string, publish: (results: readonly NodeResult[]) => void): () => void {

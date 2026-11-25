@@ -45,9 +45,9 @@ it('keeps continuous global Search suggestions within the catalog scale budget',
   const samples: number[] = []
 
   for (let batch = 0; batch < 100; batch++) {
-    for (const query of ['#', '#project_9', '#pt9', '#Work']) {
+    for (const query of ['#', '#project_9', '#pt9', '#Work', '#work']) {
       const start = performance.now()
-      catalog.searchSuggestions(query)
+      catalog.searchSuggestions(query, { suppressExactMatch: true })
       samples.push(performance.now() - start)
     }
   }

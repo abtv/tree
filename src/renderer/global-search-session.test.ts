@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { NodeResult } from '../application/node-result'
+import type { SearchScheduler } from '../application/search-executor'
 import { GlobalSearchSession } from './global-search-session'
 
 const initial: readonly NodeResult[] = [
@@ -7,7 +8,7 @@ const initial: readonly NodeResult[] = [
   { id: 'second', text: 'Second', path: null },
 ]
 
-function fixture() {
+function fixture(scheduler?: SearchScheduler) {
   const requests: {
     query: string
     publish: (items: readonly NodeResult[]) => void
@@ -15,14 +16,14 @@ function fixture() {
   }[] = []
   const source = {
     initial: vi.fn(() => initial),
-    suggestions: vi.fn((): readonly string[] => []),
+    suggestions: vi.fn<(query: string, uniqueOnly?: boolean) => readonly string[]>(() => []),
     search: vi.fn((query: string, publish: (items: readonly NodeResult[]) => void) => {
       const cancel = vi.fn()
       requests.push({ query, publish, cancel })
       return cancel
     }),
   }
-  const session = new GlobalSearchSession(source)
+  const session = new GlobalSearchSession(source, scheduler)
   session.open()
   return { session, source, requests }
 }
@@ -105,6 +106,120 @@ describe('global Search session', () => {
     expect(session.getSnapshot().completionQuery).toBe('@al')
     expect(session.acceptSuggestion()).toBe(10)
     expect(session.getSnapshot().query).toBe('task @alex next')
+  })
+
+  it('resolves distinct marker fragments independently of the caret and reuses unchanged resolutions', () => {
+    const { session, source, requests } = fixture()
+    const names: Record<string, readonly string[]> = {
+      '@al': ['alex'],
+      '@bo': ['bob'],
+      '#wo': ['work'],
+      '&mee': ['meeting'],
+    }
+    source.suggestions.mockImplementation((term) => names[term] ?? [])
+    const query = '@al @bo #wo &mee rev'
+
+    session.edit(query)
+    requests[0]!.publish(initial)
+    session.updateSelection(2, 4)
+    session.updateSelection(2)
+
+    expect(requests.map(({ query }) => query)).toEqual(['@alex @bob #work &meeting rev'])
+    expect(session.getSnapshot()).toMatchObject({
+      query,
+      completedQuery: query,
+      completedMarkerFragments: [
+        { fragment: '@al', name: 'alex' },
+        { fragment: '@bo', name: 'bob' },
+        { fragment: '#wo', name: 'work' },
+        { fragment: '&mee', name: 'meeting' },
+      ],
+    })
+
+    source.suggestions.mockClear()
+    session.edit(`${query}iew`)
+
+    expect(source.suggestions).not.toHaveBeenCalled()
+    expect(requests[1]?.query).toBe('@alex @bob #work &meeting review')
+  })
+
+  it('keeps a reused pending search current and reevaluates uniqueness on document refresh', () => {
+    const { session, source, requests } = fixture()
+    source.suggestions.mockReturnValue(['alex'])
+    session.edit('@a')
+
+    session.edit('@al ')
+    requests[0]!.publish(initial)
+
+    expect(requests).toHaveLength(1)
+    expect(session.getSnapshot()).toMatchObject({
+      completedQuery: '@al ',
+      completedMarkerFragments: [{ fragment: '@al', name: 'alex' }],
+    })
+
+    source.suggestions.mockReturnValue(['alex', 'alice'])
+    session.refresh()
+    requests[0]!.publish([])
+
+    expect(requests[1]?.query).toBe('@al')
+    expect(session.getSnapshot()).toMatchObject({ pending: true, items: initial })
+  })
+
+  it('expands repeated and equivalent marker terms only once in the effective query', () => {
+    const { session, source, requests } = fixture()
+    const name = `project-${'a'.repeat(512)}`
+    source.suggestions.mockReturnValue([name])
+    const query = `${'# '.repeat(500)}#pr ${'notes '.repeat(20)}`
+
+    session.edit(query)
+    requests[0]!.publish(initial)
+
+    expect(requests[0]!.query).toBe(`#${name} notes`)
+    expect(session.getSnapshot()).toMatchObject({
+      query,
+      completedQuery: query,
+      completedMarkerFragments: [
+        { fragment: '#', name },
+        { fragment: '#pr', name },
+      ],
+    })
+  })
+
+  it('yields during distinct catalog lookups and rejects queued work after a newer edit or close', () => {
+    const queued: { run: () => void; cancel: ReturnType<typeof vi.fn> }[] = []
+    const { session, source, requests } = fixture({
+      schedule(run) {
+        const cancel = vi.fn()
+        queued.push({ run, cancel })
+        return cancel
+      },
+    })
+    const pasted = Array.from({ length: 24 }, (_, index) => `#missing${index}`).join(' ')
+
+    session.edit(`${pasted} notes`)
+
+    expect(source.suggestions.mock.calls.length).toBeLessThan(24)
+    expect(requests).toHaveLength(0)
+    expect(session.getSnapshot().pending).toBe(true)
+    const stale = queued.shift()!
+
+    session.edit('new')
+    stale.run()
+
+    expect(stale.cancel).toHaveBeenCalledOnce()
+    expect(requests.map(({ query }) => query)).toEqual(['new'])
+
+    session.edit(pasted)
+    while (queued.length > 0) queued.shift()!.run()
+
+    expect(requests.map(({ query }) => query)).toEqual(['new', pasted])
+
+    session.edit(`${pasted.replaceAll('missing', 'other')} notes`)
+    session.close()
+    queued.shift()!.run()
+
+    expect(requests).toHaveLength(2)
+    expect(session.getSnapshot().items).toBeUndefined()
   })
 
   it.each(['s', 'se', 'second', '😀'])(

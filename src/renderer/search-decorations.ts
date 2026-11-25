@@ -1,5 +1,5 @@
 import { prepareSearch, searchText, type TextMatch } from '../domain/text-search'
-import { nodeSearchHighlights } from '../domain/node-search-query'
+import { nodeSearchHighlights, type InferredSearchMarker } from '../domain/node-search-query'
 import type { TextDecoration } from './editor-dom'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -18,6 +18,7 @@ export function useSearchDecorations(
   text: string,
   query: string,
   tagMatches?: readonly TextMatch[],
+  markerFragments?: readonly InferredSearchMarker[],
 ): readonly TextDecoration[] {
   // Bound the synchronous pass across mounted rows. Long text, pasted queries and
   // global multi-term results keep their incremental path.
@@ -33,13 +34,14 @@ export function useSearchDecorations(
     text: string
     query: string
     tagMatches: readonly TextMatch[] | undefined
+    markerFragments: readonly InferredSearchMarker[] | undefined
     ranges: TextDecoration[]
   }>()
   useEffect(() => {
     if (immediate !== undefined) return
     function* scan(): Generator<undefined, TextDecoration[]> {
       if (tagMatches !== undefined) {
-        const matches = yield* nodeSearchHighlights(text, query, tagMatches)
+        const matches = yield* nodeSearchHighlights(text, query, tagMatches, markerFragments)
         const ranges: TextDecoration[] = []
         for (const match of matches) {
           ranges.push({ ...match, className: 'search-match' })
@@ -55,7 +57,7 @@ export function useSearchDecorations(
       for (let step = 0; step < 2048; step++) {
         const next = work.next()
         if (next.done) {
-          setResult({ text, query, tagMatches, ranges: next.value })
+          setResult({ text, query, tagMatches, markerFragments, ranges: next.value })
           return
         }
       }
@@ -66,11 +68,16 @@ export function useSearchDecorations(
       clearTimeout(timer)
       work.return([])
     }
-  }, [text, query, tagMatches, immediate])
+  }, [text, query, tagMatches, markerFragments, immediate])
   if (immediate !== undefined) {
     // Release the previous oversized row and its ranges when the fast path takes over.
     if (result !== undefined) setResult(undefined)
     return immediate
   }
-  return result?.text === text && result.query === query && result.tagMatches === tagMatches ? result.ranges : []
+  return result?.text === text &&
+    result.query === query &&
+    result.tagMatches === tagMatches &&
+    result.markerFragments === markerFragments
+    ? result.ranges
+    : []
 }

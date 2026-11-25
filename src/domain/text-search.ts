@@ -21,6 +21,7 @@ const workPerCheckpoint = 8
 const nativeTextLimit = 512
 const nativeQueryLimit = 32
 const literalSource = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const uppercase = /\p{Lu}/u
 
 // Case equivalence of a pattern code point with text code points, in pages of 256 results (0 is unknown).
 // Compiling a RegExp for every compared character dominated case-insensitive scans of non-ASCII text.
@@ -69,6 +70,20 @@ function equal(left: number, right: number, sensitive: boolean): boolean {
   return equivalent(left, right)
 }
 
+/** Compare whole values using the same smart case as literal search. */
+export function wholeSearchMatcher(query: string): (text: string) => boolean {
+  if (uppercase.test(query)) return (text) => text === query
+  const codes = Array.from(query, (character) => character.codePointAt(0)!)
+  return (text) => {
+    let index = 0
+    for (const character of text) {
+      const code = codes[index++]
+      if (code === undefined || !equal(character.codePointAt(0)!, code, false)) return false
+    }
+    return index === codes.length
+  }
+}
+
 /** Query preparation is incremental too: pasted queries can be unusually long. */
 export function* prepareSearch(
   query: string,
@@ -82,7 +97,7 @@ export function* prepareSearch(
     characters.push(character)
     codes.push(character.codePointAt(0)!)
     fallback.push(0)
-    if (/\p{Lu}/u.test(character)) sensitive = true
+    if (uppercase.test(character)) sensitive = true
     yield undefined
   }
   let prefix = 0

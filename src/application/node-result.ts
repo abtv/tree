@@ -1,6 +1,13 @@
 import type { TreeNode } from '../domain/document'
 import type { TextMatch } from '../domain/text-search'
 
+export interface SearchImageExcerpt {
+  readonly text: string
+  readonly matches: readonly TextMatch[]
+  readonly ancestor?: string
+  readonly replacesTitle?: true
+}
+
 /** One node as Search lists it: its text, parent path and presentation flags. */
 export interface NodeResult {
   readonly id: string
@@ -13,6 +20,7 @@ export interface NodeResult {
   readonly starred?: true
   readonly marked?: true
   readonly pathStruckMatches?: readonly TextMatch[]
+  readonly imageExcerpt?: SearchImageExcerpt
   /** The node's image, so Search can show a thumbnail; its natural size reserves the thumbnail box. */
   readonly attachment?: { readonly id: string; readonly width?: number; readonly height?: number }
 }

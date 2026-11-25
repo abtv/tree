@@ -105,21 +105,26 @@ test('uses shared search emphasis for query markers, suggestions and result matc
     await expect(window.locator('html')).toHaveAttribute('data-appearance', appearance)
 
     for (const marker of ['@me', '#team', '&review']) {
+      const fragment = marker.slice(0, -1)
+      const properties = ['color', 'font-weight', 'background-color']
+      await input.fill(fragment)
+      const suggestionMatch = window.locator('.node-search-tag .node-search-match').first()
+      await expect(suggestionMatch).toHaveText(fragment)
+      const suggestionStyle = await suggestionMatch.evaluate((element, names) => {
+        const style = getComputedStyle(element)
+        return names.map((name) => style.getPropertyValue(name))
+      }, properties)
+
       await input.fill(marker)
       const queryMatch = window.locator('.node-search-input-mirror .node-search-match')
-      const suggestionMatch = window.locator('.node-search-tag .node-search-match').first()
       const resultMatch = window.locator('.recent-node-text .node-search-match').first()
       await expect(queryMatch).toHaveText(marker)
-      await expect(suggestionMatch).toHaveText(marker)
+      await expect(suggestionMatch).toHaveCount(0)
       await expect(resultMatch).toHaveText(marker)
 
-      for (const property of ['color', 'font-weight', 'background-color']) {
-        const expected = await suggestionMatch.evaluate(
-          (el, name) => getComputedStyle(el).getPropertyValue(name),
-          property,
-        )
-        await expect(queryMatch).toHaveCSS(property, expected)
-        await expect(resultMatch).toHaveCSS(property, expected)
+      for (const [index, property] of properties.entries()) {
+        await expect(queryMatch).toHaveCSS(property, suggestionStyle[index]!)
+        await expect(resultMatch).toHaveCSS(property, suggestionStyle[index]!)
       }
       await expect(resultMatch).toHaveCSS('text-decoration-line', 'underline')
       await window.screenshot({ path: testInfo.outputPath(`shared-${appearance}-${marker.slice(1)}.png`) })

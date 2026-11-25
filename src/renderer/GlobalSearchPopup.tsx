@@ -10,6 +10,8 @@ import {
 } from 'react'
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
+import type { SearchImageExcerpt } from '../application/node-result'
+import type { InferredSearchMarker } from '../domain/node-search-query'
 import type { TextMatch } from '../domain/text-search'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
@@ -27,7 +29,9 @@ import { SearchResultLayout } from './search-result-layout'
 import { SEARCH_THUMBNAIL_BLOCK_MARGIN, searchThumbnailSize } from './search-thumbnail-layout'
 
 const RESULT_EDGE_INSET = 12
+const IMAGE_EXCERPT_LINE_HEIGHT = 16
 const RESULT_KEYS = '↑↓ Select   ↵ Open   Esc Close'
+const SINGLE_SUGGESTION_KEYS = '↑↓ Select   ↵ Open   Tab Apply   Esc Close'
 const SUGGESTION_KEYS = '↑↓ Select   ↵/Tab Apply   Esc Close'
 
 function updateResultEdges(element: HTMLElement): void {
@@ -64,6 +68,46 @@ function revealResult(row: HTMLElement, first: boolean): void {
 
 const NO_MATCHES: readonly TextMatch[] = []
 
+function ImageExcerpt({
+  excerpt,
+  struck = false,
+}: {
+  excerpt: SearchImageExcerpt
+  struck?: boolean
+}): React.JSX.Element {
+  const fromAncestor = excerpt.ancestor !== undefined
+  return (
+    <span className="recent-node-image-excerpt" data-replaces-title={excerpt.replacesTitle} title={excerpt.ancestor}>
+      <svg
+        className="recent-node-image-recognition"
+        viewBox="0 0 16 16"
+        role={fromAncestor ? undefined : 'img'}
+        aria-hidden={fromAncestor || undefined}
+        aria-label={fromAncestor ? undefined : 'Text in image'}
+        focusable="false"
+      >
+        {!fromAncestor && <title>Text in image</title>}
+        <path d="M5 2H2v3m9-3h3v3m0 6v3h-3m-6 0H2v-3M5 6h6M5 8h6M5 10h4" />
+      </svg>
+      <span className={`recent-node-image-content${struck ? ' node-text-struck' : ''}`}>
+        {fromAncestor && (
+          <>
+            <span className="recent-node-image-source">Ancestor image</span>
+            {' · '}
+          </>
+        )}
+        {excerpt.matches.map((match, index) => (
+          <Fragment key={match.start}>
+            {excerpt.text.slice(excerpt.matches[index - 1]?.end ?? 0, match.start)}
+            <strong className="node-search-match">{excerpt.text.slice(match.start, match.end)}</strong>
+          </Fragment>
+        ))}
+        {excerpt.text.slice(excerpt.matches.at(-1)?.end ?? 0)}
+      </span>
+    </span>
+  )
+}
+
 interface SearchMeasurement {
   epoch: symbol
   layout: SearchResultLayout
@@ -73,6 +117,7 @@ interface SearchMeasurement {
 function SearchResultText({
   text,
   query,
+  markerFragments,
   active,
   onReveal,
   tagMatches = NO_MATCHES,
@@ -80,12 +125,13 @@ function SearchResultText({
 }: {
   text: string
   query: string
+  markerFragments?: readonly InferredSearchMarker[] | undefined
   active: boolean
   onReveal(): void
   tagMatches?: readonly TextMatch[] | undefined
   struckMatches?: readonly TextMatch[] | undefined
 }): React.JSX.Element {
-  const matches = useSearchDecorations(text, query, tagMatches)
+  const matches = useSearchDecorations(text, query, tagMatches, markerFragments)
   const firstMatch = useRef<HTMLElement>(null)
   const previousMatches = useRef(matches)
   useEffect(() => {
@@ -150,7 +196,7 @@ export function GlobalSearchPopup({
     () =>
       new GlobalSearchSession({
         initial: () => store.initialSearchResults(),
-        suggestions: (query) => store.searchNodeSuggestions(query),
+        suggestions: (query, uniqueOnly) => store.searchNodeSuggestions(query, uniqueOnly),
         search: (query, publish) => store.searchNodes(query, publish),
       }),
     [store],
@@ -161,11 +207,14 @@ export function GlobalSearchPopup({
     selectedPart,
     query,
     completedQuery,
+    completedMarkerFragments,
     completionQuery,
     suggestions,
     suggestionIndex,
     pending,
   } = useSyncExternalStore(session.subscribe, session.getSnapshot)
+  const suggestionsActive = suggestions.length > 1
+  const resultKeys = suggestions.length === 1 ? SINGLE_SUGGESTION_KEYS : RESULT_KEYS
   const [windowTop, setWindowTop] = useState(0)
   const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
   const [measurement, setMeasurement] = useState<SearchMeasurement>()
@@ -179,7 +228,8 @@ export function GlobalSearchPopup({
         // The first window should load images for the rows that actually fit in it.
         const thumbnail = searchThumbnailSize(item.attachment?.width, item.attachment?.height)
         const thumbnailHeight = thumbnail === undefined ? 0 : thumbnail.height + SEARCH_THUMBNAIL_BLOCK_MARGIN
-        return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight
+        const excerptHeight = item.imageExcerpt && !item.imageExcerpt.replacesTitle ? IMAGE_EXCERPT_LINE_HEIGHT : 0
+        return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight + excerptHeight
       }),
     [items],
   )
@@ -294,11 +344,9 @@ export function GlobalSearchPopup({
               ? -1
               : undefined
         if (event.key === 'Escape') close()
-        else if (
-          suggestions.length > 0 &&
-          (direction !== undefined || (plain && ['Enter', 'Tab'].includes(event.key)))
-        ) {
-          if (event.key === 'Enter' || event.key === 'Tab') acceptSuggestion()
+        else if (suggestions.length > 0 && plain && event.key === 'Tab') acceptSuggestion()
+        else if (suggestionsActive && (direction !== undefined || (plain && event.key === 'Enter'))) {
+          if (event.key === 'Enter') acceptSuggestion()
           else session.moveSuggestion(direction!)
         } else if (pending && ['Enter', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
           event.preventDefault()
@@ -392,8 +440,8 @@ export function GlobalSearchPopup({
   }, [items, suggestions.length])
 
   useLayoutEffect(() => {
-    revealPending.current = !pending && suggestions.length === 0
-  }, [items, selected, selectedPart, pending, suggestions.length])
+    revealPending.current = !pending && !suggestionsActive
+  }, [items, selected, selectedPart, pending, suggestionsActive])
 
   useLayoutEffect(() => {
     const element = panel.current
@@ -486,7 +534,7 @@ export function GlobalSearchPopup({
       if (top !== windowTop) setWindowTop(top)
       else revealPending.current = false
     }
-  }, [items, selected, selectedPart, pending, suggestions.length, windowTop, layout, revealRevision])
+  }, [items, selected, selectedPart, pending, suggestionsActive, windowTop, layout, revealRevision])
 
   useEffect(() => {
     if (!open) return
@@ -507,7 +555,6 @@ export function GlobalSearchPopup({
   })
 
   if (items === undefined) return null
-  const displayedQuery = pending ? completedQuery : query
   const resultTotal = String(items.length)
   const counterWidth = `${Math.max(capacityDigits, resultTotal.length)}ch`
 
@@ -549,7 +596,7 @@ export function GlobalSearchPopup({
           )
         }}
       />
-      {suggestions.length > 0 && (
+      {suggestionsActive && (
         <GlobalSearchSuggestions
           names={suggestions}
           query={completionQuery}
@@ -557,19 +604,23 @@ export function GlobalSearchPopup({
           accept={acceptSuggestion}
         />
       )}
-      {(suggestions.length === 0 || items.length > 0) && (
+      {(!suggestionsActive || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">
           <span>{query === '' ? initialHeading : 'Results'}</span>
-          {suggestions.length === 0 && items.length > 0 && (
+          {items.length > 0 && (
             <output
               className="node-search-position"
-              aria-label="Result position"
-              title={`Result ${selected + 1} of ${items.length}`}
+              aria-label={suggestionsActive ? 'Result count' : 'Result position'}
+              title={suggestionsActive ? `Results: ${resultTotal}` : `Result ${selected + 1} of ${resultTotal}`}
             >
-              <span className="node-search-position-index" style={{ inlineSize: counterWidth }}>
-                {selected + 1}
-              </span>
-              {' / '}
+              {!suggestionsActive && (
+                <>
+                  <span className="node-search-position-index" style={{ inlineSize: counterWidth }}>
+                    {selected + 1}
+                  </span>
+                  {' / '}
+                </>
+              )}
               <span className="node-search-position-total" style={{ inlineSize: counterWidth }}>
                 {resultTotal}
               </span>
@@ -593,12 +644,14 @@ export function GlobalSearchPopup({
           flushSync(() => setWindowTop(event.currentTarget.scrollTop))
         }}
         data-editor-focus-borrow=""
-        aria-activedescendant={items[selected] === undefined ? undefined : `recent-${selectedPart}-${selected}`}
+        aria-activedescendant={
+          suggestionsActive || items[selected] === undefined ? undefined : `recent-${selectedPart}-${selected}`
+        }
       >
         {items.length === 0 ? (
-          suggestions.length > 0 ? null : (
+          suggestionsActive ? null : (
             <div className="recent-node-empty">
-              {displayedQuery === '' ? 'No marked or starred nodes' : 'No results'}
+              {completedQuery === '' ? 'No marked or starred nodes' : 'No results'}
             </div>
           )
         ) : (
@@ -613,9 +666,19 @@ export function GlobalSearchPopup({
               {renderedIndices.map((index) => {
                 const item = items[index]!
                 const startsGroup = startsSearchGroup(items, index)
-                const active = suggestions.length === 0 && index === selected
+                const active = !suggestionsActive && index === selected
                 const headingSelected = active && selectedPart === 'heading'
                 const nodeSelected = active && selectedPart === 'node'
+                const title = item.imageExcerpt?.replacesTitle ? null : (
+                  <SearchResultText
+                    text={item.text}
+                    query={completedQuery}
+                    markerFragments={completedMarkerFragments}
+                    tagMatches={item.tagMatches}
+                    active={nodeSelected && !pending}
+                    onReveal={requestReveal}
+                  />
+                )
                 return (
                   <div
                     key={item.id}
@@ -642,7 +705,8 @@ export function GlobalSearchPopup({
                       >
                         <SearchResultText
                           text={item.path}
-                          query={displayedQuery}
+                          query={completedQuery}
+                          markerFragments={completedMarkerFragments}
                           tagMatches={item.pathTagMatches}
                           struckMatches={item.pathStruckMatches}
                           active={headingSelected && !pending}
@@ -671,14 +735,21 @@ export function GlobalSearchPopup({
                         ) : item.marked ? (
                           <span className="node-mark" role="img" aria-label="Marked" />
                         ) : null}
-                        <span className={`recent-node-text${item.struckThrough ? ' node-text-struck' : ''}`}>
-                          <SearchResultText
-                            text={item.text}
-                            query={displayedQuery}
-                            tagMatches={item.tagMatches}
-                            active={nodeSelected && !pending}
-                            onReveal={requestReveal}
-                          />
+                        <span
+                          className={`recent-node-text${item.struckThrough && item.imageExcerpt === undefined ? ' node-text-struck' : ''}`}
+                        >
+                          {item.imageExcerpt?.ancestor !== undefined && <ImageExcerpt excerpt={item.imageExcerpt} />}
+                          {title && item.imageExcerpt !== undefined ? (
+                            <span className={item.struckThrough ? 'node-text-struck' : undefined}>{title}</span>
+                          ) : (
+                            title
+                          )}
+                          {item.imageExcerpt !== undefined && item.imageExcerpt.ancestor === undefined && (
+                            <ImageExcerpt
+                              excerpt={item.imageExcerpt}
+                              struck={item.struckThrough === true && item.imageExcerpt.replacesTitle === true}
+                            />
+                          )}
                           {item.attachment !== undefined && (
                             <AttachmentThumbnail
                               attachmentId={item.attachment.id}
@@ -707,13 +778,7 @@ export function GlobalSearchPopup({
         )}
       </div>
       <div className="node-search-footer">
-        {suggestions.length > 0 ? (
-          SUGGESTION_KEYS
-        ) : pending ? (
-          <SearchPendingLabel previous={RESULT_KEYS} />
-        ) : (
-          RESULT_KEYS
-        )}
+        {suggestionsActive ? SUGGESTION_KEYS : pending ? <SearchPendingLabel previous={resultKeys} /> : resultKeys}
       </div>
     </div>
   )

@@ -177,6 +177,40 @@ it('carries the image of a matching node, with its natural size when stored', ()
     { id: 'unsized', text: 'Image', attachment: { id: 'a2' } },
     { id: 'plain', text: 'release notes', attachment: undefined },
   ])
+  expect(next.value[0]?.imageExcerpt).toEqual({ text: 'release', matches: [{ start: 0, end: 7 }] })
+  expect(next.value[1]?.imageExcerpt?.replacesTitle).toBe(true)
+  expect(next.value[2]?.imageExcerpt).toBeUndefined()
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('shows bounded evidence for image terms, including additional matches and ancestor attribution', () => {
+  const searchText = `${'😀'.repeat(13)}xx version Tree Version ${'tail '.repeat(28)}`
+  const work = searchNodes(
+    {
+      roots: [
+        {
+          id: 'source',
+          text: 'Roadmap',
+          attachment: { id: 'pic', mimeType: 'image/png', searchText },
+          children: [
+            { id: 'child', text: 'Release notes', children: [] },
+            { id: 'visible', text: 'Release Tree Version', children: [] },
+          ],
+        },
+        { id: 'outside', text: 'Release notes', children: [] },
+      ],
+    },
+    'release tree Version',
+  )
+
+  let next = work.next()
+  while (!next.done) next = work.next()
+
+  expect(next.value.map(({ id }) => id)).toEqual(['child', 'visible'])
+  const excerpt = next.value[0]?.imageExcerpt
+  expect(excerpt).toMatchObject({ ancestor: 'Roadmap', text: expect.stringMatching(/^…😀.*…$/u) })
+  expect(excerpt!.matches.map(({ start, end }) => excerpt!.text.slice(start, end))).toEqual(['Tree', 'Version'])
+  expect(next.value[1]?.imageExcerpt).toBeUndefined()
 })
 
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {

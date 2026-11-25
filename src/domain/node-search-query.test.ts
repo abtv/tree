@@ -73,6 +73,34 @@ it('retains the full union when literal highlight ranges overlap', () => {
   expect(step.value).toEqual([{ start: 0, end: 6 }])
 })
 
+// @requirement PRODUCT.md §20.14.2
+it('maps each inferred fragment to its own recognized marker and preserves explicit full matches', () => {
+  const text = '@Alex @bob @Carol #work &meeting Rev'
+  const work = nodeSearchHighlights(
+    text,
+    '@al @bo @ar @Carol #or & rev',
+    [
+      { start: 0, end: 5 },
+      { start: 6, end: 10 },
+      { start: 11, end: 17 },
+      { start: 18, end: 23 },
+      { start: 24, end: 32 },
+    ],
+    [
+      { fragment: '@al', name: 'Alex' },
+      { fragment: '@bo', name: 'bob' },
+      { fragment: '@ar', name: 'Carol' },
+      { fragment: '#or', name: 'work' },
+      { fragment: '&', name: 'meeting' },
+    ],
+  )
+
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value.map(({ start, end }) => text.slice(start, end))).toEqual(['@Al', '@bo', '@Carol', 'or', 'Rev'])
+})
+
 // @requirement PRODUCT.md §20.14.3
 it('prepares repeated terms once while preserving independent smart case', () => {
   const work = prepareNodeSearch('  alpha alpha\tAlpha\nalpha ')

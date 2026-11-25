@@ -36,9 +36,10 @@ Electron. Apple Vision processes the image locally without model downloads, netw
 calls, telemetry or task creation. Recognized text never becomes visible node text.
 
 Pasting a new image recognizes its English text automatically, including image paste
-in Agenda. The result stays hidden and participates only in global Search (`Cmd+;`),
-not local Find or Vim `/`. It does not create children, tags, dates, or status
-feedback, and never moves focus. Failures leave the image usable without search text.
+in Agenda. The recognized text participates only in global Search (`Cmd+;`), which
+can show a short matching excerpt (§20.14.2). Local Find and Vim `/` do not use it.
+It does not create children, tags, dates, or status feedback, and never moves focus.
+Failures leave the image usable without search text.
 Existing images are not automatically backfilled.
 
 Recognition runs outside the UI thread through a sequential queue. Pending work

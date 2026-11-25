@@ -3,6 +3,7 @@ import type { Document, TreeNode } from './document-types'
 import { compareCompletionRank, CompletionRankWorkspace, rankCompletionName } from './completion-ranking'
 import { findTags, nodeTags, tagFragment, type TagPrefix, type TagRange } from './tags'
 import { foldTagName } from './tag-search'
+import { wholeSearchMatcher } from './text-search'
 
 export interface TagMatch extends TagRange {
   readonly suggestions: readonly string[]
@@ -24,18 +25,34 @@ export class TagCatalog {
     return this.counts.has(name)
   }
 
-  public searchSuggestions(query: string): readonly string[] {
+  public searchSuggestions(
+    query: string,
+    options?: { suppressExactMatch: boolean; uniqueOnly?: boolean },
+  ): readonly string[] {
     const fragment = tagFragment(query, query.length, this.prefix)
     if (fragment?.start !== 0) return []
+    // Every name is an equal prefix match for a bare marker. The catalog is already sorted.
+    if (fragment.name === '') return options?.uniqueOnly && this.names.length !== 1 ? [] : this.names
+    const suppressExact = options?.suppressExactMatch
+    if (suppressExact && this.has(fragment.name)) return []
+
+    const exactMatch = suppressExact ? wholeSearchMatcher(fragment.name) : undefined
     const needle = foldTagName(fragment.name)
     const groups: string[][] = [[], [], [], []]
+    let unique: string | undefined
     for (const name of this.names) {
+      if (exactMatch?.(name)) return []
       const folded = foldTagName(name)
       if (!folded.includes(needle)) continue
+      if (options?.uniqueOnly) {
+        if (unique !== undefined) return []
+        unique = name
+        continue
+      }
       const rank = rankCompletionName(folded, needle, '_-', this.rankWorkspace)!
       groups[rank[0]!]!.push(name)
     }
-    return groups.flat()
+    return unique === undefined ? groups.flat() : [unique]
   }
 
   public update(document: Document): void {
