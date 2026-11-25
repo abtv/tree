@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditorStore } from '../application/editor-store'
 import { activateUpdate, installAppUpdates } from './app-updates'
+import { BrowserMenuCommands } from './menu-commands'
 
 class Port {
   onmessage: ((event: { data: unknown }) => void) | null = null
@@ -237,11 +238,13 @@ async function controller(
   const suspendWrites = vi.fn(() => resume)
   const close = vi.fn()
   const releaseOperation = vi.fn()
+  const commands = new BrowserMenuCommands()
   installAppUpdates(
     { flushPersistence: flush } as EditorStore,
     { suspendWrites, onSaved: () => () => {}, discardStagedImages: async () => {} },
     { close },
     () => (options.busy ? undefined : releaseOperation),
+    commands,
   )
   await Promise.resolve()
   return {
@@ -253,11 +256,53 @@ async function controller(
     registration,
     locks,
     container,
+    commands,
     button: document.getElementById('app-update') as HTMLButtonElement,
   }
 }
 
 describe('update save boundary', () => {
+  // @requirement PRODUCT.md §20.2.28
+  it('shares update availability and the save gate with the command panel', async () => {
+    let rejectSave!: (error: Error) => void
+    const flush = vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectSave = reject
+        }),
+    )
+    const worker = new Worker()
+    worker.state = 'installing'
+    const f = await controller(flush, { waiting: null, installing: worker })
+
+    expect(f.commands.getSnapshot()).toEqual([])
+    expect(f.button.hidden).toBe(true)
+
+    f.registration.waiting = worker
+    worker.state = 'installed'
+    worker.dispatchEvent(new Event('statechange'))
+
+    const command = f.commands.getSnapshot()[0]!
+    expect(command).toMatchObject({ name: 'update-app', description: 'Update App', enabled: true })
+    expect(f.button.hidden).toBe(false)
+    expect(f.button.disabled).toBe(false)
+
+    await command.run({} as never, {} as never)
+    f.button.click()
+    await command.run({} as never, {} as never)
+
+    expect(flush).toHaveBeenCalledOnce()
+    expect(f.button.disabled).toBe(true)
+    expect(f.commands.getSnapshot()[0]?.enabled).toBe(false)
+
+    rejectSave(new Error('Save failed'))
+    await vi.waitFor(() => expect(f.commands.getSnapshot()[0]?.enabled).toBe(true))
+
+    expect(f.button.disabled).toBe(false)
+    expect(f.releaseOperation).toHaveBeenCalledOnce()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+  })
+
   it('lets an old waiting worker finish on reopen without giving it a one-way activation request', async () => {
     const f = await controller(async () => undefined)
     f.worker.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
@@ -417,6 +462,46 @@ describe('update save boundary', () => {
 
     expect(document.getElementById('offline-status')!.textContent).not.toBe('Ready to work offline')
     expect(f.button.hidden).toBe(true)
+  })
+
+  it('does not save for a stale offline repair command after another worker takes over', async () => {
+    const flush = vi.fn(async () => undefined)
+    const active = new Worker()
+    active.state = 'activated'
+    active.postMessage.mockImplementation((_, ports) => ports[0]!.postMessage({ ready: false }))
+    const f = await controller(flush, { active, waiting: null })
+    await vi.waitFor(() => expect(f.commands.getSnapshot()[0]?.enabled).toBe(true))
+    const command = f.commands.getSnapshot()[0]!
+    const replacement = new Worker()
+    replacement.state = 'activated'
+    f.registration.active = replacement
+    f.container.controller = replacement
+
+    await command.run({} as never, {} as never)
+
+    expect(flush).not.toHaveBeenCalled()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+    expect(active.postMessage).toHaveBeenCalledOnce()
+    expect(replacement.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('restores editing when offline access cannot be verified before applying a repair', async () => {
+    vi.useFakeTimers()
+    const active = new Worker()
+    active.state = 'activated'
+    active.postMessage.mockImplementationOnce((_, ports) => ports[0]!.postMessage({ ready: false }))
+    const f = await controller(async () => undefined, { active, waiting: null })
+    await vi.advanceTimersByTimeAsync(0)
+    const command = f.commands.getSnapshot()[0]!
+
+    await command.run({} as never, {} as never)
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(document.getElementById('offline-status')!.textContent).toBe('Offline access could not be verified')
+    expect(document.getElementById('root')!.inert).toBe(false)
+    expect(f.commands.getSnapshot()[0]?.enabled).toBe(true)
+    expect(f.releaseOperation).toHaveBeenCalledOnce()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
   })
 
   it('closes the menu and blocks editor input handlers until a failed save restores them', async () => {
@@ -595,6 +680,7 @@ describe('update save boundary', () => {
         { suspendWrites, onSaved: () => () => {}, discardStagedImages: async () => {} },
         { close: vi.fn() },
         () => () => {},
+        new BrowserMenuCommands(),
       )
       await Promise.resolve()
 
@@ -704,7 +790,38 @@ describe('update save boundary', () => {
     await vi.waitFor(() => expect(f.registration.update).toHaveBeenCalledTimes(2))
   })
 
-  it('restores editing immediately if the activated worker is replaced before it takes control', async () => {
+  it('defers a reconnect check until the current update fails and consumes it once', async () => {
+    let refuseSave!: (error: Error) => void
+    const flush = vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          refuseSave = reject
+        }),
+    )
+    const f = await controller(flush)
+    f.registration.update.mockRejectedValueOnce(new Error('Network still offline'))
+
+    f.button.click()
+    window.dispatchEvent(new Event('online'))
+    window.dispatchEvent(new Event('online'))
+
+    expect(f.registration.update).not.toHaveBeenCalled()
+    expect(f.button.disabled).toBe(true)
+
+    refuseSave(new Error('First save failed'))
+    await vi.waitFor(() => expect(f.registration.update).toHaveBeenCalledOnce())
+    expect(f.button.disabled).toBe(false)
+    expect(document.getElementById('offline-status')!.textContent).toBe('First save failed')
+
+    f.button.click()
+    refuseSave(new Error('Second save failed'))
+    await vi.waitFor(() => expect(document.getElementById('offline-status')!.textContent).toBe('Second save failed'))
+
+    expect(f.registration.update).toHaveBeenCalledOnce()
+    expect(f.suspendWrites).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('restores editing when a requested worker is replaced (next: %s)', async (hasNext) => {
     const f = await controller(async () => undefined)
     const listening = vi.spyOn(f.container, 'addEventListener')
     f.worker.postMessage.mockImplementation((_, ports) =>
@@ -716,11 +833,13 @@ describe('update save boundary', () => {
     await vi.waitFor(() => expect(listening).toHaveBeenCalledWith('controllerchange', expect.any(Function)))
 
     f.worker.state = 'redundant'
-    f.registration.waiting = new Worker()
+    f.registration.waiting = hasNext ? new Worker() : null
     f.worker.dispatchEvent(new Event('statechange'))
 
     await vi.waitFor(() => expect(f.resume).toHaveBeenCalledOnce())
     expect(f.button.disabled).toBe(false)
+    expect(f.button.hidden).toBe(!hasNext)
+    expect(f.commands.getSnapshot().map((command) => command.name)).toEqual(hasNext ? ['update-app'] : [])
     expect(document.getElementById('offline-status')!.textContent).toContain('replaced')
   })
 

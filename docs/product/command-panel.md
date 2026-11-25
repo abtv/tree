@@ -82,7 +82,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `resume-backing-up` | — | Resume Backing Up… | — | — | Same as the browser Data action when folder backup is paused (§24.5) |
 | `restore-from-folder` | — | Restore from Folder… | — | — | Same as the supported browser Data action (§24.6) |
 
-Desktop also lists `check-for-updates` and `update-app` (§26).
+Desktop also lists `check-for-updates` and `update-app` (§26). The browser version lists `update-app` whenever **Update App** is present in its menu, using the same save-first reload action (§24.7).
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 

@@ -261,6 +261,7 @@ test('offers a save-first update when the first page predates the installed pack
 })
 
 // @requirement PRODUCT.md §24.7
+// @requirement PRODUCT.md §20.2.28
 test('downloads updates without reload, refuses other windows and preserves buffered edits on apply', async ({
   newContext,
 }) => {
@@ -270,6 +271,14 @@ test('downloads updates without reload, refuses other windows and preserves buff
     const page = await context.newPage()
     await page.goto(server.url)
     await ready(page)
+    const commandInput = page.getByRole('combobox', { name: 'Command', exact: true })
+    const updateCommand = page.locator('#command-update-app')
+    await input(page).focus()
+    await page.keyboard.press(`${primaryKey}+Shift+p`)
+    await commandInput.fill('update-app')
+    await expect(updateCommand).toHaveCount(0)
+    await commandInput.press('Escape')
+
     server.publish(2)
     await page.evaluate(() => window.dispatchEvent(new Event('online')))
     await expect(page.locator('#tree-menu-button')).toHaveClass(/update-attention/)
@@ -339,8 +348,12 @@ test('downloads updates without reload, refuses other windows and preserves buff
           })
         })
     })
-    await menu(page)
-    await page.getByRole('button', { name: 'Update App', exact: true }).click()
+    await page.keyboard.press(`${primaryKey}+Shift+p`)
+    await commandInput.fill('update-app')
+    await expect(updateCommand).toBeVisible()
+    await expect(updateCommand).toContainText('Update App')
+    await capture(page, 'offline-update-command.png')
+    await commandInput.press('Enter')
     await expect(page.locator('#root')).toHaveJSProperty('inert', true)
     await page.locator('#tree-menu-button').click()
     await expect(page.locator('#tree-menu')).not.toBeVisible()

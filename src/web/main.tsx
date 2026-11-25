@@ -51,7 +51,7 @@ try {
     tryBeginUpdate,
     dismissTransientStatus,
   } = installDataMenu(store, menu, bridge.data, menuFocus)
-  installAppUpdates(store, bridge.data, menuFocus, tryBeginUpdate)
+  installAppUpdates(store, bridge.data, menuFocus, tryBeginUpdate, menuCommands)
   const treeButton = document.getElementById('prototype-tree') as HTMLButtonElement
   const agendaButton = document.getElementById('prototype-agenda') as HTMLButtonElement
   let viewCommands: Pick<CommandServices, 'showAgenda' | 'showTree'> | undefined

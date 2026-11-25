@@ -38,7 +38,8 @@ The preparation request extends the read-only offline-status message. An older w
 #### 13.15.5 Explicit Update
 
 `src/web/app-updates.ts` registers only in the production browser entry, checks at startup
-and reconnection, and publishes readiness through the browser menu. Download never reloads
+and reconnection, and publishes readiness and the update action to the browser menu and command panel
+through the same `BrowserMenuCommands` source. Download never reloads
 the page. An explicit update can start after user-initiated folder backup configuration
 finishes. Ordinary background backup remains available. The update reserves the same operation slot as archive import and export,
 blocks input, and flushes the store, including buffered and asynchronous edits. The flush

@@ -2,6 +2,7 @@ import type { EditorStore } from '../application/editor-store'
 import { createRendererInputLock } from '../renderer/renderer-input-lock'
 import type { DataSession } from './services'
 import type { MenuFocus } from './menu-focus'
+import type { BrowserMenuCommands } from './menu-commands'
 import { otherWindowsMessage, pageAdmissionLock, reopenUpdateMessage, updateResponseTimeout } from './page-admission'
 
 const runtimeAssets = () => [
@@ -122,6 +123,7 @@ export function installAppUpdates(
   session: DataSession,
   focus: Pick<MenuFocus, 'close'>,
   tryBeginUpdate: () => (() => void) | undefined,
+  commands: BrowserMenuCommands,
 ) {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
   const button = document.getElementById('app-update') as HTMLButtonElement
@@ -153,8 +155,7 @@ export function installAppUpdates(
   }
   const render = () => {
     const waiting = updateWorker() !== undefined
-    button.hidden = !waiting
-    button.disabled = application === 'applying'
+    publishUpdate(waiting ? 'update-app' : undefined, application !== 'applying')
     trigger.classList.toggle('update-attention', waiting)
     trigger.setAttribute('aria-description', waiting ? 'An app update is ready' : '')
   }
@@ -224,7 +225,7 @@ export function installAppUpdates(
       if (failed && request.reconnected) void check()
     }
   }
-  button.onclick = async () => {
+  const apply = async () => {
     const worker = updateWorker()
     if (!worker || application === 'applying') return
     // Archive/import work owns the saved head while these actions are disabled.
@@ -281,6 +282,7 @@ export function installAppUpdates(
       }
     }
   }
+  const publishUpdate = commands.bind(button, () => void apply())
   window.addEventListener('online', () => {
     if (application === 'retry') application = 'idle'
     void check()

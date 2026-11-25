@@ -136,7 +136,7 @@ describe('browser entry wiring', () => {
       shortcutPlatform: apple ? 'apple' : 'other',
       deferRichEditing: true,
     })
-    expect(mocks.updates).toHaveBeenCalledWith(store, data, { close: mocks.close }, tryBeginUpdate)
+    expect(mocks.updates).toHaveBeenCalledWith(store, data, { close: mocks.close }, tryBeginUpdate, commands)
     expect(mocks.menu).toHaveBeenCalledExactlyOnceWith(store, document.getElementById('tree-menu'), data, {
       close: mocks.close,
     })
