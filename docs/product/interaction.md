@@ -18,7 +18,7 @@ The user normally interacts with the application through:
 
 The tree hierarchy can be navigated by entering and leaving nodes or inspected and edited through inline expansion. Expansion does not change the current location.
 
-The pointer shows the text-editing cursor only over a node editor that has focus. Text the user cannot edit — the location path, the Vim mode indicator, tooltips, status and error messages, and dialog text — shows the default arrow cursor.
+Over ordinary node text, the mouse pointer is an I-beam only when the node editor has focus and standard editing, Vim Insert, or Vim Replace is active. Vim Normal, Visual, and whole-node Visual use the system arrow, following MacVim's distinction between text entry and navigation or selection. Unfocused node editors and text the user cannot edit — the location path, the Vim mode indicator, tooltips, status and error messages, and dialog text — also use the system arrow.
 
 A primary or secondary press on an area that is not an editor, a control, an Agenda row, a dialog or a message — the margins, the space beside and below the node text, the title bar, or the location and status bars around their controls — leaves keyboard focus, caret, selection and Vim mode in the node editor or Agenda row that has them, as the pin toggle does (§2.2). The next key acts on the editor. Such a press still dismisses an open suggestion popup outside it (§20.9). Status and error messages stay selectable text, and scrollbars keep their native behavior.
 

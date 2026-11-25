@@ -137,9 +137,8 @@
   box-sizing: border-box;
 }
 
-/* The browser's `auto` cursor turns into the text-editing I-beam over any text. Only focused node
-   editors are editable text, so every element inherits the arrow and `.node-input:focus` alone
-   opts back into the I-beam. */
+/* The browser's `auto` cursor turns into the text-editing I-beam over any text. Start with the
+   arrow, then opt focused node editors into the I-beam in text-entry modes. */
 body {
   min-width: 320px;
   min-height: 100vh;
@@ -1121,10 +1120,6 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   background: transparent;
 }
 
-.vim-state-normal .node-input:focus {
-  cursor: default;
-}
-
 /* Empty text has no character selection to paint. Draw its Normal block explicitly:
    browsers that ignore caret-shape must not fall back to a thin insertion caret.
    Font-relative dimensions also follow the larger current-parent heading. */
@@ -1478,6 +1473,10 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
 
 .node-input:focus {
   background: transparent;
+}
+
+.vim-state-insert .node-input:focus,
+.vim-state-replace .node-input:focus {
   cursor: text;
 }
 

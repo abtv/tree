@@ -38,7 +38,7 @@ it('draws the window title strip in the document background and lets it drag the
 })
 
 // @requirement PRODUCT.md §20
-it('shows the text-editing cursor only over a focused node editor', () => {
+it('limits the text pointer to focused node editors in text-entry modes', () => {
   const sheet = document.createElement('style')
   sheet.textContent = styles
   document.head.append(sheet)
@@ -51,7 +51,8 @@ it('shows the text-editing cursor only over a focused node editor', () => {
 
           if (selectorText === 'body') expect(style.getPropertyValue('cursor')).toBe('default')
 
-          if (/^(?:auto|text)$/.test(style.getPropertyValue('cursor'))) textCursorSelectors.push(selectorText)
+          if (/^(?:auto|text)$/.test(style.getPropertyValue('cursor')))
+            textCursorSelectors.push(...selectorText.split(',').map((selector) => selector.trim()))
         }
         if ('cssRules' in rule) inspect((rule as CSSGroupingRule).cssRules)
       }
@@ -61,7 +62,7 @@ it('shows the text-editing cursor only over a focused node editor', () => {
 
     inspect(sheet.sheet!.cssRules)
 
-    expect(textCursorSelectors).toEqual(['.node-input:focus'])
+    expect(textCursorSelectors).toEqual(['.vim-state-insert .node-input:focus', '.vim-state-replace .node-input:focus'])
   } finally {
     sheet.remove()
   }
