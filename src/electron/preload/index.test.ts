@@ -170,9 +170,11 @@ describe('preload bridge', () => {
 
     await expect(treeApi.getUpdateCommands!()).resolves.toEqual(state)
     await treeApi.runUpdateCommand!('check-for-updates')
+    await treeApi.runUpdateCommand!('download-update', '1.2.4')
 
     expect(mocks.invoke).toHaveBeenCalledWith('tree:get-update-commands')
     expect(mocks.invoke).toHaveBeenCalledWith('tree:run-update-command', 'check-for-updates')
+    expect(mocks.invoke).toHaveBeenCalledWith('tree:run-update-command', 'download-update', '1.2.4')
     mocks.invoke.mockRejectedValueOnce(new Error('unavailable'))
     await expect(treeApi.runUpdateCommand!('update-app')).rejects.toThrow('unavailable')
     const listener = vi.fn()
@@ -183,10 +185,15 @@ describe('preload bridge', () => {
     handler({}, { 'check-for-updates': true, 'update-app': 'yes' })
     for (const status of [-1, 101, 0.5, NaN, 'download', {}]) handler({}, { ...state, status })
     for (const version of [1, {}, '', 'invalid', '1.2.3&Quit']) handler({}, { ...state, version })
+    handler({}, { ...state, 'download-update': 'yes' })
+    const available = { ...state, status: 'available', 'download-update': true }
+    const downloadFailed = { ...available, status: 'download-failed' }
+    handler({}, available)
+    handler({}, downloadFailed)
     handler({}, state)
     handler({}, commands)
 
-    expect(listener.mock.calls).toStrictEqual([[state], [commands]])
+    expect(listener.mock.calls).toStrictEqual([[available], [downloadFailed], [state], [commands]])
     stop()
     expect(mocks.removeListener).toHaveBeenCalledWith('tree:update-commands-changed', handler)
   })

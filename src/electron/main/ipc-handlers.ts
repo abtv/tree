@@ -13,7 +13,13 @@ import {
   isTrustedRendererUrl,
   type PngDecoder,
 } from './ipc-security'
-import { ipcChannels, type NotesMenuState, type UpdateCommand, type UpdateCommandsState } from '../../shared/ipc'
+import {
+  ipcChannels,
+  isAppUpdateVersion,
+  type NotesMenuState,
+  type UpdateCommand,
+  type UpdateCommandsState,
+} from '../../shared/ipc'
 import type { NotesArchiveController } from './notes-archive-controller'
 import type { FileServices } from '../../infrastructure/main/file-services'
 import { readClipboard, writeClipboard, type NativeClipboard } from '../../infrastructure/main/clipboard'
@@ -136,9 +142,13 @@ export function registerIpcHandlers({
   })
   ipcMain.handle(ipcChannels.runUpdateCommand, (event, command, ...args) => {
     requireTrustedRenderer(event)
-    requireNoArguments(args)
-    if (command !== 'check-for-updates' && command !== 'update-app') throw new Error('Invalid update command.')
-    if (getUpdateCommands?.()[command]) runUpdateCommand?.(command)
+    if (command !== 'check-for-updates' && command !== 'download-update' && command !== 'update-app')
+      throw new Error('Invalid update command.')
+    const [version, ...extra] = args
+    requireNoArguments(command === 'check-for-updates' ? args : extra)
+    if (version !== undefined && !isAppUpdateVersion(version)) throw new Error('Invalid update version.')
+    const state = getUpdateCommands?.()
+    if (state?.[command] && (command === 'check-for-updates' || state.version === version)) runUpdateCommand?.(command)
   })
   ipcMain.handle(ipcChannels.setAppUpdateBlocked, (event, blocked, ...args) => {
     requireTrustedRenderer(event)

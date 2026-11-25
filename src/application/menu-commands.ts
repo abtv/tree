@@ -2,6 +2,7 @@ import type { ApplicationCommand } from './command-registry'
 
 export const dataMenuCommands = {
   'check-for-updates': 'Check for Updates…',
+  'download-update': 'Download Update',
   'update-app': 'Update App',
   'export-notes': 'Export Notes…',
   'import-notes': 'Import Notes…',

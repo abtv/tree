@@ -82,7 +82,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `resume-backing-up` | — | Resume Backing Up… | — | — | Same as the browser Data action when folder backup is paused (§24.5) |
 | `restore-from-folder` | — | Restore from Folder… | — | — | Same as the supported browser Data action (§24.6) |
 
-Desktop also lists `check-for-updates` and `update-app` (§26). The browser version lists `update-app` whenever **Update App** is present in its menu, using the same save-first reload action (§24.7).
+The desktop application also lists `check-for-updates` and the current update action, `download-update` or `update-app` (§26). The browser version lists `update-app` whenever **Update App** is present in its menu, using the same save-first reload action (§24.7).
 
 Results match the corresponding menu item or toggle, including saved preferences, menu checks, status-bar state and focus. Pin and appearance commands remain available during the locked save-failure state; they change preferences rather than the document.
 
@@ -90,7 +90,7 @@ Results match the corresponding menu item or toggle, including saved preferences
 
 View changes resolve editing sessions and selection as `Cmd+P` does; an already-active destination preserves them. Neither edits the document nor adds undo history. Both update command history.
 
-Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text; data verbs name their menu actions. `q` is the only alias. `auto` means Automatic.
+Names use lowercase ASCII words joined by hyphens, verb first: `toggle` switches a state, `set` selects a value, `show` selects a view, `find` and `search` select search actions, `reindex` refreshes derived search text, and `download` starts a transfer. Data verbs name their menu actions. `q` is the only alias. `auto` means Automatic.
 
 Every successfully run command except `quit` moves to the front of history, without duplicates. History holds at most 100 commands, dropping the oldest. It persists across restarts as a user preference apart from the document, creates no undo entry and triggers no document save. Its file is written once per successful non-quit command, never per keystroke. Missing or unreadable history means an empty history; names absent from the current registry are ignored.
 

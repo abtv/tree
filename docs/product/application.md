@@ -117,45 +117,56 @@ If the renderer process itself terminates, its unsaved changes are already lost 
 ## 26. Desktop App Updates
 
 Packaged macOS builds check published stable GitHub releases at startup and when
-connectivity returns. Downloads run in the background without stealing focus;
-offline or failed downloads leave the installed application usable. Development
-builds do not check. No notes are sent. Prereleases and downgrades are excluded.
+connectivity returns. These checks fetch release information, not the application
+package. Only an explicit **Download Update** command starts the package download.
+It runs without interrupting editing. Development builds do not check. No notes
+are sent. Prereleases and downgrades are excluded.
 
 During a download, the left side of the desktop status bar shows the noninteractive
 text `Downloading update… <percent>%`. Once the package is downloaded it shows
 `Update ready`, without a button or click action. Installation remains available
-through the Tree menu and its command-panel equivalent. Command input, command
+through the Tree menu and its command-panel equivalent. When a version is available but
+not downloaded, the status reads `Update available. Choose Download Update.` Command input, command
 feedback and current-action status messages take priority over this indicator.
 Downloading continues while the indicator is hidden; dismissing higher-priority
-content restores the current download status. Background checks alone show no status.
+content restores the current download status.
 
-Failed checks or downloads show `Update failed. Check for Updates to retry.` instead
-of leaving a stale percentage. Saving and preparing installation show
+Background checks show no in-progress indicator. A check can still report an available
+update or a failure in the status bar.
+
+Failed checks show `Update failed. Check for Updates to retry.` Failed downloads show
+`Download failed. Try Download Update again.` and do not retry automatically.
+Finding the same version on a later check does not dismiss the download failure.
+Saving and preparing installation show
 `Preparing to restart…`. These messages have the same low priority as download progress.
 Progress is published only when the whole percentage changes, uses bounded memory,
 and performs no document writes, traversal or editor rerenders.
 
-The native Tree menu always contains **Check for Updates…** after About Tree, followed
-by **Restart and Install Update**, which becomes `Restart and Install <version>`
-when a package is ready. The command panel shows the same version in its description.
+The native Tree menu always contains **Check for Updates…** after About Tree. The
+next action is `Download Update <version>` when there is an undownloaded update, and
+`Restart and Install <version>` when the download is complete. Without an update it
+shows disabled **Restart and Install Update**. The panel exposes these actions as
+`download-update` and `update-app`, with the same labels and availability as the menu.
 
-Check for Updates checks and downloads an available update, then
-shows a native result dialog: `Tree is up to date.`, `An update is ready to install.`
-with instructions to restart and install that version, or `Could not check for updates.` with retry
-guidance. Manual and background checks share one in-flight request; repeated manual
-requests show at most one result dialog. Both commands are disabled while checking,
+Check for Updates fetches release information and shows a native result dialog.
+It reports that Tree is up to date, an update is available to download, a package is
+ready to install, or the check failed. The dialog never starts a download. Manual
+and background checks share one in-flight request; repeated manual requests show
+at most one result dialog. Both commands are disabled while checking, downloading,
 applying, or displaying a modal. Development builds disable both commands.
 
 Checks still contact the release provider when a package is ready. A failed recheck
-reports failure even if the previous package remains ready. Once another available
-package begins downloading, the previous package is no longer offered for installation;
-only the newly completed package becomes installable. A failed download can be retried
-through Check for Updates. Checks and installation cannot run concurrently.
+reports failure even if the previous package remains ready. A successful check that
+finds the same version keeps an already downloaded package ready. Finding a different
+version replaces the offer and requires a new explicit download. A successful check
+that finds no available update removes the offer to download or install the previous
+version. This does not cancel work already handed to the macOS installer. A download
+or install choice applies only to the version shown when the user chose it. Checks,
+downloads and installation cannot run concurrently.
 
-Restart and Install stays disabled until the package is downloaded, following the native
-menu convention of keeping unavailable commands visible. It is also unavailable
-during a notes operation. A document load error allows installation of a downloaded
-update and preserves the unopened document.
+Restart and Install requires a downloaded package and is unavailable during a notes
+operation. A document load error allows installation of a downloaded update and
+preserves the unopened document.
 
 Applying the update blocks editing, saves pending work including Vim buffers and attachments, and
 asks the macOS installer to verify, install and restart Tree. A failed or timed-out

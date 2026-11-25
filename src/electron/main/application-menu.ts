@@ -9,6 +9,8 @@ export interface ApplicationMenuState {
   updateBlocked?: boolean
   updateReady?: boolean
   updateVersion?: string | undefined
+  updateDownloadVersion?: string | undefined
+  updateDownloading?: boolean
   updateApplying?: boolean
   modalOpen: boolean
   vimEnabled: boolean
@@ -19,7 +21,8 @@ export interface ApplicationMenuState {
 
 export interface ApplicationMenuActions {
   checkForUpdates?: () => void
-  updateApp?: () => void
+  downloadUpdate?: (version?: string) => void
+  updateApp?: (version?: string) => void
   showAbout: () => void
   requestQuit: () => void
   setVimEnabled: (vimEnabled: boolean) => void
@@ -57,22 +60,30 @@ export function applicationMenuTemplate(
           enabled:
             state.updatesSupported === true &&
             !state.updateChecking &&
+            !state.updateDownloading &&
             !state.updateApplying &&
             !state.modalOpen &&
             !state.updateBlocked,
           click: () => actions.checkForUpdates?.(),
         },
         {
-          label: state.updateVersion ? `Restart and Install ${state.updateVersion}` : 'Restart and Install Update',
-          id: 'update-app',
+          label: state.updateDownloadVersion
+            ? `Download Update ${state.updateDownloadVersion}`
+            : state.updateVersion
+              ? `Restart and Install ${state.updateVersion}`
+              : 'Restart and Install Update',
+          id: state.updateDownloadVersion ? 'download-update' : 'update-app',
           enabled:
-            state.updateReady === true &&
+            (state.updateDownloadVersion !== undefined ||
+              (state.updateReady === true && state.notes.canInstallUpdate)) &&
             !state.updateChecking &&
+            !state.updateDownloading &&
             !state.modalOpen &&
             !state.updateApplying &&
-            !state.updateBlocked &&
-            state.notes.canInstallUpdate,
-          click: () => actions.updateApp?.(),
+            !state.updateBlocked,
+          click: state.updateDownloadVersion
+            ? () => actions.downloadUpdate?.(state.updateDownloadVersion)
+            : () => actions.updateApp?.(state.updateVersion),
         },
         { type: 'separator' },
         { label: 'Quit Tree', accelerator: 'CommandOrControl+Q', click: actions.requestQuit },

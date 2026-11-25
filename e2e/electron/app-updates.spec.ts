@@ -437,9 +437,10 @@ test('recovers through ordinary quit and reopen when native installation never r
   expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Edit after the installer stopped responding')
 })
 
-test('rechecks a ready package, replaces it only after a successful download and reports failure', async ({
+// @requirement PRODUCT.md §26
+test('checks without downloading and requires consent for the download and each retry', async ({
   userDataDir,
-}) => {
+}, testInfo) => {
   const { app, window } = await launchTree(userDataDir, { appUpdates: true, initialMode: 'normal' })
   await app.evaluate(() => {
     const probe = (globalThis as unknown as { __treeUpdates: { downloaded(): void; nextVersion: string } })
@@ -449,24 +450,41 @@ test('rechecks a ready package, replaces it only after a successful download and
   })
   const menu = () =>
     app.evaluate(({ Menu }) => {
-      const item = Menu.getApplicationMenu()!.getMenuItemById('update-app')!
+      const treeMenu = Menu.getApplicationMenu()!
+      const item = (treeMenu.getMenuItemById('download-update') ?? treeMenu.getMenuItemById('update-app'))!
       return { label: item.label, enabled: item.enabled }
     })
   await expect.poll(menu).toEqual({ label: 'Restart and Install 1.2.4', enabled: true })
 
   await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
-  await expect.poll(menu).toEqual({ label: 'Restart and Install Update', enabled: false })
+  const transfers = () =>
+    app.evaluate(() => {
+      const probe = (globalThis as unknown as { __treeUpdates: { downloads: number; installs: number } }).__treeUpdates
+      return [probe.downloads, probe.installs]
+    })
+  await expect.poll(menu).toEqual({ label: 'Download Update 1.2.5', enabled: true })
+  await expect(window.locator('.update-status')).toHaveText('Update available. Choose Download Update.')
+  await window.evaluate(() => globalThis.window.treeApi.runUpdateCommand!('download-update', '1.2.4'))
+  expect(await transfers()).toEqual([0, 0])
+
+  await window.keyboard.press(':')
+  await window.locator('.command-input-line input').fill('download-update')
+  await expect(window.locator('#command-download-update')).toContainText('Download Update 1.2.5')
+  await window.screenshot({ path: testInfo.outputPath('update-download-command.png') })
+  await window.keyboard.press('Enter')
   await expect(window.locator('.update-status')).toHaveText('Downloading update… 0%')
+  await expect.poll(menu).toEqual({ label: 'Download Update 1.2.5', enabled: false })
+  expect(await transfers()).toEqual([1, 0])
   await app.evaluate(() => {
     ;(
       globalThis as unknown as { __treeUpdates: { finishDownload(failed: boolean): void } }
     ).__treeUpdates.finishDownload(true)
   })
-  await expect(window.locator('.update-status')).toHaveText('Update failed. Check for Updates to retry.')
-  await expect.poll(menu).toEqual({ label: 'Restart and Install Update', enabled: false })
+  await expect(window.locator('.update-status')).toHaveText('Download failed. Try Download Update again.')
+  await expect.poll(menu).toEqual({ label: 'Download Update 1.2.5', enabled: true })
   await window.screenshot({ path: 'test-results/update-status-failed.png' })
 
-  await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
+  await clickApplicationMenuItem(app, 'Tree', 'Download Update 1.2.5')
   await expect(window.locator('.update-status')).toHaveText('Downloading update… 0%')
   await app.evaluate(() => {
     ;(
@@ -475,14 +493,45 @@ test('rechecks a ready package, replaces it only after a successful download and
   })
   await expect.poll(menu).toEqual({ label: 'Restart and Install 1.2.5', enabled: true })
   await expect(window.locator('.update-status')).toHaveText('Update ready')
+  // A delayed click from the download phase must not become consent to restart.
+  await window.evaluate(() => globalThis.window.treeApi.runUpdateCommand!('download-update', '1.2.5'))
+  expect(await transfers()).toEqual([2, 0])
   await window.keyboard.press(':')
   await window.locator('.command-input-line input').fill('update-app')
   await expect(window.locator('#command-update-app')).toContainText('Restart and Install 1.2.5')
 })
 
 // @requirement PRODUCT.md §26
+test('withdraws a downloaded update when the provider no longer offers it', async ({ userDataDir }) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, initialMode: 'normal' })
+  const installMenuItem = () =>
+    app.evaluate(({ Menu }) => {
+      const item = Menu.getApplicationMenu()!.getMenuItemById('update-app')!
+      return { label: item.label, enabled: item.enabled }
+    })
+  const status = window.locator('.update-status')
+  await app.evaluate(() => {
+    const probe = (globalThis as unknown as { __treeUpdates: { downloaded(): void; nextVersion: string | null } })
+      .__treeUpdates
+    probe.downloaded()
+    probe.nextVersion = null
+  })
+  await expect.poll(installMenuItem).toEqual({ label: 'Restart and Install 1.2.4', enabled: true })
+  await expect(status).toHaveText('Update ready')
+
+  await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
+
+  await expect.poll(installMenuItem).toEqual({ label: 'Restart and Install Update', enabled: false })
+  await expect(status).toHaveCount(0)
+})
+
+// @requirement PRODUCT.md §26
 test('download status yields to colon input and restores current readiness after reload', async ({ userDataDir }) => {
   const { app, window } = await launchTree(userDataDir, { appUpdates: true, initialMode: 'normal' })
+  await app.evaluate(() => {
+    ;(globalThis as unknown as { __treeUpdates: { available(): void } }).__treeUpdates.available()
+  })
+  await clickApplicationMenuItem(app, 'Tree', 'Download Update 1.2.4')
   await app.evaluate(() => {
     ;(globalThis as unknown as { __treeUpdates: { progress(percent: number): void } }).__treeUpdates.progress(42.8)
   })
@@ -498,7 +547,7 @@ test('download status yields to colon input and restores current readiness after
   await expect(window.locator('.command-input-line input')).toBeVisible()
   await expect(status).toHaveCount(0)
   await app.evaluate(() => {
-    ;(globalThis as unknown as { __treeUpdates: { downloaded(): void } }).__treeUpdates.downloaded()
+    ;(globalThis as unknown as { __treeUpdates: { finishDownload(): void } }).__treeUpdates.finishDownload()
   })
   await window.keyboard.press('Escape')
   await expect(status).toHaveText('Update ready')

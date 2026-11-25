@@ -69,9 +69,17 @@ export const ipcEvents = {
   findMenuCommand: 'tree:find-menu-command',
 } as const
 
-export type UpdateCommand = 'check-for-updates' | 'update-app'
-export type AppUpdateStatus = number | 'ready' | 'failed' | 'installing' | null
-export type UpdateCommandsState = Record<UpdateCommand, boolean> & { status?: AppUpdateStatus; version?: string }
+export type UpdateCommand = 'check-for-updates' | 'download-update' | 'update-app'
+export type AppUpdateStatus = number | 'available' | 'ready' | 'failed' | 'download-failed' | 'installing' | null
+export type UpdateCommandsState = Record<Exclude<UpdateCommand, 'download-update'>, boolean> & {
+  'download-update'?: boolean
+  status?: AppUpdateStatus
+  version?: string
+}
+
+export function isAppUpdateVersion(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 128 && /^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(value)
+}
 
 /** A notes operation that ended without a result: the user cancelled it or Tree quit. */
 export interface NotesOperationCanceled {
@@ -157,7 +165,7 @@ export type EditorContextMenuCommand = 'cut' | 'copy' | 'paste' | 'selectAll' | 
 export interface TreeApi {
   imageToText?: (attachmentId: string) => Promise<string[]>
   getUpdateCommands?: () => Promise<UpdateCommandsState>
-  runUpdateCommand?: (command: UpdateCommand) => Promise<void>
+  runUpdateCommand?: (command: UpdateCommand, version?: string) => Promise<void>
   onUpdateCommandsChanged?: (listener: (state: UpdateCommandsState) => void) => () => void
   setRendererModalOpen?: (open: boolean) => Promise<void>
   onAboutRequested?: (listener: () => void) => () => void

@@ -119,10 +119,13 @@ let menuIcons: MenuIcons | undefined
 
 function getUpdateCommands() {
   const menu = Menu.getApplicationMenu()
-  const version = appUpdates?.getVersion()
+  const update = menu?.getMenuItemById('update-app')
+  const download = menu?.getMenuItemById('download-update')
+  const version = appUpdates?.getDownloadVersion() ?? appUpdates?.getVersion()
   return {
     'check-for-updates': menu?.getMenuItemById('check-for-updates')?.enabled === true,
-    'update-app': menu?.getMenuItemById('update-app')?.enabled === true,
+    'update-app': update?.enabled === true,
+    ...(download ? { 'download-update': download.enabled } : {}),
     status: appUpdates?.getStatus() ?? null,
     ...(version ? { version } : {}),
   }
@@ -143,6 +146,8 @@ function rebuildApplicationMenu(): void {
           updateChecking: appUpdates?.isChecking() ?? false,
           updateReady: appUpdates?.canRequest() ?? false,
           updateVersion: appUpdates?.getVersion(),
+          updateDownloadVersion: appUpdates?.getDownloadVersion(),
+          updateDownloading: appUpdates?.isDownloading() ?? false,
           updateBlocked: appUpdateBlocked,
           updateApplying: appUpdates?.isApplying() ?? false,
         },
@@ -151,7 +156,17 @@ function rebuildApplicationMenu(): void {
             appUpdates?.cancelBeforeNativeQuit()
             requestQuitFromMenu()
           },
-          updateApp: () => appUpdates?.request(),
+          updateApp: (version) => {
+            if (version === undefined || version === appUpdates?.getVersion()) appUpdates?.request()
+          },
+          downloadUpdate: (version) => {
+            if (
+              !rendererModalOpen &&
+              !appUpdateBlocked &&
+              (version === undefined || version === appUpdates?.getDownloadVersion())
+            )
+              void appUpdates?.requestDownload()
+          },
           checkForUpdates: () => {
             if (rendererModalOpen || appUpdateBlocked) return
             void appUpdates
@@ -317,15 +332,13 @@ bootstrapApplication({
         }
       }
       autoUpdater.autoInstallOnAppQuit = false
-      autoUpdater.autoDownload = true
+      autoUpdater.autoDownload = false
       autoUpdater.allowPrerelease = false
       autoUpdater.allowDowngrade = false
       autoUpdater.disableDifferentialDownload = true
       appUpdates = new AppUpdates({
-        check: async () => {
-          const result = await autoUpdater.checkForUpdates()
-          await result?.downloadPromise
-        },
+        check: () => autoUpdater.checkForUpdates(),
+        download: () => autoUpdater.downloadUpdate(),
         install,
         canInstall: () =>
           !!mainWindow &&
@@ -351,15 +364,19 @@ bootstrapApplication({
             message:
               result === 'ready'
                 ? 'An update is ready to install.'
-                : result === 'failed'
-                  ? 'Could not check for updates.'
-                  : 'Tree is up to date.',
+                : result === 'available'
+                  ? 'An update is available.'
+                  : result === 'failed'
+                    ? 'Could not check for updates.'
+                    : 'Tree is up to date.',
             detail:
               result === 'ready'
                 ? `Choose Tree > Restart and Install ${appUpdates?.getVersion()} to save your work and restart with the new version.`
-                : result === 'failed'
-                  ? 'Check your Internet connection and try again.'
-                  : `You are using Tree ${app.getVersion()}.`,
+                : result === 'available'
+                  ? `Choose Tree > Download Update ${appUpdates?.getDownloadVersion()} to download it.`
+                  : result === 'failed'
+                    ? 'Check your Internet connection and try again.'
+                    : `You are using Tree ${app.getVersion()}.`,
             buttons: ['OK'],
             defaultId: 0,
             cancelId: 0,
@@ -369,7 +386,8 @@ bootstrapApplication({
       // Start native staging only after explicit consent and a successful save. Keep one
       // listener rather than MacUpdater.quitAndInstall's accumulating deferred callbacks.
       autoUpdater.on('update-downloaded', (info) => appUpdates?.downloaded(info.version))
-      autoUpdater.on('update-available', () => appUpdates?.available())
+      autoUpdater.on('update-available', (info) => appUpdates?.available(info.version))
+      autoUpdater.on('update-not-available', () => appUpdates?.notAvailable())
       autoUpdater.on('download-progress', (progress) => appUpdates?.downloading(progress.percent))
       const finishNativeOperation = (downloaded: boolean) => {
         if (nativePackage.phase !== 'staging' && nativePackage.phase !== 'installing') return
@@ -400,7 +418,8 @@ bootstrapApplication({
         finishNativeOperation(false)
       })
       autoUpdater.on('error', (error) => {
-        if (!nativeErrors.delete(error)) appUpdates?.fail('Update failed. Try Restart and Install again.')
+        if (!nativeErrors.delete(error) && !appUpdates?.isDownloading() && !appUpdates?.isChecking())
+          appUpdates?.fail('Update failed. Try Restart and Install again.')
       })
       app.on('before-quit', () => appUpdates?.cancelBeforeNativeQuit())
       void appUpdates.check()

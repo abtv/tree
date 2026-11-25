@@ -1,7 +1,10 @@
-type UpdatePackage = { phase: 'unavailable' } | { phase: 'ready'; version: string | undefined }
+import type { AppUpdateStatus } from '../../shared/ipc'
 
-type UpdateFeedback =
-  { phase: 'idle' } | { phase: 'downloading'; percent: number } | { phase: 'failed'; percent: number | null }
+type UpdatePackage =
+  | { phase: 'unavailable' }
+  | { phase: 'available'; version: string }
+  | { phase: 'downloading'; version: string; percent: number }
+  | { phase: 'ready'; version: string | undefined }
 
 type UpdateCheck =
   | { phase: 'idle'; result: 'success' | 'failed' }
@@ -17,7 +20,7 @@ type UpdateInstallation =
 export class AppUpdates {
   // A failed recheck can coexist with a previously downloaded package.
   private package: UpdatePackage = { phase: 'unavailable' }
-  private feedback: UpdateFeedback = { phase: 'idle' }
+  private failure: 'failed' | 'download-failed' | null = null
   private backgroundCheck: UpdateCheck = { phase: 'idle', result: 'success' }
   private manualCheck: 'idle' | 'waiting' | 'notifying' = 'idle'
   private recheckRequested = false
@@ -26,6 +29,7 @@ export class AppUpdates {
   public constructor(
     private readonly ports: {
       check(): Promise<unknown>
+      download(): Promise<unknown>
       install(): void
       canInstall(): boolean
       prepareQuit(): () => void
@@ -33,7 +37,7 @@ export class AppUpdates {
       finished(message: string | null): void
       changed(): void
       progressChanged?(): void
-      notifyCheck?(result: 'ready' | 'current' | 'failed'): Promise<void>
+      notifyCheck?(result: 'available' | 'ready' | 'current' | 'failed'): Promise<void>
     },
   ) {}
 
@@ -43,23 +47,54 @@ export class AppUpdates {
   public getVersion(): string | undefined {
     return this.package.phase === 'ready' ? this.package.version : undefined
   }
-  public getStatus(): number | 'ready' | 'failed' | 'installing' | null {
+  public getDownloadVersion(): string | undefined {
+    return this.package.phase === 'available' || this.package.phase === 'downloading' ? this.package.version : undefined
+  }
+  public isDownloading(): boolean {
+    return this.package.phase === 'downloading'
+  }
+  public getStatus(): AppUpdateStatus {
     if (this.isApplying()) return 'installing'
-    if (this.feedback.phase === 'failed') return 'failed'
-    return this.isReady() ? 'ready' : this.percent()
+    if (this.package.phase === 'downloading') return this.package.percent
+    if (this.failure !== null) return this.failure
+    return this.package.phase === 'unavailable' ? null : this.package.phase
   }
 
-  public available(): void {
-    this.package = { phase: 'unavailable' }
-    this.feedback = { phase: 'downloading', percent: 0 }
+  public available(version: string): void {
+    if (this.isDownloading() || (this.package.phase === 'ready' && this.package.version === version)) return
+    if (this.getDownloadVersion() !== version && this.failure === 'download-failed') this.failure = null
+    this.package = { phase: 'available', version }
     this.ports.changed()
   }
 
+  public notAvailable(): void {
+    if (this.package.phase === 'unavailable' || this.isDownloading()) return
+    this.package = { phase: 'unavailable' }
+    if (this.failure === 'download-failed') this.failure = null
+    this.ports.changed()
+  }
+
+  public async requestDownload(): Promise<void> {
+    if (this.package.phase !== 'available' || this.isChecking() || this.isApplying()) return
+    const available = this.package
+    this.package = { phase: 'downloading', version: available.version, percent: 0 }
+    this.failure = null
+    this.ports.changed()
+    try {
+      await this.ports.download()
+      this.package = { phase: 'ready', version: available.version }
+    } catch {
+      this.package = available
+      this.failure = 'download-failed'
+    }
+    this.publishOrRecheck()
+  }
+
   public downloading(percent: number): void {
-    if (this.isReady() || !Number.isFinite(percent)) return
+    if (this.package.phase !== 'downloading' || !Number.isFinite(percent)) return
     const next = Math.max(0, Math.min(100, Math.floor(percent)))
-    if (this.percent() === next) return
-    this.feedback = { phase: this.feedback.phase === 'failed' ? 'failed' : 'downloading', percent: next }
+    if (this.package.percent === next) return
+    this.package.percent = next
     this.ports.progressChanged?.()
   }
   public isChecking(): boolean {
@@ -85,8 +120,11 @@ export class AppUpdates {
   }
 
   public downloaded(version?: string): void {
+    // The provider emits before its download promise settles. Keep the active download
+    // exclusive until that promise resolves and makes the package ready.
+    if (this.isDownloading()) return
     this.package = { phase: 'ready', version }
-    this.clearFailure()
+    this.failure = null
     this.ports.changed()
   }
 
@@ -95,23 +133,22 @@ export class AppUpdates {
       if (origin === 'online') this.backgroundCheck.reconnected = true
       return this.backgroundCheck.pending
     }
-    if (this.isNotifying() || this.isApplying()) {
+    if (this.isNotifying() || this.isApplying() || this.isDownloading()) {
       this.recheckRequested = true
       return Promise.resolve()
     }
     this.recheckRequested = false
-    this.feedback = { phase: 'idle' }
+    if (this.failure !== 'download-failed') this.failure = null
     const pending = Promise.resolve()
       .then(() => this.ports.check())
       .then(
         () => undefined,
         () => {
           this.backgroundCheck = { ...this.backgroundCheck, result: 'failed' }
-          this.feedback = { phase: 'failed', percent: this.percent() }
+          this.failure = 'failed'
         },
       )
       .finally(() => {
-        this.clearProgress()
         const check = this.backgroundCheck
         if (check.phase === 'checking' && check.reconnected && check.result === 'failed') this.recheckRequested = true
         this.backgroundCheck = { phase: 'idle', result: check.result }
@@ -123,7 +160,7 @@ export class AppUpdates {
   }
 
   public async checkManually(): Promise<void> {
-    if (this.manualCheck !== 'idle' || this.isApplying()) return
+    if (this.manualCheck !== 'idle' || this.isApplying() || this.isDownloading()) return
     this.manualCheck = 'waiting'
     this.ports.changed()
     try {
@@ -131,7 +168,13 @@ export class AppUpdates {
       this.manualCheck = 'notifying'
       this.ports.changed()
       await this.ports.notifyCheck?.(
-        this.backgroundCheck.result === 'failed' ? 'failed' : this.isReady() ? 'ready' : 'current',
+        this.backgroundCheck.result === 'failed'
+          ? 'failed'
+          : this.isReady()
+            ? 'ready'
+            : this.package.phase === 'available'
+              ? 'available'
+              : 'current',
       )
     } finally {
       this.manualCheck = 'idle'
@@ -140,7 +183,7 @@ export class AppUpdates {
   }
 
   private publishOrRecheck(): void {
-    if (this.recheckRequested && !this.isChecking() && !this.isApplying()) void this.check()
+    if (this.recheckRequested && !this.isChecking() && !this.isApplying() && !this.isDownloading()) void this.check()
     else this.ports.changed()
   }
 
@@ -150,7 +193,7 @@ export class AppUpdates {
 
   public request(): void {
     if (!this.canRequest()) return
-    this.clearFailure()
+    this.failure = null
     const requestId = crypto.randomUUID()
     this.installation = {
       phase: 'awaiting-save',
@@ -185,26 +228,12 @@ export class AppUpdates {
   }
 
   public fail(message: string | null): void {
-    this.clearProgress()
-    if (message !== null) this.feedback = { phase: 'failed', percent: null }
+    if (message !== null) this.failure = 'failed'
     const installation = this.installation
     if (installation.phase !== 'idle') clearTimeout(installation.timer)
     if (installation.phase === 'native-quit') installation.releaseQuit()
     this.installation = { phase: 'idle' }
     if (installation.phase !== 'idle') this.ports.finished(message)
     this.publishOrRecheck()
-  }
-
-  private percent(): number | null {
-    return this.feedback.phase === 'idle' ? null : this.feedback.percent
-  }
-
-  private clearFailure(): void {
-    const percent = this.percent()
-    this.feedback = percent === null ? { phase: 'idle' } : { phase: 'downloading', percent }
-  }
-
-  private clearProgress(): void {
-    this.feedback = this.feedback.phase === 'failed' ? { phase: 'failed', percent: null } : { phase: 'idle' }
   }
 }

@@ -3,6 +3,7 @@ import type { AppearancePreference } from '../../shared/appearance'
 import {
   ipcChannels,
   ipcEvents,
+  isAppUpdateVersion,
   type NotesArchiveProgress,
   type NotesMenuCommand,
   type TreeApi,
@@ -14,7 +15,10 @@ export const treeApi: TreeApi = {
     ? { imageToText: (id: string) => ipcRenderer.invoke(ipcChannels.imageToText, id) }
     : {}),
   getUpdateCommands: () => ipcRenderer.invoke(ipcChannels.getUpdateCommands),
-  runUpdateCommand: (command) => ipcRenderer.invoke(ipcChannels.runUpdateCommand, command),
+  runUpdateCommand: (command, version) =>
+    version === undefined
+      ? ipcRenderer.invoke(ipcChannels.runUpdateCommand, command)
+      : ipcRenderer.invoke(ipcChannels.runUpdateCommand, command, version),
   onUpdateCommandsChanged: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown): void => {
       if (
@@ -26,24 +30,25 @@ export const treeApi: TreeApi = {
         typeof state['update-app'] === 'boolean'
       ) {
         const status = 'status' in state ? state.status : undefined
+        const download = 'download-update' in state ? state['download-update'] : undefined
+        if (download !== undefined && typeof download !== 'boolean') return
         if (
           status !== undefined &&
           status !== null &&
           status !== 'ready' &&
+          status !== 'available' &&
+          status !== 'download-failed' &&
           status !== 'failed' &&
           status !== 'installing' &&
           !(typeof status === 'number' && Number.isInteger(status) && status >= 0 && status <= 100)
         )
           return
         const version = 'version' in state ? state.version : undefined
-        if (
-          version !== undefined &&
-          !(typeof version === 'string' && version.length <= 128 && /^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(version))
-        )
-          return
+        if (version !== undefined && !isAppUpdateVersion(version)) return
         listener({
           'check-for-updates': state['check-for-updates'],
           'update-app': state['update-app'],
+          ...(download !== undefined ? { 'download-update': download } : {}),
           ...(status !== undefined ? { status } : {}),
           ...(version !== undefined ? { version } : {}),
         })

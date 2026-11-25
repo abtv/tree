@@ -50,6 +50,6 @@ The application is a native-feeling macOS application and follows Apple's Human 
 A requirement in this document that deliberately differs from the guidelines takes precedence, and the difference is recorded next to that requirement with its reason. The keyboard-first model (§1) and Vim-inspired editing (§20.2) are such deliberate differences.
 
 The desktop application menu starts with **About Tree**, **Check for Updates…** and
-**Restart and Install Update** (§26), followed by a separator before Quit Tree. About Tree opens the About dialog, which §9.4 defines.
+the current download or installation action (§26), followed by a separator before Quit Tree. About Tree opens the About dialog, which §9.4 defines.
 
 Outside Apple platforms, §1.5 maps the Cmd and Option shortcuts to Ctrl and Alt.

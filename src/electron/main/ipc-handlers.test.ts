@@ -71,7 +71,10 @@ function createHarness(configure?: (dependencies: IpcHandlerDependencies) => voi
   }
   const setNotesMenuState = vi.fn()
   const setAppUpdateBlocked = vi.fn()
-  const getUpdateCommands = vi.fn(() => ({ 'check-for-updates': true, 'update-app': false }))
+  const getUpdateCommands = vi.fn<NonNullable<IpcHandlerDependencies['getUpdateCommands']>>(() => ({
+    'check-for-updates': true,
+    'update-app': false,
+  }))
   const runUpdateCommand = vi.fn()
   const appUpdates = { check: vi.fn(async () => undefined), confirm: vi.fn(), isApplying: vi.fn(() => false) }
   const dependencies: IpcHandlerDependencies = {
@@ -421,20 +424,54 @@ describe('main IPC handlers', () => {
     expect(runUpdateCommand).not.toHaveBeenCalled()
     run(event, 'check-for-updates')
     expect(runUpdateCommand).toHaveBeenCalledExactlyOnceWith('check-for-updates')
-    getUpdateCommands.mockReturnValue({ 'check-for-updates': false, 'update-app': true })
-    run(event, 'update-app')
+    getUpdateCommands.mockReturnValue({
+      'check-for-updates': false,
+      'update-app': false,
+      'download-update': true,
+      version: '1.2.5',
+    })
+    run(event, 'download-update', '1.2.4')
+    run(event, 'download-update')
+    expect(runUpdateCommand).toHaveBeenCalledTimes(1)
+    run(event, 'download-update', '1.2.5')
+    expect(runUpdateCommand).toHaveBeenLastCalledWith('download-update')
+    getUpdateCommands.mockReturnValue({ 'check-for-updates': false, 'update-app': true, version: '1.2.5' })
+    run(event, 'download-update', '1.2.5')
+    run(event, 'update-app', '1.2.4')
+    expect(runUpdateCommand).toHaveBeenCalledTimes(2)
+    run(event, 'update-app', '1.2.5')
     expect(runUpdateCommand).toHaveBeenLastCalledWith('update-app')
 
     expect(() => get(event, true)).toThrow()
     expect(() => get({})).toThrow('Untrusted')
     expect(() => run({}, 'update-app')).toThrow('Untrusted')
     expect(() => run(event, 'quit')).toThrow('Invalid update command')
-    expect(() => run(event, 'update-app', true)).toThrow()
     runUpdateCommand.mockImplementationOnce(() => {
       throw new Error('unavailable')
     })
-    expect(() => run(event, 'update-app')).toThrow('unavailable')
+    expect(() => run(event, 'update-app', '1.2.5')).toThrow('unavailable')
   })
+
+  it('requires one valid version for a package action and no version for a check', () => {
+    const { handlers, getUpdateCommands, runUpdateCommand } = createHarness()
+    const run = handlers.get(ipcChannels.runUpdateCommand)!
+    const event = { senderFrame: { url: rendererUrl } }
+    getUpdateCommands.mockReturnValue({
+      'check-for-updates': true,
+      'update-app': false,
+      'download-update': true,
+      version: '1.2.5',
+    })
+
+    expect(() => run(event, 'check-for-updates', '1.2.5')).toThrow('This request takes no arguments.')
+    expect(() => run(event, 'download-update', '1.2.5', 'extra')).toThrow('This request takes no arguments.')
+    expect(() => run(event, 'download-update', 'invalid')).toThrow('Invalid update version.')
+    expect(() => run(event, 'update-app', true)).toThrow('Invalid update version.')
+    run(event, 'check-for-updates')
+
+    expect(runUpdateCommand).toHaveBeenCalledExactlyOnceWith('check-for-updates')
+  })
+
   it('accepts only trusted boolean About state and propagates errors', () => {
     const { handlers, setRendererModalOpen } = createHarness()
     const show = handlers.get('tree:set-renderer-modal-open')!

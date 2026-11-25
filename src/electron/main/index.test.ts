@@ -97,7 +97,12 @@ vi.mock('./window', () => ({
 }))
 vi.mock('electron-updater', async () => {
   const { EventEmitter } = await import('node:events')
-  return { autoUpdater: Object.assign(new EventEmitter(), { checkForUpdates: vi.fn(async () => null) }) }
+  return {
+    autoUpdater: Object.assign(new EventEmitter(), {
+      checkForUpdates: vi.fn(async () => null),
+      downloadUpdate: vi.fn(async () => []),
+    }),
+  }
 })
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events')
@@ -335,6 +340,10 @@ function requestedUpdateId(window: Awaited<ReturnType<typeof setup>>['window']):
   return call![1] as string
 }
 
+function testUpdateInfo(version: string) {
+  return { version, files: [], path: '/update.zip', sha512: 'test-digest', releaseDate: '2026-11-05' }
+}
+
 describe('packaged desktop update wiring', () => {
   it('offers the package after the previous renderer releases its archive operation', async () => {
     const f = await packagedSetup()
@@ -367,12 +376,18 @@ describe('packaged desktop update wiring', () => {
     expect(f.state().updateReady).toBe(false)
   })
 
-  it('offers the downloaded package when the error screen finishes loading', async () => {
+  it.each([
+    ['an ordinary load error', true],
+    ['a pending notes recovery', false],
+  ] as const)('offers the downloaded package when the error screen opens for %s', async (_reason, canImport) => {
     const f = await packagedSetup()
     vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(true)
-    f.ipc.setNotesMenuState!({ canImport: true, canExport: false, canInstallUpdate: true })
+    f.ipc.setNotesMenuState!({ canImport: false, canExport: false, canInstallUpdate: false })
     f.downloaded()
 
+    f.ipc.setNotesMenuState!({ canImport, canExport: false, canInstallUpdate: true })
+
+    expect(f.state().notes).toEqual({ canImport, canExport: false, canInstallUpdate: true })
     expect(f.state().updateReady).toBe(false)
     expect(f.updates.getVersion()).toBe('1.2.4')
     vi.mocked(f.window.webContents.isLoadingMainFrame).mockReturnValue(false)
@@ -527,6 +542,13 @@ describe('packaged desktop update wiring', () => {
       version: '1.2.4',
     })
 
+    let complete!: (paths: string[]) => void
+    vi.mocked(f.updater.downloadUpdate).mockImplementationOnce(
+      () =>
+        new Promise<string[]>((resolve) => {
+          complete = resolve
+        }),
+    )
     f.updater.emit('update-available', {
       version: '1.2.5',
       files: [],
@@ -534,6 +556,8 @@ describe('packaged desktop update wiring', () => {
       sha512: 'test-digest',
       releaseDate: '2026-11-05',
     })
+    f.actions().downloadUpdate!()
+    expect(f.state().updateDownloading).toBe(true)
     const progress = (percent: number) =>
       f.updater.emit('download-progress', { percent, total: 100, transferred: percent, bytesPerSecond: 10, delta: 1 })
     vi.mocked(f.window.webContents.send).mockClear()
@@ -545,6 +569,7 @@ describe('packaged desktop update wiring', () => {
       'check-for-updates': false,
       'update-app': false,
       status: 42,
+      version: '1.2.5',
     })
     expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith(
       ipcEvents.updateCommandsChanged,
@@ -558,14 +583,66 @@ describe('packaged desktop update wiring', () => {
     f.lifecycle.setMainWindow(null)
     progress(44)
     expect(f.window.webContents.send).not.toHaveBeenCalled()
+    complete(['/update.zip'])
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.state().updateDownloading).toBe(false)
   })
 
-  it('waits for the provider download promise before reporting a manual result', async () => {
+  it('publishes and withdraws the native download command through the current menu', async () => {
     const f = await packagedSetup()
-    let finish!: (paths: string[]) => void
-    const downloadPromise = new Promise<string[]>((resolve) => {
-      finish = resolve
-    })
+    const updateInfo = testUpdateInfo('1.2.4')
+    const getMenuItemById = (id: string) => {
+      const state = f.state()
+      if (id === 'download-update' && state.updateDownloadVersion) return { enabled: !state.updateDownloading }
+      return undefined
+    }
+    vi.mocked(f.electron.Menu.getApplicationMenu).mockReturnValue({ getMenuItemById } as never)
+
+    f.updater.emit('update-available', updateInfo)
+
+    expect(f.ipc.getUpdateCommands!()).toMatchObject({ 'download-update': true, status: 'available', version: '1.2.4' })
+    expect(f.window.webContents.send).toHaveBeenLastCalledWith(
+      ipcEvents.updateCommandsChanged,
+      f.ipc.getUpdateCommands!(),
+    )
+
+    f.updater.emit('update-not-available', updateInfo)
+
+    expect(f.ipc.getUpdateCommands!()).toEqual({ 'check-for-updates': false, 'update-app': false, status: null })
+    expect(f.window.webContents.send).toHaveBeenLastCalledWith(
+      ipcEvents.updateCommandsChanged,
+      f.ipc.getUpdateCommands!(),
+    )
+    expect(f.updater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  it('does not dispatch a native action for a replaced version', async () => {
+    const f = await packagedSetup()
+    const offer = (version: string) => f.updater.emit('update-available', testUpdateInfo(version))
+    offer('1.2.4')
+    const firstDownload = f.actions().downloadUpdate!
+    offer('1.2.5')
+
+    firstDownload('1.2.4')
+    expect(f.updater.downloadUpdate).not.toHaveBeenCalled()
+    f.actions().downloadUpdate!('1.2.5')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(f.updater.downloadUpdate).toHaveBeenCalledOnce()
+    const firstInstall = f.actions().updateApp!
+    f.downloaded('1.2.6')
+
+    firstInstall('1.2.5')
+    expect(f.updates.isApplying()).toBe(false)
+    f.actions().updateApp!('1.2.6')
+
+    expect(f.updates.isApplying()).toBe(true)
+    expect(requestedUpdateId(f.window)).toEqual(expect.any(String))
+    f.updates.cancelBeforeNativeQuit()
+  })
+
+  it('reports an available update from a manual check without downloading it', async () => {
+    const f = await packagedSetup()
     const updateInfo = {
       version: '1.2.4',
       files: [{ url: '/update.zip', sha512: 'test-digest', size: 1 }],
@@ -573,21 +650,21 @@ describe('packaged desktop update wiring', () => {
       sha512: 'test-digest',
       releaseDate: '2026-11-05',
     }
-    vi.mocked(f.updater.checkForUpdates).mockResolvedValueOnce({
-      isUpdateAvailable: true,
-      updateInfo,
-      versionInfo: updateInfo,
-      downloadPromise,
+    vi.mocked(f.updater.checkForUpdates).mockImplementationOnce(async () => {
+      f.updater.emit('update-available', updateInfo)
+      return { isUpdateAvailable: true, updateInfo, versionInfo: updateInfo, downloadPromise: null }
     })
 
-    const pending = f.updates.checkManually()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(f.updates.isChecking()).toBe(true)
-    expect(f.electron.dialog.showMessageBox).not.toHaveBeenCalled()
-    finish(['/update.zip'])
-    await pending
+    await f.updates.checkManually()
 
-    expect(f.electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+    expect(f.updater.downloadUpdate).not.toHaveBeenCalled()
+    expect(f.electron.dialog.showMessageBox).toHaveBeenCalledExactlyOnceWith(
+      f.window,
+      expect.objectContaining({
+        message: 'An update is available.',
+        detail: 'Choose Tree > Download Update 1.2.4 to download it.',
+      }),
+    )
   })
 
   it('allows retry after native staging fails and restores window creation after rollback', async () => {
@@ -709,13 +786,17 @@ describe('packaged desktop update wiring', () => {
 
   it.each(['about', 'data'] as const)('blocks the manual update action while %s is active', async (reason) => {
     const f = await packagedSetup()
+    f.updater.emit('update-available', testUpdateInfo('1.2.4'))
+    const oldActions = f.actions()
     if (reason === 'about') f.ipc.setRendererModalOpen!(true)
     else f.ipc.setAppUpdateBlocked!(true)
 
-    f.actions().checkForUpdates!()
+    oldActions.checkForUpdates!()
+    oldActions.downloadUpdate!('1.2.4')
     await vi.advanceTimersByTimeAsync(0)
 
     expect(f.updater.checkForUpdates).toHaveBeenCalledOnce()
+    expect(f.updater.downloadUpdate).not.toHaveBeenCalled()
     expect(f.state().updatesSupported).toBe(true)
     expect(f.electron.dialog.showMessageBox).not.toHaveBeenCalled()
   })
@@ -738,12 +819,23 @@ describe('packaged desktop update wiring', () => {
     expect(f.updater.checkForUpdates).toHaveBeenCalledOnce()
     expect(f.updater).toMatchObject({
       autoInstallOnAppQuit: false,
-      autoDownload: true,
+      autoDownload: false,
       allowPrerelease: false,
       allowDowngrade: false,
       disableDifferentialDownload: true,
     })
-    f.downloaded()
+    f.updater.emit('update-available', {
+      version: '1.2.4',
+      files: [],
+      path: '/update.zip',
+      sha512: 'test-digest',
+      releaseDate: '2026-11-05',
+    })
+    expect(f.state().updateDownloadVersion).toBe('1.2.4')
+    expect(f.updater.downloadUpdate).not.toHaveBeenCalled()
+    f.actions().downloadUpdate!()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.updater.downloadUpdate).toHaveBeenCalledOnce()
     expect(f.state().updateReady).toBe(true)
     expect(f.electron.autoUpdater.checkForUpdates).not.toHaveBeenCalled()
     f.actions().updateApp!()
@@ -1117,6 +1209,7 @@ describe('desktop entry wiring', () => {
       updateChecking: false,
       updateReady: false,
       updateBlocked: false,
+      updateDownloading: false,
       updateApplying: false,
       modalOpen: false,
     })

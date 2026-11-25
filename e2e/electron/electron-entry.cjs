@@ -7,32 +7,50 @@ if (process.argv.includes('--tree-test-app-updates')) {
   Object.defineProperty(app, 'isPackaged', { get: () => true })
   const updater = require('electron-updater').autoUpdater
   const native = require('electron').autoUpdater
-  const probe = { checks: 0, installs: 0, fail: false, checkFails: false, messages: [] }
+  const probe = {
+    checks: 0,
+    downloads: 0,
+    installs: 0,
+    fail: false,
+    checkFails: false,
+    nextVersion: null,
+    messages: [],
+  }
   require('electron').dialog.showMessageBox = async (_window, options) => {
     probe.messages.push(options.message)
     return { response: 0, checkboxChecked: false }
   }
   updater.checkForUpdates = async () => {
     probe.checks++
-    if (probe.checkFails) throw new Error('test offline')
-    if (probe.nextVersion) {
-      const version = probe.nextVersion
-      updater.emit('update-available', { version })
-      return {
-        downloadPromise: new Promise((resolve, reject) => {
-          probe.finishDownload = (failed = false) => {
-            if (failed) {
-              updater.emit('error', new Error('test download failure'))
-              reject(new Error('test download failure'))
-            } else {
-              updater.emit('update-downloaded', { version })
-              resolve([])
-            }
-          }
-        }),
-      }
+    if (probe.checkFails) {
+      const error = new Error('test offline')
+      updater.emit('error', error)
+      throw error
     }
-    return null
+    const updateInfo = { version: probe.nextVersion ?? app.getVersion() }
+    const result = { isUpdateAvailable: probe.nextVersion !== null, updateInfo, versionInfo: updateInfo }
+    if (!result.isUpdateAvailable) {
+      updater.emit('update-not-available', updateInfo)
+      return result
+    }
+    probe.available(updateInfo.version)
+    return { ...result, downloadPromise: updater.autoDownload ? updater.downloadUpdate() : null }
+  }
+  updater.downloadUpdate = () => {
+    probe.downloads++
+    const version = probe.offeredVersion
+    return new Promise((resolve, reject) => {
+      probe.finishDownload = (failed = false) => {
+        if (failed) {
+          const error = new Error('test download failure')
+          updater.emit('error', error)
+          reject(error)
+        } else {
+          updater.emit('update-downloaded', { version })
+          resolve([])
+        }
+      }
+    })
   }
   native.checkForUpdates = () => {
     probe.installs++
@@ -43,8 +61,14 @@ if (process.argv.includes('--tree-test-app-updates')) {
     for (const window of require('electron').BrowserWindow.getAllWindows()) window.close()
     app.quit()
   }
-  probe.downloaded = (version = '1.2.4') => updater.emit('update-downloaded', { version })
-  probe.available = () => updater.emit('update-available')
+  probe.downloaded = (version = '1.2.4') => {
+    probe.nextVersion = version
+    updater.emit('update-downloaded', { version })
+  }
+  probe.available = (version = '1.2.4') => {
+    probe.offeredVersion = version
+    updater.emit('update-available', { version })
+  }
   probe.progress = (percent) => updater.emit('download-progress', { percent })
   globalThis.__treeUpdates = probe
 }

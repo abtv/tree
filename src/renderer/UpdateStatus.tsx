@@ -31,11 +31,15 @@ export function UpdateStatus({ hidden }: { hidden: boolean }): React.JSX.Element
     <span className="status-bar-message update-status">
       {status === 'ready'
         ? 'Update ready'
-        : status === 'failed'
-          ? 'Update failed. Check for Updates to retry.'
-          : status === 'installing'
-            ? 'Preparing to restart…'
-            : `Downloading update… ${status}%`}
+        : status === 'available'
+          ? 'Update available. Choose Download Update.'
+          : status === 'download-failed'
+            ? 'Download failed. Try Download Update again.'
+            : status === 'failed'
+              ? 'Update failed. Check for Updates to retry.'
+              : status === 'installing'
+                ? 'Preparing to restart…'
+                : `Downloading update… ${status}%`}
     </span>
   )
 }

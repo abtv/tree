@@ -19,6 +19,7 @@ function applicationMenuTemplate(
 function createActions() {
   return {
     checkForUpdates: vi.fn(),
+    downloadUpdate: vi.fn(),
     updateApp: vi.fn(),
     showAbout: vi.fn(),
     requestQuit: vi.fn(),
@@ -111,6 +112,10 @@ describe('application menu template', () => {
       findCommand: vi.fn(),
     }
     const items = submenuItems(applicationMenuTemplate(state(), actions), 'Tree')
+    const download = submenuItems(
+      applicationMenuTemplate({ ...state(), updateDownloadVersion: '1.2.4' }, actions),
+      'Tree',
+    ).find((item) => item.id === 'download-update')!
 
     expect(() => {
       clickWithChecked(
@@ -121,6 +126,7 @@ describe('application menu template', () => {
         items.find((item) => item.id === 'update-app')!,
         false,
       )
+      clickWithChecked(download, false)
     }).not.toThrow()
   })
 
@@ -151,6 +157,35 @@ describe('application menu template', () => {
 
     expect(items.find((item) => item.id === 'check-for-updates')?.enabled).toBe(canCheck)
     expect(items.find((item) => item.id === 'update-app')?.enabled).toBe(canUpdate)
+  })
+
+  it.each([
+    [{}, true],
+    [{ updateDownloading: true }, false],
+    [{ updateChecking: true }, false],
+    [{ updateApplying: true }, false],
+    [{ updateBlocked: true }, false],
+    [{ modalOpen: true }, false],
+  ] as const)('offers manual download independently of install readiness for %j', (overrides, enabled) => {
+    const actions = createActions()
+    const items = submenuItems(
+      applicationMenuTemplate(
+        { ...state(), updatesSupported: true, updateDownloadVersion: '1.2.4', ...overrides },
+        actions,
+      ),
+      'Tree',
+    )
+
+    const download = items.find((item) => item.id === 'download-update')!
+
+    expect(download).toMatchObject({ label: 'Download Update 1.2.4', enabled })
+    expect(items.find((item) => item.id === 'update-app')).toBeUndefined()
+    expect(items.find((item) => item.id === 'check-for-updates')?.enabled).toBe(enabled)
+    if (enabled) {
+      clickWithChecked(download, false)
+      expect(actions.downloadUpdate).toHaveBeenCalledExactlyOnceWith('1.2.4')
+      expect(actions.updateApp).not.toHaveBeenCalled()
+    }
   })
 
   it('routes Update App and all find commands through their own actions', () => {

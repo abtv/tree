@@ -8,14 +8,22 @@ export function installUpdateCommands(api: TreeApi, data: MenuCommandSource, rep
   let receivedEvent = false
   const publish = (state: UpdateCommandsState) => {
     if (disposed) return
+    const action = state['download-update'] === undefined ? 'update-app' : 'download-update'
     updates.update(
-      (['check-for-updates', 'update-app'] as const).map((name) => ({
+      (['check-for-updates', action] as const).map((name) => ({
         name,
-        enabled: state[name],
-        ...(name === 'update-app'
-          ? { description: state.version ? `Restart and Install ${state.version}` : 'Restart and Install Update' }
-          : {}),
-        run: () => api.runUpdateCommand!(name),
+        enabled: state[name] === true,
+        ...(name === action && {
+          description:
+            name === 'download-update'
+              ? state.version
+                ? `Download Update ${state.version}`
+                : 'Download Update'
+              : state.version
+                ? `Restart and Install ${state.version}`
+                : 'Restart and Install Update',
+        }),
+        run: () => (name === action ? api.runUpdateCommand!(name, state.version) : api.runUpdateCommand!(name)),
       })),
     )
   }

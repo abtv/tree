@@ -29,6 +29,17 @@ it('keeps live menu availability ahead of a stale initial read and disposes subs
   await Promise.resolve()
 
   expect(source.getSnapshot().map((entry) => entry.enabled)).toEqual([true, true])
+  notify({
+    'check-for-updates': true,
+    'update-app': false,
+    'download-update': true,
+    status: 'available',
+    version: '1.2.4',
+  })
+  const download = source.getSnapshot().find((entry) => entry.name === 'download-update')!
+  expect(download.description).toBe('Download Update 1.2.4')
+  await download.run({} as never, {} as never)
+  expect(api.runUpdateCommand).toHaveBeenCalledWith('download-update', '1.2.4')
   notify({ 'check-for-updates': true, 'update-app': true, version: '1.2.4' })
   expect(source.getSnapshot().find((entry) => entry.name === 'update-app')?.description).toBe(
     'Restart and Install 1.2.4',

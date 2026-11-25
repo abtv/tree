@@ -134,7 +134,7 @@ export function useCommandPanel(options: {
       if (command?.enabled === false) return
       if (menuEntries.includes(command!)) {
         const current = menuCommands.getSnapshot().find((entry) => entry.name === command?.name)
-        if (current === undefined || current.enabled === false) return
+        if (current === undefined || current.enabled === false || current.description !== command?.description) return
         command = current
       }
       close()

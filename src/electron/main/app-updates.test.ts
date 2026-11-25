@@ -5,6 +5,7 @@ function harness() {
   const release = vi.fn()
   const ports = {
     check: vi.fn<() => Promise<void>>(async () => undefined),
+    download: vi.fn<() => Promise<void>>(async () => undefined),
     install: vi.fn(),
     canInstall: vi.fn(() => true),
     prepareQuit: vi.fn(() => release),
@@ -12,7 +13,7 @@ function harness() {
     finished: vi.fn(),
     changed: vi.fn(),
     progressChanged: vi.fn(),
-    notifyCheck: vi.fn<(result: 'ready' | 'current' | 'failed') => Promise<void>>(async () => undefined),
+    notifyCheck: vi.fn<(result: 'available' | 'ready' | 'current' | 'failed') => Promise<void>>(async () => undefined),
   }
   const updates = new AppUpdates(ports)
   const request = () => {
@@ -26,15 +27,16 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('desktop app updates', () => {
-  it('publishes a replacement download before progress arrives', () => {
+  it('publishes a replacement offer without downloading before consent', () => {
     const { updates, ports } = harness()
     updates.downloaded('1.2.4')
     const states: unknown[] = []
     ports.changed.mockImplementation(() => states.push([updates.isReady(), updates.getVersion(), updates.getStatus()]))
 
-    updates.available()
+    updates.available('1.2.5')
 
-    expect(states).toEqual([[false, undefined, 0]])
+    expect(states).toEqual([[false, undefined, 'available']])
+    expect(ports.download).not.toHaveBeenCalled()
   })
 
   it('clears a previous failure as soon as a background check starts', async () => {
@@ -59,6 +61,7 @@ describe('desktop app updates', () => {
     const { ports } = harness()
     const updates = new AppUpdates({
       check: ports.check,
+      download: ports.download,
       install: ports.install,
       canInstall: ports.canInstall,
       prepareQuit: ports.prepareQuit,
@@ -67,10 +70,14 @@ describe('desktop app updates', () => {
       changed: ports.changed,
     })
 
+    updates.available('1.2.4')
+    const pending = updates.requestDownload()
     updates.downloading(42)
+    expect(updates.getStatus()).toBe(42)
+    await pending
     await updates.checkManually()
 
-    expect(updates.getStatus()).toBeNull()
+    expect(updates.getStatus()).toBe('ready')
     expect(updates.isChecking()).toBe(false)
     expect(updates.isNotifying()).toBe(false)
   })
@@ -93,7 +100,7 @@ describe('desktop app updates', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('keeps neutral cancellation from turning an idle download into a failure', () => {
+  it('ignores progress without an explicitly started download', () => {
     const { updates } = harness()
     updates.downloading(42)
 
@@ -118,12 +125,17 @@ describe('desktop app updates', () => {
     expect(ports.check).toHaveBeenCalledOnce()
   })
 
-  it('replaces readiness before downloading another package and exposes its version only on completion', () => {
+  it('keeps same-version readiness and requires consent before downloading a different package', async () => {
     const { updates, ports } = harness()
     updates.downloaded('1.2.4')
     expect(updates.getVersion()).toBe('1.2.4')
 
-    updates.available()
+    updates.available('1.2.4')
+    expect(updates.getStatus()).toBe('ready')
+    updates.available('1.2.5')
+    expect(updates.getStatus()).toBe('available')
+    expect(ports.download).not.toHaveBeenCalled()
+    const pending = updates.requestDownload()
     updates.downloading(42)
     updates.request()
 
@@ -132,12 +144,7 @@ describe('desktop app updates', () => {
     expect(updates.getStatus()).toBe(42)
     expect(ports.requestSave).not.toHaveBeenCalled()
 
-    updates.fail('offline')
-    expect(updates.isReady()).toBe(false)
-    expect(updates.getStatus()).toBe('failed')
-    updates.available()
-    expect(updates.getStatus()).toBe(0)
-    updates.downloaded('1.2.5')
+    await pending
     expect(updates.getVersion()).toBe('1.2.5')
     expect(updates.getStatus()).toBe('ready')
   })
@@ -172,6 +179,35 @@ describe('desktop app updates', () => {
     expect(ports.check).toHaveBeenCalledOnce()
   })
 
+  it('does not offer to install a package withdrawn by a successful check', async () => {
+    const { updates, ports } = harness()
+    updates.downloaded('1.2.4')
+    ports.check.mockImplementationOnce(async () => updates.notAvailable())
+
+    await updates.checkManually()
+    updates.request()
+
+    expect(updates.getStatus()).toBeNull()
+    expect(ports.notifyCheck).toHaveBeenCalledWith('current')
+    expect(ports.requestSave).not.toHaveBeenCalled()
+  })
+
+  it('publishes a withdrawal of the failed download once', async () => {
+    const { updates, ports } = harness()
+    updates.available('1.2.4')
+    ports.download.mockRejectedValueOnce(new Error('offline'))
+    await updates.requestDownload()
+    const changes: unknown[] = []
+    ports.changed.mockImplementation(() => changes.push([updates.getStatus(), updates.getDownloadVersion()]))
+
+    updates.notAvailable()
+    updates.notAvailable()
+    await updates.requestDownload()
+
+    expect(changes).toEqual([[null, undefined]])
+    expect(ports.download).toHaveBeenCalledOnce()
+  })
+
   it('reports a failed recheck instead of claiming the existing package is current', async () => {
     const { updates, ports } = harness()
     updates.downloaded('1.2.4')
@@ -184,25 +220,19 @@ describe('desktop app updates', () => {
     expect(updates.getVersion()).toBe('1.2.4')
     expect(updates.getStatus()).toBe('failed')
   })
-  it('publishes bounded whole percentages and clears failed downloads', async () => {
+  it('publishes bounded whole percentages only for an active download', async () => {
     const { updates, ports } = harness()
+    updates.available('1.2.4')
+    const pending = updates.requestDownload()
+    ports.changed.mockClear()
     for (let i = 0; i < 10000; i++) updates.downloading(i / 100)
-    expect(ports.progressChanged).toHaveBeenCalledTimes(100)
+    expect(ports.progressChanged).toHaveBeenCalledTimes(99)
     expect(ports.changed).not.toHaveBeenCalled()
     expect(updates.getStatus()).toBe(99)
     updates.downloading(Number.NaN)
     expect(updates.getStatus()).toBe(99)
 
-    updates.fail('offline')
-    expect(updates.getStatus()).toBe('failed')
-    ports.check.mockImplementationOnce(async () => {
-      updates.downloading(42)
-      throw new Error('offline')
-    })
-    await updates.check()
-    expect(updates.getStatus()).toBe('failed')
-
-    updates.downloaded()
+    await pending
     updates.downloading(12)
     expect(updates.getStatus()).toBe('ready')
   })
@@ -216,10 +246,11 @@ describe('desktop app updates', () => {
     expect(updates.isNotifying()).toBe(false)
   })
 
-  it('publishes the first whole percentage and bounds progress at both ends', () => {
+  it('publishes the first whole percentage and bounds progress at both ends', async () => {
     const { updates, ports } = harness()
 
-    updates.available()
+    updates.available('1.2.4')
+    const pending = updates.requestDownload()
 
     expect(updates.getStatus()).toBe(0)
     updates.downloading(-1)
@@ -229,17 +260,90 @@ describe('desktop app updates', () => {
     updates.downloading(Infinity)
     expect(updates.getStatus()).toBe(100)
     expect(ports.progressChanged).toHaveBeenCalledOnce()
+    await pending
   })
 
-  it('keeps late download progress from clearing failure feedback', () => {
+  it('preserves the offer after failure and does not retry without consent', async () => {
     const { updates, ports } = harness()
-    updates.available()
-    updates.fail('offline')
+    updates.available('1.2.4')
+    ports.download.mockRejectedValueOnce(new Error('offline'))
 
+    await updates.requestDownload()
     updates.downloading(42)
 
-    expect(updates.getStatus()).toBe('failed')
-    expect(ports.progressChanged).toHaveBeenCalledOnce()
+    expect(updates.getStatus()).toBe('download-failed')
+    expect(updates.getDownloadVersion()).toBe('1.2.4')
+    expect(ports.progressChanged).not.toHaveBeenCalled()
+    expect(ports.download).toHaveBeenCalledOnce()
+
+    await updates.requestDownload()
+    expect(ports.download).toHaveBeenCalledTimes(2)
+    expect(updates.getStatus()).toBe('ready')
+  })
+
+  it('keeps the failed download visible through a queued check for the same version', async () => {
+    const { updates, ports } = harness()
+    let rejectDownload!: (error: Error) => void
+    ports.download.mockImplementationOnce(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectDownload = reject
+        }),
+    )
+    ports.check.mockImplementationOnce(async () => updates.available('1.2.4'))
+    updates.available('1.2.4')
+
+    const pending = updates.requestDownload()
+    await updates.check('online')
+    rejectDownload(new Error('offline'))
+    await pending
+    await vi.waitFor(() => expect(updates.isChecking()).toBe(false))
+
+    expect(ports.download).toHaveBeenCalledOnce()
+    expect(ports.check).toHaveBeenCalledOnce()
+    expect(updates.getStatus()).toBe('download-failed')
+
+    updates.available('1.2.5')
+    expect(updates.getStatus()).toBe('available')
+    updates.notAvailable()
+    expect(updates.getStatus()).toBeNull()
+  })
+
+  // @requirement PRODUCT.md §26
+  it('keeps the checked package pinned until the explicitly requested download has settled', async () => {
+    const { updates, ports } = harness()
+    let finish!: () => void
+    const states: unknown[] = []
+    let publishedBeforeDownload: unknown[] = []
+    ports.download.mockImplementationOnce(() => {
+      publishedBeforeDownload = [...states]
+      return new Promise<void>((resolve) => {
+        finish = resolve
+      })
+    })
+    updates.available('1.2.4')
+
+    await updates.checkManually()
+    expect(ports.notifyCheck).toHaveBeenCalledWith('available')
+    expect(ports.download).not.toHaveBeenCalled()
+    ports.changed.mockImplementation(() => states.push([updates.getStatus(), updates.getDownloadVersion()]))
+    const pending = updates.requestDownload()
+    updates.downloaded('1.2.4')
+    await updates.check('online')
+    await updates.requestDownload()
+    updates.request()
+
+    expect(ports.check).toHaveBeenCalledOnce()
+    expect(ports.download).toHaveBeenCalledOnce()
+    expect(ports.requestSave).not.toHaveBeenCalled()
+    expect(publishedBeforeDownload).toEqual([[0, '1.2.4']])
+    expect(updates.getStatus()).toBe(0)
+
+    finish()
+    await pending
+    expect(ports.check).toHaveBeenCalledTimes(2)
+    expect(updates.getVersion()).toBe('1.2.4')
+    expect(updates.getDownloadVersion()).toBeUndefined()
   })
 
   it('clears incomplete progress after a successful check with no ready package', async () => {
@@ -419,6 +523,7 @@ describe('desktop app updates', () => {
 
     expect(release).toHaveBeenCalledOnce()
     expect(ports.finished).toHaveBeenCalledExactlyOnceWith('Update failed. Try Restart and Install again.')
+    expect(updates.getStatus()).toBe('failed')
     expect(vi.getTimerCount()).toBe(0)
   })
 
