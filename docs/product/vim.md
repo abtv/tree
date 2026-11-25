@@ -30,6 +30,7 @@
 * When the current node is empty, Normal mode displays a non-blinking block caret at its only insertion position. This applies to plain and decorated editors, including the current-parent heading, in every appearance and in the browser version.
 * Pressing `i` or `a` enters Insert mode, where text entry and all application commands behave normally; Insert mode uses the normal thin text caret.
 * Pressing `R` enters Replace mode, where printable input overwrites existing characters and appends after the end of the node.
+* The focused text editor in Replace shows a horizontal caret under the character to be replaced, or at the insertion point if there is no character. It uses the browser's normal thin caret if the browser does not support the horizontal shape.
 * Pressing `Escape` enters Normal mode from Insert, Replace, or either Visual mode. If a completion popup is open in Insert, the first `Escape` only dismisses it and preserves Insert mode, focus, text and caret; another `Escape` with no popup enters Normal. This deliberate Vim divergence lets users dismiss suggestions without interrupting typing (§20.9, §20.12).
 * On an image-only node, `i`, `a`, or `A` followed by `Escape` with no typed text leaves the Normal caret on the sole image character.
 * Replace mode started on an active image commits the replacement text before the image; `Escape` then returns to Normal mode with the caret on the final replaced character and the image caret hidden.

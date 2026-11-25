@@ -61,7 +61,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda, except when it dismisses an open completion popup in Insert (§20.2.4).
 * Day containers accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.
 * The caret never disappears while selection moves.
-* A selected row without an editor (a day container, a parent path, a separator, an occurrence that is not the active one, or the focused-day heading) has a caret over its displayed text, drawn as in Tree: a block in Vim Normal, a thin line in Vim Insert/Replace and standard editing, and the shared selection highlight for a selection. Whole-node Visual selection is unavailable in Agenda.
+* A selected row without an editor (a day container, a parent path, a separator, an occurrence that is not the active one, or the focused-day heading) has a caret drawn over its displayed text: a block in Vim Normal, a thin line in Vim Insert/Replace and standard editing, and the shared selection highlight for a selection. Editable matches use the text editor caret (§20.2.4). Whole-node Visual selection is unavailable in Agenda.
 * Explicit pointer selection of a different row without an editor places its caret at offset zero; keyboard navigation carries its offset as above.
 * An empty text shows the caret at its end.
 

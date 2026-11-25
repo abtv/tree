@@ -828,6 +828,66 @@ test.describe('Vim editing: text editing', () => {
       await expect(editor).toHaveJSProperty('selectionStart', 6)
     })
 
+    // @requirement PRODUCT.md §20.2.4
+    test(
+      'shows an underline caret only in Replace in plain and linked editors',
+      { tag: '@linux' },
+      async ({ userDataDir }, testInfo) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              { id: 'plain', text: 'abcdef', children: [] },
+              {
+                id: 'linked',
+                text: 'abcdef',
+                links: [{ start: 1, end: 4, url: 'https://example.org' }],
+                children: [],
+              },
+              { id: 'empty', text: '', children: [] },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'plain' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const plain = node(window, 1)
+        const linked = node(window, 2)
+        const empty = node(window, 3)
+        await window.evaluate(() => {
+          document.styleSheets[0]!.insertRule('.node-input { caret-animation: manual; }')
+        })
+
+        await window.keyboard.press('l')
+        await window.keyboard.press('R')
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+        await expect(plain).toBeFocused()
+        await expect(plain).toHaveCSS('caret-shape', 'underscore')
+        await plain.screenshot({ caret: 'initial', path: testInfo.outputPath('replace-plain.png') })
+
+        await linked.click({ position: { x: 18, y: 8 } })
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+        await expect(linked).toBeFocused()
+        await expect(linked).toHaveCSS('caret-shape', 'underscore')
+        await linked.screenshot({ caret: 'initial', path: testInfo.outputPath('replace-linked.png') })
+
+        await empty.click({ position: { x: 8, y: 8 } })
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('REPLACE')
+        await expect(empty).toBeFocused()
+        await expect(empty).toHaveCSS('caret-shape', 'underscore')
+        await empty.screenshot({ caret: 'initial', path: testInfo.outputPath('replace-empty.png') })
+
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('i')
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('INSERT')
+        await expect(empty).toBeFocused()
+        await expect(empty).toHaveCSS('caret-shape', 'auto')
+        await empty.screenshot({ caret: 'initial', path: testInfo.outputPath('insert-empty.png') })
+      },
+    )
+
     test(
       'replaces text in Replace mode and repeats the completed session',
       { tag: '@linux' },
