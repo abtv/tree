@@ -1,7 +1,9 @@
 /** Yield between bounded JSON batches without retaining a task or document after completion. */
 async function yieldToInput(): Promise<void> {
-  const scheduler = (globalThis as typeof globalThis & { scheduler?: { yield(): Promise<void> } }).scheduler
-  if (scheduler !== undefined) await scheduler.yield()
+  const scheduler = globalThis.scheduler
+  // A boosted yield continuation can repeatedly run ahead of queued search work.
+  if (typeof scheduler?.postTask === 'function') await scheduler.postTask(() => undefined, { priority: 'user-visible' })
+  else if (typeof scheduler?.yield === 'function') await scheduler.yield()
   else await new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 

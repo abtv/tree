@@ -18,8 +18,7 @@ import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
 import { computeListWindow, ROW_HEIGHT_ESTIMATE } from './list-window'
-import { TagSuggestionText } from './TagSuggestionText'
-import { tagGroupLabel, tagPrefix } from '../domain/tags'
+import { GlobalSearchSuggestions } from './GlobalSearchSuggestions'
 import { SearchQueryInput } from './SearchQueryInput'
 import { initialSearchHeading } from './node-flags'
 import { AttachmentThumbnail } from './AttachmentPreview'
@@ -551,33 +550,12 @@ export function GlobalSearchPopup({
         }}
       />
       {suggestions.length > 0 && (
-        <>
-          <div className="node-search-section-title node-search-tags-heading">
-            {tagGroupLabel(tagPrefix(completionQuery)!)}
-          </div>
-          <div className="node-search-tags" role="listbox" aria-label={tagGroupLabel(tagPrefix(completionQuery)!)}>
-            {suggestions.map((name, index) => (
-              <div
-                key={name}
-                role="option"
-                data-result-divider={
-                  index < suggestions.length - 1 && index !== suggestionIndex && index + 1 !== suggestionIndex
-                    ? ''
-                    : undefined
-                }
-                aria-selected={index === suggestionIndex}
-                className={`node-search-tag${index === suggestionIndex ? ' command-row-selected' : ''}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => acceptSuggestion(index)}
-                ref={(element) => {
-                  if (index === suggestionIndex) element?.scrollIntoView({ block: 'nearest' })
-                }}
-              >
-                <TagSuggestionText name={name} query={completionQuery} />
-              </div>
-            ))}
-          </div>
-        </>
+        <GlobalSearchSuggestions
+          names={suggestions}
+          query={completionQuery}
+          selected={suggestionIndex}
+          accept={acceptSuggestion}
+        />
       )}
       {(suggestions.length === 0 || items.length > 0) && (
         <div className="node-search-section-title node-search-results-heading">

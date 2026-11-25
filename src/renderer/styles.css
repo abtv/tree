@@ -2066,6 +2066,10 @@ body.node-drag-invalid * {
   min-height: 0;
 }
 
+.node-search-tags-windowed {
+  overflow-anchor: none;
+}
+
 .node-search-results:empty {
   flex: 0;
 }

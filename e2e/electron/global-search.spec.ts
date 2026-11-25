@@ -12,7 +12,133 @@ import {
 } from './fixtures'
 import { controlPostedTasksWithClock } from '../search-clock'
 
+function isMarkerFullyVisible(row: Element): boolean {
+  const item = row.getBoundingClientRect()
+  const viewport = row.closest('[role=listbox]')!.getBoundingClientRect()
+  return item.top >= viewport.top - 1 && item.bottom <= viewport.bottom + 1
+}
+
 describeForEachEditingMode('Global Search @linux', (mode) => {
+  // @requirement PRODUCT.md §20.14.4
+  test('keeps distant wrapped marker suggestions reachable with bounded rows', async ({ userDataDir }, testInfo) => {
+    const last = `#z-last-${'wrap-'.repeat(15)}end`
+    const unbroken = `#y${'x'.repeat(146)}`
+    const names = [
+      ...Array.from({ length: 80 }, (_, i) => `#project_${String(i).padStart(3, '0')}`),
+      `${unbroken}a`,
+      `${unbroken}b`,
+      last,
+    ]
+    seedDocument(userDataDir, {
+      document: {
+        roots: names.map((name, index) => ({ id: `n${index}`, text: `Task ${name}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 500, height: 640 })
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const input = window.getByRole('searchbox')
+    const list = window.getByRole('listbox', { name: 'Tags', exact: true })
+    const selected = list.getByRole('option', { selected: true })
+    await expect(editor).toBeFocused()
+    await window.keyboard.press('Meta+;')
+    await input.fill('#')
+    await expect(selected).toHaveText(names[0]!)
+    const firstHeight = (await selected.boundingBox())!.height
+
+    expect(await list.getByRole('option').count()).toBeLessThanOrEqual(16)
+    await input.press('ArrowUp')
+    await expect(selected).toHaveText(last)
+    await expect(selected).toHaveAttribute('aria-posinset', String(names.length))
+    await expect(selected).toHaveAttribute('aria-setsize', String(names.length))
+    await expect.poll(() => selected.evaluate(isMarkerFullyVisible)).toBe(true)
+    expect((await selected.boundingBox())!.height).toBeGreaterThan(firstHeight)
+    await window.screenshot({ path: testInfo.outputPath(mode.screenshotName('global-marker-window-end.png')) })
+    await input.press('ArrowUp')
+    await expect(selected).toHaveText(`${unbroken}b`)
+    const horizontalTravel = await list.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth
+      return element.scrollLeft
+    })
+    expect(horizontalTravel).toBeGreaterThan(0)
+    await window.screenshot({ path: testInfo.outputPath(mode.screenshotName('global-marker-horizontal-end.png')) })
+    await expect
+      .poll(() =>
+        selected.evaluate((row) => {
+          const tail = row.lastChild as Text
+          const range = document.createRange()
+          range.setStart(tail, tail.length - 1)
+          range.setEnd(tail, tail.length)
+          const letter = range.getBoundingClientRect()
+          const viewport = row.closest('[role=listbox]')!.getBoundingClientRect()
+          return Math.max(viewport.left - letter.left, letter.right - viewport.right)
+        }),
+      )
+      .toBeLessThanOrEqual(1)
+    await list.evaluate((element) => (element.scrollLeft = 0))
+    await input.press('ArrowDown')
+    await expect(selected).toHaveText(last)
+    await input.press('ArrowDown')
+    await expect(selected).toHaveText(names[0]!)
+
+    await list.evaluate((element) => (element.scrollTop = element.scrollHeight))
+
+    const lastRow = list.getByRole('option', { name: last, exact: true })
+    await expect(lastRow).toBeInViewport()
+    await expect(input).toBeFocused()
+    await lastRow.click()
+    await expect(input).toHaveValue(last)
+    await expect(input).toBeFocused()
+    await input.press('Escape')
+    await expect(editor).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.14.4
+  test('keeps the selected suggestion visible when wider names wrap on resize', async ({ userDataDir }, testInfo) => {
+    const anchors = Array.from({ length: 5 }, (_, index) => `#anchor-${index}-${'wrap-'.repeat(16)}end`)
+    const names = [...anchors, '#chosen', ...Array.from({ length: 75 }, (_, index) => `#project_${index}`)]
+    seedDocument(userDataDir, {
+      document: {
+        roots: names.map((name, index) => ({ id: `n${index}`, text: `Task ${name}`, children: [] })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'n0' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowBounds(app, { width: 1200, height: 640 })
+    const input = window.getByRole('searchbox')
+    const list = window.getByRole('listbox', { name: 'Tags', exact: true })
+    const selected = list.getByRole('option', { selected: true })
+    const first = list.getByRole('option', { name: anchors[0]!, exact: true })
+    await window.keyboard.press('Meta+;')
+    await input.fill('#')
+    await expect(first).toBeVisible()
+    const wide = (await list.boundingBox())!.width
+    const firstHeight = (await first.boundingBox())!.height
+    for (let index = 0; index < 5; index += 1) await input.press('ArrowDown')
+    await expect(selected).toHaveText('#chosen')
+    const selectedIsVisible = () => selected.evaluate(isMarkerFullyVisible)
+    await expect.poll(selectedIsVisible).toBe(true)
+
+    await setMainWindowBounds(app, { width: 640, height: 640 })
+    await expect.poll(async () => (await list.boundingBox())!.width).toBeLessThan(wide - 100)
+    await expect.poll(async () => (await first.boundingBox())!.height).toBeGreaterThan(firstHeight)
+
+    await expect.poll(selectedIsVisible).toBe(true)
+    await expect(input).toBeFocused()
+    await window.screenshot({ path: testInfo.outputPath(mode.screenshotName('global-marker-narrowed.png')) })
+
+    await list.evaluate((element) => (element.scrollTop = element.scrollHeight))
+    const end = list.getByRole('option', { name: '#project_9', exact: true })
+    await expect(end).toBeInViewport()
+    await setMainWindowBounds(app, { width: 1200, height: 640 })
+
+    await expect.poll(async () => (await list.boundingBox())!.width).toBeGreaterThan(wide - 1)
+    await expect(end).toBeInViewport()
+    await expect(selected).toHaveText('#chosen')
+    await expect.poll(selectedIsVisible).toBe(false)
+  })
+
   // @requirement PRODUCT.md §20.14
   // @requirement PRODUCT.md §20.14.2
   test('uses the enlarged viewport limits while keeping short result lists compact', async ({ userDataDir }) => {

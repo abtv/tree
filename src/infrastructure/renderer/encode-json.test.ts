@@ -1,6 +1,23 @@
 import { expect, it, vi } from 'vitest'
 import { encodeJson } from './encode-json'
 
+it('queues encoding continuations alongside pending interactive tasks', async () => {
+  const yieldTask = vi.fn(async () => undefined)
+  const postTask = vi.fn(async (callback: () => void) => callback())
+  vi.stubGlobal('scheduler', { yield: yieldTask, postTask })
+  const state = Array.from({ length: 128 }, () => 'Notes')
+  let tick = 0
+  try {
+    const encoded = await encodeJson(state, undefined, () => (tick += 3))
+
+    expect(encoded).toBe(JSON.stringify(state))
+    expect(postTask).toHaveBeenCalledWith(expect.any(Function), { priority: 'user-visible' })
+    expect(yieldTask).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
 it.each([true, false])('yields through the default scheduler (scheduler available=%s)', async (available) => {
   vi.useFakeTimers()
   let tick = 0
