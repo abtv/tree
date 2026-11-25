@@ -227,6 +227,18 @@ describe('Normal-mode Leader assembly', () => {
     expect(state.pending).toBeUndefined()
   })
 
+  it('starts a fresh Leader when Space arrives after the deadline', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+
+    const restart = advanceVimLeader(state, ' ', false, 2_001)
+    const result = advanceVimLeader(state, ' ', false, 2_002)
+
+    expect(restart).toBe('consumed')
+    expect(result).toBe('global-search')
+    expect(state.pending).toBeUndefined()
+  })
+
   it('accepts a continuation exactly two seconds later', () => {
     const state = createVimCommandState()
     advanceVimLeader(state, ' ', false, 0)
