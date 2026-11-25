@@ -1,6 +1,6 @@
 import type { NodeResult } from '../application/node-result'
 import { hasGroupHeading } from './global-search-session'
-import { computeListWindow, type ListWindow } from './list-window'
+import { computeListWindow, type ListWindow, type OffsetLookup } from './list-window'
 
 const MOUNTED_ROW_LIMIT = 40
 const OVERSCAN_ENTRIES = 2
@@ -11,7 +11,7 @@ export const SEARCH_RESULT_VIEWPORT_ROWS = MOUNTED_ROW_LIMIT - 1 - 2 - 2
 
 export function computeSearchResultWindow(
   items: readonly NodeResult[],
-  offsets: ArrayLike<number>,
+  offsets: OffsetLookup,
   viewportStart: number,
   viewportHeight: number,
   selected: number,

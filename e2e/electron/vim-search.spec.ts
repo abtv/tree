@@ -380,6 +380,44 @@ test('navigates beyond capped counts and mounts highlights after scrolling', asy
   await closeApp(app)
 })
 
+test('moves the active search highlight without replacing unchanged linked fragments', async ({ userDataDir }) => {
+  const prefix = 'link https note; link '
+  const url = 'https://example.test'
+  const text = prefix + url
+  seedDocument(userDataDir, {
+    document: {
+      roots: [{ id: 'one', text, links: [{ start: prefix.length, end: text.length, url }], children: [] }],
+    },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const editor = window.locator('[data-node-id="one"] .node-input')
+  await window.keyboard.press('/')
+  const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+  await prompt.fill('link https')
+  await expect(window.locator('.search-count')).toHaveText('2')
+  await prompt.press('Enter')
+  await expect(editor.locator('a .search-match-current')).toHaveText('https')
+  const linkedFragment = await editor.locator('a .search-match-current').evaluateHandle((span) => span)
+
+  await window.keyboard.press('n')
+
+  await expect(editor.locator('.search-match-current')).toHaveCount(1)
+  await expect(editor.locator('.search-match-current')).toHaveText('link https')
+  expect(
+    await linkedFragment.evaluate((span) => span.isConnected && !span.classList.contains('search-match-current')),
+  ).toBe(true)
+  await expect(editor).toBeFocused()
+  await expect(editor).toHaveText(text)
+
+  await pressShifted(window, 'N')
+
+  await expect(editor.locator('a .search-match-current')).toHaveText('https')
+  await expect(editor.locator('.search-match-current')).toHaveCount(2)
+  expect(await linkedFragment.evaluate((span) => span.classList.contains('search-match-current'))).toBe(true)
+  await linkedFragment.dispose()
+})
+
 test('composes match, link and date rendering without moving rows or losing Insert text', async ({ userDataDir }) => {
   const url = 'https://example.test/apple'
   seedDocument(userDataDir, {

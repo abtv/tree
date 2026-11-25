@@ -11,10 +11,22 @@ import {
   test,
   closeApp,
 } from './fixtures'
+import type { Locator } from '@playwright/test'
 import catalog from '../../src/domain/emoji-catalog.json'
 
 function matchingShortcodes(query: string): string[] {
   return Object.keys(catalog).filter((shortcode) => new RegExp([...query].join('.*')).test(shortcode))
+}
+
+async function expectCatalogSize(popup: Locator, size: number): Promise<void> {
+  const options = popup.getByRole('option')
+  await expect(options.first()).toBeAttached()
+  const reported = await options.first().getAttribute('aria-setsize')
+  if (reported === null) await expect(options).toHaveCount(size)
+  else {
+    expect(reported).toBe(String(size))
+    expect(await options.count()).toBeLessThanOrEqual(13)
+  }
 }
 
 describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
@@ -90,7 +102,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
     const matches = matchingShortcodes('ma')
 
-    await expect(popup.getByRole('option')).toHaveCount(matches.length)
+    await expectCatalogSize(popup, matches.length)
 
     for (let index = 1; index <= matches.length; index++) {
       await window.keyboard.press('ArrowDown')
@@ -120,7 +132,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
     await window.keyboard.press('Meta+a')
     await window.keyboard.type(':')
 
-    await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+    await expectCatalogSize(popup, Object.keys(catalog).length)
 
     await window.keyboard.press('ArrowUp')
 
@@ -132,11 +144,78 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
 
     await window.keyboard.press('Meta+a')
     await window.keyboard.type(':')
-    await popup.getByRole('option').last().scrollIntoViewIfNeeded()
-    await popup.getByRole('option').last().click()
+    await popup.locator('..').evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    const last = Object.keys(catalog).at(-2)! as keyof typeof catalog
+    await popup
+      .getByRole('option')
+      .filter({ hasText: `:${last}:` })
+      .click()
 
-    await expect(input).toHaveValue(catalog[Object.keys(catalog).at(-2)! as keyof typeof catalog])
+    await expect(input).toHaveValue(catalog[last])
     await expect(input).toBeFocused()
+  })
+
+  // @requirement PRODUCT.md §20.12
+  test('keeps an open short suggestion list reachable when the window shrinks', async ({ userDataDir }, testInfo) => {
+    const rowsBefore = 12
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          ...Array.from({ length: rowsBefore }, (_, index) => ({
+            id: `earlier-${index}`,
+            text: `Earlier note ${index}`,
+            children: [],
+          })),
+          { id: 'n', text: 'Plan ', children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'n' },
+    })
+    const { window, app } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, { width: 800, height: 720 })
+    const input = window.getByRole('textbox', { name: `Node ${rowsBefore + 1}`, exact: true })
+    if (mode === 'vim') {
+      await window.keyboard.press('Escape')
+      await window.keyboard.press('i')
+    }
+    await setCursor(input, 5)
+
+    await window.keyboard.type(':rkt')
+    const popup = window.getByRole('listbox', { name: 'Emoji suggestions' })
+    await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('rkt').length)
+    const shell = popup.locator('..')
+    const initial = await shell.boundingBox()
+    const editorBefore = await input.boundingBox()
+    expect(initial!.y).toBeGreaterThan(editorBefore!.y)
+
+    await setMainWindowContentSize(app, { width: 800, height: 460 })
+
+    await expect.poll(() => window.evaluate(() => innerHeight)).toBeLessThan(500)
+    expect(initial!.y + initial!.height).toBeGreaterThan(await window.evaluate(() => innerHeight))
+    await expect
+      .poll(() =>
+        shell.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          return box.top >= 0 && box.bottom <= innerHeight
+        }),
+      )
+      .toBe(true)
+    expect((await input.boundingBox())!.y).toBe(editorBefore!.y)
+    expect((await shell.boundingBox())!.y).toBeLessThan(editorBefore!.y)
+    await expect(input).toBeFocused()
+    await window.keyboard.press('ArrowUp')
+    await expect
+      .poll(() =>
+        popup.getByRole('option', { selected: true }).evaluate((option) => {
+          const row = option.getBoundingClientRect()
+          const box = option.closest('.date-popup')!.getBoundingClientRect()
+          return row.top >= box.top && row.bottom <= box.bottom
+        }),
+      )
+      .toBe(true)
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('emoji-resized.png')) })
   })
 
   // @requirement PRODUCT.md §20.12
@@ -330,7 +409,7 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await setCursor(input, 16)
       await window.keyboard.type(':')
 
-      await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+      await expectCatalogSize(popup, Object.keys(catalog).length)
 
       await window.keyboard.press('ArrowUp')
 
@@ -343,11 +422,11 @@ describeForEachEditingMode('Emoji completion', ({ mode, screenshotName }) => {
       await window.screenshot({ path: testInfo.outputPath(screenshotName(`emoji-${view}-colon.png`)) })
       await window.keyboard.type('r')
 
-      await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('r').length)
+      await expectCatalogSize(popup, matchingShortcodes('r').length)
 
       await window.keyboard.type('oc')
 
-      await expect(popup.getByRole('option')).toHaveCount(matchingShortcodes('roc').length)
+      await expectCatalogSize(popup, matchingShortcodes('roc').length)
       await expect(popup.getByRole('option').nth(1)).toContainText('🚀')
 
       await window.keyboard.down('Meta')

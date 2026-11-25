@@ -3,8 +3,8 @@ import fc from 'fast-check'
 import { prepareSearch, searchText } from './text-search'
 import { searchScope } from './search-scope'
 
-function pattern(query: string) {
-  const work = prepareSearch(query)
+function pattern(query: string, nativeShortText = false) {
+  const work = prepareSearch(query, { nativeShortText })
   let step = work.next()
   while (!step.done) step = work.next()
   return step.value
@@ -49,9 +49,32 @@ it('agrees with Unicode regular-expression matching across scripts, case folds a
               end: match.index + match[0].length,
             }))
 
-      expect([...searchText(source, pattern(query))].filter((match) => match !== undefined)).toEqual(expected)
+      for (const nativeShortText of [false, true])
+        expect([...searchText(source, pattern(query, nativeShortText))].filter((match) => match !== undefined)).toEqual(
+          expected,
+        )
     }),
   )
+})
+
+it('resumes the right match offset when iterators share a native pattern', () => {
+  const prepared = pattern('.', true)
+  const first = searchText('.. .,', prepared)
+  const other = searchText('... .', prepared)
+
+  expect(first.next().value).toEqual({ start: 0, end: 1 })
+  expect(other.next().value).toEqual({ start: 0, end: 1 })
+  expect(other.next().value).toEqual({ start: 1, end: 2 })
+  expect(first.next().value).toEqual({ start: 1, end: 2 })
+  expect(first.next().value).toEqual({ start: 3, end: 4 })
+  expect(other.next().value).toEqual({ start: 2, end: 3 })
+})
+
+it('uses bounded native work for short rows but yields throughout oversized text', () => {
+  const prepared = pattern('zzz', true)
+
+  expect([...searchText('a'.repeat(480), prepared)]).toEqual([undefined])
+  expect([...searchText('a'.repeat(1000), prepared)]).toHaveLength(125)
 })
 
 it('keeps DFS identity and order after moving branches without mutating nodes', () => {

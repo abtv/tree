@@ -17,12 +17,14 @@ export interface ListWindow {
 
 export interface ListWindowOptions {
   count: number
-  offsets: ArrayLike<number>
+  offsets: OffsetLookup
   viewportStart: number
   viewportEnd: number
   overscan: number
   focusedIndex: number | undefined
 }
+
+export type OffsetLookup = ArrayLike<number> | ((index: number) => number)
 
 export function shouldWindow(count: number): boolean {
   return count > WINDOWING_THRESHOLD
@@ -76,23 +78,25 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function lowerBound(offsets: ArrayLike<number>, count: number, target: number): number {
+function lowerBound(offsets: OffsetLookup, count: number, target: number): number {
   let low = 0
   let high = count
   while (low < high) {
     const middle = (low + high) >>> 1
-    if (offsets[middle]! < target) low = middle + 1
+    const offset = typeof offsets === 'function' ? offsets(middle) : offsets[middle]!
+    if (offset < target) low = middle + 1
     else high = middle
   }
   return low
 }
 
-function upperBound(offsets: ArrayLike<number>, count: number, target: number): number {
+function upperBound(offsets: OffsetLookup, count: number, target: number): number {
   let low = 0
   let high = count
   while (low < high) {
     const middle = (low + high) >>> 1
-    if (offsets[middle]! <= target) low = middle + 1
+    const offset = typeof offsets === 'function' ? offsets(middle) : offsets[middle]!
+    if (offset <= target) low = middle + 1
     else high = middle
   }
   return low

@@ -17,13 +17,14 @@ import { GlobalSearchSession, hasGroupHeading, startsSearchGroup } from './globa
 import { OutlineRootIcon } from './LocationBar'
 import { SearchPendingLabel } from './SearchPendingLabel'
 import { useSearchDecorations } from './search-decorations'
-import { computeListWindow, computeOffsets, ROW_HEIGHT_ESTIMATE } from './list-window'
+import { computeListWindow, ROW_HEIGHT_ESTIMATE } from './list-window'
 import { TagSuggestionText } from './TagSuggestionText'
 import { tagGroupLabel, tagPrefix } from '../domain/tags'
 import { SearchQueryInput } from './SearchQueryInput'
 import { initialSearchHeading } from './node-flags'
 import { AttachmentThumbnail } from './AttachmentPreview'
 import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
+import { SearchResultLayout } from './search-result-layout'
 import { SEARCH_THUMBNAIL_BLOCK_MARGIN, searchThumbnailSize } from './search-thumbnail-layout'
 
 const RESULT_EDGE_INSET = 12
@@ -63,7 +64,12 @@ function revealResult(row: HTMLElement, first: boolean): void {
 }
 
 const NO_MATCHES: readonly TextMatch[] = []
-const NO_HEIGHTS: ReadonlyMap<string, number> = new Map()
+
+interface SearchMeasurement {
+  epoch: symbol
+  layout: SearchResultLayout
+  viewportHeight: number
+}
 
 function SearchResultText({
   text,
@@ -163,28 +169,22 @@ export function GlobalSearchPopup({
   } = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const [windowTop, setWindowTop] = useState(0)
   const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
-  const [measurement, setMeasurement] = useState<{
-    epoch: symbol
-    heights: ReadonlyMap<string, number>
-    viewportHeight: number
-  }>()
-  const heights = measurement?.epoch === measurementEpoch ? measurement.heights : NO_HEIGHTS
-  const viewportHeight = measurement?.epoch === measurementEpoch ? measurement.viewportHeight : 560
-  const layout = useMemo(
+  const [measurement, setMeasurement] = useState<SearchMeasurement>()
+  const currentMeasurement = measurement?.epoch === measurementEpoch ? measurement : undefined
+  const viewportHeight = currentMeasurement?.viewportHeight ?? 560
+  const estimatedLayout = useMemo(
     () =>
-      computeOffsets(
-        items?.map((item, index) => {
-          const measured = heights.get(item.id)
-          if (measured !== undefined) return measured
-          const heading = hasGroupHeading(items, index) ? ROW_HEIGHT_ESTIMATE : 0
-          // The first window should load images for the rows that actually fit in it.
-          const thumbnail = searchThumbnailSize(item.attachment?.width, item.attachment?.height)
-          const thumbnailHeight = thumbnail === undefined ? 0 : thumbnail.height + SEARCH_THUMBNAIL_BLOCK_MARGIN
-          return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight
-        }) ?? [],
-      ),
-    [items, heights],
+      SearchResultLayout.estimate(items?.length ?? 0, (index) => {
+        const item = items![index]!
+        const heading = hasGroupHeading(items!, index) ? ROW_HEIGHT_ESTIMATE : 0
+        // The first window should load images for the rows that actually fit in it.
+        const thumbnail = searchThumbnailSize(item.attachment?.width, item.attachment?.height)
+        const thumbnailHeight = thumbnail === undefined ? 0 : thumbnail.height + SEARCH_THUMBNAIL_BLOCK_MARGIN
+        return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight
+      }),
+    [items],
   )
+  const layout = currentMeasurement?.layout ?? estimatedLayout
   // The heading depends only on the listed items, so selection moves and scrolling do not rescan them.
   const initialHeading = useMemo(() => initialSearchHeading(items ?? []), [items])
   // Both counter numbers reserve room for every node, so no digit or separator moves while typing or navigating.
@@ -197,9 +197,7 @@ export function GlobalSearchPopup({
   const popup = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const panelSize = useRef({ width: 0, height: 0 })
-  const scrollAnchor = useRef<{ index: number; inset: number; heights: ReadonlyMap<string, number> } | undefined>(
-    undefined,
-  )
+  const scrollAnchor = useRef<{ index: number; inset: number; measurement: SearchMeasurement } | undefined>(undefined)
   const revealPending = useRef(false)
   const [revealRevision, setRevealRevision] = useState(0)
   const requestReveal = useCallback(() => {
@@ -208,7 +206,7 @@ export function GlobalSearchPopup({
   }, [])
   const restore = useRef<() => void>(() => undefined)
 
-  const resultWindow = computeSearchResultWindow(items ?? [], layout.offsets, windowTop, viewportHeight, selected)
+  const resultWindow = computeSearchResultWindow(items ?? [], layout.offsetAt, windowTop, viewportHeight, selected)
   const renderedIndices = Array.from(
     { length: resultWindow.end - resultWindow.start },
     (_, offset) => resultWindow.start + offset,
@@ -402,28 +400,36 @@ export function GlobalSearchPopup({
     const element = panel.current
     if (element === null) {
       scrollAnchor.current = undefined
+      panelSize.current = { width: 0, height: 0 }
       return
     }
     const measure = (fromObserver: boolean): void => {
       const size = { width: element.clientWidth, height: element.clientHeight }
       const viewportGrew = size.height > panelSize.current.height
       const widthChanged = panelSize.current.width !== size.width
-      let changed = widthChanged || panelSize.current.height !== size.height
+      let changed = currentMeasurement === undefined || widthChanged || panelSize.current.height !== size.height
       if (widthChanged) revealPending.current = true
       panelSize.current = size
-      const next = new Map(widthChanged ? NO_HEIGHTS : heights)
+      const base = widthChanged ? estimatedLayout : layout
+      const heights = new Map<number, number>()
       for (const row of element.querySelectorAll<HTMLElement>('.recent-node-entry')) {
-        const id = row.dataset.resultId!
+        const index = Number(row.dataset.resultIndex)
         const height = row.getBoundingClientRect().height
-        if (height > 0 && next.get(id) !== height) {
-          next.set(id, height)
+        if (height > 0 && Math.abs(base.heightAt(index) - height) > 0.001) {
+          heights.set(index, height)
           changed = true
         }
       }
       if (changed) {
+        const next = {
+          epoch: measurementEpoch,
+          layout: base.withMeasurements(heights),
+          // Until the panel has a measurable box, keep the usable viewport estimate.
+          viewportHeight: size.width === 0 && size.height === 0 ? viewportHeight : size.height,
+        }
         const anchor = computeListWindow({
           count: items?.length ?? 0,
-          offsets: layout.offsets,
+          offsets: layout.offsetAt,
           viewportStart: element.scrollTop,
           viewportEnd: element.scrollTop,
           overscan: 0,
@@ -433,10 +439,10 @@ export function GlobalSearchPopup({
           ? undefined
           : {
               index: anchor,
-              inset: element.scrollTop - (layout.offsets[anchor] ?? 0),
-              heights: next,
+              inset: element.scrollTop - layout.offsetAt(anchor),
+              measurement: next,
             }
-        const publish = () => setMeasurement({ epoch: measurementEpoch, heights: next, viewportHeight: size.height })
+        const publish = () => setMeasurement(next)
         // Recentering can expose more rows in the next paint. Mount them during resize delivery.
         if (fromObserver && viewportGrew) flushSync(publish)
         else publish()
@@ -451,9 +457,11 @@ export function GlobalSearchPopup({
   }, [
     items,
     measurement,
+    currentMeasurement,
     measurementEpoch,
-    heights,
+    estimatedLayout,
     layout,
+    viewportHeight,
     resultWindow.start,
     resultWindow.end,
     resultWindow.pinnedIndex,
@@ -462,13 +470,13 @@ export function GlobalSearchPopup({
   useLayoutEffect(() => {
     const anchor = scrollAnchor.current
     const element = panel.current
-    if (anchor?.heights !== heights) return
+    if (anchor?.measurement !== measurement) return
     scrollAnchor.current = undefined
     if (anchor !== undefined && element !== null) {
-      element.scrollTop = (layout.offsets[anchor.index] ?? 0) + anchor.inset
+      element.scrollTop = layout.offsetAt(anchor.index) + anchor.inset
       setWindowTop(element.scrollTop)
     }
-  }, [layout, heights])
+  }, [layout, measurement])
 
   useLayoutEffect(() => {
     if (!revealPending.current) return
@@ -635,11 +643,12 @@ export function GlobalSearchPopup({
                     key={item.id}
                     className="recent-node-entry"
                     data-result-id={item.id}
+                    data-result-index={index}
                     data-marked={item.marked ? '' : undefined}
                     onMouseDown={(event) => event.preventDefault()}
                     style={{
                       position: 'absolute',
-                      top: layout.offsets[index]! - windowTop,
+                      top: layout.offsetAt(index) - windowTop,
                       width: '100%',
                       boxSizing: 'border-box',
                     }}

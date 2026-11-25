@@ -12,11 +12,15 @@ export interface SearchPattern {
   readonly codes: readonly number[]
   readonly fallback: readonly number[]
   readonly sensitive: boolean
+  readonly shortLiteral?: RegExp
 }
 
 // Compared characters and prefix fallbacks between two checkpoints. One checkpoint per character made
 // generator resumption, not matching, the dominant cost of a document scan.
 const workPerCheckpoint = 8
+const nativeTextLimit = 512
+const nativeQueryLimit = 32
+const literalSource = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // Case equivalence of a pattern code point with text code points, in pages of 256 results (0 is unknown).
 // Compiling a RegExp for every compared character dominated case-insensitive scans of non-ASCII text.
@@ -45,7 +49,7 @@ function equivalent(left: number, right: number): boolean {
 
   const known = page[left & 255]!
   if (known !== 0) return known === 1
-  const source = String.fromCodePoint(left).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const source = literalSource(String.fromCodePoint(left))
   const result = new RegExp(`^(?:${source})$`, 'iu').test(String.fromCodePoint(right))
   page[left & 255] = result ? 1 : 2
   return result
@@ -66,7 +70,10 @@ function equal(left: number, right: number, sensitive: boolean): boolean {
 }
 
 /** Query preparation is incremental too: pasted queries can be unusually long. */
-export function* prepareSearch(query: string): Generator<undefined, SearchPattern> {
+export function* prepareSearch(
+  query: string,
+  options?: { nativeShortText: boolean },
+): Generator<undefined, SearchPattern> {
   const characters: string[] = []
   const codes: number[] = []
   const fallback: number[] = []
@@ -88,7 +95,11 @@ export function* prepareSearch(query: string): Generator<undefined, SearchPatter
     fallback[index] = prefix
     yield undefined
   }
-  return { characters, codes, fallback, sensitive }
+  const shortLiteral =
+    options?.nativeShortText && query.length > 0 && query.length <= nativeQueryLimit
+      ? new RegExp(literalSource(query), sensitive ? 'gu' : 'giu')
+      : undefined
+  return { characters, codes, fallback, sensitive, ...(shortLiteral && { shortLiteral }) }
 }
 
 /** The UTF-16 offset `count` code points before `end`, pairing surrogates as forward iteration does. */
@@ -104,9 +115,25 @@ function codePointsBefore(text: string, end: number, count: number): number {
 
 /** Streaming KMP avoids rescanning long near-matches and never copies the node text. */
 export function* searchText(text: string, pattern: SearchPattern): SearchWork<TextMatch> {
-  const { codes, fallback, sensitive } = pattern
+  const { codes, fallback, sensitive, shortLiteral } = pattern
   if (codes.length === 0) return
   let offset = 0
+  // The native engine avoids per-character generator work for ordinary short rows. Bound both
+  // inputs so a single step cannot run a long uninterruptible scan. Long text still streams.
+  if (shortLiteral && text.length <= nativeTextLimit) {
+    while (offset < text.length) {
+      // Another row may use the same pattern while this iterator is paused.
+      shortLiteral.lastIndex = offset
+      const found = shortLiteral.exec(text)
+      if (found === null) {
+        yield undefined
+        return
+      }
+      offset = shortLiteral.lastIndex
+      yield { start: found.index, end: offset }
+    }
+    return
+  }
   let prefix = 0
   let work = 0
   while (offset < text.length) {

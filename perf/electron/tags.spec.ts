@@ -1,6 +1,46 @@
 import { expect, launchTree, round, seedDocument, test, wideSeed } from './fixtures'
 import { recordPerfResult } from '../results'
 
+// @requirement PRODUCT.md §20.13
+// @requirement PRODUCT.md §22.1
+test('bounds the mounted broad tag list without dropping choices', async ({ userDataDir }) => {
+  const seed = wideSeed(10_001)
+  const children = (seed.document as { roots: { children: { text: string }[] }[] }).roots[0]!.children
+  children.forEach((node, index) => {
+    node.text = index === 0 ? 'Plan ' : `#project_${String(index - 1).padStart(4, '0')}`
+  })
+  seedDocument(userDataDir, seed)
+  const { window } = await launchTree(userDataDir, { vimEnabled: false })
+  const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+  await expect(input).toBeFocused()
+  await window.keyboard.press('Meta+ArrowRight')
+
+  const start = performance.now()
+  await window.keyboard.type('#')
+  const popup = window.getByRole('listbox', { name: 'Tag suggestions' })
+  const options = popup.getByRole('option')
+  await expect(options.first()).toHaveAttribute('aria-setsize', '10000')
+  const mountedAtOpen = await options.count()
+  const openMs = performance.now() - start
+
+  await window.keyboard.press('ArrowUp')
+  const selected = popup.getByRole('option', { selected: true })
+  await expect(selected).toHaveText('#project_9999')
+  await expect(selected).toHaveAttribute('aria-posinset', '10000')
+  const mountedAtEnd = await options.count()
+  await window.keyboard.press('Enter')
+
+  await expect(input).toHaveText('Plan #project_9999')
+  await expect(input).toBeFocused()
+  await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Root')
+  recordPerfResult({
+    kind: 'typing',
+    scenario: 'bare-tag-10000-windowed',
+    metrics: { openMs: round(openMs), mountedAtOpen, mountedAtEnd },
+  })
+  expect(Math.max(mountedAtOpen, mountedAtEnd)).toBeLessThanOrEqual(13)
+})
+
 for (const vimEnabled of [false, true]) {
   for (const prefix of ['#', '@', '&']) {
     // @requirement PRODUCT.md §20.13

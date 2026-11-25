@@ -20,11 +20,26 @@
   overflow-y: auto;
 }
 
-.date-popup [role='option'] {
+.date-popup-option {
   display: flex;
   gap: 14px;
   padding: 4px 8px;
   cursor: pointer;
+}
+
+.date-popup-sizing {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.date-popup-window {
+  position: relative;
+}
+.date-popup-window .date-popup-option {
+  position: absolute;
+  inset-inline: 0;
+  white-space: nowrap;
 }
 
 .date-popup-selected {

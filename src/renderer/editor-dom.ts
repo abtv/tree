@@ -275,6 +275,8 @@ export interface TextDecoration {
   start: number
   end: number
   className: string
+  /** Shared identity of the rendered fragments of a nonoverlapping local search hit. */
+  localMatch?: string
 }
 
 export const DATE_LIKE_CLASS = 'date-like-text'
@@ -326,11 +328,11 @@ export function richTextHtml(
       .join('')
   const events = decorations
     .flatMap((range, id) => [
-      { offset: range.start, id, open: true, className: range.className },
-      { offset: range.end, id, open: false, className: range.className },
+      { offset: range.start, id, open: true, range },
+      { offset: range.end, id, open: false, range },
     ])
     .sort((a, b) => a.offset - b.offset)
-  const active = new Map<number, string>()
+  const active = new Map<number, TextDecoration>()
   let eventIndex = 0
   const decoratedHtml = (start: number, end: number, includeEnd: boolean): string => {
     const result: string[] = []
@@ -338,13 +340,19 @@ export function richTextHtml(
     while (cursor < end) {
       while (eventIndex < events.length && events[eventIndex]!.offset <= cursor) {
         const event = events[eventIndex++]!
-        if (event.open) active.set(event.id, event.className)
+        if (event.open) active.set(event.id, event.range)
         else active.delete(event.id)
       }
       const next = Math.min(end, events[eventIndex]?.offset ?? end)
       const html = markedHtml(cursor, next, false)
-      const classes = [...active.values()].join(' ')
-      result.push(classes ? `<span class="${escapeHtml(classes)}">${html}</span>` : html)
+      let classes = ''
+      let localMatch = ''
+      for (const range of active.values()) {
+        if (classes) classes += ' '
+        classes += range.className
+        if (range.localMatch !== undefined) localMatch = ` data-local-match="${escapeHtml(range.localMatch)}"`
+      }
+      result.push(classes ? `<span class="${escapeHtml(classes)}"${localMatch}>${html}</span>` : html)
       cursor = next
     }
     if (start === end && includeEnd) result.push(markedHtml(start, end, true))

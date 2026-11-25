@@ -34,7 +34,9 @@ test('emoji catalog browsing stays responsive in a 10000-node Tree', async ({ us
     await window.keyboard.type(':')
 
     await expect(popup).toBeVisible()
-    await expect(popup.getByRole('option')).toHaveCount(Object.keys(catalog).length)
+    const options = popup.getByRole('option')
+    await expect(options.first()).toHaveAttribute('aria-setsize', String(Object.keys(catalog).length))
+    expect(await options.count()).toBeLessThanOrEqual(13)
 
     await window.waitForFunction(
       (count) => (window as unknown as { emojiPaints: number[] }).emojiPaints.length === count,

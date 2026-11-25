@@ -159,9 +159,10 @@ test('complete-document search keeps rendered results bounded and accepts fresh 
 // @requirement PRODUCT.md §20.14
 test('keeps full multiline result navigation and late-match reveal responsive', async ({ userDataDir }) => {
   const longText = `${'Context before the match\n'.repeat(120)}Needle at the end`
+  const count = 10_000
   seedDocument(userDataDir, {
     document: {
-      roots: Array.from({ length: 1000 }, (_, index) => ({
+      roots: Array.from({ length: count }, (_, index) => ({
         id: `n${index}`,
         text: index % 10 === 0 ? longText : `Needle ${index} ${'wrapped text '.repeat(index % 4)}`,
         children: [],
@@ -176,7 +177,7 @@ test('keeps full multiline result navigation and late-match reveal responsive', 
   const start = performance.now()
   await input.fill('Needle')
   const list = window.getByRole('listbox', { name: 'Search results' })
-  await expect(window.getByLabel('Result position')).toHaveText('1 / 1000')
+  await expect(window.getByLabel('Result position')).toHaveText(`1 / ${count}`)
   await expect
     .poll(() =>
       list.evaluate((element) => {
@@ -190,7 +191,7 @@ test('keeps full multiline result navigation and late-match reveal responsive', 
   const navigationStart = performance.now()
   for (let index = 0; index < 24; index++) {
     await window.keyboard.press('ArrowDown')
-    await expect(window.getByLabel('Result position')).toHaveText(`${index + 2} / 1000`)
+    await expect(window.getByLabel('Result position')).toHaveText(`${index + 2} / ${count}`)
   }
   const navigationMs = performance.now() - navigationStart
   await expect(input).toBeFocused()
@@ -198,7 +199,7 @@ test('keeps full multiline result navigation and late-match reveal responsive', 
   await expect(window.locator('[data-node-id="n0"] .node-input')).toHaveValue(longText)
   recordPerfResult({
     kind: 'node-search',
-    scenario: 'mixed-1000-full-text',
+    scenario: 'mixed-10000-full-text',
     samples: 24,
     metrics: { completeMs, navigationMs },
   })

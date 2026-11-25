@@ -124,3 +124,69 @@ for (const matches of [80, 5000]) {
     }
   })
 }
+
+// @requirement PRODUCT.md §22.2
+test('keeps repeated matches responsive within one densely highlighted row', async ({ userDataDir }) => {
+  const text = 'alpha rollout brief '.repeat(2500)
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'long', text, children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'long' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const input = window.getByRole('textbox', { name: 'Node 1', exact: true })
+  await window.keyboard.press('/')
+  const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+  await prompt.fill('alpha')
+  await expect(input.locator('.search-match')).toHaveCount(2500)
+  await prompt.press('Enter')
+  await expect(input).toBeFocused()
+  const ordinal = () =>
+    input.evaluate(
+      (element) =>
+        [...element.querySelectorAll('.search-match')].findIndex((span) =>
+          span.classList.contains('search-match-current'),
+        ) + 1,
+    )
+  await expect.poll(ordinal).toBe(2)
+
+  const probe = await window.evaluateHandle(() => {
+    const samples: number[] = []
+    const observe = (event: KeyboardEvent): void => {
+      if (event.key === 'n')
+        requestAnimationFrame(() => requestAnimationFrame(() => samples.push(performance.now() - event.timeStamp)))
+    }
+    document.addEventListener('keydown', observe, true)
+    return { samples, stop: () => document.removeEventListener('keydown', observe, true) }
+  })
+  const inputs = 40
+  const duration = await app.evaluate(
+    async ({ BrowserWindow }, { inputs, intervalMs }) => {
+      const contents = BrowserWindow.getAllWindows()[0]!.webContents
+      const start = performance.now()
+      for (let index = 0; index < inputs; index++) {
+        contents.sendInputEvent({ type: 'keyDown', keyCode: 'N' })
+        contents.sendInputEvent({ type: 'keyUp', keyCode: 'N' })
+        await new Promise((resolve) => setTimeout(resolve, intervalMs))
+      }
+      return performance.now() - start
+    },
+    { inputs, intervalMs },
+  )
+
+  await expect.poll(ordinal).toBe(2 + inputs)
+  await window.waitForFunction(({ samples }) => samples.length === 40, probe)
+  const samples = await probe.evaluate(({ samples, stop }) => {
+    stop()
+    return samples.toSorted((left, right) => left - right)
+  })
+  await probe.dispose()
+  await expect(input).toBeFocused()
+  await expect(input).toHaveText(text)
+  const metrics = {
+    sendIntervalMs: round(duration / inputs),
+    twoFrameP95Ms: round(samples[Math.ceil(samples.length * 0.95) - 1]!),
+  }
+  recordPerfResult({ kind: 'search', scenario: 'repeat-within-2500-hits', samples: inputs, metrics })
+  expect(metrics.sendIntervalMs).toBeLessThan(25)
+  expect(metrics.twoFrameP95Ms).toBeLessThan(110)
+})

@@ -50,6 +50,12 @@ export function useCompletion(
     owner.current.close()
     project()
   }, [project])
+  const move = useCallback((direction: -1 | 1): void => {
+    owner.current.move(direction)
+    const popup = owner.current.popup
+    // Changing the highlighted option leaves the editor text, caret and anchor geometry unchanged.
+    if (popup !== undefined) setPresentation((previous) => (previous === undefined ? previous : { ...previous, popup }))
+  }, [])
   const observe = useCallback((): void => {
     const element = input.current
     const popup = owner.current.popup
@@ -93,18 +99,21 @@ export function useCompletion(
       if (event.target instanceof Element && event.target.closest('.date-popup') !== null) return
       if (keepsEditorFocusOnPress(event, document.activeElement)) close()
     }
+    const observeEditorScroll = (event: Event): void => {
+      if (!(event.target instanceof Element) || !event.target.closest('.date-popup')) observe()
+    }
     document.addEventListener('selectionchange', observe)
     document.addEventListener('pointerdown', closeOnBlankPress, true)
     globalThis.addEventListener('blur', close)
     globalThis.addEventListener('resize', observe)
-    document.addEventListener('scroll', observe, true)
+    document.addEventListener('scroll', observeEditorScroll, true)
     return () => {
       stop()
       document.removeEventListener('selectionchange', observe)
       document.removeEventListener('pointerdown', closeOnBlankPress, true)
       globalThis.removeEventListener('blur', close)
       globalThis.removeEventListener('resize', observe)
-      document.removeEventListener('scroll', observe, true)
+      document.removeEventListener('scroll', observeEditorScroll, true)
     }
   }, [store, observe, close])
   const accept = useCallback(
@@ -255,8 +264,7 @@ export function useCompletion(
             close()
             return
           }
-          owner.current.move(event.key === 'ArrowDown' ? 1 : -1)
-          project()
+          move(event.key === 'ArrowDown' ? 1 : -1)
           return
         }
         observe()
@@ -270,8 +278,7 @@ export function useCompletion(
           }
           if (event.ctrlKey && ['n', 'p'].includes(event.key.toLowerCase())) {
             event.preventDefault()
-            owner.current.move(event.key.toLowerCase() === 'n' ? 1 : -1)
-            project()
+            move(event.key.toLowerCase() === 'n' ? 1 : -1)
             return
           }
         }
@@ -285,7 +292,7 @@ export function useCompletion(
         bindings.onKeyDown(event)
       },
     }),
-    [edit, close, observe, accept, project, mode, locked, shortcuts],
+    [edit, close, observe, accept, move, mode, locked, shortcuts],
   )
   return { presentation, accept, decorate, reconcile: observe }
 }

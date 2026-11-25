@@ -36,7 +36,9 @@ export function* prepareNodeSearch(query: string): Generator<undefined, readonly
     if (!token || seen.has(token)) return
     seen.add(token)
     const prefix = tagPrefix(token)
-    const pattern = yield* prepareSearch(prefix === undefined ? token : token.slice(1))
+    const pattern = yield* prepareSearch(prefix === undefined ? token : token.slice(1), {
+      nativeShortText: prefix === undefined,
+    })
     const valid = prefix === undefined || validNodeSearchMarker(token) !== undefined
     terms.push({ pattern, prefix, valid })
   }

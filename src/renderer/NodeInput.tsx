@@ -10,13 +10,8 @@ import type {
 } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { TreeNode } from '../domain/document'
-import {
-  getSelectionEndpoints,
-  richTextHtml,
-  setSelectionRange,
-  syncRichTextHtml,
-  type TextDecoration,
-} from './editor-dom'
+import { getSelectionEndpoints, setSelectionRange, type TextDecoration } from './editor-dom'
+import { RichTextProjection } from './rich-text-projection'
 import { useSearchDecorations } from './search-decorations'
 import { nodeFlagsLabel } from './node-flags'
 
@@ -86,17 +81,6 @@ export function NodeInput({
 }: NodeInputProps): React.JSX.Element {
   const draft = readReplaceDraft()
   const matches = useSearchDecorations(node.text, searchQuery)
-  const decorations =
-    matches.length === 0
-      ? baseDecorations
-      : [
-          ...(baseDecorations ?? []),
-          ...matches.map((match) =>
-            currentMatch?.start === match.start && currentMatch.end === match.end
-              ? { ...match, className: 'search-match search-match-current' }
-              : match,
-          ),
-        ]
   const hasLinks = (node.links?.length ?? 0) > 0
   const [composing, setComposing] = useState(false)
   const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
@@ -105,10 +89,19 @@ export function NodeInput({
   })
   // Decorated text needs the rich element. Once a row needs it, the row keeps it, so removing the last
   // decoration while typing never swaps the focused element back.
-  if (decorations !== undefined && decorations.length > 0 && !(richEditor.nodeId === node.id && richEditor.enabled))
+  if (
+    ((baseDecorations?.length ?? 0) > 0 || matches.length > 0) &&
+    !(richEditor.nodeId === node.id && richEditor.enabled)
+  )
     setRichEditor({ nodeId: node.id, enabled: true })
-  const plain = decorations === undefined && !hasLinks && !(richEditor.nodeId === node.id && richEditor.enabled)
+  const plain =
+    baseDecorations === undefined &&
+    matches.length === 0 &&
+    !hasLinks &&
+    !(richEditor.nodeId === node.id && richEditor.enabled)
   const element = useRef<HTMLElement | null>(null)
+  const projection = useRef<RichTextProjection | null>(null)
+  useLayoutEffect(() => () => projection.current?.reset(), [])
   const retainedSelection = useRef<{ anchor: number; focus: number } | undefined>(undefined)
   useLayoutEffect(() => {
     const input = element.current
@@ -131,15 +124,13 @@ export function NodeInput({
     // Commit the projection before registration/row measurement. Native input often already made
     // exactly this edit; replacing its DOM would discard selection and disturb scroll anchoring.
     if (input !== null && !plain && !composing) {
-      if (draft === undefined) {
-        syncRichTextHtml(
-          input,
-          richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
-        )
-      } else if (input.textContent !== draft) {
-        input.textContent = draft
+      if (draft === undefined)
+        (projection.current ??= new RichTextProjection()).apply(input, node, baseDecorations, matches, currentMatch)
+      else {
+        projection.current?.reset()
+        if (input.textContent !== draft) input.textContent = draft
       }
-    }
+    } else if (input !== null) projection.current?.reset()
     inputRef(input)
   }
   const className = [
