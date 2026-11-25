@@ -458,24 +458,57 @@ export function textAreaOffsetAtPoint(element: HTMLTextAreaElement, x: number, y
   return position?.offsetNode === element ? position.offset : undefined
 }
 
+/** Whether the live selection lies within one editor, so commands read the range it shows. */
+export function isSelectionWithin(element: HTMLElement): boolean {
+  if (element instanceof HTMLTextAreaElement) return true
+  const selection = element.ownerDocument.getSelection()
+  const anchor = selection?.anchorNode
+  const focus = selection?.focusNode
+  return anchor instanceof Node && focus instanceof Node && element.contains(anchor) && element.contains(focus)
+}
+
+/** A boundary's text offset in an editor, clamped to its start or end when the boundary is outside it. */
+function clampedOffsetAtBoundary(element: HTMLElement, container: Node, boundaryOffset: number): number {
+  const contents = element.ownerDocument.createRange()
+  contents.selectNodeContents(element)
+  const side = contents.comparePoint(container, boundaryOffset)
+  if (side < 0) return 0
+  if (side > 0) return nodeTextLength(element)
+  return textOffsetAtBoundary(element, container, boundaryOffset)
+}
+
 /**
- * The selection endpoints a released pointer gesture left. A macOS text area reports no selection
- * direction, so the release decides it: a press selects backward when it is released before the
- * pressed offset, which also keeps a multi-click without movement forward, as in Vim; a Shift press
- * extends to the end under the released pointer. Rich text keeps the native anchor and focus.
+ * The selection endpoints a released pointer gesture left, within the pressed editor. A browser
+ * rich field that is not editable lets a drag leave it, so an end outside it is clamped to its
+ * nearer edge. A macOS text area reports no selection direction, so the release decides it: a
+ * press selects backward when it is released before the pressed offset, which also keeps a
+ * multi-click without movement forward, as in Vim; a Shift press extends to the end under the
+ * released pointer. A release beside the text area is measured at its nearest point inside it.
  */
 export function getPointerSelectionEndpoints(
   element: HTMLElement,
   release: { x: number; y: number; pressOffset: number | undefined; extending: boolean },
 ): { anchor: number; focus: number } {
-  if (!(element instanceof HTMLTextAreaElement) || element.selectionDirection !== 'none')
-    return getSelectionEndpoints(element)
+  if (!(element instanceof HTMLTextAreaElement)) {
+    const selection = element.ownerDocument.getSelection()
+    if (!selection?.anchorNode || !selection.focusNode) return { anchor: 0, focus: 0 }
+    return {
+      anchor: clampedOffsetAtBoundary(element, selection.anchorNode, selection.anchorOffset),
+      focus: clampedOffsetAtBoundary(element, selection.focusNode, selection.focusOffset),
+    }
+  }
+  if (element.selectionDirection !== 'none') return getSelectionEndpoints(element)
   const { selectionStart: start, selectionEnd: end } = element
   if (start === end) return { anchor: start, focus: end }
 
-  const released = textAreaOffsetAtPoint(element, release.x, release.y)
   const bounds = element.getBoundingClientRect()
-  // A release outside the text area extended the selection toward the side the pointer left by.
+  const inside = (value: number, low: number, high: number): number => Math.min(Math.max(value, low + 1), high - 1)
+  const released = textAreaOffsetAtPoint(
+    element,
+    inside(release.x, bounds.left, bounds.right),
+    inside(release.y, bounds.top, bounds.bottom),
+  )
+  // When the hit test cannot reach the text area, the selection extends toward the side the pointer left by.
   const focusAtStart =
     released === undefined
       ? release.y < bounds.top || (release.y <= bounds.bottom && release.x < bounds.left)

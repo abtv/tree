@@ -414,7 +414,7 @@ export function findProductQuantityRestatements({ content, displayPath }: { cont
 }
 
 const CONFORMANCE_DOCUMENT = 'docs/VIM_CONFORMANCE.md'
-const CONFORMANCE_CITED_PATH = /^(?:src|e2e)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$/
+const CONFORMANCE_CITED_PATH = /^(?:src|e2e)\/[A-Za-z0-9_./-]+\.(?:test|spec)\.(?:ts|tsx|mts|js|jsx|mjs|cjs)$/
 const CONFORMANCE_PLACEHOLDER = /\$[A-Za-z_]\w*|%[a-zA-Z]/g
 const TEST_KEYWORD = /(?<![\w$.])(describe|it|test)\b/g
 

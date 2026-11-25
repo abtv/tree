@@ -1771,6 +1771,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       expect(await selectedText(editor)).toBe(' beta ')
 
+      // Visual `d` also writes the system clipboard.
+      await lockSystemClipboard()
       await window.keyboard.press('d')
 
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -1863,6 +1865,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       expect(await selectedText(editor)).toBe('alpha beta gamma')
 
+      await lockSystemClipboard()
       await window.keyboard.press('d')
 
       await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
@@ -1890,6 +1893,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(editor).toHaveValue('alpha beta gamma')
       expect(await selectedText(editor)).toBe('ta gamm')
 
+      await lockSystemClipboard()
       await window.keyboard.press('y')
       await window.keyboard.press('$')
       await window.keyboard.press('p')
@@ -1906,6 +1910,68 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await window.keyboard.press('x')
 
       await expect(editor).toHaveValue('alha beta gamma')
+    })
+
+    test('directs a drag released beside a wrapped text area by the text it reached', async ({ userDataDir }) => {
+      const text = 'A synthetic note with enough words to wrap over several visible lines. '.repeat(5)
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'wrapped', text, children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'wrapped' },
+      })
+      const { app, window } = await launchTree(userDataDir)
+      await setMainWindowBounds(app, { width: 1600, height: 700 })
+      const editor = node(window, 1)
+      const box = (await editor.boundingBox())!
+      const metrics = await editor.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return {
+          top: parseFloat(style.paddingTop) + parseFloat(style.borderTopWidth),
+          line: parseFloat(style.lineHeight),
+          viewport: element.ownerDocument.documentElement.clientWidth,
+        }
+      })
+      const lineY = (line: number) => box.y + metrics.top + metrics.line * (line + 0.5)
+      const beside = box.x + box.width + 20
+      const range = () =>
+        editor.evaluate((element) => [
+          (element as HTMLTextAreaElement).selectionStart,
+          (element as HTMLTextAreaElement).selectionEnd,
+        ])
+      const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+        await window.mouse.move(from.x, from.y)
+        await window.clock.install()
+        await window.clock.pauseAt(Date.now() + 60_000)
+        try {
+          await window.mouse.down()
+          await window.mouse.move(to.x, to.y, { steps: 8 })
+          await window.mouse.up()
+        } finally {
+          await window.clock.resume()
+        }
+      }
+
+      expect(beside).toBeLessThan(metrics.viewport)
+
+      // Pressed on the first line, released to the right of the text area beside the second line.
+      await drag({ x: box.x + box.width / 2, y: lineY(0) }, { x: beside, y: lineY(1) })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      const [, forwardEnd] = await range()
+
+      await window.keyboard.press('Escape')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      expect(await caretOffset(editor)).toBe(forwardEnd! - 1)
+
+      // Pressed on the second line, released beside the first line.
+      await drag({ x: box.x + box.width / 2, y: lineY(1) }, { x: beside, y: lineY(0) })
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      const [backwardStart] = await range()
+
+      await window.keyboard.press('Escape')
+
+      expect(await caretOffset(editor)).toBe(backwardStart)
     })
 
     for (const rich of [false, true]) {

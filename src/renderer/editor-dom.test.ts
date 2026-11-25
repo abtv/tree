@@ -6,6 +6,7 @@ import {
   collapseSelectionToAnchor,
   getPointerSelectionEndpoints,
   hasMultiCharacterSelection,
+  isSelectionWithin,
   nodeTextLength,
   setEditableText,
   getCaret,
@@ -790,6 +791,50 @@ describe('pointer selection endpoints', () => {
     input.setSelectionRange(3, 3)
 
     expect(getPointerSelectionEndpoints(input, release)).toEqual({ anchor: 3, focus: 3 })
+  })
+
+  it('measures a release beside a text area at its nearest point inside it', () => {
+    const input = textArea()
+    const points: number[][] = []
+    Object.defineProperty(document, 'caretPositionFromPoint', {
+      configurable: true,
+      value: (x: number, y: number) => {
+        points.push([x, y])
+        return x > 100 && x < 300 && y > 50 && y < 70 ? { offsetNode: input, offset: 2 } : { offsetNode: document.body }
+      },
+    })
+
+    // Pressed at the end of the selection and released to the right of its earlier line.
+    expect(getPointerSelectionEndpoints(input, { x: 340, y: 60, pressOffset: 6, extending: false })).toEqual({
+      anchor: 6,
+      focus: 2,
+    })
+    expect(points).toEqual([[299, 60]])
+  })
+
+  it.each([
+    ['into the next node', 'next', { anchor: 6, focus: 10 }],
+    ['into the previous node', 'previous', { anchor: 6, focus: 0 }],
+  ])('keeps a rich selection dragged %s within the pressed editor', (_case, side, expected) => {
+    const previous = document.createElement('div')
+    previous.textContent = 'before'
+    const editor = document.createElement('div')
+    editor.innerHTML = 'alpha <a href="https://example.test">beta</a>'
+    const next = document.createElement('div')
+    next.textContent = 'after'
+    document.body.append(previous, editor, next)
+    const outside = side === 'next' ? next.firstChild! : previous.firstChild!
+    const release = { x: 0, y: 0, pressOffset: undefined, extending: false }
+
+    getSelection()!.setBaseAndExtent(editor.firstChild!, 6, outside, 2)
+
+    expect(isSelectionWithin(editor)).toBe(false)
+    expect(getPointerSelectionEndpoints(editor, release)).toEqual(expected)
+
+    getSelection()!.setBaseAndExtent(editor.firstChild!, 6, editor.querySelector('a')!.firstChild!, 2)
+
+    expect(isSelectionWithin(editor)).toBe(true)
+    expect(getPointerSelectionEndpoints(editor, release)).toEqual({ anchor: 6, focus: 8 })
   })
 
   it('reads the text area offset under a point only when the point hits that text area', () => {

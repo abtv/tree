@@ -23,6 +23,7 @@ import {
   hasAttachmentCharacter,
   setCaret,
   setNormalCaret,
+  isSelectionWithin,
   setSelectionRange,
   textAreaOffsetAtPoint,
   updateDateLikeUnderline,
@@ -793,9 +794,25 @@ export function useNodeInputBindings({
     let textPress: { key: string; down: PointerEvent } | undefined
     const gestureSession = vimSession.current
     let settlementTimer: ReturnType<typeof globalThis.setTimeout> | undefined
+    // The pointer that holds the press. Another pointer's press or release, such as a finger lifted
+    // from a touch screen during a mouse drag, leaves that press alone. A mouse press, or a new
+    // primary pointer of the held pointer's type, proves that the earlier press ended even if its
+    // release was lost, so it takes over.
+    let heldPointer: { id: number; type: string } | undefined
+    const pointerIdOf = (event: Event): number | undefined =>
+      'pointerId' in event ? (event as PointerEvent).pointerId : undefined
     const onPress = (event: PointerEvent): void => {
       if (event.button !== 0) return
+      if (
+        pointerPhase === 'held' &&
+        heldPointer !== undefined &&
+        event.pointerId !== heldPointer.id &&
+        event.pointerType !== 'mouse' &&
+        !(event.isPrimary && event.pointerType === heldPointer.type)
+      )
+        return
       pointerPhase = 'held'
+      heldPointer = { id: event.pointerId, type: event.pointerType }
       const pressedNode = event.target instanceof Node ? event.target : undefined
       const pressedInput =
         pressedNode === undefined
@@ -806,7 +823,7 @@ export function useNodeInputBindings({
           ? undefined
           : {
               input: pressedInput,
-              ordinary: event.pointerType !== 'touch' && !event.metaKey && !event.ctrlKey && !event.altKey,
+              ordinary: event.pointerType === 'mouse' && !event.metaKey && !event.ctrlKey && !event.altKey,
               extending: event.shiftKey,
               // Read before the native press moves the caret: a text area reports no drag direction.
               pressOffset:
@@ -884,6 +901,9 @@ export function useNodeInputBindings({
         extending: press.extending,
         pressOffset: press.pressOffset,
       })
+      // A drag that left a browser rich field also selected other nodes. Keep the range within this
+      // node, so the mode, the highlight and the commands all use the same text.
+      if (!isSelectionWithin(input)) setSelectionRange(input, endpoints.anchor, endpoints.focus)
       const next = pointerSelectionTransition(target.text, endpoints)
       if (next.mode === 'normal') {
         if (mode !== 'visual') return
@@ -906,6 +926,9 @@ export function useNodeInputBindings({
       changeVimMode('visual')
     }
     const onRelease = (event: Event): void => {
+      // Another pointer's release leaves the held press, and its Replace click, in place; losing the
+      // window ends any press.
+      if (event.type !== 'blur' && pointerPhase === 'held' && pointerIdOf(event) !== heldPointer?.id) return
       if (
         event.type === 'blur' &&
         caretProjection.current.mode === 'replace' &&

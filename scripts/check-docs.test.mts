@@ -587,14 +587,16 @@ describe('extractTestTitles', () => {
 
 describe('parseConformanceCitations', () => {
   it('attributes names to the nearest preceding path in the same cell', () => {
-    const content = '| row | `e2e/a.spec.ts`: “one”, “two”; `src/b.test.ts`: “three” | “not a citation” |'
+    const content =
+      '| row | `e2e/a.spec.ts`: “one”, “two”; `src/b.test.ts`: “three”; `e2e/web/c.spec.mts`: “four” | “not a citation” |'
 
     expect(parseConformanceCitations(content)).toEqual({
-      citedPaths: ['e2e/a.spec.ts', 'src/b.test.ts'],
+      citedPaths: ['e2e/a.spec.ts', 'src/b.test.ts', 'e2e/web/c.spec.mts'],
       citations: [
         { path: 'e2e/a.spec.ts', name: 'one' },
         { path: 'e2e/a.spec.ts', name: 'two' },
         { path: 'src/b.test.ts', name: 'three' },
+        { path: 'e2e/web/c.spec.mts', name: 'four' },
       ],
     })
   })

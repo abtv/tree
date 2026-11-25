@@ -668,7 +668,7 @@ describe('useNodeInputBindings', () => {
     },
   )
 
-  it.each(['stationary', 'drag', 'different pointer', 'selection', 'one character', 'focus moved'] as const)(
+  it.each(['stationary', 'drag', 'selection', 'one character', 'focus moved'] as const)(
     'settles a retargeted text release with its pressed editor (%s)',
     async (release) => {
       const f = await fixture({ document: { roots: [node('node', 'first'), node('peer', 'second')] } })
@@ -690,11 +690,7 @@ describe('useNodeInputBindings', () => {
         else setCaret(destination, 1)
         if (release === 'focus moved') source.focus()
         document.body.dispatchEvent(
-          new PointerEvent('pointerup', {
-            bubbles: true,
-            pointerId: release === 'different pointer' ? 2 : 1,
-            clientX: release === 'drag' ? 50 : 12,
-          }),
+          new PointerEvent('pointerup', { bubbles: true, pointerId: 1, clientX: release === 'drag' ? 50 : 12 }),
         )
         vi.advanceTimersByTime(1)
       })
@@ -706,6 +702,40 @@ describe('useNodeInputBindings', () => {
       }
     },
   )
+
+  // @requirement PRODUCT.md §20.2.6
+  it('keeps a Replace text click pending through another pointer and settles it with its own release', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'first'), node('peer', 'second')] } })
+    const source = f.input('node')
+    const destination = f.input('peer')
+    destination.classList.add('node-input')
+    destination.parentElement!.classList.add('agenda-row')
+    destination.parentElement!.dataset.agendaKey = 'occurrence:peer'
+    source.focus()
+    f.press('R')
+
+    act(() => {
+      destination.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientX: 12 }))
+      f.bindings('peer').onMouseDown({ currentTarget: destination, button: 0, detail: 1 } as never)
+      destination.focus()
+      f.bindings('node').onBlur()
+      setCaret(destination, 1)
+      // A finger lifted from a touch screen while the mouse button is still down.
+      document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 2, clientX: 12 }))
+      vi.advanceTimersByTime(1)
+    })
+
+    expect(f.result.current.vimMode).toBe('replace')
+
+    act(() => {
+      document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, clientX: 12 }))
+      vi.advanceTimersByTime(1)
+    })
+    f.press('Q', {}, 'peer')
+
+    expect(f.result.current.vimMode).toBe('replace')
+    expect(destination.value).toBe('sQcond')
+  })
 
   it('keeps a newer Agenda press cancellable after the previous release timer runs', async () => {
     const f = await fixture({ mode: 'replace' })
@@ -3889,15 +3919,11 @@ describe('useNodeInputBindings', () => {
     const f = await fixture(),
       input = f.input()
     input.focus()
-    const press = (init: MouseEventInit, start: number, end: number): number[] => {
+    const press = (init: PointerEventInit, start: number, end: number): number[] => {
       input.setSelectionRange(start, end)
-      act(() => {
-        input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, ...init }))
-      })
+      fireEvent.pointerDown(input, { pointerType: 'mouse', pointerId: 1, ...init })
       const selection = [input.selectionStart, input.selectionEnd]
-      act(() => {
-        globalThis.dispatchEvent(new MouseEvent('pointercancel'))
-      })
+      fireEvent.pointerCancel(input, { pointerType: 'mouse', pointerId: 1 })
       return selection
     }
 
@@ -3999,6 +4025,95 @@ describe('useNodeInputBindings', () => {
   )
 
   // @requirement PRODUCT.md §20.2.6
+  it.each(['insert', 'replace'] as const)('keeps %s mode for a mouse selection', async (mode) => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] }, mode })
+    const input = f.input()
+    input.focus()
+
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    input.setSelectionRange(1, 4)
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+    expect(f.result.current.vimMode).toBe(mode)
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('keeps a mouse press through another pointer and lets a new press replace a lost one', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(0, 1)
+
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    input.setSelectionRange(1, 3)
+    // A finger touches and lifts while the mouse still drags.
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'touch', pointerId: 7 })
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'touch', pointerId: 7 })
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3])
+
+    input.setSelectionRange(1, 4)
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+
+    f.press('Escape')
+    // A touch press whose release never arrived does not hold back the next mouse press.
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'touch', pointerId: 8 })
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    input.setSelectionRange(2, 5)
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+    expect(f.result.current.vimMode).toBe('visual')
+
+    // Nor does it hold back the next primary touch, after which motions draw the block again.
+    f.press('Escape')
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'touch', pointerId: 9, isPrimary: true })
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'touch', pointerId: 10, isPrimary: true })
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'touch', pointerId: 10, isPrimary: true })
+    f.press('l')
+
+    expect(input.selectionEnd - input.selectionStart).toBe(1)
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('keeps a rich pointer selection that left the editor within it for Visual commands', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'alpha beta')] } })
+    const editor = document.createElement('div')
+    editor.tabIndex = 0
+    editor.textContent = 'alpha beta'
+    const next = document.createElement('div')
+    next.textContent = 'next'
+    document.body.append(editor, next)
+    f.bindings().inputRef(editor)
+    editor.focus()
+
+    fireEvent.pointerDown(editor, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    getSelection()!.setBaseAndExtent(editor.firstChild!, 6, next.firstChild!, 2)
+    fireEvent.pointerUp(editor, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect(getSelection()!.toString()).toBe('beta')
+
+    act(() =>
+      f.bindings().onKeyDown({
+        currentTarget: editor,
+        key: 'd',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      } as never),
+    )
+
+    expect(f.node().text).toBe('alpha ')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
   it('draws the block caret again after a context-menu press that never releases', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
@@ -4063,7 +4178,7 @@ describe('useNodeInputBindings', () => {
   })
 
   // @requirement PRODUCT.md §20.2.6
-  it('keeps the mode and selection for modified, touch, cancelled and outside presses', async () => {
+  it('keeps the mode and selection for modified, touch, pen, cancelled and outside presses', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
     input.focus()
@@ -4079,6 +4194,7 @@ describe('useNodeInputBindings', () => {
     expect(gesture({ ctrlKey: true })).toEqual(['normal', 1, 4])
     expect(gesture({ altKey: true })).toEqual(['normal', 1, 4])
     expect(gesture({ pointerType: 'touch' })).toEqual(['normal', 1, 4])
+    expect(gesture({ pointerType: 'pen' })).toEqual(['normal', 1, 4])
     expect(gesture({}, 'cancel')).toEqual(['normal', 1, 4])
     expect(gesture({}, 'up', document.body)).toEqual(['normal', 1, 4])
 

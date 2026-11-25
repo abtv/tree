@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import {
   expect,
   launchTree,
+  lockSystemClipboard,
   readPersisted,
   seedDocument,
   setAgendaToday,
@@ -516,6 +517,8 @@ test('enters character Visual from a pointer drag in an Agenda editor', async ({
   await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
   expect(await selected()).toBe('epsilon')
 
+  // Visual `d` also writes the system clipboard.
+  await lockSystemClipboard()
   await window.keyboard.press('d')
 
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
