@@ -88,6 +88,7 @@ export interface NodeInputBindingsResult {
   restoreSearchFocus: () => void
   completionPopup: CompletionPopupPresentation | undefined
   acceptCompletion: (index: number) => void
+  composing: boolean
   vimTextCommandState: VimTextCommandState
   bindings: (node: TreeNode) => NodeInputBindings
   dragFreeze: NodeDragCaretFreeze
@@ -1246,6 +1247,7 @@ export function useNodeInputBindings({
     bindings,
     dragFreeze,
     setVimEditing,
+    composing,
     vimTextCommandState,
     completionPopup: completion.presentation,
     acceptCompletion: completion.accept,

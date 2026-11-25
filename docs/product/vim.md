@@ -302,3 +302,18 @@ Normal mode also supports:
 * Application shortcuts using modifier keys retain their existing behavior.
 * Vim handling is suspended during native text composition.
 * Reading a text selection's offsets preserves its endpoints and direction, including backward selections in rich text editors.
+
+#### 20.2.32 Leader Commands
+
+In Vim Normal mode, `Space` is Tree's Leader. These sequences work when focus is on a Tree node editor or an Agenda editor or row:
+
+* `<Leader><Leader>` opens Global Search (§20.14).
+* `<Leader>tm` toggles the selected node's mark (§2.7).
+* `<Leader>ts` toggles the selected node's star (§2.6).
+* `<Leader>tt` selects the next Appearance choice by name: Automatic → Dark → Gray → Light → White → Automatic. It uses the same saved setting as View > Appearance (§20.5).
+
+Mark and star have the same target and availability as the corresponding command-panel actions (§20.2.30). Leader commands do not enter the command-panel history or replace the edit remembered for dot repeat.
+
+Press the keys separately. Key auto-repeat does not advance a sequence or extend its deadline. If more than two seconds pass between presses, the unfinished sequence is discarded and the next key is handled normally. An unmatched continuation cancels the sequence and is discarded with it. For example, `Space a` and `Space t a` do nothing when pressed within the timeout, but `Space a t` leaves Vim waiting for the character after an ordinary `t`. Escape, a pointer press, or loss of editor focus also cancels an unfinished sequence.
+
+Leader starts only when no Vim command is pending, so a command such as `f` or `r` can still take a space as its character. Outside Normal mode, in popups, and on other controls, Space retains its existing behavior.

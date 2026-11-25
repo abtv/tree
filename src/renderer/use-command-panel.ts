@@ -3,6 +3,7 @@ import { emptyMenuCommands, type MenuCommandSource } from '../application/menu-c
 import {
   availableCommands,
   matchCommands,
+  nextAppearance,
   normalizeCommandHistory,
   rememberCommand,
   type ApplicationCommand,
@@ -52,6 +53,7 @@ export function useCommandPanel(options: {
   const [message, setMessage] = useState<string>()
   const [history, setHistory] = useState<string[]>([])
   const [appearance, setAppearance] = useState<CommandAppearance>('system')
+  const appearanceCycle = useRef(Promise.resolve())
   const restore = useRef<() => void>(() => undefined)
   const inputRef = useRef<HTMLInputElement>(null)
   const bindInput = useCallback((element: HTMLInputElement | null): void => {
@@ -103,6 +105,19 @@ export function useCommandPanel(options: {
     setOpen(false)
     restore.current()
   }, [])
+
+  const applyAppearance = useCallback(async (value: CommandAppearance): Promise<void> => {
+    await window.treeApi.setAppearance(value)
+    setAppearance(value)
+  }, [])
+
+  const cycleAppearance = useCallback((): void => {
+    // Read the latest choice, including native menu changes. Consecutive mappings must each
+    // advance from the last completed write, not from a render or a stale preference read.
+    appearanceCycle.current = appearanceCycle.current
+      .then(async () => applyAppearance(nextAppearance(await window.treeApi.getAppearance())))
+      .catch((error: unknown) => store.reportError(error))
+  }, [applyAppearance, store])
 
   const showAgenda = useCallback(async () => {
     if (view === 'agenda') return
@@ -169,10 +184,7 @@ export function useCommandPanel(options: {
               await window.treeApi.setAlwaysOnTop(value)
               setAlwaysOnTop(value)
             },
-            setAppearance: async (value) => {
-              await window.treeApi.setAppearance(value)
-              setAppearance(value)
-            },
+            setAppearance: applyAppearance,
           },
           { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked },
         )
@@ -201,6 +213,7 @@ export function useCommandPanel(options: {
       setAlwaysOnTop,
       applyVimEnabled,
       applyLineNumbers,
+      applyAppearance,
       lineNumbers,
       vimEnabled,
       view,
@@ -329,6 +342,7 @@ export function useCommandPanel(options: {
   }, [open, close])
 
   return {
+    cycleAppearance,
     menuViewCommands,
     showAgenda,
     showTree,

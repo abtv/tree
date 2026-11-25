@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { VimFindCommand, VimPendingCommand, VimRepeatChange } from './vim-keyboard-types'
 import {
+  advanceVimLeader,
   appendVimCount,
   beginVimCharacter,
   beginStructuralChildOpen,
@@ -163,6 +164,57 @@ describe('pending command input', () => {
 
     expect(takeVimCharacter(state, '0')).toEqual({ kind: 'replace', count: 2, character: '0' })
     expect(state.lastFind).toBe(find)
+  })
+})
+
+// @requirement PRODUCT.md §20.2.32
+describe('Normal-mode Leader assembly', () => {
+  it.each([
+    [[' ', ' '], 'global-search'],
+    [[' ', 't', 'm'], 'toggle-mark'],
+    [[' ', 't', 's'], 'toggle-star'],
+    [[' ', 't', 't'], 'cycle-appearance'],
+  ] as const)('assembles %j as exactly one %s command', (keys, result) => {
+    const state = createVimCommandState()
+    state.lastChange = change
+
+    const results = keys.map((key) => advanceVimLeader(state, key, false))
+
+    expect(results).toEqual([...keys.slice(1).map(() => 'consumed'), result])
+    expect(state.pending).toBeUndefined()
+    expect(state.lastChange).toBe(change)
+  })
+
+  it.each([
+    ['Escape', 'leader'],
+    ['x', 'leader-toggle'],
+  ] as const)('cancels the unfinished sequence with %s and consumes the key (%s)', (key, prefix) => {
+    const state = createVimCommandState()
+    state.pending = { prefix, count: '', motionCount: '' }
+
+    expect(advanceVimLeader(state, key, false)).toBe('consumed')
+    expect(advanceVimLeader(state, 't', false)).toBeUndefined()
+  })
+
+  it.each(['f', 'r'] as const)('leaves a literal space available to %s', (awaiting) => {
+    const state = createVimCommandState()
+    state.pending = { awaiting, count: '', motionCount: '' }
+
+    expect(advanceVimLeader(state, ' ', false)).toBeUndefined()
+    expect(state.pending).toMatchObject({ awaiting })
+  })
+
+  it('does not advance a mapping on a repeated keydown', () => {
+    const state = createVimCommandState()
+
+    expect(advanceVimLeader(state, ' ', true)).toBe('consumed')
+    expect(state.pending).toBeUndefined()
+    advanceVimLeader(state, ' ', false)
+    expect(advanceVimLeader(state, ' ', true)).toBe('consumed')
+    advanceVimLeader(state, 't', false)
+    expect(advanceVimLeader(state, 't', true)).toBe('consumed')
+
+    expect(advanceVimLeader(state, 't', false)).toBe('cycle-appearance')
   })
 })
 

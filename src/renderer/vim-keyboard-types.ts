@@ -119,6 +119,14 @@ type VimPrefixPending = {
   surround?: never
 }
 
+type VimLeaderPending = {
+  prefix: 'leader' | 'leader-toggle'
+  deadline?: number | undefined
+  operator?: never
+  awaiting?: never
+  surround?: never
+}
+
 type VimCharacterPending = {
   awaiting: 'f' | 'F' | 't' | 'T' | 'r'
   operator?: VimPendingOperator
@@ -135,7 +143,14 @@ type VimSurroundPending = {
 
 /** Existing payload fields discriminate local assembly variants; undefined pending means idle. */
 export type VimPendingCommand = VimCommandCounts &
-  (VimCountPending | VimOperatorPending | VimPrefixPending | VimCharacterPending | VimSurroundPending)
+  (
+    | VimCountPending
+    | VimOperatorPending
+    | VimPrefixPending
+    | VimLeaderPending
+    | VimCharacterPending
+    | VimSurroundPending
+  )
 
 /**
  * The fold transitions the `z` keys request (`docs/PRODUCT.md` §20.2.15). The per-node commands act

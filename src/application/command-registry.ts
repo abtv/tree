@@ -10,6 +10,13 @@ export const appearanceCommands = [
 
 export type CommandAppearance = (typeof appearanceCommands)[number][1]
 
+const alphabeticalAppearances = [...appearanceCommands].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+
+export function nextAppearance(current: CommandAppearance): CommandAppearance {
+  const index = alphabeticalAppearances.findIndex(([, value]) => value === current)
+  return alphabeticalAppearances[(index + 1) % alphabeticalAppearances.length]![1]
+}
+
 export interface CommandCapabilities {
   imageToText?: boolean
   alwaysOnTop: boolean

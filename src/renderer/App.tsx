@@ -23,7 +23,8 @@ import { agendaDecorations, localToday, treeDecorations } from './date-decoratio
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
-import { clearCommandAssembly } from './vim-command-state'
+import { cancelVimLeader, clearCommandAssembly } from './vim-command-state'
+import { handleVimLeaderKey } from './vim-leader-keys'
 import { prepareVimCommand } from './vim-session-finish'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
@@ -192,6 +193,7 @@ export function App({
     bindings: nodeInputBindings,
     dragFreeze,
     setVimEditing,
+    composing,
     vimTextCommandState,
     completionPopup,
     acceptCompletion,
@@ -245,7 +247,11 @@ export function App({
     },
   })
   const searchAction = useRef<(command: EditorFindCommand) => void>(() => undefined)
-  const { bindInput: bindCommandInput, ...commandPanel } = useCommandPanel({
+  const {
+    bindInput: bindCommandInput,
+    cycleAppearance,
+    ...commandPanel
+  } = useCommandPanel({
     showAbout,
     searchCommand: (command) => {
       window.setTimeout(() => searchAction.current(command), 0)
@@ -637,7 +643,19 @@ export function App({
       onMouseDown={(event) => blankPress.press(event.nativeEvent)}
       onContextMenu={() => blankPress.contextMenu()}
       onMouseUp={() => blankPress.settle()}
-      onKeyDownCapture={() => blankPress.settle()}
+      onBlurCapture={() => cancelVimLeader(vimTextCommandState.commandState)}
+      onPointerDownCapture={() => cancelVimLeader(vimTextCommandState.commandState)}
+      onKeyDownCapture={(event) => {
+        blankPress.settle()
+        if (!vimEnabled || composing) return
+        const command = handleVimLeaderKey(event, vimTextCommandState)
+        if (command === undefined) return
+        store.search.interruptNavigation()
+        if (command === 'global-search') openGlobalSearch.current?.()
+        else if (command === 'toggle-mark') store.toggleMarkNode()
+        else if (command === 'toggle-star') store.toggleStarNode()
+        else if (command === 'cycle-appearance') cycleAppearance()
+      }}
       onKeyDown={(event) => {
         const target = event.target
         if (

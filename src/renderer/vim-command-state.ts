@@ -58,6 +58,60 @@ export function clearPending(state: VimCommandState): void {
   state.pending = undefined
 }
 
+export type VimLeaderCommand = 'global-search' | 'toggle-mark' | 'toggle-star' | 'cycle-appearance'
+
+const VIM_LEADER_TIMEOUT_MS = 2_000
+
+export function hasPendingVimLeader(state: VimCommandState): boolean {
+  return state.pending?.prefix === 'leader' || state.pending?.prefix === 'leader-toggle'
+}
+
+export function cancelVimLeader(state: VimCommandState): void {
+  if (hasPendingVimLeader(state)) clearPending(state)
+}
+
+/** Resolve Tree's Normal-mode Leader mappings without stealing a Vim command's awaited key. */
+export function advanceVimLeader(
+  state: VimCommandState,
+  key: string,
+  repeat: boolean,
+  timeStamp?: number,
+): VimLeaderCommand | 'consumed' | undefined {
+  // Expire before classifying this key so an expired prefix cannot swallow ordinary Vim input.
+  const current = state.pending
+  if (
+    (current?.prefix === 'leader' || current?.prefix === 'leader-toggle') &&
+    current.deadline !== undefined &&
+    timeStamp !== undefined &&
+    timeStamp > current.deadline
+  )
+    clearPending(state)
+
+  const pending = state.pending
+  const prefix = pending?.prefix
+  const deadline = timeStamp === undefined ? undefined : timeStamp + VIM_LEADER_TIMEOUT_MS
+  if (prefix !== 'leader' && prefix !== 'leader-toggle') {
+    if (pending !== undefined || key !== ' ') return undefined
+    if (!repeat) {
+      state.pending = { count: '', motionCount: '', prefix: 'leader', deadline }
+      state.verticalGoal = undefined
+    }
+    return 'consumed'
+  }
+  if (repeat) return 'consumed'
+  if (prefix === 'leader' && key === 't') {
+    state.pending = { count: '', motionCount: '', prefix: 'leader-toggle', deadline }
+    return 'consumed'
+  }
+
+  clearPending(state)
+  if (prefix === 'leader') return key === ' ' ? 'global-search' : 'consumed'
+  if (key === 'm') return 'toggle-mark'
+  if (key === 's') return 'toggle-star'
+  if (key === 't') return 'cycle-appearance'
+  return 'consumed'
+}
+
 /**
  * Accumulate a command or operator-motion count. Zero without a preceding count remains a motion.
  * Agenda rows deliberately recognize zero from the command count only and restart a non-operator
