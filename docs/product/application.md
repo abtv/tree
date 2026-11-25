@@ -45,9 +45,9 @@ The command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and th
 
 The menu bar has five menus, laid out as macOS applications do (§1.3):
 
-* **Tree** holds **Quit Tree** (`Cmd+Q`, §9.1).
+* **Tree** holds **About Tree** and the update commands (§1.3, §26), then **Quit Tree** (`Cmd+Q`, §9.1).
 * **File** holds **Export Notes…** and **Import Notes…** (§25).
-* **Edit** holds a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
+* **Edit** holds the Find and global Search commands (§20.2.26) and a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
 * **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with five mutually exclusive items: **Automatic**, **Light**, **Dark**, **Gray**, and **White**. The item for the current appearance choice is checked (§20.5).
 * **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
 

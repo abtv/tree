@@ -118,7 +118,7 @@ Branches that local search opens to reveal a destination (§20.2.26) belong to t
 * While such branches remain, every save, including the save on quit, stores the folds that Escape would leave. The branches stay open on screen.
 * Changing Tree location or opening Agenda closes the branches that search opened, as Escape would just before the change: only the path to the selection being left stays open.
 * A star change that switches the expansion view (§2.4) closes them in the view it leaves, as Escape does, before the new view copies its expansion.
-* An ordinary node-text click that closes search folds nothing, so rows stay under the pointer for a double-click. The branches stay open, are left out of saves, and close when one of the changes above occurs.
+* An ordinary node-text click that closes search folds nothing, so rows stay under the pointer for a double-click. The branches stay open on screen. Saves still keep only the folds that Escape would leave, and a scope change closes the other search-opened folds.
 * In Agenda, changing weeks or entering or leaving a focused day closes the days and branches that search opened, as Escape does, including in the timeline that a focused day returns to. A date edit that carries the selected occurrence to another week changes weeks too. Returning from a focused day restores the timeline's own folds (§23.15), unchanged by a search inside that day.
 
 ### 20.14 Search

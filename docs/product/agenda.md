@@ -12,7 +12,7 @@ Holding `Cmd+P` repeatedly switches views at a pace that allows consistent rende
 
 This deliberately assigns Apple's standard Print shortcut to Agenda: Tree has no printing capability and Agenda is a frequent keyboard command. The binding is application-scoped and adds no global shortcut. View > Agenda opens Agenda through the same named command as the command panel; View > Tree returns to Tree (§9.3).
 
-The location toolbar displays a calendar glyph, with no visible `Agenda` text or outline-root control. The glyph is a noninteractive location indicator. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
+The location bar displays a calendar glyph, with no visible `Agenda` text or outline-root control. The glyph is a noninteractive location indicator. Agenda selection and scrolling do not change the persisted Tree view or create files; restarting opens Tree. Agenda uses the same document, without copying nodes.
 
 ### 23.2 Projection and Dates in Text
 
@@ -138,7 +138,7 @@ Pending Cut/Paste operations apply only if their target node is still selected w
 
 ### 23.10 Structural Restrictions
 
-Agenda never creates or deletes nodes, reorders siblings, changes real parents, or moves occurrences between days. `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,` on a node, Vim `>`/`<`, `gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, and structural dot repeats do nothing and retain focus, caret, mode and text. Awaited text characters and surround delimiters still work. These restrictions do not override completion acceptance (§20.9, §20.12).
+Agenda never creates or deletes nodes, reorders siblings, or changes real parents. It has no command to move an occurrence between days. Changing a node's dates or mark can change its day membership (§23.7, §23.12). `Tab`, `Shift+Tab`, `Cmd+Backspace`, `Cmd+,` on a node, Vim `>`/`<`, `gJ`, `dj`/`dk`, `cj`/`ck`, `yj`/`yk`, `gp`/`gP`, and structural dot repeats do nothing and retain focus, caret, mode and text. Awaited text characters and surround delimiters still work. These restrictions do not override completion acceptance (§20.9, §20.12).
 
 `Backspace` on an empty direct match retains the node, including when it has no children. Removing text or dates never deletes a node automatically.
 

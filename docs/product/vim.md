@@ -14,7 +14,7 @@
 
 #### 20.2.2 Standard Editing While Vim Is Disabled
 
-* While Vim editing is disabled, the editor is a standard text editor: it has no modes and no mode indicator, every key that inserts text inserts it, `Escape` does nothing, the caret is the normal thin text caret, and the application commands and editing behavior defined outside this section apply unchanged.
+* While Vim editing is disabled, the editor is a standard text editor with no Vim modes or mode indicator. Typing inserts text and the caret is a thin line. `Escape` has no Vim action, but can still dismiss an open popup or Find or cancel a node drag under their own rules (§20.9, §20.2.26, §11). Other application commands and editing behavior apply unchanged.
 * The commands that exist only as Vim keys in this section — among them the local Vim register with `yy` and `p`, whole-node Visual mode, the Normal-mode image caret, `.` repeat, `Ctrl+d` and `Ctrl+u`, and the `z` fold keys — are unavailable; `Cmd+E` (§2.4), `Cmd+Enter` (§2.5), and `Cmd+Y` (§17.1) remain.
 
 #### 20.2.3 Switching Vim Editing On and Off
@@ -174,7 +174,7 @@ Normal mode also supports:
 * A count on `p` or `P` repeats the most recent subtree register that many times, assigning fresh IDs to every copy, and inserts all copies as one undoable command; a put rejected by the depth limit (§2.3) or by ancestry inserts no copy.
 * Plain-text `p` and `P` repeat the register value by the requested count in one edit.
 * `0` remains the beginning-of-text motion when no count is pending.
-* Counts do not extend commands across nodes for in-node text edits, and do not apply to whole-node commands (other than `gJ` in Normal mode, and `>`, `<`, `p`, `P`, `j`, `k`, `J`, and `K` in Visual mode), sibling creation, or the fold commands.
+* Counts do not extend in-node text edits across nodes. They apply to the Normal commands described above and to Normal `gJ` (§20.2.14). In whole-node Visual mode, counts apply to `>`, `<`, `p`, `P`, `j`, `k`, `J`, and `K` (§20.2.23). Sibling creation and fold commands do not take a count.
 * `u`, `Ctrl+r`, `Ctrl+o`, `Ctrl+d`, and `Ctrl+u` do not accept a count. Each of them discards a command that is still being assembled — a pending count, operator, prefix, or a command awaiting a character or delimiter — and makes no change; a command awaiting a character or delimiter takes `u` as that character instead, and the `g` prefix takes it as the `gu` operator.
 * Word-motion deletion and yanking stop at the next word start, while `cw` changes through the current word end when the caret is on non-whitespace; `$` ranges include the final character.
 * Text operators affect only the current node's text, preserving the node, children, hyperlinks outside the edited range, and attachment.

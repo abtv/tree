@@ -3,6 +3,8 @@
 Status: Accepted
 Date: 2026-10-09
 
+[ADR 0030](0030-persisted-agenda-fold-choices.md) amends the persistence decision below for explicit timeline fold choices. The remaining Agenda state stays runtime-only.
+
 ## Context
 
 The authorized Agenda initiative projects dates from the existing document. Its selection can name a day or a gap rather than a real node, and its folds must be independent of Tree expansion. The existing application store publishes one ready snapshot and coordinates document history and persistence.

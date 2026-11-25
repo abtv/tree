@@ -31,7 +31,7 @@ The product holds four standing commitments. Their details are owned elsewhere; 
 * **Vim fidelity.** While Vim editing is enabled, editing text inside a node behaves as Vim does, and every deliberate divergence is recorded with its reason. Owned by §20.2 and [VIM_CONFORMANCE.md](../VIM_CONFORMANCE.md).
 * **Responsiveness.** The application feels immediate, and ordinary editing never develops noticeable pauses. Owned by §20.4 and §22.
 
-When two of them conflict, they yield in this order: durability first, then privacy, then Vim fidelity, then responsiveness. A change must not trade a higher commitment for a lower one. Flushing every save to disk before it reports success is an example — it spends responsiveness to keep durability, and that is the intended direction.
+When two of them conflict, durability takes precedence over privacy, privacy over Vim fidelity, and Vim fidelity over responsiveness. A change must not trade a higher commitment for a lower one. Flushing every save to disk before it reports success is an example — it spends responsiveness to keep durability, and that is the intended direction.
 
 This order resolves conflicts between the four commitments. It does not rank them against any other requirement in this document, and it does not authorize weakening any of them.
 

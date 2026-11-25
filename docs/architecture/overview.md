@@ -32,7 +32,7 @@ Do not change the core technology stack without explicit Product Owner approval.
 
 Platform entry points live in `src/electron/main/`, `src/electron/preload/` and `src/web/`. Shared domain, application, renderer, contracts and infrastructure are directly under `src/`. Browser build and server tools live in `scripts/web/`.
 
-The browser entry detects Apple device identity through `src/web/device.ts` and injects the Apple or non-Apple shortcut profile (§8.7) into `App`.
+The browser entry detects Apple device identity through `src/web/device.ts` and injects the Apple or non-Apple shortcut profile (§8.7) into `App`. `src/web/services.ts` uses the same device module to decide whether Vim editing is available (PRODUCT.md §1.4). These are separate decisions: the shortcut profile does not determine the editing policy.
 
 The browser implementation under `src/web/` reuses the React renderer, application store and domain through a browser `TreeApi` adapter, using IndexedDB and Web Locks. A separate Vite build writes a standalone static package to `out/web/` with the same browser adapter and storage identity; the host serves files without a Node.js runtime. The package is published at <https://tree-editor.github.io> through the verified release pipeline (§2.3); its browser compatibility and storage constraints are in [Browser version](../../src/web/README.md).
 
@@ -210,13 +210,17 @@ The source tree has one directory per layer or process. Most modules sit directl
 src/
 ├── domain/
 ├── application/
-│   └── notes-archive/
+│   ├── notes-archive/
+│   └── test/
 ├── infrastructure/
 │   ├── archive/
 │   ├── main/
+│   │   └── notes-archive/
 │   └── renderer/
 ├── renderer/
-│   └── assets/
+│   ├── assets/
+│   │   └── fonts/
+│   └── test/
 ├── electron/
 │   ├── main/
 │   ├── native/

@@ -57,10 +57,11 @@ Chrome can install the preview or hosted site as **Tree** from its menu; see
 [installation and storage protection](../../docs/product/browser.md#241-installation-and-storage-protection).
 The production package registers a Service Worker for offline startup and updates;
 the development server does not. After the menu reports **Ready to work offline**,
-the app can restart without Internet. A complete update downloads at startup or
-reconnection and appears as **Update App** at the bottom of the menu, with a dot
-on its trigger. It saves pending edits before reloading; other Tree windows must
-be closed first. Interrupted downloads preserve the installed version. See
+the app can restart without Internet. Tree checks for updates at startup and
+after reconnecting. Once a new package is ready, **Update App** appears above
+**About Tree**, with a dot on the menu trigger. It saves pending edits before
+reloading; other Tree windows must be closed first. Interrupted downloads preserve
+the installed version. See
 [offline access and app updates](../../docs/product/browser.md#247-offline-access-and-app-updates).
 No recovery generations are added. Existing storage and save limitations below still apply.
 
@@ -77,7 +78,8 @@ same browser-local document. The database name remains `tree-browser-prototype`;
 moving source files does not migrate, clear or upload the stored document.
 Another browser, profile, hostname or port has separate storage.
 
-The ellipsis button opens Tree, Agenda, Vim Editing, appearance and Data controls.
+The ellipsis button opens Tree, Agenda, appearance and Data controls. It also shows
+Vim Editing when that option is available.
 The menu also shows local save status and whether the browser granted persistent
 storage. **About Tree** opens a modal dialog identifying the loaded build with the root `package.json`
 version and UTC build date, for example **Version 0.1.2 · Oct 29, 2026**. Local builds
@@ -139,8 +141,11 @@ Both shortcut profiles passed the macOS Chrome and Linux arm64 Chromium checks.
 Chrome assigns Ctrl+N to a new window; if it does not reach a suggestion popup,
 use the arrow keys.
 
-On iPhones, iPads and Android devices, Vim controls are hidden and standard editing is enforced;
-see [the browser requirements](../../docs/product/browser.md#14-browser-version).
+Tree hides Vim controls and uses standard editing on iPhones, iPads and browsers
+that identify themselves as Android. An Android browser requesting the desktop
+site can report a desktop identity that Tree does not classify as mobile. In that
+case Vim remains available. See
+[the browser requirements](../../docs/product/browser.md#14-browser-version).
 
 Committed edits autosave after a short idle interval. Pending Vim Replace text
 remains marked unsaved until committed. Closing with pending work warns and

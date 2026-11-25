@@ -106,8 +106,9 @@ jobs explicitly disable setup-node automatic npm caching. Upload independently f
 the immutable signer artifact and checks the signer-provided SHA-256 of each file after the
 verification job succeeds; files from the test runner never become release assets.
 These boundaries still trust source maintainers, signing tools and GitHub.
-The desktop updater downloads stable releases from the configured GitHub repository
-in the main process. It sends no notes, accepts no renderer-provided feed URLs, and
+The desktop updater checks stable releases from the configured GitHub repository
+in the main process. It downloads the package only when the user requests it.
+It sends no notes, accepts no renderer-provided feed URLs, and
 does not expand renderer network permissions. ZIP hashes and macOS code signatures
 are checked before installation. Explicit Restart and Install saves work before native staging;
 ordinary quit does not start it. GitHub release access and the Apple signing identity
@@ -270,7 +271,9 @@ files without bypassing verification.
 
 The website downloads its application resources over HTTPS from GitHub Pages.
 The desktop application runs from local resources and does not run a network
-service. Neither version uploads documents or attachments or sends telemetry.
+service. Its [updater](#desktop-distribution) contacts the configured GitHub repository.
+The [browser updater](#browser-runtime-and-storage) downloads application files from its own origin.
+Neither version uploads documents or attachments or sends telemetry.
 Local storage still permits disclosure through user-invoked features:
 
 * **Open an external hyperlink.** The website opens the destination in another
@@ -359,8 +362,8 @@ the generated static package, and source publication runs that suite in Chromium
 The release gate and real deployment acceptance checks are described in
 [Browser publication](../deployment/github-pages/README.md#failures-and-ordering).
 
-`npm run check:full` runs the shared unit/contract checks and Electron end-to-end
-and performance suites, followed by `npm audit`. It does not include the browser
-suite. A registry connectivity failure must be reported rather than treated as a
-clean audit. Between runs, a workflow audits dependencies every eight hours at high severity
+`npm run check:full` runs the shared checks, focused performance guards, and
+Electron end-to-end and performance suites, followed by `npm run audit`. It does
+not include the browser suite. A registry connectivity failure must be reported
+rather than treated as a clean audit. Between runs, a workflow audits dependencies every eight hours at high severity
 or above and Dependabot proposes updates; `docs/DEVELOPMENT.md` describes both.

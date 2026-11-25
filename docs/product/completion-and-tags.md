@@ -118,9 +118,10 @@ equal spellings within one prefix identify the same marker across dates. Typing 
 isolated `&` remains ordinary text. Email addresses and embedded prefixes are excluded
 by the same start-of-text or whitespace boundary as tags.
 
-Global Search (§20.14) accepts `@` for people and `&` for events using all the tag
-search rules: continuous case-insensitive suggestions, acceptance, complete
-case-sensitive node matches, hyperlink exclusions, and result highlighting.
+Global search (§20.14) accepts `@` for people and `&` for events using the same
+rules as tags. Suggestions match continuous fragments regardless of case
+(§20.14.4). Node results match complete recognized names using per-term smart
+case and exclude hyperlinks (§20.14.3).
 Headings are `People` and `Events`; each prefix searches only its own catalog.
 The input placeholder is `Search text, #tag, @person or &event`.
 

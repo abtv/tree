@@ -112,7 +112,7 @@ A recently displayed image appears in the first frame when its row is displayed 
 
 Clicking an attached image opens an image preview.
 
-`Cmd+Y` opens the image preview for the selected node or the editable current parent when that node has an attached image, in every Vim mode and whether or not Vim mode is enabled. When neither the selected node nor the current parent has an image, `Cmd+Y` does nothing. `Cmd+Y` is not part of Apple's standard keyboard shortcuts, so it conflicts with none of them (§1.3).
+`Cmd+Y` opens the image preview for the selected node or the editable current parent when that node has an attached image, in every Vim mode and whether or not Vim mode is enabled. When neither the selected node nor the current parent has an image, `Cmd+Y` does nothing. The shortcut is scoped to Tree, where it previews attachments rather than files. [Finder uses the same shortcut for Quick Look](https://support.apple.com/en-us/102650).
 
 The image preview is a modal overlay within the application window. It initially displays the image fitted within the available window area while preserving its aspect ratio, without enlarging it beyond its natural size.
 

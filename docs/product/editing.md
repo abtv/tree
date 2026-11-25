@@ -201,7 +201,7 @@ Finance
 Travel
 ```
 
-The application remembers the node from which the user entered, and where its row stood in the window, so that it can restore that selection and that position when navigating back (§7.1).
+The application remembers where the entered node's row stood in the window. When leaving selects that row in the same list, it restores the position (§7.1).
 
 ---
 
@@ -211,14 +211,11 @@ The application remembers the node from which the user entered, and where its ro
 
 `Cmd+,` goes back one parent level.
 
-This shortcut must remain exactly `Cmd+,`.
+This shortcut must remain exactly `Cmd+,`. It pairs with `Cmd+.` (§6.1) for entering and leaving nodes. In Tree it navigates instead of opening settings, the [usual macOS action](https://support.apple.com/en-us/102650).
 
 In Vim Normal mode, `Ctrl+o` performs the same one-level navigation.
 
-When going back:
-
-* restore the previous current parent;
-* restore selection/focus to the node from which the user entered that parent.
+When leaving, the real parent of the node being left becomes the current parent. If that node has no parent, Tree shows the root level. Tree selects and focuses the node just left. This can show a different list from the one the user entered from when entry used inline expansion or Agenda.
 
 Example:
 
@@ -281,14 +278,14 @@ At the root level:
 
 This is different from normal `Backspace`, which is ordinary text editing except when the node is empty or the caret is at its beginning (see §8.2–§8.3).
 
-After deleting a node from the currently displayed level:
+After deleting a selected node, keep the current location and choose the next selection among the deleted node's real siblings or parent:
 
 1. If a next sibling exists, select it.
-2. Otherwise select the previous sibling.
-3. If the deleted node was the only node on the current level, return to the parent.
-4. If the deleted node was the only root node, create a new empty root node.
+2. Otherwise, if a previous sibling exists, select it.
+3. If it had no sibling and has a parent, select that parent. It may be the current-parent heading or an ancestor shown by inline expansion (§2.4).
+4. If it was the only root node, create and select a new empty root node.
 
-When the deleted node is a visible descendant shown by inline expansion (§2.4) and has no sibling, its parent is selected and the location does not change; deleting a node never enters or leaves a location. The same holds for `dd`.
+The same selection and location rules apply to `dd`.
 
 When the editable current parent is focused, `Cmd+Backspace` does nothing. The current parent and its subtree can only be removed by explicitly deleting that node from its displayed parent level.
 

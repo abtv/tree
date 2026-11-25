@@ -299,15 +299,15 @@ Electron end-to-end tests live in `e2e/electron/` and run with:
 npm run test:e2e
 ```
 
-This command builds the application and runs Playwright against the production build in `out/`. Each test launches the real Electron application with an isolated `--user-data-dir`, so persistence and attachments are exercised without touching developer data. Hidden runs execute spec files in parallel across six workers locally or four in CI, and selected long-running suites distribute their independent tests across those same workers; visible runs stay serial. Parallel execution is safe because each worker cleans only its own `tree-e2e-p<pid>-` applications, the machine-global `Cmd+0` shortcut is stubbed for every launch except the serial `e2e/electron/shortcut.spec.ts`, and the shared system clipboard is serialized through a cross-process lock. The execution model and its rationale are recorded in `docs/decisions/0012-parallel-e2e-execution.md`. Use Playwright's `--workers` option when a local or CI environment needs a different concurrency limit. The complete local regression and screenshot run requires macOS with a display; the Linux functional subset runs under Xvfb as described in [Development Reference §1](DEVELOPMENT_REFERENCE.md#chromium-container-tests). Never run two Playwright invocations concurrently.
+This command builds the application and runs Playwright against the production build in `out/`. Tests use real Electron with a test-owned `--user-data-dir`, so persistence and attachments are exercised without touching developer data. A fresh process is the default; eligible hidden tests reuse a worker's application as described below. Hidden runs execute spec files in parallel across six workers locally or four in CI, and selected long-running suites distribute their independent tests across those same workers; visible runs stay serial. Parallel execution is safe because each worker cleans only its own `tree-e2e-p<pid>-` applications, the machine-global `Cmd+0` shortcut is stubbed for every launch except the serial `e2e/electron/shortcut.spec.ts`, and the shared system clipboard is serialized through a cross-process lock. The execution model and its rationale are recorded in `docs/decisions/0012-parallel-e2e-execution.md`. Use Playwright's `--workers` option when a local or CI environment needs a different concurrency limit. The complete local regression and screenshot run requires macOS with a display; the Linux functional subset runs under Xvfb as described in [Development Reference §1](DEVELOPMENT_REFERENCE.md#chromium-container-tests). Never run two Playwright invocations concurrently.
 
 Application windows are created hidden by default so the suite does not steal desktop focus. The test-owned entry `e2e/electron/electron-entry.cjs` applies hidden mode through `e2e/electron/hidden-windows.cjs` before the application bundle loads, and every launch asserts the selected window mode, so an Electron or Node upgrade that invalidates the override fails on the first launch instead of silently showing windows. Run with visible windows when observing the real UI, for example during product verification:
 
 ```bash
-TREE_E2E_VISIBLE=1 npm run test:e2e
+npm run test:e2e:visible
 ```
 
-To observe a single spec, run `TREE_E2E_VISIBLE=1 npm run test:e2e -- <spec>` (this rebuilds the application first) or `TREE_E2E_VISIBLE=1 npx playwright test -c config/testing/playwright.config.ts <spec>` (this uses the current `out/` build).
+To observe a single spec, run `npm run test:e2e:visible -- <spec>`. It rebuilds the application and passes the spec selection to Playwright.
 
 Hidden runs of `navigation.spec.ts` and eligible `tab-structure.spec.ts` cases adopt one shared application per worker through same-window reload. Navigation retains its transient native/renderer state poison regression before the next navigation case. Tab cases with nested seeds retain fresh applications; root-level collapsed seeds, native status-bar traversal and the root image-caret case are eligible. Both editing modes and all existing cases remain covered. Use `npm run test:e2e:diagnose -- --shared-reset=fresh <specs>` for matched fresh-process controls, or `--shared-reset=reload` for adopted execution. The diagnostic wrapper sets `TREE_E2E_SHARED_RESET` internally so Codex can reuse the named workflow's approval. The reset disposes the renderer, drains existing IPC work and removes document/preference data between tests, then reloads the same window. Every shared launch checks its seed, focus, editing mode and empty history before proceeding. Lifecycle, persistence, appearance, shortcut and custom launch-option tests retain fresh processes. Chromium session state and main-process caches remain shared, so this is bounded reuse rather than fresh-process isolation. The bounded rollout measurements below cover navigation, Tab structure and the eligible Vim text and navigation/selection cases.
 
@@ -398,7 +398,7 @@ Playwright enables Chromium focus emulation, so a native window blur can leave `
 
 Playwright and Vitest must not run each other's tests: Vitest excludes `e2e/**` and the `test-results/**` scratch directory where finished diagnostic specs are parked. Each Playwright target reads only its own directory under `e2e/`.
 
-Native editor context-menu behavior is covered by renderer and IPC contract tests. The macOS popup itself must be product-verified on supported macOS hardware with a display because the Playwright Electron driver cannot reliably inspect or select native menu items; use a visible suite run (`TREE_E2E_VISIBLE=1 npm run test:e2e`) when the popup must be observed. The popup only captures a small selection snapshot and does not add persistence work, tree traversal, or retained state; disk writes, interactive CPU, and memory growth remain unchanged outside the selected editing command.
+Native editor context-menu behavior is covered by renderer and IPC contract tests. The macOS popup itself must be product-verified on supported macOS hardware with a display because the Playwright Electron driver cannot reliably inspect or select native menu items; use `npm run test:e2e:visible -- <spec>` when the popup must be observed. The popup only captures a small selection snapshot and does not add persistence work, tree traversal, or retained state; disk writes, interactive CPU, and memory growth remain unchanged outside the selected editing command.
 
 ### Defect regression workflow
 
@@ -894,7 +894,7 @@ Property tests explore with a random seed on every run, locally and in CI, so ea
 
 Write every run count as `propertyRuns(base)` from `src/test/property-runs.ts`. `TREE_PROPERTY_RUNS` multiplies all of them (default 1). `npm run test:property` runs the property files at a factor of 20, and `.github/workflows/run-property-tests.yml` runs it nightly. A property whose every run builds the typed doubles passes a `maxScale` (`propertyRuns(base, maxScale)`), because Vitest retains every `vi.fn` it creates and thousands of runs exhaust the worker heap; do not create `vi.fn` inside a generated event. A property-test failure is a candidate defect: replay it, then fix it under the defect-first workflow.
 
-Mutation testing measures assertion strength, which coverage does not: Stryker changes one expression at a time in `src/domain`, `src/application`, `src/web`, `src/shared`, `src/electron`, `src/infrastructure`, and the selected pure renderer modules listed in `config/testing/stryker.config.mjs`, then reruns the tests that cover it. Renderer mutation targets have no React, DOM, or Electron imports. Tests, type declarations, and test helpers are excluded from mutation targets. A mutant that no test fails on has survived, and the mutation score is the share of mutants the tests detected.
+Mutation testing checks whether the suite catches faults that coverage alone cannot reveal: Stryker changes one expression at a time in `src/domain`, `src/application`, `src/web`, `src/shared`, `src/electron`, `src/infrastructure`, and the selected pure renderer modules listed in `config/testing/stryker.config.mjs`, then reruns the tests that cover it. Renderer mutation targets have no React, DOM, or Electron imports. Tests, type declarations, and test helpers are excluded from mutation targets. For its score, Stryker counts killed and timed-out mutants as detected and survived or uncovered mutants as undetected. Runtime and compile errors are excluded from the score. A timeout, including a test timeout reported as a kill, is not evidence that an assertion detected a defect.
 
 `npm run test:mutation` runs the full configured scope when no shard is selected. For local layer runs, use `npm run test:mutation -- --shard application`, replacing `application` with `domain`, `renderer`, `web`, `shared`, `electron`, or `infrastructure` as needed. The adapter also accepts `--shard=application`; it removes that selector and passes the remaining arguments literally to Stryker. Missing, unknown, or repeated shard arguments fail before Stryker starts. The CI selector `TREE_MUTATION_SHARD` remains supported; matching CLI/environment selectors are accepted and conflicting selectors fail. The adapter preserves Stryker's exit status, including a failed score threshold, and returns a nonzero status if the child cannot launch or is interrupted.
 
@@ -912,11 +912,11 @@ Read the weekly report when the score drops. Treat a survivor as a question abou
 
 Run ordinary Vitest validation after Stryker has finished and removed its sandbox.
 The pure completion lifecycle owner `completion-controller.ts` and its recognizer adapter `completion-sources.ts` are also in the renderer mutation scope. `config/testing/stryker.config.mjs` owns the complete module list. The scheduled workflow sets `TREE_MUTATION_SHARD` to `renderer`, `web`, `shared`, `electron`, or `infrastructure`; the configuration filters that list by layer while retaining all exclusions. With the variable unset or empty, the full scope runs, including domain and application. Unknown shard names fail configuration loading. `scripts/mutation-scope.test.mts` guards that the selectable shards partition the full scope and that the workflow uses the intended scheduled subset through this selector rather than a separate module list.
-The temporary `.stryker-tmp/` tree contains copied and mutated tests, which the
-normal test configuration can collect while it exists. Read a mutant against the
-source recorded in its report, and confirm its exact expression before manually
-replaying it. Suppress a mutator only when every replacement it produces at that
-expression is equivalent. If one replacement is meaningful, keep the mutator
+The temporary `.stryker-tmp/` tree contains Stryker's working copies. The normal
+unit test configuration excludes it, and Stryker is configured to remove it on
+exit. Before replaying a mutant manually, read the source recorded in its report
+and confirm the exact expression. Suppress a mutator only when every replacement
+it produces at that expression is equivalent. If one replacement is meaningful, keep the mutator
 enabled and explain the equivalent survivor in a source comment.
 
 Preserve expression grouping when replaying a mutant. Stryker replaces a syntax
@@ -950,7 +950,7 @@ skips and recovery after main advances follow [macOS releases, Create a release]
 The combined `Release new app version` verifies the completed main validation run, SHA and
 attempt, reserves the common immutable tag, then runs independent Web and macOS branches. The Web job waits for deployment
 and verifies hosted bytes. The macOS branch reserves an owned draft, signs its installer,
-checks the application copied from that DMG on a fresh runner without signing secrets,
+checks the applications extracted from both the DMG and update ZIP on a fresh runner without signing secrets,
 and uploads the original signer artifact from a separate runner after SHA-256 verification.
 That runner publishes the complete release only after GitHub asset digests match the signer outputs.
 It does not rerun standard validation. A failed target deployment requires manual retry through the target-run link; App

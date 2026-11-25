@@ -3,6 +3,8 @@
 Status: Accepted
 Date: 2026-09-11
 
+The choice of Playwright still stands. The original platform and serial execution details below are historical. See the [current E2E instructions](../DEVELOPMENT.md#8-tests), [ADR 0012](0012-parallel-e2e-execution.md) for parallel isolation, and [ADR 0021](0021-worker-owned-e2e-application-reuse.md) for eligible application reuse.
+
 ## Context
 
 The application is an Electron desktop app. Existing tests run domain and application logic under Vitest and render the React UI in jsdom against a fake service layer. Neither layer exercises the real Electron shell, the preload/IPC boundary, the system clipboard, or the on-disk persistence and attachment layout. Regressions in those integration points can pass all current tests.

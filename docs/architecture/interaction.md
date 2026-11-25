@@ -84,20 +84,20 @@ May include:
 
 * current parent;
 * selected node;
-* navigation stack;
-* text cursor position;
+* return positions for navigation (§10);
+* caret position;
 * focus;
 * drag state;
 * undo/redo history;
 * the mounted window of the displayed sibling list, its measured row heights, and drag auto-scroll state;
-* the inline-expansion choices of the root view and of each starred node's view.
-* Agenda origin, scope, captured Today, displayed week, occurrence selection, day folds.
+* the inline-expansion choices of the root view and of each starred node's view;
+* Tree origin, Agenda scope, captured Today, displayed week, occurrence selection, and effective day folds.
 
-Only the state explicitly required by the product specification should be persisted. The state that PRODUCT.md §16.1 lists as persisted, including the selected row's viewport position as `selectedRowTop`, is also written beside the document (§13). It remains runtime state in every other respect and never enters undo history.
+Only the state explicitly required by the product specification should be persisted. The state that PRODUCT.md §16.1 lists as persisted, including the selected row's viewport position as `selectedRowTop`, is also written beside the document (§13). That persistence does not make view-state changes undoable.
 
-Exact cursor position, focus state, navigation stack, undo/redo history, and the windowed list's mounted range and height table are runtime state unless the product specification changes.
+The exact caret position, keyboard focus, return positions, undo history, and the windowed list's mounted range and height table are runtime-only.
 
-Agenda presentation is runtime-only; explicit timeline fold choices are stored separately as described in §13. The save scheduler excludes the presentation and uses its captured Tree origin location instead of a selected Agenda occurrence. It suppresses Agenda viewport measurements and preserves the stored Tree row position. Closing restores the origin cursor with a fresh focus token; Tree expansion is unchanged.
+Agenda presentation is runtime-only; explicit timeline fold choices are stored separately as described in §13. The save scheduler excludes the presentation and uses its captured Tree origin location instead of a selected Agenda occurrence. It suppresses Agenda viewport measurements and preserves the stored Tree row position. Closing restores the Tree origin caret with a fresh focus token and activates the expansion view that governs that location (§8.10).
 
 ### 9.1 Single-Owner Interaction State
 

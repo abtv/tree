@@ -130,8 +130,9 @@ sharing a writable backup through iCloud Drive can cause conflicting writers.
 
 After access setup, push the intended source commits to main. In source Actions,
 wait for **Test and build app**, then **Release new app version**. The **Publish web app**
-job waits for target **Deploy web app** and verifies hosted bytes. Its read-only job independently authenticates
-the manifest with `gh attestation verify --bundle`, enforcing source repository,
+job waits for target **Deploy web app** and verifies hosted bytes. The target
+workflow's read-only verification job independently authenticates the manifest
+with `gh attestation verify --bundle`, enforcing source repository,
 signer workflow, main ref, source digest and GitHub-hosted runner. It verifies every
 file, the source gate/run/attempt, and both current heads. A separate Pages/OIDC
 write job checks heads again and deploys only the verified artifact; it has no
@@ -151,7 +152,9 @@ Only JavaScript, CSS, PNG and font assets are accepted; HTML/SVG assets are reje
 At the root, besides `index.html`, `.nojekyll` and the exact Service Worker name `sw.js`, only the exact installable-app
 names `manifest.webmanifest`, `icon-192.png`, `icon-512.png` and
 `apple-touch-icon.png` are accepted; they are current-only, like `index.html`.
-No archive is extracted, and no transferred JavaScript is executed in CI.
+Transfer and target verification treat candidate files as data. They neither
+extract an archive nor execute transferred JavaScript. The source browser gate
+runs the built package before transfer.
 The verifier parses HTML with the locked `parse5` dependency. It checks parsed
 `src` and `href` attributes, including unquoted values and template contents;
 only HTML anchors pointing exactly to `https://github.com/abtv/tree` or
@@ -182,13 +185,14 @@ signed package makes verification fail; it does not prune the authenticated mani
 
 ## Failures and ordering
 
-The hosting workflow's source-head resolution and pre-deployment head checks read
-`main` of the public source and hosting repositories with `git ls-remote`, not
-the REST API. Git transport needs no credential and does not count against the
-anonymous REST budget described below. Earlier deployments stopped at the
-anonymous REST read of the source head; its HTTP status was not logged. Each
-read makes one attempt with a 15-second timeout, receives no token, follows no
-redirect and ignores user and system Git configuration. It accepts only output
+The hosting workflow resolves the trusted verifier checkout and runs its final
+pre-deployment head checks with `git ls-remote`. These Git reads need no credential
+and do not count against the anonymous REST budget described below. The verifier's
+separate source validation still checks the source head and run through the REST API.
+Earlier deployments stopped at the anonymous REST read of the source head without
+logging its HTTP status. Each Git read makes one attempt with a 15-second timeout,
+receives no token, follows no redirect and ignores user and system Git
+configuration. It accepts only output
 that is exactly one `refs/heads/main` line. A failed read, malformed output or a
 superseded candidate stops the job immediately; rerun the failed job after a
 temporary network failure. The deploy job reads the source head first and the

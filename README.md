@@ -18,9 +18,9 @@ To install a published release, download its `Tree-<version>-arm64.dmg`, open it
 
 Keep projects, notes, and ideas in one outline. Expand the branches you are working on and keep other details folded away.
 
-<img src="https://abtv.github.io/tree/tree-focus-dark.png" width="860" alt="Tree in the dark appearance, focused on the first meetup branch with its breadcrumb path and Vim Normal mode indicator visible.">
+<img src="https://abtv.github.io/tree/tree-focus-dark.png" width="860" alt="Tree in the dark appearance, focused on the first meetup branch with its location path and Vim Normal mode indicator visible.">
 
-The same outline, focused on “Plan the first meetup”: the node text and expanded branches are unchanged. The breadcrumb path keeps its place in the larger project visible. Here, the dark appearance and Vim Normal mode are enabled.
+The same outline, focused on “Plan the first meetup”: the node text and expanded branches are unchanged. The location path shows where it sits in the larger project. Here, the dark appearance and Vim Normal mode are enabled.
 
 <img src="https://abtv.github.io/tree/agenda-light.png" width="860" alt="Agenda in the light appearance, showing dated nodes grouped by day.">
 
@@ -44,7 +44,7 @@ The command panel keeps application commands and their shortcuts within reach. P
 * **Notes export and import.** Export notes and their images to a ZIP archive, or import an archive from either the desktop or browser version. Import replaces the current notes after confirmation.
 * **Appearances.** Choose Light, Dark, Gray, or White, or follow the system appearance.
 
-Tree has no cloud document service and sends no telemetry. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
+Tree has no cloud document service and sends no telemetry. The desktop updater and the hosted browser version download application updates without sending your notes. Opening external links, searching with Google, and using macOS Look Up can contact external services at your request; see the [Security Policy](docs/SECURITY.md#network-egress-and-content-disclosure).
 
 Detailed behavior and editing commands are described in [Product Requirements](docs/PRODUCT.md).
 

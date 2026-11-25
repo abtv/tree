@@ -122,25 +122,25 @@ Browsers may reserve Ctrl+L for their address bar; the command panel remains ava
 
 ### 2.2 Location Path
 
-A thin toolbar at the top of the application displays the current location.
+A thin location bar at the top of the application displays the current location.
 
-At the root level, the toolbar displays only an outline-root glyph representing the implicit document container. The document container itself has no visible text label.
+At the root level, the location bar displays only an outline-root glyph representing the implicit document container. The document container itself has no visible text label.
 
-Tree and Agenda use the same toolbar insets and vertically centered 18px location icons. The root glyph has a `Top level` tooltip; the calendar glyph has an `Agenda` tooltip and accessible name. Text path segments use the same `›` separator in both views.
+Tree and Agenda use the same location bar insets and vertically centered 18px location icons. The root glyph has a `Top level` tooltip; the calendar glyph has an `Agenda` tooltip and accessible name. Text path segments use the same `›` separator in both views.
 
-Below the root level, the toolbar displays a breadcrumb beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final breadcrumb segment.
+Below the root level, the bar displays the location path, beginning with the outline-root glyph and continuing through every ancestor to the current parent. The current parent is the final segment.
 
 The location path represents the current parent/location, not the selected child. The outline-root glyph and each ancestor segment are clickable navigation controls. Clicking the outline-root glyph returns to the top-level root nodes. Clicking an ancestor segment displays that ancestor's immediate children.
 
 When navigation moves to an ancestor through the location path, the direct child on the path from the destination to the previous location becomes selected and its text cursor is placed at the beginning. Clicking the current-parent segment does nothing.
 
-During a node drag, the root glyph below root level and every ancestor segment accept the dragged subtree as their last child (the last root for the glyph). The current-parent segment and the glyph at root level do not accept drops. Each segment's hit region spans its width and the toolbar's full height; an accepting segment shows the ordinary hover-surface color without animation or layout shift. Toolbar targets take precedence over row targets; toolbar whitespace is invalid, and hovering the toolbar does not auto-scroll the list. A successful drop displays the destination's children and selects the moved node.
+During a node drag, the root glyph below root level and every ancestor segment accept the dragged subtree as their last child (the last root for the glyph). The current-parent segment and the glyph at root level do not accept drops. Each segment's hit region spans its width and the bar's full height; an accepting segment shows the ordinary hover-surface color without animation or layout shift. Targets in the location bar take precedence over row targets; whitespace in the bar is invalid, and hovering the bar does not auto-scroll the list. A successful drop displays the destination's children and selects the moved node.
 
-The location toolbar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The toolbar never causes the window to scroll horizontally, regardless of path depth or segment length.
+The location bar is confined to a single line. When space is limited, shorter segments are preserved and longer segments are truncated first. A truncated segment ends with an ellipsis; its full text remains available as a tooltip. The bar never causes the window to scroll horizontally, regardless of path depth or segment length.
 
-The toolbar is sticky: it stays fixed at the top of the window while the content scrolls beneath it, and the content never shows through it. The scrollbar belongs to the content area below the toolbar and never overlaps the toolbar.
+The location bar is sticky: it stays fixed at the top of the window while the content scrolls beneath it, and the content never shows through it. The scrollbar belongs to the content area below the bar and never overlaps it.
 
-* The pin toggle sits at the right end of the status bar fixed at the bottom of the window (§20.2). When Vim editing is enabled, the mode indicator sits immediately to its left. There is no Vim editing toggle in the status bar. The toolbar does not contain the pin.
+* The pin toggle sits at the right end of the status bar fixed at the bottom of the window (§20.2). When Vim editing is enabled, the mode indicator sits immediately to its left. There is no Vim editing toggle in the status bar. The location bar does not contain the pin.
 * When enabled, the application window stays above other application windows, including after another application receives focus. The setting persists across application restarts.
 * The toggle has a visually distinct active state and a tooltip naming its current action (`Pin window on top` or `Unpin window from top`), shown above the toggle while the pointer is over it or it has keyboard focus. The tooltip is drawn by the application, because native `title` tooltips do not appear in the application window.
 * Clicking the toggle with the pointer leaves keyboard focus, the caret, and the current Vim mode in the editor; it does not focus an editor when none had focus. Focusing the toggle with `Tab` still gives it keyboard focus.
@@ -185,7 +185,7 @@ Expansion choices are kept when the location changes: entering a node shows its 
 * Every fold change in a location — the disclosure chevron, `Cmd+E`, the Vim fold commands, and the folds that Find, a drop, a shift, `o` or a put opens — changes only that location's view. At the root level, `zM` closes every fold of the root view and leaves the starred nodes' views unchanged.
 * A starred node receives its own view the first time it governs the displayed location: a copy of the view its locations would use without the star — the nearest starred ancestor's view, or the root view — limited to the node's descendants. Its rows therefore look as they would without the star.
 * When a star is removed, the node's locations use the view of its nearest starred ancestor, or the root view. If that view hides the selected node, its nearest displayed ancestor becomes selected with the caret at the beginning of its text. Undo restores the star and its view; starring the node again in the same session also restores the view. A view is saved only while its node is starred.
-* Opening and closing Agenda changes no fold choice. A star added or removed while Agenda is open, directly or by undo, selects the governing view under these rules when Agenda closes.
+* Opening and closing Agenda does not change remembered Tree fold choices. Opening Agenda closes temporary search-opened folds as specified in §20.2.31. A star added or removed while Agenda is open, directly or by undo, selects the governing view under these rules when Agenda closes.
 
 If a collapse hides the node containing the caret, the collapsing node becomes selected with its caret at the beginning of its text. Collapsing a branch that does not contain the caret leaves selection and caret unchanged.
 

@@ -21,13 +21,13 @@ The domain owns concepts such as:
 * trees;
 * node identity;
 * tree manipulation;
-* navigation state;
+* valid tree locations and location transforms;
 * sibling ordering;
 * node splitting;
-* deletion;
-* undo/redo state and operations.
+* deletion.
 
 Product rules that determine how the tree behaves belong in the domain or application layer rather than in React components.
+The application layer owns navigation state and undo/redo history (§10, §11).
 
 ---
 
@@ -119,10 +119,6 @@ pasteText
 pasteMultilineText
 attachImage
 removeAttachment
-enterNode
-leaveNode
-undo
-redo
 ```
 
 PRODUCT.md §2.3 defines behavior at the depth limit. Application transitions use `wouldExceedMaximumDepth` for subtree pastes at a sibling position. When pasting into a current parent with no children, `pasteNodeForestTransition` checks the child depth using `subtreeHeight`. A depth violation returns `{ kind: 'rejected', message: MAX_DOCUMENT_DEPTH_ERROR }` before the transition allocates IDs or changes editor state.
@@ -145,15 +141,15 @@ Navigation represents where the user currently is in the document structure.
 
 The application maintains:
 
-* current parent, which is absent at the top-level document container;
-* selected node, which may be the current parent's direct child or, through inline expansion, any of its deeper descendants whose ancestors are expanded;
-* runtime navigation history.
+* current parent, which is absent at the root level;
+* selected node, which may be the current parent itself or any node shown in the list at the current location;
+* in-memory return positions used when navigating to an ancestor (PRODUCT.md §7.1).
 
 Entering a node changes the current parent.
 
-Leaving a node restores the previous location and selection.
+Leaving a node moves up one parent level and selects the node just left (PRODUCT.md §7.1).
 
-Navigation history must not be encoded into the persistent document tree.
+Return positions are not serialized.
 
 ---
 

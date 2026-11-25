@@ -3,6 +3,8 @@
 Status: Accepted
 Date: 2026-09-13
 
+This decision concerns desktop editing commands. The minimal menu below is historical. [PRODUCT §9.3](../product/application.md#93-application-menu) owns the current native menu, and [PRODUCT §1.4](../product/browser.md#14-browser-version) defines browser keyboard paste.
+
 ## Context
 
 On macOS, Electron delivers the standard editing commands — Undo, Redo, Cut, Copy, Paste, Select All, and Delete — through the application menu. This application intentionally installs a minimal menu containing only Quit Tree. As a result, macOS does not route those commands to the renderer, and the native `copy`, `cut`, and `paste` DOM events never fire.
