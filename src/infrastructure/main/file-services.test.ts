@@ -1444,6 +1444,72 @@ describe('notes export and import support', () => {
     },
   )
 
+  it('keeps notes unchanged when the first save cannot inspect the replacement journal', async () => {
+    const { userData, directory, services, create } = await archiveServicesForTest()
+    const original = stateWithoutImage('Original')
+    const next = stateWithoutImage('Next')
+    await services.load()
+    await services.save(original)
+    const restarted = create()
+    const denied = Object.assign(new Error('journal inspection denied'), { code: 'EACCES' })
+    const journalPath = join(userData, '.notes-import', 'commit.json')
+    vi.mocked(stat).mockRejectedValueOnce(denied)
+
+    await expect(restarted.save(next)).rejects.toBe(denied)
+
+    expect(stat).toHaveBeenLastCalledWith(journalPath)
+    expect(restarted.isNotesRecoveryRequired()).toBe(true)
+    await expect(restarted.save(next)).rejects.toThrow('The notes were replaced.')
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(original)
+
+    await expect(restarted.load()).resolves.toEqual(original)
+
+    expect(restarted.isNotesRecoveryRequired()).toBe(false)
+    vi.mocked(stat).mockClear()
+    await restarted.save(next)
+
+    expect(stat).not.toHaveBeenCalledWith(journalPath)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(next)
+  })
+
+  it('rechecks for an earlier journal before replacing notes in a loaded session', async () => {
+    const { userData, directory, services } = await archiveServicesForTest()
+    const original = stateWithoutImage('Original')
+    await services.load()
+    await services.save(original)
+    const first = stateWithImage('first')
+    const firstStage = await stageImport(services, first, 'first')
+    const secondStage = await stageImport(services, stateWithImage('second'), 'second')
+    const journalPath = join(userData, '.notes-import', 'commit.json')
+    const journal = JSON.stringify({ staging: basename(firstStage), replaced: 'previous' })
+    await writeFile(journalPath, journal)
+
+    await expect(services.replaceNotes(secondStage, 'Second.zip')).rejects.toThrow('Restart Tree')
+
+    expect(services.isNotesRecoveryRequired()).toBe(true)
+    expect(await readFile(journalPath, 'utf8')).toBe(journal)
+    expect(JSON.parse(await readFile(join(directory, 'document.json'), 'utf8'))).toEqual(original)
+    await services.discardStagingDirectory(secondStage)
+    await expect(services.load()).resolves.toEqual(first)
+    expect(services.isNotesRecoveryRequired()).toBe(false)
+  })
+
+  it('does not require a restart when only abandoned-directory inspection fails', async () => {
+    const { userData, services, create } = await archiveServicesForTest()
+    const original = stateWithoutImage('Original')
+    await services.load()
+    await services.save(original)
+    const restarted = create()
+    const denied = Object.assign(new Error('staging directory inspection denied'), { code: 'EACCES' })
+    mocks.readdir.mockRejectedValueOnce(denied)
+
+    await expect(restarted.load()).rejects.toMatchObject({ cause: denied })
+
+    expect(mocks.readdir).toHaveBeenLastCalledWith(join(userData, '.notes-import'))
+    expect(restarted.isNotesRecoveryRequired()).toBe(false)
+    await expect(restarted.load()).resolves.toEqual(original)
+  })
+
   it('fails the load without changing files when the journal is damaged', async () => {
     const { userData, directory, services, create } = await archiveServicesForTest()
 
@@ -1554,6 +1620,7 @@ describe('notes export and import support', () => {
     })
 
     await expect(services.replaceNotes(staging, 'Tree Notes 2026-10-20.zip')).rejects.toThrow('interrupted')
+    expect(services.isNotesRecoveryRequired()).toBe(true)
 
     vi.mocked(rename).mockImplementation(real.rename)
 
@@ -1572,6 +1639,7 @@ describe('notes export and import support', () => {
     )
 
     await expect(services.load()).resolves.toEqual(imported)
+    expect(services.isNotesRecoveryRequired()).toBe(false)
     expect(services.takeRecoveredReplacement()).toStrictEqual({
       replacedFolder: join(dirname(directory), 'Replaced Notes', '2026-10-23 14-05-09'),
       archive: 'Tree Notes 2026-10-20.zip',

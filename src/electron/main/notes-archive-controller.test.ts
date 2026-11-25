@@ -958,11 +958,16 @@ describe('notes archive controller: import', () => {
   })
 
   it('requires a restart after a replacement fails past its journal', async () => {
-    const { controller, destinations, fileServices } = await setup()
+    const { controller, destinations, fileServices, userData } = await setup()
 
-    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), headWithImages([]), {})
+    const imported = headWithImages([], 'Incoming')
+    await writeArchive(join(destinations, 'Tree Notes 2026-10-20.zip'), imported, {})
     await controller.chooseImportArchive()
     await controller.prepareImport()
+    const directory = join(userData, '.notes-import')
+    const entries = await readdir(directory)
+    expect(entries).toHaveLength(1)
+    const stagedDocument = join(directory, entries[0]!, 'document.json')
     vi.spyOn(fileServices, 'replaceNotes').mockImplementationOnce(async () => {
       vi.spyOn(fileServices, 'isNotesRecoveryRequired').mockReturnValue(true)
       throw new ReplacementIncompleteError(new Error('interrupted'))
@@ -973,6 +978,8 @@ describe('notes archive controller: import', () => {
       restartRequired: true,
       message: 'Your notes could not be replaced: interrupted',
     })
+
+    expect(JSON.parse(await readFile(stagedDocument, 'utf8'))).toEqual(imported)
     await expect(controller.chooseExportDestination()).rejects.toThrow('Restart Tree to complete the notes import.')
     await expect(controller.chooseImportArchive()).rejects.toThrow('Restart Tree to complete the notes import.')
   })

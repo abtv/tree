@@ -272,12 +272,19 @@ describe('desktop notes operations', () => {
 
   it('blocks another import during recovery but permits installing a downloaded update', async () => {
     const h = harness()
-    h.change({ status: 'error', notesRecoveryRequired: true })
+    h.change({ status: 'loading' })
+    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+      canExport: false,
+      canImport: false,
+      canInstallUpdate: false,
+    })
+    h.api.setNotesMenuState.mockClear()
 
+    h.change({ status: 'error', notesRecoveryRequired: true })
     await h.operations.importNotes()
 
     expect(h.api.chooseNotesImportArchive).not.toHaveBeenCalled()
-    expect(h.api.setNotesMenuState).toHaveBeenLastCalledWith({
+    expect(h.api.setNotesMenuState).toHaveBeenCalledExactlyOnceWith({
       canExport: false,
       canImport: false,
       canInstallUpdate: true,

@@ -307,10 +307,11 @@ describe('notes replacement', () => {
     const layout = await userData()
     await seedOldNotes(layout)
     const staged = await stage(layout)
+    const interruption = new Error('interrupted')
     const failing: ReplacementFileSystem = {
       ...nodeReplacementFileSystem,
       async rename(from, to) {
-        if (from.endsWith(join('staged', 'document.json'))) throw new Error('interrupted')
+        if (from.endsWith(join('staged', 'document.json'))) throw interruption
         await nodeReplacementFileSystem.rename(from, to)
       },
     }
@@ -318,6 +319,13 @@ describe('notes replacement', () => {
     await expect(commitReplacement(failing, layout, staged, NOW, 'Tree Notes 2026-10-20.zip')).rejects.toBeInstanceOf(
       ReplacementIncompleteError,
     )
+
+    const failedRecovery = recoverReplacement(failing, layout, new Set())
+
+    await expect(failedRecovery).rejects.toBeInstanceOf(ReplacementIncompleteError)
+    await expect(failedRecovery).rejects.toHaveProperty('cause', interruption)
+    expect(await sortedEntries(layout.importDirectory)).toEqual(['commit.json', staged])
+    expect(await readFile(join(layout.importDirectory, staged, 'document.json'), 'utf8')).toBe('new document')
 
     const recovery = await recoverReplacement(nodeReplacementFileSystem, layout, new Set())
 

@@ -107,6 +107,49 @@ describe('incremental executor', () => {
     else expect(neighborhood.complete).toBeNull()
   })
 
+  it('streams past the retention limit when no match cache is supplied', () => {
+    const total = 8193
+    const document = { roots: [{ id: 'a', text: 'a'.repeat(total), children: [] }] }
+
+    const result = searchHarness(512).run({
+      ...base,
+      document,
+      query: 'a',
+      operation: { kind: 'navigate', origin: { nodeId: 'a', offset: total - 1 }, direction: 1, count: 1 },
+    })
+
+    expect(result).toMatchObject({ ordinal: 1, total, wrapped: true, destination: { nodeId: 'a', start: 0, end: 1 } })
+  })
+
+  it('reuses the previous Agenda match block when a repeat jumps back across blocks', () => {
+    const harness = searchHarness(32)
+    const neighborhood: SearchNeighborhood = {}
+    const day = 1 as DayNumber
+    const document = { roots: [{ id: 'a', text: 'a '.repeat(220), children: [] }] }
+    const jump = (index: number, direction: 1 | -1, count: number) =>
+      harness.run({
+        ...base,
+        document,
+        scope: { kind: 'agenda', projection: [{ day, rows: [{ nodeId: 'a', depth: 0, role: 'match' }] }] },
+        query: 'a',
+        operation: {
+          kind: 'navigate',
+          origin: { nodeId: 'a', day, offset: index * 2 },
+          direction,
+          count,
+          neighborhood,
+        },
+      })
+    expect(jump(60, 1, 1)).toMatchObject({ ordinal: 62, total: 220 })
+    expect(jump(150, 1, 1)).toMatchObject({ ordinal: 152, total: 220 })
+    const scheduled = harness.slices()
+
+    const result = jump(151, -1, 90)
+
+    expect(result).toMatchObject({ ordinal: 62, total: 220, destination: { nodeId: 'a', day, start: 122 } })
+    expect(harness.slices() - scheduled).toBe(1)
+  })
+
   it('defers cached caret calculation and skips it when a repeat is canceled', async () => {
     const neighborhood: SearchNeighborhood = {}
     const request: SearchRequest = {

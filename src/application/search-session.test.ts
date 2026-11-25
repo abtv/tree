@@ -130,6 +130,21 @@ it('ignores editing, draft cancellation and navigation when no query is active',
   expect(jobs).toHaveLength(0)
 })
 
+it('does not restart counting when confirming an empty Find without a recalled query', () => {
+  const { session, jobs } = controlledSession()
+  const jump = vi.fn()
+  session.replaceContext(context)
+  session.begin(origin)
+  const emptyCount = jobs.at(-1)!
+
+  session.confirm(jump)
+
+  expect(emptyCount.cancel).toHaveBeenCalledOnce()
+  expect(jobs).toEqual([emptyCount])
+  expect(session.getSnapshot()).toStrictEqual({ confirmed: '', visible: false, pending: false })
+  expect(jump).not.toHaveBeenCalled()
+})
+
 it.each([
   ['begin', 'count'],
   ['context', 'count'],
@@ -500,6 +515,40 @@ it('lets a newer jump replace a confirmation that waits for its count', () => {
   expect(confirmed).not.toHaveBeenCalled()
   expect(newer).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ ordinal: 1 }))
   expect(session.getSnapshot()).toMatchObject({ pending: false, count: { total: 2 } })
+})
+
+it('serves a repeat requested during confirmation from the same pending count', () => {
+  const { session, jobs } = controlledSession()
+  const confirmed = vi.fn()
+  const repeat = vi.fn()
+  const repeatOrigin = { nodeId: 'a', offset: 3 }
+  session.replaceContext(context)
+  session.begin(origin)
+  session.edit('aa')
+  const countJob = jobs.at(-1)!
+  const stop = session.subscribe(() => {
+    stop()
+    session.navigate(repeatOrigin, -1, 2, repeat)
+  })
+
+  session.confirm(confirmed)
+  expect(jobs.at(-1)).toBe(countJob)
+  countJob.publish({ kind: 'count', total: 2, capped: false })
+
+  const navigations = jobs.filter(({ request }) => request.operation.kind === 'navigate')
+  expect(navigations).toHaveLength(1)
+  expect(navigations[0]!.request.operation).toEqual({ kind: 'navigate', origin: repeatOrigin, direction: -1, count: 2 })
+  const result = {
+    kind: 'navigate',
+    total: 2,
+    wrapped: true,
+    missingOrigin: false,
+    destination: { nodeId: 'a', start: 3, end: 5, caret: 3 },
+    ordinal: 2,
+  } as const
+  navigations[0]!.publish(result)
+  expect(repeat).toHaveBeenCalledExactlyOnceWith(result)
+  expect(confirmed).not.toHaveBeenCalled()
 })
 
 it('navigates beyond a capped count that completes after confirmation or a hidden repeat', () => {

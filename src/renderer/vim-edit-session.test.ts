@@ -60,6 +60,29 @@ it('keeps Replace overwrite width and Backspace tied to the original Unicode inp
   expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: '#XX End', cursor: 1 })
 })
 
+// @requirement PRODUCT.md §20.13
+it('undoes each expanded lowercase key separately across markers in one Replace session', () => {
+  const session = { nodeId: 'n', baseline: '#XX #YY', position: 1, typed: '' }
+
+  applyReplaceKey(session, 'A')
+  expect(applyReplaceKey(session, 'İ')).toEqual({ workingText: '#ai\u0307 #YY', cursor: 4 })
+  applyReplaceKey(session, ' ')
+  applyReplaceKey(session, '#')
+  expect(applyReplaceKey(session, 'İ')).toEqual({ workingText: '#ai\u0307 #i\u0307Y', cursor: 8 })
+
+  expect(resolveReplaceCommit(session)).toEqual({
+    finalText: '#ai\u0307 #i\u0307Y',
+    replacedStart: 1,
+    replacedEnd: 6,
+    rawCursor: 8,
+  })
+
+  expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: '#ai\u0307 #YY', cursor: 6 })
+  applyReplaceKey(session, 'Backspace')
+  applyReplaceKey(session, 'Backspace')
+  expect(applyReplaceKey(session, 'Backspace')).toEqual({ workingText: '#aX #YY', cursor: 2 })
+})
+
 describe('diffTypedText', () => {
   it('reports no change when the final text matches the baseline', () => {
     expect(diffTypedText('abc', 'abc', 1)).toEqual({ insertedText: '', insertOffset: 2, deleteCount: 0 })

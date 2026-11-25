@@ -1,7 +1,13 @@
 import { expect, it } from 'vitest'
 import fc from 'fast-check'
 import { searchHarness } from './test/search-harness'
-import type { SearchDestination, SearchNeighborhood, SearchPosition, SearchRequest } from './search-executor'
+import type {
+  SearchDestination,
+  SearchNeighborhood,
+  SearchPosition,
+  SearchRequest,
+  SearchResult,
+} from './search-executor'
 import type { DayNumber } from '../domain/calendar-date'
 import { searchScope, type SearchScope, type SearchText } from '../domain/search-scope'
 
@@ -98,7 +104,52 @@ it('preserves streaming navigation from captured, matching, manual and missing o
   )
 })
 
-it('jumps from retained capped-search positions exactly as a fresh scan does', () => {
+function literalMatchRanks(occurrences: readonly SearchText[], query: string) {
+  return occurrences.flatMap(({ nodeId, day, text }, row) => {
+    const matches: { row: number; destination: SearchDestination }[] = []
+    for (let start = text.indexOf(query); start !== -1; start = text.indexOf(query, start + query.length)) {
+      matches.push({
+        row,
+        destination: { nodeId, ...(day !== undefined && { day }), start, end: start + query.length, caret: start },
+      })
+    }
+    return matches
+  })
+}
+
+function literalJump(
+  occurrences: readonly SearchText[],
+  matches: ReturnType<typeof literalMatchRanks>,
+  origin: SearchPosition,
+  direction: 1 | -1,
+  count: number,
+): SearchResult {
+  const { beforeDay } = origin
+  const total = matches.length
+  const originRow = occurrences.findIndex(({ nodeId, day }) => nodeId === origin.nodeId && day === origin.day)
+  const missingOrigin = beforeDay === undefined && originRow === -1
+  if (missingOrigin || total === 0) return { kind: 'navigate', total, wrapped: false, missingOrigin }
+
+  const next = matches.findIndex((hit) =>
+    beforeDay !== undefined
+      ? hit.destination.day! >= beforeDay
+      : hit.row > originRow ||
+        (hit.row === originRow && hit.destination.start >= origin.offset + (direction === 1 ? 1 : 0)),
+  )
+  const boundary = next === -1 ? total : next
+  const raw = direction === 1 ? boundary + count - 1 : boundary - count
+  const index = ((raw % total) + total) % total
+  return {
+    kind: 'navigate',
+    total,
+    wrapped: raw < 0 || raw >= total,
+    missingOrigin: false,
+    destination: matches[index]!.destination,
+    ordinal: index + 1,
+  }
+}
+
+it('jumps from retained capped-search positions in literal match order', () => {
   const nodeText = fc.array(fc.constantFrom('a', 'a', 'b', ' '), { maxLength: 12 }).map((chars) => chars.join(''))
   const step = fc.record({
     origin: fc.constantFrom('repeat', 'repeat', 'repeat', 'manual', 'heading'),
@@ -144,10 +195,11 @@ it('jumps from retained capped-search positions exactly as a fresh scan does', (
           : { kind: 'tree', parentId: zoomedId }
         const document = { roots }
         const occurrences = [...searchScope(document, scope)].filter((item): item is SearchText => item !== undefined)
+        // These generated queries and rows are ASCII; their literal offsets are also their caret offsets.
+        const matches = literalMatchRanks(occurrences, query)
         const context = { id: 1, revision: 1, scopeKey: 'test', document, scope, query }
         const neighborhood: SearchNeighborhood = {}
         const retained = searchHarness(512)
-        const fresh = searchHarness(512)
         let last: SearchDestination | undefined
         const originFor = (kind: string, pick: number, offset: number): SearchPosition => {
           // The editor repeats from the start of the match it last reached.
@@ -160,12 +212,14 @@ it('jumps from retained capped-search positions exactly as a fresh scan does', (
           return { nodeId, ...(day !== undefined && { day }), offset: offset % (text.length + 1) }
         }
 
-        for (const { origin: kind, direction, count, pick, offset } of steps) {
+        for (const [index, { origin: kind, direction, count, pick, offset }] of steps.entries()) {
           const operation = { kind: 'navigate' as const, origin: originFor(kind, pick, offset), direction, count }
 
           const result = retained.run({ ...context, operation: { ...operation, neighborhood } })
 
-          expect(result).toEqual(fresh.run({ ...context, operation }))
+          expect(result).toEqual(literalJump(occurrences, matches, operation.origin, direction, count))
+          // Also cross-check one streaming navigation per generated corpus without rescanning for every jump.
+          if (index === steps.length - 1) expect(result).toEqual(searchHarness(512).run({ ...context, operation }))
           if (result.kind === 'navigate' && result.destination !== undefined) last = result.destination
         }
       },

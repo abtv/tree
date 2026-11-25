@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { EditorStore, type EditorServices } from './editor-store'
+import { NotesRecoveryRequiredError } from './editor-store-types'
 
 afterEach(() => vi.useRealTimers())
 
@@ -431,6 +432,18 @@ it('keeps initialization available when optional preference reads fail', async (
 
   expect(store.getSnapshot()).toMatchObject({ status: 'ready', location: { selectedNodeId: 'root' } })
   expect(store.emojiHistory.suggestions.length).toBeGreaterThan(0)
+})
+
+it('marks only a replacement recovery failure as blocking another archive import', async () => {
+  const message = 'Could not open the notes'
+  const load = vi.fn<EditorServices['load']>()
+  load.mockRejectedValueOnce(new NotesRecoveryRequiredError(message)).mockRejectedValueOnce(new Error(message))
+
+  const recoveryFailure = await setup({ load })
+  const ordinaryFailure = await setup({ load })
+
+  expect(recoveryFailure.getSnapshot()).toStrictEqual({ status: 'error', message, notesRecoveryRequired: true })
+  expect(ordinaryFailure.getSnapshot()).toStrictEqual({ status: 'error', message })
 })
 
 it('waits for the newer Vim clipboard write when an older write completes first', async () => {

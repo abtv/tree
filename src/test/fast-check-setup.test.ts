@@ -31,6 +31,15 @@ it.each(['0', '-17', '2147483647'])('preserves the replay seed %s and path', asy
   expect(fc.configureGlobal).toHaveBeenCalledExactlyOnceWith({ numRuns: 100, seed: Number(seed), path: '2:1:0' })
 })
 
+it('reuses a seed without narrowing the run to a counterexample path', async () => {
+  vi.stubEnv('FC_SEED', '42')
+  vi.stubEnv('FC_PATH', '')
+
+  await import('./fast-check-setup')
+
+  expect(fc.configureGlobal).toHaveBeenCalledExactlyOnceWith({ numRuns: 100, seed: 42 })
+})
+
 it('applies the property multiplier to the global default', async () => {
   vi.stubEnv('TREE_PROPERTY_RUNS', '20')
 

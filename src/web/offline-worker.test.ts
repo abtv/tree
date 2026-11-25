@@ -278,13 +278,13 @@ describe('offline package lifecycle', () => {
     expect(await metadata.clone().json()).toEqual({ waiting: `${prefix}v1` })
   })
 
-  it('abandons preparation when the requesting page never confirms', async () => {
+  it.each(['cancels', 'never confirms'])('abandons preparation when the requesting page %s', async (action) => {
     vi.useFakeTimers()
     try {
       const f = fixture()
       f.install()
       await f.emit('install')
-      const reply = { onmessage: null, postMessage: vi.fn() }
+      const reply = { onmessage: null as ((event: { data: string }) => void) | null, postMessage: vi.fn() }
       const attempt = f.emit('message', {
         data: { type: 'tree-offline-status', prepareUpdate: true, assets: [`${base}assets/app.js`] },
         source: { id: 'writer' },
@@ -292,12 +292,14 @@ describe('offline package lifecycle', () => {
       })
       await vi.waitFor(() => expect(reply.postMessage).toHaveBeenCalledWith('prepared'))
 
-      await vi.advanceTimersByTimeAsync(15_000)
+      if (action === 'cancels') reply.onmessage!({ data: 'cancel' })
+      else await vi.advanceTimersByTimeAsync(15_000)
       await attempt
 
       expect(reply.postMessage).toHaveBeenLastCalledWith('activation-failed')
       expect(f.scope.skipWaiting).not.toHaveBeenCalled()
       expect(reply.onmessage).toBeNull()
+      expect(vi.getTimerCount()).toBe(0)
     } finally {
       vi.useRealTimers()
     }
@@ -793,6 +795,18 @@ describe('offline package lifecycle', () => {
     expect(await fetch({ url: `${base}sw.js` })).toBeUndefined()
     expect(await fetch({ url: 'https://other.test/assets/app.js' })).toBeUndefined()
     expect(await fetch({ url: `${base}assets/app.js`, method: 'POST' })).toBeUndefined()
+  })
+
+  it('does not treat a fetch of the app root as a page navigation', async () => {
+    const f = fixture()
+    f.install()
+    await f.emit('install')
+    const request = new Request(base)
+    const respondWith = vi.fn()
+
+    f.handlers.get('fetch')!({ request, respondWith })
+
+    expect(respondWith).not.toHaveBeenCalled()
   })
 
   it('bounds waiting generations and preserves the actual old page across repeated activation attempts', async () => {

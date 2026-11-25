@@ -183,6 +183,13 @@ describe('Vim caret transitions', () => {
     ['collapsed click', 'abcdef', { anchor: 2, focus: 2 }, { mode: 'normal' }],
     ['emoji at the active end', 'A🚀b', { anchor: 0, focus: 3 }, { mode: 'visual', anchor: 0, focus: 1 }],
     ['emoji at the anchored end', 'A🚀b', { anchor: 3, focus: 0 }, { mode: 'visual', anchor: 1, focus: 0 }],
+    [
+      'combining accent at the active end',
+      'Ae\u0301',
+      { anchor: 0, focus: 3 },
+      { mode: 'visual', anchor: 0, focus: 1 },
+    ],
+    ['joined emoji at the anchored end', 'A👩‍💻', { anchor: 6, focus: 0 }, { mode: 'visual', anchor: 1, focus: 0 }],
   ] as const)(
     'turns the selection a pointer press leaves into Visual endpoints: %s',
     (_case, text, selection, expected) => {

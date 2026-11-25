@@ -252,9 +252,12 @@ describe('Vim text changes beyond deletion', () => {
       nextCursor: 0,
       registerText: 'one',
     })
-    expect(
-      calculateTextChange('one two', 0, { kind: 'change', motion: 'w', count: 1, insertedText: '' }),
-    ).toMatchObject({ inserted: '', nextText: ' two', nextCursor: 0, registerText: 'one' })
+    expect(calculateTextChange('one two', 0, { kind: 'change', motion: 'w', count: 1 })).toMatchObject({
+      inserted: '',
+      nextText: ' two',
+      nextCursor: 0,
+      registerText: 'one',
+    })
   })
 
   it('replaces characters with a repeated character and rejects an empty or overlong range', () => {
@@ -277,6 +280,12 @@ describe('Vim text changes beyond deletion', () => {
       end: 3,
       inserted: 'Z',
       nextText: 'aZ',
+      nextCursor: 1,
+      registerText: 'bc',
+    })
+    expect(calculateTextChange('abc', 1, { kind: 'substitute', count: 2 })).toMatchObject({
+      inserted: '',
+      nextText: 'a',
       nextCursor: 1,
       registerText: 'bc',
     })
@@ -430,6 +439,27 @@ describe('Vim text changes beyond deletion', () => {
     expect(calculateTextChange(text, start, { kind: 'case', mode: 'upper', count: 5 }, false, links)).toMatchObject({
       nextText: `${first} ALPHA beta ${second} tail`,
       edits: [{ start, end, inserted: 'ALPHA' }],
+    })
+  })
+
+  // @requirement PRODUCT.md §20.2.11
+  it('does not change either hyperlink when a case selection starts and ends inside links', () => {
+    const first = 'https://First.test'
+    const second = 'https://Second.test'
+    const text = `${first} ß ${second} tail`
+    const start = first.length - 3
+    const linkStart = text.indexOf(second)
+    const end = linkStart + 'https://Second'.length
+    const links = [
+      { start: 0, end: first.length, url: first },
+      { start: linkStart, end: linkStart + second.length, url: second },
+    ]
+
+    const change = calculateTextChange(text, start, { kind: 'case', mode: 'upper', count: end - start }, false, links)
+
+    expect(change).toMatchObject({
+      edits: [{ start: first.length, end: linkStart, inserted: ' SS ' }],
+      nextText: `${first} SS ${second} tail`,
     })
   })
 

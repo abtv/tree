@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { NotesRecoveryRequiredError } from '../../application/editor-store-types'
 import { NOTES_REPLACED_MESSAGE, type ClipboardPayload, type TreeApi } from '../../shared/ipc'
 import {
   attachmentImageCache,
@@ -170,6 +171,44 @@ describe('renderer Electron services', () => {
     Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => undefined })
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:attachment' })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+  })
+
+  it('does not ask about recovery after a successful load', async () => {
+    const isNotesRecoveryRequired = vi.fn(async () => true)
+    window.treeApi = { ...api, isNotesRecoveryRequired }
+
+    await expect(createElectronEditorServices().load()).resolves.toBeNull()
+
+    expect(api.load).toHaveBeenCalledOnce()
+    expect(isNotesRecoveryRequired).not.toHaveBeenCalled()
+  })
+
+  it.each(['not required', 'unavailable'])('keeps an ordinary load error when recovery is %s', async (status) => {
+    const failure = new Error('Document could not be opened')
+    const load = vi.fn().mockRejectedValue(failure)
+    const isNotesRecoveryRequired = vi.fn(async () => false)
+    window.treeApi = status === 'unavailable' ? { ...api, load } : { ...api, load, isNotesRecoveryRequired }
+
+    await expect(createElectronEditorServices().load()).rejects.toBe(failure)
+
+    expect(isNotesRecoveryRequired).toHaveBeenCalledTimes(status === 'unavailable' ? 0 : 1)
+  })
+
+  // @requirement PRODUCT.md §25.4
+  it.each(['required', 'unknown'])('reports a recovery-required load error when status is %s', async (status) => {
+    const failure = new Error('The notes import could not be completed')
+    const load = vi.fn().mockRejectedValue(failure)
+    const isNotesRecoveryRequired = vi.fn(async () => {
+      if (status === 'unknown') throw new Error('Recovery status request failed')
+      return true
+    })
+    window.treeApi = { ...api, load, isNotesRecoveryRequired }
+
+    const result = createElectronEditorServices().load()
+
+    await expect(result).rejects.toBeInstanceOf(NotesRecoveryRequiredError)
+    await expect(result).rejects.toMatchObject({ message: failure.message, cause: failure })
+    expect(isNotesRecoveryRequired).toHaveBeenCalledExactlyOnceWith()
   })
 
   it('forwards every editor service call and preserves return values', async () => {

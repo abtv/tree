@@ -6668,6 +6668,27 @@ describe('EditorStore', () => {
       },
     )
 
+    it('keeps newer typing without a conflict when a delayed clipboard read returns nothing', async () => {
+      const pending = gate()
+      const store = new EditorStore(textState('abc'), ids('unused'), new FakeClock())
+      await store.initialize()
+
+      const pasting = store.paste('root', 3, async () => {
+        await pending.promise
+        return { kind: 'text', text: '' }
+      })
+      store.editText('root', 'abcd')
+      pending.open()
+      await pasting
+
+      const state = store.getSnapshot()
+      if (state.status !== 'ready') throw new Error('Expected a ready editor.')
+      expect(rootText(store)).toBe('abcd')
+      expect(state.operationError).toBeUndefined()
+      store.undo()
+      expect(rootText(store)).toBe('abc')
+    })
+
     it('keeps a successful delayed paste separate from typing that restored the original text', async () => {
       const pending = gate()
       const store = new EditorStore(textState('abc'), ids('unused'), new FakeClock())
@@ -7500,6 +7521,35 @@ describe('EditorStore', () => {
       await cut
 
       expect(rootText(store)).toBe('one two three')
+    })
+
+    it('does not start reading the clipboard if saving locks while paste waits for copy', async () => {
+      const clock = new FakeClock()
+      let finishCopy!: () => void
+      const pending = new Promise<void>((resolve) => {
+        finishCopy = resolve
+      })
+      const services = textState('abc')
+      services.writeClipboard = () => pending
+      const readClipboard = vi
+        .fn<EditorServices['readClipboard']>()
+        .mockRejectedValue(new Error('Clipboard read failed'))
+      services.readClipboard = readClipboard
+      services.save = async () => {
+        throw new Error('disk full')
+      }
+      const store = new EditorStore(services, ids('unused'), clock)
+      await store.initialize()
+
+      const copying = store.copy('root', 0, 1)
+      const pasting = store.paste('root', 3)
+      await failSavesUntilLocked(store, clock)
+      finishCopy()
+      await Promise.all([copying, pasting])
+
+      expect(readClipboard).not.toHaveBeenCalled()
+      expect(store.getSnapshot()).toMatchObject({ persistenceLocked: true })
+      expect(rootText(store)).toBe('abc')
     })
 
     it.each(['short-text', 'ten-words', 'link', 'image-read', 'image-write'] as const)(

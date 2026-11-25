@@ -807,21 +807,22 @@ describe('browser data operations', () => {
     },
   )
 
-  it('cancels an import while its initial save is pending and ignores the later resolution', async () => {
+  it.each(['succeeds', 'fails'] as const)('keeps an import canceled when its initial save later %s', async (result) => {
     const f = fixture()
-    let finish!: () => void
+    let completeSave!: () => void
     f.flushPersistence.mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
-          finish = resolve
+        new Promise<void>((resolve, reject) => {
+          completeSave = result === 'succeeds' ? resolve : () => reject(new Error('Local save failed'))
         }),
     )
     f.choose()
 
     f.button('data-activity-action').click()
-    finish()
+    completeSave()
     await Promise.resolve()
 
+    expect(document.getElementById('data-activity')!.hidden).toBe(true)
     expect(ArchiveWorker.instances).toEqual([])
     expect(f.isRunning()).toBe(false)
     expect(f.session.discardStagedImages).toHaveBeenCalledOnce()
@@ -934,13 +935,13 @@ describe('browser data operations', () => {
     expect(f.isRunning()).toBe(false)
   })
 
-  it('cancels export during a pending save without starting a worker', async () => {
+  it.each(['succeeds', 'fails'] as const)('keeps an export canceled when its initial save later %s', async (result) => {
     const f = fixture()
-    let finish!: () => void
+    let completeSave!: () => void
     f.flushPersistence.mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
-          finish = resolve
+        new Promise<void>((resolve, reject) => {
+          completeSave = result === 'succeeds' ? resolve : () => reject(new Error('Local save failed'))
         }),
     )
     f.button('data-export').click()
@@ -949,7 +950,7 @@ describe('browser data operations', () => {
     expect(f.status()).toBe('Exporting Notes…')
 
     f.button('data-activity-action').click()
-    finish()
+    completeSave()
     await Promise.resolve()
 
     expect(f.isRunning()).toBe(false)

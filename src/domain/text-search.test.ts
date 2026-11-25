@@ -11,6 +11,21 @@ export function pattern(query: string): SearchPattern {
 }
 
 describe('literal search', () => {
+  it('does not compile case-equivalence expressions for ASCII-only searches', () => {
+    const compile = vi.spyOn(globalThis, 'RegExp')
+
+    try {
+      expect(spans('Plan PLAN plan', 'plan')).toEqual([
+        [0, 4],
+        [5, 9],
+        [10, 14],
+      ])
+      expect(compile).not.toHaveBeenCalled()
+    } finally {
+      compile.mockRestore()
+    }
+  })
+
   it('preserves literal Unicode case equivalence for ASCII and cross-ASCII matches', () => {
     const text = Array.from({ length: 128 }, (_, code) => String.fromCharCode(code)).join('') + 'ſK'
 
@@ -49,6 +64,27 @@ describe('literal search', () => {
         expect(spans(text, query), `${query} pass ${pass}`).toEqual(expectedSpans(text, query))
       }
     }
+  })
+
+  it('keeps different case results for code points at the same offset on different cache pages', () => {
+    // É and ǉ both end in C9, but only É matches é under smart case.
+    const text = 'ÉǉǉÉ'
+    const expected = [
+      [0, 1],
+      [3, 4],
+    ]
+
+    expect(spans(text, 'é')).toEqual(expected)
+    expect(spans(text, 'é')).toEqual(expected)
+  })
+
+  it('reports complete UTF-16 spans for adjacent matches with both BMP and astral characters', () => {
+    const text = '😀A😀Éa😀é'
+
+    expect(spans(text, 'a😀é')).toEqual([
+      [2, 6],
+      [6, 10],
+    ])
   })
 
   // The pattern characters below appear in no other test, so earlier tests cannot have resolved their pairs.
@@ -101,6 +137,16 @@ describe('literal search', () => {
 
     // 1000 matched characters, then 1000 fallback steps at `c`, then `c` itself.
     expect(work.filter((match) => match === undefined)).toHaveLength(250)
+  })
+
+  it('yields through both passes while preparing a long pasted query', () => {
+    const characters = 256
+    const query = 'a'.repeat(characters)
+
+    const checkpoints = [...prepareSearch(query)]
+
+    // One checkpoint per character, then one per prefix-table entry after the first.
+    expect(checkpoints).toHaveLength(2 * characters - 1)
   })
 
   it.each([

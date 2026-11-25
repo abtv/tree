@@ -140,6 +140,19 @@ describe('caret projection ownership', () => {
     expect(owner.focusToken).toBe(2)
   })
 
+  it('does not project a retained Normal selection after switching to Insert', () => {
+    const owner = new CaretProjectionState<string>(focus, 'normal')
+    owner.beginCommit(focus, 'normal')
+    const selection = { anchor: 4, focus: 1 }
+
+    owner.retainInputSelection('first', 'textarea', selection)
+    expect(owner.pendingCaret?.retainedSelection).toEqual(selection)
+
+    owner.changeMode('insert')
+
+    expect(owner.takeCaret()).toBeUndefined()
+  })
+
   it('lets explicit caret or Visual work win over replacement selection in either order', () => {
     const owner = new CaretProjectionState<string>(focus, 'insert')
     const retain = (): void => owner.retainInputSelection('first', 'textarea', { anchor: 4, focus: 1 })
