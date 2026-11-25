@@ -1,13 +1,15 @@
 import type { TreeNode } from '../domain/document'
 import type { TextMatch } from '../domain/text-search'
-import { richTextHtml, syncRichTextHtml, type TextDecoration } from './editor-dom'
+import { plainLocalSearchHtml, richTextHtml, syncRichTextHtml, type TextDecoration } from './editor-dom'
 
 const currentClass = 'search-match-current'
 const keyOf = ({ start, end }: TextMatch): string => `${start}:${end}`
 
-function changesProjection(records: readonly MutationRecord[]): boolean {
+function changesProjection(records: readonly MutationRecord[], input: HTMLElement, compact: boolean): boolean {
   return records.some(
-    (record) => record.attributeName !== 'class' || (record.target as Element).hasAttribute('data-local-match'),
+    (record) =>
+      record.attributeName !== 'class' ||
+      (compact ? record.target !== input : (record.target as Element).hasAttribute('data-local-match')),
   )
 }
 
@@ -32,6 +34,7 @@ interface ActiveProjection {
   valid: boolean
   key: string | undefined
   fragments: Iterable<Element>
+  compact: boolean
 }
 
 /** Keep the live selection and links intact when only the active search hit changes. */
@@ -59,33 +62,35 @@ export class RichTextProjection {
       previous.matches === matches &&
       sameDecorations(previous.decorations, base) &&
       previous.valid &&
-      !changesProjection(previous.observer.takeRecords())
+      !changesProjection(previous.observer.takeRecords(), input, previous.compact)
     ) {
       if (previous.key !== key) {
         for (const fragment of previous.fragments) fragment.classList.remove(currentClass)
         previous.key = key
-        previous.fragments = this.highlight(input, key)
+        previous.fragments = this.highlight(input, key, current, previous.compact ? matches : undefined)
         // Ignore the classes this projection just changed, but not native DOM edits.
         previous.observer.takeRecords()
       }
-      if (key === undefined) this.reset()
+      if (key === undefined && !previous.compact) this.reset()
       return
     }
 
     this.reset()
-    const decorations =
-      matches.length === 0
-        ? base
-        : [...(base ?? []), ...matches.map((match) => ({ ...match, localMatch: keyOf(match) }))]
-    syncRichTextHtml(
-      input,
-      richTextHtml(node, decorations) + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''),
-    )
-    if (key === undefined || matches.length === 0) return
+    const compact = matches.length >= 512 && (base?.length ?? 0) === 0 && (node.links?.length ?? 0) === 0
+    const html = compact
+      ? plainLocalSearchHtml(node.text, matches)
+      : richTextHtml(
+          node,
+          matches.length === 0
+            ? base
+            : [...(base ?? []), ...matches.map((match) => ({ ...match, localMatch: keyOf(match) }))],
+        )
+    syncRichTextHtml(input, html + (node.text.endsWith('\n') ? '<br data-trailing-line>' : ''))
+    if ((key === undefined && !compact) || matches.length === 0) return
 
-    const fragments = this.highlight(input, key)
+    const fragments = this.highlight(input, key, current, compact ? matches : undefined)
     const observer = new MutationObserver((records) => {
-      if (changesProjection(records)) active.valid = false
+      if (changesProjection(records, input, compact)) active.valid = false
     })
     // Retain only the projected fields, not an obsolete immutable subtree from a parent heading.
     const active = {
@@ -98,6 +103,7 @@ export class RichTextProjection {
       valid: true,
       key,
       fragments,
+      compact,
     }
     this.active = active
     // Native input and Replace may mutate content independently of the React render.
@@ -111,8 +117,29 @@ export class RichTextProjection {
     })
   }
 
-  private highlight(input: HTMLElement, key: string | undefined): Iterable<Element> {
-    if (key === undefined) return []
+  private highlight(
+    input: HTMLElement,
+    key: string | undefined,
+    current: TextMatch | undefined,
+    orderedMatches: readonly TextDecoration[] | undefined,
+  ): Iterable<Element> {
+    if (key === undefined || current === undefined) return []
+    if (orderedMatches !== undefined) {
+      let low = 0
+      let high = orderedMatches.length
+      while (low < high) {
+        const middle = (low + high) >>> 1
+        if (orderedMatches[middle]!.start < current.start) low = middle + 1
+        else high = middle
+      }
+      const match = orderedMatches[low]
+      if (match?.start !== current.start || match.end !== current.end) return []
+      // Compact markup has exactly one element child per match, in the same order.
+      const fragment = input.children.item(low)
+      if (fragment === null) return []
+      fragment.classList.add(currentClass)
+      return [fragment]
+    }
     const fragments = input.querySelectorAll(`[data-local-match="${key}"]`)
     for (const fragment of fragments) fragment.classList.add(currentClass)
     return fragments

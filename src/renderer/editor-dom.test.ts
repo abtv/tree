@@ -13,6 +13,7 @@ import {
   getSelectionRange,
   isCollapsedSelection,
   readEditableContent,
+  plainLocalSearchHtml,
   richTextHtml,
   selectAll,
   setCaret,
@@ -260,6 +261,18 @@ describe('editor DOM adapters', () => {
 
   it('renders an empty node as an empty editable text surface', () => {
     expect(richTextHtml(node(''))).toBe('')
+  })
+
+  it('escapes compact local search spans and their gaps without introducing extra text', () => {
+    const text = '<&"😸>\n'
+    const matches = [
+      { start: 1, end: 2 },
+      { start: 2, end: 5 },
+    ]
+
+    const html = plainLocalSearchHtml(text, matches)
+
+    expect(html).toBe('&lt;<span class="search-match">&amp;</span><span class="search-match">&quot;😸</span>&gt;\n')
   })
 
   it('reads text and link ranges from editable markup', () => {

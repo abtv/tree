@@ -2,6 +2,7 @@ import type { LinkRange, TreeNode } from '../domain/document'
 import { findDateLikeTokens } from '../domain/date-recognition'
 import { markedPieces, type CaretMark } from './agenda-row-caret'
 import { characterBoundaries, characterStart, moveCharacterOffset } from '../domain/text-characters'
+import type { TextMatch } from '../domain/text-search'
 
 /** Measure a windowed-out Tree row with the same row styles and indentation as a mounted row. */
 export function unmountedNodeGeometry(
@@ -376,6 +377,19 @@ export function richTextHtml(
     marks.some((mark) => mark.start === node.text.length && mark.end === node.text.length)
   )
     parts.push(markedHtml(node.text.length, node.text.length, true))
+  return parts.join('')
+}
+
+/** A local search stream is ordered and nonoverlapping, with no other markup in this path. */
+export function plainLocalSearchHtml(text: string, matches: readonly TextMatch[]): string {
+  const parts: string[] = []
+  let position = 0
+  for (const { start, end } of matches) {
+    if (start > position) parts.push(escapeHtml(text.slice(position, start)))
+    parts.push(`<span class="search-match">${escapeHtml(text.slice(start, end))}</span>`)
+    position = end
+  }
+  parts.push(escapeHtml(text.slice(position)))
   return parts.join('')
 }
 

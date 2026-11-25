@@ -13,7 +13,46 @@ import {
 } from './fixtures'
 import { controlPostedTasksWithClock } from '../search-clock'
 
-describeForEachEditingMode('Local search', ({ mode }) => {
+describeForEachEditingMode('Local search', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.2.26
+  test('keeps the caret and active match correct through dense Find transitions', async ({ userDataDir }, testInfo) => {
+    const source = `lead ${'match <& review '.repeat(600)}end`
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'dense', text: source, children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'dense' },
+    })
+    const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+    const marks = editor.locator('.search-match')
+    await setCursor(editor, 2)
+    await window.keyboard.press('Meta+f')
+    await prompt.fill('match')
+    await expect(marks).toHaveCount(600)
+
+    await prompt.press('Escape')
+    await expect(editor).toBeFocused()
+    await expect(marks).toHaveCount(0)
+    if (mode === 'vim') await window.keyboard.press('i')
+    await window.keyboard.insertText('Z')
+    await expect(editor).toHaveText(`leZ${source.slice(2)}`)
+    if (mode === 'vim') await window.keyboard.press('Escape')
+
+    await window.keyboard.press('Meta+f')
+    await prompt.fill('match')
+    await expect(marks).toHaveCount(600)
+    const firstText = await marks.first().evaluateHandle((span) => span.firstChild)
+    await prompt.press('Enter')
+    await expect(marks.first()).toHaveClass('search-match search-match-current')
+    await window.keyboard.press('Meta+g')
+
+    await expect(marks.nth(1)).toHaveClass('search-match search-match-current')
+    await expect(marks.first()).toHaveClass('search-match')
+    expect(await marks.first().evaluate((span, original) => span.firstChild === original, firstText)).toBe(true)
+    await firstText.dispose()
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('dense-find-current.png')) })
+  })
+
   test('keeps Find geometry and focus stable while typing and counting', async ({ userDataDir }) => {
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'one', text: 'apple apple', children: [] }] },

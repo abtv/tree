@@ -190,3 +190,76 @@ test('keeps repeated matches responsive within one densely highlighted row', asy
   expect(metrics.sendIntervalMs).toBeLessThan(25)
   expect(metrics.twoFrameP95Ms).toBeLessThan(110)
 })
+
+// @requirement PRODUCT.md §22.2
+test('renders the first dense local query without a long frame gap on a throttled renderer', async ({
+  userDataDir,
+}) => {
+  const text = `${'needle release brief '.repeat(2500)}x`
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'root', text: 'Root', children: [{ id: 'dense', text, children: [] }] }] },
+    location: { currentParentId: 'root', selectedNodeId: 'dense' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const cdp = await window.context().newCDPSession(window)
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 })
+  const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+  const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+  await expect(editor).toBeFocused()
+  await window.keyboard.press('/')
+  await expect(prompt).toBeFocused()
+  const handle = await prompt.evaluateHandle((field) => {
+    const row = document.querySelector('[data-node-id="dense"]')!
+    const sample = { started: -1, finished: -1, longestFrame: 0 }
+    let previous = performance.now()
+    let active = true
+    function frame(now: number): void {
+      if (!active) return
+      if (sample.started >= 0) sample.longestFrame = Math.max(sample.longestFrame, now - previous)
+      previous = now
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
+    const start = (event: Event) => (sample.started = event.timeStamp)
+    field.addEventListener('input', start, { capture: true, once: true })
+    const observer = new MutationObserver(() => {
+      if (row.querySelectorAll('.search-match').length !== 2500) return
+      observer.disconnect()
+      requestAnimationFrame(() => requestAnimationFrame(() => (sample.finished = performance.now())))
+    })
+    observer.observe(row, { childList: true, subtree: true })
+    return {
+      sample,
+      stop() {
+        active = false
+        observer.disconnect()
+        field.removeEventListener('input', start, true)
+      },
+    }
+  })
+  try {
+    await window.keyboard.type('n')
+    await window.waitForFunction(({ sample }) => sample.started >= 0 && sample.finished >= 0, handle)
+    const { started, finished, longestFrame } = await handle.evaluate(({ sample, stop }) => {
+      stop()
+      return sample
+    })
+
+    const metrics = { twoFrameResponseMs: round(finished - started), longestFrameMs: round(longestFrame) }
+    recordPerfResult({ kind: 'search', scenario: 'first-local-highlight-2500-cpu-4x', metrics })
+    expect(metrics.twoFrameResponseMs).toBeLessThan(115)
+    expect(metrics.longestFrameMs).toBeLessThan(70)
+    await expect(editor.locator('.search-match')).toHaveCount(2500)
+    await prompt.fill('x')
+    await expect(editor.locator('.search-match')).toHaveText(['x'])
+    await expect(prompt).toBeFocused()
+    await prompt.press('Escape')
+    await expect(editor).toBeFocused()
+    await expect(editor).toHaveText(text)
+    await expect(window.getByRole('textbox', { name: 'Current parent', exact: true })).toHaveValue('Root')
+  } finally {
+    await handle.evaluate(({ stop }) => stop())
+    await handle.dispose()
+    await cdp.detach()
+  }
+})
