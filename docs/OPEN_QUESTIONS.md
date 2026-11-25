@@ -70,39 +70,6 @@ Keep an entry short enough to re-read in a minute. A question that needs more th
 
 ## 5. Active Questions
 
-## PD-001: Retrieval across the hierarchy
-
-Kind: product
-Status: Exploring
-
-### Observation
-
-The original observation predates application search. The current application provides local Find, document-wide node and tag search, and marked and starred nodes listed by empty Search (`docs/PRODUCT.md` §20.14); recent-node navigation was removed on 2026-11-22. The remaining question is whether these facilities resolve retrieval friction in ordinary use; their existence alone is not usage evidence.
-
-### Hypothesis
-
-As personal notes accumulate, remembering that a note exists but not where it lives will become a frequent enough problem that hierarchy navigation alone is insufficient.
-
-### Counter-hypotheses and tradeoffs
-
-- A stable, personally designed hierarchy may make retrieval sufficiently fast.
-- A search interface could add visual or conceptual distraction.
-- Better capture and organization conventions might address the problem without another interface.
-
-### Experiment
-
-During normal use, record each failed or noticeably slow retrieval attempt, what was remembered, where the note was located, and how it was eventually found. After enough real attempts to reveal a pattern, compare hierarchy navigation with a disposable, non-production retrieval prototype.
-
-### Decision criteria
-
-Support requires recurring retrieval failures that a focused search interaction resolves materially faster without exposing an expanded tree. Disconfirmation would be reliable hierarchy navigation with negligible retrieval friction.
-
-### Evidence
-
-- 2026-09-21 — Repository fact: `docs/PRODUCT.md` specifies one-level navigation and describes browser-find limitations for windowed sibling lists.
-- 2026-09-21 — Agent inference: retrieval is likely to become more important as the document grows; real usage evidence is still required.
-- 2026-11-03 — Repository fact: PRODUCT §20.14 and the search implementation supersede the original absence-of-search premise. The recorded status is unchanged; any further experiment must assess the existing search first.
-
 ## PD-002: Keyboard-only sibling reordering
 
 Kind: product
@@ -169,23 +136,6 @@ Each time a typed, completed or displayed date in Tree or Agenda is unexpected o
 ### What would settle it
 
 Research that compares the observed problems with the current date model, followed by a Product Owner choice: keep, change together with Agenda, or simplify.
-
-## PD-011: Two search interfaces
-
-Kind: product
-Status: Idea
-
-### Question
-
-Product Owner statement (2026-11-21): there are currently two versions of search, and Search should be improved, but how is not yet known. Repository fact: local search in the current view (`/` and `Cmd+F`, §20.2.26) uses the status bar in Vim and a Find panel in standard editing; document-wide node search is `Cmd+;` (§20.14). Which two versions the Product Owner means is not yet recorded. PD-001 asks the related retrieval question.
-
-### What we are watching
-
-Which search is used for which purpose in ordinary use, and when the wrong one is opened or neither finds the note.
-
-### What would settle it
-
-The Product Owner names the two versions and the friction between them. Agent inference: the options include merging them, separating their purposes more clearly, or changing one of them.
 
 ## PD-013: Whether `#` tags and `&` events are useful
 
