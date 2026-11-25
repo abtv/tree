@@ -4,6 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
+| [Deferred performance investigations](deferred-performance-investigations.md) | Deferred | None until explicitly resumed. Start with P5 (mixed session). |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
