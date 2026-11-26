@@ -70,6 +70,20 @@ export function cancelVimLeader(state: VimCommandState): void {
   if (hasPendingVimLeader(state)) clearPending(state)
 }
 
+/**
+ * Whether a Leader sequence is still unfinished at `timeStamp`. The deadline is checked only when a
+ * key arrives, so every reader that decides a key's owner asks here and an expired sequence is
+ * discarded instead of holding that key back.
+ */
+export function hasLiveVimLeader(state: VimCommandState, timeStamp?: number): boolean {
+  const pending = state.pending
+  if (pending?.prefix !== 'leader' && pending?.prefix !== 'leader-toggle') return false
+  if (pending.deadline === undefined || timeStamp === undefined || timeStamp <= pending.deadline) return true
+
+  clearPending(state)
+  return false
+}
+
 /** Resolve Tree's Normal-mode Leader mappings without stealing a Vim command's awaited key. */
 export function advanceVimLeader(
   state: VimCommandState,
@@ -78,14 +92,7 @@ export function advanceVimLeader(
   timeStamp?: number,
 ): VimLeaderCommand | 'consumed' | undefined {
   // Expire before classifying this key so an expired prefix cannot swallow ordinary Vim input.
-  const current = state.pending
-  if (
-    (current?.prefix === 'leader' || current?.prefix === 'leader-toggle') &&
-    current.deadline !== undefined &&
-    timeStamp !== undefined &&
-    timeStamp > current.deadline
-  )
-    clearPending(state)
+  hasLiveVimLeader(state, timeStamp)
 
   const pending = state.pending
   const prefix = pending?.prefix

@@ -12,7 +12,7 @@ import {
 import type { EditorStore } from '../application/editor-store'
 import type { VimMode } from './vim-editing'
 import type { VimCommandState } from './vim-command-state'
-import { clearPending } from './vim-command-state'
+import { clearPending, hasLiveVimLeader } from './vim-command-state'
 import { moveSuggestionIndex } from './completion-controller'
 import { captureFocusRestoration, getCaret } from './editor-dom'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
@@ -263,7 +263,9 @@ export function useCommandPanel(options: {
         !event.altKey &&
         vimEnabled &&
         vimMode === 'normal' &&
-        !(target instanceof Element && target.closest('.search-input-line'))
+        !(target instanceof Element && target.closest('.search-input-line')) &&
+        // This listener runs before the Leader handler, which discards an unmatched continuation.
+        !hasLiveVimLeader(commandState, event.timeStamp)
       if (
         (!shortcut && !colon) ||
         event.isComposing ||

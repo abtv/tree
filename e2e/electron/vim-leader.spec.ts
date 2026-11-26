@@ -43,6 +43,17 @@ test('runs Leader actions on the focused node without stealing literal spaces', 
   await keys(window, 'A', 'Space', 'Space', 'z', 'Escape')
   await expect(editor).toHaveValue('alpha  eta  z')
   await expect(search).toHaveCount(0)
+
+  // A colon that follows Leader is discarded; had it opened the panel, the next colon would be typed into it.
+  const command = window.getByRole('combobox', { name: 'Command' })
+  await keys(window, 'Space', ':', ':')
+  await expect(command).toBeFocused()
+  await expect(command).toHaveValue('')
+  await keys(window, 'Escape')
+  await expect(editor).toBeFocused()
+
+  await keys(window, 'Space', 'Control+l', 't', 'm')
+  await expect(marker).not.toHaveAttribute('data-marked', 'true')
 })
 
 // @requirement PRODUCT.md §20.2.32

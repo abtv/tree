@@ -24,7 +24,7 @@ import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
 import { cancelVimLeader, clearCommandAssembly } from './vim-command-state'
-import { handleVimLeaderKey } from './vim-leader-keys'
+import { handleVimLeaderKey, useVimLeaderShortcutCancel } from './vim-leader-keys'
 import { prepareVimCommand } from './vim-session-finish'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
@@ -215,6 +215,7 @@ export function App({
     onFoldCommand: applyFoldCommand,
     shortcuts,
   })
+  useVimLeaderShortcutCancel(vimTextCommandState.commandState)
   const applyVimEnabled = useCallback(
     async (nextValue: boolean): Promise<void> => {
       preferences.vim.set(nextValue)

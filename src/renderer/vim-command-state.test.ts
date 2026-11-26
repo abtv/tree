@@ -11,6 +11,7 @@ import {
   clearPending,
   clearVisualRange,
   createVimCommandState,
+  hasLiveVimLeader,
   recordRepeatChange,
   rememberNodeVisual,
   rememberTextVisual,
@@ -237,6 +238,30 @@ describe('Normal-mode Leader assembly', () => {
     expect(restart).toBe('consumed')
     expect(result).toBe('global-search')
     expect(state.pending).toBeUndefined()
+  })
+
+  it.each([
+    [1_999, true],
+    [2_000, true],
+    [2_001, false],
+  ])('reports an unfinished Leader at %i ms as live: %s', (timeStamp, live) => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+
+    const result = hasLiveVimLeader(state, timeStamp)
+
+    expect(result).toBe(live)
+    expect(state.pending === undefined).toBe(!live)
+  })
+
+  it('does not report or clear another pending command as a live Leader', () => {
+    const state = createVimCommandState()
+    state.pending = { prefix: 'g', count: '', motionCount: '' }
+
+    const result = hasLiveVimLeader(state, 5_000)
+
+    expect(result).toBe(false)
+    expect(state.pending).toMatchObject({ prefix: 'g' })
   })
 
   it('accepts a continuation exactly two seconds later', () => {
