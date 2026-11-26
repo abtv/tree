@@ -1024,6 +1024,33 @@ it.each([null, 'scope'] as const)(
   },
 )
 
+it('uses a verified Agenda row index for selection without scanning and ignores stale hints', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  const rows = store.getAgendaRows()
+  const key = `node:${today + 1}:match`
+  const index = rows.findIndex((row) => row.key === key)
+  const find = vi.spyOn(rows, 'find')
+
+  try {
+    store.applyAgenda({ kind: 'select', key, rowIndex: index, cursor: 4, revealLine: true })
+
+    expect(ready(store).agenda?.selectedKey).toBe(key)
+    expect(ready(store).focus).toMatchObject({ nodeId: 'match', cursor: 4, revealLine: true })
+    expect(find.mock.calls.length).toBe(0)
+
+    store.applyAgenda({ kind: 'select', key: `day:${today}`, rowIndex: index })
+
+    expect(ready(store).agenda?.selectedKey).toBe(`day:${today}`)
+
+    store.applyAgenda({ kind: 'select', key: 'missing', rowIndex: index })
+
+    expect(ready(store).agenda?.selectedKey).toBe(`day:${today}`)
+  } finally {
+    find.mockRestore()
+  }
+})
+
 it('publishes real-row selection and focus atomically, including reselection, and ignores invalid commands', async () => {
   const { store } = await agendaHarness()
 

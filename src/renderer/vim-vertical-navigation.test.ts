@@ -413,6 +413,36 @@ describe('Vim vertical navigation', () => {
     expect(applyCaretState).toHaveBeenCalledWith('current', { cursor: 2, imageActive: false })
   })
 
+  it('reuses verified row positions through counted Tree navigation', () => {
+    const roots = Array.from({ length: 10 }, (_, i) => node(String(i), 'abc'))
+    const document = { roots }
+    const rows = buildVisibleRows(roots, () => false)
+    const find = vi.spyOn(rows, 'findIndex')
+    const navigationStore = scriptedStore(readySnapshot(document, '5', null), roots, (_direction, cursor, current) => {
+      if (current.status !== 'ready') return current
+      const nodeId = String(Number(current.location.selectedNodeId) + 1)
+      return {
+        ...current,
+        location: { ...current.location, selectedNodeId: nodeId },
+        focus: { nodeId, cursor, token: current.focus.token + 1 },
+      }
+    })
+    navigationStore.getVisibleRows = () => rows
+    const applyCaretState = vi.fn()
+
+    navigateVertically({
+      store: navigationStore,
+      node: roots[5]!,
+      caret: { cursor: 1, imageActive: false },
+      direction: 'down',
+      count: 3,
+      applyCaretState,
+    })
+
+    expect(find).toHaveBeenCalledTimes(1)
+    expect(applyCaretState).toHaveBeenLastCalledWith('8', { cursor: 1, imageActive: false }, true)
+  })
+
   it('moves down from a selected heading only when it has visible rows', () => {
     const withChild = node('parent', 'heading', [node('child', 'child')])
     const childStore = store({ roots: [withChild] }, withChild.id, withChild.id)
@@ -427,7 +457,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState: vi.fn(),
     })
 
-    expect(moveWithChild).toHaveBeenCalledWith('down', 3)
+    expect(moveWithChild).toHaveBeenCalledWith('down', 3, -1)
 
     const childless = node('parent', 'heading')
     const emptyStore = store({ roots: [childless] }, childless.id, childless.id)
@@ -459,7 +489,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState: vi.fn(),
     })
 
-    expect(moveSelection).toHaveBeenCalledWith('up', 2)
+    expect(moveSelection).toHaveBeenCalledWith('up', 2, -1)
   })
 
   it('crosses from a selection that is not among the visible rows', () => {
@@ -476,7 +506,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState: vi.fn(),
     })
 
-    expect(moveSelection).toHaveBeenCalledWith('up', 1)
+    expect(moveSelection).toHaveBeenCalledWith('up', 1, -1)
   })
 
   it('carries the starting caret column through every counted step', () => {
@@ -494,8 +524,8 @@ describe('Vim vertical navigation', () => {
     })
 
     expect(moveSelection.mock.calls).toEqual([
-      ['down', 3],
-      ['down', 3],
+      ['down', 3, 0],
+      ['down', 3, 1],
     ])
   })
 
@@ -514,8 +544,8 @@ describe('Vim vertical navigation', () => {
     })
 
     expect(moveSelection.mock.calls).toEqual([
-      ['down', 0],
-      ['down', 0],
+      ['down', 0, 0],
+      ['down', 0, 1],
     ])
   })
 
@@ -539,9 +569,9 @@ describe('Vim vertical navigation', () => {
     })
 
     expect(moveSelection.mock.calls).toEqual([
-      ['down', 2],
-      ['down', 0],
-      ['down', 0],
+      ['down', 2, 0],
+      ['down', 0, 1],
+      ['down', 0, 2],
     ])
   })
 
@@ -632,7 +662,7 @@ describe('Vim vertical navigation', () => {
       applyCaretState,
     })
 
-    expect(navigationStore.moveSelection).toHaveBeenCalledWith('down', 5)
+    expect(navigationStore.moveSelection).toHaveBeenCalledWith('down', 5, 0)
     expect(applyCaretState).toHaveBeenLastCalledWith('b', { cursor: 2, imageActive: false }, true)
   })
 

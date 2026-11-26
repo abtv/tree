@@ -108,7 +108,13 @@ import { buildVisibleRows, type VisibleRow } from './visible-rows'
 import { AgendaRowsCache, type AgendaRow } from './agenda-rows'
 import { AgendaFoldMemory } from './agenda-fold-memory'
 import { ReturnPositions } from './return-positions'
-import { focusedAgendaDay, applyAgendaCommand, openAgendaState, type AgendaCommand } from './agenda-state'
+import {
+  focusedAgendaDay,
+  applyAgendaCommand,
+  findAgendaRow,
+  openAgendaState,
+  type AgendaCommand,
+} from './agenda-state'
 import { dayNumberOf } from '../domain/calendar-date'
 import {
   agendaHistorySelection,
@@ -381,7 +387,11 @@ export class EditorStore {
     const changedPresentation = command.kind === 'return-timeline' || command.kind === 'shift-week'
     const nextRows = changedPresentation ? this.agendaRowsCache.get(state.document, changed) : rows
     const agenda = changedPresentation ? reconcileAgendaSelection(changed, nextRows) : changed
-    const selected = nextRows.find((row) => row.key === agenda.selectedKey)
+    const selected = findAgendaRow(
+      nextRows,
+      agenda.selectedKey,
+      command.kind === 'select' ? command.rowIndex : undefined,
+    )
     const realSelection =
       selected?.kind === 'node' && (agenda.selectedKey !== state.agenda.selectedKey || command.kind === 'select')
     if (agenda === state.agenda && !realSelection) return
@@ -954,9 +964,16 @@ export class EditorStore {
     this.textSession.markNextEditStandalone()
   }
 
-  public moveSelection(direction: 'up' | 'down', cursor: number): void {
+  public moveSelection(direction: 'up' | 'down', cursor: number, rowIndex?: number): void {
     const state = this.runtime.ready()
-    const target = moveSelectionTransition(state.document, state.location, this.getVisibleRows(), direction, cursor)
+    const target = moveSelectionTransition(
+      state.document,
+      state.location,
+      this.getVisibleRows(),
+      direction,
+      cursor,
+      rowIndex,
+    )
     if (target !== undefined) this.selectNode(target.nodeId, target.cursor)
   }
 

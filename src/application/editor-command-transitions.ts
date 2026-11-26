@@ -20,7 +20,7 @@ import {
 } from '../domain/document'
 import { MAX_DOCUMENT_DEPTH, MAX_DOCUMENT_DEPTH_ERROR } from '../domain/document'
 import { currentParentAfterMove } from './editor-node-visual-transitions'
-import type { VisibleRow } from './visible-rows'
+import { findVisibleRowIndex, type VisibleRow } from './visible-rows'
 
 export interface FocusTarget {
   nodeId: NodeId
@@ -279,6 +279,7 @@ export function moveSelectionTransition(
   visibleRows: readonly VisibleRow[],
   direction: 'up' | 'down',
   cursor: number,
+  rowIndex?: number,
 ): FocusTarget | undefined {
   if (location.currentParentId === location.selectedNodeId) {
     const parent = requireNode(document, location.currentParentId).node
@@ -291,7 +292,7 @@ export function moveSelectionTransition(
       : { nodeId: child.id, cursor: Math.min(cursor, child.text.length) }
   }
 
-  const index = visibleRows.findIndex((row) => row.node.id === location.selectedNodeId)
+  const index = findVisibleRowIndex(visibleRows, location.selectedNodeId, rowIndex)
   if (index < 0) return undefined
   if (direction === 'up' && index === 0) {
     if (location.currentParentId === null)

@@ -57,7 +57,14 @@ export function pinnedAgendaOccurrence(state: Pick<AgendaState, 'activity'> | un
 
 export type AgendaCommand =
   | { readonly kind: 'shift-week'; readonly direction: -1 | 1 }
-  | { readonly kind: 'select'; readonly key: string; readonly cursor?: number; readonly revealLine?: boolean }
+  | {
+      readonly kind: 'select'
+      readonly key: string
+      /** Lookup hint from the current row list. The occurrence key remains authoritative. */
+      readonly rowIndex?: number
+      readonly cursor?: number
+      readonly revealLine?: boolean
+    }
   | { readonly kind: 'focus-day'; readonly key: string; readonly scrollTop: number }
   | { readonly kind: 'return-timeline'; readonly key: string }
   | { readonly kind: 'toggle-fold'; readonly key: string }
@@ -73,6 +80,11 @@ export function dayKey(day: DayNumber): string {
 
 export function overdueKey(weekStart: DayNumber): string {
   return `overdue:${weekStart}`
+}
+
+export function findAgendaRow(rows: readonly AgendaRow[], key: string, rowIndex?: number): AgendaRow | undefined {
+  const hinted = rowIndex === undefined ? undefined : rows[rowIndex]
+  return hinted?.key === key ? hinted : rows.find((row) => row.key === key)
 }
 
 export function agendaWeekStart(day: DayNumber): DayNumber {
@@ -161,7 +173,7 @@ export function applyAgendaCommand(
     }
   }
 
-  const row = rows.find((candidate) => candidate.key === command.key)
+  const row = findAgendaRow(rows, command.key, command.kind === 'select' ? command.rowIndex : undefined)
   if (row === undefined) return state
   if (command.kind === 'focus-day') {
     if (row.kind !== 'day' || row.overdue || state.presentation.kind !== 'timeline') return state

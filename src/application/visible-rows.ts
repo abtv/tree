@@ -8,6 +8,11 @@ export interface VisibleRow {
   readonly siblingCount: number
 }
 
+/** Reuse a tentative position only while it still names the selected node. */
+export function findVisibleRowIndex(rows: readonly Pick<VisibleRow, 'node'>[], id: string, hint = -1): number {
+  return rows[hint]?.node.id === id ? hint : rows.findIndex((row) => row.node.id === id)
+}
+
 /** Inclusive visible range of selected sibling subtrees, including the final root's descendants. */
 export function selectedSubtreeRowRange(
   rows: readonly VisibleRow[],

@@ -243,6 +243,15 @@ describe('editor command transitions', () => {
     expect(document.roots[0]!.children.map((node) => node.id)).toEqual(['first', 'second'])
   })
 
+  it('checks a vertical row position against the selected node before using it', () => {
+    const location = { currentParentId: 'root', selectedNodeId: 'first' }
+    const rows = rowsFor(document, location)
+
+    expect(moveSelectionTransition(document, location, rows, 'down', 5, 0)).toEqual({ nodeId: 'second', cursor: 5 })
+    expect(moveSelectionTransition(document, location, rows, 'down', 5, 1)).toEqual({ nodeId: 'second', cursor: 5 })
+    expect(moveSelectionTransition(document, location, rows, 'up', 4, 99)).toEqual({ nodeId: 'root', cursor: 4 })
+  })
+
   it('resolves first and last displayed nodes while clamping the cursor', () => {
     const childLocation = { currentParentId: 'root', selectedNodeId: 'first' }
 

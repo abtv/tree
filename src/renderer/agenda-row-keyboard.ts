@@ -86,7 +86,8 @@ export function createAgendaKeyDownHandler({
             rowCaretMode(vim),
           ).focus
     const select = (target: number, preserveViewport = false, cursor = sourceCursor(), explicit = false): void => {
-      const destination = rows[Math.max(0, Math.min(rows.length - 1, target))]!
+      const rowIndex = Math.max(0, Math.min(rows.length - 1, target))
+      const destination = rows[rowIndex]!
       if (destination.key === row.key && !explicit) return
       if (destination.key === row.key && rowText !== undefined && !rowText.hasEditor(destination)) {
         rowText.setCaret(
@@ -98,6 +99,7 @@ export function createAgendaKeyDownHandler({
       store.applyAgenda({
         kind: 'select',
         key: destination.key,
+        rowIndex,
         cursor,
       })
     }
@@ -218,7 +220,13 @@ export function createAgendaKeyDownHandler({
           if (leftImage && !caret.imageActive)
             preferredLeft = geometry(current)?.position(caret.cursor).left ?? preferredLeft
           beforeSelect?.(false)
-          store.applyAgenda({ kind: 'select', key: current.key, cursor: caret.cursor, revealLine: true })
+          store.applyAgenda({
+            kind: 'select',
+            key: current.key,
+            rowIndex: position,
+            cursor: caret.cursor,
+            revealLine: true,
+          })
           publishCaret(current, caret, true)
         }
       } finally {

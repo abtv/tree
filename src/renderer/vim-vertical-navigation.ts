@@ -1,11 +1,12 @@
 import type { EditorSnapshot } from '../application/editor-store-types'
+import { findVisibleRowIndex } from '../application/visible-rows'
 import { requireNode, type TreeNode } from '../domain/document'
 import { focusCaretTransition, verticalCaretTransition, type VimCaretState } from './vim-caret-transition'
 
 export interface VimVerticalNavigationStore {
   getSnapshot: () => EditorSnapshot
   getVisibleRows: () => readonly { node: TreeNode }[]
-  moveSelection: (direction: 'up' | 'down', cursor: number) => void
+  moveSelection: (direction: 'up' | 'down', cursor: number, rowIndex?: number) => void
 }
 
 export interface VimVerticalNavigationOptions {
@@ -30,6 +31,7 @@ export function navigateVertically({
 }: VimVerticalNavigationOptions): void {
   let currentNode = node
   let caret = initialCaret
+  let rowIndex = -1
 
   // Each iteration is one complete single motion from the current caret, so a count takes exactly
   // the steps of repeated presses; the desired column survives through `textLineCursor`.
@@ -47,8 +49,8 @@ export function navigateVertically({
     // Counted vertical motion crosses onto the adjacent visible row, or to the current-parent
     // heading when moving up from the first visible row.
     const rows = store.getVisibleRows()
-    const rowIndex = rows.findIndex((row) => row.node.id === before.location.selectedNodeId)
     const headingSelected = before.location.selectedNodeId === before.location.currentParentId
+    rowIndex = headingSelected ? -1 : findVisibleRowIndex(rows, before.location.selectedNodeId, rowIndex)
     const canCrossNode = headingSelected
       ? direction === 'down'
         ? rows.length > 0
@@ -74,7 +76,9 @@ export function navigateVertically({
     }
 
     const focusCursor = step.focusCursor
-    store.moveSelection(direction, focusCursor)
+    store.moveSelection(direction, focusCursor, rowIndex)
+    // Carry the expected adjacent position. The next iteration checks it against actual focus.
+    rowIndex += direction === 'down' ? 1 : -1
     const after = store.getSnapshot()
     if (after.status !== 'ready') break
     // Mutation triage: a ready snapshot always carries `focus` and `document` (see `EditorSnapshot`),
