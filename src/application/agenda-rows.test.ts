@@ -154,12 +154,16 @@ describe('Agenda rows', () => {
 
   // @requirement PRODUCT.md §23.3
   // @requirement PRODUCT.md §23.7
-  it('restores the earliest overdue date after leaving an active occurrence with same-day peers', () => {
+  it('restores the earliest overdue date when two nodes share a later date', () => {
     const state = openAgendaState(location, 0, today)
+    const firstDay = dayNumberOf({ year: 2026, month: 9, day: 1 })
+    const olderPeerDay = dayNumberOf({ year: 2026, month: 9, day: 15 })
+    const duplicateDay = dayNumberOf({ year: 2026, month: 9, day: 20 })
     const source: Document = {
       roots: [
         { id: 'old', text: '2026-10-04 task', children: [] },
         { id: 'peer', text: '2026-10-04 peer', children: [] },
+        { id: 'duplicate', text: '2026-09-20 2026-10-04 another task', children: [] },
         { id: 'older-peer', text: '2026-09-15 peer', children: [] },
       ],
     }
@@ -173,37 +177,55 @@ describe('Agenda rows', () => {
       cache.getProjection(edited, state).map((day) => [day.day, day.rows.map((entry) => entry.nodeId)])
 
     expect(dates(active)).toEqual([
-      [dayNumberOf({ year: 2026, month: 9, day: 15 }), ['older-peer']],
+      [olderPeerDay, ['older-peer']],
+      [duplicateDay, ['duplicate']],
       [row.day, ['old', 'peer']],
     ])
 
     const left = applyAgendaCommand(active, { kind: 'select', key: dayKey(today) }, cache.get(edited, active))
 
     expect(dates(left)).toEqual([
-      [dayNumberOf({ year: 2026, month: 9, day: 1 }), ['old']],
-      [dayNumberOf({ year: 2026, month: 9, day: 15 }), ['older-peer']],
+      [firstDay, ['old']],
+      [olderPeerDay, ['older-peer']],
+      [duplicateDay, ['duplicate']],
       [row.day, ['peer']],
     ])
-    expect(cache.get(edited, left).filter((entry) => entry.kind === 'node')).toHaveLength(3)
+    const rowKeys = cache
+      .get(edited, left)
+      .filter((entry) => entry.kind === 'node')
+      .map((entry) => entry.key)
+    expect(rowKeys).toEqual([
+      `node:${firstDay}:old`,
+      `node:${olderPeerDay}:older-peer`,
+      `node:${duplicateDay}:duplicate`,
+      `node:${row.day}:peer`,
+    ])
   })
 
   // @requirement PRODUCT.md §23.3
-  it('does not rescan overdue nodes when selecting their earliest occurrences', () => {
+  it('does not rescan overdue nodes when selecting their earliest or current-week occurrences', () => {
     const source: Document = {
-      roots: Array.from({ length: 4_000 }, (_, index) => ({
-        id: `overdue-${index}`,
-        text: index % 2 === 0 ? '2026-10-01 2026-10-04 task' : '2026-10-02 task',
-        children: [],
-      })),
+      roots: [
+        { id: 'through-friday', text: '2026-10-01 2026-10-04 2026-10-05 2026-10-09 task', children: [] },
+        ...Array.from({ length: 3_999 }, (_, index) => ({
+          id: `overdue-${index}`,
+          text: index % 2 === 0 ? '2026-10-01 2026-10-04 task' : '2026-10-02 task',
+          children: [],
+        })),
+      ],
     }
     let state = openAgendaState({ currentParentId: null, selectedNodeId: 'overdue-0' }, 0, today)
     const cache = new AgendaRowsCache()
     const rows = cache.get(source, state)
     const projection = cache.getProjection(source, state)
-    const targets = rows.filter((row) => row.kind === 'node')
+    const targets = rows.filter((row) => row.kind === 'node' && row.groupKey !== undefined)
+    const thisWeek = rows.filter(
+      (row) => row.kind === 'node' && row.nodeId === 'through-friday' && row.groupKey === undefined,
+    )
+    expect(thisWeek.map((row) => row.day)).toEqual([state.weekStart, today + 1])
     const locate = vi.spyOn(documentModule, 'locateNode')
     try {
-      for (const row of [targets[0]!, targets.at(-1)!, targets[1]!, rows[0]!]) {
+      for (const row of [targets[0]!, targets.at(-1)!, targets[1]!, ...thisWeek, rows[0]!]) {
         state = applyAgendaCommand(state, { kind: 'select', key: row.key }, rows)
 
         expect(cache.get(source, state)).toBe(rows)
@@ -214,6 +236,78 @@ describe('Agenda rows', () => {
     } finally {
       locate.mockRestore()
     }
+  })
+
+  it('reuses grouped overdue rows when an edit preserves their dates and parent paths', () => {
+    const source: Document = {
+      roots: [
+        {
+          id: 'parent',
+          text: 'Project',
+          children: [{ id: 'task', text: '2026-10-01 Draft', children: [] }],
+        },
+      ],
+    }
+    const state = openAgendaState(location, 0, today)
+    const cache = new AgendaRowsCache()
+    const before = cache.get(source, state)
+    expect(before.find((row) => row.kind === 'path')).toMatchObject({
+      parentId: 'parent',
+      groupKey: overdueKey(state.weekStart),
+    })
+
+    const edited = editNodeText(source, 'task', '2026-10-01 Draft revised')
+
+    expect(cache.get(edited, state)).toBe(before)
+  })
+
+  it('does not walk the existing date projection again when selecting an overdue row', () => {
+    const source: Document = {
+      roots: [{ id: 'task', text: '2026-10-01 2026-10-04 Draft', children: [] }],
+    }
+    const [earliest, ...later] = projectAgenda(source, null)
+    const row = earliest!.rows[0]!
+    const readNodeId = vi.fn(() => row.nodeId)
+    const observed = {
+      ...row,
+      get nodeId() {
+        return readNodeId()
+      },
+    }
+    const project = vi
+      .spyOn(projectionModule, 'projectAgenda')
+      .mockReturnValue([{ ...earliest!, rows: [observed] }, ...later])
+    const state = openAgendaState({ currentParentId: null, selectedNodeId: 'task' }, 0, today)
+    const cache = new AgendaRowsCache()
+    try {
+      const before = cache.get(source, state)
+      const selected = applyAgendaCommand(state, { kind: 'select', key: `node:${earliest!.day}:task` }, before)
+      readNodeId.mockClear()
+
+      const after = cache.get(source, selected)
+
+      expect(after).toBe(before)
+      expect(readNodeId).not.toHaveBeenCalled()
+    } finally {
+      project.mockRestore()
+    }
+  })
+
+  // @requirement PRODUCT.md §23.3
+  it('keeps the overdue copy visible while editing the same task on Monday', () => {
+    const source: Document = {
+      roots: [{ id: 'task', text: '2026-10-01 2026-10-05 Draft', children: [] }],
+    }
+    const state = openAgendaState({ currentParentId: null, selectedNodeId: 'task' }, 0, today)
+    const cache = new AgendaRowsCache()
+    const monday = `node:${state.weekStart}:task`
+    const overdue = `node:${state.weekStart - 4}:task`
+    const selected = applyAgendaCommand(state, { kind: 'select', key: monday }, cache.get(source, state))
+    const edited = editNodeText(source, 'task', '2026-10-01 2026-10-05 Draft revised')
+
+    const rows = cache.get(edited, selected)
+
+    expect(rows.filter((row) => row.kind === 'node').map((row) => row.key)).toEqual([overdue, monday])
   })
 
   // @requirement PRODUCT.md §20.2.26
@@ -327,6 +421,8 @@ describe('Agenda rows', () => {
       [remainingDay, ['parent']],
       [originalDay, ['child']],
     ])
+    const rows = cache.get(edited, selected).filter((row) => row.kind === 'node')
+    expect(rows.map((row) => row.key)).toEqual([`node:${remainingDay}:parent`, `node:${originalDay}:child`])
   })
 
   it('shows distinct unfinished overdue nodes only in the current week and updates after strikethrough', () => {

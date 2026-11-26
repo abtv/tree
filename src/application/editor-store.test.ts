@@ -4952,6 +4952,38 @@ describe('EditorStore', () => {
     expect(state.status === 'ready' && state.focus).toMatchObject({ nodeId: 'a', cursor: 5 })
   })
 
+  it('uses a verified Tree row position and looks up the selected node when the position is stale', async () => {
+    const services = loadedState(
+      {
+        roots: [
+          { id: 'a', text: 'Alpha', children: [] },
+          { id: 'b', text: 'Beta', children: [] },
+          { id: 'c', text: 'C', children: [] },
+        ],
+      },
+      { currentParentId: null, selectedNodeId: 'b' },
+    )
+    const store = new EditorStore(services, ids('unused'))
+    await store.initialize()
+    const rows = store.getVisibleRows()
+    const index = rows.findIndex((row) => row.node.id === 'b')
+    const find = vi.spyOn(rows, 'findIndex')
+    try {
+      store.moveSelection('down', 3, index)
+
+      expect(find).not.toHaveBeenCalled()
+      expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'c', cursor: 1 } })
+
+      store.moveSelection('up', 3, index)
+
+      expect(find).toHaveBeenCalledOnce()
+      expect(store.getSnapshot()).toMatchObject({ focus: { nodeId: 'b', cursor: 3 } })
+    } finally {
+      find.mockRestore()
+    }
+    await store.flushPersistence()
+  })
+
   it('moves to the first displayed or current parent boundary and clamps the cursor', async () => {
     const services = loadedState(
       {

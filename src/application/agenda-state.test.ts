@@ -29,6 +29,7 @@ it('captures the origin and retains identity for invalid or inapplicable command
     selectedKey: 'day:100',
     today: 100,
     origin: { location: { currentParentId: 'scope', selectedNodeId: 'origin' }, cursor: 7 },
+    presentation: { kind: 'timeline' },
   })
   for (const command of [
     { kind: 'select', key: 'missing' },
@@ -118,6 +119,19 @@ it('toggles a day without moving an unrelated selection and preserves the nonemp
     applyAgendaCommand(folded, { kind: 'toggle-fold', key: 'day:99' }, buildAgendaRows(projection, folded)).collapsed
       .size,
   ).toBe(0)
+})
+
+// @requirement PRODUCT.md §23.5
+it('keeps the separator selected when folding the day that follows it', () => {
+  const state = opened()
+  const rows = buildAgendaRows(projection, state)
+  const separator = rows.find((row) => row.kind === 'separator' && row.day === 101)!
+  const selected = applyAgendaCommand(state, { kind: 'select', key: separator.key }, rows)
+
+  const folded = applyAgendaCommand(selected, { kind: 'toggle-fold', key: 'day:101' }, rows)
+
+  expect([...folded.collapsed]).toEqual(['day:101'])
+  expect(folded.selectedKey).toBe(separator.key)
 })
 
 // @requirement PRODUCT.md §23.7

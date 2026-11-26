@@ -409,10 +409,45 @@ describe('packaged desktop update wiring', () => {
     const f = await packagedSetup()
 
     f.lifecycle.closeSavedMainWindow()
+    f.lifecycle.closeSavedMainWindow()
 
     expect(mocks.boundsSaver.save).toHaveBeenCalledExactlyOnceWith({ x: 10, y: 20, width: 800, height: 600 })
     expect(mocks.boundsSaver.flush).toHaveBeenCalledBefore(vi.mocked(f.window.destroy))
+    expect(f.window.destroy).toHaveBeenCalledOnce()
     expect(f.lifecycle.getMainWindow()).toBeNull()
+  })
+
+  it('delivers a failed installation to the reopened editor once its notes load settles', async () => {
+    const f = await packagedSetup()
+    const native = f.electron.autoUpdater
+    f.quitControl.closeForUpdate.mockImplementationOnce((install) => {
+      f.lifecycle.closeSavedMainWindow()
+      install()
+    })
+    f.quitControl.restoreMainWindow.mockImplementationOnce(() => f.lifecycle.createMainWindow(f.quitWithoutSave))
+    f.downloaded()
+    f.updates.request()
+    f.updates.confirm(requestedUpdateId(f.window), true)
+    native.emit('update-downloaded')
+    expect(f.lifecycle.getMainWindow()).toBeNull()
+    vi.mocked(f.window.webContents.send).mockClear()
+
+    native.emit('error', new Error('native installation failed'))
+
+    expect(f.quitControl.restoreMainWindow).toHaveBeenCalledOnce()
+    const recovered = f.electron.BrowserWindow.getAllWindows().at(-1)!
+    expect(recovered).not.toBe(f.window)
+    const messages = () =>
+      vi.mocked(recovered.webContents.send).mock.calls.filter(([channel]) => channel === ipcEvents.appUpdateFinished)
+    f.ipc.setNotesMenuState!({ canExport: false, canImport: false, canInstallUpdate: false })
+    expect(messages()).toEqual([])
+
+    const settled = { canExport: true, canImport: true, canInstallUpdate: true }
+    f.ipc.setNotesMenuState!(settled)
+    f.ipc.setNotesMenuState!(settled)
+
+    expect(messages()).toEqual([[ipcEvents.appUpdateFinished, 'Update failed. Try Restart and Install again.']])
+    expect(f.window.webContents.send).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -538,6 +573,7 @@ describe('packaged desktop update wiring', () => {
     expect(f.updates.isApplying()).toBe(false)
     expect(f.window.webContents.send).not.toHaveBeenCalled()
     expect(f.prepare).not.toHaveBeenCalled()
+    expect(f.quitControl.restoreMainWindow).not.toHaveBeenCalled()
   })
 
   it('keeps an installation in progress when a late staging result reports no update', async () => {
@@ -1223,6 +1259,8 @@ describe('desktop entry wiring', () => {
   it('starts an unpackaged window with secure dimensions and updates unavailable', async () => {
     const f = await setup()
     const options = (f.window as unknown as { options: unknown }).options
+
+    f.window.webContents.emit('did-stop-loading')
 
     expect(options).toEqual({
       width: 1000,

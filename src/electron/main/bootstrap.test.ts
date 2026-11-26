@@ -211,6 +211,19 @@ describe('bootstrapApplication', () => {
     expect(install).not.toHaveBeenCalled()
   })
 
+  it('does not start the installer while a native window remains open', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    f.quitControl.prepareUpdateQuit()
+    const install = vi.fn()
+
+    f.quitControl.closeForUpdate(install)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    expect(f.dependencies.closeSavedMainWindow).toHaveBeenCalledOnce()
+    expect(install).not.toHaveBeenCalled()
+  })
+
   it('keeps a confirmed quit when a failed update installation rolls back', async () => {
     const f = createHarness()
     await Promise.resolve()

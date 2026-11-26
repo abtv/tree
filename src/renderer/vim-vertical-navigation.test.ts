@@ -413,14 +413,17 @@ describe('Vim vertical navigation', () => {
     expect(applyCaretState).toHaveBeenCalledWith('current', { cursor: 2, imageActive: false })
   })
 
-  it('reuses verified row positions through counted Tree navigation', () => {
+  it.each([
+    ['down', '8'],
+    ['up', '2'],
+  ] as const)('reuses verified row positions through counted Tree navigation %s', (direction, destination) => {
     const roots = Array.from({ length: 10 }, (_, i) => node(String(i), 'abc'))
     const document = { roots }
     const rows = buildVisibleRows(roots, () => false)
     const find = vi.spyOn(rows, 'findIndex')
-    const navigationStore = scriptedStore(readySnapshot(document, '5', null), roots, (_direction, cursor, current) => {
+    const navigationStore = scriptedStore(readySnapshot(document, '5', null), roots, (motion, cursor, current) => {
       if (current.status !== 'ready') return current
-      const nodeId = String(Number(current.location.selectedNodeId) + 1)
+      const nodeId = String(Number(current.location.selectedNodeId) + (motion === 'down' ? 1 : -1))
       return {
         ...current,
         location: { ...current.location, selectedNodeId: nodeId },
@@ -434,13 +437,13 @@ describe('Vim vertical navigation', () => {
       store: navigationStore,
       node: roots[5]!,
       caret: { cursor: 1, imageActive: false },
-      direction: 'down',
+      direction,
       count: 3,
       applyCaretState,
     })
 
     expect(find).toHaveBeenCalledTimes(1)
-    expect(applyCaretState).toHaveBeenLastCalledWith('8', { cursor: 1, imageActive: false }, true)
+    expect(applyCaretState).toHaveBeenLastCalledWith(destination, { cursor: 1, imageActive: false }, true)
   })
 
   it('moves down from a selected heading only when it has visible rows', () => {
