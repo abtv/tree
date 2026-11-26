@@ -300,7 +300,9 @@ Normal mode also supports:
 
 * Unsupported unmodified keys do not edit text in Normal or Visual mode.
 * Application shortcuts using modifier keys retain their existing behavior.
-* Vim handling is suspended during native text composition.
+* Vim handling is suspended during native text composition in the editor that started it. Removing that editor or moving focus to another control releases the suspension, even if the original editor receives no composition-end event.
+* While the same editor has focus, a new text decoration, such as a Find match or date, waits until composition ends before changing the editor or its markup.
+* The caret placement that follows a completed composition does not override a newer native caret movement.
 * Reading a text selection's offsets preserves its endpoints and direction, including backward selections in rich text editors.
 
 #### 20.2.32 Leader Commands
@@ -308,12 +310,23 @@ Normal mode also supports:
 In Vim Normal mode, `Space` is Tree's Leader. These sequences work when focus is on a Tree node editor or an Agenda editor or row:
 
 * `<Leader><Leader>` opens Global Search (§20.14).
-* `<Leader>tm` toggles the selected node's mark (§2.7).
-* `<Leader>ts` toggles the selected node's star (§2.6).
-* `<Leader>tt` selects the next Appearance choice by name: Automatic → Dark → Gray → Light → White → Automatic. It uses the same saved setting as View > Appearance (§20.5).
+* `<Leader>m` toggles the selected node's mark (§2.7). `<Leader>tm` does the same.
+* `<Leader>s` toggles the selected node's star (§2.6). `<Leader>ts` does the same.
+* `<Leader>p` switches between Tree and Agenda using the same opening and focus restoration as `Cmd+P` (§23.1). Holding `p` does not switch views again.
+* `<Leader>e` toggles the selected Tree node's fold (§2.4) or the selected Agenda day's fold (§23.5), with the same behavior as `Cmd+E`.
+* `<Leader>ha` opens About Tree (§9.4) and returns focus to the same editor or Agenda row when closed.
+* `<Leader>hh` opens a read-only outline of Leader shortcuts in the same window, with all branches expanded. Tree navigation, folding, text selection and copy work on the reference, without editing it or the notes. Press `<Leader>hh` again in Normal mode to return to the originating Tree or Agenda selection. Escape clears pending keys, exits Visual or dismisses Find before returning. `<Leader>p` or `Cmd+P` leaves the reference and switches from the underlying view. The Tree and Agenda menu items can also leave the reference and select their named view.
+* `<Leader>fe` starts Export Notes… and `<Leader>fi` starts Import Notes… (§24.3, §24.4, §25). Each uses the same availability, file selection and confirmation as its menu action.
+* `<Leader>tf` toggles Float on Top in the desktop app (§2.2, §9.3). In the browser this sequence does nothing.
+* `<Leader>tt` selects the next Appearance choice by name: Automatic → Dark → Gray → Light → White → Automatic. It uses the same saved setting as View > Appearance (§20.5). A newer menu choice is not replaced by the reply to an earlier Leader read.
 
 Mark and star have the same target and availability as the corresponding command-panel actions (§20.2.30). Leader commands do not enter the command-panel history or replace the edit remembered for dot repeat.
 
-Press the keys separately. Key auto-repeat does not advance a sequence or extend its deadline. If more than two seconds pass between presses, the unfinished sequence is discarded and the next key is handled normally. An unmatched continuation cancels the sequence and is discarded with it. For example, `Space a` and `Space t a` do nothing when pressed within the timeout, but `Space a t` leaves Vim waiting for the character after an ordinary `t`. Escape, a pointer press, or loss of editor focus also cancels an unfinished sequence. A shortcut that uses Control, Command or Option cancels it too and then runs as usual.
+* Press the keys separately. Key auto-repeat does not advance a sequence or extend its deadline. A key consumed by Leader does not repeat as an edit or type into a popup it just opened.
+* If more than two seconds pass between presses, the unfinished sequence is discarded and the next key is handled normally.
+* An unmatched continuation cancels the sequence and is discarded with it. For example, `Space a` and `Space t a` do nothing when pressed within the timeout, and `Space Tab` does not move a node. `Space a t` still leaves Vim waiting for the character after an ordinary `t`.
+* Escape, a pointer press, or loss of editor focus also cancels an unfinished sequence. A shortcut that uses Control, Command or Option cancels it too and then runs as usual.
 
 Leader starts only when no Vim command is pending, so a command such as `f` or `r` can still take a space as its character. Outside Normal mode, in popups, and on other controls, Space retains its existing behavior.
+
+On a focused reference row in Normal mode, `/` and `Cmd+F` find text in the current reference scope. `<Leader><Leader>` opens the ordinary notes Search (§20.14), not a search of the reference. `<Leader>e` toggles the selected reference branch. About, Export Notes, Float on Top where supported, and Appearance keep their usual effects. Mark, star and Import Notes via Leader require returning to the notes.

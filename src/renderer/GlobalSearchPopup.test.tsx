@@ -130,6 +130,7 @@ it('names the list parts once per result list instead of rescanning it while the
         store={store}
         shortcuts={APPLE_SHORTCUTS}
         blocked={false}
+        isEditorComposing={() => false}
         beforeOpen={vi.fn()}
         beforeVisit={vi.fn()}
       />
@@ -168,6 +169,7 @@ function setup(empty = false) {
         store={store}
         shortcuts={APPLE_SHORTCUTS}
         blocked={false}
+        isEditorComposing={() => false}
         beforeOpen={vi.fn()}
         beforeVisit={beforeVisit}
       />
@@ -462,13 +464,27 @@ it('accepts tag suggestions with ordinary completion keys and respects IME', () 
   fireEvent.change(input, { target: { value: '#work' } })
   fireEvent.compositionStart(input)
   fireEvent.change(input, { target: { value: '#作' } })
-  fireEvent.keyDown(input, { key: 'Escape', isComposing: true })
+  expect(fireEvent.keyDown(input, { key: 'Tab', isComposing: true })).toBe(false)
+  fireEvent.keyDown(input, { key: 'Escape', isComposing: false })
   fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
   expect(input).toHaveFocus()
   expect(screen.queryByRole('listbox', { name: 'Tags' })).toBeNull()
   expect(input).toHaveValue('#作')
   fireEvent.compositionEnd(input)
   expect(screen.getByRole('listbox', { name: 'Tags' })).toBeInTheDocument()
+})
+
+it('resumes Search shortcuts after the native clear input ends composition without compositionend', () => {
+  setup()
+  const input = screen.getByRole('searchbox')
+  fireEvent.compositionStart(input)
+  fireEvent.input(input, { target: { value: '日本' }, inputType: 'insertCompositionText', isComposing: true })
+
+  fireEvent.input(input, { target: { value: '' } })
+  fireEvent.keyDown(input, { key: 'Escape', isComposing: false })
+
+  expect(screen.queryByRole('searchbox')).toBeNull()
+  expect(screen.getByLabelText('Editor')).toHaveFocus()
 })
 
 it.each(['keyboard', 'pointer'])(

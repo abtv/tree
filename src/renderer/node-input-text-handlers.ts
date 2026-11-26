@@ -10,17 +10,18 @@ import { clearPending, type VimCommandState } from './vim-command-state'
 import type { VimEditSessionState } from './vim-edit-session'
 import { startVimReplace } from './vim-session-finish'
 import type { VimMode } from './vim-editing'
+import type { EditorComposition } from './editor-composition'
 
 interface TextEditHandlerDeps {
   store: EditorStore
-  composing: boolean
+  composition: EditorComposition
   pendingLinkDraft: { current: { nodeId: string; range: LinkRange } | undefined }
   schedulePendingCaret: (request: Omit<PendingCaret, 'normal' | 'revision' | 'focusToken'>) => void
+  requestProjectionCommit: () => void
   getMode: () => VimMode
   session: VimEditSessionState
   commandState: VimCommandState
   finishVimReplace: (input?: HTMLElement, retreat?: boolean, preserveSelection?: boolean) => boolean
-  setComposing: (value: boolean) => void
 }
 
 export function createTextEditHandlers(
@@ -32,21 +33,21 @@ export function createTextEditHandlers(
 > {
   const {
     store,
-    composing,
+    composition,
     pendingLinkDraft,
     schedulePendingCaret,
+    requestProjectionCommit,
     getMode,
     session,
     commandState,
     finishVimReplace,
-    setComposing,
   } = deps
   return {
     onTextChange: (event) => {
       // Replacing the textarea would cancel a native composition and orphan its compositionend,
       // so link recognition waits for the first edit after the composition.
       const native = event.nativeEvent as Partial<InputEvent> | undefined
-      const composingNow = composing || native?.isComposing === true
+      const composingNow = composition.owns(event.currentTarget) || native?.isComposing === true
       const { text, cursor } = normalizeTypedInput(
         event.currentTarget.value,
         event.currentTarget.selectionStart,
@@ -75,7 +76,7 @@ export function createTextEditHandlers(
       const content = readEditableContent(event.currentTarget)
       const agendaInput = event.currentTarget.closest('.agenda-row') !== null
       const native = event.nativeEvent as Partial<InputEvent> | undefined
-      const composingNow = composing || native?.isComposing === true
+      const composingNow = composition.owns(event.currentTarget) || native?.isComposing === true
       const { text, cursor } = normalizeTypedInput(
         content.text,
         getCaret(event.currentTarget),
@@ -109,6 +110,7 @@ export function createTextEditHandlers(
     },
     onCompositionEnd: (event) => {
       const input = event.currentTarget
+      const agendaInput = input.closest('.agenda-row') !== null
       const content =
         input instanceof HTMLTextAreaElement ? { text: input.value, links: [] } : readEditableContent(input)
       const normalized = normalizeTypedInput(content.text, getCaret(input), event.data, content.links)
@@ -121,14 +123,18 @@ export function createTextEditHandlers(
         const edit = reconcileLinkTextEdit(node.text, node.links ?? [], normalized.text)
         store.editContent(node.id, normalized.text, edit.links, edit.createsNewLink)
       }
-      if (event.currentTarget.closest('.agenda-row') !== null)
+      if (agendaInput) {
         schedulePendingCaret({
           nodeId: node.id,
-          input: event.currentTarget,
+          input,
           cursor: normalized.cursor,
           refocus: true,
         })
-      setComposing(false)
+        // The committed text can equal the last pre-edit. Project this caret now even without a
+        // store render, so a later unrelated render cannot replay it over a newer native selection.
+        requestProjectionCommit()
+      }
+      composition.end(input)
       if (getMode() === 'replace') {
         startVimReplace(store, session, {
           nodeId: node.id,
@@ -137,11 +143,13 @@ export function createTextEditHandlers(
         })
       }
     },
-    onCompositionStart: () => {
+    onCompositionStart: (event) => {
+      const input = event.currentTarget
+      const text = input instanceof HTMLTextAreaElement ? input.value : readEditableContent(input).text
       store.search.interruptNavigation()
       clearPending(commandState)
       finishVimReplace(undefined, false, true)
-      setComposing(true)
+      composition.start(input, text)
     },
   }
 }

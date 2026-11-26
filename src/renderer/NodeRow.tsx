@@ -6,6 +6,7 @@ import { TouchDragSurface } from './TouchDragSurface'
 import { nodeFlagsLabel } from './node-flags'
 
 interface NodeRowProps {
+  readOnly?: boolean
   lineNumber?: number | undefined
   node: TreeNode
   index: number
@@ -14,24 +15,25 @@ interface NodeRowProps {
   renderInput: (node: TreeNode, label: string, match?: TextMatch) => ReactNode
   currentMatch?: TextMatch | undefined
   onActivate?: (node: TreeNode) => void
-  onEnter: (node: TreeNode) => void
+  onEnter?: (node: TreeNode) => void
   onToggleExpansion?: (node: TreeNode) => void
   expanded?: boolean
-  onPointerDown: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
-  onPointerLeave: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
-  rowRef: (nodeId: string, element: HTMLDivElement | null) => void
-  dragging: boolean
-  dropBefore: boolean
-  dropAfter: boolean
-  dropOn: boolean
+  onPointerDown?: (node: TreeNode, index: number, event: ReactPointerEvent<HTMLDivElement>) => void
+  onPointerLeave?: (nodeId: string, event: ReactPointerEvent<HTMLDivElement>) => void
+  rowRef?: (nodeId: string, element: HTMLDivElement | null) => void
+  dragging?: boolean
+  dropBefore?: boolean
+  dropAfter?: boolean
+  dropOn?: boolean
   dropLevel?: number | undefined
-  focused: boolean
+  focused?: boolean
   visualSelected?: boolean
   pinned?: boolean
   pinnedOffset?: number
 }
 
 export const NodeRow = memo(function NodeRow({
+  readOnly = false,
   lineNumber,
   node,
   index,
@@ -56,9 +58,10 @@ export const NodeRow = memo(function NodeRow({
   pinned = false,
   pinnedOffset = 0,
 }: NodeRowProps): React.JSX.Element {
-  const attach = useCallback((element: HTMLDivElement | null) => rowRef(node.id, element), [node.id, rowRef])
+  const attach = useCallback((element: HTMLDivElement | null) => rowRef?.(node.id, element), [node.id, rowRef])
 
   const hasChildren = node.children.length > 0
+  const enterClass = `node-enter-control${hasChildren ? ' node-enter-control-has-children' : ''}`
   const className = [
     pinned ? 'node-row node-row-pinned' : 'node-row',
     node.text.length === 0 && node.attachment !== undefined ? 'node-row-image-only' : '',
@@ -94,35 +97,39 @@ export const NodeRow = memo(function NodeRow({
           return
         onActivate?.(node)
       }}
-      onPointerDown={(event) => onPointerDown(node, index, event)}
-      onPointerLeave={(event) => onPointerLeave(node.id, event)}
-      ref={attach}
+      onPointerDown={onPointerDown && ((event) => onPointerDown(node, index, event))}
+      onPointerLeave={onPointerLeave && ((event) => onPointerLeave(node.id, event))}
+      ref={rowRef === undefined ? undefined : attach}
       style={style}
     >
-      <TouchDragSurface />
+      {readOnly ? null : <TouchDragSurface />}
       {lineNumber === undefined ? null : (
         <span aria-hidden="true" className="line-number">
           {lineNumber}
         </span>
       )}
       {focused ? <span aria-hidden="true" className="node-focus-marker" /> : null}
-      <button
-        aria-label={`Enter node ${index + 1}`}
-        data-starred={node.starred}
-        data-marked={node.marked}
-        title={nodeFlagsLabel(node)}
-        className={`node-enter-control${hasChildren ? ' node-enter-control-has-children' : ''}`}
-        onClick={() => onEnter(node)}
-        onMouseDown={(event) => {
-          event.preventDefault()
-          globalThis.getSelection()?.removeAllRanges()
-        }}
-        onPointerDown={(event) => {
-          event.preventDefault()
-          globalThis.getSelection()?.removeAllRanges()
-        }}
-        type="button"
-      />
+      {onEnter === undefined || (readOnly && !hasChildren) ? (
+        <span aria-hidden="true" className={enterClass} data-starred={node.starred} data-marked={node.marked} />
+      ) : (
+        <button
+          aria-label={`Enter node ${index + 1}`}
+          data-starred={node.starred}
+          data-marked={node.marked}
+          title={nodeFlagsLabel(node)}
+          className={enterClass}
+          onClick={() => onEnter(node)}
+          onMouseDown={(event) => {
+            event.preventDefault()
+            globalThis.getSelection()?.removeAllRanges()
+          }}
+          onPointerDown={(event) => {
+            event.preventDefault()
+            globalThis.getSelection()?.removeAllRanges()
+          }}
+          type="button"
+        />
+      )}
       {hasChildren ? (
         <button
           aria-expanded={expanded}

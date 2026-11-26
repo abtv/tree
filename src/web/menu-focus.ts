@@ -16,7 +16,7 @@ export function installMenuFocus(menu: HTMLElement, trigger: HTMLElement, restor
     if (!(element instanceof HTMLElement)) return
     if (element.matches('.search-input-line input, .search-controls button'))
       previous = { element, restore: restoreFind }
-    else if (element.matches('.node-input, .agenda-row'))
+    else if (element.matches('.node-input, .agenda-row, .vim-help-node'))
       previous = { element, restore: captureFocusRestoration(element) }
   }
   const restore = () => {

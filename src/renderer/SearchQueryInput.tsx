@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ComponentPropsWithRef } from 'react'
 import { validNodeSearchMarker } from '../domain/node-search-query'
+import { isCommittedCompositionInput } from './editor-composition'
 
 type Props = Omit<ComponentPropsWithRef<'input'>, 'value'> & { value: string }
 
@@ -72,7 +73,10 @@ export function SearchQueryInput({
           if (typeof ref === 'function') return ref(element)
           if (ref != null) ref.current = element
         }}
-        onChange={onChange}
+        onChange={(event) => {
+          if (composing && isCommittedCompositionInput(event.nativeEvent)) setComposing(false)
+          onChange?.(event)
+        }}
         onSelect={onSelect}
         onCompositionStart={(event) => {
           setComposing(true)

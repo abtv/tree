@@ -792,7 +792,7 @@ describe('browser editing service contracts', () => {
     await installBrowserPrototype()
 
     expect(await window.treeApi.getAlwaysOnTop()).toBe(false)
-    await expect(window.treeApi.setAlwaysOnTop(true)).rejects.toThrow('Always on Top is unavailable in the browser.')
+    await expect(window.treeApi.setAlwaysOnTop(true)).rejects.toThrow('Float on Top is unavailable in the browser.')
     await expect(window.treeApi.quitWithoutSaving()).rejects.toThrow('Close the browser tab to leave the prototype.')
     expect(await window.treeApi.readAttachment('missing')).toBeNull()
     f.values.set('blobs:image', new Uint8Array([1, 2]))

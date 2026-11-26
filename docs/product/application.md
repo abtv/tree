@@ -41,7 +41,7 @@ Closing the main window quits the application on macOS, including when the appli
 
 ### 9.3 Application Menu
 
-The command panel (§20.2.28) also runs Quit, Always on Top, Vim Editing, and the Appearance choices through the same application services as these menu items.
+The command panel (§20.2.28) also runs Quit, Float on Top, Vim Editing, and the Appearance choices through the same application services as these menu items.
 
 The menu bar has five menus, laid out as macOS applications do (§1.3):
 
@@ -49,9 +49,9 @@ The menu bar has five menus, laid out as macOS applications do (§1.3):
 * **File** holds **Export Notes…** and **Import Notes…** (§25).
 * **Edit** holds the Find and global Search commands (§20.2.26) and a **Vim Editing** check item, checked while Vim editing is enabled (§20.2).
 * **View** holds **Tree** and **Agenda**, then a separator and an **Appearance** submenu with five mutually exclusive items: **Automatic**, **Light**, **Dark**, **Gray**, and **White**. The item for the current appearance choice is checked (§20.5).
-* **Window** holds an **Always on Top** check item, checked while the window floats above other windows.
+* **Window** holds a **Float on Top** check item, checked while the window floats above other windows.
 
-The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Always on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup. A newer selection made during startup takes precedence over an earlier preference read, including for the first editor keystroke.
+The Appearance and Vim Editing items have no status-bar toggles. Choosing Vim Editing enters Normal mode or returns to standard editing with the caret kept (§20.2.3); the choice is saved and restored at the next start. Float on Top agrees with the pin toggle: either control pins or unpins the window, keeps editor focus, and saves the choice. The menu check marks and corresponding window, appearance and editing states always agree, including at startup. A newer selection made during startup takes precedence over an earlier preference read, including for the first editor keystroke.
 
 Tree and Agenda invoke the same named view commands as the command panel (§20.2.28), without additional shortcuts. Selecting the already open view does nothing. Switching views finishes buffered editing and follows the origin/caret behavior (§23). These commands do nothing while no renderer is available or while its main frame is loading. The native Tree, Agenda, Export Notes… and Import Notes… items have text labels and show macOS symbols for connected nodes, a calendar, export and import. Other native items have their standard text/check-mark presentation.
 
@@ -79,7 +79,7 @@ The outside click only dismisses About; it does not act on the editor.
 Closing restores the previous focus and selection without changing editor state.
 Repeated About commands focus the existing dialog. It closes with the main window.
 
-While it is open, editor, view, data and Always on Top menu actions are disabled;
+While it is open, editor, view, data and Float on Top menu actions are disabled;
 About Tree, Quit Tree and Appearance remain available. Closing restores the menu actions.
 The shared inline dialog replaces the native About panel so its colors match Tree and it opens promptly.
 

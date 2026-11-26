@@ -3,6 +3,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { SearchSessionSnapshot } from '../application/search-session'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import { getCaret } from './editor-dom'
+import { findPromptComposition, isCommittedCompositionInput } from './editor-composition'
 
 export function SearchPrompt({
   store,
@@ -12,6 +13,7 @@ export function SearchPrompt({
   navigate,
   beginEditing,
   vim = false,
+  allowAgenda = true,
 }: {
   store: EditorStore
   snapshot: SearchSessionSnapshot
@@ -20,10 +22,10 @@ export function SearchPrompt({
   navigate?: (direction: -1 | 1) => void
   beginEditing?: () => void
   vim?: boolean
+  allowAgenda?: boolean
 }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
   const editing = snapshot.draft !== undefined
-  const composing = useRef(false)
   const editingInPlace = useRef(false)
   useLayoutEffect(() => {
     if (!editing) return
@@ -60,6 +62,7 @@ export function SearchPrompt({
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => {
+          if (isCommittedCompositionInput(event.nativeEvent)) findPromptComposition.end(event.currentTarget)
           const value = event.target.value
           if (snapshot.draft === undefined) {
             editingInPlace.current = true
@@ -67,13 +70,14 @@ export function SearchPrompt({
           }
           store.search.edit(value)
         }}
-        onCompositionStart={() => {
-          composing.current = true
+        onCompositionStart={(event) => {
+          findPromptComposition.start(event.currentTarget)
         }}
-        onCompositionEnd={() => {
-          composing.current = false
+        onCompositionEnd={(event) => {
+          findPromptComposition.end(event.currentTarget)
         }}
         onBlur={(event) => {
+          findPromptComposition.end(event.currentTarget)
           if (
             event.relatedTarget instanceof Element &&
             event.relatedTarget.closest('.search-controls, dialog[role="alertdialog"]')
@@ -85,9 +89,10 @@ export function SearchPrompt({
         }}
         onKeyDown={(event) => {
           event.stopPropagation()
-          if (composing.current || event.nativeEvent.isComposing) return
+          if (findPromptComposition.owns(event.currentTarget) || event.nativeEvent.isComposing) return
           if (shortcuts.isPrimary(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
             event.preventDefault()
+            if (!allowAgenda) return
             store.search.cancelDraft()
             restoreEditor()
             const active = document.activeElement

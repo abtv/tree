@@ -26,6 +26,6 @@ Performance assessment (PRODUCT.md §22.1): every appearance choice, including G
 
 The native window surface is the exception to renderer color ownership: `src/electron/main/window.ts` mirrors the document background colors for Electron's `backgroundColor` at construction, follows `nativeTheme` updates with `setBackgroundColor`, and removes the listener on `closed`. The real-Electron appearance tests compare the native surface with the renderer in all appearances to prevent these values drifting.
 
-#### 8.11.5 Startup Reads of Vim and Always on Top
+#### 8.11.5 Startup Reads of Vim and Float on Top
 
-The desktop renderer subscribes to Vim and Always on Top changes before reading their initial values. Each preference retains its latest value and revision across the first React render. A newer native or local choice invalidates the outstanding read. The Vim read uses the startup wait (§16.3). The pin read is independent of that wait. Each preference uses one subscription and its IPC read, with no writes or document traversal of its own.
+The desktop renderer subscribes to Vim and Float on Top changes before reading their initial values. Each preference retains its latest value and revision across the first React render. A newer native or local choice invalidates the outstanding read. The Vim read uses the startup wait (§16.3). The pin read is independent of that wait. Each preference uses one subscription and its IPC read, with no writes or document traversal of its own.

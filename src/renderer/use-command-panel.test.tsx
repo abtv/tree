@@ -61,12 +61,14 @@ async function setup(
   save.mockClear()
   const commandState = createVimCommandState()
   let menuViewCommands: ReturnType<typeof useCommandPanel>['menuViewCommands']
+  let runFileCommand: ReturnType<typeof useCommandPanel>['runFileCommand']
   function Harness() {
     const panel = useCommandPanel({
       store,
       vimEnabled: enabled,
       vimMode: mode,
       commandState,
+      isEditorComposing: () => false,
       alwaysOnTop: false,
       setAlwaysOnTop: () => undefined,
       applyVimEnabled: async () => undefined,
@@ -77,6 +79,7 @@ async function setup(
       menuCommands,
     })
     menuViewCommands = panel.menuViewCommands
+    runFileCommand = panel.runFileCommand
     return (
       <>
         {rich ? (
@@ -116,10 +119,72 @@ async function setup(
     appearanceWrite,
     save,
     getMenuViewCommands: () => menuViewCommands,
+    getRunFileCommand: () => runFileCommand,
   }
 }
 
 describe('command panel owner', () => {
+  // @requirement PRODUCT.md §20.2.32
+  it('runs the current enabled file command without restoring panel focus or saving history', async () => {
+    const source = new MenuCommands()
+    const launchExport = vi.fn()
+    const launchImport = vi.fn(() => {
+      expect(document.activeElement).toBe(destination)
+    })
+
+    source.update([{ name: 'export-notes', enabled: true, run: launchExport }])
+    const { editor, historyWrite, getRunFileCommand } = await setup('normal', true, false, APPLE_SHORTCUTS, source)
+    fireEvent.keyDown(editor, { key: ':' })
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Escape' })
+    const destination = document.createElement('textarea')
+    editor.after(destination)
+    destination.focus()
+    const runFileCommand = getRunFileCommand()
+
+    await act(async () => {
+      source.update([
+        { name: 'export-notes', enabled: false, run: launchExport },
+        { name: 'import-notes', enabled: true, run: launchImport },
+      ])
+      await runFileCommand('export-notes')
+      await runFileCommand('import-notes')
+    })
+
+    expect(launchExport).not.toHaveBeenCalled()
+    expect(launchImport).toHaveBeenCalledOnce()
+    expect(historyWrite).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Command')).toBeNull()
+    expect(document.activeElement).toBe(destination)
+  })
+
+  // @requirement PRODUCT.md §20.2.32
+  it('runs a Leader file command while the closed panel is still saving history', async () => {
+    const source = new MenuCommands()
+    const launchImport = vi.fn()
+    source.update([{ name: 'import-notes', enabled: true, run: launchImport }])
+    const { editor, historyWrite, getRunFileCommand } = await setup('normal', true, false, APPLE_SHORTCUTS, source)
+    let finishHistory!: () => void
+    historyWrite.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishHistory = () => resolve(undefined)
+      }),
+    )
+    fireEvent.keyDown(editor, { key: ':' })
+    fireEvent.change(screen.getByLabelText('Command'), { target: { value: 'find' } })
+    fireEvent.keyDown(screen.getByLabelText('Command'), { key: 'Enter' })
+    await waitFor(() => expect(historyWrite).toHaveBeenCalledExactlyOnceWith(['find']))
+    expect(document.activeElement).toBe(editor)
+
+    try {
+      await act(async () => getRunFileCommand()('import-notes'))
+
+      expect(launchImport).toHaveBeenCalledOnce()
+      expect(historyWrite).toHaveBeenCalledOnce()
+    } finally {
+      await act(async () => finishHistory())
+    }
+  })
+
   // @requirement PRODUCT.md §9.3
   it.each(['native-dialog', 'aria-dialog'])('ignores menu view commands while a %s owns focus', async (kind) => {
     const { store, getMenuViewCommands } = await setup()

@@ -186,7 +186,8 @@ textarea {
   timeline-scope: --content-scroll;
 }
 
-.scroll-viewport {
+.scroll-viewport,
+.vim-help-view {
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
@@ -195,6 +196,25 @@ textarea {
   background-image: radial-gradient(circle, var(--color-grid-dot) 1px, transparent 1.3px);
   background-size: 20px 20px;
   background-attachment: local;
+}
+
+.scroll-viewport[inert] {
+  visibility: hidden;
+  scroll-timeline: none;
+}
+
+.vim-help-view {
+  position: absolute;
+  inset: calc(var(--title-bar-height) + var(--location-bar-height)) 0 var(--status-bar-height);
+  outline: none;
+}
+
+.vim-help-view .current-parent-input {
+  margin: 0;
+}
+
+.vim-help-node:focus {
+  outline: none;
 }
 
 /* Scroll-edge fades (docs/PRODUCT.md §20.6). Content fades into the background at an edge of the
@@ -838,6 +858,10 @@ body:not(.node-drag-active) .location-link:hover {
   content: '';
 }
 
+.vim-help-view .node-enter-control[aria-hidden='true'] {
+  pointer-events: none;
+}
+
 .node-enter-control[data-starred='true']::before,
 .current-parent[data-starred='true']::before {
   background: var(--color-gutter-mark);
@@ -1073,7 +1097,7 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   margin-bottom: -64px;
 }
 
-.node-input {
+:is(.node-input, .node-text) {
   display: block;
   width: 100%;
   max-width: calc(120ch + 12px);
@@ -1084,15 +1108,18 @@ body.node-drag-active .drop-zone-end.drop-zone-edge {
   color: inherit;
   background: transparent;
   cursor: default;
-  caret-color: var(--color-caret);
-  outline: none;
-  resize: none;
   overflow: hidden;
-  field-sizing: content;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   font-size: 15px;
   line-height: 20px;
+}
+
+.node-input {
+  caret-color: var(--color-caret);
+  outline: none;
+  resize: none;
+  field-sizing: content;
 }
 
 /* Inside the whole-node Visual highlight the struck text takes the highlight pair, keeping its line. */

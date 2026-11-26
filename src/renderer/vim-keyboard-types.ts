@@ -119,8 +119,10 @@ type VimPrefixPending = {
   surround?: never
 }
 
+export type VimLeaderPrefix = 'leader' | 'leader-toggle' | 'leader-help' | 'leader-file'
+
 type VimLeaderPending = {
-  prefix: 'leader' | 'leader-toggle'
+  prefix: VimLeaderPrefix
   deadline?: number | undefined
   operator?: never
   awaiting?: never

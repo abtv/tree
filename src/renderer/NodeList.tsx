@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from 'react'
 import type { TreeNode } from '../domain/document'
 import type { TextMatch } from '../domain/text-search'
 import type { SearchDestination } from '../application/search-executor'
@@ -28,7 +28,8 @@ import {
 } from './scroll-viewport'
 import { useNodeListDrag } from './use-node-list-drag'
 
-interface NodeListProps {
+interface EditableNodeListProps {
+  readOnly?: false
   lineNumbers?: boolean
   nodes: readonly TreeNode[]
   visibleRows?: readonly VisibleRow[]
@@ -49,9 +50,59 @@ interface NodeListProps {
   onBreadcrumbTarget?: ((parentId: string | null | undefined) => void) | undefined
 }
 
-const NEVER_EXPANDED = (): boolean => false
+interface ReadOnlyNodeListProps {
+  readOnly: true
+  nodes: readonly TreeNode[]
+  lineNumbers?: boolean
+  colorDepthOffset?: number
+  isExpanded: (nodeId: string) => boolean
+  onToggleExpansion: (node: TreeNode) => void
+  onEnter: (node: TreeNode) => void
+  focusedNodeId?: string | undefined
+  renderText?: (node: TreeNode) => ReactNode
+}
 
-export function NodeList({
+const NEVER_EXPANDED = (): boolean => false
+const renderReadOnlyText = (node: TreeNode): ReactNode => <span className="node-text">{node.text}</span>
+
+export function NodeList(props: EditableNodeListProps | ReadOnlyNodeListProps): React.JSX.Element {
+  if (!props.readOnly) return <EditableNodeList {...props} />
+
+  const {
+    nodes,
+    isExpanded,
+    onToggleExpansion,
+    onEnter,
+    lineNumbers = false,
+    colorDepthOffset = 0,
+    focusedNodeId,
+    renderText = renderReadOnlyText,
+  } = props
+  const visibleRows = buildVisibleRows(nodes, isExpanded)
+
+  return (
+    <NodeListFrame lineNumbers={lineNumbers} lineNumberDigits={Math.max(2, String(visibleRows.length).length)}>
+      {visibleRows.map(({ node, depth }, index) => (
+        <NodeRow
+          readOnly
+          key={node.id}
+          node={node}
+          index={index}
+          depth={depth}
+          colorDepth={depth + colorDepthOffset}
+          lineNumber={lineNumbers ? index + 1 : undefined}
+          focused={node.id === focusedNodeId}
+          expanded={isExpanded(node.id)}
+          onEnter={onEnter}
+          onToggleExpansion={onToggleExpansion}
+          renderInput={(node) => renderText(node)}
+        />
+      ))}
+    </NodeListFrame>
+  )
+}
+
+function EditableNodeList({
   lineNumbers = false,
   nodes,
   visibleRows: suppliedVisibleRows,
@@ -70,7 +121,7 @@ export function NodeList({
   locked = false,
   breadcrumbTargets,
   onBreadcrumbTarget,
-}: NodeListProps): React.JSX.Element {
+}: EditableNodeListProps): React.JSX.Element {
   const listRef = useRef<HTMLElement | null>(null)
   const heightsRef = useRef(new Map<string, number>())
   const observedElementsRef = useRef(new Map<string, HTMLElement>())
@@ -341,39 +392,30 @@ export function NodeList({
   )
 
   return (
-    <section
-      aria-label="Nodes"
+    <NodeListFrame
+      lineNumbers={lineNumbers}
+      lineNumberDigits={lineNumberDigits}
+      windowed={listWindow !== undefined}
+      invalidDrop={invalidDrop}
       data-window-start={listWindow === undefined ? undefined : viewport.start}
-      className={`node-list${lineNumbers ? ' line-numbered' : ''}${listWindow === undefined ? '' : ' node-list-windowed'}${invalidDrop ? ' node-list-drop-invalid' : ''}`}
       onClickCapture={onListClick}
       onLostPointerCapture={onLostPointerCapture}
       onPointerCancel={onListPointerCancel}
       onPointerMove={onListPointerMove}
       onPointerUp={onListPointerUp}
       ref={listRef}
-      style={
-        {
-          ...(listWindow === undefined ? {} : { height: layout.total }),
-          '--row-indent': `${DROP_LEVEL_STEP_PX}px`,
-          '--line-number-digits': lineNumberDigits,
-        } as React.CSSProperties
-      }
+      style={listWindow === undefined ? undefined : { height: layout.total }}
     >
-      <span aria-hidden="true" className="line-number-sizer">
-        {'9'.repeat(lineNumberDigits)}
-      </span>
-      <div className={`outline-content${listWindow === undefined ? '' : ' node-list-window-anchor'}`}>
-        <div
-          style={{ position: 'relative', ...(listWindow === undefined ? {} : { top: windowOffset - viewport.start }) }}
-        >
-          <DropZone index={0} start />
-          {listWindow === undefined
-            ? visibleRows.map((row, index) => renderRow(row.node, row.depth, index))
-            : renderWindowed(listWindow)}
-          <DropZone end index={visibleRows.length} />
-        </div>
+      <div
+        style={{ position: 'relative', ...(listWindow === undefined ? {} : { top: windowOffset - viewport.start }) }}
+      >
+        <DropZone index={0} start />
+        {listWindow === undefined
+          ? visibleRows.map((row, index) => renderRow(row.node, row.depth, index))
+          : renderWindowed(listWindow)}
+        <DropZone end index={visibleRows.length} />
       </div>
-    </section>
+    </NodeListFrame>
   )
 
   function renderWindowed(windowRange: ListWindow): ReactNode {
@@ -409,6 +451,41 @@ export function NodeList({
     }
     return children
   }
+}
+
+function NodeListFrame({
+  lineNumbers,
+  lineNumberDigits,
+  windowed = false,
+  invalidDrop = false,
+  style,
+  children,
+  ...sectionProps
+}: ComponentPropsWithRef<'section'> & {
+  lineNumbers: boolean
+  lineNumberDigits: number
+  windowed?: boolean
+  invalidDrop?: boolean
+}): React.JSX.Element {
+  return (
+    <section
+      {...sectionProps}
+      aria-label="Nodes"
+      className={`node-list${lineNumbers ? ' line-numbered' : ''}${windowed ? ' node-list-windowed' : ''}${invalidDrop ? ' node-list-drop-invalid' : ''}`}
+      style={
+        {
+          ...style,
+          '--row-indent': `${DROP_LEVEL_STEP_PX}px`,
+          '--line-number-digits': lineNumberDigits,
+        } as CSSProperties
+      }
+    >
+      <span aria-hidden="true" className="line-number-sizer">
+        {'9'.repeat(lineNumberDigits)}
+      </span>
+      <div className={`outline-content${windowed ? ' node-list-window-anchor' : ''}`}>{children}</div>
+    </section>
+  )
 }
 
 function DropZone({

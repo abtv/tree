@@ -10,6 +10,7 @@ import type { VimMode } from './vim-editing'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import { normalizeTypedInput } from './typed-marker-input'
 import { keepsEditorFocusOnPress } from './blank-press-focus'
+import type { EditorComposition } from './editor-composition'
 
 export function useCompletion(
   store: EditorStore,
@@ -17,6 +18,7 @@ export function useCompletion(
   locked: boolean,
   scheduleCaret: (nodeId: string, cursor: number) => void,
   vimEnabled: boolean,
+  composition: EditorComposition,
   shortcuts: ShortcutProfile = APPLE_SHORTCUTS,
 ): {
   presentation: CompletionPopupPresentation | undefined
@@ -26,8 +28,6 @@ export function useCompletion(
 } {
   const owner = useRef(new CompletionController())
   const input = useRef<HTMLElement | undefined>(undefined)
-  const composing = useRef(false)
-  const compositionText = useRef<string | undefined>(undefined)
   const context = useRef<{ parentId: string | null; agendaKey: string | undefined } | undefined>(undefined)
   const [presentation, setPresentation] = useState<CompletionPopupPresentation>()
   const project = useCallback((): void => {
@@ -71,10 +71,10 @@ export function useCompletion(
         element.ownerDocument.activeElement === element &&
         mode === 'insert' &&
         !locked &&
-        !composing.current,
+        !composition.owns(element),
     )
     project()
-  }, [mode, locked, project])
+  }, [mode, locked, project, composition])
   useLayoutEffect(() => {
     if (mode !== 'insert' || locked) close()
   }, [mode, locked, close])
@@ -137,7 +137,7 @@ export function useCompletion(
       if (
         mode !== 'insert' ||
         locked ||
-        composing.current ||
+        composition.owns(element) ||
         event?.isComposing ||
         event?.inputType === 'insertFromPaste'
       ) {
@@ -177,7 +177,7 @@ export function useCompletion(
           : undefined
       project()
     },
-    [mode, locked, close, project, store],
+    [mode, locked, close, project, store, composition],
   )
   const decorate = useCallback(
     (node: TreeNode, bindings: NodeInputBindings): NodeInputBindings => ({
@@ -201,25 +201,20 @@ export function useCompletion(
         bindings.onContentChange(event)
       },
       onCompositionStart: (event) => {
-        composing.current = true
-        compositionText.current =
-          event.currentTarget instanceof HTMLTextAreaElement
-            ? event.currentTarget.value
-            : readEditableContent(event.currentTarget).text
         close()
         bindings.onCompositionStart(event)
       },
       onCompositionEnd: (event) => {
+        const initialText = composition.initialText(event.currentTarget)
         bindings.onCompositionEnd(event)
-        composing.current = false
         const text =
           event.currentTarget instanceof HTMLTextAreaElement
             ? event.currentTarget.value
             : readEditableContent(event.currentTarget).text
-        if (text !== compositionText.current) edit(node, event.currentTarget, event.nativeEvent)
-        compositionText.current = undefined
+        if (text !== initialText) edit(node, event.currentTarget, event.nativeEvent)
       },
       onBlur: (event) => {
+        if (event?.relatedTarget instanceof Element) composition.end(event.currentTarget)
         close()
         bindings.onBlur(event)
       },
@@ -237,7 +232,7 @@ export function useCompletion(
       },
       onKeyDown: (event) => {
         if (
-          composing.current ||
+          composition.owns(event.currentTarget) ||
           event.nativeEvent?.isComposing ||
           event.key === 'Process' ||
           event.key === 'Unidentified'
@@ -292,7 +287,7 @@ export function useCompletion(
         bindings.onKeyDown(event)
       },
     }),
-    [edit, close, observe, accept, move, mode, locked, shortcuts],
+    [edit, close, observe, accept, move, mode, locked, shortcuts, composition],
   )
   return { presentation, accept, decorate, reconcile: observe }
 }

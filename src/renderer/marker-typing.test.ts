@@ -5,13 +5,14 @@ import { createRealStoreHarness } from './test/real-store-harness'
 import { createVimEditSessionState } from './vim-edit-session'
 import { createVimCommandState } from './vim-command-state'
 import { getCaret, setCaret } from './editor-dom'
+import { EditorComposition } from './editor-composition'
 import type { LinkRange } from '../domain/document'
 
 afterEach(() => document.body.replaceChildren())
 
 async function fixture(text: string, links: readonly LinkRange[] = []) {
   const harness = await createRealStoreHarness({ document: { roots: [{ id: 'n', text, links, children: [] }] } })
-  let composing = false
+  const composition = new EditorComposition()
   const schedulePendingCaret = vi.fn()
   const session = createVimEditSessionState()
   const commandState = createVimCommandState()
@@ -19,16 +20,14 @@ async function fixture(text: string, links: readonly LinkRange[] = []) {
     createTextEditHandlers(
       {
         store: harness.store,
-        composing,
+        composition,
         pendingLinkDraft: { current: undefined },
         schedulePendingCaret,
+        requestProjectionCommit: () => undefined,
         getMode: () => 'insert',
         session,
         commandState,
         finishVimReplace: () => false,
-        setComposing: (value) => {
-          composing = value
-        },
       },
       harness.node('n'),
     )

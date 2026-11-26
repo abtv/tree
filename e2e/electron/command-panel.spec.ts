@@ -227,7 +227,7 @@ test.describe('Normal command panel', () => {
     await window.getByRole('option', { selected: true }).click()
 
     await expect(window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
-    expect(await applicationMenuItemChecked(app, 'Window', 'Always on Top')).toBe(true)
+    expect(await applicationMenuItemChecked(app, 'Window', 'Float on Top')).toBe(true)
 
     await fireIdleSave(window)
 
@@ -441,7 +441,7 @@ test.describe('Normal command panel', () => {
 
     await run(window, 'toggle')
 
-    expect(await applicationMenuItemChecked(app, 'Window', 'Always on Top')).toBe(true)
+    expect(await applicationMenuItemChecked(app, 'Window', 'Float on Top')).toBe(true)
 
     await run(window, 'toggle-vim-editing')
 

@@ -228,6 +228,23 @@ describe('date-like text in a Tree input', () => {
 
     expect(document.activeElement).toBe(document.body)
   })
+
+  it('keeps the focused textarea until the new decoration can be projected after composition', () => {
+    const { rerender } = render(view('due '))
+    const input = screen.getByLabelText('Node 1')
+    input.focus()
+    fireEvent.compositionStart(input)
+
+    rerender(view('due 2026-10-14'))
+
+    expect(screen.getByLabelText('Node 1')).toBe(input)
+    expect(input).toBe(document.activeElement)
+
+    fireEvent.compositionEnd(input)
+
+    expect(screen.getByLabelText('Node 1').querySelector('.agenda-date-active')?.textContent).toBe('2026-10-14')
+  })
+
   it('freezes the markup during composition in a row that stayed rich after its token was removed', () => {
     const { rerender } = render(view('2026-10-1'))
     const input = screen.getByLabelText('Node 1')

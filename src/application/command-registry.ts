@@ -150,7 +150,7 @@ export const commandRegistry: readonly ApplicationCommand[] = [
     name: 'toggle-always-on-top',
     requires: 'alwaysOnTop',
     aliases: [],
-    description: 'Keep the window above other windows',
+    description: 'Float the window above other windows',
     active: (context) => context.alwaysOnTop,
     run: (services, context) => services.setAlwaysOnTop(!context.alwaysOnTop),
   },

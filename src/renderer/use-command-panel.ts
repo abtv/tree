@@ -18,6 +18,7 @@ import { captureFocusRestoration, getCaret } from './editor-dom'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 
 export function useCommandPanel(options: {
+  blocked?: boolean
   showAbout?: (() => void) | undefined
   searchCommand?: (command: 'find' | 'next' | 'previous' | 'all') => void
   store: EditorStore
@@ -26,12 +27,14 @@ export function useCommandPanel(options: {
   alwaysOnTopAvailable?: boolean
   vimMode: VimMode
   commandState: VimCommandState
+  isEditorComposing(target: EventTarget | null): boolean
   alwaysOnTop: boolean
   setAlwaysOnTop(value: boolean): void
   applyVimEnabled(value: boolean): Promise<void>
   lineNumbers: boolean
   applyLineNumbers(value: boolean): Promise<void>
   beforeViewChange(): void
+  beforeMenuViewChange?: () => void
   beforeOpen?: () => void
   shortcuts?: ShortcutProfile
   menuCommands?: MenuCommandSource | undefined
@@ -39,8 +42,11 @@ export function useCommandPanel(options: {
   const { store, vimEnabled, vimMode, commandState, alwaysOnTop, setAlwaysOnTop, applyVimEnabled, beforeViewChange } =
     options
   const shortcuts = options.shortcuts ?? APPLE_SHORTCUTS
+  const blocked = options.blocked ?? false
   const { lineNumbers, applyLineNumbers } = options
   const beforeOpen = options.beforeOpen
+  const beforeMenuViewChange = options.beforeMenuViewChange
+  const { isEditorComposing } = options
   const searchCommand = options.searchCommand
   const showAbout = options.showAbout
   const menuCommands = options.menuCommands ?? emptyMenuCommands
@@ -53,13 +59,14 @@ export function useCommandPanel(options: {
   const [message, setMessage] = useState<string>()
   const [history, setHistory] = useState<string[]>([])
   const [appearance, setAppearance] = useState<CommandAppearance>('system')
+  const appearanceRevision = useRef(0)
   const appearanceCycle = useRef(Promise.resolve())
   const restore = useRef<() => void>(() => undefined)
   const inputRef = useRef<HTMLInputElement>(null)
   const bindInput = useCallback((element: HTMLInputElement | null): void => {
     inputRef.current = element
   }, [])
-  const running = useRef(false)
+  const runningFromPanel = useRef(false)
   const snapshot = store.getSnapshot()
   const starTarget = store.starTarget
   const starred = starTarget?.starred === true
@@ -89,33 +96,50 @@ export function useCommandPanel(options: {
     const timer = window.setTimeout(() => setMessage(undefined), 2000)
     return () => window.clearTimeout(timer)
   }, [message])
+  const observeAppearance = useCallback((value: CommandAppearance): void => {
+    appearanceRevision.current++
+    setAppearance(value)
+  }, [])
   useEffect(() => {
+    const revision = appearanceRevision.current
+    const unsubscribe = window.treeApi.onAppearanceChanged?.(observeAppearance)
     void window.treeApi
       .getAppearance()
-      .then(setAppearance)
+      .then((value) => {
+        if (appearanceRevision.current === revision) setAppearance(value)
+      })
       .catch((error: unknown) => store.reportError(error))
     void window.treeApi
       .getCommandHistory()
       .then((value) => setHistory(normalizeCommandHistory(value)))
       .catch((error: unknown) => store.reportError(error))
-    return window.treeApi.onAppearanceChanged?.(setAppearance)
-  }, [store])
+    return unsubscribe
+  }, [observeAppearance, store])
 
   const close = useCallback(() => {
     setOpen(false)
     restore.current()
   }, [])
 
-  const applyAppearance = useCallback(async (value: CommandAppearance): Promise<void> => {
-    await window.treeApi.setAppearance(value)
-    setAppearance(value)
-  }, [])
+  const applyAppearance = useCallback(
+    async (value: CommandAppearance): Promise<void> => {
+      const revision = appearanceRevision.current
+      await window.treeApi.setAppearance(value)
+      // The adapter's change notification can be followed by a newer menu choice before this reply.
+      if (appearanceRevision.current === revision) observeAppearance(value)
+    },
+    [observeAppearance],
+  )
 
   const cycleAppearance = useCallback((): void => {
     // Read the latest choice, including native menu changes. Consecutive mappings must each
     // advance from the last completed write, not from a render or a stale preference read.
     appearanceCycle.current = appearanceCycle.current
-      .then(async () => applyAppearance(nextAppearance(await window.treeApi.getAppearance())))
+      .then(async () => {
+        const revision = appearanceRevision.current
+        const appearance = await window.treeApi.getAppearance()
+        if (appearanceRevision.current === revision) await applyAppearance(nextAppearance(appearance))
+      })
       .catch((error: unknown) => store.reportError(error))
   }, [applyAppearance, store])
 
@@ -135,29 +159,31 @@ export function useCommandPanel(options: {
     const runViewCommand = async (command: () => Promise<void>): Promise<void> => {
       if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]') !== null) return
       if (open) close()
+      beforeMenuViewChange?.()
       await command()
     }
     return {
       showAgenda: () => runViewCommand(showAgenda),
       showTree: () => runViewCommand(showTree),
     }
-  }, [open, close, showAgenda, showTree])
+  }, [open, close, beforeMenuViewChange, showAgenda, showTree])
 
   const run = useCallback(
-    async (command: ApplicationCommand | undefined) => {
-      if (running.current) return
+    async (command: ApplicationCommand | undefined, source: 'panel' | 'leader' = 'panel') => {
+      const fromPanel = source === 'panel'
+      if (fromPanel && runningFromPanel.current) return
       if (command?.enabled === false) return
-      if (menuEntries.includes(command!)) {
+      if (command !== undefined && menuEntries.includes(command)) {
         const current = menuCommands.getSnapshot().find((entry) => entry.name === command?.name)
         if (current === undefined || current.enabled === false || current.description !== command?.description) return
         command = current
       }
-      close()
+      if (fromPanel) close()
       if (command === undefined) {
-        setMessage(`Not a command: ${input.trim()}`)
+        if (fromPanel) setMessage(`Not a command: ${input.trim()}`)
         return
       }
-      running.current = true
+      if (fromPanel) runningFromPanel.current = true
       try {
         await command.run(
           {
@@ -188,7 +214,7 @@ export function useCommandPanel(options: {
           },
           { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked },
         )
-        if (command.name !== 'quit') {
+        if (fromPanel && command.name !== 'quit') {
           const next = rememberCommand(history, command.name)
           setHistory(next)
           await window.treeApi.setCommandHistory(next)
@@ -196,7 +222,7 @@ export function useCommandPanel(options: {
       } catch (error) {
         store.reportError(error)
       } finally {
-        running.current = false
+        if (fromPanel) runningFromPanel.current = false
       }
     },
     [
@@ -226,6 +252,7 @@ export function useCommandPanel(options: {
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent): void => {
+      if (blocked) return
       if (event.target instanceof Element && event.target.closest('dialog[open]')) return
       if (message !== undefined) setMessage(undefined)
       if (open) {
@@ -263,6 +290,7 @@ export function useCommandPanel(options: {
         !event.altKey &&
         vimEnabled &&
         vimMode === 'normal' &&
+        !isEditorComposing(target) &&
         !(target instanceof Element && target.closest('.search-input-line')) &&
         // This listener runs before the Leader handler, which discards an unmatched continuation.
         !hasLiveVimLeader(commandState, event.timeStamp)
@@ -286,6 +314,7 @@ export function useCommandPanel(options: {
     document.addEventListener('keydown', keydown, true)
     return () => document.removeEventListener('keydown', keydown, true)
   }, [
+    blocked,
     open,
     input,
     selected,
@@ -296,6 +325,7 @@ export function useCommandPanel(options: {
     vimEnabled,
     vimMode,
     commandState,
+    isEditorComposing,
     store,
     shortcuts,
     beforeOpen,
@@ -356,6 +386,13 @@ export function useCommandPanel(options: {
     matches,
     total: commands.length,
     context: { alwaysOnTop, appearance, vimEnabled, lineNumbers, view, starred, marked },
+    runFileCommand: (name: 'export-notes' | 'import-notes'): Promise<void> => {
+      // The browser picker must be opened on the same trusted key event, without deferring.
+      return run(
+        menuCommands.getSnapshot().find((entry) => entry.name === name),
+        'leader',
+      )
+    },
     changeInput: (value: string) => {
       setInput(value)
       setSelected(0)

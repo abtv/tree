@@ -103,7 +103,7 @@ Outside Apple platforms, every Cmd shortcut in this document runs on Ctrl with t
 
 The browser version keeps notes in the storage of one browser profile and origin (§1.4). Clearing site data or deleting the profile removes them. This section defines how the user keeps an independent copy.
 
-The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They have no dedicated keyboard shortcuts and must also be available in the command panel (§20.2.28). Tree never prompts for them at startup.
+The controls are in a **Data** block of the ellipsis menu, below the Appearance choices and above the save status. They are also available in the command panel (§20.2.28). Tree never prompts for them at startup.
 
 Nothing in this section sends notes over the network. Notes leave browser storage only as a file or folder that the user chose.
 
@@ -131,7 +131,7 @@ An archive holds at most 65,535 entries (`document.json` and 65,534 images). `do
 
 ### 24.3 Export
 
-**Export Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while another export or an import (§24.4) runs.
+**Export Notes…** is available in every supported browser, including via `<Leader>fe` when Vim Normal applies (§20.2.32). It is disabled in the locked save-failure state (§16.2) and while another export or an import (§24.4) runs.
 
 Choosing it closes the menu and first saves pending edits, as Quit does. It then exports the saved document and every referenced image in browser storage. Stored images that the document does not reference are not exported. Export never changes the stored notes.
 
@@ -160,7 +160,7 @@ In a browser that supports folder backup (§24.5), an archive-limit refusal adds
 
 Desktop import uses the same archive validation with the replacement behavior of §25.
 
-**Import Notes…** is available in every supported browser. It is disabled in the locked save-failure state (§16.2) and while an export or another import runs. It stays available when the stored document cannot be opened, so an archive can replace invalid stored notes.
+**Import Notes…** is available in every supported browser, including via `<Leader>fi` when Vim Normal applies (§20.2.32). It is disabled in the locked save-failure state (§16.2) and while an export or another import runs. It stays available when the stored document cannot be opened, so an archive can replace invalid stored notes.
 
 Choosing it closes the menu and opens the browser's file chooser. After a file is chosen, Tree saves pending edits, as Quit does, and checks the archive in the background while editing remains available. The panel of §24.3 shows `Importing Notes…`, then `Importing Notes… 3 of 120 images`, with **Cancel**.
 

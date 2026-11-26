@@ -15,10 +15,22 @@ it('keeps the location toolbar outside the scrolling content area, with an opaqu
 
   expect(app).toMatch(/height:\s*100vh/)
 
-  const viewport = /\.scroll-viewport\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
-
-  expect(viewport).toMatch(/overflow-y:\s*auto/)
-  expect(viewport).toMatch(/min-height:\s*0/)
+  const sheet = document.createElement('style')
+  const viewport = document.createElement('div')
+  sheet.textContent = styles
+  document.head.append(sheet)
+  document.body.append(viewport)
+  try {
+    for (const className of ['scroll-viewport', 'vim-help-view']) {
+      viewport.className = className
+      const computed = getComputedStyle(viewport)
+      expect(computed.overflowY).toBe('auto')
+      expect(computed.minHeight).toMatch(/^0(?:px)?$/)
+    }
+  } finally {
+    sheet.remove()
+    viewport.remove()
+  }
 
   const status = /\.status-bar\s*\{([^}]*)\}/.exec(styles)?.[1] ?? ''
 

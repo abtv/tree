@@ -1,4 +1,10 @@
-import type { VimFindCommand, VimPendingCommand, VimRepeatChange, VimStructuralChange } from './vim-keyboard-types'
+import type {
+  VimFindCommand,
+  VimLeaderPrefix,
+  VimPendingCommand,
+  VimRepeatChange,
+  VimStructuralChange,
+} from './vim-keyboard-types'
 import { parseCount } from './vim-text-commands'
 
 export type VimStructuralInsertSession =
@@ -58,12 +64,41 @@ export function clearPending(state: VimCommandState): void {
   state.pending = undefined
 }
 
-export type VimLeaderCommand = 'global-search' | 'toggle-mark' | 'toggle-star' | 'cycle-appearance'
+export type VimLeaderCommand =
+  | 'global-search'
+  | 'toggle-mark'
+  | 'toggle-star'
+  | 'toggle-agenda'
+  | 'toggle-fold'
+  | 'show-about'
+  | 'show-vim-help'
+  | 'export-notes'
+  | 'import-notes'
+  | 'toggle-always-on-top'
+  | 'cycle-appearance'
 
 const VIM_LEADER_TIMEOUT_MS = 2_000
 
+function isVimLeaderPending(
+  pending: VimPendingCommand | undefined,
+): pending is Extract<VimPendingCommand, { prefix: VimLeaderPrefix }> {
+  return (
+    pending?.prefix === 'leader' ||
+    pending?.prefix === 'leader-toggle' ||
+    pending?.prefix === 'leader-help' ||
+    pending?.prefix === 'leader-file'
+  )
+}
+
+function leaderGroup(key: string): VimLeaderPrefix | undefined {
+  if (key === 't') return 'leader-toggle'
+  if (key === 'h') return 'leader-help'
+  if (key === 'f') return 'leader-file'
+  return undefined
+}
+
 export function hasPendingVimLeader(state: VimCommandState): boolean {
-  return state.pending?.prefix === 'leader' || state.pending?.prefix === 'leader-toggle'
+  return isVimLeaderPending(state.pending)
 }
 
 export function cancelVimLeader(state: VimCommandState): void {
@@ -77,7 +112,7 @@ export function cancelVimLeader(state: VimCommandState): void {
  */
 export function hasLiveVimLeader(state: VimCommandState, timeStamp?: number): boolean {
   const pending = state.pending
-  if (pending?.prefix !== 'leader' && pending?.prefix !== 'leader-toggle') return false
+  if (!isVimLeaderPending(pending)) return false
   if (pending.deadline === undefined || timeStamp === undefined || timeStamp <= pending.deadline) return true
 
   clearPending(state)
@@ -95,9 +130,8 @@ export function advanceVimLeader(
   hasLiveVimLeader(state, timeStamp)
 
   const pending = state.pending
-  const prefix = pending?.prefix
   const deadline = timeStamp === undefined ? undefined : timeStamp + VIM_LEADER_TIMEOUT_MS
-  if (prefix !== 'leader' && prefix !== 'leader-toggle') {
+  if (!isVimLeaderPending(pending)) {
     if (pending !== undefined || key !== ' ') return undefined
     if (!repeat) {
       state.pending = { count: '', motionCount: '', prefix: 'leader', deadline }
@@ -106,16 +140,31 @@ export function advanceVimLeader(
     return 'consumed'
   }
   if (repeat) return 'consumed'
-  if (prefix === 'leader' && key === 't') {
-    state.pending = { count: '', motionCount: '', prefix: 'leader-toggle', deadline }
+  const { prefix } = pending
+  const group = prefix === 'leader' ? leaderGroup(key) : undefined
+  if (group !== undefined) {
+    state.pending = { count: '', motionCount: '', prefix: group, deadline }
     return 'consumed'
   }
 
   clearPending(state)
-  if (prefix === 'leader') return key === ' ' ? 'global-search' : 'consumed'
+  if (prefix === 'leader-help') {
+    if (key === 'a') return 'show-about'
+    return key === 'h' ? 'show-vim-help' : 'consumed'
+  }
+  if (prefix === 'leader-file') {
+    if (key === 'e') return 'export-notes'
+    return key === 'i' ? 'import-notes' : 'consumed'
+  }
   if (key === 'm') return 'toggle-mark'
   if (key === 's') return 'toggle-star'
-  if (key === 't') return 'cycle-appearance'
+  if (prefix === 'leader-toggle') {
+    if (key === 't') return 'cycle-appearance'
+    return key === 'f' ? 'toggle-always-on-top' : 'consumed'
+  }
+  if (key === ' ') return 'global-search'
+  if (key === 'p') return 'toggle-agenda'
+  if (key === 'e') return 'toggle-fold'
   return 'consumed'
 }
 

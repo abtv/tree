@@ -26,6 +26,7 @@ export interface NodeInputBindings {
   onContentChange: (event: FormEvent<HTMLElement>) => void
   onCompositionStart: (event: CompositionEvent<HTMLElement>) => void
   onCompositionEnd: (event: CompositionEvent<HTMLElement>) => void
+  onCompositionProjectionChange?: () => void
   onCut: () => void
   onContextMenu: (event: MouseEvent<HTMLElement>) => void
   onClick: (event: MouseEvent<HTMLElement>) => void
@@ -69,6 +70,7 @@ export function NodeInput({
   onContentChange,
   onCompositionStart,
   onCompositionEnd,
+  onCompositionProjectionChange,
   onContextMenu,
   onClick,
   onCut,
@@ -82,7 +84,7 @@ export function NodeInput({
   const draft = readReplaceDraft()
   const matches = useSearchDecorations(node.text, searchQuery)
   const hasLinks = (node.links?.length ?? 0) > 0
-  const [composing, setComposing] = useState(false)
+  const [compositionProjection, setCompositionProjection] = useState<'plain' | 'rich'>()
   const [richEditor, setRichEditor] = useState<{ nodeId: string; enabled: boolean }>({
     nodeId: node.id,
     enabled: hasLinks,
@@ -90,15 +92,18 @@ export function NodeInput({
   // Decorated text needs the rich element. Once a row needs it, the row keeps it, so removing the last
   // decoration while typing never swaps the focused element back.
   if (
+    compositionProjection === undefined &&
     ((baseDecorations?.length ?? 0) > 0 || matches.length > 0) &&
     !(richEditor.nodeId === node.id && richEditor.enabled)
   )
     setRichEditor({ nodeId: node.id, enabled: true })
-  const plain =
+  const canStayPlain =
     baseDecorations === undefined &&
     matches.length === 0 &&
     !hasLinks &&
     !(richEditor.nodeId === node.id && richEditor.enabled)
+  // A new decoration during composition must not replace the element receiving native input.
+  const plain = compositionProjection === undefined ? canStayPlain : compositionProjection === 'plain'
   const element = useRef<HTMLElement | null>(null)
   const projection = useRef<RichTextProjection | null>(null)
   useLayoutEffect(() => () => projection.current?.reset(), [])
@@ -123,7 +128,7 @@ export function NodeInput({
     element.current = input
     // Commit the projection before registration/row measurement. Native input often already made
     // exactly this edit; replacing its DOM would discard selection and disturb scroll anchoring.
-    if (input !== null && !plain && !composing) {
+    if (input !== null && !plain && compositionProjection === undefined) {
       if (draft === undefined)
         (projection.current ??= new RichTextProjection()).apply(input, node, baseDecorations, matches, currentMatch)
       else {
@@ -148,15 +153,17 @@ export function NodeInput({
     'aria-label': label,
     'aria-description': nodeFlagsLabel(node),
     className,
-    onBlur,
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      if (event.relatedTarget instanceof Element) setCompositionProjection(undefined)
+      onBlur(event)
+    },
     onCompositionEnd: (event: CompositionEvent<HTMLElement>) => {
       onCompositionEnd(event)
-      setComposing(false)
+      setCompositionProjection(undefined)
+      if (plain && !canStayPlain) onCompositionProjectionChange?.()
     },
     onCompositionStart: (event: CompositionEvent<HTMLElement>) => {
-      // Any rich element freezes its markup for the composition, including a Tree row that kept the
-      // rich element after its last date-like token was removed.
-      if (!plain) setComposing(true)
+      setCompositionProjection(plain ? 'plain' : 'rich')
       onCompositionStart(event)
     },
     onContextMenu,

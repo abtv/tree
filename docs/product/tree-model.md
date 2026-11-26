@@ -174,7 +174,7 @@ Expansion choices belong to a view. Tree has one root view and one view for each
 * Dragging moves a node's whole subtree between visible rows at the level selected by the pointer; it may change the node's parent.
 * The Vim fold commands in §20.2 operate on the selected node's own fold and on the folds within the current location.
 * `Cmd+E` toggles the selected node's own fold, exactly as `za` does, in every Vim mode and in the same way whether or not Vim mode is enabled: it does nothing on a node without children and on the editable current-parent heading, never moves the caret, and does not end Insert mode. Like the other `Cmd` commands it discards an unfinished Normal-mode command.
-* Expansion adds no other keyboard command.
+* Vim Normal also accepts `<Leader>e` (§20.2.32) for the same fold toggle.
 
 Expansion is view state, not a document edit. It creates no undo entry and never saves by itself.
 

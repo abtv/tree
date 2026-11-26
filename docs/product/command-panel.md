@@ -65,7 +65,7 @@ These application-control bindings extend the keyboard-first model (§1.3); they
 | `show-agenda` | — | Show Agenda | Agenda open | — | Open Agenda using the origin/caret navigation of §23; do nothing if already in Agenda |
 | `show-tree` | — | Show Tree | Tree open | — | Return to Tree using the Agenda origin of §23; do nothing if already in Tree |
 | `about-tree` | — | About Tree | — | — | Open About (§9.4) |
-| `toggle-always-on-top` | — | Keep the window above other windows | Pinned | — | Same as the pin toggle and Window > Always on Top (§2.2, §9.3) |
+| `toggle-always-on-top` | — | Float the window above other windows | Pinned | — | Same as the pin toggle and Window > Float on Top (§2.2, §9.3) |
 | `toggle-vim-editing` | — | Use Vim editing | Vim enabled | — | Same preference change as Edit > Vim Editing (§20.2.1–3) |
 | `toggle-line-numbers` | — | Show line numbers | Numbers visible | `⌃L` (`Ctrl+L`) | Toggle visible-node numbering (§2.1) |
 | `toggle-star-node` | — | Star or unstar the selected node | Selected node starred | — | Toggle the star of the selected real node (§2.6) |

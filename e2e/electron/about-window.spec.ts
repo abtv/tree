@@ -92,7 +92,7 @@ for (const appearance of ['light', 'dark'] as const) {
     const blocked = await menuState()
     await clickApplicationMenuItem(app, 'View', 'Agenda')
     await clickApplicationMenuItem(app, 'Edit', 'Vim Editing')
-    await clickApplicationMenuItem(app, 'Window', 'Always on Top')
+    await clickApplicationMenuItem(app, 'Window', 'Float on Top')
     await clickApplicationMenuItem(app, 'Edit', 'Find…')
     await clickApplicationMenuItem(app, 'File', 'Export Notes…')
     await clickApplicationMenuItem(app, 'File', 'Import Notes…')

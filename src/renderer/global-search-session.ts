@@ -148,6 +148,10 @@ export class GlobalSearchSession {
     this.dismissSuggestions()
   }
 
+  public isComposing(): boolean {
+    return this.composing
+  }
+
   public endComposition(query: string, selectionStart = query.length, selectionEnd = selectionStart): void {
     this.composing = false
     this.edit(query, false, selectionStart, selectionEnd)

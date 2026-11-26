@@ -6,7 +6,7 @@ The desktop application exports and imports the notes archive of §24.2, so note
 
 ### 25.1 Menu Commands
 
-**Export Notes…** and **Import Notes…** are in the File menu, in that order. They have no dedicated keyboard shortcuts and must also be available in the command panel (§20.2.28). Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored document cannot be opened, so an archive can replace it. If Tree cannot read the import journal or finish the replacement it records (§25.4), both commands stay disabled until recovery succeeds.
+**Export Notes…** and **Import Notes…** are in the File menu, in that order. Both are also available in the command panel (§20.2.28) and through Vim Normal `<Leader>fe` and `<Leader>fi` (§20.2.32). Both are disabled while the window is starting, in the locked save-failure state (§16.2), and while an export or an import runs. Export is disabled when the stored notes cannot be opened. Import Notes… stays available when the stored document cannot be opened, so an archive can replace it. If Tree cannot read the import journal or finish the replacement it records (§25.4), both commands stay disabled until recovery succeeds.
 
 Both native items show the corresponding export/import symbols (§9.3), including the system's disabled appearance when unavailable.
 

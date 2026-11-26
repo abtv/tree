@@ -253,20 +253,23 @@ it('restores on native dismissal that temporarily focuses the body', async () =>
   expect(getSelectionEndpoints(f.editor)).toEqual({ anchor: 4, focus: 4 })
 })
 
-it('restores an agenda row after native dismissal without creating an editor selection', async () => {
-  const f = fixture()
-  const row = document.createElement('div')
-  row.className = 'agenda-row'
-  row.tabIndex = 0
-  document.body.append(row)
-  row.focus()
-  f.open()
+it.each(['agenda-row', 'vim-help-node'])(
+  'restores a %s after native dismissal without creating an editor selection',
+  async (className) => {
+    const f = fixture()
+    const row = document.createElement('div')
+    row.className = className
+    row.tabIndex = 0
+    document.body.append(row)
+    row.focus()
+    f.open()
 
-  f.menu.hidePopover()
-  await Promise.resolve()
+    f.menu.hidePopover()
+    await Promise.resolve()
 
-  expect(document.activeElement).toBe(row)
-})
+    expect(document.activeElement).toBe(row)
+  },
+)
 
 it('restores before an outside press and leaves its explicit destination focused', async () => {
   const f = fixture()

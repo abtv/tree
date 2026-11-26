@@ -2371,7 +2371,7 @@ describe('App', () => {
     }
 
     // @requirement PRODUCT.md §9.3
-    it('follows the menu for Always on Top without writing the preference again', async () => {
+    it('follows the menu for Float on Top without writing the preference again', async () => {
       const store = await createSeededStore(
         { roots: [{ id: 'root', text: 'abc', children: [] }] },
         { currentParentId: null, selectedNodeId: 'root' },

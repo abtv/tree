@@ -5,17 +5,19 @@ export function LocationBar({
   currentParentId,
   onNavigate,
   dropParentId,
+  rootLabel = 'Top level',
 }: {
   path: readonly TreeNode[]
   currentParentId: string | null
   onNavigate: (parentId: string | null) => void
   dropParentId?: string | null | undefined
+  rootLabel?: string
 }): React.JSX.Element {
   return (
     <header className="location-bar" aria-label="Current location">
       <button
-        aria-label="Top level"
-        title="Top level"
+        aria-label={rootLabel}
+        title={rootLabel}
         data-breadcrumb-id=""
         className={`location-root location-icon${dropParentId === null ? ' location-drop-target' : ''}`}
         onClick={() => onNavigate(null)}

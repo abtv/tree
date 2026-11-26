@@ -83,7 +83,7 @@ export interface EditorKeyboardHandlerDependencies {
   store: EditorStore
   nativePaste?: boolean
   node: TreeNode
-  isComposing: () => boolean
+  isComposing: (input: HTMLElement) => boolean
   setSelectAllNodeId: (nodeId: string | undefined) => void
   onPreviewAttachment: (attachmentId: string) => void
   /** Shift the focused subtree while preserving the editor's current text selection. */
@@ -115,7 +115,7 @@ export function createEditorKeyDownHandler({
     // neutral-key set in `vim-keyboard-handler.ts` covers; "ignores a keydown the native composition
     // flag marks as composing" and "clears a pending fold prefix through composition started by a
     // Process keydown" in `editor-input-handlers.test.ts` pin both shapes.
-    if (isComposing() || event.nativeEvent?.isComposing) return
+    if (isComposing(event.currentTarget) || event.nativeEvent?.isComposing) return
     const primary = shortcuts.isPrimary(event)
     const editing = vim === undefined || vim.mode === 'insert' || vim.mode === 'replace'
     if (

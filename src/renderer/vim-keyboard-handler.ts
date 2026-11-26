@@ -57,7 +57,7 @@ import type { ShortcutProfile } from './shortcut-profile'
 import { characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2.15). */
-const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
+export const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
   c: 'close',
   o: 'open',
   a: 'toggle',

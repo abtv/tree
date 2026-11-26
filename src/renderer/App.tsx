@@ -1,5 +1,6 @@
 import { activeAgendaOccurrence, focusedAgendaDay } from '../application/agenda-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 import type { CommandServices } from '../application/command-registry'
 import type { TextMatch } from '../domain/text-search'
 import { EditorStore } from '../application/editor-store'
@@ -23,12 +24,14 @@ import { agendaDecorations, localToday, treeDecorations } from './date-decoratio
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
-import { cancelVimLeader, clearCommandAssembly } from './vim-command-state'
-import { handleVimLeaderKey, useVimLeaderShortcutCancel } from './vim-leader-keys'
+import { cancelVimLeader, clearCommandAssembly, type VimLeaderCommand } from './vim-command-state'
+import { useVimLeaderRouting } from './vim-leader-keys'
+import { VimHelpView, type VimHelpSearchCommand } from './VimHelpView'
 import { prepareVimCommand } from './vim-session-finish'
 import { breadcrumbDropTargets } from '../application/drop-targets'
 import { NodeInput } from './NodeInput'
 import { SearchPrompt } from './SearchPrompt'
+import { findPromptComposition } from './editor-composition'
 import { createBlankPressFocus } from './blank-press-focus'
 import { SearchCount } from './SearchCount'
 import { useLocalSearch } from './use-local-search'
@@ -49,7 +52,7 @@ import { useLineNumbers } from './use-line-numbers'
 import { BooleanPreference, type EditingPreferences } from './editing-preferences'
 import { UpdateStatus } from './UpdateStatus'
 import { useActiveLineHighlight } from './use-active-line-highlight'
-import { getCaret } from './editor-dom'
+import { captureFocusRestoration, getCaret } from './editor-dom'
 import { useAgendaRepeat } from './use-agenda-repeat'
 import { StatusBar } from './StatusBar'
 
@@ -138,6 +141,21 @@ export function App({
   const appliedVim = useRef(vimEnabled)
   usePopupNavigation(vimEnabled)
   const [vimMode, setVimMode] = useState<VimMode>(vimEnabled ? 'normal' : 'insert')
+  const [vimHelpOpen, setVimHelpOpen] = useState(false)
+  const [vimHelpStatusTarget, setVimHelpStatusTarget] = useState<HTMLDivElement | null>(null)
+  const vimHelpSearchCommands = useRef<((command: VimHelpSearchCommand) => void) | undefined>(undefined)
+  const returnFromVimHelp = useRef<(() => void) | undefined>(undefined)
+  const closeVimHelp = useCallback((): void => setVimHelpOpen(false), [])
+  useLayoutEffect(() => {
+    if (vimHelpOpen) return
+    const restore = returnFromVimHelp.current
+    returnFromVimHelp.current = undefined
+    restore?.()
+  }, [vimHelpOpen])
+  const restoreNotesBeforeViewChange = useCallback((): void => {
+    // Agenda captures the live Tree caret. Release the inert notes and restore that caret first.
+    if (vimHelpOpen) flushSync(closeVimHelp)
+  }, [closeVimHelp, vimHelpOpen])
   const richEditingEnabled = !deferRichEditing || !vimEnabled || vimMode === 'insert' || vimMode === 'replace'
   const [nodeVisualSelection, setNodeVisualSelection] = useState<{ anchorId: string; focusId: string }>()
   const leftCommandKeyPressed = useLeftCommandKey(shortcuts)
@@ -193,7 +211,7 @@ export function App({
     bindings: nodeInputBindings,
     dragFreeze,
     setVimEditing,
-    composing,
+    isEditorComposing,
     vimTextCommandState,
     completionPopup,
     acceptCompletion,
@@ -215,7 +233,7 @@ export function App({
     onFoldCommand: applyFoldCommand,
     shortcuts,
   })
-  useVimLeaderShortcutCancel(vimTextCommandState.commandState)
+  const routeVimLeaderKey = useVimLeaderRouting(vimTextCommandState)
   const applyVimEnabled = useCallback(
     async (nextValue: boolean): Promise<void> => {
       preferences.vim.set(nextValue)
@@ -232,27 +250,27 @@ export function App({
       active instanceof HTMLElement && active.matches('.node-input') ? active : undefined,
     )
   }, [vimTextCommandState])
-  useAgendaRepeat({
-    shortcuts,
-    blocked: updateBlocked,
-    switchView: () => {
-      const current = store.getSnapshot()
-      if (current.status !== 'ready') return
-      beforeViewChange()
-      store.search.interruptNavigation()
-      if (current.agenda !== undefined) store.closeAgenda()
-      else {
-        const active = document.activeElement
-        store.openAgenda(active instanceof HTMLElement && active.matches('.node-input') ? getCaret(active) : undefined)
-      }
-    },
-  })
+  const switchAgendaView = (): void => {
+    const current = store.getSnapshot()
+    if (current.status !== 'ready' || updateBlocked) return
+    restoreNotesBeforeViewChange()
+    beforeViewChange()
+    store.search.interruptNavigation()
+    if (current.agenda !== undefined) store.closeAgenda()
+    else {
+      const active = document.activeElement
+      store.openAgenda(active instanceof HTMLElement && active.matches('.node-input') ? getCaret(active) : undefined)
+    }
+  }
+  useAgendaRepeat({ shortcuts, blocked: updateBlocked || vimHelpOpen, switchView: switchAgendaView })
   const searchAction = useRef<(command: EditorFindCommand) => void>(() => undefined)
   const {
     bindInput: bindCommandInput,
     cycleAppearance,
     ...commandPanel
   } = useCommandPanel({
+    blocked: vimHelpOpen,
+    beforeMenuViewChange: restoreNotesBeforeViewChange,
     showAbout,
     searchCommand: (command) => {
       window.setTimeout(() => searchAction.current(command), 0)
@@ -265,6 +283,7 @@ export function App({
     vimEnabled,
     vimMode,
     commandState: vimTextCommandState.commandState,
+    isEditorComposing,
     alwaysOnTop,
     setAlwaysOnTop,
     applyVimEnabled,
@@ -285,6 +304,7 @@ export function App({
     beforeViewChange,
   })
   const searchCaret = useRef<(() => number | undefined) | undefined>(undefined)
+  const toggleAgendaFold = useRef<(() => void) | null>(null)
   const activeLineRoot = useRef<HTMLElement | null>(null)
   const blankPress = useMemo(() => createBlankPressFocus(), [])
   const refreshActiveLine = useActiveLineHighlight(activeLineRoot)
@@ -303,7 +323,7 @@ export function App({
     completionOpen: completionPopup !== undefined,
     store,
     shortcuts,
-    blocked: commandPanel.open || previewAttachmentId !== undefined,
+    blocked: commandPanel.open || previewAttachmentId !== undefined || vimHelpOpen,
     readAgendaCaret,
     readEditorCaret: readSearchCaret,
     restoreEditor: restoreSearchFocus,
@@ -335,12 +355,13 @@ export function App({
   }, [store, vimTextCommandState, setNodeVisualSelection])
   useLayoutEffect(() => {
     searchAction.current = (command) => {
-      if (command === 'find') localSearch.open()
-      else if (command === 'all') openGlobalSearch.current?.()
+      if (command === 'all') openGlobalSearch.current?.()
+      else if (vimHelpOpen) vimHelpSearchCommands.current?.(command)
+      else if (command === 'find') localSearch.open()
       else if (command === 'restore-editor') restoreSearchFocus()
       else localSearch.navigate(command === 'next' ? 1 : -1)
     }
-  }, [localSearch, restoreSearchFocus])
+  }, [localSearch, restoreSearchFocus, vimHelpOpen])
   useEffect(() => window.treeApi.onFindMenuCommand?.((command) => searchAction.current(command)), [])
   useEffect(() => registerSearchCommands?.((command) => searchAction.current(command)), [registerSearchCommands])
   useLayoutEffect(
@@ -637,6 +658,40 @@ export function App({
   const path = state.location.currentParentId === null ? [] : nodePath(state.document, state.location.currentParentId)
   const topLevel = state.location.currentParentId === null
 
+  const dispatchLeaderCommand = (command: VimLeaderCommand | 'consumed', fromHelp = false): void => {
+    if (command === 'toggle-agenda') {
+      switchAgendaView()
+      return
+    }
+    if (fromHelp) {
+      // A reference row is not a note. Never send document-changing commands to the hidden editor.
+      if (command === 'toggle-mark' || command === 'toggle-star' || command === 'import-notes') return
+    } else store.search.interruptNavigation()
+    if (command === 'global-search') openGlobalSearch.current?.()
+    else if (command === 'toggle-mark') store.toggleMarkNode()
+    else if (command === 'toggle-star') store.toggleStarNode()
+    else if (command === 'show-about') showAbout?.()
+    else if (command === 'show-vim-help') {
+      if (updateBlocked) return
+      if (fromHelp) closeVimHelp()
+      else {
+        returnFromVimHelp.current = captureFocusRestoration(document.activeElement, 'native')
+        setVimHelpOpen(true)
+      }
+    } else if (command === 'export-notes' || command === 'import-notes') {
+      if (!updateBlocked) void commandPanel.runFileCommand(command)
+    } else if (command === 'toggle-always-on-top') {
+      if (alwaysOnTopAvailable && !updateBlocked) toggleAlwaysOnTop()
+    } else if (command === 'toggle-fold') {
+      prepareVimCommand(vimTextCommandState, 'command')
+      const current = store.getSnapshot()
+      if (current.status === 'ready') {
+        if (current.agenda === undefined) store.applyFold('toggle', current.location.selectedNodeId)
+        else toggleAgendaFold.current?.()
+      }
+    } else if (command === 'cycle-appearance') cycleAppearance()
+  }
+
   return (
     <main
       ref={activeLineRoot}
@@ -648,16 +703,33 @@ export function App({
       onPointerDownCapture={() => cancelVimLeader(vimTextCommandState.commandState)}
       onKeyDownCapture={(event) => {
         blankPress.settle()
-        if (!vimEnabled || composing) return
-        const command = handleVimLeaderKey(event, vimTextCommandState)
-        if (command === undefined) return
-        store.search.interruptNavigation()
-        if (command === 'global-search') openGlobalSearch.current?.()
-        else if (command === 'toggle-mark') store.toggleMarkNode()
-        else if (command === 'toggle-star') store.toggleStarNode()
-        else if (command === 'cycle-appearance') cycleAppearance()
+        if (vimHelpOpen) {
+          const target = event.target
+          if (!(target instanceof Element) || target.closest('dialog, [role="dialog"]')) return
+          if (
+            event.key.toLowerCase() === 'p' &&
+            shortcuts.isPrimary(event) &&
+            !shortcuts.hasNonPrimaryCtrl(event) &&
+            !event.shiftKey &&
+            !event.altKey &&
+            !event.nativeEvent.isComposing
+          ) {
+            event.preventDefault()
+            event.stopPropagation()
+            switchAgendaView()
+          } else if (event.key === 'Escape' && !target.closest('.vim-help-view, .vim-search-line')) {
+            event.preventDefault()
+            event.stopPropagation()
+            closeVimHelp()
+          }
+          return
+        }
+        if (!vimEnabled || isEditorComposing(event.target)) return
+        const command = routeVimLeaderKey(event)
+        if (command !== undefined) dispatchLeaderCommand(command)
       }}
       onKeyDown={(event) => {
+        if (vimHelpOpen) return
         const target = event.target
         if (
           !(target instanceof Element) ||
@@ -680,7 +752,18 @@ export function App({
       <div className="title-bar" aria-hidden="true">
         Tree
       </div>
-      {agenda !== undefined ? (
+      {vimHelpOpen ? (
+        <VimHelpView
+          showFloatOnTop={alwaysOnTopAvailable}
+          lineNumbers={lineNumbers}
+          shortcuts={shortcuts}
+          statusTarget={vimHelpStatusTarget}
+          searchCommandsRef={vimHelpSearchCommands}
+          routeLeader={routeVimLeaderKey}
+          onLeaderCommand={(command) => dispatchLeaderCommand(command, true)}
+          onClose={closeVimHelp}
+        />
+      ) : agenda !== undefined ? (
         <AgendaLocationBar agenda={agenda} />
       ) : (
         <LocationBar
@@ -695,7 +778,12 @@ export function App({
         store={store}
         shortcuts={shortcuts}
         blocked={commandPanel.open || state.quitWithoutSavingPrompt === true}
+        isEditorComposing={(target) => isEditorComposing(target) || findPromptComposition.owns(target)}
         beforeOpen={() => {
+          if (vimHelpOpen) {
+            vimHelpSearchCommands.current?.('prepare-global-search')
+            return
+          }
           prepareVimCommand(vimTextCommandState, 'focus-borrow')
           store.search.interruptNavigation()
           if (store.search.session.getSnapshot().draft !== undefined) {
@@ -703,9 +791,12 @@ export function App({
             restoreSearchFocus()
           }
         }}
-        beforeVisit={beforeViewChange}
+        beforeVisit={() => {
+          restoreNotesBeforeViewChange()
+          beforeViewChange()
+        }}
       />
-      <div className={SCROLL_VIEWPORT_CLASS}>
+      <div className={SCROLL_VIEWPORT_CLASS} inert={vimHelpOpen}>
         <section
           onClick={(event) => {
             if (
@@ -728,6 +819,7 @@ export function App({
             <AgendaView
               lineNumbers={lineNumbers}
               searchCaretRef={searchCaret}
+              toggleFoldRef={toggleAgendaFold}
               refreshActiveLine={refreshActiveLine}
               store={store}
               agenda={agenda}
@@ -813,7 +905,7 @@ export function App({
       </div>
       <CompletionPopup presentation={completionPopup} accept={acceptCompletion} />
       {commandList}
-      {search.visible && !commandPanel.open && !vimEnabled ? (
+      {!vimHelpOpen && search.visible && !commandPanel.open && !vimEnabled ? (
         <section className="local-search-panel" aria-label="Find in current view" data-editor-focus-borrow>
           <SearchPrompt
             store={store}
@@ -889,8 +981,8 @@ export function App({
           {dataOperations === undefined ? null : <DesktopDataActivity operations={dataOperations} />}
           {platformStatus}
         </div>
-        <div className="status-controls">
-          {vimEnabled && search.visible && !commandPanel.open ? (
+        <div className="status-controls" ref={vimHelpOpen ? setVimHelpStatusTarget : undefined}>
+          {!vimHelpOpen && vimEnabled && search.visible && !commandPanel.open ? (
             <div className="vim-search-line" aria-label="Find in current view" data-editor-focus-borrow>
               {search.draft !== undefined ? (
                 <SearchPrompt
@@ -927,14 +1019,14 @@ export function App({
             <span className="command-count">
               {commandPanel.matches.length} of {commandPanel.total}
             </span>
-          ) : statusMessage !== undefined ? (
+          ) : statusMessage !== undefined && !vimHelpOpen ? (
             <span className={`status-bar-message${search.visible ? ' search-status-message' : ''}`} role="status">
               {statusMessage}
             </span>
           ) : (
             <UpdateStatus hidden={commandPanel.message !== undefined} />
           )}
-          {vimEnabled ? (
+          {vimEnabled && !vimHelpOpen ? (
             <div className={`vim-mode vim-mode-${vimMode}`} aria-label="Vim mode">
               {vimMode === 'visual-node' ? 'VISUAL NODE' : vimMode.toUpperCase()}
             </div>

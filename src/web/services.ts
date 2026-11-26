@@ -272,7 +272,7 @@ export async function installBrowserPrototype(): Promise<{
       return false
     },
     async setAlwaysOnTop() {
-      throw new Error('Always on Top is unavailable in the browser.')
+      throw new Error('Float on Top is unavailable in the browser.')
     },
     async getVimEnabled() {
       return vimEnabled

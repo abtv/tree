@@ -1,5 +1,15 @@
 import { activeAgendaOccurrence, focusedAgendaDay, dayKey, type AgendaState } from '../application/agenda-state'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import { flushSync } from 'react-dom'
 import type { EditorStore } from '../application/editor-store'
 import { isEditableOccurrence, type AgendaRow as AgendaRowModel } from '../application/agenda-rows'
@@ -51,10 +61,12 @@ export function AgendaView({
   renderText,
   shortcuts,
   searchCaretRef,
+  toggleFoldRef,
   refreshActiveLine,
 }: {
   lineNumbers?: boolean
   searchCaretRef?: { current: (() => number | undefined) | undefined }
+  toggleFoldRef?: Ref<() => void>
   refreshActiveLine?: () => void
   shortcuts?: ShortcutProfile
   store: EditorStore
@@ -107,6 +119,16 @@ export function AgendaView({
   // Key handlers read the caret between renders, so a ref mirrors it and every write updates both.
   const caretRef = useRef(caret)
   const [viewportState] = useState(() => new AgendaViewportState<Document, readonly AgendaRowModel[]>())
+  useImperativeHandle(
+    toggleFoldRef,
+    () => () => {
+      const current = store.getSnapshot()
+      if (current.status !== 'ready' || current.agenda === undefined) return
+      if (currentCaret.kind === 'synthetic') viewportState.navigate('keyboard')
+      store.applyAgenda({ kind: 'toggle-fold', key: current.agenda.selectedKey })
+    },
+    [store, viewportState, currentCaret.kind],
+  )
   useLayoutEffect(() => {
     if (searchCaretRef === undefined) return
     searchCaretRef.current = currentCaret.kind === 'native' ? () => undefined : () => caretRef.current.focus

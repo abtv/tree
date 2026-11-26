@@ -94,7 +94,7 @@ describeForEachEditingMode('always-on-top window', ({ mode }) => {
   })
 
   // @requirement PRODUCT.md §9.3
-  test('switches Always on Top from the Window menu and keeps the menu and status bar in step', async ({
+  test('switches Float on Top from the Window menu and keeps the menu and status bar in step', async ({
     userDataDir,
   }) => {
     const first = await launchTree(userDataDir, { initialMode: 'normal' })
@@ -103,9 +103,9 @@ describeForEachEditingMode('always-on-top window', ({ mode }) => {
     const alwaysOnTop = (): Promise<boolean | undefined> =>
       first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isAlwaysOnTop())
 
-    expect(await applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(false)
+    expect(await applicationMenuItemChecked(first.app, 'Window', 'Float on Top')).toBe(false)
 
-    await clickApplicationMenuItem(first.app, 'Window', 'Always on Top')
+    await clickApplicationMenuItem(first.app, 'Window', 'Float on Top')
 
     await expect(first.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
     await expect.poll(alwaysOnTop).toBe(true)
@@ -113,20 +113,20 @@ describeForEachEditingMode('always-on-top window', ({ mode }) => {
 
     await first.window.getByRole('button', { name: 'Unpin window from top' }).click()
 
-    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(false)
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Float on Top')).toBe(false)
 
     await first.window.getByRole('button', { name: 'Pin window on top' }).click()
 
-    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Always on Top')).toBe(true)
+    await expect.poll(() => applicationMenuItemChecked(first.app, 'Window', 'Float on Top')).toBe(true)
 
     await closeApp(first.app)
 
     const second = await launchTree(userDataDir)
 
     await expect(second.window.getByRole('button', { name: 'Unpin window from top' })).toBeVisible()
-    expect(await applicationMenuItemChecked(second.app, 'Window', 'Always on Top')).toBe(true)
+    expect(await applicationMenuItemChecked(second.app, 'Window', 'Float on Top')).toBe(true)
 
-    await clickApplicationMenuItem(second.app, 'Window', 'Always on Top')
+    await clickApplicationMenuItem(second.app, 'Window', 'Float on Top')
 
     await expect(second.window.getByRole('button', { name: 'Pin window on top' })).toBeVisible()
     await expect

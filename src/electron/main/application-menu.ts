@@ -168,7 +168,7 @@ export function applicationMenuTemplate(
       label: 'Window',
       submenu: [
         {
-          label: 'Always on Top',
+          label: 'Float on Top',
           enabled: !state.modalOpen,
           type: 'checkbox',
           checked: state.alwaysOnTop,

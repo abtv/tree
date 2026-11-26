@@ -7,6 +7,7 @@ import {
   beginStructuralChildOpen,
   beginStructuralOpen,
   beginStructuralVisual,
+  cancelVimLeader,
   clearCommandAssembly,
   clearPending,
   clearVisualRange,
@@ -82,7 +83,7 @@ describe('pending command input', () => {
     expect(state.lastFind).toBe(find)
   })
 
-  it.each(['0', 'g', 'ArrowLeft', 'F1', 'F12'])(
+  it.each(['0', 'g', 'ArrowLeft', 'F1', 'F12', '1️⃣'])(
     'leaves a non-count key available to the command adapter (%s)',
     (key) => {
       const state = createVimCommandState()
@@ -172,6 +173,15 @@ describe('pending command input', () => {
 describe('Normal-mode Leader assembly', () => {
   it.each([
     [[' ', ' '], 'global-search'],
+    [[' ', 'm'], 'toggle-mark'],
+    [[' ', 's'], 'toggle-star'],
+    [[' ', 'p'], 'toggle-agenda'],
+    [[' ', 'e'], 'toggle-fold'],
+    [[' ', 'h', 'a'], 'show-about'],
+    [[' ', 'h', 'h'], 'show-vim-help'],
+    [[' ', 'f', 'e'], 'export-notes'],
+    [[' ', 'f', 'i'], 'import-notes'],
+    [[' ', 't', 'f'], 'toggle-always-on-top'],
     [[' ', 't', 'm'], 'toggle-mark'],
     [[' ', 't', 's'], 'toggle-star'],
     [[' ', 't', 't'], 'cycle-appearance'],
@@ -189,6 +199,13 @@ describe('Normal-mode Leader assembly', () => {
   it.each([
     ['Escape', 'leader'],
     ['x', 'leader-toggle'],
+    ['p', 'leader-toggle'],
+    ['m', 'leader-help'],
+    ['s', 'leader-help'],
+    ['t', 'leader-help'],
+    ['m', 'leader-file'],
+    ['s', 'leader-file'],
+    ['t', 'leader-file'],
   ] as const)('cancels the unfinished sequence with %s and consumes the key (%s)', (key, prefix) => {
     const state = createVimCommandState()
     state.pending = { prefix, count: '', motionCount: '' }
@@ -203,6 +220,41 @@ describe('Normal-mode Leader assembly', () => {
 
     expect(advanceVimLeader(state, ' ', false)).toBeUndefined()
     expect(state.pending).toMatchObject({ awaiting })
+  })
+
+  it('starts a fresh Leader after an interruption during the toggle sequence', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+    advanceVimLeader(state, 't', false, 100)
+
+    cancelVimLeader(state)
+    const start = advanceVimLeader(state, ' ', false, 200)
+    const command = advanceVimLeader(state, ' ', false, 300)
+
+    expect(start).toBe('consumed')
+    expect(command).toBe('global-search')
+  })
+
+  it('refreshes the deadline when starting help and expires it before the next command', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+    advanceVimLeader(state, 'h', false, 1_500)
+
+    expect(hasLiveVimLeader(state, 3_500)).toBe(true)
+    expect(advanceVimLeader(state, 'a', false, 3_501)).toBeUndefined()
+    expect(state.pending).toBeUndefined()
+  })
+
+  it('leaves a repeated export key pending until a separate press or cancellation', () => {
+    const state = createVimCommandState()
+    advanceVimLeader(state, ' ', false, 0)
+    advanceVimLeader(state, 'f', false, 1)
+
+    expect(advanceVimLeader(state, 'e', true, 2)).toBe('consumed')
+    cancelVimLeader(state)
+
+    expect(advanceVimLeader(state, 'i', false, 3)).toBeUndefined()
+    expect(state.pending).toBeUndefined()
   })
 
   it('does not advance a mapping on a repeated keydown', () => {

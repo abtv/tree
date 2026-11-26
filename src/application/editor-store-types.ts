@@ -11,6 +11,8 @@ export type ClipboardValue = ClipboardPayload
 export class NotesRecoveryRequiredError extends Error {}
 
 export interface EditorServices {
+  /** A transient reference document supports navigation and search but never saves or edits notes. */
+  readOnly?: boolean
   /** A cut or paste can still change the document after its platform I/O finishes. */
   onPendingEditsChanged?(pending: boolean): void
   imageToText?(attachmentId: AttachmentId): Promise<string[]>

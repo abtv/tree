@@ -83,7 +83,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 
 ### 23.5 Folding Days
 
-Clicking a disclosure chevron, `Cmd+E`, or Vim Normal `za` toggles a populated day. Folding hides all its entries; a folded day stays non-empty. Empty Today does not fold. Node and separator rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Mode and document content are unchanged.
+A disclosure click, `Cmd+E`, and the Vim Normal commands `za` and `<Leader>e` (§20.2.32) each toggle a populated day. Folding hides all its entries; a folded day stays non-empty. Empty Today does not fold. Node and separator rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Mode and document content are unchanged.
 
 Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected populated day; recursive forms have the same effect because entries are flat. `zM`/`zR` close or open all populated days from any row.
 

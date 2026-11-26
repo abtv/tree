@@ -7,7 +7,7 @@ import {
   createVimEditSessionState,
   takeReplaceClick,
 } from './vim-edit-session'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { requireNode, type LinkRange, type TreeNode } from '../domain/document'
 import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
@@ -53,6 +53,7 @@ import { createVimKeyboardState } from './vim-keyboard-state'
 import { createPointerHandlers } from './node-input-pointer-handlers'
 import { createTextEditHandlers } from './node-input-text-handlers'
 import { useCompletion } from './use-completion'
+import { EditorComposition } from './editor-composition'
 import type { CompletionPopupPresentation } from './CompletionPopup'
 import type { EditorServices } from '../application/editor-store-types'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
@@ -88,7 +89,7 @@ export interface NodeInputBindingsResult {
   restoreSearchFocus: () => void
   completionPopup: CompletionPopupPresentation | undefined
   acceptCompletion: (index: number) => void
-  composing: boolean
+  isEditorComposing: (target: EventTarget | null) => boolean
   vimTextCommandState: VimTextCommandState
   bindings: (node: TreeNode) => NodeInputBindings
   dragFreeze: NodeDragCaretFreeze
@@ -130,7 +131,8 @@ export function useNodeInputBindings({
     [store],
   )
   const pendingLinkDraft = useRef<{ nodeId: string; range: LinkRange } | undefined>(undefined)
-  const [composing, setComposing] = useState(false)
+  const [composition] = useState(() => new EditorComposition())
+  const [, requestProjectionCommit] = useReducer((revision: number) => revision + 1, 0)
   const [selectAllNodeId, setSelectAllNodeId] = useState<string>()
   // The pure owner instance is created once per mount and kept in a ref because its register and
   // pending session are intentionally mutable local editing state that must not trigger renders.
@@ -183,6 +185,7 @@ export function useNodeInputBindings({
     persistenceLocked,
     scheduleCompletionCaret,
     vimEnabled,
+    composition,
     shortcuts,
   )
   const decorateCompletionBindings = completion.decorate
@@ -613,6 +616,9 @@ export function useNodeInputBindings({
   }, [])
 
   useLayoutEffect(() => {
+    // A ref can detach and reattach on the same render. Only retire a composition
+    // whose element is gone after React has finished committing the input tree.
+    composition.releaseDetached()
     const projection = caretProjection.current
     const changes = projection.beginCommit(focus, vimMode)
     // One commit pipeline owns precedence: authority, mode, focus, Visual restoration,
@@ -1073,17 +1079,20 @@ export function useNodeInputBindings({
             normalCaretResizeObserver.current?.observe(input)
           }
         },
+        // A deferred decoration can replace only this local field. Commit through the shared
+        // caret pipeline as well so the replacement keeps focus and the native selection.
+        onCompositionProjectionChange: requestProjectionCommit,
         ...createTextEditHandlers(
           {
             store,
-            composing,
+            composition,
             pendingLinkDraft,
             schedulePendingCaret,
+            requestProjectionCommit,
             getMode: () => caretProjection.current.mode,
             session: vimSession.current,
             commandState: vimCommandState.current,
             finishVimReplace,
-            setComposing,
           },
           node,
         ),
@@ -1113,7 +1122,7 @@ export function useNodeInputBindings({
           shortcuts,
           nativePaste: capturePasteClipboard !== undefined,
           node,
-          isComposing: () => composing,
+          isComposing: composition.owns,
           setSelectAllNodeId,
           onPreviewAttachment,
           shiftFocusedNode: (direction, selection, cursor) => {
@@ -1158,7 +1167,7 @@ export function useNodeInputBindings({
     [
       decorateCompletionBindings,
       capturePasteClipboard,
-      composing,
+      composition,
       applyCaretState,
       commandNodeVisual,
       shiftNodeVisual,
@@ -1260,7 +1269,7 @@ export function useNodeInputBindings({
     bindings,
     dragFreeze,
     setVimEditing,
-    composing,
+    isEditorComposing: composition.owns,
     vimTextCommandState,
     completionPopup: completion.presentation,
     acceptCompletion: completion.accept,

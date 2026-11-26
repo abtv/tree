@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LinkRange, TreeNode } from '../domain/document'
 import { setCaret } from './editor-dom'
+import { EditorComposition } from './editor-composition'
 import { createTextEditHandlers } from './node-input-text-handlers'
 import { createRealStoreHarness } from './test/real-store-harness'
 import { createVimCommandState } from './vim-command-state'
@@ -36,14 +37,14 @@ async function fixture(text = 'hello', links?: LinkRange[]) {
   let mode: VimMode = 'insert'
   const deps = {
     store: harness.store,
-    composing: false as boolean,
+    composition: new EditorComposition(),
     pendingLinkDraft: { current: undefined as { nodeId: string; range: LinkRange } | undefined },
     schedulePendingCaret: vi.fn(),
+    requestProjectionCommit: vi.fn(),
     getMode: () => mode,
     session: createVimEditSessionState(),
     commandState: createVimCommandState(),
     finishVimReplace: vi.fn(() => true),
-    setComposing: vi.fn(),
   } satisfies Parameters<typeof createTextEditHandlers>[0]
   return {
     ...harness,
@@ -66,7 +67,7 @@ describe('textarea text edits', () => {
     document.body.append(row)
 
     setCaret(input, 18)
-    f.deps.composing = true
+    f.deps.composition.start(input, '2026-10-14 ')
 
     f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: true } } as never)
 
@@ -76,8 +77,7 @@ describe('textarea text edits', () => {
     f.handlers().onCompositionEnd({ currentTarget: input } as never)
 
     expect(f.deps.schedulePendingCaret).toHaveBeenCalledWith({ nodeId: 'node', input, cursor: 18, refocus: true })
-
-    f.deps.composing = false
+    expect(f.deps.requestProjectionCommit).toHaveBeenCalledOnce()
 
     f.handlers().onContentInput({ currentTarget: input, nativeEvent: { isComposing: false } } as never)
 
@@ -106,14 +106,13 @@ describe('textarea text edits', () => {
     expect(f.deps.schedulePendingCaret).toHaveBeenCalledExactlyOnceWith({ nodeId: 'node', cursor: 5, refocus: true })
   })
 
-  it.each(['render', 'native'] as const)('defers URL recognition during %s composition', async (source) => {
+  it.each(['owned', 'native'] as const)('defers URL recognition during %s composition', async (source) => {
     const f = await fixture('https://example.')
-    f.deps.composing = source === 'render'
+    const input = textarea(url)
     const handlers = f.handlers()
-    // The composing value belongs to the render that created these handlers.
-    f.deps.composing = false
+    if (source === 'owned') f.deps.composition.start(input, 'https://example.')
 
-    handlers.onTextChange({ currentTarget: textarea(url), nativeEvent: { isComposing: source === 'native' } } as never)
+    handlers.onTextChange({ currentTarget: input, nativeEvent: { isComposing: source === 'native' } } as never)
 
     expect(f.node().text).toBe(url)
     expect(f.node().links ?? []).toEqual([])
@@ -186,18 +185,19 @@ it('treats a missing content-change text value as empty', async () => {
 describe('composition transitions', () => {
   it('clears pending commands before finishing Replace and marking composition active', async () => {
     const f = await fixture()
+    const input = textarea('hello')
     f.deps.commandState.pending = { count: '', operator: 'd', motionCount: '' }
     f.deps.finishVimReplace.mockImplementation(() => {
       expect(f.deps.commandState.pending).toBeUndefined()
-      expect(f.deps.setComposing).not.toHaveBeenCalled()
+      expect(f.deps.composition.owns(input)).toBe(false)
 
       return true
     })
 
-    f.handlers().onCompositionStart({ currentTarget: textarea('hello') } as never)
+    f.handlers().onCompositionStart({ currentTarget: input } as never)
 
     expect(f.deps.finishVimReplace).toHaveBeenCalledExactlyOnceWith(undefined, false, true)
-    expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(true)
+    expect(f.deps.composition.owns(input)).toBe(true)
   })
 
   it.each(['textarea', 'rich'] as const)(
@@ -208,15 +208,12 @@ describe('composition transitions', () => {
 
       f.setMode('replace')
       const input = kind === 'textarea' ? textarea('composed', 4) : richInput('composed', 4)
-      f.deps.setComposing.mockImplementation((value) => {
-        expect(value).toBe(false)
-        expect(f.deps.session.replace).toBeUndefined()
-      })
+      f.deps.composition.start(input, 'hello')
 
       handlers.onCompositionEnd({ currentTarget: input } as never)
 
       expect(f.deps.session.replace).toEqual({ nodeId: 'node', baseline: 'composed', position: 4, typed: '' })
-      expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(false)
+      expect(f.deps.composition.owns(input)).toBe(false)
     },
   )
 
@@ -224,12 +221,14 @@ describe('composition transitions', () => {
     'ends composition without creating a Replace session in %s mode',
     async (mode) => {
       const f = await fixture()
+      const input = textarea('hello')
+      f.deps.composition.start(input, 'hello')
 
       f.setMode(mode)
-      f.handlers().onCompositionEnd({ currentTarget: textarea('hello') } as never)
+      f.handlers().onCompositionEnd({ currentTarget: input } as never)
 
       expect(f.deps.session.replace).toBeUndefined()
-      expect(f.deps.setComposing).toHaveBeenCalledExactlyOnceWith(false)
+      expect(f.deps.composition.owns(input)).toBe(false)
     },
   )
 })

@@ -271,7 +271,7 @@ describe('application menu template', () => {
     expect(actions.notesCommand.mock.calls).toEqual([['export'], ['import']])
   })
   // @requirement PRODUCT.md §9.3
-  it('follows the macOS layout: Quit in the app menu, Vim in Edit, Appearance in View, Always on Top in Window', () => {
+  it('follows the macOS layout: Quit in the app menu, Vim in Edit, Appearance in View, Float on Top in Window', () => {
     const template = applicationMenuTemplate(state(), createActions())
 
     expect(template.map((entry) => entry.label)).toEqual(['Tree', 'File', 'Edit', 'View', 'Window'])
@@ -298,7 +298,7 @@ describe('application menu template', () => {
       'Appearance',
     ])
     expect(appearanceItems(template).map((item) => item.label)).toEqual(['Automatic', 'Light', 'Dark', 'Gray', 'White'])
-    expect(submenuItems(template, 'Window').map((item) => item.label)).toEqual(['Always on Top'])
+    expect(submenuItems(template, 'Window').map((item) => item.label)).toEqual(['Float on Top'])
   })
 
   // @requirement PRODUCT.md §9.3

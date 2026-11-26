@@ -19,7 +19,7 @@ const seed = {
 }
 
 test.describe('Vim editing toggle', () => {
-  for (const preference of ['Vim Editing', 'Always on Top'] as const) {
+  for (const preference of ['Vim Editing', 'Float on Top'] as const) {
     test(`keeps a newer native ${preference} choice after a delayed startup reply`, async ({
       userDataDir,
     }, testInfo) => {

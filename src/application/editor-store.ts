@@ -1831,7 +1831,7 @@ export class EditorStore {
   }
 
   private markPersistedChange(): void {
-    this.saveScheduler.markPersistedChange()
+    if (!this.services.readOnly) this.saveScheduler.markPersistedChange()
   }
 
   private noteChange(insertedWords: number, saveImmediately: boolean): void {
@@ -1843,7 +1843,7 @@ export class EditorStore {
   }
 
   private queueAttachmentCleanup(): void {
-    this.saveScheduler.requestAttachmentCleanup()
+    if (!this.services.readOnly) this.saveScheduler.requestAttachmentCleanup()
   }
 
   private referencedAttachmentIds(): Set<AttachmentId> {
@@ -1888,6 +1888,7 @@ export class EditorStore {
   private isPersistenceLocked(): boolean {
     // Only a ready snapshot has persistenceLocked, so the status check is redundant.
     return (
+      this.services.readOnly === true ||
       this.editSeals.size > 0 ||
       (this.runtime.snapshot.status === 'ready' && this.runtime.snapshot.persistenceLocked === true)
     )

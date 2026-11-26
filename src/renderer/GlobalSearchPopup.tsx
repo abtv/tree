@@ -22,6 +22,7 @@ import { useSearchDecorations } from './search-decorations'
 import { computeListWindow, ROW_HEIGHT_ESTIMATE } from './list-window'
 import { GlobalSearchSuggestions } from './GlobalSearchSuggestions'
 import { SearchQueryInput } from './SearchQueryInput'
+import { isCommittedCompositionInput } from './editor-composition'
 import { initialSearchHeading } from './node-flags'
 import { AttachmentThumbnail } from './AttachmentPreview'
 import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
@@ -181,6 +182,7 @@ export function GlobalSearchPopup({
   store,
   shortcuts,
   blocked,
+  isEditorComposing,
   beforeOpen,
   beforeVisit,
   openRef,
@@ -188,6 +190,7 @@ export function GlobalSearchPopup({
   store: EditorStore
   shortcuts: ShortcutProfile
   blocked: boolean
+  isEditorComposing(target: EventTarget | null): boolean
   beforeOpen(): void
   beforeVisit(): void
   openRef?: { current: (() => void) | undefined }
@@ -267,10 +270,6 @@ export function GlobalSearchPopup({
     setWindowTop(0)
     if (panel.current) panel.current.scrollTop = 0
   }
-  const changeQuery = (value: string, start: number, end: number): void => {
-    resetScroll()
-    session.edit(value, false, start, end)
-  }
   const acceptSuggestion = (index?: number): void => {
     resetScroll()
     let caret: number | undefined
@@ -309,6 +308,7 @@ export function GlobalSearchPopup({
     const show = (): void => {
       if (
         blocked ||
+        isEditorComposing(document.activeElement) ||
         store.getSnapshot().status !== 'ready' ||
         document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
       )
@@ -320,7 +320,16 @@ export function GlobalSearchPopup({
     }
     if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
-      if (event.isComposing || blocked) return
+      if (blocked || isEditorComposing(event.target)) return
+      const queryComposing = event.target === input.current && (event.isComposing || session.isComposing())
+      if (queryComposing && (event.key === 'Tab' || event.key === 'Escape')) {
+        // Browser defaults would tab out of the modal or clear the native search input while the
+        // input method owns the key. Clearing the field can end composition without a notification.
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return
+      }
+      if (event.isComposing || queryComposing) return
       if (items !== undefined) {
         if (
           shortcuts.isPrimary(event) &&
@@ -570,11 +579,13 @@ export function GlobalSearchPopup({
         data-editor-focus-borrow=""
         onChange={(event) => {
           const target = event.currentTarget
-          changeQuery(
-            target.value,
-            target.selectionStart ?? target.value.length,
-            target.selectionEnd ?? target.value.length,
-          )
+          const { value } = target
+          const start = target.selectionStart ?? value.length
+          const end = target.selectionEnd ?? value.length
+          resetScroll()
+          if (session.isComposing() && isCommittedCompositionInput(event.nativeEvent))
+            session.endComposition(value, start, end)
+          else session.edit(value, false, start, end)
         }}
         onSelect={(event) => {
           const target = event.currentTarget
@@ -587,6 +598,7 @@ export function GlobalSearchPopup({
           session.beginComposition()
         }}
         onCompositionEnd={(event) => {
+          if (!session.isComposing()) return
           resetScroll()
           const target = event.currentTarget
           session.endComposition(
