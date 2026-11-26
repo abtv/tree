@@ -60,6 +60,7 @@ app.setName('Tree')
 registerRendererScheme(protocol)
 
 let mainWindow: BrowserWindow | null = null
+let closeSavedMainWindow: (() => void) | undefined
 // Assigned synchronously by bootstrapApplication below, before any window or service exists.
 let quitControl!: QuitControl
 let alwaysOnTopStore: BooleanPreferenceStore | null = null
@@ -74,6 +75,7 @@ const packagedRendererDirectory = join(__dirname, '../renderer')
 let renderer: ReturnType<typeof resolveRendererUrl> | null = null
 let rendererModalOpen = false
 let appUpdates: AppUpdates | undefined
+let updateRecovery: { window: BrowserWindow; message: string } | undefined
 let appUpdateBlocked = false
 
 const nativeClipboard: NativeClipboard = {
@@ -279,14 +281,24 @@ function createMainWindow(quitWithoutSave: () => void): void {
   }
   window.on('move', saveWindowBounds)
   window.on('resize', saveWindowBounds)
-  window.on('close', () => {
+  const flushWindowBounds = (): void => {
     saveWindowBounds()
     windowBounds.flush()
-  })
+  }
+  window.on('close', flushWindowBounds)
+  closeSavedMainWindow = () => {
+    if (window.isDestroyed()) return
+    flushWindowBounds()
+    // The acknowledged renderer is sealed. Destroy it now so a timeout cannot
+    // unlock the editor while a graceful close is still in flight.
+    window.destroy()
+  }
   window.on('closed', () => {
     rendererModalOpen = false
+    if (updateRecovery?.window === window) updateRecovery = undefined
     if (mainWindow === window) {
       mainWindow = null
+      closeSavedMainWindow = undefined
       if (appUpdates?.isReady()) rebuildApplicationMenu()
     }
   })
@@ -306,6 +318,7 @@ bootstrapApplication({
     mainWindow = window as BrowserWindow | null
   },
   createMainWindow,
+  closeSavedMainWindow: () => closeSavedMainWindow?.(),
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
     if (app.isPackaged && process.platform === 'darwin') {
@@ -322,13 +335,24 @@ bootstrapApplication({
           return
         }
         const staged = nativePackage.phase === 'staged' && nativePackage.version === version
-        nativePackage = { phase: staged ? 'installing' : 'staging', version, retryWaiting: false }
-        try {
-          if (staged) appUpdates!.handOffToInstaller(() => nativeUpdater.quitAndInstall())
-          else nativeUpdater.checkForUpdates()
-        } catch (error) {
-          nativePackage = staged ? { phase: 'staged', version } : { phase: 'idle' }
-          throw error
+        if (staged) {
+          appUpdates!.handOffToInstaller(() => {
+            nativePackage = { phase: 'installing', version, retryWaiting: false }
+            try {
+              nativeUpdater.quitAndInstall()
+            } catch (error) {
+              nativePackage = { phase: 'idle' }
+              throw error
+            }
+          })
+        } else {
+          nativePackage = { phase: 'staging', version, retryWaiting: false }
+          try {
+            nativeUpdater.checkForUpdates()
+          } catch (error) {
+            nativePackage = { phase: 'idle' }
+            throw error
+          }
         }
       }
       autoUpdater.autoInstallOnAppQuit = false
@@ -349,8 +373,17 @@ bootstrapApplication({
           notesArchive?.isIdle?.() === true &&
           notesMenuState.canInstallUpdate,
         prepareQuit: () => quitControl.prepareUpdateQuit(),
+        closeForInstall: (whenClosed) => quitControl.closeForUpdate(whenClosed),
         requestSave: (id) => mainWindow?.webContents.send(ipcEvents.appUpdateRequested, id),
-        finished: (message) => mainWindow?.webContents.send(ipcEvents.appUpdateFinished, message),
+        finished: (message) => {
+          const window = mainWindow
+          if (window && !window.isDestroyed()) {
+            window.webContents.send(ipcEvents.appUpdateFinished, message)
+          } else if (message !== null) {
+            quitControl.restoreMainWindow()
+            if (mainWindow) updateRecovery = { window: mainWindow, message }
+          }
+        },
         changed: rebuildApplicationMenu,
         progressChanged: () => {
           if (mainWindow && !mainWindow.isDestroyed()) {
@@ -391,8 +424,10 @@ bootstrapApplication({
       autoUpdater.on('download-progress', (progress) => appUpdates?.downloading(progress.percent))
       const finishNativeOperation = (downloaded: boolean) => {
         if (nativePackage.phase !== 'staging' && nativePackage.phase !== 'installing') return
-        const { phase, version, retryWaiting } = nativePackage
-        nativePackage = downloaded || phase === 'installing' ? { phase: 'staged', version } : { phase: 'idle' }
+        const { version, retryWaiting } = nativePackage
+        // An installer failure does not prove the native copy is still staged. The
+        // provider's downloaded ZIP remains ready for a fresh preparation on retry.
+        nativePackage = downloaded ? { phase: 'staged', version } : { phase: 'idle' }
         if (appUpdates?.isInstalling()) {
           if (!downloaded && !retryWaiting) {
             appUpdates.fail('Update failed. Try Restart and Install again.')
@@ -535,6 +570,12 @@ bootstrapApplication({
       },
       notesArchive,
       setNotesMenuState: (value) => {
+        // The recovered renderer cannot display operation errors until the notes load settles.
+        const recovery = updateRecovery
+        if (value.canInstallUpdate && recovery !== undefined && recovery.window === mainWindow) {
+          updateRecovery = undefined
+          recovery.window.webContents.send(ipcEvents.appUpdateFinished, recovery.message)
+        }
         if (
           notesMenuState.canExport === value.canExport &&
           notesMenuState.canImport === value.canImport &&

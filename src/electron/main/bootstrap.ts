@@ -28,6 +28,8 @@ export interface QuitControl {
   quitWithoutSave(): void
   /** Called only after the update renderer flush; returns a rollback for installation failure. */
   prepareUpdateQuit(): () => void
+  closeForUpdate(whenClosed: () => void): void
+  restoreMainWindow(): void
   /**
    * The window's renderer process ended, so its unsaved changes are gone and no save can be
    * confirmed: a waiting quit completes, and later quits skip the save request.
@@ -46,6 +48,7 @@ export interface ApplicationBootstrapDependencies {
   setMainWindow: (window: MainWindowReference | null) => void
   // A window whose renderer never loaded has no document to save, so its failure quits directly.
   createMainWindow: (quitWithoutSave: () => void) => void
+  closeSavedMainWindow: () => void
   getWindowCount: () => number
   registerReadyServices: (quitHandshake: QuitHandshake, onQuitConfirmed: () => void) => void
   registerShortcut: (surfaceWindow: () => void) => boolean
@@ -70,6 +73,7 @@ export function bootstrapApplication({
   getMainWindow,
   setMainWindow,
   createMainWindow,
+  closeSavedMainWindow,
   getWindowCount,
   registerReadyServices,
   registerShortcut,
@@ -97,6 +101,11 @@ export function bootstrapApplication({
     phase = 'quitting'
     app.quit()
   }
+  const openMainWindow = (): void => {
+    if (phase !== 'running' || getWindowCount() !== 0) return
+    createMainWindow(quitWithoutSave)
+    watchMainWindowClose()
+  }
   registerQuitControl({
     isQuitting: () => phase !== 'running',
     quitWithoutSave,
@@ -106,6 +115,14 @@ export function bootstrapApplication({
         if (phase === 'updating') phase = 'running'
       }
     },
+    closeForUpdate: (whenClosed) => {
+      // Electron registers an additional quit observer if the native installer sees any windows.
+      closeSavedMainWindow()
+      setImmediate(() => {
+        if (phase === 'updating' && getWindowCount() === 0) whenClosed()
+      })
+    },
+    restoreMainWindow: openMainWindow,
     // The handshake addresses only the current main window, so only its renderer can end a waiting request.
     rendererGone: (window) => {
       goneRenderer = window
@@ -166,12 +183,7 @@ export function bootstrapApplication({
       setApplicationMenu(() => app.quit())
       createMainWindow(quitWithoutSave)
       watchMainWindowClose()
-      app.on('activate', () => {
-        if (phase === 'running' && getWindowCount() === 0) {
-          createMainWindow(quitWithoutSave)
-          watchMainWindowClose()
-        }
-      })
+      app.on('activate', openMainWindow)
     })
     .catch(onStartupError)
 

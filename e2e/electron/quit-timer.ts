@@ -20,13 +20,16 @@ export async function captureQuitTimer(
           callback(...callbackArgs)
         }
         const handle = Reflect.apply(target, receiver, [fire, milliseconds])
-        timers.push({
-          milliseconds,
-          expire: () => {
-            clearTimeout(handle)
-            fire()
-          },
-        })
+        // Update confirmation can also schedule window-bounds persistence while closing.
+        if (route !== 'update' || milliseconds === 60_000) {
+          timers.push({
+            milliseconds,
+            expire: () => {
+              clearTimeout(handle)
+              fire()
+            },
+          })
+        }
         return handle
       },
     })

@@ -39,6 +39,7 @@ function createHarness(locked = true) {
     getMainWindow: vi.fn<() => MainWindowReference | null>(() => window),
     setMainWindow: vi.fn(),
     createMainWindow: vi.fn(),
+    closeSavedMainWindow: vi.fn(),
     getWindowCount: vi.fn(() => 1),
     registerReadyServices,
     registerShortcut: vi.fn(() => true),
@@ -174,6 +175,40 @@ describe('bootstrapApplication', () => {
     f.listeners.activate!()
 
     expect(f.dependencies.createMainWindow).toHaveBeenCalledTimes(2)
+  })
+
+  it('hands off the update only after the native window closes and can restore the editor after rollback', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const rollback = f.quitControl.prepareUpdateQuit()
+    const install = vi.fn()
+
+    f.quitControl.closeForUpdate(install)
+    expect(f.dependencies.closeSavedMainWindow).toHaveBeenCalledOnce()
+    expect(install).not.toHaveBeenCalled()
+    f.dependencies.getWindowCount.mockReturnValue(0)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    expect(install).toHaveBeenCalledOnce()
+    f.quitControl.restoreMainWindow()
+    expect(f.dependencies.createMainWindow).toHaveBeenCalledOnce()
+    rollback()
+    f.quitControl.restoreMainWindow()
+    expect(f.dependencies.createMainWindow).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not hand off if the installation rolls back after closing the saved window', async () => {
+    const f = createHarness()
+    await Promise.resolve()
+    const install = vi.fn()
+    const rollback = f.quitControl.prepareUpdateQuit()
+
+    f.quitControl.closeForUpdate(install)
+    f.dependencies.getWindowCount.mockReturnValue(0)
+    rollback()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    expect(install).not.toHaveBeenCalled()
   })
 
   it('keeps a confirmed quit when a failed update installation rolls back', async () => {
@@ -534,6 +569,7 @@ describe('bootstrapApplication', () => {
       getMainWindow: () => null,
       setMainWindow: vi.fn(),
       createMainWindow: vi.fn(),
+      closeSavedMainWindow: vi.fn(),
       getWindowCount: () => 0,
       registerReadyServices: vi.fn(),
       registerShortcut: vi.fn(() => true),

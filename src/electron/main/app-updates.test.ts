@@ -9,6 +9,7 @@ function harness() {
     install: vi.fn(),
     canInstall: vi.fn(() => true),
     prepareQuit: vi.fn(() => release),
+    closeForInstall: vi.fn((install: () => void) => install()),
     requestSave: vi.fn(),
     finished: vi.fn(),
     changed: vi.fn(),
@@ -41,7 +42,9 @@ describe('desktop app updates', () => {
 
   it('clears a previous failure as soon as a background check starts', async () => {
     const { updates, ports } = harness()
-    updates.fail('offline')
+    ports.check.mockRejectedValueOnce(new Error('offline'))
+    await updates.check()
+    expect(updates.getStatus()).toBe('failed')
     let finish!: () => void
     ports.check.mockImplementationOnce(
       () =>
@@ -65,6 +68,7 @@ describe('desktop app updates', () => {
       install: ports.install,
       canInstall: ports.canInstall,
       prepareQuit: ports.prepareQuit,
+      closeForInstall: ports.closeForInstall,
       requestSave: ports.requestSave,
       finished: ports.finished,
       changed: ports.changed,
@@ -523,7 +527,7 @@ describe('desktop app updates', () => {
 
     expect(release).toHaveBeenCalledOnce()
     expect(ports.finished).toHaveBeenCalledExactlyOnceWith('Update failed. Try Restart and Install again.')
-    expect(updates.getStatus()).toBe('failed')
+    expect(updates.getStatus()).toBe('ready')
     expect(vi.getTimerCount()).toBe(0)
   })
 

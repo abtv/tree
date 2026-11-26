@@ -176,10 +176,16 @@ When the user retries after a failure, a late response from the earlier attempt 
 restore editing during the retry's save or installation. If the previous native operation
 is still running, the saved retry waits for it before starting another installation.
 
-An installation error or preparation timeout restores editing and allows another attempt. The timeout
+An installation error or preparation timeout restores editing and allows another attempt. If the
+editor window has already closed, Tree reopens it and shows the error. After an installation error,
+the next attempt prepares the downloaded package again without downloading it again. The timeout
 message also offers quitting and reopening Tree to recover from an unresponsive macOS installer.
+
 Ordinary Quit does not initiate installation of an update the user has not requested.
-Closing the window or choosing Quit while macOS is still preparing the package uses the ordinary save-and-quit path. The installer takes over closing windows when Tree calls it to quit and install. If installation fails while the document cannot open, both errors remain visible.
+Closing the window or choosing Quit while macOS is still preparing the package uses the ordinary
+save-and-quit path. Once preparation succeeds, Tree closes the saved editor window before asking
+the installer to quit and restart. If installation fails while the document cannot open, both
+errors remain visible.
 
 Update checks add no document writes or document traversal. Explicit installation
 uses the persistence flush of §16.1. Download/cache storage is proportional to the

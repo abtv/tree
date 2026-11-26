@@ -33,6 +33,7 @@ export class AppUpdates {
       install(): void
       canInstall(): boolean
       prepareQuit(): () => void
+      closeForInstall(whenClosed: () => void): void
       requestSave(id: string): void
       finished(message: string | null): void
       changed(): void
@@ -115,8 +116,20 @@ export class AppUpdates {
 
   public handOffToInstaller(quitAndInstall: () => void): void {
     if (this.installation.phase !== 'preparing-install') return
-    this.installation = { phase: 'native-quit', timer: this.installation.timer, releaseQuit: this.ports.prepareQuit() }
-    quitAndInstall()
+    const handoff = {
+      phase: 'native-quit',
+      timer: this.installation.timer,
+      releaseQuit: this.ports.prepareQuit(),
+    } as const
+    this.installation = handoff
+    this.ports.closeForInstall(() => {
+      if (this.installation !== handoff) return
+      try {
+        quitAndInstall()
+      } catch {
+        this.fail('Update failed. Try Restart and Install again.')
+      }
+    })
   }
 
   public downloaded(version?: string): void {
@@ -228,12 +241,12 @@ export class AppUpdates {
   }
 
   public fail(message: string | null): void {
-    if (message !== null) this.failure = 'failed'
     const installation = this.installation
-    if (installation.phase !== 'idle') clearTimeout(installation.timer)
+    if (installation.phase === 'idle') return
+    clearTimeout(installation.timer)
     if (installation.phase === 'native-quit') installation.releaseQuit()
     this.installation = { phase: 'idle' }
-    if (installation.phase !== 'idle') this.ports.finished(message)
+    this.ports.finished(message)
     this.publishOrRecheck()
   }
 }

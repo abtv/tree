@@ -329,7 +329,7 @@ test('keeps a retry locked when an earlier failed-save acknowledgment arrives la
 // @requirement PRODUCT.md §26
 for (const timing of ['during', 'after'] as const) {
   test(`a late native install error ${timing} the retry save cannot unlock the editor`, async ({ userDataDir }) => {
-    const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+    const { app } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
     await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
     const expire = await captureQuitTimer(app, 'update')
     const handoff = await app.evaluateHandle(({ autoUpdater }) => {
@@ -343,8 +343,10 @@ for (const timing of ['during', 'after'] as const) {
     allowRendererError(/Update preparation took too long/)
     await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
     await expect.poll(() => handoff.evaluate((status) => status.starts)).toBe(1)
+    const recovered = app.waitForEvent('window')
     await expire()
-    await expect(window.locator('#root')).toHaveJSProperty('inert', false)
+    const window = await recovered
+    await expect(window.getByRole('alert')).toContainText(/quit and reopen Tree/i)
 
     const gate = await app.evaluateHandle(() => {
       const save = { started: false, confirmed: false, release() {} }
@@ -372,6 +374,8 @@ for (const timing of ['during', 'after'] as const) {
     }
     const startsBeforeError = await handoff.evaluate((status) => status.starts)
     await app.evaluate(({ autoUpdater }) => {
+      // Keep the retry in staging so we can inspect its renderer after the old error.
+      autoUpdater.checkForUpdates = () => undefined
       autoUpdater.emit('error', new Error('Late native install failure'))
     })
     await window.evaluate(() => globalThis.window.treeApi.load())
@@ -379,6 +383,8 @@ for (const timing of ['during', 'after'] as const) {
     await expect(window.locator('#root')).toHaveJSProperty('inert', true)
     expect(startsBeforeError).toBe(1)
     if (timing === 'during') await gate.evaluate((save) => save.release())
+    await expect.poll(() => gate.evaluate((save) => save.confirmed)).toBe(true)
+    await app.evaluate(({ autoUpdater }) => autoUpdater.emit('update-downloaded'))
     await expect.poll(() => handoff.evaluate((status) => status.starts)).toBe(2)
     const closed = app.waitForEvent('close')
     await handoff.evaluate((status) => status.finish())
@@ -388,11 +394,25 @@ for (const timing of ['during', 'after'] as const) {
 }
 
 test('recovers through ordinary quit and reopen when native installation never responds', async ({ userDataDir }) => {
-  const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+  const launched = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+  const { app } = launched
+  let { window } = launched
   await expect.poll(() => existsSync(documentPath(userDataDir))).toBe(true)
   const expire = await captureQuitTimer(app, 'update', 2)
-  const status = await app.evaluateHandle(({ autoUpdater }) => {
-    const status = { confirmed: 0, handoffs: 0 }
+  const status = await app.evaluateHandle(({ autoUpdater, BrowserWindow }) => {
+    const original = BrowserWindow.getAllWindows()[0]!
+    const status = {
+      confirmed: 0,
+      handoffs: 0,
+      closing: false,
+      completePendingClose() {
+        if (this.closing && !original.isDestroyed()) original.destroy()
+      },
+    }
+    // Delay a graceful close until after the deadline to reproduce a window closing after rollback.
+    original.close = () => {
+      status.closing = true
+    }
     autoUpdater.quitAndInstall = () => {
       status.handoffs++
     }
@@ -405,13 +425,19 @@ test('recovers through ordinary quit and reopen when native installation never r
     return status
   })
   allowRendererError(/Update preparation took too long/)
-  const editor = window.locator('.node-input').first()
   for (const attempt of [1, 2]) {
     const text = `Edit before attempt ${attempt}`
-    await editor.fill(text)
+    await window.locator('.node-input').first().fill(text)
     await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
     await expect.poll(() => status.evaluate((value) => value.confirmed)).toBe(attempt)
+    if (attempt === 1)
+      await expect.poll(() => status.evaluate((value) => value.closing || value.handoffs === 1)).toBe(true)
+    const recovered = attempt === 1 ? app.waitForEvent('window', { timeout: 3000 }) : undefined
     await expire()
+    if (recovered) {
+      await status.evaluate((value) => value.completePendingClose())
+      window = await recovered
+    }
 
     await expect(window.locator('#root')).toHaveJSProperty('inert', false)
     expect(readPersisted(userDataDir).document.roots[0]?.text).toBe(text)
@@ -419,7 +445,7 @@ test('recovers through ordinary quit and reopen when native installation never r
   expect(await status.evaluate((value) => value.handoffs)).toBe(1)
   await expect(window.getByRole('alert')).toContainText(/quit and reopen Tree/i)
   await window.screenshot({ path: 'test-results/update-preparation-timeout.png' })
-  await editor.fill('Edit after the installer stopped responding')
+  await window.locator('.node-input').first().fill('Edit after the installer stopped responding')
   const closed = app.waitForEvent('close')
   await clickApplicationMenuQuit(app)
   await closed
@@ -642,6 +668,65 @@ test('updates only on request, flushes edits, and keeps normal quit safe after i
   await pressKeyThatQuits(window, 'Enter')
   await closed
   expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Edited after failed update')
+})
+
+// @requirement PRODUCT.md §26
+test('retries installation from the downloaded ZIP after native preparation becomes invalid', async ({
+  userDataDir,
+}, testInfo) => {
+  const { app, window } = await launchTree(userDataDir, { appUpdates: true, vimPreference: false })
+  const native = await app.evaluateHandle(({ autoUpdater, BrowserWindow }) => {
+    const probe = (
+      globalThis as unknown as {
+        __treeUpdates: { downloads: number; installs: number; nextVersion: string; finishDownload(): void }
+      }
+    ).__treeUpdates
+    const state = {
+      preparations: () => probe.installs,
+      downloads: () => probe.downloads,
+      finishDownload: () => probe.finishDownload(),
+      handoffs: 0,
+      openWindows: -1,
+    }
+    const finish = autoUpdater.quitAndInstall.bind(autoUpdater)
+    autoUpdater.quitAndInstall = () => {
+      state.handoffs++
+      state.openWindows = BrowserWindow.getAllWindows().length
+      // Once this handoff fails, only a new native preparation restores the installer state.
+      if (probe.installs < 2) autoUpdater.emit('error', new Error('Prepared update is missing'))
+      else finish()
+    }
+    probe.nextVersion = '1.2.4'
+    return state
+  })
+  allowRendererError(/Update failed\. Try Restart and Install again/)
+  const editor = window.locator('.node-input').first()
+  await editor.fill('Saved before the first attempt')
+  await clickApplicationMenuItem(app, 'Tree', 'Check for Updates…')
+  await expect
+    .poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('download-update')?.enabled))
+    .toBe(true)
+  await clickApplicationMenuItem(app, 'Tree', 'Download Update 1.2.4')
+  await native.evaluate((state) => state.finishDownload())
+  await expect(window.locator('.update-status')).toHaveText('Update ready')
+
+  const recovered = app.waitForEvent('window')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
+  const reopened = await recovered
+  await expect(reopened.getByRole('alert')).toContainText('Update failed. Try Restart and Install again.')
+  await expect(reopened.getByText('Update failed. Check for Updates to retry.')).toHaveCount(0)
+  expect(
+    await native.evaluate((state) => [state.downloads(), state.preparations(), state.handoffs, state.openWindows]),
+  ).toEqual([1, 1, 1, 0])
+  await expect(reopened.locator('.node-input').first()).toHaveValue('Saved before the first attempt')
+  await reopened.screenshot({ path: testInfo.outputPath('update-recovered-editor.png') })
+
+  await reopened.locator('.node-input').first().fill('Saved before retry')
+  const closed = app.waitForEvent('close')
+  await clickApplicationMenuItem(app, 'Tree', 'Restart and Install 1.2.4')
+  await closed
+
+  expect(readPersisted(userDataDir).document.roots[0]?.text).toBe('Saved before retry')
 })
 
 // @requirement PRODUCT.md §26
