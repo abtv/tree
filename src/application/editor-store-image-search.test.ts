@@ -64,10 +64,11 @@ it('reindexes completed images without adding children or undo steps, and dedupl
   expect(recognize).toHaveBeenCalledTimes(2)
   expect(results(store, 'Old')).toHaveLength(1)
 
-  finish(['New'])
+  finish(['New', 'Details'])
   await vi.waitFor(() => expect(results(store, 'New')).toHaveLength(1))
 
   expect(results(store, 'Old')).toHaveLength(0)
+  expect(ready(store).document.roots[0]!.attachment?.searchText).toBe('New\nDetails')
   expect(ready(store).focus).toBe(before.focus)
   expect(ready(store).document.roots[0]!.children).toEqual([])
   store.undo()
@@ -115,6 +116,40 @@ it('retains the existing index when reindexing fails', async () => {
   await vi.advanceTimersByTimeAsync(0)
 
   expect(results(store, 'Previous')).toHaveLength(1)
+})
+
+// @requirement PRODUCT.md §15.1
+it('saves completed reindex text without needing a subsequent edit', async () => {
+  const { store, save } = await setup(async () => ['Recognized text'], {
+    roots: [
+      {
+        id: 'source',
+        text: 'Caption',
+        attachment: { id: 'pic', mimeType: 'image/png' },
+        children: [],
+      },
+    ],
+  })
+  await store.flushPersistence()
+  save.mockClear()
+
+  store.reindexAllImages()
+  await vi.waitFor(() => expect(ready(store).document.roots[0]?.attachment?.searchText).toBe('Recognized text'))
+  await store.flushPersistence()
+
+  expect(save).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      document: {
+        roots: [
+          expect.objectContaining({
+            id: 'source',
+            text: 'Caption',
+            attachment: expect.objectContaining({ id: 'pic', searchText: 'Recognized text' }),
+          }),
+        ],
+      },
+    }),
+  )
 })
 
 it('keeps reindexing a shared image when its first owner is deleted', async () => {

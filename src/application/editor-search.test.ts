@@ -71,6 +71,31 @@ it.each(['confirm', 'navigate'])('keeps a newer jump started by a subscriber dur
   expect(apply.mock.calls[0]).toEqual([expect.objectContaining({ nodeId: 'a', caret: 6 })])
 })
 
+it('does not resume the old queue when a subscriber replaces it after an applied jump', async () => {
+  const { state } = await setup()
+  const apply = vi.fn(() => true)
+  const search = new EditorSearch(apply, new AgendaRowsCache())
+  const origin = { nodeId: 'a', offset: 0 }
+  search.update(state())
+  search.begin(origin)
+  search.edit('apple')
+  search.confirm()
+  search.navigate(origin, 1, 1)
+  const stop = search.subscribe(() => {
+    if (search.getResult()?.destination === undefined) return
+    stop()
+    search.interruptNavigation()
+    search.navigate({ nodeId: 'c', offset: 0 }, 1, 1)
+  })
+
+  await vi.runAllTimersAsync()
+
+  expect(apply.mock.calls).toEqual([
+    [expect.objectContaining({ nodeId: 'a', caret: 6 })],
+    [expect.objectContaining({ nodeId: 'd', caret: 0 })],
+  ])
+})
+
 it('publishes a zero-result search without applying an absent destination', async () => {
   const { state } = await setup()
   const apply = vi.fn()
@@ -868,6 +893,36 @@ it('leaves the folds of a view that replaced the searched view before publicatio
   search.closeFoldsLeavingScope(next, previous)
 
   expect(next.expansion.expandedIds).toEqual(new Set(['a']))
+})
+
+// @requirement PRODUCT.md §20.2.31
+it('releases search folds when a restored expansion view takes over the same location', async () => {
+  const { state } = await setup(1, true)
+  const search = new EditorSearch(vi.fn(), new AgendaRowsCache())
+  const before: ReadySnapshot = {
+    ...state(),
+    location: { currentParentId: 'a', selectedNodeId: 'a' },
+  }
+  search.update(before)
+  const reveal = search.revealView(before, { nodeId: 'nested', start: 0, end: 5, caret: 0 })
+  if (reveal?.kind !== 'tree') throw new Error('Expected a Tree search reveal')
+  const previous = { ...before, expansion: reveal.expansion }
+  search.update(previous)
+  const next: ReadySnapshot = {
+    ...previous,
+    document: { roots: previous.document.roots.map((root) => (root.id === 'a' ? { ...root, starred: true } : root)) },
+    expansion: {
+      viewOwnerId: 'a',
+      expandedIds: new Set(['b']),
+      otherViews: new Map([[null, new Set<string>()]]),
+    },
+  }
+
+  search.closeFoldsLeavingScope(next, previous)
+  search.update(next)
+
+  expect(search.persistentExpansion(next)).toBe(next.expansion)
+  expect(search.hideView(next)).toBeUndefined()
 })
 
 // @requirement PRODUCT.md §20.2.31

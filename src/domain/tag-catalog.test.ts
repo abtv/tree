@@ -41,6 +41,25 @@ it('offers no global tag suggestions in a document without tags or after the las
   expect(catalog.searchSuggestions('#')).toEqual([])
 })
 
+// @requirement PRODUCT.md §20.14.4
+it('resolves a bare marker only while the catalog has exactly one distinct name', () => {
+  const catalog = new TagCatalog('@')
+  const first = node('first', '@Alex @Alex')
+  const second = node('second', '@Sam')
+  const options = { suppressExactMatch: true, uniqueOnly: true }
+  catalog.update({ roots: [first] })
+
+  expect(catalog.searchSuggestions('@', options)).toEqual(['Alex'])
+
+  catalog.update({ roots: [first, second] })
+
+  expect(catalog.searchSuggestions('@', options)).toEqual([])
+
+  catalog.update({ roots: [second] })
+
+  expect(catalog.searchSuggestions('@', options)).toEqual(['Sam'])
+})
+
 it('releases character buckets after the last tags are removed', () => {
   const catalog = new TagCatalog()
   catalog.update({ roots: [{ ...node('done', '#archived #other'), struckThrough: true }] })

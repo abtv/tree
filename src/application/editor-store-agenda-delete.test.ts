@@ -6,18 +6,45 @@ import type { TreeNode } from '../domain/document'
 
 const dated = (id: string): TreeNode => ({ id, text: '1970-04-11', children: [] })
 
+// @requirement PRODUCT.md §23.3
 it.each([
-  ['a', 'b'],
-  ['b', 'c'],
-  ['c', 'b'],
-] as const)('keeps the nearest Overdue row after completing %s', async (selected, expected) => {
-  const { store, ready } = await setup(['a', 'b', 'c'].map((id) => ({ id, text: '1970-04-01', children: [] })))
-  store.applyAgenda({ kind: 'select', key: `node:90:${selected}`, cursor: 4 })
+  ['a', 'b', 0, 0],
+  ['b', 'c', 7, 7],
+  ['c', 'b', undefined, 4],
+] as const)(
+  'keeps the nearest Overdue row and caret after completing %s',
+  async (selected, expected, cursor, offset) => {
+    const { store, ready } = await setup(['a', 'b', 'c'].map((id) => ({ id, text: '1970-04-01', children: [] })))
+    store.applyAgenda({ kind: 'select', key: `node:90:${selected}`, cursor: 4 })
 
-  store.toggleStrikethrough(selected, selected)
+    store.toggleStrikethrough(selected, selected, cursor)
 
-  expect(ready().agenda?.selectedKey).toBe(`node:90:${expected}`)
-  expect(ready().location.selectedNodeId).toBe(expected)
+    expect(ready().agenda?.selectedKey).toBe(`node:90:${expected}`)
+    expect(ready().agenda?.selectionCursor).toBe(offset)
+    expect(ready().location.selectedNodeId).toBe(expected)
+  },
+)
+
+// @requirement PRODUCT.md §23.3
+it('falls back to the nearest day when completing the last Overdue item', async () => {
+  const { store, ready } = await setup([{ id: 'overdue', text: '1970-04-01', children: [] }, dated('today')])
+  store.applyAgenda({ kind: 'select', key: 'node:90:overdue', cursor: 4 })
+
+  store.toggleStrikethrough('overdue', 'overdue', 4)
+
+  expect(ready().agenda?.selectedKey).toBe('day:95')
+})
+
+// @requirement PRODUCT.md §23.3
+it('keeps the current week’s selected item and caret when completing it', async () => {
+  const { store, ready } = await setup([dated('today'), dated('other')])
+  store.applyAgenda({ kind: 'select', key: 'node:100:today', cursor: 4 })
+
+  store.toggleStrikethrough('today', 'today', 7)
+
+  expect(ready().agenda?.selectedKey).toBe('node:100:today')
+  expect(ready().agenda?.selectionCursor).toBe(4)
+  expect(ready().document.roots[0]?.struckThrough).toBe(true)
 })
 
 async function setup(roots: TreeNode[], cursor = 0) {

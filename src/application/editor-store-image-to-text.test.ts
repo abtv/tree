@@ -184,8 +184,11 @@ it('discards pending results and refuses new recognition when saving becomes loc
   finish(['Must not be stored'])
   await vi.waitFor(() => expect(recognize).toHaveBeenCalledTimes(2))
   store.reindexAllImages()
+  finish(['Second result must not be stored either'])
+  await vi.advanceTimersByTimeAsync(0)
 
   expect(ready(store).document).toBe(before)
   expect(searchText(store, 0)).toBeUndefined()
+  expect(searchText(store, 1)).toBeUndefined()
   expect(recognize).toHaveBeenCalledTimes(2)
 })

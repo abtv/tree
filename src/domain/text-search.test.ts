@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { prepareSearch, searchText, type SearchPattern } from './text-search'
+import { prepareSearch, searchText, wholeSearchMatcher, type SearchPattern } from './text-search'
 
 // @requirement PRODUCT.md §20.2.26
 
@@ -9,6 +9,21 @@ export function pattern(query: string): SearchPattern {
   while (!step.done) step = work.next()
   return step.value
 }
+
+describe('whole marker name search', () => {
+  it('uses Unicode smart case and rejects different names of the same length', () => {
+    const insensitive = wholeSearchMatcher('ος')
+    const sensitive = wholeSearchMatcher('ΟΣ')
+
+    expect(insensitive('ΟΣ')).toBe(true)
+    expect(insensitive('οσ')).toBe(true)
+    expect(insensitive('οχ')).toBe(false)
+    expect(insensitive('ο')).toBe(false)
+    expect(insensitive('οσα')).toBe(false)
+    expect(sensitive('ΟΣ')).toBe(true)
+    expect(sensitive('οσ')).toBe(false)
+  })
+})
 
 describe('literal search', () => {
   it('does not compile case-equivalence expressions for ASCII-only searches', () => {

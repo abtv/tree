@@ -304,6 +304,70 @@ it('starts a new typing undo entry after opening the same node from Search', asy
   expect(store.getSnapshot()).toMatchObject({ document: { roots: [{ id: 'root', text: 'Typed' }, { id: 'other' }] } })
 })
 
+// @requirement PRODUCT.md §20.2.32
+it.each(['starred', 'marked'] as const)('finishes pending text before toggling %s', async (flag) => {
+  vi.useFakeTimers()
+  const store = await setup()
+  let pending = true
+  store.registerPendingEditFinisher(() => {
+    if (!pending) return false
+    pending = false
+    store.editText('root', 'Buffered text')
+    return true
+  })
+  const root = () => {
+    const state = store.getSnapshot()
+    if (state.status !== 'ready') throw new Error('Expected ready editor')
+    return state.document.roots[0]!
+  }
+  const originalText = root().text
+
+  const changed = flag === 'starred' ? store.toggleStarNode() : store.toggleMarkNode()
+
+  expect(changed).toBe(true)
+  expect(root()).toMatchObject({ text: 'Buffered text', [flag]: true })
+
+  store.editText('root', 'Later text')
+  store.undo()
+
+  expect(root()).toMatchObject({ text: 'Buffered text', [flag]: true })
+
+  store.undo()
+
+  expect(root().text).toBe('Buffered text')
+  expect(root()[flag]).not.toBe(true)
+
+  store.undo()
+
+  expect(root().text).toBe(originalText)
+})
+
+it('blocks a late Find jump during the final save seal and allows it after cancellation', async () => {
+  vi.useFakeTimers()
+  const store = await setup()
+  const seal = new AbortController()
+  await store.flushPersistence({ sealEditsUntil: seal.signal })
+  const jumped = vi.fn()
+  const stop = store.search.onJump(jumped)
+  const origin = { nodeId: 'root', offset: 0 }
+
+  store.search.begin(origin)
+  store.search.edit('other')
+  store.search.confirm()
+  await vi.runAllTimersAsync()
+
+  expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'root' } })
+  expect(jumped).not.toHaveBeenCalled()
+
+  seal.abort()
+  store.search.navigate(origin, 1, 1)
+  await vi.runAllTimersAsync()
+  stop()
+
+  expect(store.getSnapshot()).toMatchObject({ location: { selectedNodeId: 'other' } })
+  expect(jumped).toHaveBeenCalledOnce()
+})
+
 it('reveals a search match inside a nested scope without expanding ancestors outside that scope', async () => {
   vi.useFakeTimers()
   const store = await setup({

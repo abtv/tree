@@ -55,6 +55,13 @@ it('keeps literal punctuation and original UTF-16 offsets with Unicode smart cas
   expect(matches('#k.* [.*]', node)).toEqual([[], []])
 })
 
+// @requirement PRODUCT.md §20.14.3
+it('rejects an invalid marker even when Unicode case folding would match a valid name', () => {
+  const node = { id: 'a', text: '@ι', children: [] }
+
+  expect(matches('@ι @\u0345', node)).toEqual([[{ start: 0, end: 2 }], []])
+})
+
 it('can interrupt preparation of a long pasted term before compiling a search pattern', () => {
   const preparation = prepareNodeSearch('x'.repeat(100_000))
 
@@ -65,12 +72,21 @@ it('can interrupt preparation of a long pasted term before compiling a search pa
 })
 
 // @requirement PRODUCT.md §20.14.2
-it('retains the full union when literal highlight ranges overlap', () => {
-  const work = nodeSearchHighlights('abcdef', 'abcd cdef', [])
+it.each([
+  ['abcd cdef', [{ start: 0, end: 6 }]],
+  [
+    'abc def',
+    [
+      { start: 0, end: 3 },
+      { start: 3, end: 6 },
+    ],
+  ],
+])('merges overlapping but not adjacent literal highlights (%s)', (query, expected) => {
+  const work = nodeSearchHighlights('abcdef', query, [])
   let step = work.next()
   while (!step.done) step = work.next()
 
-  expect(step.value).toEqual([{ start: 0, end: 6 }])
+  expect(step.value).toEqual(expected)
 })
 
 // @requirement PRODUCT.md §20.14.2
@@ -99,6 +115,54 @@ it('maps each inferred fragment to its own recognized marker and preserves expli
   while (!step.done) step = work.next()
 
   expect(step.value.map(({ start, end }) => text.slice(start, end))).toEqual(['@Al', '@bo', '@Carol', 'or', 'Rev'])
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('merges inferred fragments in source order without borrowing a full match from another marker', () => {
+  const text = '@Jonathan #Jonathan @Jon &meeting'
+  const work = nodeSearchHighlights(
+    text,
+    '@than @nat @Jon #Jonathan &meeting',
+    [
+      { start: 0, end: 9 },
+      { start: 10, end: 19 },
+      { start: 20, end: 24 },
+      { start: 25, end: 33 },
+    ],
+    [
+      { fragment: '@than', name: 'Jonathan' },
+      { fragment: '@nat', name: 'Jonathan' },
+    ],
+  )
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toEqual([
+    { start: 3, end: 9 },
+    { start: 10, end: 19 },
+    { start: 20, end: 24 },
+    { start: 25, end: 33 },
+  ])
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('continues highlighting a recognized name after a nonmatching full-term scan yields', () => {
+  const work = nodeSearchHighlights(
+    '@Thunderstorms @An',
+    '@storms @An',
+    [
+      { start: 0, end: 14 },
+      { start: 15, end: 18 },
+    ],
+    [{ fragment: '@storms', name: 'Thunderstorms' }],
+  )
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toEqual([
+    { start: 8, end: 14 },
+    { start: 15, end: 18 },
+  ])
 })
 
 // @requirement PRODUCT.md §20.14.3

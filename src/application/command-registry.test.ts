@@ -4,6 +4,7 @@ import {
   type ApplicationCommand,
   commandRegistry,
   matchCommands,
+  nextAppearance,
   normalizeCommandHistory,
   rememberCommand,
 } from './command-registry'
@@ -12,6 +13,17 @@ const names = (query: string, history: readonly string[] = []): string[] =>
   matchCommands(query, history).map((command) => command.name)
 
 describe('command registry', () => {
+  // @requirement PRODUCT.md §20.2.32
+  it.each([
+    ['system', 'dark'],
+    ['dark', 'gray'],
+    ['gray', 'light'],
+    ['light', 'white'],
+    ['white', 'system'],
+  ] as const)('cycles Appearance from %s to %s', (current, next) => {
+    expect(nextAppearance(current)).toBe(next)
+  })
+
   it('cannot restore unsupported image recognition from command history', () => {
     const history = ['reindex-all-images']
     const unsupported = availableCommands({ alwaysOnTop: false, vim: true, imageToText: false })

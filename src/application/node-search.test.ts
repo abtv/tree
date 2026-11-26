@@ -146,6 +146,21 @@ it('puts matching marked stars, then marked nodes, then stars before other match
   expect(next.value[0]).toMatchObject({ starred: true, marked: true })
 })
 
+// @requirement PRODUCT.md §20.14.3
+it.each([{ marked: true }, { marked: true, starred: true }] as const)(
+  'keeps the first priority group when the other groups do not match (%j)',
+  (flags) => {
+    const source: Document = {
+      roots: [
+        { id: 'plain', text: 'Note', children: [] },
+        { id: 'priority', text: 'Note', ...flags, children: [] },
+      ],
+    }
+
+    expect(results('note', source).map(({ id }) => id)).toEqual(['priority', 'plain'])
+  },
+)
+
 // @requirement PRODUCT.md §20.14.2
 it('carries the image of a matching node, with its natural size when stored', () => {
   const work = searchNodes(
@@ -213,6 +228,120 @@ it('shows bounded evidence for image terms, including additional matches and anc
   expect(next.value[1]?.imageExcerpt).toBeUndefined()
 })
 
+// @requirement PRODUCT.md §20.14.2
+// @requirement PRODUCT.md §20.14.3
+it('keeps OCR evidence on its ancestor path and never highlights a marker inside an image', () => {
+  const source: Document = {
+    roots: [
+      {
+        id: 'outer',
+        text: 'Roadmap',
+        attachment: { id: 'outer-image', mimeType: 'image/png', searchText: 'tree @Project outer plan' },
+        children: [
+          {
+            id: 'inner',
+            text: 'Branch',
+            attachment: { id: 'inner-image', mimeType: 'image/png', searchText: 'tree @Project inner' },
+            children: [{ id: 'nested', text: 'Release @Project', children: [] }],
+          },
+          { id: 'sibling', text: 'Release @Project', children: [] },
+          {
+            id: 'own',
+            text: 'Release @Project',
+            attachment: { id: 'own-image', mimeType: 'image/png', searchText: 'plan @Project own' },
+            children: [],
+          },
+          { id: 'visible', text: 'Release @Project tree plan', children: [] },
+        ],
+      },
+      { id: 'outside', text: 'Release @Project', children: [] },
+    ],
+  }
+
+  const matches = results('release tree plan @Project', source)
+
+  expect(matches.map(({ id }) => id)).toEqual(['nested', 'sibling', 'own', 'visible'])
+  expect(matches.find(({ id }) => id === 'sibling')?.imageExcerpt).toEqual({
+    ancestor: 'Roadmap',
+    text: 'tree @Project outer plan',
+    matches: [
+      { start: 0, end: 4 },
+      { start: 20, end: 24 },
+    ],
+  })
+  expect(matches.find(({ id }) => id === 'own')?.imageExcerpt).toEqual({
+    text: 'plan @Project own',
+    matches: [{ start: 0, end: 4 }],
+  })
+  expect(matches.find(({ id }) => id === 'visible')?.imageExcerpt).toBeUndefined()
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('does not reuse an earlier leaf image to explain a later node’s visible match', () => {
+  const source: Document = {
+    roots: [
+      {
+        id: 'image',
+        text: 'Release',
+        attachment: { id: 'pic', mimeType: 'image/png', searchText: 'Tree' },
+        children: [],
+      },
+      { id: 'plain', text: 'Release Tree', children: [] },
+    ],
+  }
+
+  const matches = results('release tree', source)
+
+  expect(matches.map(({ id }) => id)).toEqual(['image', 'plain'])
+  expect(matches[0]?.imageExcerpt?.text).toBe('Tree')
+  expect(matches[1]?.imageExcerpt).toBeUndefined()
+})
+
+// @requirement PRODUCT.md §20.14.2
+it('keeps a clipped image match found after the streaming scan yields', () => {
+  const term = `release${'x'.repeat(110)}`
+  const context = 'before '.repeat(80)
+  const source: Document = {
+    roots: [
+      {
+        id: 'image',
+        text: '',
+        attachment: { id: 'pic', mimeType: 'image/png', searchText: context + term },
+        children: [],
+      },
+    ],
+  }
+
+  const matches = results(term, source)
+
+  expect(matches).toHaveLength(1)
+  expect(matches[0]?.imageExcerpt).toEqual({
+    text: `…${context.slice(-24)}${term.slice(0, 72)}…`,
+    matches: [{ start: 25, end: 97 }],
+    replacesTitle: true,
+  })
+})
+
+// @requirement PRODUCT.md §20.14.2
+it.each(['😀', '\u{10000}', '\u{203ff}'])('does not split %s at the trailing excerpt boundary', (character) => {
+  const before = `needle ${'x'.repeat(88)}`
+  const source: Document = {
+    roots: [
+      {
+        id: 'image',
+        text: 'Photo',
+        attachment: { id: 'pic', mimeType: 'image/png', searchText: `${before}${character} label` },
+        children: [],
+      },
+    ],
+  }
+
+  expect(results('needle', source)[0]?.imageExcerpt).toEqual({
+    text: `${before}…`,
+    matches: [{ start: 0, end: 6 }],
+  })
+})
+
 it('cancels the pending callback and does not reschedule an already queued stale callback', () => {
   const callbacks: (() => void)[] = []
   const cancelled = vi.fn()
@@ -266,8 +395,8 @@ it('includes finished branches', () => {
   ])
 })
 
-function results(query: string) {
-  const work = searchNodes(document, query)
+function results(query: string, source = document) {
+  const work = searchNodes(source, query)
   let next = work.next()
   while (!next.done) next = work.next()
   return next.value

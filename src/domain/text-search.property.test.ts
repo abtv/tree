@@ -68,13 +68,19 @@ it('resumes the right match offset when iterators share a native pattern', () =>
   expect(first.next().value).toEqual({ start: 1, end: 2 })
   expect(first.next().value).toEqual({ start: 3, end: 4 })
   expect(other.next().value).toEqual({ start: 2, end: 3 })
+  expect(other.next().value).toEqual({ start: 4, end: 5 })
+  expect(other.next().done).toBe(true)
 })
 
-it('uses bounded native work for short rows but yields throughout oversized text', () => {
-  const prepared = pattern('zzz', true)
+it('uses bounded native work only when both the query and row fit the native limits', () => {
+  const atQueryLimit = pattern('z'.repeat(32), true)
+  const beyondQueryLimit = pattern('z'.repeat(33), true)
+  const atTextLimit = 'a'.repeat(512)
+  const beyondTextLimit = 'a'.repeat(513)
 
-  expect([...searchText('a'.repeat(480), prepared)]).toEqual([undefined])
-  expect([...searchText('a'.repeat(1000), prepared)]).toHaveLength(125)
+  expect([...searchText(atTextLimit, atQueryLimit)]).toEqual([undefined])
+  expect([...searchText(beyondTextLimit, atQueryLimit)]).toHaveLength(64)
+  expect([...searchText(atTextLimit, beyondQueryLimit)]).toHaveLength(64)
 })
 
 it('keeps DFS identity and order after moving branches without mutating nodes', () => {

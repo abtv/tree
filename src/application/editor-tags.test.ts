@@ -23,6 +23,7 @@ it('routes global Search to independent marker catalogs and suppresses redundant
   expect(store.searchNodeSuggestions('@anna')).toEqual(['Anna_Smith'])
   expect(store.searchNodeSuggestions('@Anna_Smith')).toEqual([])
   expect(store.searchNodeSuggestions('&weekly-review')).toEqual([])
+  expect(store.searchNodeSuggestions('anna')).toEqual([])
   for (const [query, expected] of [
     ['@Anna', []],
     ['&Anna_Smith', []],
