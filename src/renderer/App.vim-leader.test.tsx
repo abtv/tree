@@ -12,6 +12,41 @@ function keyDownAt(element: HTMLElement, key: string, timeStamp: number): void {
   fireEvent(element, event)
 }
 
+// @requirement PRODUCT.md §20.2.32
+it('lets a fresh Escape close Help after the Leader deadline', async () => {
+  const f = await createAppHarness({ vimEnabled: true })
+  const input = screen.getByRole('textbox', { name: 'Node 1' })
+  for (const key of [' ', 'h', 'h']) await f.press(input, key)
+  const heading = screen.getByRole('heading', { name: 'Vim shortcuts' })
+  expect(heading).toHaveFocus()
+  keyDownAt(heading, ' ', 1_000)
+
+  keyDownAt(heading, 'Escape', 3_001)
+  await settleApp()
+
+  expect(heading).not.toBeInTheDocument()
+  expect(input).toHaveFocus()
+})
+
+// @requirement PRODUCT.md §20.2.32
+// @requirement PRODUCT.md §20.2.26
+it('cancels a queued Help Find jump as soon as Leader starts', async () => {
+  const f = await createAppHarness({ vimEnabled: true })
+  const input = screen.getByRole('textbox', { name: 'Node 1' })
+  for (const key of [' ', 'h', 'h']) await f.press(input, key)
+  const heading = screen.getByRole('heading', { name: 'Vim shortcuts' })
+  await f.press(heading, '/')
+  const find = screen.getByRole('textbox', { name: 'Search' })
+  fireEvent.change(find, { target: { value: 'Toggle mark' } })
+
+  fireEvent.keyDown(find, { key: 'Enter' })
+  fireEvent.keyDown(heading, { key: ' ' })
+  await settleApp()
+
+  expect(heading).toHaveFocus()
+  expect(heading).toHaveAttribute('tabindex', '0')
+})
+
 // @requirement PRODUCT.md §20.14
 it('cancels a queued Help Find jump when borrowing focus for notes Search', async () => {
   const f = await createAppHarness({ vimEnabled: true })

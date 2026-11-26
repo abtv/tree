@@ -28,6 +28,8 @@ type Shortcut = readonly [keys: string, action: string]
 type HelpAppLeaderCommand = Exclude<VimLeaderCommand, 'toggle-fold'>
 export type VimHelpSearchCommand = Exclude<EditorFindCommand, 'all'> | 'prepare-global-search'
 
+const isHelpRow = (target: Element): boolean => target.matches('.vim-help-node')
+
 function helpNode(text: string, children: readonly TreeNode[] = []): TreeNode {
   return { id: `vim-help:${text}`, text, children }
 }
@@ -299,6 +301,14 @@ function ReadyVimHelpView({
         onKeyDown={(event) => {
           const target = event.target
           if (event.defaultPrevented || event.nativeEvent.isComposing || !(target instanceof Element)) return
+          const onRow = isHelpRow(target)
+          const leader = onRow ? routeLeader(event, { vim, isTarget: isHelpRow }) : undefined
+          if (leader !== undefined) {
+            store.search.interruptNavigation()
+            if (leader === 'toggle-fold') store.applyFold('toggle', selectedNodeId)
+            else if (leader !== 'consumed') onLeaderCommand(leader)
+            return
+          }
           if (event.key === 'Escape') {
             event.preventDefault()
             event.stopPropagation()
@@ -310,13 +320,7 @@ function ReadyVimHelpView({
             } else onClose()
             return
           }
-          if (!target.matches('.vim-help-node')) return
-          const leader = routeLeader(event, { vim, isTarget: (target) => target.matches('.vim-help-node') })
-          if (leader !== undefined) {
-            if (leader === 'toggle-fold') store.applyFold('toggle', selectedNodeId)
-            else if (leader !== 'consumed') onLeaderCommand(leader)
-            return
-          }
+          if (!onRow) return
           navigateVimHelp({
             event,
             store,

@@ -7,6 +7,32 @@ async function keys(window: Page, ...sequence: string[]): Promise<void> {
 }
 
 // @requirement PRODUCT.md §20.2.32
+test('cancels Leader without letting the held Escape close Help', async ({ userDataDir }, testInfo) => {
+  seedDocument(userDataDir, {
+    document: { roots: [{ id: 'one', text: 'alpha beta', children: [] }] },
+    location: { currentParentId: null, selectedNodeId: 'one' },
+  })
+  const { window } = await launchTree(userDataDir, { initialMode: 'normal' })
+  const editor = node(window, 1)
+  const heading = window.getByRole('heading', { name: 'Vim shortcuts' })
+  await expect(editor).toBeFocused()
+  await keys(window, '0', 'l', 'l', 'Space', 'h', 'h')
+  await expect(heading).toBeFocused()
+
+  await keys(window, 'Space', 'h')
+  await window.keyboard.down('Escape')
+  await window.keyboard.down('Escape')
+  await window.keyboard.up('Escape')
+
+  await expect(heading).toBeFocused()
+  await window.screenshot({ path: testInfo.outputPath('help-after-held-escape.png') })
+  await keys(window, 'Escape')
+  await expect(heading).toHaveCount(0)
+  await expect(editor).toBeFocused()
+  await expect(editor).toHaveJSProperty('selectionStart', 2)
+})
+
+// @requirement PRODUCT.md §20.2.32
 // @requirement PRODUCT.md §20.14
 test('uses the usual Search from Help and only leaves Help when opening a note', async ({ userDataDir }) => {
   seedDocument(userDataDir, {
