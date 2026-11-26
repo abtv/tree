@@ -378,7 +378,6 @@ export class EditorStore {
     const state = this.runtime.ready()
     if (state.agenda === undefined) return
     const rows = this.getAgendaRows()
-    if (command.kind === 'select') this.search.cancelDraft()
     if (command.kind === 'toggle-fold' || command.kind === 'fold') {
       this.searchOwner.manualAgendaFold(command)
     }
@@ -392,6 +391,10 @@ export class EditorStore {
       agenda.selectedKey,
       command.kind === 'select' ? command.rowIndex : undefined,
     )
+    if (command.kind === 'select') {
+      if (selected?.key !== command.key) return
+      this.search.cancelDraft()
+    }
     const realSelection =
       selected?.kind === 'node' && (agenda.selectedKey !== state.agenda.selectedKey || command.kind === 'select')
     if (agenda === state.agenda && !realSelection) return

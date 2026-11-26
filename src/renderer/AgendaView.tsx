@@ -415,11 +415,13 @@ export function AgendaView({
   })
   const select = useCallback(
     (key: string): void => {
+      const rowIndex = store.getAgendaRows().findIndex((row) => row.key === key)
+      if (rowIndex < 0) return
       viewportState.navigate('pointer')
       store.search.cancelDraft()
       store.search.interruptNavigation()
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
-      store.applyAgenda({ kind: 'select', key })
+      store.applyAgenda({ kind: 'select', key, rowIndex })
     },
     [store, vim, viewportState],
   )

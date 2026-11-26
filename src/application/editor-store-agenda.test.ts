@@ -1051,6 +1051,28 @@ it('uses a verified Agenda row index for selection without scanning and ignores 
   }
 })
 
+// @requirement PRODUCT.md §23.4
+it('ignores a selection request for an Agenda row that is no longer visible', async () => {
+  const { store } = await agendaHarness()
+  store.openAgenda()
+  const retired = `node:${today + 1}:match`
+  const rowIndex = store.getAgendaRows().findIndex((row) => row.key === retired)
+  expect(rowIndex).toBeGreaterThanOrEqual(0)
+  store.applyAgenda({ kind: 'toggle-fold', key: `day:${today + 1}` })
+  expect(store.getAgendaRows().some((row) => row.key === retired)).toBe(false)
+  await store.flushPersistence()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 3}:other`, cursor: 4 })
+  const before = ready(store)
+  expect(before.focus).toMatchObject({ nodeId: 'other', cursor: 4 })
+  store.search.begin(store.searchOrigin(4))
+  store.search.edit('Other')
+
+  store.applyAgenda({ kind: 'select', key: retired, rowIndex })
+
+  expect(ready(store)).toBe(before)
+  expect(store.search.session.getSnapshot().draft).toBe('Other')
+})
+
 it('publishes real-row selection and focus atomically, including reselection, and ignores invalid commands', async () => {
   const { store } = await agendaHarness()
 

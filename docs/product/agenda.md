@@ -57,6 +57,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 * `gg`/`G`, `H`/`M`/`L`, and `Ctrl+d`/`Ctrl+u` land on the destination's first non-whitespace text character, using a direct match's image only when it has no text, as in §20.2.9.
 * A vertical motion that clamps at the current row preserves its caret and image return position.
 * Clicking a row selects and focuses it with the same focus dot, except on separators.
+* A selection request for a row that is no longer visible leaves the current selection, caret and Find draft unchanged.
 * An ordinary primary-button row click keeps Replace mode and completes any pending replacement as one edit before changing rows. A row without an editor retains Replace without accepting text edits; clicking an editable occurrence then resumes overwrite at its focused caret. Text typed after changing rows is a separate edit for Undo. This includes day containers, inactive occurrences and the focused-day heading; it does not extend Replace to navigation controls or other focus losses.
 * `Escape` clears unfinished commands and returns Vim to Normal without closing Agenda, except when it dismisses an open completion popup in Insert (§20.2.4).
 * Day containers accept no text input; Vim `i`/`a`/`R` on them never enter Insert or Replace.

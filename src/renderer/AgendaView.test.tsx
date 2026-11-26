@@ -88,6 +88,39 @@ it('groups adjacent siblings by path and lets navigation stop on a read-only pat
   expect(container.querySelector('.agenda-today')).toHaveFocus()
 })
 
+// @requirement PRODUCT.md §23.4
+it('keeps Find and the caret when a click reaches a row retired before the render commits', async () => {
+  const today = dayNumberOf({ year: 2026, month: 10, day: 8 })
+  const { store, snapshot } = await createRealStoreHarness({
+    document: {
+      roots: [
+        { id: 'retired', text: '2026-10-08 First', children: [] },
+        { id: 'active', text: '2026-10-09 Second', children: [] },
+      ],
+    },
+    services: { today: () => today },
+  })
+  store.openAgenda()
+  store.applyAgenda({ kind: 'select', key: `node:${today + 1}:active`, cursor: 4 })
+  store.search.begin(store.searchOrigin(4))
+  store.search.edit('Second')
+  const { container } = render(<View store={store} />)
+  const row = container.querySelector<HTMLElement>('.agenda-row[data-node-id="retired"]')!
+  const focus = snapshot().focus
+
+  act(() => {
+    store.applyAgenda({ kind: 'toggle-fold', key: `day:${today}` })
+    expect(row.isConnected).toBe(true)
+    expect(store.getAgendaRows().some((candidate) => candidate.key === row.dataset.agendaKey)).toBe(false)
+    fireEvent.click(row)
+  })
+
+  expect(row.isConnected).toBe(false)
+  expect(snapshot().focus).toBe(focus)
+  expect(store.search.session.getSnapshot().draft).toBe('Second')
+  await store.flushPersistence()
+})
+
 // @requirement PRODUCT.md §23.2
 it('refreshes path labels after editing a dated ancestor without changing grouped row identities', async () => {
   const harness = await createRealStoreHarness({
