@@ -1,21 +1,47 @@
 import {
   alignRowAt,
+  contextMargin,
   onViewportLayout,
   onViewportScroll,
   refreshViewportContext,
   revealInViewport,
   revealRectInViewport,
   centerRectInViewport,
+  viewportBounds,
   viewportContent,
   viewportScroller,
 } from './scroll-viewport'
 import { caretLineRect } from './editor-dom'
+
+function fitsWithContext(rect: DOMRect): boolean {
+  const { top, bottom } = viewportBounds()
+  const height = bottom - top
+  return rect.height <= height - 2 * contextMargin(rect.height, height)
+}
+
+function findPanelInset(element: Element): number {
+  const panel = element.ownerDocument.querySelector('.local-search-panel')?.getBoundingClientRect()
+  return panel === undefined || panel.height === 0 ? 0 : Math.max(0, panel.bottom - viewportBounds().top)
+}
+
+function lineRevealRect(element: HTMLElement, cursor: number): DOMRect {
+  const agendaRow = element.closest<HTMLElement>('.agenda-row')
+  if (agendaRow !== null) {
+    const bounds = agendaRow.getBoundingClientRect()
+    const minimum = Number.parseFloat(getComputedStyle(agendaRow).minHeight)
+    // Single-line entries share the same scroll boundary as Agenda's headings and separators.
+    // Wrapped text and attachments still reveal only the current text line.
+    if (bounds.height > 0 && bounds.height <= minimum + 1) return bounds
+  }
+  return caretLineRect(element, cursor)
+}
 
 interface RevealIntent {
   element: () => Element | undefined
   keepContext: boolean
   isCurrent: () => boolean
   cursor?: number
+  wholeRowIfFits?: boolean
   region?: () => DOMRect | undefined
   /** A remembered distance of the row from the top of the window (`docs/PRODUCT.md` §7.1). */
   top?: number
@@ -62,6 +88,7 @@ export function createViewportReveal() {
     // A counted motion can end outside the mounted window. Retain its intent until React mounts it.
     if (element === undefined) return
     if (!element.isConnected) return cancel()
+    const treeRow = intent.wholeRowIfFits ? (element.closest('.node-row') ?? element) : undefined
     if (intent.region !== undefined) {
       const rect = intent.region()
       if (rect === undefined) return
@@ -69,16 +96,14 @@ export function createViewportReveal() {
     } else if (intent.top !== undefined) alignRowAt(element, intent.top)
     else if (intent.cursor === undefined) revealInViewport(element, intent.keepContext)
     else {
-      let rect = caretLineRect(element as HTMLElement, intent.cursor)
-      const agendaRow = element.closest<HTMLElement>('.agenda-row')
-      if (agendaRow !== null) {
-        const bounds = agendaRow.getBoundingClientRect()
-        const minimum = Number.parseFloat(getComputedStyle(agendaRow).minHeight)
-        // Single-line entries share the same scroll boundary as Agenda's headings and separators.
-        // Wrapped text and attachments still reveal only the current text line.
-        if (bounds.height > 0 && bounds.height <= minimum + 1) rect = bounds
+      const wholeRow = treeRow?.getBoundingClientRect()
+      if (wholeRow !== undefined && fitsWithContext(wholeRow)) {
+        revealRectInViewport(wholeRow, intent.keepContext, treeRow)
+      } else {
+        const line = lineRevealRect(element as HTMLElement, intent.cursor)
+        if (treeRow !== undefined) revealRectInViewport(line, intent.keepContext, element, findPanelInset(element))
+        else revealRectInViewport(line, intent.keepContext, element)
       }
-      revealRectInViewport(rect, intent.keepContext, element)
     }
     rememberScroll()
     if (typeof ResizeObserver === 'undefined' || observedElement === element) return
@@ -86,7 +111,7 @@ export function createViewportReveal() {
     observer.disconnect()
     observedElement = element
     // Three targets regardless of document size: destination, content and the fixed viewport.
-    for (const target of new Set([element, viewportContent(), viewportScroller()])) {
+    for (const target of new Set([treeRow ?? element, viewportContent(), viewportScroller()])) {
       if (target !== undefined) observer.observe(target)
     }
   }
@@ -96,9 +121,14 @@ export function createViewportReveal() {
     rememberScroll()
     correct()
   }
-  const beginLine = (element: () => HTMLElement | undefined, cursor: number, isCurrent: () => boolean): void => {
+  const beginLine = (
+    element: () => HTMLElement | undefined,
+    cursor: number,
+    isCurrent: () => boolean,
+    options?: { wholeRowIfFits: boolean; keepContext: boolean },
+  ): void => {
     cancel()
-    intent = { element, cursor, keepContext: true, isCurrent }
+    intent = { element, cursor, keepContext: true, isCurrent, ...options }
     rememberScroll()
     correct()
   }
@@ -122,7 +152,17 @@ export function createViewportReveal() {
       if (metrics().top !== expectedScroll) correct()
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (intent?.region !== undefined || ['PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) cancel()
+      if (intent === undefined) return
+      if (
+        intent.region !== undefined ||
+        ['PageUp', 'PageDown', 'Home', 'End'].includes(event.key) ||
+        (intent.wholeRowIfFits &&
+          event.key.startsWith('Arrow') &&
+          event.target instanceof Element &&
+          event.target.closest('.node-input'))
+      ) {
+        cancel()
+      }
     }
     const onResize = (): void => {
       refreshViewportContext()

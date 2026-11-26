@@ -118,7 +118,9 @@ The content area is the scrolling region between the location toolbar and the st
 
 Going back to the node the user entered from (§7.1) is the exception: its row returns to the window position it had before entering, within the limits §7.1 states, instead of following the rules below.
 
-In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and other commands use the node-reveal rules.
+In Tree, Normal `j`/`k` reveal the destination text line instead of the whole node, including when the caret stays in the same node. The context and minimum-distance rules below apply to that line. A wrapped node is revealed progressively as the caret approaches an edge; a node taller than the viewport does not keep its start visible at the expense of its caret. Counts and `J`/`K` apply this rule to the final destination. Image destinations and commands without a line-reveal rule use the node-reveal rules.
+
+Tree local Find (§20.2.26) reveals the line containing the start of the match instead of the start of the row when the row cannot fit between the viewport margins. Where space and scroll limits allow, that line stays clear of the floating Find panel.
 
 #### Context
 

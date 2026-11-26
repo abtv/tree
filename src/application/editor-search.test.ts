@@ -630,7 +630,7 @@ it('resolves a reveal without publishing or mutating the supplied view', async (
   expect(view).toMatchObject({
     kind: 'tree',
     location: { currentParentId: null, selectedNodeId: 'b' },
-    focus: { nodeId: 'b', cursor: 0 },
+    focus: { nodeId: 'b', cursor: 0, revealLine: true },
     expansion: { expandedIds: new Set(['a']) },
   })
   expect(view?.focus).not.toHaveProperty('token')

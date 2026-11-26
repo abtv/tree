@@ -68,6 +68,52 @@ function fixture() {
 }
 
 describe('viewport reveal lifecycle', () => {
+  it.each(['wheel', 'ArrowLeft'])('keeps a Tree Find match reveal through layout until %s takes over', (action) => {
+    const { viewport, row, reveal } = fixture()
+    viewport.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600)
+    row.className = 'node-row'
+    let height = 60
+    row.getBoundingClientRect = () => new DOMRect(0, 700, 400, height)
+    const input = document.createElement('textarea')
+    input.className = 'node-input'
+    row.append(input)
+    const panel = document.createElement('div')
+    panel.className = 'local-search-panel'
+    panel.getBoundingClientRect = () => new DOMRect(120, 8, 280, 40)
+    document.body.append(panel)
+
+    reveal.beginLine(
+      () => input,
+      80,
+      () => true,
+      { wholeRowIfFits: true, keepContext: false },
+    )
+
+    expect(revealRectInViewport).toHaveBeenLastCalledWith(new DOMRect(0, 700, 400, 60), false, row)
+    expect(caretLineRect).not.toHaveBeenCalled()
+    expect(observed.has(row)).toBe(true)
+
+    height = 590
+    notify()
+
+    expect(caretLineRect).toHaveBeenCalledOnce()
+    expect(caretLineRect).toHaveBeenCalledWith(input, 80)
+    expect(revealRectInViewport).toHaveBeenLastCalledWith(new DOMRect(0, 700, 400, 20), false, input, 48)
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', metaKey: true, bubbles: true }))
+    notifyViewportLayout()
+
+    expect(revealRectInViewport).toHaveBeenCalledTimes(3)
+
+    if (action === 'wheel') viewport.dispatchEvent(new Event('wheel', { bubbles: true }))
+    else input.dispatchEvent(new KeyboardEvent('keydown', { key: action, bubbles: true }))
+    notifyViewportLayout()
+
+    expect(revealRectInViewport).toHaveBeenCalledTimes(3)
+    expect(observed.size).toBe(0)
+  })
+
   it.each([25, 45])('uses the full Agenda row only when it is one line (%ipx)', (height) => {
     const { row, reveal } = fixture()
     row.className = 'agenda-row'

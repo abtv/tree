@@ -248,7 +248,7 @@ export class EditorSearch {
       kind: 'tree',
       expansion,
       location: { ...state.location, selectedNodeId: destination.nodeId },
-      focus: { nodeId: destination.nodeId, cursor: destination.caret },
+      focus: { nodeId: destination.nodeId, cursor: destination.caret, revealLine: true },
     }
   }
 

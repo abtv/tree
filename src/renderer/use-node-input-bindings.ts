@@ -636,6 +636,7 @@ export function useNodeInputBindings({
       pointerDriven.current = false
       const restoring = !initialFocusApplied.current && store.getRestoredSelectedRowTop() !== undefined
       initialFocusApplied.current = true
+      const origin = store.getSnapshot()
       const isCurrent = (): boolean => {
         const state = store.getSnapshot()
         return state.status === 'ready' && state.focus?.token === focus.token
@@ -650,9 +651,21 @@ export function useNodeInputBindings({
         if (!keepSearchFocus) input.focus({ preventScroll: true })
         if (!preserve) {
           const row = input.closest('.node-row, .agenda-row') ?? input
-          if (firstPass && focus.revealLine === true)
-            viewportReveal.beginLine(() => inputs.current.get(focus.nodeId), focus.cursor, isCurrent)
-          else if (firstPass && focus.returnRowTop !== undefined)
+          if (firstPass && focus.revealLine === true) {
+            const destination = () => inputs.current.get(focus.nodeId)
+            if (origin.status === 'ready' && origin.agenda === undefined) {
+              const isFindCurrent = (): boolean => {
+                const state = store.getSnapshot()
+                return (
+                  state.status === 'ready' &&
+                  state.document === origin.document &&
+                  state.focus.token === focus.token &&
+                  projection.isCurrentFocusWork(work)
+                )
+              }
+              viewportReveal.beginLine(destination, focus.cursor, isFindCurrent, { wholeRowIfFits: true, keepContext })
+            } else viewportReveal.beginLine(destination, focus.cursor, isCurrent)
+          } else if (firstPass && focus.returnRowTop !== undefined)
             viewportReveal.beginAt(row, focus.returnRowTop, isCurrent)
           else if (viewportReveal.hasLine()) viewportReveal.correct()
           else if (restoring) {

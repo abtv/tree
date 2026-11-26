@@ -81,19 +81,21 @@ export function revealInViewport(element: Element, keepContext = false): void {
 }
 
 /** Apply the same context policy to a measured text line instead of a whole row. */
-export function revealRectInViewport(rect: DOMRect, keepContext = false, element?: Element): void {
-  const { top, bottom } = viewportBounds()
+export function revealRectInViewport(rect: DOMRect, keepContext = false, element?: Element, topInset = 0): void {
+  const { top: viewportTop, bottom } = viewportBounds()
   const list = element?.closest<HTMLElement>('[data-window-start]')
   if (list !== undefined && list !== null) {
     // A sticky window can still paint its previous position before native scroll is delivered.
     // Reveal the destination's document position, not that deliberately retained paint.
-    const currentStart = Math.max(0, top - list.getBoundingClientRect().top)
+    const currentStart = Math.max(0, viewportTop - list.getBoundingClientRect().top)
     const pendingScroll = currentStart - Number(list.dataset.windowStart)
     if (pendingScroll !== 0) rect = new DOMRect(rect.left, rect.top - pendingScroll, rect.width, rect.height)
   }
   // An element that is not laid out has no position to reveal.
   if (rect.width === 0 && rect.height === 0) return
+  const top = Math.min(viewportTop + topInset, bottom)
   const height = bottom - top
+  if (height <= 0) return
   const margin = contextMargin(rect.height, height)
   // With keepContext the element must also stay clear of both edges, not only be fully visible.
   const inset = keepContext ? margin : 0

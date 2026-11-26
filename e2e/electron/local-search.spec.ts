@@ -10,10 +10,86 @@ import {
   clickApplicationMenuQuit,
   describeForEachEditingMode,
   readPersisted,
+  setMainWindowContentSize,
 } from './fixtures'
 import { controlPostedTasksWithClock } from '../search-clock'
 
 describeForEachEditingMode('Local search', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.2.26
+  test('reveals the active Find match within the same oversized Tree row', async ({ userDataDir }, testInfo) => {
+    const section = 'Wrapped text that extends beyond the viewport. '.repeat(3_700)
+    const text = `First needle ${section}middle needle ${section}last needle.`
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'long', text, children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'long' },
+    })
+    const { app, window } = await launchTree(userDataDir, { initialMode: 'normal' })
+    await setMainWindowContentSize(app, { width: 680, height: 500 })
+    const editor = window.getByRole('textbox', { name: 'Node 1', exact: true })
+    const prompt = window.getByRole('textbox', { name: 'Search', exact: true })
+    const matches = editor.locator('.search-match')
+    const visibleMatch = async (ordinal: number) => {
+      await expect(window.locator('.search-count')).toHaveText(`${ordinal} / 3`)
+      const match = matches.nth(ordinal - 1)
+      await expect(match).toHaveClass(/search-match-current/)
+      await expect
+        .poll(() =>
+          match.evaluate((element) => {
+            const viewport = document.querySelector('.scroll-viewport')!.getBoundingClientRect()
+            const bounds = element.getBoundingClientRect()
+            const panel = document.querySelector('.local-search-panel')?.getBoundingClientRect()
+            const overlapsPanel =
+              panel !== undefined &&
+              panel.top < bounds.bottom &&
+              panel.bottom > bounds.top &&
+              panel.left < bounds.right &&
+              panel.right > bounds.left
+            return bounds.top >= viewport.top && bounds.bottom <= viewport.bottom && bounds.height > 0 && !overlapsPanel
+          }),
+        )
+        .toBe(true)
+      await expect(mode === 'vim' ? editor : prompt).toBeFocused()
+    }
+
+    await window.keyboard.press('Meta+f')
+    await prompt.fill('needle')
+    await expect(matches).toHaveCount(3)
+
+    await prompt.press('Enter')
+    await visibleMatch(1)
+    await window.keyboard.press('Meta+g')
+    await visibleMatch(2)
+    await window.keyboard.press('Meta+g')
+    await visibleMatch(3)
+    await window.keyboard.press('Meta+Shift+g')
+    await visibleMatch(2)
+    await window.keyboard.press('Shift')
+    await setMainWindowContentSize(app, { width: 760, height: 480 })
+    await visibleMatch(2)
+    await window.screenshot({ path: testInfo.outputPath(screenshotName('oversized-find-current.png')) })
+
+    const offset = text.indexOf('middle needle') + 'middle '.length
+    const readCaret = () =>
+      editor.evaluate((input) => {
+        const selection = getSelection()
+        if (!selection?.anchorNode || !input.contains(selection.anchorNode)) return null
+        const before = document.createRange()
+        before.selectNodeContents(input)
+        before.setEnd(selection.anchorNode, selection.anchorOffset)
+        return [before.toString().length, selection.toString()]
+      })
+    if (mode === 'vim') await expect.poll(readCaret).toEqual([offset, 'n'])
+    await window.keyboard.press('Escape')
+    await expect(editor).toBeFocused()
+    if (mode === 'vim') {
+      await expect.poll(readCaret).toEqual([offset, 'n'])
+      await window.keyboard.press('i')
+    }
+    await expect.poll(readCaret).toEqual([offset, ''])
+    await window.keyboard.insertText('Z')
+    await expect.poll(() => editor.evaluate((input) => input.textContent!.includes('middle Zneedle'))).toBe(true)
+  })
+
   // @requirement PRODUCT.md §20.2.26
   test('keeps the caret and active match correct through dense Find transitions', async ({ userDataDir }, testInfo) => {
     const source = `lead ${'match <& review '.repeat(600)}end`
