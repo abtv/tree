@@ -148,13 +148,37 @@ function withParentPaths(rows: readonly AgendaRow[], document?: Document): reado
   return grouped
 }
 
+function includesOverdue(state: AgendaState): boolean {
+  return state.presentation.kind === 'timeline' && state.weekStart === agendaWeekStart(state.today)
+}
+
+/** Index only occurrences that could replace a node's earliest overdue date when active. */
+function indexLaterOverdueOccurrences(
+  matches: readonly AgendaProjectionDay[],
+  currentWeek: DayNumber,
+): ReadonlyMap<DayNumber, ReadonlySet<NodeId>> {
+  const later = new Map<DayNumber, Set<NodeId>>()
+  const seen = new Set<NodeId>()
+  for (const { day, rows } of matches) {
+    if (day >= currentWeek) break
+    for (const { nodeId } of rows) {
+      if (seen.has(nodeId)) {
+        let ids = later.get(day)
+        if (ids === undefined) later.set(day, (ids = new Set()))
+        ids.add(nodeId)
+      } else seen.add(nodeId)
+    }
+  }
+  return later
+}
+
 /** Keep one dated occurrence per overdue node; an active editor retains its date. */
 function overdueProjection(
   projection: readonly AgendaProjectionDay[],
   state: AgendaState,
   document: Document,
 ): readonly AgendaProjectionDay[] {
-  if (state.presentation.kind !== 'timeline' || state.weekStart !== agendaWeekStart(state.today)) return []
+  if (!includesOverdue(state)) return []
   const active = activeAgendaOccurrence(state)
   const activePresent =
     active !== undefined &&
@@ -189,11 +213,7 @@ export function buildAgendaRows(
   const timelineDays =
     state.presentation.kind === 'timeline' ? agendaWeekDays(state.weekStart) : [state.presentation.day]
   const rows: AgendaRow[] = []
-  if (
-    document !== undefined &&
-    state.presentation.kind === 'timeline' &&
-    state.weekStart === agendaWeekStart(state.today)
-  ) {
+  if (document !== undefined && includesOverdue(state)) {
     const overdue: AgendaRow[] = []
     const key = overdueKey(state.weekStart)
     for (const entry of overdueProjection(projection, state, document)) {
@@ -272,6 +292,8 @@ export class AgendaRowsCache {
   private scope: NodeId | null | undefined
   private projection: readonly AgendaProjectionDay[] = []
   private searchProjection: readonly AgendaProjectionDay[] = []
+  private laterOverdue: ReadonlyMap<DayNumber, ReadonlySet<NodeId>> = new Map()
+  private overdueOverride: AgendaOccurrence | undefined
   private weekProjection: readonly AgendaProjectionDay[] = []
   private state: AgendaState | undefined
   private rows: readonly AgendaRow[] = []
@@ -322,12 +344,20 @@ export class AgendaRowsCache {
       this.scope = state.scopeParentId
     }
     const overdueChanged = documentChanged && this.projection.some((day) => day.day < state.weekStart)
-    const activeChanged = activeAgendaOccurrence(this.state) !== activeAgendaOccurrence(state)
+    if (changed || todayChanged)
+      this.laterOverdue = indexLaterOverdueOccurrences(this.searchProjection, agendaWeekStart(state.today))
+    const active = activeAgendaOccurrence(state)
+    const overdueOverride =
+      active !== undefined && includesOverdue(state) && this.laterOverdue.get(active.day)?.has(active.nodeId)
+        ? active
+        : undefined
+    const overdueOverrideChanged =
+      overdueOverride?.day !== this.overdueOverride?.day || overdueOverride?.nodeId !== this.overdueOverride?.nodeId
     const presentationChanged = focusedAgendaDay(this.state) !== focusedAgendaDay(state)
     if (
       changed ||
       overdueChanged ||
-      activeChanged ||
+      overdueOverrideChanged ||
       presentationChanged ||
       this.state?.weekStart !== state.weekStart ||
       this.state?.today !== state.today
@@ -345,7 +375,7 @@ export class AgendaRowsCache {
     if (
       changed ||
       overdueChanged ||
-      activeChanged ||
+      overdueOverrideChanged ||
       this.state?.weekStart !== state.weekStart ||
       this.state?.today !== state.today ||
       focusedAgendaDay(this.state) !== focusedAgendaDay(state) ||
@@ -366,6 +396,7 @@ export class AgendaRowsCache {
         })
       if (changed || !same) this.rows = rows
     }
+    this.overdueOverride = overdueOverride
     this.state = state
     return this.rows
   }
@@ -377,6 +408,8 @@ export class AgendaRowsCache {
     this.scope = undefined
     this.projection = []
     this.searchProjection = []
+    this.laterOverdue = new Map()
+    this.overdueOverride = undefined
     this.weekProjection = []
     this.state = undefined
     this.rows = []

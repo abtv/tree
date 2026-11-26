@@ -3,6 +3,7 @@ import { dayNumberOf, type DayNumber } from '../domain/calendar-date'
 import { projectAgenda } from '../domain/agenda-projection'
 import * as projectionModule from '../domain/agenda-projection'
 import { editNodeText, type Document, type TreeNode } from '../domain/document'
+import * as documentModule from '../domain/document'
 import * as recognition from '../domain/date-recognition'
 import {
   agendaAncestorKeys,
@@ -184,6 +185,35 @@ describe('Agenda rows', () => {
       [row.day, ['peer']],
     ])
     expect(cache.get(edited, left).filter((entry) => entry.kind === 'node')).toHaveLength(3)
+  })
+
+  // @requirement PRODUCT.md §23.3
+  it('does not rescan overdue nodes when selecting their earliest occurrences', () => {
+    const source: Document = {
+      roots: Array.from({ length: 4_000 }, (_, index) => ({
+        id: `overdue-${index}`,
+        text: index % 2 === 0 ? '2026-10-01 2026-10-04 task' : '2026-10-02 task',
+        children: [],
+      })),
+    }
+    let state = openAgendaState({ currentParentId: null, selectedNodeId: 'overdue-0' }, 0, today)
+    const cache = new AgendaRowsCache()
+    const rows = cache.get(source, state)
+    const projection = cache.getProjection(source, state)
+    const targets = rows.filter((row) => row.kind === 'node')
+    const locate = vi.spyOn(documentModule, 'locateNode')
+    try {
+      for (const row of [targets[0]!, targets.at(-1)!, targets[1]!, rows[0]!]) {
+        state = applyAgendaCommand(state, { kind: 'select', key: row.key }, rows)
+
+        expect(cache.get(source, state)).toBe(rows)
+        expect(cache.getProjection(source, state)).toBe(projection)
+      }
+
+      expect(locate.mock.calls.length).toBe(0)
+    } finally {
+      locate.mockRestore()
+    }
   })
 
   // @requirement PRODUCT.md §20.2.26
