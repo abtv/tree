@@ -1,5 +1,7 @@
 import type { AppUpdateStatus } from '../../shared/ipc'
 
+export const UPDATE_FAILED_MESSAGE = 'Update failed. Try Restart and Install again.'
+
 type UpdatePackage =
   | { phase: 'unavailable' }
   | { phase: 'available'; version: string }
@@ -127,7 +129,7 @@ export class AppUpdates {
       try {
         quitAndInstall()
       } catch {
-        this.fail('Update failed. Try Restart and Install again.')
+        this.fail(UPDATE_FAILED_MESSAGE)
       }
     })
   }
@@ -236,7 +238,7 @@ export class AppUpdates {
     try {
       this.ports.install()
     } catch {
-      this.fail('Update failed. Try Restart and Install again.')
+      this.fail(UPDATE_FAILED_MESSAGE)
     }
   }
 

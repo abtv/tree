@@ -15,7 +15,8 @@ import {
   shell,
 } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { AppUpdates } from './app-updates'
+import { AppUpdates, UPDATE_FAILED_MESSAGE } from './app-updates'
+import { NativeUpdateInstaller } from './native-update-installer'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
@@ -322,48 +323,15 @@ bootstrapApplication({
   getWindowCount: () => BrowserWindow.getAllWindows().length,
   registerReadyServices: (quitHandshake, onQuitConfirmed) => {
     if (app.isPackaged && process.platform === 'darwin') {
-      let nativePackage:
-        | { phase: 'idle' }
-        | { phase: 'staging' | 'installing'; version: string; retryWaiting: boolean }
-        | { phase: 'staged'; version: string } = { phase: 'idle' }
-      const install = () => {
-        const version = appUpdates?.getVersion()
-        if (!version) throw new Error('No downloaded update version.')
-        // Native callbacks carry no request ID. Keep at most one outstanding operation across timeouts.
-        if (nativePackage.phase === 'staging' || nativePackage.phase === 'installing') {
-          nativePackage.retryWaiting = true
-          return
-        }
-        const staged = nativePackage.phase === 'staged' && nativePackage.version === version
-        if (staged) {
-          appUpdates!.handOffToInstaller(() => {
-            nativePackage = { phase: 'installing', version, retryWaiting: false }
-            try {
-              nativeUpdater.quitAndInstall()
-            } catch (error) {
-              nativePackage = { phase: 'idle' }
-              throw error
-            }
-          })
-        } else {
-          nativePackage = { phase: 'staging', version, retryWaiting: false }
-          try {
-            nativeUpdater.checkForUpdates()
-          } catch (error) {
-            nativePackage = { phase: 'idle' }
-            throw error
-          }
-        }
-      }
       autoUpdater.autoInstallOnAppQuit = false
       autoUpdater.autoDownload = false
       autoUpdater.allowPrerelease = false
       autoUpdater.allowDowngrade = false
       autoUpdater.disableDifferentialDownload = true
-      appUpdates = new AppUpdates({
+      const updates = new AppUpdates({
         check: () => autoUpdater.checkForUpdates(),
         download: () => autoUpdater.downloadUpdate(),
-        install,
+        install: () => installer.install(),
         canInstall: () =>
           !!mainWindow &&
           !mainWindow.isDestroyed() &&
@@ -418,43 +386,23 @@ bootstrapApplication({
       })
       // Start native staging only after explicit consent and a successful save. Keep one
       // listener rather than MacUpdater.quitAndInstall's accumulating deferred callbacks.
+      const installer = new NativeUpdateInstaller(nativeUpdater, updates)
+      appUpdates = updates
       autoUpdater.on('update-downloaded', (info) => appUpdates?.downloaded(info.version))
       autoUpdater.on('update-available', (info) => appUpdates?.available(info.version))
       autoUpdater.on('update-not-available', () => appUpdates?.notAvailable())
       autoUpdater.on('download-progress', (progress) => appUpdates?.downloading(progress.percent))
-      const finishNativeOperation = (downloaded: boolean) => {
-        if (nativePackage.phase !== 'staging' && nativePackage.phase !== 'installing') return
-        const { version, retryWaiting } = nativePackage
-        // An installer failure does not prove the native copy is still staged. The
-        // provider's downloaded ZIP remains ready for a fresh preparation on retry.
-        nativePackage = downloaded ? { phase: 'staged', version } : { phase: 'idle' }
-        if (appUpdates?.isInstalling()) {
-          if (!downloaded && !retryWaiting) {
-            appUpdates.fail('Update failed. Try Restart and Install again.')
-            return
-          }
-          try {
-            install()
-          } catch {
-            appUpdates.fail('Update failed. Try Restart and Install again.')
-          }
-        }
-      }
-      nativeUpdater.on('update-downloaded', () => {
-        if (nativePackage.phase === 'staging') finishNativeOperation(true)
-      })
-      nativeUpdater.on('update-not-available', () => {
-        if (nativePackage.phase === 'staging') finishNativeOperation(false)
-      })
+      nativeUpdater.on('update-downloaded', () => installer.nativeFinished('downloaded'))
+      nativeUpdater.on('update-not-available', () => installer.nativeFinished('not-available'))
       // MacUpdater forwards this same Error to the provider emitter synchronously.
       const nativeErrors = new WeakSet<Error>()
       nativeUpdater.prependListener('error', (error: Error) => {
         nativeErrors.add(error)
-        finishNativeOperation(false)
+        installer.nativeFinished('error')
       })
       autoUpdater.on('error', (error) => {
         if (!nativeErrors.delete(error) && !appUpdates?.isDownloading() && !appUpdates?.isChecking())
-          appUpdates?.fail('Update failed. Try Restart and Install again.')
+          appUpdates?.fail(UPDATE_FAILED_MESSAGE)
       })
       app.on('before-quit', () => appUpdates?.cancelBeforeNativeQuit())
       void appUpdates.check()
