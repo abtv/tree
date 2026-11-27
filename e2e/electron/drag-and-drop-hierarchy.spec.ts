@@ -444,10 +444,9 @@ describeForEachEditingMode('breadcrumb drag and drop', ({ mode }) => {
 
       await expect(source).toBeFocused()
       expect(await source.evaluate((element) => (element as HTMLTextAreaElement).selectionStart)).toBe(cursor)
+      // The drag clears the text selection, so character Visual mode ends for Normal (PRODUCT §20.2.8).
       if (mode === 'vim')
-        await expect(window.getByLabel('Vim mode')).toHaveText(
-          state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : 'NORMAL',
-        )
+        await expect(window.getByLabel('Vim mode')).toHaveText(state === 'insert' ? 'INSERT' : 'NORMAL')
       await expect(window.locator('.location-current')).toHaveCount(0)
     })
   }

@@ -758,7 +758,12 @@ describe('App drag editing-state matrix', () => {
         assertDocument(expected, destination)
         expect(input()).toHaveValue(text)
 
-        const normalCaret = state === 'normal' || state === 'replace' || (state === 'visual-node' && route !== 'gap')
+        // The drag clears the text selection, so character Visual mode ends for Normal (PRODUCT §20.2.8).
+        const normalCaret =
+          state === 'normal' ||
+          state === 'replace' ||
+          state === 'visual' ||
+          (state === 'visual-node' && route !== 'gap')
 
         expect([input().selectionStart, input().selectionEnd]).toEqual([
           frozenCursor,
@@ -766,8 +771,7 @@ describe('App drag editing-state matrix', () => {
         ])
         expect(row()).toHaveAttribute('data-depth', route === 'row' ? '1' : '0')
 
-        const mode =
-          state === 'insert' ? 'INSERT' : state === 'visual' ? 'VISUAL' : route === 'gap' ? 'VISUAL NODE' : 'NORMAL'
+        const mode = state === 'insert' ? 'INSERT' : route === 'gap' ? 'VISUAL NODE' : 'NORMAL'
 
         if (state !== 'standard') expect(screen.getByLabelText('Vim mode')).toHaveTextContent(mode)
         expect(document.querySelectorAll('.node-row-visual-selected')).toHaveLength(route === 'gap' ? 1 : 0)

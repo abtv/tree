@@ -1842,6 +1842,54 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       })
     }
 
+    // @requirement PRODUCT.md §20.2.6
+    // @requirement PRODUCT.md §20.2.8
+    test('leaves character Visual mode for Normal when a slow click on its text becomes a node drag', async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'first', text: 'alpha beta gamma', children: [] },
+            { id: 'second', text: 'delta epsilon', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      const box = (await editor.boundingBox())!
+      await window.keyboard.press('v')
+      await window.keyboard.press('l')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
+      await window.mouse.move(await textX(editor, 7), box.y + box.height / 2)
+      await window.clock.install()
+      await window.clock.pauseAt(Date.now() + 60_000)
+      try {
+        await window.mouse.down()
+        // The press stays still past the hold, so it becomes a node drag, which clears the selection.
+        await window.clock.runFor(300)
+
+        await expect(window.locator('.node-row-dragging')).toHaveCount(1)
+
+        await window.mouse.up()
+      } finally {
+        await window.clock.resume()
+      }
+
+      // Character Visual mode without a selection is never left behind.
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(editor).toBeFocused()
+      await expect.poll(() => selectedText(editor)).toBe('e')
+      expect(await nodeTexts(window)).toEqual(['alpha beta gamma', 'delta epsilon'])
+
+      await window.keyboard.press('x')
+
+      await expect(editor).toHaveValue('alpha bta gamma')
+    })
+
     test('places the Normal caret where a click lands inside a select-all selection', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },

@@ -50,7 +50,7 @@
 * In Normal and character Visual mode, an ordinary primary-button press on node text — a mouse or trackpad press without `Cmd`, `Ctrl` or `Option` — sets the mode as Vim does with the mouse enabled. While the press is held, the mode follows its selection: character Visual mode as soon as the press selects text by dragging, double- or triple-clicking, or `Shift`-clicking, and Normal mode while it has only a caret, including after a drag returns to where it began.
 * The release of such a press settles the mode. A selection leaves character Visual mode, anchored where the press began and active where it was released; a double- or triple-click selects forward. A press that leaves only a caret leaves Normal mode at that caret.
 * Such a press starts a new selection instead of dragging selected text, both in character Visual mode and over a Normal-mode `Cmd+A` selection. A drag that leaves the pressed node keeps its selection within that node. This holds in Tree and in Agenda editors; Agenda rows without an editor keep §23.4.
-* A held press that ends without its release, because it became a node drag (§11) or the pointer or the window was lost, leaves the mode it began in. A selection it was making does not replace the selection that `gv` restores (§20.2.25). In character Visual mode the press has already replaced the old selection, so the next motion anchors at the caret.
+* A held press that ends without its release, because it became a node drag (§11) or the pointer or the window was lost, leaves Normal mode, including a press that began in character Visual mode, whose old selection the press already replaced. A selection it was making does not replace the selection that `gv` restores (§20.2.25).
 * While a pointer press is held, another pointer's press or release, such as a finger lifted from a touch screen during a mouse drag, neither ends that press nor settles its click.
 * An ordinary primary-button click on node text, in the same node or another, keeps Replace mode. Any pending replacement completes as one edit first; the caret then moves to the clicked position, and the next typed characters overwrite from there. Text typed after the click is a separate edit, so Undo reverts it on its own.
 * A double-click keeps the selected word visible and Replace active until typing: the first typed character replaces the selected range once, then subsequent characters overwrite from the resulting caret. This applies to plain and rich text with or without a pending replacement.
@@ -63,6 +63,7 @@
 
 * Whole-node Visual mode ends and returns to Normal mode when a drop changes the selected node's parent, whether it lands between rows, onto a row, or onto a breadcrumb entry.
 * Same-parent reordering does not end the mode.
+* A node drag ends character Visual mode for Normal mode when the drag starts, however it was pressed, because the drag clears the text selection (§11). A drag of the selected row returns the Normal caret where §11 places the text cursor; a drag of another row leaves the Normal caret at the active Visual end, as `Escape` does.
 * The Vim register and `.` repeat are unchanged by drag-and-drop.
 
 #### 20.2.9 Motions and Undo

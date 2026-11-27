@@ -96,7 +96,6 @@ interface HeldTextPress {
   extending: boolean
   pressOffset: number | undefined
   point: { x: number; y: number }
-  pressMode: VimMode
   followedMode: 'normal' | 'visual' | undefined
 }
 
@@ -180,8 +179,8 @@ export function useNodeInputBindings({
   // whose selection decides between Normal and character Visual mode (docs/PRODUCT.md §20.2.6): the
   // mode follows it while the press is held, and the release settles it. `extending` marks a Shift
   // press, `pressOffset` is a text area's offset under the press, and `point` is where the pointer
-  // was last seen. `pressMode` is the mode the press began in and `followedMode` the mode it last
-  // followed its selection into; a press that never settles gives the first back.
+  // was last seen. `followedMode` is the mode the held press last followed its selection into; a
+  // press that never settles ends a Visual mode it followed.
   const heldTextPress = useRef<HeldTextPress | undefined>(undefined)
 
   function schedulePendingCaret(request: Omit<PendingCaret, 'normal' | 'revision' | 'focusToken'>): void {
@@ -215,18 +214,19 @@ export function useNodeInputBindings({
     [setVimMode],
   )
 
-  // A press that ends without its release (a node drag, a cancelled pointer, a lost window, a context
-  // menu or a press that takes over) changes no mode, so it gives back the mode it began in. A node
-  // drag from character Visual mode therefore keeps that mode, as it did before the mode followed.
-  const restoreHeldPressMode = useCallback(
+  // Character Visual mode needs a selection. A press that ends without its release (a node drag, a
+  // cancelled pointer, a lost window, a context menu or a press that takes over) selects nothing for
+  // Vim, so it ends a Visual mode it followed; a press that began in Visual mode left it when it
+  // replaced the old range (docs/PRODUCT.md §20.2.6).
+  const endFollowedVisual = useCallback(
     (pressed: HeldTextPress | undefined = heldTextPress.current): void => {
       const followed = pressed?.followedMode
       if (pressed === undefined || followed === undefined) return
       pressed.followedMode = undefined
       // A command that changed the mode during the press keeps its own result.
-      if (followed === pressed.pressMode || caretProjection.current.mode !== followed) return
+      if (followed !== 'visual' || caretProjection.current.mode !== 'visual') return
       clearVisualRange(vimCommandState.current)
-      changeVimMode(pressed.pressMode)
+      changeVimMode('normal')
     },
     [changeVimMode],
   )
@@ -258,59 +258,6 @@ export function useNodeInputBindings({
     [clearFrozenPointerListener, store],
   )
 
-  // The caret authority suspends the captured caret while a node drag freezes the text surface and
-  // restores it when the frozen pointer is released, even if the release lands outside the list
-  // (for example after Escape already ended the visual freeze).
-  const beginFrozenCaret = useCallback(
-    (nodeId: string, pointerId: number): void => {
-      // A press held long enough to move the node is a drag, not a text click (PRODUCT §20.2.6),
-      // so the blur below must end Replace mode as before, and the mode the press followed its
-      // selection into returns to the mode it began in.
-      takeReplaceClick(vimSession.current)
-      restoreHeldPressMode()
-      const existing = frozenCaret.current
-      if (existing !== undefined && existing.pointerId === pointerId) return
-      if (existing !== undefined) {
-        clearFrozenPointerListener()
-        frozenCaret.current = undefined
-      }
-      const input = inputs.current.get(nodeId)
-      if (input === undefined || document.activeElement !== input) {
-        // A press on a row's blank area keeps another editor's focus (PRODUCT §20) until the hold
-        // becomes a drag. The drag then finishes that editor's buffered session through its blur, as
-        // the press used to, and gives focus back, so a cancelled drag leaves the editor usable.
-        const active = document.activeElement
-        if (active instanceof HTMLElement && [...inputs.current.values()].includes(active)) {
-          active.blur()
-          active.focus({ preventScroll: true })
-        }
-        return
-      }
-      caretProjection.current.invalidateCaret()
-      collapseSelectionToAnchor(input)
-      frozenCaret.current = freezeCaret(nodeId, pointerId, {
-        ...caretProjection.current.authority.caret,
-        cursor: getCaret(input),
-      })
-      const listener = (event: PointerEvent): void => {
-        if (event.pointerId === pointerId) releaseFrozenCaret(pointerId)
-      }
-      frozenPointerListener.current = listener
-      globalThis.addEventListener('pointerup', listener)
-      globalThis.addEventListener('pointercancel', listener)
-      input.blur()
-    },
-    [clearFrozenPointerListener, releaseFrozenCaret, restoreHeldPressMode],
-  )
-
-  useEffect(
-    () => () => {
-      frozenCaret.current = undefined
-      clearFrozenPointerListener()
-    },
-    [clearFrozenPointerListener],
-  )
-
   const applyCaretState = useCallback(
     (
       nodeId: string,
@@ -339,6 +286,71 @@ export function useNodeInputBindings({
     },
     [store, setImageCaretNodeId, searchFocus],
   )
+
+  // The caret authority suspends the captured caret while a node drag freezes the text surface and
+  // restores it when the frozen pointer is released, even if the release lands outside the list
+  // (for example after Escape already ended the visual freeze).
+  const beginFrozenCaret = useCallback(
+    (nodeId: string, pointerId: number): void => {
+      // A press held long enough to move the node is a drag, not a text click (PRODUCT §20.2.6),
+      // so the blur below must end Replace mode as before. The drag clears the text selection
+      // (PRODUCT §11), and character Visual mode cannot outlive its selection, so it ends for Normal
+      // mode however the drag began (PRODUCT §20.2.8).
+      takeReplaceClick(vimSession.current)
+      endFollowedVisual()
+      const endsVisual = caretProjection.current.mode === 'visual'
+      const visualFocus = vimCommandState.current.visualFocus
+      if (endsVisual) {
+        clearVisualRange(vimCommandState.current)
+        changeVimMode('normal')
+      }
+      const existing = frozenCaret.current
+      if (existing !== undefined && existing.pointerId === pointerId) return
+      if (existing !== undefined) {
+        clearFrozenPointerListener()
+        frozenCaret.current = undefined
+      }
+      const input = inputs.current.get(nodeId)
+      if (input === undefined || document.activeElement !== input) {
+        // A press on a row's blank area keeps another editor's focus (PRODUCT §20) until the hold
+        // becomes a drag. The drag then finishes that editor's buffered session through its blur, as
+        // the press used to, and gives focus back, so a cancelled drag leaves the editor usable.
+        const active = document.activeElement
+        const activeId = [...inputs.current.entries()].find(([, candidate]) => candidate === active)?.[0]
+        if (active instanceof HTMLElement && activeId !== undefined) {
+          active.blur()
+          active.focus({ preventScroll: true })
+          // The drag clears the editor's Visual range as well: Normal mode draws its block at the
+          // active Visual end, as Escape would.
+          if (endsVisual) applyCaretState(activeId, { cursor: visualFocus ?? getCaret(active), imageActive: false })
+        }
+        return
+      }
+      caretProjection.current.invalidateCaret()
+      collapseSelectionToAnchor(input)
+      frozenCaret.current = freezeCaret(nodeId, pointerId, {
+        ...caretProjection.current.authority.caret,
+        cursor: getCaret(input),
+      })
+      const listener = (event: PointerEvent): void => {
+        if (event.pointerId === pointerId) releaseFrozenCaret(pointerId)
+      }
+      frozenPointerListener.current = listener
+      globalThis.addEventListener('pointerup', listener)
+      globalThis.addEventListener('pointercancel', listener)
+      input.blur()
+    },
+    [applyCaretState, changeVimMode, clearFrozenPointerListener, releaseFrozenCaret, endFollowedVisual],
+  )
+
+  useEffect(
+    () => () => {
+      frozenCaret.current = undefined
+      clearFrozenPointerListener()
+    },
+    [clearFrozenPointerListener],
+  )
+
   const finishStructuralInsert = useCallback((input: HTMLElement): void => {
     sessionFinish.finishStructuralInsertSession({ commandState: vimCommandState.current }, input)
   }, [])
@@ -660,7 +672,10 @@ export function useNodeInputBindings({
     // pending placement, decoration, then completion. Unrelated commits skip focus/mode work.
     if (focus !== undefined && focus.token !== projection.syncedFocusToken) syncImageCaretToFocus()
     const focusedInput = focus === undefined ? undefined : inputs.current.get(focus.nodeId)
-    if (searchFocus.canProjectCaret() && changes.modeChanged && focusedInput !== undefined) {
+    // A node drag freezes its editor with the selection cleared (docs/PRODUCT.md §11); its release
+    // restores the caret, so a mode change during the drag leaves the frozen editor alone.
+    const frozen = focus !== undefined && frozenCaret.current?.nodeId === focus.nodeId
+    if (searchFocus.canProjectCaret() && changes.modeChanged && focusedInput !== undefined && !frozen) {
       if (vimMode === 'normal') {
         // Cmd+A's deliberate selection survives the transition to Normal, and a held press keeps its own.
         if (!hasMultiCharacterSelection(focusedInput) && heldTextPress.current?.input !== focusedInput)
@@ -867,7 +882,7 @@ export function useNodeInputBindings({
       )
         return
       // A press that takes over from one whose release was lost ends that press without settling it.
-      restoreHeldPressMode()
+      endFollowedVisual()
       pointerPhase = 'held'
       heldPointer = { id: event.pointerId, type: event.pointerType }
       const pressedNode = event.target instanceof Node ? event.target : undefined
@@ -888,7 +903,6 @@ export function useNodeInputBindings({
                   ? textAreaOffsetAtPoint(pressedInput, event.clientX, event.clientY)
                   : undefined,
               point: { x: event.clientX, y: event.clientY },
-              pressMode: caretProjection.current.mode,
               followedMode: undefined,
             }
       const target = event.target instanceof Element ? event.target : undefined
@@ -940,7 +954,7 @@ export function useNodeInputBindings({
     // A Control-click opens a native menu that can swallow the release, so the press stops owning
     // the selection here; otherwise later keyboard motions would draw no block caret.
     const onContextMenu = (): void => {
-      restoreHeldPressMode()
+      endFollowedVisual()
       heldTextPress.current = undefined
     }
     const heldEndpoints = (pressed: HeldTextPress): { anchor: number; focus: number } =>
@@ -1090,7 +1104,7 @@ export function useNodeInputBindings({
       if (event instanceof MouseEvent && event.type === 'pointerup' && holdsPressedEditor(pressed)) {
         pressed.point = { x: event.clientX, y: event.clientY }
         settlePointerSelection(pressed, true)
-      } else restoreHeldPressMode(pressed)
+      } else endFollowedVisual(pressed)
       if (pointerPhase !== 'held') return
       pointerPhase = 'released'
       const input = document.activeElement
@@ -1129,7 +1143,7 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [applyCaretState, changeVimMode, finishVimReplace, restoreHeldPressMode, shortcuts, store])
+  }, [applyCaretState, changeVimMode, finishVimReplace, endFollowedVisual, shortcuts, store])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>

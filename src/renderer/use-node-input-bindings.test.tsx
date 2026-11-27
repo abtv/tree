@@ -4100,7 +4100,7 @@ describe('useNodeInputBindings', () => {
 
   // @requirement PRODUCT.md §20.2.6
   it.each(['window blur', 'node drag', 'context menu', 'new press'] as const)(
-    'gives back the mode a held press followed when a %s ends the press',
+    'ends the Visual mode a held press followed when a %s ends the press',
     async (ending) => {
       const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
       const input = f.input()
@@ -4143,7 +4143,7 @@ describe('useNodeInputBindings', () => {
 
   // @requirement PRODUCT.md §20.2.6
   it.each(['pointer cancel', 'node drag'] as const)(
-    'gives a held Visual press its mode back when a %s ends the press',
+    'leaves Normal mode when a %s ends a held press that began in Visual mode',
     async (ending) => {
       const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
       const input = f.input()
@@ -4167,10 +4167,10 @@ describe('useNodeInputBindings', () => {
         f.sync()
       }
 
-      // A node drag keeps character Visual mode. The press replaced the old range, so the mode has
-      // only a caret until the next motion anchors there (PRODUCT.md §20.2.6).
-      expect(f.result.current.vimMode).toBe('visual')
-      expect([input.selectionStart, input.selectionEnd]).toEqual([3, 3])
+      // The press replaced the old range, so no Visual mode without a selection is left behind
+      // (PRODUCT.md §20.2.6, §20.2.8).
+      expect(f.result.current.vimMode).toBe('normal')
+      expect(input.selectionStart).toBe(3)
 
       // `gv` still restores the selection made before the press.
       f.press('Escape')
@@ -4181,6 +4181,57 @@ describe('useNodeInputBindings', () => {
       expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
     },
   )
+
+  // @requirement PRODUCT.md §20.2.8
+  it('ends character Visual mode when a node drag starts from outside the text', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(1, 1)
+    f.press('v')
+    f.press('l')
+
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3])
+
+    act(() => f.result.current.dragFreeze.begin('node', 7))
+    f.sync()
+
+    // The mode change renders while the drag is active; the frozen field keeps its cleared selection.
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(input.selectionStart).toBe(input.selectionEnd)
+
+    act(() => f.result.current.dragFreeze.end(7))
+    f.sync()
+
+    // The drag cleared the selection at its anchor, and the next key is a Normal motion from there.
+    expect(input.selectionStart).toBe(1)
+
+    f.press('l')
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 3])
+  })
+
+  // @requirement PRODUCT.md §20.2.8
+  it('clears the character Visual range of the focused editor when another row starts a node drag', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'abcdef'), node('b', 'second')] } })
+    const first = f.input('a')
+    act(() => f.store.selectNode('a', 0))
+    first.focus()
+    first.setSelectionRange(1, 1)
+    f.press('v', {}, 'a')
+    f.press('l', {}, 'a')
+
+    expect([first.selectionStart, first.selectionEnd]).toEqual([1, 3])
+
+    act(() => f.result.current.dragFreeze.begin('b', 7))
+    f.sync()
+
+    // Normal mode shows its block at the active Visual end, not the old range.
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(document.activeElement).toBe(first)
+    expect([first.selectionStart, first.selectionEnd]).toEqual([2, 3])
+  })
 
   // @requirement PRODUCT.md §20.2.6
   it.each(['insert', 'replace'] as const)('keeps %s mode for a mouse selection', async (mode) => {
