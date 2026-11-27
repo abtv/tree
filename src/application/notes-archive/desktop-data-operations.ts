@@ -128,6 +128,15 @@ export class DesktopDataOperations {
     this.updateMenu()
   }
 
+  /** Read the one-shot notice once the restored editor or load-error surface can present it. */
+  presentStartupImportNotice(): void {
+    const state = this.store.getSnapshot()
+    if (this.lifecycle !== 'started' || this.noticeTaken || (state.status !== 'ready' && state.status !== 'error'))
+      return
+    this.noticeTaken = true
+    void this.showImportNotice()
+  }
+
   private busy(): boolean {
     return (
       this.preparation.phase === 'prepared' ||
@@ -161,10 +170,6 @@ export class DesktopDataOperations {
         },
       },
     ])
-    if (!this.noticeTaken && (state.status === 'ready' || state.status === 'error')) {
-      this.noticeTaken = true
-      void this.showImportNotice()
-    }
     if (
       next.canExport === this.lastMenu?.canExport &&
       next.canImport === this.lastMenu.canImport &&

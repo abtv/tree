@@ -24,6 +24,10 @@ import { installWindowFocusReturn } from './window-focus-return'
 declare const __TREE_APP_VERSION__: string
 declare const __TREE_BUILD_DATE__: string
 
+// Load the bundled font alongside startup reads. Mounting with fallback metrics first can
+// show blank text and move wrapped rows. A missing font must not prevent the app from opening.
+const editorFontReady = document.fonts.load('15px "JetBrains Mono"').catch(() => [])
+
 blockExternalDrops(window)
 const stopWindowFocusReturn = installWindowFocusReturn(window)
 window.addEventListener('pagehide', () => stopWindowFocusReturn(), { once: true })
@@ -126,6 +130,7 @@ void Promise.all([
   vim.ready,
   window.treeApi.getLineNumbers().catch(() => false),
   window.treeApi.getAppearance().catch((): AppearancePreference => 'system'),
+  editorFontReady,
 ]).then(([, initialLineNumbers, initialAppearance]) => {
   if (!appearanceChanged) applyAppearance(initialAppearance)
 

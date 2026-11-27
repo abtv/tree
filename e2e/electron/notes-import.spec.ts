@@ -1,4 +1,5 @@
 // @editing-modes: independent
+import type { Page } from '@playwright/test'
 import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildZip } from '../../src/application/test/zip-builder'
@@ -15,6 +16,8 @@ import {
   test,
   vimPreferencePath,
 } from './fixtures'
+
+type ImportNoticeProbe = typeof globalThis & { importNoticeReturned?: boolean }
 
 function archive(path: string, version = 1): void {
   writeFileSync(
@@ -39,6 +42,28 @@ function seed(path: string): void {
     document: { roots: [{ id: 'old', text: 'Previous synthetic notes', children: [] }] },
     location: { currentParentId: null, selectedNodeId: 'old' },
   })
+}
+
+async function holdBundledFont(window: Page) {
+  let unblock!: () => void
+  const gate = new Promise<void>((resolve) => {
+    unblock = resolve
+  })
+  let requested = false
+  await window.route('**/*JetBrainsMono*.ttf', async (route) => {
+    requested = true
+    await gate
+    await route.continue()
+  })
+  const cdp = await window.context().newCDPSession(window)
+  await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
+  return {
+    requested: () => requested,
+    async release() {
+      unblock()
+      await cdp.detach()
+    },
+  }
 }
 
 test.describe('desktop Import Notes', () => {
@@ -73,6 +98,7 @@ test.describe('desktop Import Notes', () => {
       await app.evaluate((_electron, channel) => {
         globalThis.__treeIpc.wrap(channel, async (original, ...args) => {
           const result = (await original(...args)) as { replacedFolder: string | null } | null
+          if (result !== null) (globalThis as ImportNoticeProbe).importNoticeReturned = true
           return result === null
             ? null
             : { ...result, replacedFolder: '~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09' }
@@ -116,7 +142,23 @@ test.describe('desktop Import Notes', () => {
       await expect(confirmation).toHaveScreenshot(`import-confirmation-${appearance}.png`)
 
       await window.screenshot({ path: `.scratch/desktop-notes-import/confirmation-${appearance}.png` })
-      await confirmation.getByRole('button', { name: 'Replace Notes', exact: true }).click()
+      const replace = confirmation.getByRole('button', { name: 'Replace Notes', exact: true })
+      if (appearance === 'light') {
+        // A reload can finish reading the document before the first editor frame is ready.
+        // The notice must not be consumed while the bundled font holds that frame.
+        const font = await holdBundledFont(window)
+        try {
+          await replace.click()
+
+          await expect.poll(font.requested).toBe(true)
+          await window.evaluate(
+            () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+          )
+          expect(await app.evaluate(() => (globalThis as ImportNoticeProbe).importNoticeReturned)).toBeUndefined()
+        } finally {
+          await font.release()
+        }
+      } else await replace.click()
 
       await expect(node(window, 1)).toHaveValue('Imported synthetic notes')
 
@@ -162,11 +204,61 @@ test.describe('desktop Import Notes', () => {
       await panel.getByRole('button', { name: 'OK', exact: true }).click()
 
       await expect(panel).toHaveCount(0)
+      await expect(node(window, 1)).toBeFocused()
       expect(readdirSync(join(userDataDir, '.notes-import'))).toEqual([])
 
       await closeApp(app)
     })
   }
+
+  // @requirement PRODUCT.md §25.3
+  test('starts the transient import notice timeout when the restored window can present it', async ({
+    userDataDir,
+  }) => {
+    seed(userDataDir)
+    const path = join(userDataDir, 'Notes.zip')
+    archive(path)
+    const { app, window } = await launchTree(userDataDir, { appearance: 'light', vimPreference: false })
+    await app.evaluate(
+      ({ dialog }, { chosen, channel }) => {
+        dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [chosen] })) as typeof dialog.showOpenDialog
+        // Exercise a transient result with the same real import/reload and IPC wiring.
+        globalThis.__treeIpc.wrap(channel, async (original, ...args) => {
+          const result = (await original(...args)) as { replacedFolder: string | null } | null
+          return result === null ? null : { ...result, replacedFolder: null }
+        })
+      },
+      { chosen: path, channel: ipcChannels.takeNotesImportNotice },
+    )
+    await clickApplicationMenuItem(app, 'File', 'Import Notes…')
+    const confirmation = window.getByRole('dialog', { name: 'Replace Current Notes?' })
+    await expect(confirmation).toBeVisible()
+    await window.clock.install()
+    const font = await holdBundledFont(window)
+    try {
+      await confirmation.getByRole('button', { name: 'Replace Notes', exact: true }).click()
+
+      await expect.poll(font.requested).toBe(true)
+      // IPC still runs in real time. Allow the restored document to finish loading before
+      // advancing the renderer clock across the notice's entire six-second lifetime.
+      await window.clock.runFor(250)
+      await window.clock.fastForward(6_200)
+    } finally {
+      await font.release()
+    }
+
+    await expect(node(window, 1)).toHaveValue('Imported synthetic notes')
+    const notice = window.getByRole('complementary', { name: 'Notes activity' })
+    await expect(notice).toContainText('Imported “Notes.zip”.')
+    await expect(notice.getByRole('button', { name: 'OK', exact: true })).toBeFocused()
+    await window.clock.fastForward(5_000)
+    await expect(notice).toBeVisible()
+
+    await window.clock.fastForward(1_000)
+
+    await expect(notice).toHaveCount(0)
+    await expect(node(window, 1)).toBeFocused()
+  })
 
   // @requirement PRODUCT.md §25.1
   // @requirement PRODUCT.md §25.3

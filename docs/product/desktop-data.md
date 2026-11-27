@@ -28,7 +28,7 @@ Tab and Shift+Tab move between the confirmation buttons and stay inside the dial
 
 * **Replace Notes** shows `Replacing Notes…`, disables the dialog, saves pending edits, replaces the notes (§25.4) and reloads the window, which opens the imported notes. Import does not change preferences.
 * The panel then shows `Imported “Tree Notes 2026-10-20.zip”. Your previous notes are in “~/Library/Application Support/Tree/Replaced Notes/2026-10-23 14-05-09”.` with **Show in Finder** and **OK** until OK; Show in Finder selects that folder in the Finder.
-* Without previous notes it shows `Imported “Tree Notes 2026-10-20.zip”.` and closes after six seconds or with OK.
+* Without previous notes it shows `Imported “Tree Notes 2026-10-20.zip”.` and closes six seconds after appearing or with OK.
 * After import, OK receives keyboard focus. Enter or Space closes the result; with previous notes, Shift+Tab reaches Show in Finder, and Tab returns to OK. Closing the focused result returns focus to the editor.
 * Cancel and every failure before the replacement leave the notes unchanged and remove what the import prepared; failures show `Import failed. <reason>` until OK.
 * A failure after replacement has committed keeps editing blocked and shows `Import failed. <reason> Restart Tree to complete the import.` The next start attempts the recovery described in §25.4.

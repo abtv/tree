@@ -389,6 +389,9 @@ export function App({
   }, [preferences, setVimEditing, store])
   // Called after the input bindings so the restore aligns the selected row after their initial focus.
   useScrollRestoration(store, state.status === 'ready' && agenda === undefined)
+  useLayoutEffect(() => {
+    if (state.status !== 'loading') dataOperations?.presentStartupImportNotice()
+  }, [dataOperations, state.status])
   const enterNode = useCallback(
     (node: TreeNode): void => {
       // The disclosure control's own mousedown handler calls preventDefault to avoid stealing

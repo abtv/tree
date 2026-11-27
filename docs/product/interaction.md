@@ -74,6 +74,8 @@ Save-error and inline image-error messages remain legible against the document s
 
 The application must not show unintended flashes of a contrasting background during startup, renderer loading or reloading, closing, or system appearance changes. In dark appearance, even a brief white or light-background flash is a visual defect. This applies to the whole application window, including the native surface before the renderer paints and while it is torn down. The native window background matches the document surface from window creation through closing, including after a system appearance change.
 
+On desktop, the document first appears with the bundled editor font, so late font loading does not hide text or move visible rows. If the font cannot load, the editor opens with the available fallback.
+
 The window's top strip, which holds the window controls (close, minimize, zoom) and the title `Tree`, has the same color as the document background in every appearance. The system title bar is not shown, so the strip never differs in tone from the content below it. The strip drags the window, the window controls keep their standard behavior, and the title uses the secondary text color of the current appearance.
 
 The dark appearance uses a palette adapted from the Emacs port of the Zenburn color scheme, `zenburn-emacs` (<https://github.com/bbatsov/zenburn-emacs>), not from the original Vim theme: a warm gray document surface, soft off-white text, and muted accent colors.

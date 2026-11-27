@@ -67,6 +67,7 @@ function harness(notice: import('../../shared/ipc').NotesImportNotice | null = n
   }
   const operations = new DesktopDataOperations(api, store)
   operations.start()
+  operations.presentStartupImportNotice()
   return {
     operations,
     api,
@@ -211,7 +212,8 @@ describe('desktop notes operations', () => {
     const operations = new DesktopDataOperations(h.api, h.store)
 
     operations.start()
-    h.change({ status: 'ready' })
+    operations.presentStartupImportNotice()
+    operations.presentStartupImportNotice()
 
     expect(h.api.takeNotesImportNotice).toHaveBeenCalledOnce()
 
@@ -229,6 +231,19 @@ describe('desktop notes operations', () => {
     operations.start()
 
     expect(subscribe).not.toHaveBeenCalled()
+  })
+
+  it('does not consume the startup import notice after the window is disposed', () => {
+    const h = harness()
+    h.operations.dispose()
+    h.api.takeNotesImportNotice.mockClear()
+    const operations = new DesktopDataOperations(h.api, h.store)
+    operations.start()
+    operations.dispose()
+
+    operations.presentStartupImportNotice()
+
+    expect(h.api.takeNotesImportNotice).not.toHaveBeenCalled()
   })
 
   it.each(['export', 'import'] as const)('blocks other commands while choosing an %s archive', async (command) => {
@@ -319,7 +334,7 @@ describe('desktop notes operations', () => {
     expect(h.api.cancelNotesOperation).toHaveBeenCalledOnce()
   })
 
-  it('takes the import notice on an initial load error, but waits during loading', async () => {
+  it('takes the import notice after mounting the initial load-error surface, but not during loading', async () => {
     const h = harness()
     await Promise.resolve()
     h.operations.dispose()
@@ -327,9 +342,38 @@ describe('desktop notes operations', () => {
     h.api.takeNotesImportNotice.mockClear()
     const operations = new DesktopDataOperations(h.api, h.store)
     operations.start()
+    operations.presentStartupImportNotice()
     expect(h.api.takeNotesImportNotice).not.toHaveBeenCalled()
     h.change({ status: 'error' })
+
+    expect(h.api.takeNotesImportNotice).not.toHaveBeenCalled()
+    operations.presentStartupImportNotice()
+
     expect(h.api.takeNotesImportNotice).toHaveBeenCalledOnce()
+    operations.dispose()
+  })
+
+  it('starts a transient notice lifetime only after the ready surface can present it', async () => {
+    vi.useFakeTimers()
+    const h = harness()
+    h.operations.dispose()
+    h.api.takeNotesImportNotice.mockClear().mockResolvedValueOnce({ fileName: 'Import.zip', replacedFolder: null })
+    const operations = new DesktopDataOperations(h.api, h.store)
+
+    operations.start()
+    await vi.advanceTimersByTimeAsync(6_200)
+
+    expect(h.api.takeNotesImportNotice).not.toHaveBeenCalled()
+    expect(operations.getSnapshot()).toEqual({ phase: 'idle' })
+
+    operations.presentStartupImportNotice()
+    await vi.advanceTimersByTimeAsync(5_999)
+
+    expect(operations.getSnapshot()).toMatchObject({ phase: 'done', focusAction: true })
+
+    await vi.advanceTimersByTimeAsync(1)
+
+    expect(operations.getSnapshot()).toEqual({ phase: 'idle' })
     operations.dispose()
   })
 
@@ -514,6 +558,7 @@ describe('desktop notes operations', () => {
         h.api.takeNotesImportNotice.mockRejectedValueOnce(error)
         const other = new DesktopDataOperations(h.api, h.store)
         other.start()
+        other.presentStartupImportNotice()
         await Promise.resolve()
         other.dispose()
       } else {
@@ -559,6 +604,7 @@ describe('desktop notes operations', () => {
     h.api.takeNotesImportNotice.mockReturnValueOnce(notice.promise)
     const operations = new DesktopDataOperations(h.api, h.store)
     operations.start()
+    operations.presentStartupImportNotice()
     if (disposed) operations.dispose()
     else await operations.importNotes()
     const state = operations.getSnapshot()
