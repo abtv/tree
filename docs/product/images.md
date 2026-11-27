@@ -115,7 +115,7 @@ Clicking an attached image opens an image preview.
 
 `Cmd+Y` opens the image preview for the selected node or the editable current parent when that node has an attached image, in every Vim mode and whether or not Vim mode is enabled. When neither the selected node nor the current parent has an image, `Cmd+Y` does nothing. The shortcut is scoped to Tree, where it previews attachments rather than files. [Finder uses the same shortcut for Quick Look](https://support.apple.com/en-us/102650).
 
-The image preview is a modal overlay within the application window. It initially displays the image fitted within the available window area while preserving its aspect ratio, without enlarging it beyond its natural size.
+The image preview is a modal overlay within the application window and can be closed immediately. If the image is still loading after 200 ms, the overlay shows `Loading image…`. An image that finishes loading after dismissal does not reopen the preview. When ready, the image is fitted within the available window area while preserving its aspect ratio, without enlarging it beyond its natural size.
 
 * A trackpad pinch or `Cmd++` / `Cmd+-` zooms the preview image. `Cmd+=` also zooms in without requiring Shift. Zoom ranges from the initial fitted size to 16 times that size, including enlargement beyond natural size.
 * Keyboard zoom uses the window center; pinch zoom keeps the point under the pointer in place until an image edge is reached.

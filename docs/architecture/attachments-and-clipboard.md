@@ -52,6 +52,8 @@ The decoded-byte budgets count retained entries, not the Chromium renderer or GP
 
 `AttachmentImage` (`src/renderer/AttachmentPreview.tsx`) reserves an image's box before its bytes load, so a remounted or newly mounted row does not grow after its first paint. It takes the box from the size measured when the image last decoded in this renderer, kept for at most 1,024 attachments, or else from the stored `width` and `height` (§13.7), fitted to the inline bounding box of PRODUCT.md §17.1. The placeholder takes the margins of the image button it stands in for. A load-error message after a reserved box takes the same margins and keeps the box's height as its minimum height. On load it compares the decoded natural size with the stored one; a difference re-renders with the decoded box and is reported to `EditorStore.recordAttachmentDimensions`.
 
+`ImagePreview` presents a static status only after the shared image request remains pending for 200 ms. The pending presentation owns a single timer and cancels it on dismissal, readiness, or error. Cached images do not schedule the timer. Closing detaches the preview from the request without interrupting inline image loading, and the loading status adds no file operation.
+
 ---
 
 ## 15. Clipboard

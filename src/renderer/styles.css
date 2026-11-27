@@ -1702,6 +1702,10 @@ body.node-drag-invalid * {
   color: var(--color-attachment-error-on-overlay);
 }
 
+.image-preview-loading {
+  color: var(--color-overlay-button-foreground);
+}
+
 .image-preview-close {
   z-index: 1;
   position: fixed;

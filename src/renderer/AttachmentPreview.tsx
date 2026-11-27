@@ -290,6 +290,22 @@ export function AttachmentImage({
   )
 }
 
+function ImagePreviewLoading(): React.JSX.Element | null {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    // Brief cache misses should not flash a label before showing the image.
+    const timer = window.setTimeout(() => setVisible(true), 200)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  return visible ? (
+    <span className="image-preview-loading" role="status">
+      Loading image…
+    </span>
+  ) : null
+}
+
 export function ImagePreview({
   attachmentId,
   onClose,
@@ -402,6 +418,7 @@ export function ImagePreview({
             onError={onImageError}
           />
         ) : null}
+        {state.status === 'loading' ? <ImagePreviewLoading /> : null}
         {state.status === 'error' ? <ImageErrorMessage /> : null}
       </div>
     </div>

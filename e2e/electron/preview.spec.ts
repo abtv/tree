@@ -1,10 +1,14 @@
 // @editing-modes: both
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { onePixelPng } from '../../src/shared/png-test-utils'
 import {
   describeForEachEditingMode,
   expect,
   firePaste,
   launchTree,
   node,
+  seedDocument,
   setCursor,
   test,
   typeInto,
@@ -226,6 +230,85 @@ describeForEachEditingMode('image preview', ({ mode, screenshotName }) => {
 })
 
 test.describe('image preview (mode-independent)', () => {
+  for (const appearance of ['light', 'dark'] as const) {
+    // @requirement PRODUCT.md §17.1
+    test(
+      'shows a dismissible loading state for a slow image preview (' + appearance + ')',
+      async ({ userDataDir }, info) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              {
+                id: 'branch',
+                text: 'Synthetic attachments',
+                children: [
+                  {
+                    id: 'note',
+                    text: 'Synthetic image',
+                    attachment: { id: 'slow', mimeType: 'image/png', width: 1, height: 1 },
+                    children: [],
+                  },
+                ],
+              },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'branch' },
+        })
+        const attachments = join(userDataDir, 'data', 'attachments')
+        mkdirSync(attachments, { recursive: true })
+        writeFileSync(join(attachments, 'slow.png'), onePixelPng)
+        const { app, window } = await launchTree(userDataDir, { appearance, vimPreference: false })
+        await window.emulateMedia({ colorScheme: appearance })
+        await app.evaluate(() => {
+          const probe = globalThis as typeof globalThis & { releasePreviewImage?: () => void }
+          const pending = new Promise<void>((resolve) => {
+            probe.releasePreviewImage = resolve
+          })
+          globalThis.__treeIpc.wrap('tree:read-attachment', async (read, ...args) => {
+            await pending
+            return read(...args)
+          })
+        })
+        const release = () =>
+          app.evaluate(() =>
+            (globalThis as typeof globalThis & { releasePreviewImage?: () => void }).releasePreviewImage?.(),
+          )
+        const editor = window.locator('[data-node-id="note"] .node-input')
+        const preview = window.getByRole('dialog', { name: 'Image preview' })
+        try {
+          await window.keyboard.press('Meta+.')
+          await editor.click()
+          await window.clock.install()
+          await window.clock.pauseAt(Date.now() + 1000)
+          await window.keyboard.press('Meta+y')
+
+          await expect(preview.getByRole('button', { name: 'Close image preview' })).toBeFocused()
+          await expect(preview.getByRole('status')).toHaveCount(0)
+          await window.clock.runFor(200)
+          await expect(preview.getByRole('status')).toHaveText('Loading image…')
+          await expect(preview).toBeVisible()
+          await expect(preview.getByRole('img')).toHaveCount(0)
+          await window.screenshot({ path: info.outputPath('preview-pending.png') })
+
+          await window.keyboard.press('Escape')
+
+          await expect(preview).toHaveCount(0)
+          await expect(editor).toBeFocused()
+          await release()
+          await expect(window.getByAltText('Attached image', { exact: true })).toBeVisible()
+          await expect(preview).toHaveCount(0)
+
+          await window.keyboard.press('Meta+y')
+
+          await expect(preview.getByRole('img')).toBeVisible()
+          await expect(preview.getByRole('status')).toHaveCount(0)
+        } finally {
+          await release()
+        }
+      },
+    )
+  }
+
   // @requirement PRODUCT.md §17.1
   test('handles Chromium trackpad pinch and real wheel input without zooming or scrolling the page', async ({
     userDataDir,
