@@ -87,6 +87,7 @@ When several alignments match a name, its best alignment determines its rank. As
 
 * The popup uses the date completion geometry, appearance, footer and lifecycle (§20.9), including modifier-only key handling.
 * Keyboard selection scrolls the selected option into view, and the popup height adapts to the available space above or below the edited row.
+* Pointer scrolling keeps the last painted suggestions visible until replacement options are ready. Rapid reversals and jumps do not flash an empty list or move focus away from the editor. Large lists render only nearby options plus any option needed for keyboard selection, even when names wrap. These rules also apply to tag, people and event completion.
 * Plain `↓`/`↑` and `Ctrl+N`/`Ctrl+P` cycle suggestions; plain `Enter`, plain `Tab` or clicking an option replaces only the fragment with its complete Unicode emoji sequence as one undoable edit.
 * The caret sits after that sequence, focus stays in the editor and the editing mode remains unchanged.
 * These shortcuts override ordinary commands only while suggestions are open, following the keyboard-first completion interaction in standard editing and Vim Insert.

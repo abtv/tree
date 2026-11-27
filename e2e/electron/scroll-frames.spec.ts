@@ -292,6 +292,76 @@ test('Search keeps windowed marker suggestions painted through large scroll jump
   await expect(input).toBeFocused()
 })
 
+// @requirement PRODUCT.md §20.13
+test('inline tag completion retains painted options during rapid wheel reversals and jumps', async ({
+  userDataDir,
+}, info) => {
+  const tag = (index: number) => `#project_${String(index).padStart(4, '0')}`
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'draft', text: 'Plan ', children: [] },
+        ...Array.from({ length: 1000 }, (_, index) => ({
+          id: `tag-${index}`,
+          text: `Task ${tag(index)}`,
+          children: [],
+        })),
+      ],
+    },
+    location: { currentParentId: null, selectedNodeId: 'draft' },
+  })
+  const { app, window } = await launchTree(userDataDir, { appearance: 'light', vimPreference: false })
+  await setMainWindowContentSize(app, { width: 800, height: 600 })
+  const input = window.locator('[data-node-id="draft"] .node-input')
+  await expect(input).toBeFocused()
+  await window.keyboard.press('Meta+ArrowRight')
+  await window.keyboard.type('#')
+  const popup = window.locator('.date-popup')
+  const options = window.getByRole('listbox', { name: 'Tag suggestions' }).getByRole('option')
+  await expect(options.first()).toHaveAttribute('aria-setsize', '1000')
+  const selected = popup.getByRole('option', { selected: true })
+  await expect(selected).toHaveText(tag(0))
+  const region = await popup.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return { left: Math.ceil(rect.left + 6), top: Math.ceil(rect.top + 24), width: 140, height: 96 }
+  })
+  const top = () => popup.evaluate((element) => element.scrollTop)
+  await window.mouse.move(region.left + 40, region.top + 10)
+  await capture(
+    app,
+    window,
+    info,
+    'inline-tag-wheel',
+    async () => {
+      for (const delta of [900, 900, -1000, 1200, -900]) {
+        const before = await top()
+        await window.mouse.wheel(0, delta)
+        if (delta > 0) await expect.poll(top).toBeGreaterThan(before)
+        else await expect.poll(top).toBeLessThan(before)
+      }
+    },
+    region,
+  )
+
+  const retainedOptions = await popup.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+    const bounds = element.getBoundingClientRect()
+    return [...element.querySelectorAll('[role="option"]')].filter((option) => {
+      const row = option.getBoundingClientRect()
+      return row.bottom > bounds.top && row.top < bounds.bottom
+    }).length
+  })
+  expect(retainedOptions).toBeGreaterThanOrEqual(5)
+  await expect(options.last()).toHaveText(tag(999))
+  expect(await options.count()).toBeLessThanOrEqual(13)
+  await expect(input).toBeFocused()
+  await window.keyboard.press('ArrowUp')
+  await expect(selected).toHaveText(tag(999))
+  await window.keyboard.press('Enter')
+  await expect(input).toHaveText(`Plan ${tag(999)}`)
+  await expect(input).toBeFocused()
+})
+
 for (const grouped of [false, true]) {
   // @requirement PRODUCT.md §20.14
   test(`Search bounds mounted rows in a tall viewport with ${grouped ? 'grouped' : 'root'} results`, async ({

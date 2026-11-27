@@ -10,6 +10,8 @@ import {
   completionWindow,
   revealCompletionOption,
 } from './completion-window'
+import { computeListWindow } from './list-window'
+import { SearchResultLayout } from './search-result-layout'
 
 export interface CompletionPopupPresentation {
   readonly popup: CompletionPopupState
@@ -22,6 +24,12 @@ interface LargeListSizing {
   epoch: symbol
   widest: number
   fits: boolean
+}
+
+interface WrappedMeasurement {
+  readonly estimate: SearchResultLayout
+  readonly layout: SearchResultLayout
+  readonly anchor: { index: number; inset: number; atEnd: boolean } | undefined
 }
 
 /** Find the intrinsic-width option once per list, without mounting every option to size the popup. */
@@ -89,8 +97,33 @@ export function CompletionPopup({
   const large = (suggestions?.length ?? 0) > COMPLETION_WINDOW_THRESHOLD
   const sizingEpoch = useMemo(() => Symbol(`suggestions:${suggestions?.length ?? 0}`), [suggestions])
   const currentSizing = sizing?.epoch === sizingEpoch ? sizing : undefined
-  // Narrow windows with an exceptional label keep the existing variable-height wrapping path.
-  const windowed = large && currentSizing?.fits !== false
+  const windowed = large
+  const wrapEstimate = useMemo(
+    () =>
+      currentSizing?.fits === false
+        ? SearchResultLayout.estimate(suggestions!.length, () => COMPLETION_ROW_HEIGHT)
+        : undefined,
+    [currentSizing, suggestions],
+  )
+  const [wrapMeasurement, setWrapMeasurement] = useState<WrappedMeasurement>()
+  if (wrapMeasurement !== undefined && wrapMeasurement.estimate !== wrapEstimate) setWrapMeasurement(undefined)
+  const measured = wrapMeasurement?.estimate === wrapEstimate ? wrapMeasurement : undefined
+  const wrapLayout = measured?.layout ?? wrapEstimate
+  const wrapWindow = useMemo(
+    () =>
+      wrapLayout === undefined
+        ? undefined
+        : computeListWindow({
+            count: suggestions!.length,
+            offsets: wrapLayout.offsetAt,
+            viewportStart: scrollTop,
+            viewportEnd: scrollTop + COMPLETION_MAX_HEIGHT,
+            overscan: 2,
+            focusedIndex: selectedIndex,
+          }),
+    [wrapLayout, suggestions, scrollTop, selectedIndex],
+  )
+  const revealWrapped = useRef(false)
 
   useLayoutEffect(() => {
     if (suggestions === undefined) return
@@ -138,6 +171,10 @@ export function CompletionPopup({
   useLayoutEffect(() => {
     const element = container.current
     if (element === null || selectedIndex === undefined) return
+    if (currentSizing?.fits === false) {
+      revealWrapped.current = true
+      return
+    }
     if (windowed) {
       const currentTop = element.scrollTop
       const nextTop = revealCompletionOption(selectedIndex, currentTop, viewportHeightRef.current)
@@ -154,14 +191,103 @@ export function CompletionPopup({
     }
   }, [left, top, rowTop, suggestions, selectedIndex, currentSizing, windowed, viewportRevision])
 
+  useLayoutEffect(() => {
+    if (wrapEstimate === undefined || wrapLayout === undefined || wrapWindow === undefined) return
+    const element = container.current
+    if (element === null) return
+    const heights = new Map<number, number>()
+    for (const option of element.querySelectorAll<HTMLElement>('[aria-posinset]')) {
+      const index = Number(option.getAttribute('aria-posinset')) - 1
+      const height = option.getBoundingClientRect().height
+      if (height > 0 && height !== wrapLayout.heightAt(index)) heights.set(index, height)
+    }
+    const layout = wrapLayout.withMeasurements(heights)
+    if (layout === wrapLayout) return
+    const top = element.scrollTop
+    const index = computeListWindow({
+      count: suggestions!.length,
+      offsets: wrapLayout.offsetAt,
+      viewportStart: top,
+      viewportEnd: top,
+      overscan: 0,
+      focusedIndex: undefined,
+    }).start
+    const anchor = revealWrapped.current
+      ? undefined
+      : {
+          index,
+          inset: top - wrapLayout.offsetAt(index),
+          atEnd: top > 0 && element.scrollHeight - element.clientHeight - top < 1,
+        }
+    const publish = () => setWrapMeasurement({ estimate: wrapEstimate, layout, anchor })
+    publish()
+  }, [suggestions, wrapEstimate, wrapLayout, wrapWindow])
+
+  useLayoutEffect(() => {
+    const element = container.current
+    if (element === null || measured?.anchor === undefined || revealWrapped.current) return
+    const { anchor, layout } = measured
+    element.scrollTop = anchor.atEnd ? element.scrollHeight : layout.offsetAt(anchor.index) + anchor.inset
+    setScrollTop(element.scrollTop)
+  }, [measured])
+
+  useLayoutEffect(() => {
+    const element = container.current
+    if (wrapLayout === undefined || element === null || selectedIndex === undefined || !revealWrapped.current) return
+    const top = wrapLayout.offsetAt(selectedIndex)
+    const bottom = wrapLayout.offsetAt(selectedIndex + 1)
+    const height = element.clientHeight
+    if (top < element.scrollTop || bottom - top > height) element.scrollTop = top
+    else if (bottom > element.scrollTop + height) element.scrollTop = bottom - height
+    const selected = element.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (selected?.getBoundingClientRect().height === bottom - top && element.scrollTop === scrollTop)
+      revealWrapped.current = false
+    if (element.scrollTop !== scrollTop) setScrollTop(element.scrollTop)
+  }, [left, top, rowTop, scrollTop, selectedIndex, wrapLayout])
+
   if (presentation === undefined) return null
   const { popup } = presentation
   const items = popup.suggestions
-  const { start, end } = windowed ? completionWindow(items.length, scrollTop) : { start: 0, end: items.length }
+  const { start, end } =
+    wrapWindow ?? (windowed ? completionWindow(items.length, scrollTop) : { start: 0, end: items.length })
+  const indices = Array.from({ length: end - start }, (_, offset) => start + offset)
+  if (wrapWindow?.pinnedIndex !== undefined) indices.push(wrapWindow.pinnedIndex)
+  const options = indices.map((index) => {
+    const suggestion = items[index]!
+    const selected = index === popup.selected
+    return (
+      <div
+        key={suggestion.id}
+        role="option"
+        aria-selected={selected}
+        aria-posinset={windowed ? index + 1 : undefined}
+        aria-setsize={windowed ? items.length : undefined}
+        className={selected ? 'date-popup-option date-popup-selected' : 'date-popup-option'}
+        style={
+          windowed
+            ? {
+                top: (wrapLayout?.offsetAt(index) ?? index * COMPLETION_ROW_HEIGHT) - scrollTop,
+                ...(wrapLayout === undefined
+                  ? { height: COMPLETION_ROW_HEIGHT }
+                  : { minHeight: COMPLETION_ROW_HEIGHT }),
+              }
+            : undefined
+        }
+        onMouseDown={(event) => {
+          if (event.button !== 0) return
+          event.preventDefault()
+          accept(index)
+        }}
+      >
+        <OptionText suggestion={suggestion} />
+      </div>
+    )
+  })
   return (
     <div
       ref={container}
       className="date-popup"
+      data-windowed={windowed || undefined}
       style={{ left, top }}
       onScroll={
         windowed
@@ -183,30 +309,10 @@ export function CompletionPopup({
         role="listbox"
         aria-label={popup.listLabel}
         className={windowed ? 'date-popup-window' : undefined}
-        style={windowed ? { height: items.length * COMPLETION_ROW_HEIGHT } : undefined}
+        data-wrap={wrapLayout !== undefined || undefined}
+        style={windowed ? { height: wrapLayout?.total ?? items.length * COMPLETION_ROW_HEIGHT } : undefined}
       >
-        {items.slice(start, end).map((suggestion, offset) => {
-          const index = start + offset
-          const selected = index === popup.selected
-          return (
-            <div
-              key={suggestion.id}
-              role="option"
-              aria-selected={selected}
-              aria-posinset={windowed ? index + 1 : undefined}
-              aria-setsize={windowed ? items.length : undefined}
-              className={selected ? 'date-popup-option date-popup-selected' : 'date-popup-option'}
-              style={windowed ? { top: index * COMPLETION_ROW_HEIGHT, height: COMPLETION_ROW_HEIGHT } : undefined}
-              onMouseDown={(event) => {
-                if (event.button !== 0) return
-                event.preventDefault()
-                accept(index)
-              }}
-            >
-              <OptionText suggestion={suggestion} />
-            </div>
-          )
-        })}
+        {windowed ? <div className="date-popup-window-anchor">{options}</div> : options}
       </div>
       <div className="date-popup-footer">↑ ↓ select · Enter/Tab accept · Esc dismiss</div>
     </div>

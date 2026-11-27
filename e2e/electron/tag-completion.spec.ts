@@ -6,12 +6,65 @@ import {
   seedDocument,
   setAgendaToday,
   setCursor,
+  setMainWindowContentSize,
   test,
   unlockSystemClipboard,
   writeClipboardText,
 } from './fixtures'
 
 describeForEachEditingMode('Tags', ({ mode, screenshotName }) => {
+  // @requirement PRODUCT.md §20.13
+  test('keeps a large catalog windowed when a distant tag wraps', async ({ userDataDir }, info) => {
+    const long = `#z-${'readable-wrapped-name-'.repeat(8)}end`
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          { id: 'draft', text: 'Plan ', children: [] },
+          ...Array.from({ length: 9999 }, (_, index) => ({
+            id: `tag-${index}`,
+            text: `#project_${String(index).padStart(4, '0')}`,
+            children: [],
+          })),
+          { id: 'long', text: long, children: [] },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'draft' },
+    })
+    const { app, window } = await launchTree(userDataDir)
+    await setMainWindowContentSize(app, { width: 640, height: 560 })
+    const editor = window.locator('[data-node-id="draft"] .node-input')
+    const suggestions = window.getByRole('listbox', { name: 'Tag suggestions' })
+    const options = suggestions.getByRole('option')
+    const selected = suggestions.getByRole('option', { selected: true })
+    await expect(editor).toBeFocused()
+    await setCursor(editor, 'Plan '.length)
+
+    await window.keyboard.type('#')
+
+    await expect(editor).toHaveValue('Plan #')
+    await expect(selected).toHaveText('#project_0000')
+    await expect(options.first()).toHaveAttribute('aria-setsize', '10000')
+    expect(await options.count()).toBeLessThanOrEqual(16)
+    const shortHeight = (await selected.boundingBox())!.height
+
+    await window.keyboard.press('ArrowUp')
+
+    await expect(selected).toHaveText(long)
+    await expect(selected).toHaveAttribute('aria-posinset', '10000')
+    expect((await selected.boundingBox())!.height).toBeGreaterThan(shortHeight)
+    await expect(selected).toBeInViewport()
+    expect(await options.count()).toBeLessThanOrEqual(16)
+    await window.screenshot({ path: info.outputPath(screenshotName('wrapped-inline-tag.png')) })
+
+    await setMainWindowContentSize(app, { width: 950, height: 560 })
+    await expect(selected).toBeInViewport()
+    await expect(selected).toHaveText(long)
+    await window.keyboard.press('Enter')
+
+    await expect(editor).toHaveText(`Plan ${long}`)
+    await expect(editor).toBeFocused()
+  })
+
   // @requirement PRODUCT.md §20.13
   test('accepts from a bare hash while replacing the plain editor', async ({ userDataDir }) => {
     seedDocument(userDataDir, {

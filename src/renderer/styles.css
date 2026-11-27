@@ -27,6 +27,10 @@
   cursor: pointer;
 }
 
+.date-popup[data-windowed] {
+  overflow-anchor: none;
+}
+
 .date-popup-sizing {
   height: 0;
   overflow: hidden;
@@ -35,11 +39,23 @@
 }
 .date-popup-window {
   position: relative;
+  overflow: visible clip;
+}
+
+.date-popup-window-anchor {
+  /* Retain painted options until the next range and its offset can commit together. */
+  position: sticky;
+  top: 0;
+  height: 0;
 }
 .date-popup-window .date-popup-option {
   position: absolute;
   inset-inline: 0;
   white-space: nowrap;
+}
+
+.date-popup-window[data-wrap] .date-popup-option {
+  white-space: normal;
 }
 
 .date-popup-selected {
