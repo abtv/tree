@@ -4025,13 +4025,177 @@ describe('useNodeInputBindings', () => {
   )
 
   // @requirement PRODUCT.md §20.2.6
+  it('follows the selection of a held ordinary press with the mode before the release', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    input.focus()
+    const drag = (start: number, end: number): void =>
+      act(() => {
+        input.setSelectionRange(start, end, 'forward')
+        document.dispatchEvent(new Event('selectionchange'))
+      })
+
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    drag(1, 4)
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+
+    // Dragging back to the press leaves only a caret; the held press still owns it, so no block is drawn.
+    drag(1, 1)
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1])
+
+    drag(1, 3)
+
+    expect(f.result.current.vimMode).toBe('visual')
+
+    fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3])
+
+    f.press('l')
+
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+
+    // Without a held press a selection change sets no mode.
+    f.press('Escape')
+    drag(0, 4)
+
+    expect(f.result.current.vimMode).toBe('normal')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('directs the follow of an undirected text area selection by where the held pointer was last seen', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+    const input = f.input()
+    input.focus()
+
+    fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    // Another pointer's move is not the held press; the held pointer then moves above the text area.
+    fireEvent.pointerMove(input, { pointerType: 'touch', pointerId: 2, clientY: -40 })
+    act(() => {
+      input.setSelectionRange(2, 4)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    // A key that is not a command leaves a selection inside the editor as the drag made it.
+    fireEvent.keyDown(input, { key: 'Shift' })
+    f.press('l')
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5])
+
+    fireEvent.pointerMove(input, { pointerType: 'mouse', pointerId: 1, clientY: -40 })
+    act(() => {
+      input.setSelectionRange(2, 4)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    f.press('h')
+
+    // The pointer left above the text, so the active end is the start of the selection.
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4])
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each(['window blur', 'node drag', 'context menu', 'new press'] as const)(
+    'gives back the mode a held press followed when a %s ends the press',
+    async (ending) => {
+      const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+      const input = f.input()
+      input.focus()
+      // A settled selection that `gv` remembers before the press.
+      input.setSelectionRange(0, 0)
+      f.press('v')
+      f.press('l')
+      f.press('Escape')
+
+      fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+      act(() => {
+        input.setSelectionRange(1, 4, 'forward')
+        document.dispatchEvent(new Event('selectionchange'))
+      })
+
+      expect(f.result.current.vimMode).toBe('visual')
+
+      if (ending === 'window blur')
+        act(() => {
+          globalThis.dispatchEvent(new Event('blur'))
+        })
+      else if (ending === 'node drag') act(() => f.result.current.dragFreeze.begin('node', 1))
+      else if (ending === 'context menu') fireEvent.contextMenu(input)
+      else fireEvent.pointerDown(document.body, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+      expect(f.result.current.vimMode).toBe('normal')
+
+      // The press never settled, so `gv` still restores the selection made before it.
+      if (ending === 'node drag') act(() => f.result.current.dragFreeze.end(1))
+      else if (ending === 'new press') fireEvent.pointerUp(document.body, { button: 0, pointerId: 1 })
+      f.press('g')
+      f.press('v')
+      f.sync()
+
+      expect(f.result.current.vimMode).toBe('visual')
+      expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each(['pointer cancel', 'node drag'] as const)(
+    'gives a held Visual press its mode back when a %s ends the press',
+    async (ending) => {
+      const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
+      const input = f.input()
+      input.focus()
+      input.setSelectionRange(0, 0)
+      f.press('v')
+      f.press('l')
+
+      fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
+      act(() => {
+        input.setSelectionRange(3, 3)
+        document.dispatchEvent(new Event('selectionchange'))
+      })
+
+      expect(f.result.current.vimMode).toBe('normal')
+
+      if (ending === 'pointer cancel') fireEvent.pointerCancel(input, { pointerType: 'mouse', pointerId: 1 })
+      else {
+        act(() => f.result.current.dragFreeze.begin('node', 1))
+        act(() => f.result.current.dragFreeze.end(1))
+        f.sync()
+      }
+
+      // A node drag keeps character Visual mode. The press replaced the old range, so the mode has
+      // only a caret until the next motion anchors there (PRODUCT.md §20.2.6).
+      expect(f.result.current.vimMode).toBe('visual')
+      expect([input.selectionStart, input.selectionEnd]).toEqual([3, 3])
+
+      // `gv` still restores the selection made before the press.
+      f.press('Escape')
+      f.press('g')
+      f.press('v')
+      f.sync()
+
+      expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.6
   it.each(['insert', 'replace'] as const)('keeps %s mode for a mouse selection', async (mode) => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] }, mode })
     const input = f.input()
     input.focus()
 
     fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
-    input.setSelectionRange(1, 4)
+    act(() => {
+      input.setSelectionRange(1, 4)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    expect(f.result.current.vimMode).toBe(mode)
+
     fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse', pointerId: 1 })
 
     expect(f.result.current.vimMode).toBe(mode)
@@ -4114,6 +4278,47 @@ describe('useNodeInputBindings', () => {
   })
 
   // @requirement PRODUCT.md §20.2.6
+  it('keeps a held rich selection that left the editor within it for a Visual command typed before the release', async () => {
+    const f = await fixture({ document: { roots: [node('node', 'alpha beta')] } })
+    const editor = document.createElement('div')
+    editor.tabIndex = 0
+    editor.textContent = 'alpha beta'
+    const next = document.createElement('div')
+    next.textContent = 'next'
+    document.body.append(editor, next)
+    f.bindings().inputRef(editor)
+    editor.focus()
+
+    fireEvent.pointerDown(editor, { button: 0, pointerType: 'mouse', pointerId: 1 })
+    act(() => {
+      getSelection()!.setBaseAndExtent(editor.firstChild!, 6, next.firstChild!, 2)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    // The follow leaves the native drag alone, so the selection still reaches into the next node.
+    expect(f.result.current.vimMode).toBe('visual')
+    expect(getSelection()!.toString()).toContain('next'.slice(0, 2))
+
+    fireEvent.keyDown(editor, { key: 'd' })
+
+    expect(getSelection()!.toString()).toBe('beta')
+
+    act(() =>
+      f.bindings().onKeyDown({
+        currentTarget: editor,
+        key: 'd',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      } as never),
+    )
+
+    expect(f.node().text).toBe('alpha ')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
   it('draws the block caret again after a context-menu press that never releases', async () => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
@@ -4166,7 +4371,15 @@ describe('useNodeInputBindings', () => {
 
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 0])
 
-    input.setSelectionRange(4, 4)
+    // The held press has only a caret, so it has already left Visual mode, as a click in Vim does.
+    act(() => {
+      input.setSelectionRange(4, 4)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([4, 4])
+
     fireEvent.pointerUp(input, { button: 0, pointerType: 'mouse' })
 
     expect(f.result.current.vimMode).toBe('normal')
@@ -4182,21 +4395,26 @@ describe('useNodeInputBindings', () => {
     const f = await fixture({ document: { roots: [node('node', 'abcdef')] } })
     const input = f.input()
     input.focus()
+    // Each result is the mode while the press is held, then the mode and selection after it ends.
     const gesture = (init: PointerEventInit, release: 'up' | 'cancel' = 'up', target: Element = input) => {
       fireEvent.pointerDown(target, { button: 0, pointerType: 'mouse', ...init })
-      input.setSelectionRange(1, 4)
+      act(() => {
+        input.setSelectionRange(1, 4)
+        document.dispatchEvent(new Event('selectionchange'))
+      })
+      const held = f.result.current.vimMode
       if (release === 'up') fireEvent.pointerUp(target, { button: 0 })
       else fireEvent.pointerCancel(target)
-      return [f.result.current.vimMode, input.selectionStart, input.selectionEnd]
+      return [held, f.result.current.vimMode, input.selectionStart, input.selectionEnd]
     }
 
-    expect(gesture({ metaKey: true })).toEqual(['normal', 1, 4])
-    expect(gesture({ ctrlKey: true })).toEqual(['normal', 1, 4])
-    expect(gesture({ altKey: true })).toEqual(['normal', 1, 4])
-    expect(gesture({ pointerType: 'touch' })).toEqual(['normal', 1, 4])
-    expect(gesture({ pointerType: 'pen' })).toEqual(['normal', 1, 4])
-    expect(gesture({}, 'cancel')).toEqual(['normal', 1, 4])
-    expect(gesture({}, 'up', document.body)).toEqual(['normal', 1, 4])
+    expect(gesture({ metaKey: true })).toEqual(['normal', 'normal', 1, 4])
+    expect(gesture({ ctrlKey: true })).toEqual(['normal', 'normal', 1, 4])
+    expect(gesture({ altKey: true })).toEqual(['normal', 'normal', 1, 4])
+    expect(gesture({ pointerType: 'touch' })).toEqual(['normal', 'normal', 1, 4])
+    expect(gesture({ pointerType: 'pen' })).toEqual(['normal', 'normal', 1, 4])
+    expect(gesture({}, 'cancel')).toEqual(['visual', 'normal', 1, 4])
+    expect(gesture({}, 'up', document.body)).toEqual(['normal', 'normal', 1, 4])
 
     input.setSelectionRange(0, 0)
     f.press('v')

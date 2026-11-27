@@ -59,6 +59,10 @@ test('keeps a pointer Visual selection inside the pressed rich node when the dra
   await page.mouse.move(press.x, press.y)
   await page.mouse.down()
   await page.mouse.move(release.x, release.y, { steps: 8 })
+
+  // The mode follows the held drag, and following it leaves the native drag alone.
+  await expect(page.getByLabel('Vim mode')).toHaveText('VISUAL')
+
   await page.mouse.up()
 
   await expect(page.getByLabel('Vim mode')).toHaveText('VISUAL')

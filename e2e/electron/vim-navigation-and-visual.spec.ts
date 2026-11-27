@@ -1795,6 +1795,53 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       expect(await caretOffset(editor)).toBe(5)
     })
 
+    for (const rich of [false, true]) {
+      // @requirement PRODUCT.md §20.2.6
+      test(`follows a held ${rich ? 'rich' : 'plain'} pointer drag with the mode before the release`, async ({
+        userDataDir,
+      }) => {
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'first', text: `${rich ? '#note' : 'alpha'} beta gamma`, children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'first' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        const box = (await editor.boundingBox())!
+        const y = box.y + box.height / 2
+        const start = await textX(editor, 6)
+        const end = await textX(editor, 10)
+        await window.mouse.move(start, y)
+        // The node-drag hold runs on a paused clock, as in `dragSelectText`; the drag cancels it.
+        await window.clock.install()
+        await window.clock.pauseAt(Date.now() + 60_000)
+        try {
+          await window.mouse.down()
+          await window.mouse.move(end, y, { steps: 8 })
+        } finally {
+          await window.clock.resume()
+        }
+
+        // The button is still held: the mode already matches the selection being dragged.
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(editor)).toBe('beta')
+
+        // Dragging back to the press leaves only a caret, which is Normal mode again.
+        await window.mouse.move(start, y, { steps: 8 })
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
+        await window.mouse.move(end, y, { steps: 8 })
+        await window.mouse.up()
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(editor)).toBe('beta')
+
+        await window.keyboard.press('l')
+
+        expect(await selectedText(editor)).toBe('beta ')
+      })
+    }
+
     test('places the Normal caret where a click lands inside a select-all selection', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },

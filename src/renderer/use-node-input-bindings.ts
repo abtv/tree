@@ -39,7 +39,13 @@ import { revealInViewport } from './scroll-viewport'
 import { createViewportReveal } from './viewport-reveal'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
-import { clearVisualRange, createVimCommandState, setVisualRange, type VimCommandState } from './vim-command-state'
+import {
+  clearVisualRange,
+  createVimCommandState,
+  followVisualRange,
+  setVisualRange,
+  type VimCommandState,
+} from './vim-command-state'
 import type { NodeInputBindings } from './NodeInput'
 import type { VimMode } from './vim-editing'
 import { focusCaretTransition, type VimCaretState } from './vim-caret-transition'
@@ -82,6 +88,16 @@ interface UseNodeInputBindingsOptions {
   onFoldCommand?: (command: VimFoldCommand, nodeId: string) => void
   /** The platform's primary-modifier profile; Apple conventions when absent. */
   shortcuts?: ShortcutProfile
+}
+
+interface HeldTextPress {
+  input: HTMLElement
+  ordinary: boolean
+  extending: boolean
+  pressOffset: number | undefined
+  point: { x: number; y: number }
+  pressMode: VimMode
+  followedMode: 'normal' | 'visual' | undefined
 }
 
 export interface NodeInputBindingsResult {
@@ -161,11 +177,12 @@ export function useNodeInputBindings({
   // selection: it places the caret at the press and extends it as the pointer drags. A Normal block
   // caret drawn there by a focus or caret pass during the press would become the drag's anchor, so
   // the release draws it instead. `ordinary` marks a mouse press without Command, Control or Option,
-  // whose release decides between Normal and character Visual mode (docs/PRODUCT.md §20.2.6);
-  // `extending` marks a Shift press, and `pressOffset` is a text area's offset under the press.
-  const heldTextPress = useRef<
-    { input: HTMLElement; ordinary: boolean; extending: boolean; pressOffset: number | undefined } | undefined
-  >(undefined)
+  // whose selection decides between Normal and character Visual mode (docs/PRODUCT.md §20.2.6): the
+  // mode follows it while the press is held, and the release settles it. `extending` marks a Shift
+  // press, `pressOffset` is a text area's offset under the press, and `point` is where the pointer
+  // was last seen. `pressMode` is the mode the press began in and `followedMode` the mode it last
+  // followed its selection into; a press that never settles gives the first back.
+  const heldTextPress = useRef<HeldTextPress | undefined>(undefined)
 
   function schedulePendingCaret(request: Omit<PendingCaret, 'normal' | 'revision' | 'focusToken'>): void {
     const projection = caretProjection.current
@@ -196,6 +213,22 @@ export function useNodeInputBindings({
       setVimMode(mode)
     },
     [setVimMode],
+  )
+
+  // A press that ends without its release (a node drag, a cancelled pointer, a lost window, a context
+  // menu or a press that takes over) changes no mode, so it gives back the mode it began in. A node
+  // drag from character Visual mode therefore keeps that mode, as it did before the mode followed.
+  const restoreHeldPressMode = useCallback(
+    (pressed: HeldTextPress | undefined = heldTextPress.current): void => {
+      const followed = pressed?.followedMode
+      if (pressed === undefined || followed === undefined) return
+      pressed.followedMode = undefined
+      // A command that changed the mode during the press keeps its own result.
+      if (followed === pressed.pressMode || caretProjection.current.mode !== followed) return
+      clearVisualRange(vimCommandState.current)
+      changeVimMode(pressed.pressMode)
+    },
+    [changeVimMode],
   )
 
   const clearFrozenPointerListener = useCallback((): void => {
@@ -231,8 +264,10 @@ export function useNodeInputBindings({
   const beginFrozenCaret = useCallback(
     (nodeId: string, pointerId: number): void => {
       // A press held long enough to move the node is a drag, not a text click (PRODUCT §20.2.6),
-      // so the blur below must end Replace mode as before.
+      // so the blur below must end Replace mode as before, and the mode the press followed its
+      // selection into returns to the mode it began in.
       takeReplaceClick(vimSession.current)
+      restoreHeldPressMode()
       const existing = frozenCaret.current
       if (existing !== undefined && existing.pointerId === pointerId) return
       if (existing !== undefined) {
@@ -265,7 +300,7 @@ export function useNodeInputBindings({
       globalThis.addEventListener('pointercancel', listener)
       input.blur()
     },
-    [clearFrozenPointerListener, releaseFrozenCaret],
+    [clearFrozenPointerListener, releaseFrozenCaret, restoreHeldPressMode],
   )
 
   useEffect(
@@ -831,6 +866,8 @@ export function useNodeInputBindings({
         !(event.isPrimary && event.pointerType === heldPointer.type)
       )
         return
+      // A press that takes over from one whose release was lost ends that press without settling it.
+      restoreHeldPressMode()
       pointerPhase = 'held'
       heldPointer = { id: event.pointerId, type: event.pointerType }
       const pressedNode = event.target instanceof Node ? event.target : undefined
@@ -850,6 +887,9 @@ export function useNodeInputBindings({
                 pressedInput instanceof HTMLTextAreaElement
                   ? textAreaOffsetAtPoint(pressedInput, event.clientX, event.clientY)
                   : undefined,
+              point: { x: event.clientX, y: event.clientY },
+              pressMode: caretProjection.current.mode,
+              followedMode: undefined,
             }
       const target = event.target instanceof Element ? event.target : undefined
       const row = target?.closest<HTMLElement>('.agenda-row')
@@ -900,14 +940,22 @@ export function useNodeInputBindings({
     // A Control-click opens a native menu that can swallow the release, so the press stops owning
     // the selection here; otherwise later keyboard motions would draw no block caret.
     const onContextMenu = (): void => {
+      restoreHeldPressMode()
       heldTextPress.current = undefined
     }
-    /** A released ordinary text press leaves character Visual mode for a selection and Normal mode otherwise. */
-    const settlePointerSelection = (
-      input: HTMLElement,
-      release: MouseEvent,
-      press: { extending: boolean; pressOffset: number | undefined },
-    ): void => {
+    const heldEndpoints = (pressed: HeldTextPress): { anchor: number; focus: number } =>
+      getPointerSelectionEndpoints(pressed.input, {
+        ...pressed.point,
+        extending: pressed.extending,
+        pressOffset: pressed.pressOffset,
+      })
+    /**
+     * An ordinary text press leaves character Visual mode for a selection and Normal mode for a caret.
+     * The mode follows the selection while the press is held, as Vim's does during a drag, and the
+     * release settles it.
+     */
+    const settlePointerSelection = (pressed: HeldTextPress, released: boolean): void => {
+      const input = pressed.input
       const mode = caretProjection.current.mode
       if (mode !== 'normal' && mode !== 'visual') return
       const nodeId = [...inputs.current.entries()].find(([, candidate]) => candidate === input)?.[0]
@@ -915,16 +963,13 @@ export function useNodeInputBindings({
       if (nodeId === undefined || state.status !== 'ready') return
 
       const target = requireNode(state.document, nodeId).node
-      const endpoints = getPointerSelectionEndpoints(input, {
-        x: release.clientX,
-        y: release.clientY,
-        extending: press.extending,
-        pressOffset: press.pressOffset,
-      })
-      // A drag that left a browser rich field also selected other nodes. Keep the range within this
-      // node, so the mode, the highlight and the commands all use the same text.
-      if (!isSelectionWithin(input)) setSelectionRange(input, endpoints.anchor, endpoints.focus)
+      const endpoints = heldEndpoints(pressed)
+      // A drag that left a browser rich field also selected other nodes. The release keeps the range
+      // within this node, so the mode, the highlight and the commands all use the same text; a
+      // rewrite before it would reset the native drag.
+      if (released && !isSelectionWithin(input)) setSelectionRange(input, endpoints.anchor, endpoints.focus)
       const next = pointerSelectionTransition(target.text, endpoints)
+      if (!released) pressed.followedMode = next.mode
       if (next.mode === 'normal') {
         if (mode !== 'visual') return
         clearVisualRange(vimCommandState.current)
@@ -942,8 +987,33 @@ export function useNodeInputBindings({
         false,
         'preserve-selection',
       )
-      setVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus, target.text.length > 0)
+      // The release remembers the selection for `gv`; a press that never settles leaves that memory alone.
+      if (released) setVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus, target.text.length > 0)
+      else followVisualRange(vimCommandState.current, next.anchor, next.focus)
       changeVimMode('visual')
+    }
+    const holdsPressedEditor = (pressed: HeldTextPress | undefined): pressed is HeldTextPress =>
+      pressed?.ordinary === true && pressed.input === document.activeElement
+    const onMove = (event: PointerEvent): void => {
+      const pressed = heldTextPress.current
+      if (pressed === undefined || pointerPhase !== 'held' || event.pointerId !== heldPointer?.id) return
+      pressed.point = { x: event.clientX, y: event.clientY }
+    }
+    // The native press extends the selection after its move event, so the selection change, not the
+    // move, is when the held press has a new selection to follow.
+    const onSelectionChange = (): void => {
+      const pressed = heldTextPress.current
+      if (pointerPhase === 'held' && holdsPressedEditor(pressed)) settlePointerSelection(pressed, false)
+    }
+    // A Visual command typed while the press is still held reads the native selection. A range that
+    // left a browser rich field is therefore kept within the pressed node before the key is handled,
+    // as the release would keep it; the key gives up the native drag.
+    const onKeyDown = (): void => {
+      const pressed = heldTextPress.current
+      if (pointerPhase !== 'held' || !holdsPressedEditor(pressed) || pressed.followedMode !== 'visual') return
+      if (isSelectionWithin(pressed.input)) return
+      const endpoints = heldEndpoints(pressed)
+      setSelectionRange(pressed.input, endpoints.anchor, endpoints.focus)
     }
     const onRelease = (event: Event): void => {
       // Another pointer's release leaves the held press, and its Replace click, in place; losing the
@@ -1017,13 +1087,10 @@ export function useNodeInputBindings({
       // A node drag blurs the pressed editor, and a cancelled or interrupted press changes no mode.
       const pressed = heldTextPress.current
       heldTextPress.current = undefined
-      if (
-        event instanceof MouseEvent &&
-        event.type === 'pointerup' &&
-        pressed?.ordinary === true &&
-        pressed.input === document.activeElement
-      )
-        settlePointerSelection(pressed.input, event, pressed)
+      if (event instanceof MouseEvent && event.type === 'pointerup' && holdsPressedEditor(pressed)) {
+        pressed.point = { x: event.clientX, y: event.clientY }
+        settlePointerSelection(pressed, true)
+      } else restoreHeldPressMode(pressed)
       if (pointerPhase !== 'held') return
       pointerPhase = 'released'
       const input = document.activeElement
@@ -1031,6 +1098,9 @@ export function useNodeInputBindings({
     }
     document.addEventListener('pointerdown', onPress, true)
     document.addEventListener('contextmenu', onContextMenu, true)
+    document.addEventListener('selectionchange', onSelectionChange)
+    document.addEventListener('keydown', onKeyDown, true)
+    globalThis.addEventListener('pointermove', onMove, true)
     globalThis.addEventListener('pointerup', onRelease, true)
     globalThis.addEventListener('pointercancel', onRelease, true)
     // A release outside an inactive window never arrives, so losing focus also ends the press.
@@ -1050,13 +1120,16 @@ export function useNodeInputBindings({
       observer?.disconnect()
       document.removeEventListener('pointerdown', onPress, true)
       document.removeEventListener('contextmenu', onContextMenu, true)
+      document.removeEventListener('selectionchange', onSelectionChange)
+      document.removeEventListener('keydown', onKeyDown, true)
       heldTextPress.current = undefined
+      globalThis.removeEventListener('pointermove', onMove, true)
       globalThis.removeEventListener('pointerup', onRelease, true)
       globalThis.removeEventListener('pointercancel', onRelease, true)
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [applyCaretState, changeVimMode, finishVimReplace, shortcuts, store])
+  }, [applyCaretState, changeVimMode, finishVimReplace, restoreHeldPressMode, shortcuts, store])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>

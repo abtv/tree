@@ -11,6 +11,7 @@ import {
   clearCommandAssembly,
   clearPending,
   clearVisualRange,
+  followVisualRange,
   createVimCommandState,
   hasLiveVimLeader,
   recordRepeatChange,
@@ -361,6 +362,16 @@ describe('Visual memory for gv', () => {
     clearCommandAssembly(state)
 
     expect(state.visualAnchor).toBeUndefined()
+    expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 2, focus: 0, hadText: true })
+  })
+
+  it('follows a selection still being made without remembering it', () => {
+    const state = createVimCommandState()
+    setVisualRange(state, 'a', 2, 0, true)
+
+    followVisualRange(state, 1, 4)
+
+    expect([state.visualAnchor, state.visualFocus]).toEqual([1, 4])
     expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 2, focus: 0, hadText: true })
   })
 

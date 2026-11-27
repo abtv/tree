@@ -251,6 +251,15 @@ export function setVisualRange(
   state.lastVisual = { kind: 'text', nodeId, anchor, focus, hadText }
 }
 
+/**
+ * Write the endpoints of a selection that a held pointer press is still making. The `gv` memory
+ * waits for the release, because a press that never settles must leave no selection behind.
+ */
+export function followVisualRange(state: VimCommandState, anchor: number, focus: number): void {
+  state.visualAnchor = anchor
+  state.visualFocus = focus
+}
+
 /** Remember a whole-node Visual selection; `ids` is the sibling range in ascending order. */
 export function rememberNodeVisual(
   state: VimCommandState,
