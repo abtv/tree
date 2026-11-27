@@ -29,6 +29,36 @@ export function readPngDimensions(bytes: Uint8Array): AttachmentDimensions | und
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
 const IHDR = [73, 72, 68, 82]
+const SRGB_CHROMATICITIES = [31270, 32900, 64000, 33000, 30000, 60000, 15000, 6000]
+
+/** Describes rendering metadata before the first image-data chunk without reading pixel data. */
+export function pngPresentation(bytes: Uint8Array): 'plain' | 'profiled' | 'original' {
+  if (readPngDimensions(bytes) === undefined) return 'original'
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  let offset = PNG_SIGNATURE.length
+  let profiled = false
+  let srgb = false
+  while (offset + 12 <= bytes.length) {
+    const length = view.getUint32(offset)
+    const type = view.getUint32(offset + 4)
+    const next = offset + 12 + length
+    if (next > bytes.length) return 'original'
+    if (type === 0x49444154) return profiled && !srgb ? 'profiled' : 'plain' // IDAT
+    if (type === 0x6163544c || type === 0x63494350) return 'original' // acTL, cICP
+    if (type === 0x73524742) srgb = true // sRGB
+    if (
+      type === 0x69434350 || // iCCP
+      (type === 0x6348524d && // cHRM
+        length === SRGB_CHROMATICITIES.length * 4 &&
+        SRGB_CHROMATICITIES.some((value, index) => view.getUint32(offset + 8 + index * 4) !== value))
+    ) {
+      profiled = true
+    }
+    offset = next
+  }
+  return 'original'
+}
 
 export function validateAttachmentBytes(value: unknown, decode: PngDecoder): Uint8Array {
   const bytes = toUint8Array(value)

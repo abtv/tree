@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isPng, PNG_DIMENSIONS_HEADER_BYTES, readPngDimensions, validateAttachmentBytes } from './png-validation'
+import {
+  isPng,
+  PNG_DIMENSIONS_HEADER_BYTES,
+  pngPresentation,
+  readPngDimensions,
+  validateAttachmentBytes,
+} from './png-validation'
 import { onePixelPng, pngIhdr, pngWith, transparentPng } from './png-test-utils'
 import { MAX_ATTACHMENT_BYTES } from './attachment-limits'
 
@@ -10,6 +16,68 @@ function withHeader(header: number[]) {
     ['IEND', []],
   ])
 }
+
+describe('PNG presentation metadata', () => {
+  const header: [string, number[]] = ['IHDR', pngIhdr(800, 600)]
+  const control: [string, number[]] = ['acTL', [0, 0, 0, 2, 0, 0, 0, 0]]
+  const image: [string, number[]] = ['IDAT', [97, 99, 84, 76]]
+
+  it('preserves animation in a PNG view with a nonzero byte offset', () => {
+    const png = pngWith([header, control, image])
+    const padded = new Uint8Array(png.length + 6)
+    padded.set(png, 5)
+
+    expect(pngPresentation(padded.subarray(5, -1))).toBe('original')
+  })
+
+  it('does not detect bytes within or after image data or in a truncated header', () => {
+    expect(pngPresentation(pngWith([header, image, control]))).toBe('plain')
+    expect(pngPresentation(new Uint8Array([137, 80, 78, 71]))).toBe('original')
+  })
+
+  it('keeps the original when image data is missing or its first chunk is truncated', () => {
+    const headerOnly = pngWith([header])
+    const png = pngWith([header, image])
+    const partialDataHeader = png.subarray(0, headerOnly.length + 6)
+    const partialDataChunk = png.subarray(0, png.length - 1)
+
+    expect(pngPresentation(headerOnly)).toBe('original')
+    expect(pngPresentation(partialDataHeader)).toBe('original')
+    expect(pngPresentation(partialDataChunk)).toBe('original')
+  })
+
+  it('keeps the original for an image whose declared dimensions cannot be used', () => {
+    const png = pngWith([['IHDR', pngIhdr(0, 600)], image])
+
+    expect(pngPresentation(png)).toBe('original')
+  })
+
+  it('distinguishes embedded profiles from explicit media color metadata', () => {
+    expect(pngPresentation(pngWith([header, ['iCCP', [1]], image]))).toBe('profiled')
+    expect(pngPresentation(pngWith([header, ['cICP', [9, 16, 0, 1]], image]))).toBe('original')
+  })
+
+  it('uses the ordinary path for standard sRGB chromaticities or an explicit sRGB marker', () => {
+    const chromaticities = (red: number): [string, number[]] => {
+      const values = new DataView(new ArrayBuffer(32))
+      const pairs = [31270, 32900, red, 33000, 30000, 60000, 15000, 6000]
+      pairs.forEach((value, index) => values.setUint32(index * 4, value))
+      return ['cHRM', [...new Uint8Array(values.buffer)]]
+    }
+
+    expect(pngPresentation(pngWith([header, chromaticities(64000), image]))).toBe('plain')
+    expect(pngPresentation(pngWith([header, chromaticities(68000), image]))).toBe('profiled')
+    expect(pngPresentation(pngWith([header, chromaticities(68000), ['sRGB', [0]], image]))).toBe('plain')
+  })
+
+  it('does not read ordinary metadata or a short chromaticity chunk as a color profile', () => {
+    const comment = Array.from('Comment\0Exported from screenshot', (character) => character.charCodeAt(0))
+    const incompleteChromaticities = Array.from({ length: 28 }, () => 0)
+
+    expect(pngPresentation(pngWith([header, ['tEXt', comment], image]))).toBe('plain')
+    expect(pngPresentation(pngWith([header, ['cHRM', incompleteChromaticities], image]))).toBe('plain')
+  })
+})
 
 describe('shared PNG structural validation', () => {
   it('rejects a tiny input declaring a four-gigabyte chunk before attempting its CRC scan', () => {

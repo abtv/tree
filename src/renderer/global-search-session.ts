@@ -19,6 +19,7 @@ function replaceCompletionTerm(query: string, term: CompletionTerm, name: string
 
 interface ResultPresentation {
   readonly completedQuery: string
+  readonly highlightQuery: string
   readonly completedMarkerFragments: readonly InferredSearchMarker[] | undefined
 }
 
@@ -49,6 +50,7 @@ const closed: GlobalSearchSnapshot = {
   items: undefined,
   query: '',
   completedQuery: '',
+  highlightQuery: '',
   completedMarkerFragments: undefined,
   pending: false,
   ...firstResult,
@@ -222,11 +224,13 @@ export class GlobalSearchSession {
     const nextNames = new Map<string, string | undefined>()
     const inferred: InferredSearchMarker[] = []
     const terms = new Set<string>()
+    const highlightTerms = new Set<string>()
     const composing = this.composing
     const completionAccepted = this.completionAccepted
     const previousNames = this.markerNames
     let lookups = 0
     for (const [term] of query.matchAll(/\S+/gu)) {
+      highlightTerms.add(term)
       const prefix = tagPrefix(term)
       if (prefix === undefined || composing) {
         terms.add(term)
@@ -255,6 +259,7 @@ export class GlobalSearchSession {
       effectiveQuery: [...terms].join(' '),
       markerNames: nextNames,
       completedQuery: query,
+      highlightQuery: [...highlightTerms].join(' '),
       completedMarkerFragments: inferred.length > 0 ? inferred : undefined,
     }
   }
@@ -299,9 +304,24 @@ export class GlobalSearchSession {
     const { effectiveQuery, markerNames, ...presentation } = resolved
     this.markerNames = markerNames
     if (change !== 'refresh' && this.request?.query === effectiveQuery) {
-      this.request.presentation = presentation
-      const replacesPresentation = !next.pending && next.completedQuery !== presentation.completedQuery
-      this.set({ ...next, ...(!next.pending && presentation), ...(replacesPresentation && firstResult) })
+      const previous = this.request.presentation
+      const previousFragments = previous.completedMarkerFragments
+      const fragments = presentation.completedMarkerFragments
+      const sameFragments =
+        previousFragments?.length === fragments?.length &&
+        (fragments?.every(
+          ({ fragment, name }, index) =>
+            previousFragments?.[index]?.fragment === fragment && previousFragments[index]?.name === name,
+        ) ??
+          true)
+      this.request.presentation = sameFragments
+        ? { ...presentation, completedMarkerFragments: previousFragments }
+        : presentation
+      this.set({
+        ...next,
+        ...(!next.pending && this.request.presentation),
+        ...(!next.pending && this.completionAccepted && firstResult),
+      })
       return
     }
 

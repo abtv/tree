@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
+import { searchThumbnailCache } from '../infrastructure/renderer/search-thumbnail-cache'
 import './test/setup'
 import { AttachmentImage, AttachmentThumbnail, ImagePreview } from './AttachmentPreview'
 import { OTHER_SHORTCUTS } from './shortcut-profile'
@@ -42,6 +43,7 @@ function mockTreeApi(overrides: Partial<Window['treeApi']> = {}): void {
 beforeEach(() => {
   mockTreeApi()
   attachmentImageCache.clear()
+  searchThumbnailCache.clear()
   // jsdom does not decode images.
   Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => undefined })
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => createdObjectUrl })
@@ -334,6 +336,44 @@ describe('AttachmentImage', () => {
 })
 
 describe('AttachmentThumbnail', () => {
+  it('uses the supplied full-image cache when the bitmap cannot be painted', async () => {
+    const createContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const readOriginal = vi.fn(async () => attachmentBytes)
+    const bitmap = { width: 240, height: 72, close: vi.fn() }
+    const thumbnails = createAttachmentImageCache(
+      async () => attachmentBytes,
+      async () => ({ bitmap, colorSpace: 'srgb' as const, width: 240, height: 72, release: bitmap.close }),
+      100_000,
+    )
+    const originals = createAttachmentImageCache(
+      readOriginal,
+      async () => ({ url: 'blob:provided-original', width: 800, height: 240, release: vi.fn() }),
+      1_000_000,
+    )
+
+    try {
+      render(
+        <AttachmentThumbnail
+          attachmentId="screenshot"
+          width={800}
+          height={240}
+          images={thumbnails}
+          originalImages={originals}
+        />,
+      )
+
+      const original = await screen.findByAltText('Attached image')
+
+      expect(original).toHaveAttribute('src', 'blob:provided-original')
+      expect(original).toHaveAttribute('width', '120')
+      expect(original).toHaveAttribute('height', '36')
+      expect(readOriginal).toHaveBeenCalledExactlyOnceWith('screenshot')
+      expect(bitmap.close).not.toHaveBeenCalled()
+    } finally {
+      createContext.mockRestore()
+    }
+  })
+
   // @requirement PRODUCT.md §20.14.2
   it.each([
     [800, 240, '120', '36'],
@@ -361,6 +401,18 @@ describe('AttachmentThumbnail', () => {
 
     expect(await screen.findByText('Image could not be loaded.')).toHaveClass('search-thumbnail-error')
     expect(screen.queryByAltText('Attached image')).not.toBeInTheDocument()
+  })
+
+  it('keeps room for a line of error text without enlarging a short thumbnail', async () => {
+    const { container } = render(<AttachmentThumbnail attachmentId="image" width={960} height={64} />)
+    const slot = container.querySelector('.search-thumbnail-slot')
+
+    expect(slot).toHaveStyle({ minHeight: '20px' })
+    const image = await screen.findByAltText('Attached image')
+
+    expect(image.parentElement).toBe(slot)
+    expect(image).toHaveAttribute('height', '8')
+    expect(slot).toHaveStyle({ minHeight: '20px' })
   })
 })
 

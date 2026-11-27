@@ -776,6 +776,7 @@ export function App({
       <GlobalSearchPopup
         openRef={openGlobalSearch}
         store={store}
+        attachmentImages={attachmentImages}
         shortcuts={shortcuts}
         blocked={commandPanel.open || state.quitWithoutSavingPrompt === true}
         isEditorComposing={(target) => isEditorComposing(target) || findPromptComposition.owns(target)}

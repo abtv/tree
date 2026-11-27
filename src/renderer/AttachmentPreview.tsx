@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { IMAGE_LOAD_ERROR } from '../domain/product-messages'
-import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
+import type { AttachmentImageCache, RetainedAttachmentImage } from '../infrastructure/renderer/attachment-image-cache'
 import { attachmentImageCache } from '../infrastructure/renderer/electron-services'
-import { searchThumbnailSize } from './search-thumbnail-layout'
+import {
+  searchThumbnailCache,
+  type DecodedThumbnailBitmap,
+  type SearchThumbnail,
+} from '../infrastructure/renderer/search-thumbnail-cache'
+import { searchThumbnailSize, searchThumbnailSlotHeight } from './search-thumbnail-layout'
 import { APPLE_SHORTCUTS, type ShortcutProfile } from './shortcut-profile'
 import { useImagePreviewTransform } from './use-image-preview-transform'
 
-type AttachmentState =
+type AttachmentState<Image> =
   | { attachmentId: string; status: 'loading' }
-  | { attachmentId: string; status: 'ready'; url: string }
+  | { attachmentId: string; status: 'ready'; image: Image }
   | { attachmentId: string; status: 'error' }
 
 const MAX_IMAGE_SIDE = 200 // Keep in sync with `.attachment-image` in styles.css.
@@ -34,20 +39,23 @@ function rememberRenderedSize(attachmentId: string, box: ImageBox): void {
   if (renderedSizes.size > MAX_REMEMBERED_SIZES) renderedSizes.delete(renderedSizes.keys().next().value!)
 }
 
-function cachedState(cache: AttachmentImageCache, attachmentId: string): AttachmentState {
-  const url = cache.peek(attachmentId)?.url
-  return url === undefined ? { attachmentId, status: 'loading' } : { attachmentId, status: 'ready', url }
+function cachedState<Image extends RetainedAttachmentImage>(
+  cache: AttachmentImageCache<Image>,
+  attachmentId: string,
+): AttachmentState<Image> {
+  const image = cache.peek(attachmentId)
+  return image === undefined ? { attachmentId, status: 'loading' } : { attachmentId, status: 'ready', image }
 }
 
-function useAttachmentImage(
-  cache: AttachmentImageCache,
+function useAttachmentImage<Image extends RetainedAttachmentImage>(
+  cache: AttachmentImageCache<Image>,
   attachmentId: string,
 ): {
-  state: AttachmentState
+  state: AttachmentState<Image>
   onImageError: () => void
 } {
   // A decoded image already in the cache renders in the first frame, without a placeholder.
-  const [state, setState] = useState<AttachmentState>(() => cachedState(cache, attachmentId))
+  const [state, setState] = useState<AttachmentState<Image>>(() => cachedState(cache, attachmentId))
   if (state.attachmentId !== attachmentId) {
     setState(cachedState(cache, attachmentId))
   }
@@ -64,9 +72,9 @@ function useAttachmentImage(
           return
         }
         setState((current) =>
-          current.attachmentId === attachmentId && current.status === 'ready' && current.url === image.url
+          current.attachmentId === attachmentId && current.status === 'ready' && current.image === image
             ? current
-            : { attachmentId, status: 'ready', url: image.url },
+            : { attachmentId, status: 'ready', image },
         )
       })
       .catch(() => {
@@ -77,16 +85,16 @@ function useAttachmentImage(
     }
   }, [cache, attachmentId, request])
 
-  const failedUrl = state.status === 'ready' ? state.url : undefined
+  const failedImage = state.status === 'ready' ? state.image : undefined
   const onImageError = useCallback(() => {
-    if (failedUrl !== undefined && !cache.discard(attachmentId, failedUrl)) {
-      // The cache evicted this URL before the image loaded; the attachment itself may be fine.
+    if (failedImage !== undefined && !cache.discard(attachmentId, failedImage)) {
+      // The cache released this image before it painted; the attachment itself may be fine.
       setState({ attachmentId, status: 'loading' })
       setRequest((current) => current + 1)
       return
     }
     setState((current) => (current.attachmentId === attachmentId ? { attachmentId, status: 'error' } : current))
-  }, [cache, attachmentId, failedUrl])
+  }, [cache, attachmentId, failedImage])
 
   return { state, onImageError }
 }
@@ -100,32 +108,116 @@ function ImageErrorMessage({ box }: { box?: ImageBox | undefined }): React.JSX.E
   )
 }
 
-/** A small, non-interactive copy of a node's image for Search results. */
-export function AttachmentThumbnail({
-  attachmentId,
-  width,
-  height,
-  images = attachmentImageCache,
+function ThumbnailBitmap({
+  image,
+  size,
+  onEvicted,
+  onUnavailable,
 }: {
+  image: DecodedThumbnailBitmap
+  size: ImageBox | undefined
+  onEvicted: () => void
+  onUnavailable: () => void
+}): React.JSX.Element {
+  const canvas = useRef<HTMLCanvasElement>(null)
+  useLayoutEffect(() => {
+    if (image.bitmap.width === 0) {
+      onEvicted()
+      return
+    }
+    try {
+      const { colorSpace } = image
+      const context = canvas.current?.getContext('2d', { colorSpace })
+      if (
+        context == null ||
+        (colorSpace === 'display-p3' && context.getContextAttributes?.().colorSpace !== colorSpace)
+      ) {
+        onUnavailable()
+        return
+      }
+      // Replace transparent pixels too when a new image reuses the same canvas size.
+      context.globalCompositeOperation = 'copy'
+      context.drawImage(image.bitmap, 0, 0)
+    } catch {
+      onUnavailable()
+    }
+  }, [image, onEvicted, onUnavailable])
+
+  return (
+    <canvas
+      ref={canvas}
+      className="search-thumbnail"
+      role="img"
+      aria-label="Attached image"
+      width={image.width}
+      height={image.height}
+      style={size}
+    />
+  )
+}
+
+interface AttachmentThumbnailProps {
   attachmentId: string
   width?: number | undefined
   height?: number | undefined
-  images?: AttachmentImageCache
+  images?: AttachmentImageCache<SearchThumbnail>
+  originalImages?: AttachmentImageCache | undefined
+}
+
+/** A small, non-interactive copy of a node's image for Search results. */
+export function AttachmentThumbnail({
+  originalImages = attachmentImageCache,
+  ...props
+}: AttachmentThumbnailProps): React.JSX.Element {
+  const [originalFor, setOriginalFor] = useState<string>()
+  const useOriginal = originalFor === props.attachmentId
+  return (
+    <SearchThumbnailSlot
+      key={useOriginal ? 'original' : 'thumbnail'}
+      {...props}
+      images={useOriginal ? originalImages : (props.images ?? searchThumbnailCache)}
+      onBitmapFailure={setOriginalFor}
+    />
+  )
+}
+
+function SearchThumbnailSlot({
+  attachmentId,
+  width,
+  height,
+  images,
+  onBitmapFailure,
+}: AttachmentThumbnailProps & {
+  images: AttachmentImageCache<SearchThumbnail>
+  onBitmapFailure: (id: string) => void
 }): React.JSX.Element | null {
   const { state, onImageError } = useAttachmentImage(images, attachmentId)
-  // The stored natural size reserves the box, so a row does not grow when the bytes arrive.
+  const showOriginal = useCallback(() => onBitmapFailure(attachmentId), [attachmentId, onBitmapFailure])
+  // The same slot reserves space for pending, ready and failed images when the size is known.
   const size = searchThumbnailSize(width, height)
-  if (state.status === 'error') {
-    return (
-      <span className="attachment-error search-thumbnail-error" role="status">
-        {IMAGE_LOAD_ERROR}
-      </span>
-    )
-  }
-  if (state.status === 'loading') {
-    return size === undefined ? null : <span aria-hidden="true" className="search-thumbnail" style={size} />
-  }
-  return <img className="search-thumbnail" src={state.url} alt="Attached image" {...size} onError={onImageError} />
+  if (state.status === 'loading' && size === undefined) return null
+
+  return (
+    <span className="search-thumbnail-slot" style={{ minHeight: searchThumbnailSlotHeight(size) }}>
+      {state.status === 'loading' ? (
+        <span aria-hidden="true" className="search-thumbnail" style={size} />
+      ) : state.status === 'error' ? (
+        <span className="attachment-error search-thumbnail-error" role="status">
+          {IMAGE_LOAD_ERROR}
+        </span>
+      ) : 'bitmap' in state.image ? (
+        <ThumbnailBitmap
+          key={state.image.colorSpace}
+          image={state.image}
+          size={size}
+          onEvicted={onImageError}
+          onUnavailable={showOriginal}
+        />
+      ) : (
+        <img className="search-thumbnail" src={state.image.url} alt="Attached image" {...size} onError={onImageError} />
+      )}
+    </span>
+  )
 }
 
 export function AttachmentImage({
@@ -188,7 +280,7 @@ export function AttachmentImage({
     >
       <img
         className="attachment-image"
-        src={state.url}
+        src={state.image.url}
         alt="Attached image"
         {...size}
         onError={onImageError}
@@ -305,7 +397,7 @@ export function ImagePreview({
             ref={imageRef}
             className="image-preview-image"
             style={{ transform }}
-            src={state.url}
+            src={state.image.url}
             alt="Attached image preview"
             onError={onImageError}
           />

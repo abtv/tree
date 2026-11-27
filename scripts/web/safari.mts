@@ -408,8 +408,51 @@ async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean
     await mkdir(output, { recursive: true })
     const screenshot = await request(`/session/${session}/screenshot`, undefined, 'GET')
     await writeFile(resolve(output, 'smoke.png'), Buffer.from(screenshot, 'base64'))
-    console.log(`Safari ${created.capabilities.browserVersion}: typing, synthetic URL paste and reload passed`)
     console.log('Screenshot: test-results/safari/smoke.png')
+
+    const seeded = await request(`/session/${session}/execute/async`, {
+      script: `const done = arguments[arguments.length - 1];
+        (async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 800; canvas.height = 240;
+          const context = canvas.getContext('2d');
+          context.fillStyle = '#325989'; context.fillRect(0, 0, 800, 240);
+          const png = await new Promise(resolve => canvas.toBlob(resolve));
+          const id = 'safari-search-screenshot';
+          await window.treeApi.writeAttachment(id, new Uint8Array(await png.arrayBuffer()));
+          await window.treeApi.save({
+            version: 1, location: { currentParentId: null, selectedNodeId: 'start' },
+            document: { roots: [
+              { id: 'start', text: 'Start', children: [] },
+              { id, text: 'Synthetic screenshot', children: [],
+                attachment: { id, mimeType: 'image/png', width: 800, height: 240 } }
+            ] }
+          });
+        })().then(() => done(true), error => done(String(error)));`,
+      args: [],
+    })
+    assert.equal(seeded, true)
+    await request(`/session/${session}/refresh`, {})
+    await waitFor(ready)
+    await evaluate(
+      `document.querySelector('#tree-menu-button').click(); document.querySelector('#global-search').click();`,
+    )
+    const query = await request(`/session/${session}/element`, {
+      using: 'css selector',
+      value: 'input[aria-label="Search query"]',
+    })
+    await request(`/session/${session}/element/${query['element-6066-11e4-a52e-4f735466cecf']}/value`, {
+      text: 'Synthetic screenshot',
+    })
+    await waitFor(`const image = document.querySelector('canvas.search-thumbnail');
+      return image?.width === 240 && image.height === 72 && image.clientHeight === 36 &&
+        image.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 255;`)
+    const searchScreenshot = await request(`/session/${session}/screenshot`, undefined, 'GET')
+    await writeFile(resolve(output, 'search-thumbnail.png'), Buffer.from(searchScreenshot, 'base64'))
+    await evaluate(`document.querySelector('canvas.search-thumbnail').click();`)
+    await waitFor(`return document.querySelector('[data-node-id="safari-search-screenshot"] img.attachment-image')?.naturalWidth === 800 &&
+      !document.querySelector('input[aria-label="Search query"]');`)
+    console.log(`Safari ${created.capabilities.browserVersion}: typing, URL paste, reload and Search thumbnail passed`)
   } catch (error) {
     failure = error
     log(`Failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -421,7 +464,7 @@ async function runSafariAttempt(smoke: boolean, signal: AbortSignal, ci: boolean
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (validateArguments(process.argv.slice(2)) === 'help') {
-    console.log('npm run test:safari: isolated real-Safari typing, synthetic URL paste and reload checks')
+    console.log('npm run test:safari: isolated real-Safari typing, URL paste, reload and Search thumbnail checks')
     console.log('Requires macOS and Safari Remote Automation enabled by the owner. No arguments are accepted.')
   } else {
     await runSafari()

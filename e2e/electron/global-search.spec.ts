@@ -866,6 +866,14 @@ test.describe('Search popup geometry (mode-independent)', () => {
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
     )
     expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
+    await input.press('Space')
+    await expect(input).toHaveValue('needle ')
+    await window.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    )
+    expect(await list.evaluate((element) => element.scrollTop)).toBe(0)
+    await input.press('Backspace')
+    await expect(input).toHaveValue('needle')
     await window.keyboard.press('ArrowDown')
     await expect(window.getByLabel('Result position')).toHaveText('2 / 80')
     await matchVisible()
@@ -925,6 +933,19 @@ test.describe('Search popup geometry (mode-independent)', () => {
     expect(beforeScroll).toBeGreaterThan(0)
     expect(beforeRow).not.toBeNull()
     await window.screenshot({ path: testInfo.outputPath('search-refinement-before.png') })
+
+    // A space does not change the effective query or replace its completed results.
+    await input.press('Space')
+    await expect(input).toHaveValue('nod ')
+    await expect(results).toHaveAttribute('aria-busy', 'false')
+    await window.screenshot({ path: testInfo.outputPath('search-equivalent-query.png') })
+    expect(await scrollTop()).toBe(beforeScroll)
+    await expect(last).toHaveAttribute('aria-selected', 'true')
+    expect(await last.boundingBox()).toEqual(beforeRow)
+    await input.press('Backspace')
+    await expect(input).toHaveValue('nod')
+    expect(await scrollTop()).toBe(beforeScroll)
+
     await window.clock.install()
     await window.clock.pauseAt(Date.now() + 1000)
     await controlPostedTasksWithClock(window)
@@ -948,6 +969,45 @@ test.describe('Search popup geometry (mode-independent)', () => {
     expect(await scrollTop()).toBe(0)
     expect(await popup.boundingBox()).toEqual(before)
     await window.screenshot({ path: testInfo.outputPath('search-refinement-complete.png') })
+  })
+
+  // @requirement PRODUCT.md §20.14
+  test('does not reveal a previously selected result again when only its marker highlight changes @linux', async ({
+    userDataDir,
+  }, info) => {
+    seedDocument(userDataDir, {
+      document: {
+        roots: Array.from({ length: 160 }, (_, index) => ({
+          id: `marker-${index}`,
+          text: `Team @alex result ${index}`,
+          children: [],
+        })),
+      },
+      location: { currentParentId: null, selectedNodeId: 'marker-0' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await window.keyboard.press('Meta+;')
+    const input = window.getByRole('searchbox')
+    const list = window.getByRole('listbox', { name: 'Search results' })
+    const highlight = list.getByRole('option', { selected: true }).locator('.node-search-match')
+    await input.fill('@al')
+    await expect(highlight).toHaveText('@al')
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 160')
+    await list.evaluate((element) => (element.scrollTop = 1000))
+    await expect(list.locator('[data-result-id="marker-45"]')).toBeInViewport()
+    const before = await list.evaluate((element) => element.scrollTop)
+
+    await input.press('e')
+
+    await expect(input).toHaveValue('@ale')
+    await expect(highlight).toHaveText('@ale')
+    await window.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    )
+    await window.screenshot({ path: info.outputPath('marker-reuse.png') })
+    expect(await list.evaluate((element) => element.scrollTop)).toBe(before)
+    await expect(window.getByLabel('Result position')).toHaveText('1 / 160')
+    await expect(input).toBeFocused()
   })
 
   // @requirement PRODUCT.md §20.14

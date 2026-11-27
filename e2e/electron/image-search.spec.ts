@@ -139,6 +139,142 @@ describeForEachEditingMode('automatic image search', ({ screenshotName }) => {
 })
 
 test.describe('image thumbnails in Search', () => {
+  for (const failure of ['no context', 'draw error'] as const) {
+    // @requirement PRODUCT.md §20.14.2
+    test(`shows the original if the thumbnail canvas cannot draw it (${failure})`, async ({ userDataDir }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            {
+              id: 'branch',
+              text: 'Synthetic attachments',
+              children: [
+                {
+                  id: 'picture',
+                  text: 'Searchable screenshot',
+                  children: [],
+                  attachment: { id: 'image', mimeType: 'image/png', width: 800, height: 240 },
+                },
+              ],
+            },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'branch' },
+      })
+      mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+      writeFileSync(attachmentPath(userDataDir, 'image'), solidPng(800, 240))
+      const { window } = await launchTree(userDataDir)
+      await window.evaluate((failure) => {
+        const getContext = HTMLCanvasElement.prototype.getContext
+        HTMLCanvasElement.prototype.getContext = function (
+          this: HTMLCanvasElement,
+          ...args: Parameters<typeof getContext>
+        ) {
+          const context = Reflect.apply(getContext, this, args) as RenderingContext | null
+          if (!this.matches('canvas.search-thumbnail')) return context
+          if (failure === 'no context') return null
+          if (context instanceof CanvasRenderingContext2D) {
+            context.drawImage = () => {
+              throw new Error('Synthetic canvas draw error')
+            }
+          }
+          return context
+        } as typeof getContext
+      }, failure)
+      const popup = window.getByRole('dialog', { name: 'Search' })
+      const input = popup.getByRole('searchbox')
+
+      await window.keyboard.press('Meta+;')
+      await input.fill('Searchable screenshot')
+
+      await expect(popup.getByLabel('Result position')).toHaveText('1 / 1')
+      await expect(popup.getByRole('img', { name: 'Attached image' })).toHaveJSProperty('naturalWidth', 800)
+      expect(await popup.locator('img.search-thumbnail').boundingBox()).toMatchObject({ width: 120, height: 36 })
+      await expect(popup.getByText('Image could not be loaded.')).toHaveCount(0)
+      await expect(input).toBeFocused()
+    })
+  }
+
+  // @requirement PRODUCT.md §20.14.2
+  test('keeps neighboring results still when pending thumbnails finish or fail', async ({ userDataDir }, info) => {
+    const result = (id: string, width: number, height: number) => ({
+      id,
+      text: '',
+      attachment: { id, mimeType: 'image/png', width, height, searchText: `Results about the ${id} attachment` },
+      children: [],
+    })
+    seedDocument(userDataDir, {
+      document: {
+        roots: [
+          {
+            id: 'branch',
+            text: 'Synthetic image examples',
+            children: [
+              result('tall-failure', 120, 480),
+              result('wide-failure', 960, 64),
+              result('loaded', 320, 240),
+              { id: 'neighbor', text: 'A note about layout', children: [] },
+            ],
+          },
+        ],
+      },
+      location: { currentParentId: null, selectedNodeId: 'branch' },
+    })
+    mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+    writeFileSync(attachmentPath(userDataDir, 'loaded'), solidPng(320, 240))
+    const { app, window } = await launchTree(userDataDir, { appearance: 'light' })
+    await window.emulateMedia({ colorScheme: 'light' })
+    await setMainWindowContentSize(app, { width: 760, height: 800 })
+    await app.evaluate(() => {
+      const probe = globalThis as typeof globalThis & { releaseSearchThumbnails?: () => void }
+      const held = new Promise<void>((resolve) => {
+        probe.releaseSearchThumbnails = resolve
+      })
+      globalThis.__treeIpc.wrap('tree:read-attachment', async (read, event, id) => {
+        await held
+        return id === 'loaded' ? read(event, id) : null
+      })
+    })
+    const release = () =>
+      app.evaluate(() =>
+        (globalThis as typeof globalThis & { releaseSearchThumbnails?: () => void }).releaseSearchThumbnails?.(),
+      )
+    const popup = window.getByRole('dialog', { name: 'Search' })
+    const input = popup.getByRole('searchbox')
+    const entries = popup.locator('.recent-node-entry')
+    const geometry = () =>
+      entries.evaluateAll((rows) =>
+        rows.map((row) => {
+          const { y, height } = row.getBoundingClientRect()
+          return { id: (row as HTMLElement).dataset.resultId, y, height }
+        }),
+      )
+    try {
+      await window.keyboard.press('Meta+;')
+      await input.fill('about')
+      await expect(popup.getByLabel('Result position')).toHaveText('1 / 4')
+      await expect(popup.locator('span.search-thumbnail')).toHaveCount(3)
+      await input.press('ArrowDown')
+      await input.press('ArrowDown')
+      await input.press('ArrowDown')
+      await expect(popup.getByLabel('Result position')).toHaveText('4 / 4')
+      const pending = await geometry()
+      await window.screenshot({ path: info.outputPath('pending-thumbnails.png') })
+
+      await release()
+
+      await expect(popup.getByText('Image could not be loaded.', { exact: true })).toHaveCount(2)
+      await expect(popup.getByRole('img', { name: 'Attached image' })).toBeVisible()
+      await expect(popup.locator('span.search-thumbnail')).toHaveCount(0)
+      await window.screenshot({ path: info.outputPath('resolved-thumbnails.png') })
+      await expect.poll(geometry).toEqual(pending)
+      await expect(popup.getByLabel('Result position')).toHaveText('4 / 4')
+      await expect(input).toBeFocused()
+    } finally {
+      await release()
+    }
+  })
+
   // @requirement PRODUCT.md §20.14.2
   test('reads only nearby image results on the first query', async ({ userDataDir }) => {
     const images = Array.from({ length: 48 }, (_, index) => ({
@@ -169,21 +305,28 @@ test.describe('image thumbnails in Search', () => {
     const popup = window.getByRole('dialog', { name: 'Search' })
     await popup.getByRole('searchbox').fill('release')
     await expect(popup.getByLabel('Result position')).toHaveText('1 / 48')
-    await expect
-      .poll(() =>
-        popup
-          .locator('img.search-thumbnail')
-          .first()
-          .evaluate((image: HTMLImageElement) => image.naturalWidth),
+    const thumbnail = popup.locator('canvas.search-thumbnail').first()
+    await expect(thumbnail).toHaveJSProperty('width', 128)
+    const readIds = () =>
+      app.evaluate(
+        () => (globalThis as unknown as { searchThumbnailReads: { ids: string[] } }).searchThumbnailReads.ids,
       )
-      .toBe(320)
-    const ids = await app.evaluate(
-      () => (globalThis as unknown as { searchThumbnailReads: { ids: string[] } }).searchThumbnailReads.ids,
-    )
+    const ids = await readIds()
 
     expect(ids).toContain('image-0')
     expect(ids).not.toContain('image-12')
     expect(ids.length).toBeLessThanOrEqual(12)
+
+    await window.keyboard.press('Escape')
+    await window.keyboard.press('Meta+;')
+    await popup.getByRole('searchbox').fill('release')
+    await expect(thumbnail).toBeVisible()
+
+    expect((await readIds()).filter((id) => id === 'image-0')).toHaveLength(1)
+
+    await window.keyboard.press('Enter')
+
+    await expect(window.locator('[data-node-id="result-0"] img.attachment-image')).toHaveJSProperty('naturalWidth', 320)
   })
 
   // @requirement PRODUCT.md §20.14.2
@@ -250,15 +393,21 @@ test.describe('image thumbnails in Search', () => {
     await expect(rows.nth(1).locator('[data-replaces-title]')).toHaveCount(1)
     await expect(excerpts.locator('.node-search-match')).toHaveText(['release', 'Version', 'release', 'Version'])
     await expect(excerpts.getByRole('img', { name: 'Text in image' })).toHaveCount(2)
-    const thumbnails = popup.locator('img.search-thumbnail')
+    const thumbnails = popup.locator('canvas.search-thumbnail')
     await expect(thumbnails).toHaveCount(2)
     await expect
-      .poll(() => thumbnails.evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete)))
+      .poll(() =>
+        thumbnails.evaluateAll((images) =>
+          images.every(
+            (image) => (image as HTMLCanvasElement).getContext('2d')?.getImageData(0, 0, 1, 1).data[3] === 255,
+          ),
+        ),
+      )
       .toBe(true)
 
     const geometry = await rows.evaluateAll((elements) =>
       elements.map((row) => {
-        const image = row.querySelector('img.search-thumbnail')?.getBoundingClientRect()
+        const image = row.querySelector('canvas.search-thumbnail')?.getBoundingClientRect()
         const text = row.querySelector<HTMLElement>('.recent-node-text')!
         const excerpt = row.querySelector<HTMLElement>('.recent-node-image-content')
         const icon = row.querySelector('.recent-node-image-recognition')?.getBoundingClientRect()

@@ -185,6 +185,39 @@ describe('global Search session', () => {
     })
   })
 
+  it('preserves the selection and marker decoration when the completed result list is reused', () => {
+    const { session, source, requests } = fixture()
+    source.suggestions.mockReturnValue(['alex'])
+    session.edit('@al')
+    requests[0]!.publish(initial)
+    session.moveResult(1)
+    const original = session.getSnapshot()
+
+    session.edit('@al  @al ')
+
+    expect(requests).toHaveLength(1)
+    expect(session.getSnapshot()).toMatchObject({
+      completedQuery: '@al  @al ',
+      highlightQuery: '@al',
+      selected: 1,
+      pending: false,
+    })
+    expect(session.getSnapshot().items).toBe(original.items)
+    expect(session.getSnapshot().completedMarkerFragments).toBe(original.completedMarkerFragments)
+
+    session.edit('@alex')
+
+    expect(requests).toHaveLength(1)
+    expect(session.getSnapshot()).toMatchObject({ highlightQuery: '@alex', selected: 1 })
+    expect(session.getSnapshot().completedMarkerFragments).toBeUndefined()
+
+    session.edit('@al')
+    session.acceptSuggestion()
+
+    expect(requests).toHaveLength(1)
+    expect(session.getSnapshot()).toMatchObject({ highlightQuery: '@alex', selected: 0 })
+  })
+
   it('yields during distinct catalog lookups and rejects queued work after a newer edit or close', () => {
     const queued: { run: () => void; cancel: ReturnType<typeof vi.fn> }[] = []
     const { session, source, requests } = fixture({

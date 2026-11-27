@@ -136,6 +136,25 @@ describe('attachment image cache', () => {
     expect(cache.peek('image-999')).toBeDefined()
   })
 
+  it('does not charge for encoded source bytes when only the bitmap remains', async () => {
+    const decode = async (): Promise<DecodedAttachmentImage> => ({
+      url: 'blob:reduced',
+      width: 2,
+      height: 2,
+      encodedByteLength: 0,
+      release: vi.fn(),
+    })
+    const read = vi.fn(async () => bytes(8_000))
+    const cache = createAttachmentImageCache(read, decode, 32)
+
+    await cache.get('first')
+    await cache.get('second')
+    await cache.get('first')
+
+    expect(cache.peek('second')).toBeDefined()
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
   it('retains a single image larger than the budget', async () => {
     const read = vi.fn(async () => bytes(8))
     const decoder = fakeDecoder(100, 100)
@@ -184,7 +203,7 @@ describe('attachment image cache', () => {
 
     const image = await cache.get('image')
 
-    expect(cache.discard('image', image!.url)).toBe(true)
+    expect(cache.discard('image', image!)).toBe(true)
 
     expect(decoder.released).toEqual([image!.url])
     expect(cache.peek('image')).toBeUndefined()
@@ -200,12 +219,32 @@ describe('attachment image cache', () => {
 
     const stale = await cache.get('image')
 
-    cache.discard('image', stale!.url)
+    cache.discard('image', stale!)
     const fresh = await cache.get('image')
 
-    expect(cache.discard('image', stale!.url)).toBe(false)
+    expect(cache.discard('image', stale!)).toBe(false)
     expect(cache.peek('image')).toBe(fresh)
     expect(decoder.released).toEqual([stale!.url])
+  })
+
+  it('does not discard a newer bitmap when a stale bitmap without a URL fails to display', async () => {
+    const stale = { width: 2, height: 2, encodedByteLength: 0, release: vi.fn() }
+    const fresh = { ...stale, release: vi.fn() }
+    const read = vi.fn(async () => bytes(8))
+    const decode = vi.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(fresh)
+    const cache = createAttachmentImageCache<typeof stale>(read, decode, 32)
+    await cache.get('image')
+    cache.discard('image', stale)
+    await cache.get('image')
+
+    const discarded = cache.discard('image', stale)
+    const current = await cache.get('image')
+
+    expect(discarded).toBe(false)
+    expect(current).toBe(fresh)
+    expect(stale.release).toHaveBeenCalledOnce()
+    expect(fresh.release).not.toHaveBeenCalled()
+    expect(read).toHaveBeenCalledTimes(2)
   })
 
   it('releases every image on clear', async () => {

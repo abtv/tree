@@ -82,3 +82,90 @@ test('keeps image-heavy global search and result navigation responsive', async (
   expect(completeMedianMs).toBeLessThan(300)
   expect(navigationMedianMs).toBeLessThan(400)
 })
+
+// @requirement PRODUCT.md §20.14.2
+test('reuses decoded thumbnails after crossing a list of distinct large attachments', async ({ userDataDir }) => {
+  const count = 144
+  const width = 1200
+  const height = 1000
+  const attachments = Array.from({ length: count }, (_, index) => ({
+    id: `search-image-${index}`,
+    mimeType: 'image/png' as const,
+    width,
+    height,
+  }))
+  seedDocument(userDataDir, {
+    document: {
+      roots: [
+        { id: 'workspace', text: 'Workspace', children: [{ id: 'start', text: 'Start', children: [] }] },
+        ...attachments.map((attachment, index) => ({
+          id: `n${index}`,
+          text: `Distinct screenshot ${index}`,
+          attachment,
+          children: [],
+        })),
+      ],
+    },
+    location: { currentParentId: 'workspace', selectedNodeId: 'start' },
+  })
+  mkdirSync(join(userDataDir, 'data', 'attachments'), { recursive: true })
+  const screenshot = solidPng(width, height)
+  for (const { id } of attachments) writeFileSync(attachmentPath(userDataDir, id), screenshot)
+  const { app, window } = await launchTree(userDataDir, { vimEnabled: false })
+  await app.evaluate(() => {
+    const reads: string[] = []
+    Object.assign(globalThis, { distinctSearchAttachmentReads: reads })
+    globalThis.__treeIpc.wrap('tree:read-attachment', (read, event, id) => {
+      reads.push(String(id))
+      return read(event, id)
+    })
+  })
+  const readIds = () =>
+    app.evaluate(
+      () =>
+        (globalThis as typeof globalThis & { distinctSearchAttachmentReads: string[] }).distinctSearchAttachmentReads,
+    )
+  const origin = window.getByRole('textbox', { name: 'Node 1', exact: true })
+  const input = window.getByRole('searchbox')
+  const position = window.getByLabel('Result position')
+  const results = window.getByRole('listbox', { name: 'Search results' })
+  const selectedThumbnail = results
+    .getByRole('option', { selected: true })
+    .locator('canvas.search-thumbnail, img.search-thumbnail')
+  await expect(origin).toBeFocused()
+  await window.keyboard.press('Meta+;')
+  await input.fill('distinct screenshot')
+  await expect(position).toHaveText(`1 / ${count}`)
+  await expect(selectedThumbnail).toBeVisible()
+
+  for (let index = 1; index < count; index += 1) await input.press('ArrowDown')
+  await expect(position).toHaveText(`${count} / ${count}`)
+  await expect(selectedThumbnail).toBeVisible()
+  const coldReads = await readIds()
+  expect(new Set(coldReads)).toEqual(new Set(attachments.map(({ id }) => id)))
+
+  for (let index = 1; index < count; index += 1) await input.press('ArrowUp')
+  await expect(position).toHaveText(`1 / ${count}`)
+  await expect(selectedThumbnail).toBeVisible()
+  await window.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  )
+
+  const warmReads = (await readIds()).length - coldReads.length
+  const thumbnailSize = await selectedThumbnail.evaluate((image) =>
+    image instanceof HTMLCanvasElement
+      ? { width: image.width, height: image.height }
+      : { width: (image as HTMLImageElement).naturalWidth, height: (image as HTMLImageElement).naturalHeight },
+  )
+  recordPerfResult({
+    kind: 'node-search',
+    scenario: 'distinct-screenshot-thumbnail-retention',
+    samples: count,
+    metrics: { coldReads: coldReads.length, warmReads },
+  })
+  expect(coldReads).toHaveLength(count)
+  expect(warmReads).toBe(0)
+  expect(thumbnailSize).toEqual({ width: 115, height: 96 })
+  await input.press('Escape')
+  await expect(origin).toBeFocused()
+})

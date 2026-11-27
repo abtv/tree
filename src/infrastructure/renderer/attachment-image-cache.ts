@@ -1,36 +1,41 @@
-export interface DecodedAttachmentImage {
-  url: string
+export interface RetainedAttachmentImage {
   width: number
   height: number
-  /** Revokes the URL and drops the decoded pixels. */
+  /** Encoded bytes retained instead of the source PNG, if different. */
+  encodedByteLength?: number
+  /** Releases retained image resources. */
   release(): void
 }
 
-export interface AttachmentImageCache {
+export interface DecodedAttachmentImage extends RetainedAttachmentImage {
+  url: string
+}
+
+export interface AttachmentImageCache<Image extends RetainedAttachmentImage = DecodedAttachmentImage> {
   /** Returns an already decoded image without waiting; it does not change the eviction order. */
-  peek(id: string): DecodedAttachmentImage | undefined
-  get(id: string): Promise<DecodedAttachmentImage | null>
+  peek(id: string): Image | undefined
+  get(id: string): Promise<Image | null>
   /**
-   * Drops the entry for a URL that failed to display, so the next request reads it again. Returns false
-   * when the URL is no longer cached: it was evicted or replaced, which revoked it, so the failure does
-   * not show that the image itself is unusable.
+   * Drops an entry that failed to display, so the next request reads it again. Returns false if the
+   * entry was replaced or evicted: a failure to display the released entry does not show that the
+   * attachment itself is unusable.
    */
-  discard(id: string, url: string): boolean
+  discard(id: string, image: Image): boolean
   clear(): void
 }
 
 // Encoded bytes plus four bytes per decoded pixel.
-function retainedBytes(bytes: Uint8Array, image: DecodedAttachmentImage): number {
-  return bytes.byteLength + image.width * image.height * 4
+function retainedBytes(bytes: Uint8Array, image: RetainedAttachmentImage): number {
+  return (image.encodedByteLength ?? bytes.byteLength) + image.width * image.height * 4
 }
 
-export function createAttachmentImageCache(
+export function createAttachmentImageCache<Image extends RetainedAttachmentImage>(
   readAttachment: (id: string) => Promise<Uint8Array | null>,
-  decodeImage: (bytes: Uint8Array) => Promise<DecodedAttachmentImage>,
+  decodeImage: (bytes: Uint8Array) => Promise<Image>,
   maxBytes: number,
-): AttachmentImageCache {
-  const entries = new Map<string, { image: DecodedAttachmentImage; bytes: number }>()
-  const pending = new Map<string, Promise<DecodedAttachmentImage | null>>()
+): AttachmentImageCache<Image> {
+  const entries = new Map<string, { image: Image; bytes: number }>()
+  const pending = new Map<string, Promise<Image | null>>()
   let totalBytes = 0
   let generation = 0
 
@@ -42,7 +47,7 @@ export function createAttachmentImageCache(
     entry.image.release()
   }
 
-  const retain = (id: string, image: DecodedAttachmentImage, bytes: number): void => {
+  const retain = (id: string, image: Image, bytes: number): void => {
     remove(id)
     entries.set(id, { image, bytes })
     totalBytes += bytes
@@ -78,8 +83,8 @@ export function createAttachmentImageCache(
       pending.set(id, request)
       return request
     },
-    discard(id, url) {
-      if (entries.get(id)?.image.url !== url) return false
+    discard(id, image) {
+      if (entries.get(id)?.image !== image) return false
       remove(id)
       return true
     },

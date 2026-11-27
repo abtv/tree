@@ -13,6 +13,7 @@ import type { EditorStore } from '../application/editor-store'
 import type { SearchImageExcerpt } from '../application/node-result'
 import type { InferredSearchMarker } from '../domain/node-search-query'
 import type { TextMatch } from '../domain/text-search'
+import type { AttachmentImageCache } from '../infrastructure/renderer/attachment-image-cache'
 import type { ShortcutProfile } from './shortcut-profile'
 import { captureFocusRestoration } from './editor-dom'
 import { GlobalSearchSession, hasGroupHeading, startsSearchGroup } from './global-search-session'
@@ -27,7 +28,7 @@ import { initialSearchHeading } from './node-flags'
 import { AttachmentThumbnail } from './AttachmentPreview'
 import { computeSearchResultWindow, SEARCH_RESULT_VIEWPORT_ROWS } from './search-result-window'
 import { SearchResultLayout } from './search-result-layout'
-import { SEARCH_THUMBNAIL_BLOCK_MARGIN, searchThumbnailSize } from './search-thumbnail-layout'
+import { estimateSearchThumbnailBlockHeight } from './search-thumbnail-layout'
 
 const RESULT_EDGE_INSET = 12
 const IMAGE_EXCERPT_LINE_HEIGHT = 16
@@ -119,7 +120,7 @@ function SearchResultText({
   text,
   query,
   markerFragments,
-  active,
+  revealKey,
   onReveal,
   tagMatches = NO_MATCHES,
   struckMatches = NO_MATCHES,
@@ -127,22 +128,28 @@ function SearchResultText({
   text: string
   query: string
   markerFragments?: readonly InferredSearchMarker[] | undefined
-  active: boolean
+  revealKey?: symbol | undefined
   onReveal(): void
   tagMatches?: readonly TextMatch[] | undefined
   struckMatches?: readonly TextMatch[] | undefined
 }): React.JSX.Element {
   const matches = useSearchDecorations(text, query, tagMatches, markerFragments)
   const firstMatch = useRef<HTMLElement>(null)
-  const previousMatches = useRef(matches)
+  const reveal = useRef<{ key: symbol; ready: boolean }>(undefined)
   useEffect(() => {
-    const changed = previousMatches.current !== matches
-    previousMatches.current = matches
-    // Selection already reveals ready matches; only newly computed highlights need another pass.
-    if (!changed) return
-    const row = firstMatch.current?.closest<HTMLElement>('[role="option"]')
-    if (active && row) onReveal()
-  }, [active, matches, onReveal])
+    if (revealKey === undefined) {
+      reveal.current = undefined
+      return
+    }
+    const ready = firstMatch.current !== null
+    // Layout already reveals a match that was ready when selection arrived. A late first
+    // match may finish that reveal once, but highlight edits do not start a new reveal.
+    if (reveal.current?.key !== revealKey) reveal.current = { key: revealKey, ready }
+    else if (ready && !reveal.current.ready) {
+      reveal.current.ready = true
+      onReveal()
+    }
+  }, [matches, onReveal, revealKey])
 
   function renderText(start: number, end: number): React.ReactNode {
     const parts: React.ReactNode[] = []
@@ -186,6 +193,7 @@ export function GlobalSearchPopup({
   beforeOpen,
   beforeVisit,
   openRef,
+  attachmentImages,
 }: {
   store: EditorStore
   shortcuts: ShortcutProfile
@@ -194,6 +202,7 @@ export function GlobalSearchPopup({
   beforeOpen(): void
   beforeVisit(): void
   openRef?: { current: (() => void) | undefined }
+  attachmentImages?: AttachmentImageCache
 }): React.JSX.Element | null {
   const session = useMemo(
     () =>
@@ -210,6 +219,7 @@ export function GlobalSearchPopup({
     selectedPart,
     query,
     completedQuery,
+    highlightQuery,
     completedMarkerFragments,
     completionQuery,
     suggestions,
@@ -218,10 +228,10 @@ export function GlobalSearchPopup({
   } = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const suggestionsActive = suggestions.length > 1
   const resultKeys = suggestions.length === 1 ? SINGLE_SUGGESTION_KEYS : RESULT_KEYS
-  const [resultViewport, setResultViewport] = useState({ items, completedQuery, top: 0 })
-  if (resultViewport.items !== items || resultViewport.completedQuery !== completedQuery) {
+  const [resultViewport, setResultViewport] = useState({ items, top: 0 })
+  if (resultViewport.items !== items) {
     // Select the first window before committing replacement rows, not after measuring the old offset.
-    setResultViewport({ items, completedQuery, top: 0 })
+    setResultViewport({ items, top: 0 })
   }
   const windowTop = resultViewport.top
   const setWindowTop = useCallback((top: number) => {
@@ -237,8 +247,7 @@ export function GlobalSearchPopup({
         const item = items![index]!
         const heading = hasGroupHeading(items!, index) ? ROW_HEIGHT_ESTIMATE : 0
         // The first window should load images for the rows that actually fit in it.
-        const thumbnail = searchThumbnailSize(item.attachment?.width, item.attachment?.height)
-        const thumbnailHeight = thumbnail === undefined ? 0 : thumbnail.height + SEARCH_THUMBNAIL_BLOCK_MARGIN
+        const thumbnailHeight = estimateSearchThumbnailBlockHeight(item.attachment?.width, item.attachment?.height)
         const excerptHeight = item.imageExcerpt && !item.imageExcerpt.replacesTitle ? IMAGE_EXCERPT_LINE_HEIGHT : 0
         return ROW_HEIGHT_ESTIMATE + heading + thumbnailHeight + excerptHeight
       }),
@@ -260,6 +269,11 @@ export function GlobalSearchPopup({
   const scrollAnchor = useRef<{ index: number; inset: number; measurement: SearchMeasurement } | undefined>(undefined)
   const revealPending = useRef(false)
   const [revealRevision, setRevealRevision] = useState(0)
+  const [acceptedSelectionRevision, setAcceptedSelectionRevision] = useState(0)
+  const resultRevealKey = useMemo(
+    () => Symbol(`search-selection:${items?.length ?? 0}:${selected}:${selectedPart}:${acceptedSelectionRevision}`),
+    [items, selected, selectedPart, acceptedSelectionRevision],
+  )
   const requestReveal = useCallback(() => {
     revealPending.current = true
     setRevealRevision((revision) => revision + 1)
@@ -277,6 +291,10 @@ export function GlobalSearchPopup({
     let caret: number | undefined
     flushSync(() => {
       caret = session.acceptSuggestion(index)
+      if (caret !== undefined && !session.getSnapshot().pending) {
+        setAcceptedSelectionRevision((revision) => revision + 1)
+        requestReveal()
+      }
     })
     if (caret !== undefined) input.current?.setSelectionRange(caret, caret)
   }
@@ -427,10 +445,10 @@ export function GlobalSearchPopup({
 
   useLayoutEffect(() => {
     // Keep the old viewport in place while its rows are still displayed. Reset only with the
-    // completed presentation, before measurement and reveal run for the replacement rows.
+    // replacement list, before measurement and reveal run for its rows.
     scrollAnchor.current = undefined
     if (panel.current !== null) panel.current.scrollTop = 0
-  }, [items, completedQuery])
+  }, [items])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -689,10 +707,10 @@ export function GlobalSearchPopup({
                 const title = item.imageExcerpt?.replacesTitle ? null : (
                   <SearchResultText
                     text={item.text}
-                    query={completedQuery}
+                    query={highlightQuery}
                     markerFragments={completedMarkerFragments}
                     tagMatches={item.tagMatches}
-                    active={nodeSelected && !pending}
+                    revealKey={nodeSelected && !pending ? resultRevealKey : undefined}
                     onReveal={requestReveal}
                   />
                 )
@@ -722,11 +740,11 @@ export function GlobalSearchPopup({
                       >
                         <SearchResultText
                           text={item.path}
-                          query={completedQuery}
+                          query={highlightQuery}
                           markerFragments={completedMarkerFragments}
                           tagMatches={item.pathTagMatches}
                           struckMatches={item.pathStruckMatches}
-                          active={headingSelected && !pending}
+                          revealKey={headingSelected && !pending ? resultRevealKey : undefined}
                           onReveal={requestReveal}
                         />
                       </div>
@@ -772,6 +790,7 @@ export function GlobalSearchPopup({
                               attachmentId={item.attachment.id}
                               width={item.attachment.width}
                               height={item.attachment.height}
+                              originalImages={attachmentImages}
                             />
                           )}
                         </span>
