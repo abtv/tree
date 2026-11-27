@@ -229,6 +229,33 @@ describe('incremental executor', () => {
     expect(callbacks).toHaveLength(0)
   })
 
+  it('bounds local count and jump work across many short nonmatching rows', () => {
+    const text = 'ordinary notes about plans and reviews with links, tasks, and details '.repeat(2)
+    const document = {
+      roots: Array.from({ length: 10_000 }, (_, index) => ({
+        id: String(index),
+        text: index === 9999 ? `${text} Kelvin` : text,
+        children: [],
+      })),
+    }
+    const request = { ...base, document, query: 'kelvin' }
+    const count = searchHarness(8192)
+    const jump = searchHarness(8192)
+
+    expect(count.run(request)).toEqual({ kind: 'count', total: 1, capped: false })
+    expect(
+      jump.run({
+        ...request,
+        operation: { kind: 'navigate', origin: { nodeId: '0', offset: 0 }, direction: 1, count: 1 },
+      }),
+    ).toMatchObject({ total: 1, destination: { nodeId: '9999', start: text.length + 1 } })
+
+    // Allow a few work slices, but not one generator resumption per handful of characters in every short row.
+    expect(count.slices()).toBeGreaterThan(1)
+    expect(count.slices()).toBeLessThanOrEqual(4)
+    expect(jump.slices()).toBeLessThanOrEqual(6) // An uncached jump may scan for both rank and destination.
+  })
+
   it.each([
     [2, 1, 2, 0, false],
     [2, -1, 1, 6, false],

@@ -76,6 +76,43 @@ it('scans long ancestor context once while matching many descendants', () => {
   expect(performance.now() - start).toBeLessThan(2000)
 })
 
+it('does not rebuild a shared path and its marker ranges for every sibling result', () => {
+  let labelReads = 0
+  const text = '  Project\n  #work'
+  const count = 2000
+  const document = {
+    roots: [
+      {
+        id: 'root',
+        get text() {
+          labelReads++
+          return text
+        },
+        struckThrough: true as const,
+        children: Array.from({ length: count }, (_, index) => ({
+          id: String(index),
+          text: 'meeting',
+          children: [],
+        })),
+      },
+    ],
+  }
+
+  const work = searchNodes(document, '#work meeting')
+  let step = work.next()
+  while (!step.done) step = work.next()
+
+  expect(step.value).toHaveLength(count)
+  expect(step.value[0]).toMatchObject({
+    parentId: 'root',
+    path: 'Project #work',
+    pathTagMatches: [{ start: 8, end: 13 }],
+    pathStruckMatches: [{ start: 0, end: 13 }],
+  })
+  expect(step.value.at(-1)?.pathTagMatches).toEqual(step.value[0]?.pathTagMatches)
+  expect(labelReads).toBeLessThan(30)
+})
+
 it('reuses long ancestor image evidence and a bounded set of highlights across descendants', () => {
   const count = 2000
   const document = {

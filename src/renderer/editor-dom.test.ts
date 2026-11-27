@@ -166,6 +166,21 @@ describe('visual line cursor', () => {
     expect(visualLineCursor(text, position, 0, 'down', 20, true)).toBe(2)
     expect(visualLineCursor(text.slice(0, 10), position, 6, 'down', 20)).toBe(9)
   })
+
+  it('keeps the first exact column without measuring the rest of a wide destination line', () => {
+    const wide = 'x'.repeat(240)
+    let measurements = 0
+    const columns = (offset: number) => {
+      measurements++
+      const column = offset % 120
+      return { top: Math.floor(offset / 120) * 20, left: column === 2 ? 0 : column * 10 }
+    }
+
+    expect(visualLineCursor(wide, columns, 20, 'down', 0, true)).toBe(0)
+    expect(visualLineCursor(wide, columns, 20, 'down', 0)).toBe(120)
+
+    expect(measurements).toBeLessThan(60)
+  })
 })
 
 function node(text: string, links?: TreeNode['links']): TreeNode {

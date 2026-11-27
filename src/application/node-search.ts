@@ -1,6 +1,13 @@
 import type { Document, TreeNode } from '../domain/document'
 import { mergeSearchMatches, prepareNodeSearch, searchNodeTerm, type NodeSearchTerm } from '../domain/node-search-query'
-import { completionPresentation, label, resultText, type NodeResult, type SearchImageExcerpt } from './node-result'
+import {
+  completionPath,
+  label,
+  nodePresentation,
+  resultText,
+  type NodeResult,
+  type SearchImageExcerpt,
+} from './node-result'
 import { searchScheduler, type SearchScheduler } from './search-executor'
 import { searchText, type SearchWork, type TextMatch } from '../domain/text-search'
 
@@ -17,6 +24,8 @@ interface SearchFrame {
   readonly inherited: readonly number[]
   readonly inheritedImages?: readonly number[]
 }
+
+type ParentPresentation = Pick<NodeResult, 'path' | 'parentId' | 'pathTagMatches' | 'pathStruckMatches'>
 
 function* firstMatch(work: SearchWork<TextMatch>): Generator<undefined, TextMatch | undefined> {
   for (const match of work) {
@@ -87,6 +96,21 @@ function* pathTagMatches(
   return matches
 }
 
+function* parentPresentation(
+  ancestors: readonly TreeNode[],
+  terms: readonly NodeSearchTerm[],
+): Generator<undefined, ParentPresentation> {
+  let markers: TextMatch[] = []
+  for (const term of terms) {
+    markers = yield* mergeSearchMatches(markers, yield* pathTagMatches(ancestors, term))
+  }
+  return {
+    path: ancestors.length === 0 ? null : ancestors.map(label).join(' › '),
+    ...completionPath(ancestors),
+    ...(terms.length === 0 ? {} : { pathTagMatches: markers }),
+  }
+}
+
 export function* searchNodes(document: Document, query: string): Generator<undefined, readonly NodeResult[]> {
   const terms = yield* prepareNodeSearch(query)
   if (terms.length === 0) return []
@@ -100,6 +124,7 @@ export function* searchNodes(document: Document, query: string): Generator<undef
   const results: NodeResult[] = []
   const ancestors: TreeNode[] = []
   const stack: SearchFrame[] = [{ nodes: document.roots, index: 0, inherited: [] }]
+  let parent: { frame: SearchFrame; presentation: ParentPresentation } | undefined
   function* removeImageMatches(indices: readonly number[]): Generator<undefined> {
     for (const index of indices) {
       yield undefined
@@ -164,7 +189,6 @@ export function* searchNodes(document: Document, query: string): Generator<undef
         }
       }
       let tagMatches: TextMatch[] = []
-      let pathMatches: TextMatch[] = []
       for (const term of tagTerms) {
         const matches: TextMatch[] = []
         for (const match of searchNodeTerm(node, term)) {
@@ -172,8 +196,10 @@ export function* searchNodes(document: Document, query: string): Generator<undef
           if (match !== undefined) matches.push(match)
         }
         tagMatches = yield* mergeSearchMatches(tagMatches, matches)
-        pathMatches = yield* mergeSearchMatches(pathMatches, yield* pathTagMatches(ancestors, term))
       }
+      // Consecutive hits under the same parent share the path and its highlight ranges.
+      // Keep one projection, without retaining paths for unrelated branches or other queries.
+      if (parent?.frame !== frame) parent = { frame, presentation: yield* parentPresentation(ancestors, tagTerms) }
       const matches = node.marked
         ? node.starred
           ? markedStarredResults
@@ -185,15 +211,10 @@ export function* searchNodes(document: Document, query: string): Generator<undef
       matches.push({
         id: node.id,
         text: resultText(node),
-        path: ancestors.length ? ancestors.map(label).join(' › ') : null,
-        ...completionPresentation(node, ancestors),
+        ...parent.presentation,
+        ...nodePresentation(node),
         ...(excerpt === undefined ? {} : { imageExcerpt: excerpt }),
-        ...(tagTerms.length === 0
-          ? {}
-          : {
-              tagMatches,
-              pathTagMatches: pathMatches,
-            }),
+        ...(tagTerms.length === 0 ? {} : { tagMatches }),
       })
     }
     if (node.children.length > 0) {

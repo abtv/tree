@@ -175,6 +175,7 @@ export function visualLineCursor(
     if (offset < lineStart) continue
     if (offset >= lineEnd) break
     const candidateDistance = Math.abs(position(offset).left - preferredLeft)
+    if (candidateDistance === 0) return offset
     if (candidateDistance < distance) {
       nearest = offset
       distance = candidateDistance

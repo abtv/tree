@@ -250,7 +250,7 @@ function cachedNavigation(operation: SearchOperation): (() => SearchResult) | un
 function* executeSearch(request: SearchRequest): Generator<undefined, SearchResult> {
   const operation = request.operation
   if (operation.kind === 'navigate' && operation.exact) return yield* navigateExact(request, operation, operation.exact)
-  const pattern = yield* prepareSearch(request.query)
+  const pattern = yield* prepareSearch(request.query, { nativeShortText: true })
   if (operation.kind === 'count' && pattern.characters.length === 0) return { kind: 'count', total: 0, capped: false }
   const collect = operation.kind === 'count' ? operation.collect : undefined
   const exact: ExactMatches | undefined = collect && { matches: [] }

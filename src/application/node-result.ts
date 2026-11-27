@@ -35,7 +35,7 @@ export function resultText(node: TreeNode): string {
 }
 
 /** Completion ranges use the same compact labels and separators as search paths. */
-export function completionPresentation(node: TreeNode, ancestors: readonly TreeNode[]): Partial<NodeResult> {
+export function completionPath(ancestors: readonly TreeNode[]): Pick<NodeResult, 'parentId' | 'pathStruckMatches'> {
   const pathStruckMatches: TextMatch[] = []
   let offset = 0
   for (const ancestor of ancestors) {
@@ -45,10 +45,17 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
   }
   return {
     ...(ancestors.length > 0 ? { parentId: ancestors[ancestors.length - 1]!.id } : {}),
+    ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
+  }
+}
+
+export function nodePresentation(
+  node: TreeNode,
+): Pick<NodeResult, 'struckThrough' | 'starred' | 'marked' | 'attachment'> {
+  return {
     ...(node.struckThrough ? { struckThrough: true as const } : {}),
     ...(node.starred ? { starred: true as const } : {}),
     ...(node.marked ? { marked: true as const } : {}),
-    ...(pathStruckMatches.length > 0 ? { pathStruckMatches } : {}),
     ...(node.attachment === undefined
       ? {}
       : {
@@ -59,4 +66,8 @@ export function completionPresentation(node: TreeNode, ancestors: readonly TreeN
           },
         }),
   }
+}
+
+export function completionPresentation(node: TreeNode, ancestors: readonly TreeNode[]): Partial<NodeResult> {
+  return { ...completionPath(ancestors), ...nodePresentation(node) }
 }
