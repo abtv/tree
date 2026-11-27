@@ -19,6 +19,7 @@ import {
   seedDocument,
   setCursor,
   test,
+  tryReadPersisted,
   typeInto,
   unlockSystemClipboard,
   writeClipboardImage,
@@ -597,7 +598,7 @@ test.describe('clipboard in Vim Replace', () => {
 
     await field.press('Escape')
     await fireIdleSave(window)
-    await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, idleSavePoll).toBe('abcXef')
+    await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll).toBe('abcXef')
 
     await field.press('u')
     await expect(field).toHaveValue('abcdef')
@@ -642,7 +643,7 @@ test.describe('clipboard in Vim Replace', () => {
       const committed = 'XY' + original.slice(2)
       await expect(field).toHaveJSProperty(textProperty, committed)
       await fireIdleSave(window)
-      await expect.poll(() => readPersisted(userDataDir).document.roots[0]?.text, idleSavePoll).toBe(committed)
+      await expect.poll(() => tryReadPersisted(userDataDir)?.document.roots[0]?.text, idleSavePoll).toBe(committed)
 
       await field.press('u')
       await expect(field).toHaveJSProperty(textProperty, original)
