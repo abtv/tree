@@ -165,9 +165,12 @@ function WindowedSuggestions(props: Props & { label: string }): React.JSX.Elemen
       }}
     >
       <div style={{ height: layout.total, position: 'relative', overflow: 'visible clip' }}>
-        {indices.map((index) => (
-          <Suggestion key={names[index]} {...props} index={index} top={layout.offsetAt(index)} />
-        ))}
+        {/* Keep the committed options in place until native scroll delivery can replace them. */}
+        <div style={{ position: 'sticky', top: 0, height: 0 }}>
+          {indices.map((index) => (
+            <Suggestion key={names[index]} {...props} index={index} top={layout.offsetAt(index) - scrollTop} />
+          ))}
+        </div>
       </div>
     </div>
   )

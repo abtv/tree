@@ -43,14 +43,15 @@ interface GlobalSearchSnapshot extends ResultPresentation {
   readonly suggestionIndex: number
 }
 
+const firstResult = { selected: 0, selectedPart: 'node' } as const
+
 const closed: GlobalSearchSnapshot = {
   items: undefined,
   query: '',
   completedQuery: '',
   completedMarkerFragments: undefined,
   pending: false,
-  selected: 0,
-  selectedPart: 'node',
+  ...firstResult,
   suggestions: [],
   completionQuery: '',
   suggestionIndex: 0,
@@ -267,9 +268,7 @@ export class GlobalSearchSession {
       ...completion,
       query,
       suggestionIndex: 0,
-      selected: 0,
-      selectedPart: 'node',
-    } as const
+    }
 
     const preparation = this.resolveMarkers(query, completion)
     const first = preparation.next()
@@ -301,7 +300,8 @@ export class GlobalSearchSession {
     this.markerNames = markerNames
     if (change !== 'refresh' && this.request?.query === effectiveQuery) {
       this.request.presentation = presentation
-      this.set({ ...next, ...(!next.pending && presentation) })
+      const replacesPresentation = !next.pending && next.completedQuery !== presentation.completedQuery
+      this.set({ ...next, ...(!next.pending && presentation), ...(replacesPresentation && firstResult) })
       return
     }
 
@@ -313,7 +313,7 @@ export class GlobalSearchSession {
     if (this.request !== request) return
     const cancel = this.source.search(effectiveQuery, (items) => {
       if (this.request !== request) return
-      this.set({ ...this.snapshot, items, ...request.presentation, pending: false })
+      this.set({ ...this.snapshot, items, ...request.presentation, ...firstResult, pending: false })
     })
     if (this.request === request) request.cancel = cancel
     else cancel()

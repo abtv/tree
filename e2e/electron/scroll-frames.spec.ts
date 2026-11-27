@@ -220,6 +220,78 @@ test('Search paints continuous results during arrows, wheel reversal, refinement
   await expect(window.locator('.node-input:focus')).toContainText('Result node 0')
 })
 
+// @requirement PRODUCT.md §20.14.4
+test('Search keeps windowed marker suggestions painted through large scroll jumps and reversals', async ({
+  userDataDir,
+}, info) => {
+  const tag = (index: number) => `#project_${String(index).padStart(4, '0')}`
+  seedDocument(userDataDir, {
+    document: {
+      roots: Array.from({ length: 1000 }, (_, index) => ({
+        id: `tag-${index}`,
+        text: `Task ${tag(index)}`,
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'tag-0' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', appearance: 'light' })
+  await setMainWindowContentSize(app, { width: 800, height: 640 })
+  await window.keyboard.press('Meta+;')
+  const input = window.getByRole('searchbox')
+  const list = window.getByRole('listbox', { name: 'Tags', exact: true })
+  const selected = list.getByRole('option', { selected: true })
+  await input.fill('#')
+  await expect(selected).toHaveText(tag(0))
+  await expect(list.getByRole('option', { name: tag(0), exact: true })).toBeInViewport()
+
+  const region = await list.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return { left: Math.ceil(rect.left + 12), top: Math.ceil(rect.top + 24), width: 240, height: 96 }
+  })
+  const top = () => list.evaluate((element) => element.scrollTop)
+  await window.mouse.move(region.left + 100, region.top + 30)
+  await capture(
+    app,
+    window,
+    info,
+    'suggestion-wheel',
+    async () => {
+      for (const delta of [900, 900, -1000, 1200, -900]) {
+        const before = await top()
+        await window.mouse.wheel(0, delta)
+        if (delta > 0) await expect.poll(top).toBeGreaterThan(before)
+        else await expect.poll(top).toBeLessThan(before)
+      }
+    },
+    region,
+  )
+
+  // Change the native offset before the scroll event can run. The previously rendered options
+  // must still cover the viewport until the new range commits.
+  const retainedOptions = await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+    const viewport = element.getBoundingClientRect()
+    return [...element.querySelectorAll('[role="option"]')].filter((option) => {
+      const rect = option.getBoundingClientRect()
+      return rect.bottom > viewport.top && rect.top < viewport.bottom
+    }).length
+  })
+  expect(retainedOptions).toBeGreaterThanOrEqual(5)
+  const last = list.getByRole('option', { name: tag(999), exact: true })
+  await expect(last).toBeInViewport()
+  expect(await list.getByRole('option').count()).toBeLessThanOrEqual(16)
+  await expect(selected).toHaveText(tag(0))
+  await expect(input).toBeFocused()
+  await window.screenshot({ path: info.outputPath('suggestion-end.png') })
+
+  await input.press('ArrowUp')
+  await expect(last).toHaveAttribute('aria-selected', 'true')
+  await input.press('Enter')
+  await expect(input).toHaveValue(tag(999))
+  await expect(input).toBeFocused()
+})
+
 for (const grouped of [false, true]) {
   // @requirement PRODUCT.md §20.14
   test(`Search bounds mounted rows in a tall viewport with ${grouped ? 'grouped' : 'root'} results`, async ({
@@ -291,6 +363,45 @@ for (const grouped of [false, true]) {
     await expect(results.getByRole('option', { selected: true })).toHaveText('Needle 99')
   })
 }
+
+// @requirement PRODUCT.md §23.1
+test('Tree and Agenda paint continuous content during rapid view changes from a distant Tree row', async ({
+  userDataDir,
+}, info) => {
+  seedDocument(userDataDir, {
+    document: {
+      roots: Array.from({ length: 1000 }, (_, index) => ({
+        id: `switch-${index}`,
+        text: `2026-10-08 Switch row ${index} ${'Readable wrapped content. '.repeat(1 + (index % 8))}`,
+        children: [],
+      })),
+    },
+    location: { currentParentId: null, selectedNodeId: 'switch-769' },
+  })
+  const { app, window } = await launchTree(userDataDir, { initialMode: 'normal', appearance: 'light' })
+  await setAgendaToday(window)
+  await setMainWindowContentSize(app, { width: 720, height: 560 })
+  const origin = window.locator('.node-row[data-node-id="switch-769"] .node-input')
+  const todayRow = window.locator('.agenda-row[data-agenda-key^="day:"][aria-selected="true"]')
+  await expect(origin).toBeFocused()
+  await expect(origin).toBeInViewport()
+
+  await capture(app, window, info, 'rapid-view-changes', async () => {
+    for (let switchIndex = 0; switchIndex < 13; switchIndex++) {
+      await window.keyboard.press('Meta+p')
+      if (switchIndex % 2 === 0) await expect(todayRow).toBeInViewport()
+      else {
+        await expect(origin).toBeFocused()
+        await expect(origin).toBeInViewport()
+      }
+      // Allow the visible compositor to sample each handoff, not just the ending Tree state.
+      await window.waitForTimeout(24)
+    }
+  })
+  await window.keyboard.press('Meta+p')
+  await expect(origin).toBeFocused()
+  await expect(origin).toBeInViewport()
+})
 
 for (const view of ['Tree', 'Agenda'] as const) {
   // @requirement PRODUCT.md §20.1

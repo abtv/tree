@@ -899,7 +899,9 @@ test.describe('Search popup geometry (mode-independent)', () => {
   })
 
   // @requirement PRODUCT.md §20.14
-  test('keeps the result list in place while an extra character is being searched @linux', async ({ userDataDir }) => {
+  test('keeps the scrolled result list in place until a refinement completes @linux', async ({
+    userDataDir,
+  }, testInfo) => {
     seedDocument(userDataDir, {
       document: {
         roots: Array.from({ length: 21 }, (_, i) => ({ id: `n${i}`, text: `Result node ${i}`, children: [] })),
@@ -911,25 +913,41 @@ test.describe('Search popup geometry (mode-independent)', () => {
     const input = window.getByRole('searchbox')
     await input.fill('nod')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
+    await input.press('ArrowUp')
+    await expect(window.getByLabel('Result position')).toHaveText('21 / 21')
     const popup = window.getByRole('dialog', { name: 'Search' })
+    const results = window.getByRole('listbox', { name: 'Search results' })
+    const last = results.locator('[data-result-id="n20"] [role="option"]')
+    const scrollTop = () => results.evaluate((element) => element.scrollTop)
     const before = await popup.boundingBox()
+    const beforeScroll = await scrollTop()
+    const beforeRow = await last.boundingBox()
+    expect(beforeScroll).toBeGreaterThan(0)
+    expect(beforeRow).not.toBeNull()
+    await window.screenshot({ path: testInfo.outputPath('search-refinement-before.png') })
     await window.clock.install()
     await window.clock.pauseAt(Date.now() + 1000)
     await controlPostedTasksWithClock(window)
 
     await input.press('e')
-    const results = window.getByRole('listbox', { name: 'Search results' })
     await expect(results).toHaveAttribute('aria-busy', 'true')
-    await window.screenshot({ path: 'test-results/search-refinement-pending.png' })
+    await window.screenshot({ path: testInfo.outputPath('search-refinement-pending.png') })
 
     expect(await popup.boundingBox()).toEqual(before)
+    expect(await scrollTop()).toBe(beforeScroll)
+    expect(await last.boundingBox()).toEqual(beforeRow)
     expect(await window.getByRole('option').count()).toBeLessThanOrEqual(40)
-    await expect(window.getByRole('option').first()).toContainText('Result node 0')
+    await expect(window.getByLabel('Result position')).toHaveText('21 / 21')
+    await input.press('ArrowUp')
+    await input.press('Enter')
+    await expect(input).toBeFocused()
+    await expect(last).toHaveAttribute('aria-selected', 'true')
     await window.clock.resume()
     await expect(results).toHaveAttribute('aria-busy', 'false')
     await expect(window.getByLabel('Result position')).toHaveText('1 / 21')
+    expect(await scrollTop()).toBe(0)
     expect(await popup.boundingBox()).toEqual(before)
-    await window.screenshot({ path: 'test-results/search-refinement-complete.png' })
+    await window.screenshot({ path: testInfo.outputPath('search-refinement-complete.png') })
   })
 
   // @requirement PRODUCT.md §20.14

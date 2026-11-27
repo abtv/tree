@@ -218,7 +218,15 @@ export function GlobalSearchPopup({
   } = useSyncExternalStore(session.subscribe, session.getSnapshot)
   const suggestionsActive = suggestions.length > 1
   const resultKeys = suggestions.length === 1 ? SINGLE_SUGGESTION_KEYS : RESULT_KEYS
-  const [windowTop, setWindowTop] = useState(0)
+  const [resultViewport, setResultViewport] = useState({ items, completedQuery, top: 0 })
+  if (resultViewport.items !== items || resultViewport.completedQuery !== completedQuery) {
+    // Select the first window before committing replacement rows, not after measuring the old offset.
+    setResultViewport({ items, completedQuery, top: 0 })
+  }
+  const windowTop = resultViewport.top
+  const setWindowTop = useCallback((top: number) => {
+    setResultViewport((current) => (current.top === top ? current : { ...current, top }))
+  }, [])
   const measurementEpoch = useMemo(() => Symbol(`results:${items?.length ?? 0}`), [items])
   const [measurement, setMeasurement] = useState<SearchMeasurement>()
   const currentMeasurement = measurement?.epoch === measurementEpoch ? measurement : undefined
@@ -265,13 +273,7 @@ export function GlobalSearchPopup({
   )
   if (resultWindow.pinnedIndex !== undefined) renderedIndices.push(resultWindow.pinnedIndex)
 
-  const resetScroll = (): void => {
-    scrollAnchor.current = undefined
-    setWindowTop(0)
-    if (panel.current) panel.current.scrollTop = 0
-  }
   const acceptSuggestion = (index?: number): void => {
-    resetScroll()
     let caret: number | undefined
     flushSync(() => {
       caret = session.acceptSuggestion(index)
@@ -316,7 +318,6 @@ export function GlobalSearchPopup({
       beforeOpen()
       restore.current = captureFocusRestoration()
       session.open()
-      setWindowTop(0)
     }
     if (openRef !== undefined) openRef.current = show
     const keydown = (event: KeyboardEvent): void => {
@@ -423,6 +424,13 @@ export function GlobalSearchPopup({
   useEffect(() => {
     if (open) input.current?.focus({ preventScroll: true })
   }, [open])
+
+  useLayoutEffect(() => {
+    // Keep the old viewport in place while its rows are still displayed. Reset only with the
+    // completed presentation, before measurement and reveal run for the replacement rows.
+    scrollAnchor.current = undefined
+    if (panel.current !== null) panel.current.scrollTop = 0
+  }, [items, completedQuery])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -532,7 +540,7 @@ export function GlobalSearchPopup({
       element.scrollTop = layout.offsetAt(anchor.index) + anchor.inset
       setWindowTop(element.scrollTop)
     }
-  }, [layout, measurement])
+  }, [layout, measurement, setWindowTop])
 
   useLayoutEffect(() => {
     if (!revealPending.current) return
@@ -543,7 +551,7 @@ export function GlobalSearchPopup({
       if (top !== windowTop) setWindowTop(top)
       else revealPending.current = false
     }
-  }, [items, selected, selectedPart, pending, suggestionsActive, windowTop, layout, revealRevision])
+  }, [items, selected, selectedPart, pending, suggestionsActive, windowTop, layout, revealRevision, setWindowTop])
 
   useEffect(() => {
     if (!open) return
@@ -558,7 +566,6 @@ export function GlobalSearchPopup({
       }
       if (state.document === document) return
       document = state.document
-      resetScroll()
       session.refresh()
     })
   })
@@ -582,7 +589,6 @@ export function GlobalSearchPopup({
           const { value } = target
           const start = target.selectionStart ?? value.length
           const end = target.selectionEnd ?? value.length
-          resetScroll()
           if (session.isComposing() && isCommittedCompositionInput(event.nativeEvent))
             session.endComposition(value, start, end)
           else session.edit(value, false, start, end)
@@ -599,7 +605,6 @@ export function GlobalSearchPopup({
         }}
         onCompositionEnd={(event) => {
           if (!session.isComposing()) return
-          resetScroll()
           const target = event.currentTarget
           session.endComposition(
             target.value,

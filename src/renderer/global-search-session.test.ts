@@ -227,7 +227,8 @@ describe('global Search session', () => {
     (query) => {
       const { session, requests } = fixture()
       session.edit('first')
-      requests[0]!.publish([initial[0]!])
+      requests[0]!.publish(initial)
+      session.moveResult(1)
 
       session.edit(query)
       session.moveResult(1)
@@ -236,20 +237,25 @@ describe('global Search session', () => {
       expect(session.getSnapshot()).toMatchObject({
         query,
         completedQuery: 'first',
-        items: [initial[0]],
+        items: initial,
         pending: true,
-        selected: 0,
+        selected: 1,
       })
       expect(session.takeResult()).toBeUndefined()
 
       requests[0]!.publish([])
 
       expect(session.getSnapshot().pending).toBe(true)
-      expect(session.getSnapshot().items).toEqual([initial[0]])
+      expect(session.getSnapshot().items).toBe(initial)
 
       requests[1]!.publish([initial[1]!])
 
-      expect(session.getSnapshot()).toMatchObject({ completedQuery: query, items: [initial[1]], pending: false })
+      expect(session.getSnapshot()).toMatchObject({
+        completedQuery: query,
+        items: [initial[1]],
+        pending: false,
+        selected: 0,
+      })
       expect(session.takeResult()).toBe('second')
       expect(session.getSnapshot().items).toBeUndefined()
     },
