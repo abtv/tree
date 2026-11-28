@@ -4,7 +4,6 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Consistent Vim character Visual mode](vim-visual-consistency.md) | Awaiting owner acceptance | Owner acceptance |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 
