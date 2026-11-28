@@ -4076,6 +4076,20 @@ describe('editor keyboard handler', () => {
         hadText: true,
       })
     })
+
+    // @requirement PRODUCT.md §4.3
+    it('remembers incoming text that ends with an emoji up to the start of that emoji', async () => {
+      const { input, press, vim, node } = await textFixture({ id: 'node', text: 'red blue', children: [] }, 'visual')
+      vim.register.current = { kind: 'text', value: 'go👩‍💻' }
+      input.setSelectionRange(4, 8)
+
+      press('p')
+
+      // The Visual put repeat counts the four replaced characters, and `gv` ends on the whole emoji.
+      expect(node().text).toBe('red go👩‍💻')
+      expect(vim.commandState.lastVisual).toMatchObject({ anchor: 4, focus: 6 })
+      expect(vim.commandState.lastChange).toEqual({ kind: 'overwrite', text: 'go👩‍💻', replaced: 4 })
+    })
   })
 
   it('handles p and P without editing when the local register is empty', async () => {

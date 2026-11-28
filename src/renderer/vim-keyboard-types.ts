@@ -37,6 +37,7 @@ export type VimTextChange =
       /** Set for `gp` and `gP`: the caret goes to the character after the inserted text. */
       past?: boolean
     }
+  /** `replaced` counts whole characters (grapheme clusters), not UTF-16 code units. */
   | { kind: 'overwrite'; text: string; replaced: number }
   | {
       kind: 'case'

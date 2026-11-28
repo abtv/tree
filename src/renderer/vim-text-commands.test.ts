@@ -32,6 +32,22 @@ describe('Vim text command calculations', () => {
   })
 
   // @requirement PRODUCT.md §4.3
+  it.each([
+    ['r', { kind: 'replace', character: 'z', count: 1 }, 1, 'azb', 1],
+    ['2r', { kind: 'replace', character: 'z', count: 2 }, 1, 'azz', 2],
+    ['s', { kind: 'substitute', count: 1, insertedText: 'z' }, 1, 'azb', 1],
+    ['~', { kind: 'case', mode: 'toggle', count: 2 }, 1, 'a👩‍💻B', 7],
+    ['p', { kind: 'paste', text: 'z', after: true }, 1, 'a👩‍💻zb', 6],
+    ['a Replace repeat', { kind: 'overwrite', text: 'z', replaced: 1 }, 1, 'azb', 1],
+  ] as const)('keeps a joined emoji whole for %s', (_name, change, cursor, nextText, nextCursor) => {
+    expect(calculateTextChange('a👩‍💻b', cursor, change)).toMatchObject({ kind: 'edit', nextText, nextCursor })
+  })
+
+  it('does not replace past the end of the text when r has too large a count', () => {
+    expect(calculateTextChange('a👩‍💻b', 1, { kind: 'replace', character: 'z', count: 3 })).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §4.3
   it('enters Insert after the complete emoji with a', () => {
     expect(insertPosition('A👩‍💻Z', 1, 'a')).toBe(6)
   })

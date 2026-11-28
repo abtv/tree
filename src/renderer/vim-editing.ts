@@ -219,9 +219,11 @@ export function firstNonWhitespace(text: string): number {
   return text.search(/\S/u) === -1 ? 0 : text.search(/\S/u)
 }
 
-export function vimPastePosition(textLength: number, cursor: number, after: boolean): number {
-  const boundedCursor = Math.max(0, Math.min(cursor, textLength))
-  return after ? Math.min(boundedCursor + 1, textLength) : boundedCursor
+/** Where `p` (after) or `P` (before) inserts: after puts past the whole character under the cursor. */
+export function vimPastePosition(text: string, cursor: number, after: boolean): number {
+  const boundedCursor = Math.max(0, Math.min(cursor, text.length))
+  if (!after || boundedCursor >= text.length) return boundedCursor
+  return moveCharacterOffset(text, boundedCursor, 1)
 }
 
 export function isImageCaretCursor(hasAttachment: boolean, textLength: number, cursor: number): boolean {

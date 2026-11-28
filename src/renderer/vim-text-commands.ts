@@ -24,7 +24,7 @@ import type { LinkedTextEdit, LinkRange } from '../domain/document'
 import type { VimFindCommand } from './vim-keyboard-types'
 import type { VimSurroundChange, VimTextChange } from './vim-keyboard-types'
 import { vimPastePosition } from './vim-editing'
-import { moveCharacterOffset } from '../domain/text-characters'
+import { characterBoundaries, characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 // Mutation triage: `Number('')` is `0`, which the surrounding `Math.max(1, ...)` raises to `1`, so
 // both the empty-string test and its forced-false branch are equivalent to the literal `1`.
@@ -248,12 +248,14 @@ export function calculateTextChange(
     inserted = change.insertedText ?? ''
     nextCursor = start + Math.max(0, inserted.length - 1)
   } else if (change.kind === 'replace') {
-    end = cursor + change.count
-    if (end > text.length || start === end) return undefined
+    // `r` replaces whole characters, and only when the count fits before the end, as in Vim.
+    const following = characterBoundaries(text).filter((boundary) => boundary > cursor)
+    if (cursor >= text.length || change.count <= 0 || following.length < change.count) return undefined
+    end = following[change.count - 1]!
     inserted = change.character.repeat(change.count)
-    nextCursor = Math.max(cursor, end - 1)
+    nextCursor = start + inserted.length - change.character.length
   } else if (change.kind === 'substitute') {
-    end = Math.min(text.length, cursor + change.count)
+    end = moveCharacterOffset(text, cursor, 1, change.count)
     inserted = change.insertedText ?? ''
     nextCursor = start + Math.max(0, inserted.length - 1)
   } else if (change.kind === 'insert') {
@@ -262,18 +264,19 @@ export function calculateTextChange(
     inserted = change.insertedText ?? ''
     nextCursor = start + Math.max(0, inserted.length - 1)
   } else if (change.kind === 'paste') {
-    start = vimPastePosition(text.length, cursor, change.after)
+    start = vimPastePosition(text, cursor, change.after)
     end = start
     inserted = change.text
     // `gp` and `gP` leave the caret on the character after the text; the Normal caret clamps it.
     nextCursor = start + inserted.length - (change.past === true ? 0 : 1)
   } else if (change.kind === 'overwrite') {
-    end = Math.min(text.length, cursor + change.replaced)
+    // `replaced` counts whole characters, so a repeat never splits an emoji it overwrites.
+    end = change.replaced > 0 ? moveCharacterOffset(text, cursor, 1, change.replaced) : cursor
     inserted = change.text
-    nextCursor = cursor + Math.max(0, inserted.length - 1)
+    nextCursor = cursor + (inserted === '' ? 0 : characterStart(inserted, inserted.length - 1))
     // Mutation triage: `case` is the last arm of an exhaustive union, so only `case` reaches it.
   } else if (change.kind === 'case') {
-    if (change.motion === undefined) end = Math.min(text.length, cursor + change.count)
+    if (change.motion === undefined) end = moveCharacterOffset(text, cursor, 1, change.count)
     else {
       const range = textMotion(text, cursor, change.motion, change.count)
       if (range === undefined) return undefined

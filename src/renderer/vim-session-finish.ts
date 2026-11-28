@@ -1,5 +1,6 @@
 import type { EditorStore } from '../application/editor-store'
 import { requireNode } from '../domain/document'
+import { characterBoundaries } from '../domain/text-characters'
 import { getCaret, hasMultiCharacterSelection, readEditableContent, setEditableText } from './editor-dom'
 import { editCaretTransition, type VimCaretState } from './vim-caret-transition'
 import {
@@ -274,7 +275,7 @@ export function finishReplaceSession(
   recordRepeatChange(commandState, {
     kind: 'overwrite',
     text: session.typed,
-    replaced: replacedEnd - replacedStart,
+    replaced: characterBoundaries(session.baseline.slice(replacedStart, replacedEnd)).length - 1,
   })
   const state = store.getSnapshot()
   const hasAttachment =

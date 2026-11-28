@@ -55,7 +55,7 @@ import { horizontalNavigation } from './vim-horizontal-navigation'
 import { agendaAllows } from './agenda-key-policy'
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import type { ShortcutProfile } from './shortcut-profile'
-import { characterStart, moveCharacterOffset } from '../domain/text-characters'
+import { characterBoundaries, characterStart, moveCharacterOffset } from '../domain/text-characters'
 
 /** The seven Normal-mode fold keys after the `z` prefix (`docs/PRODUCT.md` §20.2.15). */
 export const FOLD_COMMANDS: Readonly<Record<string, VimFoldCommand>> = {
@@ -899,18 +899,20 @@ export function handleVimKey(
         // `p` exchanges: the removed selection becomes the register. `P` keeps the incoming one.
         if (event.key === 'p') vim.register.current = { kind: 'text', value: removed }
         // `gv` after a Visual put selects the incoming text (T7).
-        rememberTextVisual(commandState, node.id, selection.start, selection.start + incoming.length - 1, true)
+        // The last incoming character may be an emoji, so its start, not the last code unit, ends the range.
+        const lastIncoming = selection.start + characterStart(incoming, incoming.length - 1)
+        rememberTextVisual(commandState, node.id, selection.start, lastIncoming, true)
         vim.imageTextCursor.current = undefined
         recordRepeatChange(commandState, {
           kind: 'overwrite',
           text: incoming,
-          replaced: selection.end - selection.start,
+          replaced: characterBoundaries(removed).length - 1,
         })
         leaveVisual(
           vim,
           node,
           input,
-          selection.start + Math.max(0, incoming.length - 1),
+          lastIncoming,
           node.text.length - (selection.end - selection.start) + incoming.length,
         )
       }

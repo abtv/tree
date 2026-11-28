@@ -63,6 +63,53 @@ test.describe('Vim editing: text editing', () => {
 
       await expect.poll(value).toBe(`${prefix} z`)
     })
+
+    // @requirement PRODUCT.md §4.3
+    test(`replaces, puts after and overwrites a joined emoji whole (${rich ? 'rich' : 'plain'})`, async ({
+      userDataDir,
+    }) => {
+      const prefix = rich ? '#go' : 'go'
+      const emoji = '👩🏽‍🚀'
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: `${prefix} ${emoji}z`, children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      const value = () =>
+        editor.evaluate((element) =>
+          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+        )
+      const onEmoji = prefix.length + 1
+
+      await setCursor(editor, onEmoji)
+      await window.keyboard.press('r')
+      await window.keyboard.press('y')
+
+      await expect.poll(value).toBe(`${prefix} yz`)
+
+      await window.keyboard.press('u')
+      await expect.poll(value).toBe(`${prefix} ${emoji}z`)
+      await setCursor(editor, onEmoji)
+
+      // `p` puts after the whole emoji, not between its code units.
+      await window.keyboard.press('y')
+      await window.keyboard.press('l')
+      await window.keyboard.press('p')
+
+      await expect.poll(value).toBe(`${prefix} ${emoji}${emoji}z`)
+
+      await window.keyboard.press('u')
+      await expect.poll(value).toBe(`${prefix} ${emoji}z`)
+      await setCursor(editor, onEmoji)
+
+      // Replace mode overwrites the whole emoji with one typed character, and `.` repeats it.
+      await window.keyboard.press('R')
+      await window.keyboard.type('Q')
+      await window.keyboard.press('Escape')
+
+      await expect.poll(value).toBe(`${prefix} Qz`)
+    })
   }
 
   for (const rich of [false, true]) {

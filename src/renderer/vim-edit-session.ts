@@ -1,6 +1,7 @@
 import type { NodeForest, NodeVisualCommand } from '../application/editor-store'
 import { cloneNode, type TreeNode } from '../domain/document'
 import { lowercaseTypedMarkerText } from '../domain/tags'
+import { characterBoundaries, moveCharacterOffset } from '../domain/text-characters'
 import type { VimRegister, VimTextChange } from './vim-keyboard-types'
 
 export interface VimTextDiff {
@@ -78,9 +79,15 @@ function replaceLength(
   session: Pick<VimReplaceSession, 'baseline' | 'position' | 'typed' | 'typedKeyLengths' | 'selectionEnd'>,
 ): number {
   if (session.typed === '') return 0
-  const selected = (session.selectionEnd ?? session.position) - session.position
-  const keys = session.typedKeyLengths?.length ?? session.typed.length
-  return Math.min(keys + Math.max(0, selected - 1), session.baseline.length - session.position)
+  const { baseline, position } = session
+  const keys = session.typedKeyLengths?.length ?? characterBoundaries(session.typed).length - 1
+  // The first key replaces a pointer-selected word whole; every key overwrites one whole character,
+  // so an emoji is replaced entirely and never split.
+  const first =
+    session.selectionEnd !== undefined && session.selectionEnd > position
+      ? session.selectionEnd
+      : moveCharacterOffset(baseline, position, 1)
+  return Math.min(moveCharacterOffset(baseline, first, 1, keys - 1), baseline.length) - position
 }
 
 /**

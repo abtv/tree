@@ -34,6 +34,15 @@ it.each(['#', '@', '&'])('lowercases Replace typing after %s while Backspace res
   expect(resolveReplaceCommit(session)?.finalText).toBe(`${prefix}Oldyame`)
 })
 
+// @requirement PRODUCT.md §4.3
+it('overwrites a whole joined emoji for each Replace key, never half of it', () => {
+  const session = { nodeId: 'n', baseline: 'a👩‍💻b', position: 1, typed: '' }
+
+  expect(applyReplaceKey(session, 'z')).toEqual({ workingText: 'azb', cursor: 2 })
+  expect(applyReplaceKey(session, 'y')).toEqual({ workingText: 'azy', cursor: 3 })
+  expect(resolveReplaceCommit(session)).toEqual({ finalText: 'azy', replacedStart: 1, replacedEnd: 7, rawCursor: 3 })
+})
+
 // @requirement PRODUCT.md §20.13
 it('lowercases Replace typing after a bare prefix and after a newly typed prefix', () => {
   const existing = { nodeId: 'n', baseline: '@', position: 1, typed: '' }

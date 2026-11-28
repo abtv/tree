@@ -236,18 +236,23 @@ describe('Vim counted word objects', () => {
 
 describe('Vim paste positions', () => {
   it('puts after the current character for p', () => {
-    expect(vimPastePosition(3, 1, true)).toBe(2)
-    expect(vimPastePosition(3, 2, true)).toBe(3)
+    expect(vimPastePosition('abc', 1, true)).toBe(2)
+    expect(vimPastePosition('abc', 2, true)).toBe(3)
+  })
+
+  // @requirement PRODUCT.md §4.3
+  it('puts after a whole joined emoji for p, never inside it', () => {
+    expect(vimPastePosition('a👩‍💻b', 1, true)).toBe(6)
   })
 
   it('puts before the current character for P', () => {
-    expect(vimPastePosition(3, 1, false)).toBe(1)
+    expect(vimPastePosition('abc', 1, false)).toBe(1)
   })
 
   it('clamps positions for empty and boundary nodes', () => {
-    expect(vimPastePosition(0, 0, true)).toBe(0)
-    expect(vimPastePosition(3, 99, false)).toBe(3)
-    expect(vimPastePosition(3, -1, false)).toBe(0)
+    expect(vimPastePosition('', 0, true)).toBe(0)
+    expect(vimPastePosition('abc', 99, false)).toBe(3)
+    expect(vimPastePosition('abc', -1, false)).toBe(0)
   })
 })
 
