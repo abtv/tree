@@ -420,7 +420,13 @@ export function AgendaView({
       viewportState.navigate('pointer')
       store.search.cancelDraft()
       store.search.interruptNavigation()
-      if (vim !== undefined) clearCommandAssembly(vim.commandState)
+      if (vim !== undefined) {
+        clearCommandAssembly(vim.commandState)
+        // A click on another row ends a character Visual selection, as a click elsewhere does in Vim.
+        const current = store.getSnapshot()
+        if (vim.mode === 'visual' && current.status === 'ready' && current.agenda?.selectedKey !== key)
+          vim.setMode('normal')
+      }
       store.applyAgenda({ kind: 'select', key, rowIndex })
     },
     [store, vim, viewportState],
@@ -431,7 +437,14 @@ export function AgendaView({
       if (row === undefined) return
       viewportState.navigate('pointer')
       if (vim !== undefined) clearCommandAssembly(vim.commandState)
+      const before = store.getSnapshot()
+      const selectedKey = before.status === 'ready' ? before.agenda?.selectedKey : undefined
       store.applyAgenda({ kind: 'toggle-fold', key })
+      // A collapse that hides the selected entry selects its day, so a character Visual selection
+      // ends as for any move to another row; an unrelated fold keeps it (PRODUCT §20.2.6, §23.5).
+      const after = store.getSnapshot()
+      if (vim?.mode === 'visual' && after.status === 'ready' && after.agenda?.selectedKey !== selectedKey)
+        vim.setMode('normal')
     },
     [store, vim, viewportState],
   )

@@ -26,6 +26,29 @@ it('returns to the editor after confirming a Vim query', () => {
   expect(restoreEditor).toHaveBeenCalledOnce()
 })
 
+// @requirement PRODUCT.md §20.2.6
+it('resolves the editor modes after returning focus and before Cmd+P switches the view', () => {
+  const store = createEditorStoreDouble()
+  const calls: string[] = []
+  vi.spyOn(store, 'openAgenda').mockImplementation(() => {
+    calls.push('switch')
+  })
+  render(
+    <SearchPrompt
+      store={store}
+      snapshot={{ confirmed: '', draft: 'apple', visible: true, pending: false }}
+      restoreEditor={() => calls.push('restore')}
+      beforeViewChange={() => calls.push('prepare')}
+      vim
+    />,
+  )
+
+  fireEvent.keyDown(screen.getByRole('textbox', { name: 'Search' }), { key: 'p', metaKey: true })
+
+  // A switch from Find reaches another view, so Visual mode ends as for any other Cmd+P.
+  expect(calls).toEqual(['restore', 'prepare', 'switch'])
+})
+
 it('confirms backward with Shift+Enter while retaining input focus', () => {
   const store = createEditorStoreDouble()
   const confirm = vi.spyOn(store.search, 'confirm')

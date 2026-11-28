@@ -40,6 +40,7 @@ import { createViewportReveal } from './viewport-reveal'
 import { moveViewportSelection } from './vim-viewport-motion'
 import type { VimFoldCommand, VimRegister, VimStructuralChange, VimViewportMotion } from './vim-keyboard-types'
 import {
+  clearCommandAssembly,
   clearVisualRange,
   createVimCommandState,
   followVisualRange,
@@ -206,8 +207,11 @@ export function useNodeInputBindings({
   )
   const decorateCompletionBindings = completion.decorate
 
+  // The one writer of the renderer Vim mode. Character Visual mode and its range end together, so
+  // every transition out of `'visual'` clears the range here (docs/PRODUCT.md §20.2.20).
   const changeVimMode = useCallback(
     (mode: VimMode): void => {
+      if (mode !== 'visual') clearVisualRange(vimCommandState.current)
       caretProjection.current.changeMode(mode)
       setVimMode(mode)
     },
@@ -790,8 +794,18 @@ export function useNodeInputBindings({
       }
     }
 
-    // React can replace a class or underline span without emitting selectionchange.
+    // Character Visual mode never outlives its range or the node editor that owns it. A path that
+    // reached another node, or lost the range, without leaving the mode ends it here, at the one
+    // projection point, rather than showing Visual mode with nothing selected (docs/PRODUCT.md §20.2.6).
     const active = document.activeElement
+    if (projection.mode === 'visual' && active instanceof HTMLElement) {
+      const activeNodeId = [...inputs.current.entries()].find(([, candidate]) => candidate === active)?.[0]
+      const range = vimCommandState.current
+      if (activeNodeId !== undefined && (range.visualAnchor === undefined || range.visualNodeId !== activeNodeId))
+        changeVimMode('normal')
+    }
+
+    // React can replace a class or underline span without emitting selectionchange.
     if (active instanceof HTMLElement && active.classList.contains('node-input')) {
       active.classList.toggle('node-input-text-selected', hasMultiCharacterSelection(active))
       // Re-rendered text replaces the underline spans, so the caret rule is applied again after a commit.
@@ -1003,7 +1017,7 @@ export function useNodeInputBindings({
       )
       // The release remembers the selection for `gv`; a press that never settles leaves that memory alone.
       if (released) setVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus, target.text.length > 0)
-      else followVisualRange(vimCommandState.current, next.anchor, next.focus)
+      else followVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus)
       changeVimMode('visual')
     }
     const holdsPressedEditor = (pressed: HeldTextPress | undefined): pressed is HeldTextPress =>
@@ -1101,6 +1115,19 @@ export function useNodeInputBindings({
       // A node drag blurs the pressed editor, and a cancelled or interrupted press changes no mode.
       const pressed = heldTextPress.current
       heldTextPress.current = undefined
+      // A click on node text ends whole-node Visual mode, as a click ends Visual mode in Vim; the
+      // release then settles as a press in Normal mode. A press that became a node drag blurred its
+      // editor first, so a reorder keeps the mode (PRODUCT §20.2.6, §20.2.8).
+      if (
+        event.type === 'pointerup' &&
+        pressed !== undefined &&
+        pressed.input === document.activeElement &&
+        caretProjection.current.mode === 'visual-node'
+      ) {
+        setNodeVisualSelection(undefined)
+        clearCommandAssembly(vimCommandState.current)
+        changeVimMode('normal')
+      }
       if (event instanceof MouseEvent && event.type === 'pointerup' && holdsPressedEditor(pressed)) {
         pressed.point = { x: event.clientX, y: event.clientY }
         settlePointerSelection(pressed, true)
@@ -1143,7 +1170,7 @@ export function useNodeInputBindings({
       globalThis.removeEventListener('blur', onRelease)
       normalCaretResizeObserver.current = undefined
     }
-  }, [applyCaretState, changeVimMode, finishVimReplace, endFollowedVisual, shortcuts, store])
+  }, [applyCaretState, changeVimMode, finishVimReplace, endFollowedVisual, setNodeVisualSelection, shortcuts, store])
 
   const bindings = useCallback(
     (node: TreeNode): NodeInputBindings =>

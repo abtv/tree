@@ -46,6 +46,7 @@ import {
   recordRepeatChange,
   rememberTextVisual,
   setVisualRange,
+  visualTextRange,
   takeVimCharacter,
 } from './vim-command-state'
 import { editCaretTransition } from './vim-caret-transition'
@@ -209,8 +210,10 @@ export function handleVimKey(
   }
   const input = event.currentTarget
   const cursor = getCaret(input)
-  const selection = getSelectionRange(input)
   const visual = vim.mode === 'visual'
+  // Visual commands act on the live Visual range, which is what the mode shows; the native selection
+  // can still be settling after a pointer drag or a re-render (PRODUCT §20.2.20).
+  const selection = (visual ? visualTextRange(commandState, node.text) : undefined) ?? getSelectionRange(input)
   const motionCursor = visual ? (commandState.visualFocus ?? cursor) : cursor
   const move = (target: number, allowAttachment = false): void => {
     const maximum =
@@ -831,8 +834,8 @@ export function handleVimKey(
   } else if (visual && event.key === 'v') {
     leaveVisual(vim, node, input, motionCursor, node.text.length)
   } else if (visual && event.key === 'o') {
-    const anchor = commandState.visualAnchor ?? selection.start
-    const focus = commandState.visualFocus ?? selection.end - 1
+    const anchor = commandState.visualAnchor ?? cursor
+    const focus = commandState.visualFocus ?? cursor
     setVisualRange(commandState, node.id, focus, anchor, node.text.length > 0)
     setSelectionRange(input, Math.min(anchor, focus), moveCharacterOffset(node.text, Math.max(anchor, focus), 1))
   } else if (visual && (event.key === 'd' || event.key === 'y' || event.key === 'x')) {

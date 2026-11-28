@@ -12,7 +12,7 @@ import { createRealStoreHarness } from './test/real-store-harness'
 import type { RealStoreOptions } from './test/real-store-harness'
 import { createVimKeyboardDouble } from './test/vim-keyboard-double'
 import type { VimCaretState } from './vim-caret-transition'
-import { clearPending } from './vim-command-state'
+import { clearPending, setVisualRange } from './vim-command-state'
 import { setNormalCaret } from './editor-dom'
 import * as editorDom from './editor-dom'
 import { APPLE_SHORTCUTS, OTHER_SHORTCUTS } from './shortcut-profile'
@@ -2316,8 +2316,8 @@ describe('editor keyboard handler', () => {
       input.setSelectionRange(2, 2)
       const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, mode)
       vim.commandState.pending = { count: '2', motionCount: '', prefix: 'g' }
-      vim.commandState.visualAnchor = 0
-      vim.commandState.visualFocus = 2
+      // Only character Visual mode owns a range.
+      if (mode === 'visual') setVisualRange(vim.commandState, 'node', 0, 2, true)
       vim.finishReplace = vi.fn(() => true)
       const event = keyEvent(input, 'p', { metaKey: true })
 
@@ -2329,7 +2329,8 @@ describe('editor keyboard handler', () => {
       expect(vim.commandState.pending).toBeUndefined()
       expect(vim.commandState.visualAnchor).toBeUndefined()
       expect(vim.commandState.visualFocus).toBeUndefined()
-      expect(vim.mode).toBe(mode === 'replace' || mode === 'visual-node' ? 'normal' : mode)
+      // Opening Agenda reaches another place, so both Visual modes end (PRODUCT §20.2.6).
+      expect(vim.mode).toBe(mode === 'insert' ? 'insert' : 'normal')
       if (mode === 'replace') {
         expect(vim.finishReplace).toHaveBeenCalledWith(input, false)
         expect(vi.mocked(vim.finishReplace).mock.invocationCallOrder[0]).toBeLessThan(
@@ -2483,82 +2484,30 @@ describe('editor keyboard handler', () => {
     expect(store.enter).not.toHaveBeenCalled()
   })
 
-  it('keeps character Visual mode but clears its command assembly before Cmd+.', () => {
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    { name: 'Cmd+.', key: '.', options: { metaKey: true }, command: 'enter' },
+    { name: 'Cmd+,', key: ',', options: { metaKey: true }, command: 'leave' },
+    { name: 'Cmd+Backspace', key: 'Backspace', options: { metaKey: true }, command: 'deleteSelected' },
+    { name: 'Cmd+Z', key: 'z', options: { metaKey: true }, command: 'undo' },
+    { name: 'Cmd+Shift+Z', key: 'z', options: { metaKey: true, shiftKey: true }, command: 'redo' },
+  ] as const)('ends character Visual mode and its range before $name', ({ key, options, command }) => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 1
+    setVisualRange(vim.commandState, 'node', 0, 1, true)
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
-    handle(keyEvent(input, '.', { metaKey: true }))
+    handle(keyEvent(input, key, options))
 
-    expect(store.enter).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('visual')
+    expect(store[command]).toHaveBeenCalledOnce()
+    expect(vim.mode).toBe('normal')
     expect(vim.commandState.visualAnchor).toBeUndefined()
     expect(vim.commandState.visualFocus).toBeUndefined()
     expect(vim.commandState.pending).toBeUndefined()
-  })
-
-  it('keeps character Visual mode but clears its command assembly before Cmd+,', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'text'
-    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 1
-
-    handle(keyEvent(input, ',', { metaKey: true }))
-
-    expect(store.leave).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('visual')
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
-  })
-
-  it('keeps character Visual mode but clears its command assembly before Cmd+Backspace', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'text'
-    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 1
-
-    handle(keyEvent(input, 'Backspace', { metaKey: true }))
-
-    expect(store.deleteSelected).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('visual')
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
-  })
-
-  it('keeps character Visual mode but clears its command assembly before Cmd+Z and Cmd+Shift+Z', () => {
-    const store = createStore()
-    const input = document.createElement('textarea')
-    input.value = 'text'
-    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 1
-    vim.commandState.pending = { count: '', motionCount: '', prefix: 'a' }
-
-    handle(keyEvent(input, 'z', { metaKey: true }))
-
-    expect(store.undo).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('visual')
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
-    expect(vim.commandState.pending).toBeUndefined()
-
-    vim.commandState.visualAnchor = 2
-    vim.commandState.visualFocus = 3
-
-    handle(keyEvent(input, 'z', { metaKey: true, shiftKey: true }))
-
-    expect(store.redo).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('visual')
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
+    // The `gv` memory keeps the selection the command ended.
+    expect(vim.commandState.lastVisual).toEqual({ kind: 'text', nodeId: 'node', anchor: 0, focus: 1, hadText: true })
   })
 
   it.each([
@@ -2710,18 +2659,18 @@ describe('editor keyboard handler', () => {
       expect(vim.mode).toBe('normal')
     })
 
-    it('toggles the current node in character Visual mode and keeps the mode', () => {
+    it('toggles the current node in character Visual mode and keeps the mode and its range', () => {
       const store = createStore()
       const input = textInput()
       const { handle, vim } = vimHandler(store, node, 'visual')
-      vim.commandState.visualAnchor = 0
-      vim.commandState.visualFocus = 2
+      setVisualRange(vim.commandState, 'node', 0, 2, true)
 
       handle(keyEvent(input, 'Enter', { metaKey: true }))
 
       expect(store.toggleStrikethrough).toHaveBeenCalledExactlyOnceWith('node', 'node')
       expect(vim.mode).toBe('visual')
-      expect(vim.commandState.visualAnchor).toBeUndefined()
+      // The toggle neither replaces the selection nor moves to another node, so `d` still deletes it.
+      expect([vim.commandState.visualAnchor, vim.commandState.visualFocus]).toEqual([0, 2])
     })
 
     it('toggles the whole-node Visual range and returns to Normal mode', () => {
@@ -3270,18 +3219,18 @@ describe('editor keyboard handler', () => {
     expect(vim.commandState.visualFocus).toBeUndefined()
   })
 
-  it('keeps character Visual mode but clears its command assembly before Cmd+A', () => {
+  // @requirement PRODUCT.md §20.2.6
+  it('ends character Visual mode and its range before Cmd+A selects all text', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 2
+    setVisualRange(vim.commandState, 'node', 0, 2, true)
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, 'a', { metaKey: true }))
 
-    expect(vim.mode).toBe('visual')
+    expect(vim.mode).toBe('normal')
     expect(vim.commandState.visualAnchor).toBeUndefined()
     expect(vim.commandState.visualFocus).toBeUndefined()
     expect(vim.commandState.pending).toBeUndefined()
@@ -3387,19 +3336,19 @@ describe('editor keyboard handler', () => {
     else expect(store.cut).toHaveBeenCalledWith('node', 0, 1)
   })
 
-  it('keeps character Visual mode but clears its command assembly before Cmd+V', () => {
+  // @requirement PRODUCT.md §20.2.6
+  it('ends character Visual mode and its range before Cmd+V pastes at the selection start', () => {
     const store = createStore()
     const input = document.createElement('textarea')
     input.value = 'text'
     input.setSelectionRange(0, 2)
     const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    vim.commandState.visualAnchor = 0
-    vim.commandState.visualFocus = 2
+    setVisualRange(vim.commandState, 'node', 0, 1, true)
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, 'v', { metaKey: true }))
 
-    expect(vim.mode).toBe('visual')
+    expect(vim.mode).toBe('normal')
     expect(vim.commandState.visualAnchor).toBeUndefined()
     expect(vim.commandState.visualFocus).toBeUndefined()
     expect(vim.commandState.pending).toBeUndefined()
@@ -4029,6 +3978,17 @@ describe('editor keyboard handler', () => {
       visual.press('g', 'v')
 
       expect(visual.vim.restoreVisual).not.toHaveBeenCalled()
+    })
+
+    // @requirement PRODUCT.md §20.2.20
+    it('exchanges ends at the caret, never before the text, when Visual mode has lost its range', async () => {
+      const { input, press, vim } = await textFixture({ id: 'node', text: 'one two', children: [] }, 'visual')
+      input.setSelectionRange(0, 0)
+
+      press('o')
+
+      expect(vim.commandState.lastVisual).toEqual({ kind: 'text', nodeId: 'node', anchor: 0, focus: 0, hadText: true })
+      expect([input.selectionStart, input.selectionEnd]).toEqual([0, 1])
     })
 
     it('remembers a character Visual selection written by v, a motion, a text object, and o', async () => {

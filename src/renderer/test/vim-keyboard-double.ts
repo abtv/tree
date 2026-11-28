@@ -2,6 +2,7 @@ import { vi } from 'vitest'
 import {
   beginStructuralChildOpen,
   beginStructuralOpen,
+  clearVisualRange,
   createVimCommandState,
   type VimCommandState,
 } from '../vim-command-state'
@@ -90,7 +91,9 @@ export function createVimKeyboardDouble(
     moveViewport: vi.fn(),
     revealVerticalCaret: vi.fn(),
     syncImageCaretToFocus: vi.fn(),
+    // Mirrors the bindings' one mode writer: character Visual mode and its range end together.
     setMode: vi.fn((next: VimMode) => {
+      if (next !== 'visual') clearVisualRange(commandState)
       vim.mode = next
     }),
     openAttachment: options.onPreviewAttachment ?? vi.fn(),

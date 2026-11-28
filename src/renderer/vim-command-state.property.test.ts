@@ -252,10 +252,9 @@ it('keeps each direct owner write in one slot and each transition scoped to its 
           model.visualAnchor = undefined
           model.visualFocus = undefined
         } else {
+          // The Visual range belongs to Visual mode, not to the command assembly.
           clearCommandAssembly(state)
           model.pending = undefined
-          model.visualAnchor = undefined
-          model.visualFocus = undefined
         }
       }
 

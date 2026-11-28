@@ -3774,9 +3774,14 @@ describe('useNodeInputBindings', () => {
     expect(f.result.current.vimMode).toBe('normal')
   })
 
-  it.each(['pointer', 'blur', 'enter'])(
-    'clears character Visual endpoints through %s and re-anchors the next motion',
-    async (path) => {
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    { path: 'pointer', mode: 'normal', selection: [4, 5] },
+    { path: 'blur', mode: 'visual', selection: [0, 2] },
+    { path: 'enter', mode: 'normal', selection: [1, 2] },
+  ] as const)(
+    'ends character Visual mode with its range, or keeps both, through $path',
+    async ({ path, mode, selection }) => {
       const f = await fixture({ document: { roots: [node('a', 'Alpha')] } })
       f.input().setSelectionRange(0, 0)
 
@@ -3785,6 +3790,7 @@ describe('useNodeInputBindings', () => {
         f.input().setSelectionRange(3, 3)
         act(() => f.bindings().onMouseDown({ currentTarget: f.input(), button: 0 } as never))
       } else if (path === 'blur') {
+        // A blur with no destination, such as a removed and remounted input, keeps the mode and range.
         act(() => f.bindings().onBlur())
         f.input().setSelectionRange(0, 0)
       } else {
@@ -3795,10 +3801,13 @@ describe('useNodeInputBindings', () => {
         f.input('a').setSelectionRange(0, 0)
       }
 
+      // Visual mode never remains without its range, so the next `l` is a motion of the mode it shows.
+      expect(f.result.current.vimMode).toBe(mode)
+
       f.press('l', {}, 'a')
 
-      expect(f.result.current.vimMode).toBe('visual')
-      expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual(path === 'pointer' ? [3, 5] : [0, 2])
+      expect(f.result.current.vimMode).toBe(mode)
+      expect([f.input('a').selectionStart, f.input('a').selectionEnd]).toEqual(selection)
     },
   )
 
@@ -3817,6 +3826,149 @@ describe('useNodeInputBindings', () => {
     expect(f.snapshot().location.currentParentId).toBeNull()
     expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['b'])
   })
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    { name: 'an undo with no history', key: 'z', modifiers: { metaKey: true } },
+    { name: 'a redo with no history', key: 'z', modifiers: { metaKey: true, shiftKey: true } },
+    { name: 'a leave at the top level', key: ',', modifiers: { metaKey: true } },
+  ])('draws the Normal block at the active end when $name ends character Visual mode', async ({ key, modifiers }) => {
+    const f = await fixture({ document: { roots: [node('a', 'Alpha')] } })
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(0, 0)
+    f.press('v')
+    f.press('l')
+    f.press('l')
+
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 3])
+
+    f.press(key, modifiers)
+
+    // The command changed nothing, so nothing else places a caret; the old range must not stay lit.
+    expect(f.result.current.vimMode).toBe('normal')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 3])
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('ends character Visual mode when focus reaches another node with the range left behind', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'Alpha'), node('b', 'Beta')] } })
+    f.input('b')
+    const first = f.input('a')
+    first.focus()
+    first.setSelectionRange(0, 0)
+    f.press('v', {}, 'a')
+    f.press('l', {}, 'a')
+
+    expect(f.result.current.vimMode).toBe('visual')
+
+    // A path that moves focus without a Visual-aware command: the projection ends the mode.
+    await act(async () => {
+      f.input('b').focus()
+      f.store.selectNode('b', 1)
+    })
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.vimTextCommandState.commandState.visualAnchor).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §20.2.25
+  it('restores a character Visual selection with gv in another node through the blur of the node left', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'Alpha'), node('b', 'Beta')] } })
+    const second = f.input('b')
+    act(() => f.store.selectNode('b', 0))
+    second.focus()
+    second.setSelectionRange(1, 1)
+    f.press('v', {}, 'b')
+    f.press('l', {}, 'b')
+    f.press('Escape', {}, 'b')
+    const first = f.input('a')
+    await act(async () => {
+      first.focus()
+      f.store.selectNode('a', 0)
+    })
+
+    expect(f.result.current.vimMode).toBe('normal')
+
+    f.press('g', {}, 'a')
+    await act(async () => {
+      f.bindings('a').onKeyDown({
+        currentTarget: first,
+        key: 'v',
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      } as never)
+    })
+
+    expect(f.snapshot().location.selectedNodeId).toBe('b')
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([second.selectionStart, second.selectionEnd]).toEqual([1, 3])
+
+    f.press('d', {}, 'b')
+
+    expect(f.node('b').text).toBe('Ba')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it('keeps character Visual mode and its range for a secondary press and ends it for a primary one', async () => {
+    const f = await fixture({ document: { roots: [node('a', 'Alpha')] } })
+    const input = f.input()
+    input.focus()
+    input.setSelectionRange(0, 0)
+    f.press('v')
+    f.press('l')
+
+    act(() => f.bindings().onMouseDown({ currentTarget: input, button: 2, preventDefault: () => undefined } as never))
+
+    expect(f.result.current.vimMode).toBe('visual')
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
+
+    // A Command press, such as one that opens a link, replaces the selection.
+    act(() =>
+      f
+        .bindings()
+        .onMouseDown({ currentTarget: input, button: 0, metaKey: true, preventDefault: () => undefined } as never),
+    )
+
+    expect(f.result.current.vimMode).toBe('normal')
+    expect(f.result.current.vimTextCommandState.commandState.visualAnchor).toBeUndefined()
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each(['another node', 'the same node'])(
+    'ends whole-node Visual mode when a press on the text of %s is released',
+    async (target) => {
+      const f = await fixture({ document: { roots: [node('a', 'Alpha'), node('b', 'Beta'), node('c', 'Gamma')] } })
+      const first = f.input('a')
+      const second = f.input('b')
+      first.focus()
+      f.press('V', {}, 'a')
+      f.press('j', {}, 'a')
+
+      expect(f.result.current.vimMode).toBe('visual-node')
+
+      const pressed = target === 'another node' ? f.input('c') : second
+      fireEvent.pointerDown(pressed, { button: 0, pointerType: 'mouse', pointerId: 1 })
+      await act(async () => {
+        pressed.focus()
+        f.store.selectNode(target === 'another node' ? 'c' : 'b', 1)
+      })
+      pressed.setSelectionRange(1, 1)
+      fireEvent.pointerUp(pressed, { button: 0, pointerType: 'mouse', pointerId: 1 })
+
+      expect(f.result.current.vimMode).toBe('normal')
+      expect(f.result.current.selection).toBeUndefined()
+
+      // `d` no longer deletes the earlier whole-node range.
+      f.press('d', {}, target === 'another node' ? 'c' : 'b')
+      f.press('Escape', {}, target === 'another node' ? 'c' : 'b')
+
+      expect(f.snapshot().document.roots.map((item) => item.id)).toEqual(['a', 'b', 'c'])
+    },
+  )
 
   it('keeps whole-node Visual active when a range move blurs the previous input', async () => {
     const f = await fixture({ document: { roots: [node('a', 'A'), node('b', 'B')] } })
@@ -4471,14 +4623,20 @@ describe('useNodeInputBindings', () => {
     f.press('v')
     f.press('l')
 
-    // A Command press keeps the Visual selection for its own action, such as opening a link.
+    // A Command press keeps the native selection for its own action, such as opening a link, but it
+    // is a primary press, so it ends character Visual mode (PRODUCT §20.2.6).
     fireEvent.pointerDown(input, { button: 0, pointerType: 'mouse', metaKey: true })
+    act(() =>
+      f
+        .bindings()
+        .onMouseDown({ currentTarget: input, button: 0, metaKey: true, preventDefault: () => undefined } as never),
+    )
 
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 2])
 
     fireEvent.pointerUp(input, { button: 0 })
 
-    expect(f.result.current.vimMode).toBe('visual')
+    expect(f.result.current.vimMode).toBe('normal')
   })
 
   // @requirement PRODUCT.md §20.2.6

@@ -57,6 +57,7 @@ type VimCommandInterruption =
   | 'focus-borrow'
   | 'search-jump'
   | 'history'
+  | 'select-all'
   | 'selection-command'
   | 'command'
 
@@ -68,10 +69,34 @@ function leaveCommandAssembly(vim: VimTextCommandState): void {
 }
 
 /**
+ * A command that replaces the selection or reaches another place ends character Visual mode, as
+ * any such command does in Vim; the mode writer clears the range with the mode (PRODUCT §20.2.6).
+ * The Normal block is drawn first, at the active end as Escape draws it, or at the selection start
+ * where a text edit will act, so a command that turns out to do nothing (an undo with no history,
+ * a leave at the top level, a rejected paste) does not leave the old range highlighted in Normal
+ * mode. A command that does act then places its own caret.
+ */
+function leaveCharacterVisual(
+  vim: VimTextCommandState,
+  input: HTMLElement | undefined,
+  at: 'active-end' | 'start',
+): void {
+  if (vim.mode !== 'visual') return
+  // The mode writer clears the range, so its ends are read first; the block follows the mode, as
+  // Escape orders them.
+  const { visualNodeId: nodeId, visualAnchor: anchor, visualFocus: focus } = vim.commandState
+  vim.setMode('normal')
+  if (input !== undefined && nodeId !== undefined && anchor !== undefined && focus !== undefined)
+    vim.applyCaretState?.(nodeId, { cursor: at === 'start' ? Math.min(anchor, focus) : focus, imageActive: false })
+}
+
+/**
  * Resolve the session before an application command. Callers name the interruption rather than
  * choosing commit flags, clearing owners and changing modes themselves. These policies deliberately
  * differ: search borrows the current mode, text edits preserve selection, and history retreats the
- * Replace caret. None captures an Insert change for dot-repeat (PRODUCT §20.2.5/6/19).
+ * Replace caret. Text edits, navigation, view changes, history and select-all end character Visual
+ * mode; search, a borrowed focus, a strikethrough toggle and a fold command keep it with its range.
+ * None captures an Insert change for dot-repeat (PRODUCT §20.2.5/6/19).
  */
 export function prepareVimCommand(
   vim: VimTextCommandState | undefined,
@@ -93,10 +118,12 @@ export function prepareVimCommand(
         vim.setMode('normal')
       }
       clearCommandAssembly(vim.commandState)
+      leaveCharacterVisual(vim, input, 'start')
       return
     case 'navigation':
       if (input !== undefined) vim.finishInsert?.(input)
       leaveCommandAssembly(vim)
+      leaveCharacterVisual(vim, input, 'active-end')
       if (vim.mode === 'replace') {
         vim.finishReplace?.(input, false)
         vim.setMode('normal')
@@ -108,6 +135,7 @@ export function prepareVimCommand(
         if (mode === 'replace') vim.finishReplace?.(input, false)
       }
       clearCommandAssembly(vim.commandState)
+      leaveCharacterVisual(vim, input, 'active-end')
       if (mode === 'replace' || mode === 'visual-node') {
         vim.nodeVisual?.exit()
         vim.setMode('normal')
@@ -131,6 +159,16 @@ export function prepareVimCommand(
         vim.setMode('normal')
       } else if (mode === 'insert' && input !== undefined) vim.finishInsert?.(input)
       leaveCommandAssembly(vim)
+      leaveCharacterVisual(vim, input, 'active-end')
+      return
+    case 'select-all':
+      if (mode === 'replace') {
+        vim.finishReplace?.(input, false, true)
+        vim.setMode('normal')
+      }
+      leaveCommandAssembly(vim)
+      // The whole text is selected right after, so no block is drawn in between.
+      leaveCharacterVisual(vim, undefined, 'active-end')
       return
     case 'selection-command':
       if (mode === 'replace') {
@@ -191,6 +229,10 @@ export function prepareVimPointerPress(
   takeReplaceClick(deps.session)
   if (deps.getMode() === 'replace' && press.button === 0 && !press.contextMenu) beginReplaceClick(deps.session)
   clearCommandAssembly(deps.commandState)
+  // A primary press replaces the selection, so it ends character Visual mode; an ordinary press
+  // then follows its own selection (PRODUCT §20.2.6). A secondary press keeps the selection for the
+  // context menu, as Vim's popup menu keeps a selection it was opened on.
+  if (deps.getMode() === 'visual' && press.button === 0 && !press.contextMenu) deps.changeVimMode('normal')
 }
 
 export function finishStructuralInsertSession(deps: { commandState: VimCommandState }, input: HTMLElement): void {

@@ -70,7 +70,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 
 * The caret moves over that text without changing it.
 * In Vim Normal and Visual, `0`, `^`, `$`, `w`, `W`, `b`, `B`, `e`, `E`, `ge`, `f`, `F`, `t`, `T`, `;` and `,` work with counts and stop at the first and last character; they never cross to another row. Visual `h` and `l` also stay within the row, and Visual `j` and `k` move by displayed line within it as stated above; Normal `h` and `l` follow the row-crossing rules above.
-* `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the active endpoint, and `y` copies the selected text to the system clipboard and the Vim register.
+* `v` starts a character Visual selection (both end characters are selected), `o` exchanges its ends, `v` or `Esc` leaves it with the caret at the active endpoint, and `y` copies the selected text to the system clipboard and the Vim register. As in Tree (§20.2.6), undo or redo, `Cmd+.`, `Cmd+,`, `Cmd+P`, a week shift, `Up` or `Down` to another row and a click on another row end it for Normal mode, while `Cmd+E` keeps it.
 * In standard editing and Vim Insert, `Left`, `Right`, `Home`, `End`, `Option+Left`, `Option+Right`, `Cmd+Left`, `Cmd+Right` and `Shift` with any of them move or extend a selection, clamped at both ends, and an arrow with a selection collapses it to the matching end.
 * `Cmd+C` copies the selection, or in Vim Normal the character under the block; `Cmd+A` selects the whole text, entering Visual in Vim.
 * `Left`, `Right`, `Home` and `End` do nothing in Vim Normal and Visual. Up and Down retain the row-navigation behavior above.
@@ -84,7 +84,7 @@ Headers scroll with the content; none is sticky. Transitions between Agenda and 
 
 ### 23.5 Folding Days
 
-A disclosure click, `Cmd+E`, and the Vim Normal commands `za` and `<Leader>e` (§20.2.32) each toggle a populated day. Folding hides all its entries; a folded day stays non-empty. Empty Today does not fold. Node and separator rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Mode and document content are unchanged.
+A disclosure click, `Cmd+E`, and the Vim Normal commands `za` and `<Leader>e` (§20.2.32) each toggle a populated day. Folding hides all its entries; a folded day stays non-empty. Empty Today does not fold. Node and separator rows never fold. If collapsing a day hides the selected entry, the day becomes selected and focused; an unrelated fold retains selection and focus. Document content is unchanged, and so is the mode, except that a collapse hiding an entry in character Visual mode ends that mode for Normal mode, as in Tree (§20.2.6).
 
 Vim `zc`/`zo`, `za`, and `zC`/`zO` close, open or toggle only the selected populated day; recursive forms have the same effect because entries are flat. `zM`/`zR` close or open all populated days from any row.
 

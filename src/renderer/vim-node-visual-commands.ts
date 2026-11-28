@@ -7,6 +7,7 @@ import {
   beginStructuralVisual,
   clearCommandAssembly,
   recordRepeatChange,
+  setVisualRange,
   type VimCommandState,
 } from './vim-command-state'
 import { rememberIncomingNodes, rememberNodeRange, resolveVisualMemory } from './vim-visual-memory'
@@ -50,6 +51,9 @@ export function restoreVisual(deps: RestoreVisualDeps): void {
   const focus = characterStart(text, restore.focus)
   const start = Math.min(anchor, focus)
   store.selectNode(restore.nodeId, start)
+  // The range belongs to Visual mode from its first moment, so the blur of the node being left and
+  // the projection's ownership check both see the restored range rather than none.
+  setVisualRange(commandState, restore.nodeId, anchor, focus, restore.hadText)
   schedulePendingVisualSelection({
     nodeId: restore.nodeId,
     start,

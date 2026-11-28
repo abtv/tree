@@ -65,6 +65,16 @@ export function createAgendaKeyDownHandler({
     const finishClickReplace = (): void => {
       if (vim?.mode === 'replace') vim.setMode('normal')
     }
+    // A command that reaches another place or edits ends a row's character Visual selection at its
+    // active end, as Escape does (PRODUCT §20.2.6).
+    const leaveRowVisual = (): void => {
+      if (vim?.mode !== 'visual') return
+      if (rowText !== undefined) {
+        const caret = rowText.caret()
+        rowText.setCaret({ ...caret, anchor: caret.focus, focus: caret.focus })
+      }
+      vim.setMode('normal')
+    }
     const textOf = (candidate: AgendaRow): string =>
       candidate.kind === 'node'
         ? requireNode(state.document, candidate.nodeId).node.text
@@ -379,6 +389,7 @@ export function createAgendaKeyDownHandler({
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
+        leaveRowVisual()
         beforeSelect?.(false)
         store.applyAgenda({ kind: 'shift-week', direction: weekDirection })
       } else if (rowTextKey()) {
@@ -388,11 +399,13 @@ export function createAgendaKeyDownHandler({
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
+        leaveRowVisual()
         store.closeAgenda()
       } else if (event.key === '.') {
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
+        leaveRowVisual()
         if (row.kind === 'node') {
           store.enter()
         } else if (row.kind === 'day') {
@@ -405,6 +418,7 @@ export function createAgendaKeyDownHandler({
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         if (focusedAgendaDay(state.agenda) !== undefined) finishClickReplace()
+        leaveRowVisual()
         beforeSelect?.(true)
         rowText?.setCaret(arrivalCaret(row.key))
         store.applyAgenda({ kind: 'return-timeline', key: row.key })
@@ -417,6 +431,7 @@ export function createAgendaKeyDownHandler({
         event.preventDefault()
         if (vim !== undefined) clearCommandAssembly(vim.commandState)
         finishClickReplace()
+        leaveRowVisual()
         if (event.shiftKey) store.redo()
         else store.undo()
       } else if (['backspace', 'enter', ',', 'x', 'v', 'e'].includes(event.key.toLowerCase())) {
@@ -568,9 +583,12 @@ export function createAgendaKeyDownHandler({
     } else if (normal && event.key === 'u' && pending?.prefix === undefined) store.undo()
     else if (event.key === 'ArrowDown' || (normal && ['j', 'J'].includes(event.key) && pending?.prefix === undefined)) {
       finishClickReplace()
+      // Arrow keys reach another row, so they end a row's Visual selection like a click on it.
+      leaveRowVisual()
       vertical('down', count * (event.key === 'J' ? 10 : 1))
     } else if (event.key === 'ArrowUp' || (normal && ['k', 'K'].includes(event.key) && pending?.prefix === undefined)) {
       finishClickReplace()
+      leaveRowVisual()
       vertical('up', count * (event.key === 'K' ? 10 : 1))
     } else if (normal && event.key === 'g' && pending?.prefix === 'g') {
       const target = Math.min(rows.length - 1, count - 1)

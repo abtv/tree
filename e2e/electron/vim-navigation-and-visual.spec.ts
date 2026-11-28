@@ -16,6 +16,7 @@ import {
   parent,
   pressShifted,
   seedDocument,
+  setAgendaToday,
   setCursor,
   setMainWindowBounds,
   sharedApplicationAdopted,
@@ -1890,6 +1891,42 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(editor).toHaveValue('alpha bta gamma')
     })
 
+    // @requirement PRODUCT.md §20.2.6
+    test('ends whole-node Visual mode with a click on node text, so dd deletes only the clicked node', async ({
+      userDataDir,
+    }) => {
+      seedDocument(userDataDir, {
+        document: {
+          roots: [
+            { id: 'first', text: 'alpha', children: [] },
+            { id: 'second', text: 'bravo', children: [] },
+            { id: 'third', text: 'charlie', children: [] },
+          ],
+        },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      await window.keyboard.press('Shift+V')
+      await window.keyboard.press('j')
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+      await expect(window.locator('.node-row-visual-selected')).toHaveCount(2)
+
+      const third = node(window, 3)
+      const box = (await third.boundingBox())!
+      await third.click({ position: { x: (await textX(third, 2)) - box.x, y: box.height / 2 } })
+
+      await expect(third).toBeFocused()
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
+
+      await lockSystemClipboard()
+      await window.keyboard.press('d')
+      await window.keyboard.press('d')
+
+      await expect.poll(() => nodeTexts(window)).toEqual(['alpha', 'bravo'])
+    })
+
     test('places the Normal caret where a click lands inside a select-all selection', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: { roots: [{ id: 'first', text: 'alpha beta gamma', children: [] }] },
@@ -3287,7 +3324,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await expect(link).toHaveText(url)
   })
 
-  test('clears stale Visual state on a focus-changing shortcut and a whole-node Visual exit', async ({
+  test('ends character Visual on a focus-changing shortcut and clears a whole-node Visual exit', async ({
     userDataDir,
   }) => {
     seedDocument(userDataDir, {
@@ -3306,8 +3343,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await setCursor(alpha, 0)
 
-    // A focus-changing shortcut during character Visual mode keeps the mode but drops the stale
-    // endpoints, so the next motion anchors at the reached node's caret instead of the old focus.
+    // A focus-changing shortcut ends character Visual mode, as reaching another place does in Vim,
+    // so the reached node shows the Normal block and the next motion moves it.
     await window.keyboard.press('v')
     await window.keyboard.press('l')
 
@@ -3316,7 +3353,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await window.keyboard.press('Meta+.')
 
-    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     const heading = window.getByRole('textbox', { name: 'Current parent' })
 
@@ -3324,13 +3361,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await window.keyboard.press('l')
 
-    await expect(heading).toHaveJSProperty('selectionStart', 0)
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(heading).toHaveJSProperty('selectionStart', 1)
     await expect(heading).toHaveJSProperty('selectionEnd', 2)
 
     // A whole-node Visual g prefix must not survive Escape and turn the next Normal d into gd.
-    await window.keyboard.press('Escape')
-
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
     await window.keyboard.press('Meta+,')
 
@@ -3357,6 +3392,79 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     await expect(window.locator('.node-row')).toHaveCount(2)
     await expect(node(window, 1)).toHaveValue('Bravo')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  test('ends character Visual at the Normal block when an undo or a top-level leave changes nothing', async ({
+    userDataDir,
+  }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'alpha', text: 'Alpha', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'alpha' },
+    })
+    const { window } = await launchTree(userDataDir)
+    const alpha = node(window, 1)
+    await alpha.focus()
+    await setCursor(alpha, 0)
+    await window.keyboard.press('v')
+    await window.keyboard.press('l')
+    await window.keyboard.press('l')
+
+    await expect(alpha).toHaveJSProperty('selectionStart', 0)
+    await expect(alpha).toHaveJSProperty('selectionEnd', 3)
+
+    // Nothing is undone and nothing else places a caret, so only the Normal block may remain, at
+    // the active end, rather than the old highlight under a NORMAL indicator.
+    await window.keyboard.press('Meta+z')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(alpha).toHaveJSProperty('selectionStart', 2)
+    await expect(alpha).toHaveJSProperty('selectionEnd', 3)
+
+    await window.keyboard.press('v')
+    await window.keyboard.press('h')
+
+    await expect(alpha).toHaveJSProperty('selectionStart', 1)
+    await expect(alpha).toHaveJSProperty('selectionEnd', 3)
+
+    await window.keyboard.press('Meta+,')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(alpha).toHaveJSProperty('selectionStart', 1)
+    await expect(alpha).toHaveJSProperty('selectionEnd', 2)
+
+    await window.keyboard.press('x')
+
+    await expect(alpha).toHaveValue('Apha')
+  })
+
+  // @requirement PRODUCT.md §20.2.6
+  // @requirement PRODUCT.md §23.5
+  test('ends character Visual when an Agenda day collapse hides the entry that holds it', async ({ userDataDir }) => {
+    seedDocument(userDataDir, {
+      document: { roots: [{ id: 'first', text: '2026-10-10 alpha beta gamma', children: [] }] },
+      location: { currentParentId: null, selectedNodeId: 'first' },
+    })
+    const { window } = await launchTree(userDataDir)
+    await setAgendaToday(window)
+    await window.keyboard.press('Meta+p')
+    const entry = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+    await entry.click()
+    await window.keyboard.press('Escape')
+    for (const key of ['0', 'f', 'a', 'v', 'e']) await window.keyboard.press(key)
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
+    // The collapse moves selection and focus to the day row; a selection the user never made must
+    // not appear there under a VISUAL indicator.
+    await window.getByRole('button', { name: 'Collapse Sat Oct 10', exact: true }).click()
+
+    const saturday = window.locator('.agenda-row-day').filter({ hasText: 'Sat Oct 10' })
+
+    await expect(entry).toHaveCount(0)
+    await expect(saturday).toHaveAttribute('aria-selected', 'true')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(saturday.locator('.agenda-selection')).toHaveCount(0)
   })
 
   // @requirement PRODUCT.md §20.2.6
@@ -4128,7 +4236,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(window.locator('.node-row-visual-selected')).toHaveCount(0)
     })
 
-    test('re-anchors character Visual after a breadcrumb click and an enter-control click', async ({ userDataDir }) => {
+    // @requirement PRODUCT.md §20.2.6
+    test('ends character Visual after a breadcrumb click and an enter-control click', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -4153,11 +4262,11 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(child).toHaveJSProperty('selectionStart', 0)
       await expect(child).toHaveJSProperty('selectionEnd', 2)
 
-      // Character Visual keeps its mode across a level change but must drop the stale endpoints so
-      // the next motion anchors at the reached caret.
+      // A level change ends character Visual mode, so the reached node never shows Visual mode with
+      // nothing selected; its Normal block moves with the next motion.
       await window.getByRole('button', { name: 'Top level' }).click()
 
-      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
       const root = node(window, 1)
 
@@ -4165,14 +4274,19 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await window.keyboard.press('l')
 
-      await expect(root).toHaveJSProperty('selectionStart', 0)
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(root).toHaveJSProperty('selectionStart', 1)
       await expect(root).toHaveJSProperty('selectionEnd', 2)
 
-      // The enter control drops the endpoints the same way while the mode stays active. Entering a
-      // node with children focuses its first child, so the next motion anchors there.
-      await window.getByRole('button', { name: 'Enter node 1' }).click()
+      // The enter control ends a Visual selection the same way. Entering a node with children
+      // focuses its first child.
+      await window.keyboard.press('v')
 
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+
+      await window.getByRole('button', { name: 'Enter node 1' }).click()
+
+      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
       const entered = node(window, 1)
 
@@ -4180,12 +4294,13 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await window.keyboard.press('l')
 
-      await expect(entered).toHaveJSProperty('selectionStart', 0)
+      await expect(entered).toHaveJSProperty('selectionStart', 1)
       await expect(entered).toHaveJSProperty('selectionEnd', 2)
     })
   })
 
-  test('re-anchors character Visual after a paste at the resulting caret', async ({ userDataDir }) => {
+  // @requirement PRODUCT.md §20.2.6
+  test('ends character Visual after a paste and moves the Normal block from the paste end', async ({ userDataDir }) => {
     await lockSystemClipboard()
     seedDocument(userDataDir, {
       document: { roots: [{ id: 'alpha', text: 'Alpha', children: [] }] },
@@ -4211,14 +4326,16 @@ test.describe('Vim editing: navigation and Visual modes', () => {
     await window.keyboard.press('Meta+v')
 
     await expect(editor).toHaveValue('PASTEDAlpha')
-    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
 
-    // The paste drops the stale endpoints, so the next motion anchors at the paste end rather than
-    // re-selecting from the pre-paste anchor.
+    // The paste replaced the selection, so Visual mode ended; the next motion moves the Normal block
+    // from the paste end rather than re-selecting from the pre-paste anchor.
     await window.keyboard.press('l')
 
-    await expect(editor).toHaveJSProperty('selectionStart', 6)
-    await expect(window.locator('.node-list')).toHaveScreenshot('vim-visual-paste-anchor-light.png')
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    await expect(editor).toHaveJSProperty('selectionStart', 7)
+    await expect(editor).toHaveJSProperty('selectionEnd', 8)
+    await expect(window.locator('.node-list')).toHaveScreenshot('vim-paste-ends-visual-light.png')
   })
 
   test('keeps whole-node Visual mode and its range across a paste', async ({ userDataDir }) => {

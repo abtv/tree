@@ -6,6 +6,7 @@ import type {
   VimStructuralChange,
 } from './vim-keyboard-types'
 import { parseCount } from './vim-text-commands'
+import { moveCharacterOffset } from '../domain/text-characters'
 
 export type VimStructuralInsertSession =
   | { kind: 'open'; originNodeId: string; position: 'before' | 'after' }
@@ -48,6 +49,13 @@ export interface VimCommandState {
   pending?: VimPendingCommand | undefined
   lastChange?: VimRepeatChange | undefined
   lastFind?: VimFindCommand | undefined
+  /**
+   * The live character-wise Visual range: the node that owns it and its first and active
+   * characters. The three are written and cleared together, and they exist exactly while the editor
+   * is in character Visual mode: the hook's mode writer clears them whenever the mode leaves
+   * `'visual'` (`docs/PRODUCT.md` §20.2.20).
+   */
+  visualNodeId?: string | undefined
   visualAnchor?: number | undefined
   visualFocus?: number | undefined
   /** Survives every clear below: only a later Visual selection replaces it. */
@@ -246,8 +254,7 @@ export function setVisualRange(
   focus: number,
   hadText: boolean,
 ): void {
-  state.visualAnchor = anchor
-  state.visualFocus = focus
+  followVisualRange(state, nodeId, anchor, focus)
   state.lastVisual = { kind: 'text', nodeId, anchor, focus, hadText }
 }
 
@@ -255,9 +262,23 @@ export function setVisualRange(
  * Write the endpoints of a selection that a held pointer press is still making. The `gv` memory
  * waits for the release, because a press that never settles must leave no selection behind.
  */
-export function followVisualRange(state: VimCommandState, anchor: number, focus: number): void {
+export function followVisualRange(state: VimCommandState, nodeId: string, anchor: number, focus: number): void {
+  state.visualNodeId = nodeId
   state.visualAnchor = anchor
   state.visualFocus = focus
+}
+
+/**
+ * The text the live Visual range covers in `text`, as UTF-16 boundaries: from the first selected
+ * character to the end of the last one, clamped to the current text. A range on an attached image
+ * or on empty text covers no text. Visual commands act on this range rather than on the native
+ * selection, which can differ from it while a pointer drag or a re-render is still settling.
+ */
+export function visualTextRange(state: VimCommandState, text: string): { start: number; end: number } | undefined {
+  if (state.visualAnchor === undefined || state.visualFocus === undefined) return undefined
+  const first = Math.min(Math.max(0, Math.min(state.visualAnchor, state.visualFocus)), text.length)
+  const last = Math.min(Math.max(state.visualAnchor, state.visualFocus), text.length)
+  return { start: first, end: last >= text.length ? text.length : moveCharacterOffset(text, last, 1) }
 }
 
 /** Remember a whole-node Visual selection; `ids` is the sibling range in ascending order. */
@@ -287,23 +308,23 @@ export function rememberTextVisual(
   state.lastVisual = { kind: 'text', nodeId, anchor, focus, hadText }
 }
 
-/** The character-wise Visual endpoints only exist as a pair, so clear both halves together. */
+/** The character-wise Visual range only exists as a whole, so clear its node and both ends together. */
 export function clearVisualRange(state: VimCommandState): void {
+  state.visualNodeId = undefined
   state.visualAnchor = undefined
   state.visualFocus = undefined
 }
 
 /**
- * Drop the unfinished command together with both character-wise Visual endpoints. Every path that
- * abandons the command assembly for the current node — a Visual mode exit or an application command
- * that moves focus — must clear the pending command and the Visual range as one unit; leaving either
- * behind makes the next motion reinterpret state that belongs to an earlier node. Repeat changes,
- * the last character find, and the structural insert session survive.
+ * Drop the unfinished command and the desired vertical position. The live Visual range is not part
+ * of the assembly: it belongs to character Visual mode and ends only with it, so a command that
+ * keeps Visual mode also keeps its range, and one that leaves Visual mode changes the mode, whose
+ * writer clears the range (`docs/PRODUCT.md` §20.2.6). Repeat changes, the last character find,
+ * the `gv` memory, and the structural insert session survive.
  */
 export function clearCommandAssembly(state: VimCommandState): void {
   state.verticalGoal = undefined
   clearPending(state)
-  clearVisualRange(state)
 }
 
 export function beginStructuralOpen(state: VimCommandState, originNodeId: string, position: 'before' | 'after'): void {

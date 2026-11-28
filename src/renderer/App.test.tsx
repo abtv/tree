@@ -2180,7 +2180,8 @@ describe('App', () => {
     expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
   })
 
-  it('keeps character Visual mode and re-anchors the next motion after Cmd+V', async () => {
+  // @requirement PRODUCT.md §20.2.6
+  it('ends character Visual mode for Normal mode after Cmd+V pastes', async () => {
     const store = createStore({ kind: 'text', text: 'PASTED' })
 
     await act(async () => {
@@ -2205,11 +2206,13 @@ describe('App', () => {
     })
 
     expect(input).toHaveValue('PASTEDabcd')
-    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('VISUAL')
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
 
+    // The next `l` is a Normal motion of the one-character block, not a Visual extension.
     fireEvent.keyDown(input, { key: 'l' })
 
-    expect(input.selectionStart).toBe(6)
+    expect(screen.getByLabelText('Vim mode')).toHaveTextContent('NORMAL')
+    expect(input.selectionEnd - input.selectionStart).toBe(1)
   })
 
   it('keeps whole-node Visual mode and its range after Cmd+V', async () => {

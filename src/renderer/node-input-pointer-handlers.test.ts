@@ -162,41 +162,48 @@ function mouse(currentTarget: HTMLElement, extra: Record<string, unknown> = {}) 
 }
 
 describe('blur', () => {
+  // @requirement PRODUCT.md §20.2.20
   it.each([
-    { focused: false, destination: false, preserve: true },
-    { focused: true, destination: false, preserve: false },
-    { focused: false, destination: true, preserve: false },
-  ])('retains Visual endpoints only when the window loses focus: %j', async ({ focused, destination, preserve }) => {
+    { focused: false, destination: false },
+    { focused: true, destination: false },
+    { focused: false, destination: true },
+  ])('keeps the Visual range with its mode through a blur: %j', async ({ focused, destination }) => {
     vi.spyOn(document, 'hasFocus').mockReturnValue(focused)
     const f = await fixture({ mode: 'visual' })
+    f.commandState.visualNodeId = 'node'
     f.commandState.visualAnchor = 3
     f.commandState.visualFocus = 1
     f.commandState.pending = { count: '2', motionCount: '' }
 
     f.handlers().onBlur({ relatedTarget: destination ? document.createElement('button') : null } as never)
 
-    expect(f.commandState.visualAnchor).toBe(preserve ? 3 : undefined)
-    expect(f.commandState.visualFocus).toBe(preserve ? 1 : undefined)
+    expect([f.commandState.visualAnchor, f.commandState.visualFocus]).toEqual([3, 1])
     expect(f.commandState.pending).toBeUndefined()
   })
 
-  it.each([false, true])('preserves live Visual endpoints only for a returning modal (%s)', async (returns) => {
-    const f = await fixture({ mode: 'visual' })
-    const destination = document.createElement('button')
-    const container = document.createElement('div')
-    if (returns) container.setAttribute('data-editor-selection-return', '')
-    container.append(destination)
-    f.commandState.visualAnchor = 3
-    f.commandState.visualFocus = 1
-    f.commandState.pending = { count: '2', motionCount: '' }
+  // @requirement PRODUCT.md §20.2.20
+  it.each([false, true])(
+    'keeps character Visual mode and its range together when focus leaves the editor (returning: %s)',
+    async (returns) => {
+      const f = await fixture({ mode: 'visual' })
+      const destination = document.createElement('button')
+      const container = document.createElement('div')
+      if (returns) container.setAttribute('data-editor-selection-return', '')
+      container.append(destination)
+      f.commandState.visualNodeId = 'node'
+      f.commandState.visualAnchor = 3
+      f.commandState.visualFocus = 1
+      f.commandState.pending = { count: '2', motionCount: '' }
 
-    f.handlers().onBlur({ relatedTarget: destination } as never)
+      f.handlers().onBlur({ relatedTarget: destination } as never)
 
-    expect(f.commandState.visualAnchor).toBe(returns ? 3 : undefined)
-    expect(f.commandState.visualFocus).toBe(returns ? 1 : undefined)
-    expect(f.commandState.pending).toBeUndefined()
-    expect(f.deps.changeVimMode).not.toHaveBeenCalled()
-  })
+      // A blur alone neither replaces the selection nor reaches another node; a command or a focus
+      // on another node ends Visual mode through the mode writer.
+      expect([f.commandState.visualAnchor, f.commandState.visualFocus]).toEqual([3, 1])
+      expect(f.commandState.pending).toBeUndefined()
+      expect(f.deps.changeVimMode).not.toHaveBeenCalled()
+    },
+  )
 
   it('finishes Replace normally when a returning modal takes focus', async () => {
     const f = await fixture({ mode: 'replace' })

@@ -24,7 +24,7 @@ import { agendaDecorations, localToday, treeDecorations } from './date-decoratio
 import { createAgendaKeyDownHandler } from './agenda-row-keyboard'
 import { agendaStatusMessage } from './agenda-labels'
 import type { CaretMark } from './agenda-row-caret'
-import { cancelVimLeader, clearCommandAssembly, type VimLeaderCommand } from './vim-command-state'
+import { cancelVimLeader, type VimLeaderCommand } from './vim-command-state'
 import { useVimLeaderRouting } from './vim-leader-keys'
 import { VimHelpView, type VimHelpSearchCommand } from './VimHelpView'
 import { prepareVimCommand } from './vim-session-finish'
@@ -392,21 +392,26 @@ export function App({
   useLayoutEffect(() => {
     if (state.status !== 'loading') dataOperations?.presentStartupImportNotice()
   }, [dataOperations, state.status])
+  // Reaching another level ends both Visual modes: a whole-node range is relative to the displayed
+  // level, and a character range belongs to the node being left (PRODUCT §20.2.6). The mode changes
+  // through the bindings' one writer, which clears the character range with it.
+  const leaveVisualModes = useCallback((): void => {
+    const mode = vimTextCommandState.mode
+    if (mode !== 'visual' && mode !== 'visual-node') return
+    setNodeVisualSelection(undefined)
+    vimTextCommandState.setMode('normal')
+  }, [vimTextCommandState, setNodeVisualSelection])
   const enterNode = useCallback(
     (node: TreeNode): void => {
       // The disclosure control's own mousedown handler calls preventDefault to avoid stealing
       // focus while dragging, which also suppresses the browser's default blur on click. Blur the
       // active input explicitly so a pending Insert or Replace session finishes before navigating.
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-      // Whole-node Visual's range is relative to the displayed level, so entering a node ends it.
-      if (vimMode === 'visual-node') {
-        setNodeVisualSelection(undefined)
-        setVimMode('normal')
-      }
+      leaveVisualModes()
       store.selectNode(node.id, 0)
       store.enter()
     },
-    [store, vimMode, setNodeVisualSelection, setVimMode],
+    [store, leaveVisualModes],
   )
   const activateNode = useCallback(
     (node: TreeNode): void => {
@@ -420,12 +425,12 @@ export function App({
       if (before.status !== 'ready') return
       const sourceParent = requireNode(before.document, nodeId).ancestors.at(-1)?.id ?? null
       const moved = store.moveNodeToParent(nodeId, target.parentId, target.index)
-      if (moved && sourceParent !== target.parentId && vimMode === 'visual-node') {
+      if (moved && sourceParent !== target.parentId && vimTextCommandState.mode === 'visual-node') {
         setNodeVisualSelection(undefined)
-        setVimMode('normal')
+        vimTextCommandState.setMode('normal')
       }
     },
-    [store, vimMode, setNodeVisualSelection, setVimMode],
+    [store, vimTextCommandState, setNodeVisualSelection],
   )
   const onToggleExpansion = useCallback(
     (node: TreeNode): void => {
@@ -446,27 +451,25 @@ export function App({
       // does; an unrelated collapse must not blur the currently focused row.
       if (hidesSelection && search.draft === undefined && document.activeElement instanceof HTMLElement)
         document.activeElement.blur()
+      // A hidden selection takes its character Visual range with it.
+      if (hidesSelection && vimTextCommandState.mode === 'visual') vimTextCommandState.setMode('normal')
       store.toggleExpansion(node.id)
       if (
         nodeVisualSelection !== undefined &&
         (isHiddenByCollapse(nodeVisualSelection.anchorId) || isHiddenByCollapse(nodeVisualSelection.focusId))
       ) {
         setNodeVisualSelection(undefined)
-        setVimMode('normal')
+        vimTextCommandState.setMode('normal')
       }
     },
-    [store, nodeVisualSelection, setNodeVisualSelection, setVimMode, search.draft],
+    [store, nodeVisualSelection, setNodeVisualSelection, vimTextCommandState, search.draft],
   )
   const navigateToAncestor = useCallback(
     (parentId: string | null): void => {
-      // A breadcrumb click changes the displayed level, so a whole-node Visual range cannot survive.
-      if (vimMode === 'visual-node') {
-        setNodeVisualSelection(undefined)
-        setVimMode('normal')
-      }
+      leaveVisualModes()
       store.navigateToAncestor(parentId)
     },
-    [store, vimMode, setNodeVisualSelection, setVimMode],
+    [store, leaveVisualModes],
   )
   const dismissQuitWithoutSaving = useCallback((): void => {
     store.dismissQuitWithoutSavingPrompt()
@@ -743,11 +746,7 @@ export function App({
           createAgendaKeyDownHandler({ store, vim: vimEnabled ? vimTextCommandState : undefined, shortcuts })(event)
         } else if (shortcuts.isPrimary(event) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
           event.preventDefault()
-          clearCommandAssembly(vimTextCommandState.commandState)
-          if (vimMode === 'visual-node') {
-            setNodeVisualSelection(undefined)
-            setVimMode('normal')
-          }
+          prepareVimCommand(vimTextCommandState, 'view-change')
           store.openAgenda()
         }
       }}
@@ -918,6 +917,7 @@ export function App({
             shortcuts={shortcuts}
             navigate={localSearch.navigate}
             beginEditing={() => localSearch.open(false)}
+            beforeViewChange={beforeViewChange}
           />
           <SearchCount
             pending={search.pending}
@@ -996,6 +996,7 @@ export function App({
                   shortcuts={shortcuts}
                   navigate={localSearch.navigate}
                   vim
+                  beforeViewChange={beforeViewChange}
                 />
               ) : (
                 <span>/{search.confirmed}</span>

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRealStoreHarness } from './test/real-store-harness'
-import { beginStructuralOpen, createVimCommandState } from './vim-command-state'
+import { beginStructuralOpen, clearVisualRange, createVimCommandState, setVisualRange } from './vim-command-state'
 import { beginInsertSession, beginReplaceSession, createVimEditSessionState } from './vim-edit-session'
 import {
   finishInsertSession,
@@ -174,8 +174,8 @@ describe('command interruption policy', () => {
     const previous = { kind: 'delete' as const, motion: 'l', count: 1 }
     f.commandState.lastChange = previous
     f.commandState.pending = { count: '2', motionCount: '' }
-    f.commandState.visualAnchor = 1
-    f.commandState.visualFocus = 3
+    // Only character Visual mode owns a range.
+    if (initialMode === 'visual') setVisualRange(f.commandState, 'node', 1, 2, true)
     const vim: VimTextCommandState = {
       get mode() {
         return mode
@@ -192,31 +192,49 @@ describe('command interruption policy', () => {
           completed,
         ),
       finishReplace: (input, retreat, preserve) => finishReplaceSession(f.deps, input, retreat, preserve),
+      applyCaretState: f.applyCaretState,
       nodeVisual: {
         exit: () => {
           nodeVisual = false
         },
       },
+      // Mirrors the bindings' one mode writer: character Visual mode and its range end together.
       setMode: (next) => {
+        if (next !== 'visual') clearVisualRange(f.commandState)
         mode = next
       },
     }
     return { ...f, element, vim, previous, nodeVisual: () => nodeVisual }
   }
 
-  it.each(['search-open', 'focus-borrow'] as const)(
-    'retains live Visual endpoints when %s borrows focus',
-    async (reason) => {
-      const f = await commandFixture('visual')
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    { reason: 'text-edit', keeps: false, block: 1 },
+    { reason: 'navigation', keeps: false, block: 3 },
+    { reason: 'view-change', keeps: false, block: 3 },
+    { reason: 'history', keeps: false, block: 3 },
+    { reason: 'select-all', keeps: false, block: undefined },
+    { reason: 'search-open', keeps: true, block: undefined },
+    { reason: 'focus-borrow', keeps: true, block: undefined },
+    { reason: 'selection-command', keeps: true, block: undefined },
+    { reason: 'command', keeps: true, block: undefined },
+  ] as const)('ends or keeps character Visual mode with its range for $reason', async ({ reason, keeps, block }) => {
+    const f = await commandFixture('visual')
+    // The range covers more than one character, so its start differs from its active end.
+    setVisualRange(f.commandState, 'node', 1, 3, true)
 
-      prepareVimCommand(f.vim, reason, f.element)
+    prepareVimCommand(f.vim, reason, f.element)
 
-      expect(f.commandState.pending).toBeUndefined()
-      expect(f.commandState.visualAnchor).toBe(1)
-      expect(f.commandState.visualFocus).toBe(3)
-      expect(f.vim.mode).toBe('visual')
-    },
-  )
+    // Visual mode and its range end together or survive together; neither outlives the other.
+    expect(f.vim.mode).toBe(keeps ? 'visual' : 'normal')
+    expect([f.commandState.visualAnchor, f.commandState.visualFocus]).toEqual(keeps ? [1, 3] : [undefined, undefined])
+    expect(f.commandState.pending).toBeUndefined()
+    expect(f.commandState.lastVisual).toEqual({ kind: 'text', nodeId: 'node', anchor: 1, focus: 3, hadText: true })
+    // An ending draws the Normal block where the command acts, so a command that then changes
+    // nothing leaves no Visual highlight behind; select-all draws its own whole-text selection.
+    if (block === undefined) expect(f.applyCaretState).not.toHaveBeenCalled()
+    else expect(f.applyCaretState).toHaveBeenCalledExactlyOnceWith('node', { cursor: block, imageActive: false })
+  })
 
   it.each([
     { reason: 'text-edit', normal: true, preserve: true, cursor: 1, clear: true },
@@ -237,7 +255,6 @@ describe('command interruption policy', () => {
     expect(f.session.replace).toBeUndefined()
     expect(f.vim.mode).toBe(expected.normal ? 'normal' : 'replace')
     expect(f.commandState.pending === undefined).toBe(expected.clear)
-    expect(f.commandState.visualAnchor === undefined).toBe(expected.clear)
     expect(f.commandState.lastChange).toEqual({ kind: 'overwrite', text: 'X', replaced: 1 })
     expect(f.applyCaretState).toHaveBeenCalledWith(
       'node',

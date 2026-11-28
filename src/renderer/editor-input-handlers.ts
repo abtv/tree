@@ -47,7 +47,7 @@ function selectEditorText(
   setSelectAllNodeId?: (nodeId: string) => void,
 ): void {
   if (vim?.mode === 'insert') vim.finishInsert?.(input)
-  prepareVimCommand(vim, 'selection-command', input)
+  prepareVimCommand(vim, 'select-all', input)
   selectAll(input)
   globalThis.queueMicrotask(() => {
     setSelectAllNodeId?.(nodeId)

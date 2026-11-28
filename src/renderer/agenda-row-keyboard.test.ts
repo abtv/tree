@@ -34,6 +34,62 @@ async function fixture(document: Document = { roots: [{ id: 'node', text: '2026-
   return { ...harness, vim, press }
 }
 
+describe('read-only Agenda Visual selection', () => {
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    { name: 'Cmd+Z', key: 'z', leaves: true },
+    { name: 'Cmd+Shift+Z', key: 'z', shiftKey: true, leaves: true },
+    { name: 'Cmd+.', key: '.', leaves: true },
+    { name: 'Cmd+,', key: ',', leaves: true },
+    { name: 'Cmd+P', key: 'p', leaves: true },
+    { name: 'Cmd+E', key: 'e', leaves: false },
+    { name: 'ArrowDown', key: 'ArrowDown', plain: true, leaves: true },
+    { name: 'ArrowUp', key: 'ArrowUp', plain: true, leaves: true },
+  ])('ends the row Visual selection at its active end for $name, unless the command keeps it', async (command) => {
+    const harness = await createRealStoreHarness({
+      services: { today: () => dayNumberOf({ year: 2026, month: 10, day: 12 }) },
+      document: { roots: [{ id: 'node', text: '2026-10-15 Prepare', children: [] }] },
+    })
+    harness.store.openAgenda(2)
+    const day = harness.store.getAgendaRows().find((row) => row.kind === 'day')!
+    harness.store.applyAgenda({ kind: 'select', key: day.key })
+    let caret = { key: day.key, anchor: 1, focus: 4 }
+    const vim: VimTextCommandState = {
+      mode: 'visual',
+      commandState: createVimCommandState(),
+      setMode: (mode) => {
+        vim.mode = mode
+      },
+    }
+    const handler = createAgendaKeyDownHandler({
+      store: harness.store,
+      vim,
+      rowText: {
+        textOf: () => 'Thursday',
+        hasEditor: () => false,
+        caret: () => caret,
+        setCaret: (next) => {
+          caret = next
+        },
+        copy: vi.fn(),
+      },
+    })
+
+    handler({
+      key: command.key,
+      metaKey: command.plain !== true,
+      shiftKey: command.shiftKey === true,
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent<HTMLElement>)
+
+    expect(vim.mode).toBe(command.leaves ? 'normal' : 'visual')
+    // A command that reaches another place may then place its own arrival caret; either way no
+    // selection remains in Normal mode.
+    if (command.leaves) expect(caret.anchor).toBe(caret.focus)
+    else expect([caret.anchor, caret.focus]).toEqual([1, 4])
+  })
+})
+
 describe('read-only Agenda keyboard', () => {
   it.each(['/', 'n', 'N'])('starts Vim %s at the first overdue date from the Overdue heading', async (key) => {
     const f = await fixture({ roots: [{ id: 'old', text: '2026-09-01 task', children: [] }] })

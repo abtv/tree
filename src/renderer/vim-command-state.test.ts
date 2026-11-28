@@ -22,6 +22,7 @@ import {
   swapNodeVisual,
   takeStructuralInsert,
   takeVimCharacter,
+  visualTextRange,
   type VimCommandState,
 } from './vim-command-state'
 
@@ -369,10 +370,29 @@ describe('Visual memory for gv', () => {
     const state = createVimCommandState()
     setVisualRange(state, 'a', 2, 0, true)
 
-    followVisualRange(state, 1, 4)
+    followVisualRange(state, 'b', 1, 4)
 
-    expect([state.visualAnchor, state.visualFocus]).toEqual([1, 4])
+    expect([state.visualNodeId, state.visualAnchor, state.visualFocus]).toEqual(['b', 1, 4])
     expect(state.lastVisual).toEqual({ kind: 'text', nodeId: 'a', anchor: 2, focus: 0, hadText: true })
+  })
+
+  // @requirement PRODUCT.md §20.2.20
+  it.each([
+    { name: 'forward', anchor: 1, focus: 3, text: 'abcdef', range: { start: 1, end: 4 } },
+    { name: 'backward', anchor: 3, focus: 1, text: 'abcdef', range: { start: 1, end: 4 } },
+    { name: 'one character', anchor: 2, focus: 2, text: 'abcdef', range: { start: 2, end: 3 } },
+    { name: 'a joined emoji', anchor: 0, focus: 1, text: 'a👍🏽b', range: { start: 0, end: 5 } },
+    { name: 'the attached image', anchor: 3, focus: 3, text: 'abc', range: { start: 3, end: 3 } },
+    { name: 'text that shrank', anchor: 1, focus: 9, text: 'abc', range: { start: 1, end: 3 } },
+  ])('covers the characters of a $name Visual range', ({ anchor, focus, text, range }) => {
+    const state = createVimCommandState()
+    setVisualRange(state, 'a', anchor, focus, true)
+
+    expect(visualTextRange(state, text)).toEqual(range)
+  })
+
+  it('covers nothing without a Visual range', () => {
+    expect(visualTextRange(createVimCommandState(), 'abc')).toBeUndefined()
   })
 
   it('keeps only the latest selection, whatever its kind', () => {
@@ -462,14 +482,15 @@ describe('clearVisualRange', () => {
 })
 
 describe('clearCommandAssembly', () => {
-  it('clears the pending command and both Visual endpoints together and leaves repeat and insert state alone', () => {
+  it('clears the pending command and leaves the Visual range, repeat and insert state alone', () => {
     const state = populatedState()
+    const range = [state.visualAnchor, state.visualFocus]
 
     clearCommandAssembly(state)
 
     expect(state.pending).toBeUndefined()
-    expect(state.visualAnchor).toBeUndefined()
-    expect(state.visualFocus).toBeUndefined()
+    // The range belongs to Visual mode and ends only with it, through the mode writer.
+    expect([state.visualAnchor, state.visualFocus]).toEqual(range)
     expect(state.lastChange).toBe(change)
     expect(state.lastFind).toBe(find)
     expect(state.structuralInsert).toEqual({ kind: 'open', originNodeId: 'a', position: 'after' })

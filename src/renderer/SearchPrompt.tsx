@@ -14,6 +14,7 @@ export function SearchPrompt({
   beginEditing,
   vim = false,
   allowAgenda = true,
+  beforeViewChange,
 }: {
   store: EditorStore
   snapshot: SearchSessionSnapshot
@@ -23,6 +24,8 @@ export function SearchPrompt({
   beginEditing?: () => void
   vim?: boolean
   allowAgenda?: boolean
+  /** Resolves the editor's sessions and modes before `Cmd+P` switches between Tree and Agenda. */
+  beforeViewChange?: () => void
 }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null)
   const editing = snapshot.draft !== undefined
@@ -96,6 +99,8 @@ export function SearchPrompt({
             store.search.cancelDraft()
             restoreEditor()
             const active = document.activeElement
+            // The switch reaches another view, as the other `Cmd+P` paths do (PRODUCT §20.2.6).
+            beforeViewChange?.()
             const state = store.getSnapshot()
             if (state.status === 'ready' && state.agenda !== undefined) store.closeAgenda()
             else store.openAgenda(active instanceof HTMLElement ? getCaret(active) : undefined)
