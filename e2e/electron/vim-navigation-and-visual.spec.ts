@@ -1,7 +1,7 @@
 // @editing-modes: vim
 import type { Page } from '@playwright/test'
 import { caretGeometry } from './caret-line-geometry'
-import { doubleClickDragText, dragText, textX } from './text-pointer'
+import { characterBoxes, doubleClickDragText, dragText, textX } from './text-pointer'
 import {
   allowRendererError,
   clickApplicationMenuItem,
@@ -1710,8 +1710,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       // A pointer drag enters character Visual mode and uses the highlight pair, in both appearances.
       // The press starts on the block caret's character and stays still before moving: neither the
-      // block nor a later render may turn it into a native text drag or move its anchor.
-      await dragSelectText(window, first, 6, 70, 300)
+      // block nor a later render may turn it into a native text drag or move its anchor. The drag ends
+      // on the seventh character, which a Vim drag includes.
+      const firstX = (await first.boundingBox())!.x
+      await dragSelectText(window, first, 6, (await textX(first, 6)) - firstX + 2, 300)
 
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       expect(
@@ -1760,7 +1762,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       const { window } = await launchTree(userDataDir)
       const editor = node(window, 1)
 
-      await dragText(window, editor, 6, 10)
+      // The drag selects from the pressed character through the one under the pointer, as in Vim.
+      await dragText(window, editor, 6, 9)
 
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       expect(await selectedText(editor)).toBe('beta')
@@ -1781,7 +1784,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
       await window.keyboard.press('u')
       await expect(editor).toHaveValue('alpha beta gamma')
-      await dragText(window, editor, 10, 6)
+      await dragText(window, editor, 9, 6)
 
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       expect(await selectedText(editor)).toBe('beta')
@@ -1798,9 +1801,174 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
     for (const rich of [false, true]) {
       // @requirement PRODUCT.md §20.2.6
-      test(`follows a held ${rich ? 'rich' : 'plain'} pointer drag with the mode before the release`, async ({
+      test(`places the Normal block and drag ends on the ${rich ? 'rich' : 'plain'} characters under the pointer`, async ({
+        userDataDir,
+      }, testInfo) => {
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'first', text: `${rich ? '#note' : 'alpha'} beta gamma`, children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'first' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        const boxes = await characterBoxes(editor)
+        const y = (boxes[7]!.top + boxes[7]!.bottom) / 2
+        const across = (offset: number, fraction: number): number =>
+          boxes[offset]!.left + (boxes[offset]!.right - boxes[offset]!.left) * fraction
+        const press = async (from: number, to: number): Promise<void> => {
+          await window.mouse.move(from, y)
+          // The node-drag hold runs on a paused clock, as in `dragSelectText`.
+          await window.clock.install()
+          await window.clock.pauseAt(Date.now() + 60_000)
+          try {
+            await window.mouse.down()
+            await window.mouse.move(to, y, { steps: 4 })
+            await window.mouse.up()
+          } finally {
+            await window.clock.resume()
+          }
+        }
+
+        // A click on the right half of `e` places the block on `e`, as in Vim, not on the boundary
+        // nearest the pointer, which would put it on `t`.
+        await press(across(7, 0.8), across(7, 0.8))
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        expect(await caretOffset(editor)).toBe(7)
+        expect(await selectedText(editor)).toBe('e')
+
+        await editor.screenshot({ path: testInfo.outputPath(`right-half-click-${rich ? 'rich' : 'plain'}.png`) })
+
+        // A hand that moves a few pixels across the middle of one character still clicks it.
+        await press(across(9, 0.2), across(9, 0.8))
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        expect(await caretOffset(editor)).toBe(9)
+
+        // A drag includes the pressed character and the one under the pointer in either direction,
+        // whichever half of each the pointer is on.
+        await press(across(6, 0.8), across(9, 0.2))
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(editor)).toBe('beta')
+
+        await editor.screenshot({ path: testInfo.outputPath(`forward-drag-${rich ? 'rich' : 'plain'}.png`) })
+
+        await press(across(9, 0.2), across(6, 0.8))
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        expect(await selectedText(editor)).toBe('beta')
+
+        await window.keyboard.press('h')
+
+        expect(await selectedText(editor)).toBe(' beta')
+      })
+
+      // @requirement PRODUCT.md §20.2.6
+      test(`places the Normal block on the last character of a wrapped ${rich ? 'rich' : 'plain'} line clicked past its end`, async ({
         userDataDir,
       }) => {
+        const words = Array.from({ length: 40 }, (_, index) => `word${index}`).join(' ')
+        seedDocument(userDataDir, {
+          document: { roots: [{ id: 'first', text: `${rich ? '#note' : 'note'} ${words}`, children: [] }] },
+          location: { currentParentId: null, selectedNodeId: 'first' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        const boxes = await characterBoxes(editor)
+        const secondLine = boxes.findIndex((box) => box.top > boxes[0]!.top + 1)
+        const lastOnFirstLine = secondLine - 1
+        const firstLine = boxes[0]!
+        const editorBox = (await editor.boundingBox())!
+
+        expect(secondLine).toBeGreaterThan(0)
+
+        // Past the end of the first visual line, the native caret sits at the boundary that also
+        // starts the second line; Vim puts the cursor on the clicked line's last character.
+        await window.mouse.click(editorBox.x + editorBox.width - 3, (firstLine.top + firstLine.bottom) / 2)
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        expect(await caretOffset(editor)).toBe(lastOnFirstLine)
+      })
+
+      // @requirement PRODUCT.md §20.2.6
+      test(`selects to the end of the ${rich ? 'rich' : 'plain'} text when a drag leaves the node below it, and clicks by character from whole-node Visual`, async ({
+        userDataDir,
+      }) => {
+        seedDocument(userDataDir, {
+          document: {
+            roots: [
+              { id: 'first', text: `${rich ? '#note' : 'alpha'} beta gamma`, children: [] },
+              { id: 'second', text: 'delta epsilon', children: [] },
+            ],
+          },
+          location: { currentParentId: null, selectedNodeId: 'first' },
+        })
+        const { window } = await launchTree(userDataDir)
+        const editor = node(window, 1)
+        const boxes = await characterBoxes(editor)
+        const y = (boxes[7]!.top + boxes[7]!.bottom) / 2
+        const editorBox = (await editor.boundingBox())!
+        await window.mouse.move(boxes[6]!.left + 1, y)
+        await window.clock.install()
+        await window.clock.pauseAt(Date.now() + 60_000)
+        try {
+          await window.mouse.down()
+          // Below the node, over the next row, at the x of a character before the press.
+          await window.mouse.move(boxes[2]!.left + 1, editorBox.y + editorBox.height + 8, { steps: 6 })
+          await window.mouse.up()
+        } finally {
+          await window.clock.resume()
+        }
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
+        await expect(editor).toBeFocused()
+        expect(await selectedText(editor)).toBe('beta gamma')
+
+        // A click on the right half of a character ends whole-node Visual mode on that character.
+        await window.keyboard.press('Escape')
+        await window.keyboard.press('V')
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL NODE')
+
+        await window.mouse.click(boxes[7]!.left + (boxes[7]!.right - boxes[7]!.left) * 0.8, y)
+
+        await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+        expect(await caretOffset(editor)).toBe(7)
+      })
+
+      if (!rich)
+        // @requirement PRODUCT.md §20.2.6
+        test('places the Normal block by character on lines separated by hard line breaks', async ({ userDataDir }) => {
+          seedDocument(userDataDir, {
+            document: { roots: [{ id: 'first', text: 'alpha\n\nbeta gamma', children: [] }] },
+            location: { currentParentId: null, selectedNodeId: 'first' },
+          })
+          const { window } = await launchTree(userDataDir)
+          const editor = node(window, 1)
+          const boxes = await characterBoxes(editor)
+          const editorBox = (await editor.boundingBox())!
+          const rowMiddle = (offset: number): number => (boxes[offset]!.top + boxes[offset]!.bottom) / 2
+
+          // Past the end of the first line the click is on its last character, not on its line break.
+          await window.mouse.click(editorBox.x + editorBox.width - 3, rowMiddle(0))
+
+          await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+          expect(await caretOffset(editor)).toBe(4)
+
+          // On the empty line, the only character is its line break, as Vim's empty line is.
+          await window.mouse.click(boxes[0]!.left + 1, rowMiddle(6) + 2)
+
+          expect(await caretOffset(editor)).toBe(6)
+
+          await window.mouse.click(boxes[8]!.left + (boxes[8]!.right - boxes[8]!.left) * 0.8, rowMiddle(8))
+
+          expect(await caretOffset(editor)).toBe(8)
+        })
+
+      // @requirement PRODUCT.md §20.2.6
+      test(`follows a held ${rich ? 'rich' : 'plain'} pointer drag with the mode before the release`, async ({
+        userDataDir,
+      }, testInfo) => {
         seedDocument(userDataDir, {
           document: { roots: [{ id: 'first', text: `${rich ? '#note' : 'alpha'} beta gamma`, children: [] }] },
           location: { currentParentId: null, selectedNodeId: 'first' },
@@ -1809,8 +1977,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         const editor = node(window, 1)
         const box = (await editor.boundingBox())!
         const y = box.y + box.height / 2
-        const start = await textX(editor, 6)
-        const end = await textX(editor, 10)
+        // The press is on the right half of `b`, where the native press anchors after it, and the
+        // drag stops on the right half of `a`, where the native end already includes it.
+        const start = (await textX(editor, 7)) - 3
+        const end = (await textX(editor, 10)) - 3
         await window.mouse.move(start, y)
         // The node-drag hold runs on a paused clock, as in `dragSelectText`; the drag cancels it.
         await window.clock.install()
@@ -1822,9 +1992,12 @@ test.describe('Vim editing: navigation and Visual modes', () => {
           await window.clock.resume()
         }
 
-        // The button is still held: the mode already matches the selection being dragged.
+        // The button is still held: the mode already matches the selection being dragged, and the
+        // highlight includes the pressed character although the press was on its right half.
         await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
         expect(await selectedText(editor)).toBe('beta')
+
+        await editor.screenshot({ path: testInfo.outputPath(`held-drag-${rich ? 'rich' : 'plain'}.png`) })
 
         // Dragging back to the press leaves only a caret, which is Normal mode again.
         await window.mouse.move(start, y, { steps: 8 })
@@ -2019,7 +2192,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       expect(await selectedText(editor)).toBe('beta')
 
       // A press on the selected word selects anew instead of dragging the word's text elsewhere.
-      await dragText(window, editor, 8, 15)
+      await dragText(window, editor, 8, 14)
 
       await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       await expect(editor).toHaveValue('alpha beta gamma')
@@ -2129,7 +2302,8 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         const { window } = await launchTree(userDataDir)
         const second = node(window, 2)
 
-        await dragText(window, second, 13, 6)
+        // A drag selects the characters under the press and the pointer, both included, as in Vim.
+        await dragText(window, second, 12, 6)
 
         await expect(second).toBeFocused()
         await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
@@ -2151,7 +2325,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
         // A drag that begins in another node from character Visual mode starts a new selection there.
         await window.keyboard.press('v')
         await window.keyboard.press('l')
-        await dragText(window, second, 6, 13)
+        await dragText(window, second, 6, 12)
 
         await expect(second).toBeFocused()
         await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')

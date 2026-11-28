@@ -11,6 +11,13 @@ import { App } from './App'
 import { HOLD_ACTIVATION_MS } from './node-drag'
 import { getSelectionEndpoints, setSelectionRange } from './editor-dom'
 
+// jsdom lays out no text, so the character hit test is replaced: a pointer's `clientX` names the
+// character under it, as in `use-node-input-bindings.test.tsx`.
+vi.mock('./editor-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./editor-dom')>()),
+  textCellAtPoint: (_element: HTMLElement, x: number) => Math.floor(x),
+}))
+
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 
 afterEach(() => {

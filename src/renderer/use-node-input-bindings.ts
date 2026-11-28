@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { EditorStore, FocusIntent, NodeVisualCommand } from '../application/editor-store'
 import { requireNode, type LinkRange, type TreeNode } from '../domain/document'
+import { moveCharacterOffset } from '../domain/text-characters'
 import type { NodeVisualSelection, PendingCaret, PendingVisualSelection } from './node-input-types'
 import {
   collapseSelectionToAnchor,
@@ -21,11 +22,13 @@ import {
   getSelectionRange,
   readEditableContent,
   hasAttachmentCharacter,
+  isCollapsedSelection,
   setCaret,
   setNormalCaret,
   isSelectionWithin,
   setSelectionRange,
   textAreaOffsetAtPoint,
+  textCellAtPoint,
   updateDateLikeUnderline,
   updateSelectedLinks,
 } from './editor-dom'
@@ -34,7 +37,12 @@ import { createEditorKeyDownHandler } from './editor-input-handlers'
 import type { VimTextCommandState } from './vim-session-finish'
 import { freezeCaret, releaseCaret, type CaretFreeze, type NodeDragCaretFreeze } from './drag-caret-freeze'
 import { normalCaretTarget } from './link-caret'
-import { characterCaretTransition, pointerCaretTransition, pointerSelectionTransition } from './vim-caret-transition'
+import {
+  characterCaretTransition,
+  pointerCaretTransition,
+  pointerCellTransition,
+  pointerSelectionTransition,
+} from './vim-caret-transition'
 import { revealInViewport } from './scroll-viewport'
 import { createViewportReveal } from './viewport-reveal'
 import { moveViewportSelection } from './vim-viewport-motion'
@@ -96,6 +104,14 @@ interface HeldTextPress {
   ordinary: boolean
   extending: boolean
   pressOffset: number | undefined
+  /**
+   * The character under a single, unmodified press in Normal or character Visual mode, which
+   * decides the mode and range by Vim's cell rule; a multi-click or `Shift` press leaves it
+   * undefined and keeps the native selection's word, line or extension.
+   */
+  pressCell: number | undefined
+  /** The native drag's anchor boundary: the press's own, then the last one written, which Chromium keeps. */
+  anchorBoundary: number | undefined
   point: { x: number; y: number }
   followedMode: 'normal' | 'visual' | undefined
 }
@@ -904,21 +920,36 @@ export function useNodeInputBindings({
         pressedNode === undefined
           ? undefined
           : [...inputs.current.values()].find((candidate) => candidate.contains(pressedNode))
+      const ordinary = event.pointerType === 'mouse' && !event.metaKey && !event.ctrlKey && !event.altKey
+      const pressMode = caretProjection.current.mode
       heldTextPress.current =
         pressedInput === undefined
           ? undefined
           : {
               input: pressedInput,
-              ordinary: event.pointerType === 'mouse' && !event.metaKey && !event.ctrlKey && !event.altKey,
+              ordinary,
               extending: event.shiftKey,
               // Read before the native press moves the caret: a text area reports no drag direction.
               pressOffset:
                 pressedInput instanceof HTMLTextAreaElement
                   ? textAreaOffsetAtPoint(pressedInput, event.clientX, event.clientY)
                   : undefined,
+              // Measured before the native press moves the caret to the boundary nearest the pointer.
+              // A press in whole-node Visual mode is measured too: its release ends that mode and then
+              // settles as a click in Normal mode.
+              pressCell:
+                ordinary &&
+                !event.shiftKey &&
+                (pressMode === 'normal' || pressMode === 'visual' || pressMode === 'visual-node')
+                  ? textCellAtPoint(pressedInput, event.clientX, event.clientY)
+                  : undefined,
+              anchorBoundary: undefined,
               point: { x: event.clientX, y: event.clientY },
               followedMode: undefined,
             }
+      // A cell press replaces a character Visual selection at once, so a press that then ends without
+      // a release or a move, such as a cancelled pointer, never leaves Visual mode without a range.
+      if (heldTextPress.current?.pressCell !== undefined && pressMode === 'visual') changeVimMode('normal')
       const target = event.target instanceof Element ? event.target : undefined
       const row = target?.closest<HTMLElement>('.agenda-row')
       const key = row?.dataset.agendaKey
@@ -965,6 +996,12 @@ export function useNodeInputBindings({
       if ((mode === 'visual' || hasMultiCharacterSelection(input)) && heldTextPress.current?.ordinary !== true) return
       setCaret(input, getCaret(input))
     }
+    // A double or triple click selects a word or a line natively, as Vim's do, so it leaves the
+    // cell rule for the native selection.
+    const onMouseDown = (event: MouseEvent): void => {
+      const pressed = heldTextPress.current
+      if (pressed !== undefined && event.detail >= 2) pressed.pressCell = undefined
+    }
     // A Control-click opens a native menu that can swallow the release, so the press stops owning
     // the selection here; otherwise later keyboard motions would draw no block caret.
     const onContextMenu = (): void => {
@@ -977,6 +1014,65 @@ export function useNodeInputBindings({
         extending: pressed.extending,
         pressOffset: pressed.pressOffset,
       })
+    /**
+     * A single press decides by the characters under the press and the pointer, as Vim does, not by
+     * the boundary nearest the pointer (PRODUCT §20.2.6). Chromium keeps an anchor written into the
+     * drag it is extending as its base, so the pressed character stays selected in either direction;
+     * it recomputes the moving end on every move, so only the release writes that end, which can lag
+     * one character behind the pointer until then. The command-state range is always exact.
+     */
+    // The boundary the native press anchored its drag at: a text area reports no direction, so the
+    // offset under the press, read before the press, names it.
+    const pressBoundary = (pressed: HeldTextPress): number =>
+      pressed.input instanceof HTMLTextAreaElement
+        ? (pressed.pressOffset ?? pressed.input.selectionStart)
+        : getSelectionEndpoints(pressed.input).anchor
+    const settleCellPress = (pressed: HeldTextPress, nodeId: string, target: TreeNode, released: boolean): void => {
+      const input = pressed.input
+      const mode = caretProjection.current.mode
+      const next = pointerCellTransition(
+        target.text,
+        pressed.pressCell!,
+        textCellAtPoint(input, pressed.point.x, pressed.point.y),
+      )
+      if (released) {
+        if (next.mode === 'visual') setSelectionRange(input, next.anchorBoundary, next.focusBoundary)
+      } else {
+        pressed.followedMode = next.mode
+        const nativeBase = pressed.anchorBoundary ?? pressBoundary(pressed)
+        pressed.anchorBoundary = nativeBase
+        // The anchor is written only where the native press chose another boundary, always with a
+        // selected character after it, because Chromium turns a drag whose selection was rewritten as
+        // a caret into a caret move, and only once the native drag has extended a selection. Before
+        // that, Chromium has not yet chosen between extending and dragging a selection: a written
+        // selection under the press would make it drag that text and cancel the pointer.
+        const focus =
+          next.mode === 'visual' ? next.focusBoundary : moveCharacterOffset(target.text, next.anchorBoundary, 1)
+        const extending =
+          input instanceof HTMLTextAreaElement ? input.selectionStart !== input.selectionEnd : !isCollapsedSelection()
+        if (nativeBase !== next.anchorBoundary && focus !== next.anchorBoundary && extending) {
+          setSelectionRange(input, next.anchorBoundary, focus)
+          pressed.anchorBoundary = next.anchorBoundary
+        }
+      }
+      const caretAt = (cursor: number): VimCaretState =>
+        pointerCaretTransition(
+          caretProjection.current.authority.caret,
+          cursor,
+          target.text.length,
+          target.attachment !== undefined,
+        )
+      if (next.mode === 'normal') {
+        if (mode === 'visual') changeVimMode('normal')
+        // The block is drawn on the pressed character, not at the boundary the native press chose.
+        if (released) applyCaretState(nodeId, caretAt(next.cursor))
+        return
+      }
+      applyCaretState(nodeId, caretAt(next.focus), false, 'preserve-selection')
+      if (released) setVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus, target.text.length > 0)
+      else followVisualRange(vimCommandState.current, nodeId, next.anchor, next.focus)
+      changeVimMode('visual')
+    }
     /**
      * An ordinary text press leaves character Visual mode for a selection and Normal mode for a caret.
      * The mode follows the selection while the press is held, as Vim's does during a drag, and the
@@ -991,6 +1087,10 @@ export function useNodeInputBindings({
       if (nodeId === undefined || state.status !== 'ready') return
 
       const target = requireNode(state.document, nodeId).node
+      if (pressed.pressCell !== undefined) {
+        settleCellPress(pressed, nodeId, target, released)
+        return
+      }
       const endpoints = heldEndpoints(pressed)
       // A drag that left a browser rich field also selected other nodes. The release keeps the range
       // within this node, so the mode, the highlight and the commands all use the same text; a
@@ -1026,19 +1126,59 @@ export function useNodeInputBindings({
       const pressed = heldTextPress.current
       if (pressed === undefined || pointerPhase !== 'held' || event.pointerId !== heldPointer?.id) return
       pressed.point = { x: event.clientX, y: event.clientY }
+      // A cell press follows the pointer itself: the character under it can change while the native
+      // selection stays the same, and a write here precedes the native extension that keeps it.
+      if (pressed.pressCell !== undefined && holdsPressedEditor(pressed)) settlePointerSelection(pressed, false)
     }
     // The native press extends the selection after its move event, so the selection change, not the
-    // move, is when the held press has a new selection to follow.
+    // move, is when a held native press has a new selection to follow.
     const onSelectionChange = (): void => {
       const pressed = heldTextPress.current
+      // A cell press follows it too: the first extension is when its anchor can be written safely.
       if (pointerPhase === 'held' && holdsPressedEditor(pressed)) settlePointerSelection(pressed, false)
     }
     // A Visual command typed while the press is still held reads the native selection. A range that
     // left a browser rich field is therefore kept within the pressed node before the key is handled,
     // as the release would keep it; the key gives up the native drag.
-    const onKeyDown = (): void => {
+    const onKeyDown = (event: KeyboardEvent): void => {
       const pressed = heldTextPress.current
-      if (pointerPhase !== 'held' || !holdsPressedEditor(pressed) || pressed.followedMode !== 'visual') return
+      if (
+        pointerPhase !== 'held' ||
+        !holdsPressedEditor(pressed) ||
+        ['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)
+      )
+        return
+      if (pressed.pressCell !== undefined) {
+        // The key gives up the press: its command may edit the text or change the mode, so neither a
+        // later move nor the release settles the press again. The moving end of the native drag can
+        // lag the range, so the exact range is written first for a native command that reads it.
+        heldTextPress.current = undefined
+        if (pressed.followedMode !== 'visual') {
+          // A still press is a click on the pressed character, so the key acts there, as after a click.
+          const nodeId = [...inputs.current.entries()].find(([, candidate]) => candidate === pressed.input)?.[0]
+          const state = store.getSnapshot()
+          if (nodeId === undefined || state.status !== 'ready' || caretProjection.current.mode !== 'normal') return
+          const target = requireNode(state.document, nodeId).node
+          applyCaretState(
+            nodeId,
+            pointerCaretTransition(
+              caretProjection.current.authority.caret,
+              pressed.pressCell,
+              target.text.length,
+              target.attachment !== undefined,
+            ),
+          )
+          return
+        }
+        const next = pointerCellTransition(
+          nodeText(pressed.input),
+          pressed.pressCell,
+          textCellAtPoint(pressed.input, pressed.point.x, pressed.point.y),
+        )
+        if (next.mode === 'visual') setSelectionRange(pressed.input, next.anchorBoundary, next.focusBoundary)
+        return
+      }
+      if (pressed.followedMode !== 'visual') return
       if (isSelectionWithin(pressed.input)) return
       const endpoints = heldEndpoints(pressed)
       setSelectionRange(pressed.input, endpoints.anchor, endpoints.focus)
@@ -1138,6 +1278,7 @@ export function useNodeInputBindings({
       if (input instanceof HTMLElement && [...inputs.current.values()].includes(input)) redraw(input)
     }
     document.addEventListener('pointerdown', onPress, true)
+    document.addEventListener('mousedown', onMouseDown, true)
     document.addEventListener('contextmenu', onContextMenu, true)
     document.addEventListener('selectionchange', onSelectionChange)
     document.addEventListener('keydown', onKeyDown, true)
@@ -1160,6 +1301,7 @@ export function useNodeInputBindings({
       takeReplaceClick(gestureSession)
       observer?.disconnect()
       document.removeEventListener('pointerdown', onPress, true)
+      document.removeEventListener('mousedown', onMouseDown, true)
       document.removeEventListener('contextmenu', onContextMenu, true)
       document.removeEventListener('selectionchange', onSelectionChange)
       document.removeEventListener('keydown', onKeyDown, true)

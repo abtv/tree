@@ -3,6 +3,7 @@ import { findDateLikeTokens } from '../domain/date-recognition'
 import { markedPieces, type CaretMark } from './agenda-row-caret'
 import { characterBoundaries, characterStart, moveCharacterOffset } from '../domain/text-characters'
 import type { TextMatch } from '../domain/text-search'
+import { cellAtPoint, type CellBox } from './text-cell-hit'
 
 /** Measure a windowed-out Tree row with the same row styles and indentation as a mounted row. */
 export function unmountedNodeGeometry(
@@ -43,9 +44,40 @@ export function unmountedNodeGeometry(
   }
 }
 
+/**
+ * The character under a viewport point in an editor, by Vim's cell rule (`cellAtPoint`): the
+ * character whose box holds the point, else the nearest one on that visual line. A point beside the
+ * editor uses the visual line at its height. A point above or below the editor, where a drag has
+ * left the node, is its first or last character, as a native text field selects to its start or end.
+ */
+export function textCellAtPoint(element: HTMLElement, x: number, y: number): number {
+  const bounds = element.getBoundingClientRect()
+  const text = nodeText(element)
+  if (text.length === 0 || y < bounds.top) return 0
+  if (y >= bounds.bottom) return characterStart(text, text.length - 1)
+  const geometry = measureTextGeometry(element)
+  try {
+    // A text area is measured on a mirror that does not scroll; a rich field's boxes already do.
+    const scroll = element instanceof HTMLTextAreaElement ? element.scrollTop : 0
+    return cellAtPoint(text, geometry.box, { x: x - bounds.left, y: y - bounds.top + scroll })
+  } finally {
+    geometry.dispose()
+  }
+}
+
 /** Measure wrapped text without changing the live selection. Dispose after a vertical command. */
 export function visualTextGeometry(element: HTMLElement): {
   position: (offset: number) => { top: number; left: number }
+  dispose: () => void
+} {
+  const { position, dispose } = measureTextGeometry(element)
+  return { position, dispose }
+}
+
+function measureTextGeometry(element: HTMLElement): {
+  position: (offset: number) => { top: number; left: number }
+  /** The box of the character that starts at a grapheme offset, relative to the editor's border box. */
+  box: (offset: number) => CellBox
   dispose: () => void
 } {
   let measured = element
@@ -93,19 +125,28 @@ export function visualTextGeometry(element: HTMLElement): {
     child = walker.nextNode()
   }
   const range = document.createRange()
+  const box = (cursor: number): CellBox => {
+    const part = textNodes.find((part) => cursor >= part.start && cursor < part.end)
+    if (part === undefined) return { top: 0, bottom: 0, left: 0, right: 0 }
+    range.setStart(part.node, cursor - part.start)
+    const end = moveCharacterOffset(text, cursor, 1)
+    const last = textNodes.find((part) => end > part.start && end <= part.end) ?? part
+    range.setEnd(last.node, end - last.start)
+    const rect = range.getBoundingClientRect()
+    const origin = measured.getBoundingClientRect()
+    return {
+      top: rect.top - origin.top,
+      bottom: rect.bottom - origin.top,
+      left: rect.left - origin.left,
+      right: rect.right - origin.left,
+    }
+  }
   return {
     position: (offset) => {
-      const cursor = characterStart(text, Math.min(offset, Math.max(0, text.length - 1)))
-      const part = textNodes.find((part) => cursor >= part.start && cursor < part.end)
-      if (part === undefined) return { top: 0, left: 0 }
-      range.setStart(part.node, cursor - part.start)
-      const end = moveCharacterOffset(text, cursor, 1)
-      const last = textNodes.find((part) => end > part.start && end <= part.end) ?? part
-      range.setEnd(last.node, end - last.start)
-      const rect = range.getBoundingClientRect()
-      const origin = measured.getBoundingClientRect()
-      return { top: rect.top - origin.top, left: rect.left - origin.left }
+      const { top, left } = box(characterStart(text, Math.min(offset, Math.max(0, text.length - 1))))
+      return { top, left }
     },
+    box,
     dispose: () => {
       range.detach()
       if (measured !== element) measured.remove()
@@ -643,25 +684,22 @@ export function setCaret(element: HTMLElement, position: number): void {
   const selection = globalThis.getSelection()
   if (selection === null) return
   const range = document.createRange()
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let remaining = position
-  let current: Node | null = walker.nextNode()
-  while (current !== null) {
-    const length = current.textContent?.length ?? 0
-    if (remaining < length) {
-      range.setStart(current, remaining)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
-      return
-    }
-    remaining -= length
-    current = walker.nextNode()
-  }
-  range.selectNodeContents(element)
-  range.collapse(false)
+  range.setStart(...richBoundary(element, position))
+  range.collapse(true)
   selection.removeAllRanges()
   selection.addRange(range)
+}
+
+/** The DOM boundary of a UTF-16 text offset in a rich editor: the start of the text node holding it. */
+function richBoundary(element: HTMLElement, position: number): [Node, number] {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let remaining = position
+  for (let current = walker.nextNode(); current !== null; current = walker.nextNode()) {
+    const length = current.textContent?.length ?? 0
+    if (remaining < length) return [current, remaining]
+    remaining -= length
+  }
+  return [element, element.childNodes.length]
 }
 
 export function setNormalCaret(element: HTMLElement, position: number): void {
@@ -683,15 +721,11 @@ export function setSelectionRange(element: HTMLElement, anchor: number, focus: n
     element.setSelectionRange(Math.min(anchor, focus), Math.max(anchor, focus), anchor > focus ? 'backward' : 'forward')
     return
   }
-  setCaret(element, anchor)
   const selection = globalThis.getSelection()
-  if (selection === null || selection.anchorNode === null) return
-  const anchorNode = selection.anchorNode
-  const anchorOffset = selection.anchorOffset
-  setCaret(element, focus)
-  if (selection.focusNode !== null) {
-    selection.setBaseAndExtent(anchorNode, anchorOffset, selection.focusNode, selection.focusOffset)
-  }
+  if (selection === null) return
+  // One write: a native drag that is still extending must never see a collapsed caret in between,
+  // because Chromium then turns the drag into a caret move.
+  selection.setBaseAndExtent(...richBoundary(element, anchor), ...richBoundary(element, focus))
 }
 
 export function isCollapsedSelection(): boolean {

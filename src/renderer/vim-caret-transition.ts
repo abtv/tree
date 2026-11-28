@@ -83,7 +83,35 @@ export function pointerCaretTransition(
 }
 
 /**
- * The mode a released Normal or character Visual text press leaves (PRODUCT §20.2.6). A selection
+ * The mode and selection a single ordinary press leaves by Vim's cell rule (PRODUCT §20.2.6). The
+ * press and the pointer each name the character under them. One character is Normal mode on it; two
+ * are character Visual mode from the pressed character to the one under the pointer, both included.
+ * The native boundaries draw that range, so the anchor boundary falls before the pressed character
+ * for a forward range and after it for a backward one.
+ */
+export function pointerCellTransition(
+  text: string,
+  pressCell: number,
+  pointerCell: number,
+):
+  | { mode: 'normal'; cursor: number; anchorBoundary: number }
+  | { mode: 'visual'; anchor: number; focus: number; anchorBoundary: number; focusBoundary: number } {
+  if (pointerCell === pressCell) return { mode: 'normal', cursor: pressCell, anchorBoundary: pressCell }
+
+  const after = (offset: number): number => moveCharacterOffset(text, offset, 1)
+  const forward = pointerCell > pressCell
+  return {
+    mode: 'visual',
+    anchor: pressCell,
+    focus: pointerCell,
+    anchorBoundary: forward ? pressCell : after(pressCell),
+    focusBoundary: forward ? after(pointerCell) : pointerCell,
+  }
+}
+
+/**
+ * The mode a released multi-click or `Shift` text press leaves, from the native selection
+ * (PRODUCT §20.2.6). A selection
  * becomes character Visual mode, anchored where the press began and active where it ended; a
  * collapsed caret is Normal mode. Native offsets are boundaries around the selected characters,
  * while Visual endpoints name the first and last selected characters.

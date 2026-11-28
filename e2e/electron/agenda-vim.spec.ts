@@ -15,7 +15,7 @@ import {
   attachmentPath,
   setCursor,
 } from './fixtures'
-import { dragText } from './text-pointer'
+import { characterBoxes, dragText } from './text-pointer'
 
 const node = (id: string, text: string, children: TreeNode[] = []): TreeNode => ({ id, text, children })
 const dayNumber = (month: number, day: number): number => Math.round(Date.UTC(2026, month - 1, day) / 86_400_000)
@@ -502,7 +502,8 @@ test('enters character Visual from a pointer drag in an Agenda editor', async ({
   const second = window.getByRole('textbox', { name: 'Agenda node second', exact: true })
   const selected = () => window.evaluate(() => getSelection()?.toString())
 
-  await dragText(window, first, 21, 17)
+  // A drag includes the characters under the press and the pointer, as in Vim.
+  await dragText(window, first, 20, 17)
 
   await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
   expect(await selected()).toBe('beta')
@@ -511,7 +512,7 @@ test('enters character Visual from a pointer drag in an Agenda editor', async ({
 
   expect(await selected()).toBe(' beta')
 
-  await dragText(window, second, 17, 24)
+  await dragText(window, second, 17, 23)
 
   await expect(second).toBeFocused()
   await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
@@ -523,6 +524,41 @@ test('enters character Visual from a pointer drag in an Agenda editor', async ({
 
   await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
   await expect(second).toHaveText('2026-10-10 delta  zeta')
+})
+
+// @requirement PRODUCT.md §20.2.6
+test('places the Normal block on the Agenda character under a click on its right half or past the line end', async ({
+  userDataDir,
+}) => {
+  seedDocument(userDataDir, {
+    document: { roots: [node('first', '2026-10-10 alpha beta gamma')] },
+    location: { currentParentId: null, selectedNodeId: 'first' },
+  })
+  const { window } = await launchTree(userDataDir)
+  await openAndSelect(window, nodeKey(10, 10, 'first'))
+  const first = window.getByRole('textbox', { name: 'Agenda node first', exact: true })
+  const boxes = await characterBoxes(first)
+  const y = (boxes[18]!.top + boxes[18]!.bottom) / 2
+  const caret = () =>
+    first.evaluate((element) => {
+      const prefix = document.createRange()
+      prefix.selectNodeContents(element)
+      const range = getSelection()!.getRangeAt(0)
+      prefix.setEnd(range.startContainer, range.startOffset)
+      return [prefix.toString().length, range.toString()]
+    })
+
+  // The right half of `e` is still `e`, as in Vim.
+  await window.mouse.click(boxes[18]!.left + (boxes[18]!.right - boxes[18]!.left) * 0.8, y)
+
+  await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+  expect(await caret()).toEqual([18, 'e'])
+
+  // Past the end of the line, the click is on its last character.
+  const box = (await first.boundingBox())!
+  await window.mouse.click(box.x + box.width - 3, y)
+
+  expect(await caret()).toEqual([26, 'a'])
 })
 
 /** Open Agenda, put the focus in a direct match's editor and return to Normal. */

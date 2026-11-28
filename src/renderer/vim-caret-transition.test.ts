@@ -5,6 +5,7 @@ import {
   focusCaretTransition,
   horizontalCaretTransition,
   pointerCaretTransition,
+  pointerCellTransition,
   pointerSelectionTransition,
   sameNodeImageTransition,
   verticalCaretTransition,
@@ -194,6 +195,40 @@ describe('Vim caret transitions', () => {
     'turns the selection a pointer press leaves into Visual endpoints: %s',
     (_case, text, selection, expected) => {
       expect(pointerSelectionTransition(text, selection)).toEqual(expected)
+    },
+  )
+
+  // @requirement PRODUCT.md §20.2.6
+  it.each([
+    ['a press released on its own character', 'abcdef', 2, 2, { mode: 'normal', cursor: 2, anchorBoundary: 2 }],
+    ['a forward drag', 'abcdef', 1, 3, { mode: 'visual', anchor: 1, focus: 3, anchorBoundary: 1, focusBoundary: 4 }],
+    ['a backward drag', 'abcdef', 3, 1, { mode: 'visual', anchor: 3, focus: 1, anchorBoundary: 4, focusBoundary: 1 }],
+    [
+      'the next character',
+      'abcdef',
+      2,
+      3,
+      { mode: 'visual', anchor: 2, focus: 3, anchorBoundary: 2, focusBoundary: 4 },
+    ],
+    [
+      'a joined emoji under the pointer',
+      'A👩‍💻b',
+      0,
+      1,
+      { mode: 'visual', anchor: 0, focus: 1, anchorBoundary: 0, focusBoundary: 6 },
+    ],
+    [
+      'a joined emoji pressed before a backward drag',
+      'A👩‍💻b',
+      1,
+      0,
+      { mode: 'visual', anchor: 1, focus: 0, anchorBoundary: 6, focusBoundary: 0 },
+    ],
+    ['empty text', '', 0, 0, { mode: 'normal', cursor: 0, anchorBoundary: 0 }],
+  ] as const)(
+    'includes the characters under the press and the pointer for %s',
+    (_case, text, pressCell, pointerCell, expected) => {
+      expect(pointerCellTransition(text, pressCell, pointerCell)).toEqual(expected)
     },
   )
 

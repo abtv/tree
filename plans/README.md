@@ -4,7 +4,7 @@ This index lists work that spans multiple sessions: initiatives and review follo
 
 | Plan | Status | Next task |
 | --- | --- | --- |
-| [Consistent Vim character Visual mode](vim-visual-consistency.md) | In progress | T2: mouse by character |
+| [Consistent Vim character Visual mode](vim-visual-consistency.md) | In progress | T3: Cmd+A enters Visual |
 
 Deferred or paused plans remain indexed to preserve their scope and evidence, but are excluded from ready-task selection. Generic continuation does not resume them.
 

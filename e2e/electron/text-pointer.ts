@@ -29,6 +29,68 @@ export function textX(field: Locator, offset: number): Promise<number> {
   }, offset)
 }
 
+export interface CharacterBox {
+  left: number
+  right: number
+  top: number
+  bottom: number
+}
+
+/**
+ * The viewport box of the character at each UTF-16 offset of a plain or rich editor, measured
+ * without moving the selection; a text area is measured on a mirror laid over it.
+ */
+export function characterBoxes(field: Locator): Promise<CharacterBox[]> {
+  return field.evaluate((element) => {
+    let measured = element as HTMLElement
+    let mirror: HTMLElement | undefined
+    if (element instanceof HTMLTextAreaElement) {
+      mirror = document.createElement('div')
+      const style = getComputedStyle(element)
+      for (const property of [
+        'font-family',
+        'font-size',
+        'font-weight',
+        'font-style',
+        'line-height',
+        'letter-spacing',
+        'padding',
+        'border',
+        'box-sizing',
+        'word-break',
+        'overflow-wrap',
+        'tab-size',
+      ])
+        mirror.style.setProperty(property, style.getPropertyValue(property))
+      const bounds = element.getBoundingClientRect()
+      Object.assign(mirror.style, {
+        position: 'fixed',
+        visibility: 'hidden',
+        whiteSpace: 'pre-wrap',
+        width: `${bounds.width}px`,
+        left: `${bounds.left}px`,
+        top: `${bounds.top - element.scrollTop}px`,
+      })
+      mirror.textContent = element.value
+      document.body.append(mirror)
+      measured = mirror
+    }
+    const boxes: CharacterBox[] = []
+    const walker = document.createTreeWalker(measured, NodeFilter.SHOW_TEXT)
+    for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
+      for (let index = 0; index < (text.textContent?.length ?? 0); index += 1) {
+        const range = document.createRange()
+        range.setStart(text, index)
+        range.setEnd(text, index + 1)
+        const { left, right, top, bottom } = range.getBoundingClientRect()
+        boxes.push({ left, right, top, bottom })
+      }
+    }
+    mirror?.remove()
+    return boxes
+  })
+}
+
 /** Double-click at one text boundary and drag word by word to another; the node-drag hold stays paused. */
 export async function doubleClickDragText(window: Page, field: Locator, from: number, to: number): Promise<void> {
   const box = await field.boundingBox()
