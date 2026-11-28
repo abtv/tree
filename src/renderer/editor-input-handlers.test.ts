@@ -2530,7 +2530,8 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, key, options))
 
     expect(vim.commandState.pending).toBeUndefined()
-    expect(vim.mode).toBe('normal')
+    // Cmd+A selects everything as a Visual selection; the other commands stay in Normal mode.
+    expect(vim.mode).toBe(key === 'a' ? 'visual' : 'normal')
     if (key === '.') expect(store.enter).toHaveBeenCalledOnce()
     else if (key === ',') expect(store.leave).toHaveBeenCalledOnce()
     else if (key === 'Backspace') expect(store.deleteSelected).toHaveBeenCalledOnce()
@@ -3213,26 +3214,38 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, key, options))
 
     expect(exit).toHaveBeenCalledOnce()
-    expect(vim.mode).toBe('normal')
     expect(vim.commandState.pending).toBeUndefined()
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
+    // Cmd+A then selects the whole text in character Visual mode; the other commands leave Normal mode.
+    expect(vim.mode).toBe(key === 'a' ? 'visual' : 'normal')
+    expect([vim.commandState.visualAnchor, vim.commandState.visualFocus]).toEqual(
+      key === 'a' ? [0, 3] : [undefined, undefined],
+    )
   })
 
   // @requirement PRODUCT.md §20.2.6
-  it('ends character Visual mode and its range before Cmd+A selects all text', () => {
+  it.each([
+    { name: 'character Visual', mode: 'visual' as const, text: 'text', range: [0, 3], selected: 'visual' },
+    { name: 'Normal', mode: 'normal' as const, text: 'a👍🏽', range: [0, 1], selected: 'visual' },
+    {
+      name: 'Normal on empty text',
+      mode: 'normal' as const,
+      text: '',
+      range: [undefined, undefined],
+      selected: 'normal',
+    },
+  ])('selects the whole text in character Visual mode when Cmd+A is pressed in $name mode', (example) => {
     const store = createStore()
     const input = document.createElement('textarea')
-    input.value = 'text'
-    const { handle, vim } = vimHandler(store, { id: 'node', text: 'text', children: [] }, 'visual')
-    setVisualRange(vim.commandState, 'node', 0, 2, true)
+    input.value = example.text
+    const { handle, vim } = vimHandler(store, { id: 'node', text: example.text, children: [] }, example.mode)
+    if (example.mode === 'visual') setVisualRange(vim.commandState, 'node', 0, 2, true)
     vim.commandState.pending = { count: '', motionCount: '', prefix: 'i' }
 
     handle(keyEvent(input, 'a', { metaKey: true }))
 
-    expect(vim.mode).toBe('normal')
-    expect(vim.commandState.visualAnchor).toBeUndefined()
-    expect(vim.commandState.visualFocus).toBeUndefined()
+    // As `ggVG` would in Vim, the whole text becomes the Visual range; empty text has none.
+    expect(vim.mode).toBe(example.selected)
+    expect([vim.commandState.visualAnchor, vim.commandState.visualFocus]).toEqual(example.range)
     expect(vim.commandState.pending).toBeUndefined()
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(input.value.length)
@@ -3293,7 +3306,7 @@ describe('editor keyboard handler', () => {
     handle(keyEvent(input, 'a', { metaKey: true }))
 
     expect(finishReplace).toHaveBeenCalledWith(input, false, true)
-    expect(vim.mode).toBe('normal')
+    expect(vim.mode).toBe('visual')
     expect(input.selectionStart).toBe(0)
     expect(input.selectionEnd).toBe(input.value.length)
   })
@@ -3431,7 +3444,8 @@ describe('editor keyboard handler', () => {
 
     executeEditorContextMenuCommand('selectAll', store, node(), input, textCommandState(vim))
 
-    expect(vim.mode).toBe('normal')
+    // The context menu's Select All is the same Visual selection of the whole text as Cmd+A.
+    expect(vim.mode).toBe('visual')
     expect(node().text).toBe('abXd')
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, 4])
     store.undo()

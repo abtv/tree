@@ -1689,7 +1689,7 @@ test.describe('Vim editing: navigation and Visual modes', () => {
 
   test.describe(() => {
     test.use({ sharedApplicationReset: 'off' })
-    test('uses the highlight pair for a pointer Visual selection and a Normal select-all', async ({ userDataDir }) => {
+    test('uses the highlight pair for a pointer Visual selection and a Visual select-all', async ({ userDataDir }) => {
       seedDocument(userDataDir, {
         document: {
           roots: [
@@ -1740,10 +1740,10 @@ test.describe('Vim editing: navigation and Visual modes', () => {
       await expect(first).not.toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(first)).toEqual({ background: 'rgb(55, 63, 67)', color: 'rgb(255, 255, 255)' })
 
-      // Select-all is a deliberate Normal-mode selection, not the one-character block caret.
+      // Select-all is a Visual selection of the whole text, with the same highlight pair.
       await window.keyboard.press('Meta+a')
 
-      await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+      await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
       await expect(first).toHaveClass(/node-input-text-selected/)
       expect(await selectionColors(first)).toEqual({ background: 'rgb(241, 228, 189)', color: 'rgb(59, 56, 51)' })
 

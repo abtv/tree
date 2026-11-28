@@ -4,8 +4,17 @@ import type { EditorStore } from '../application/editor-store'
 import type { TreeNode } from '../domain/document'
 import type { EditorContextMenuCommand } from '../shared/ipc'
 import { editCaretTransition } from './vim-caret-transition'
-import { clearCommandAssembly, clearPending } from './vim-command-state'
-import { getCaret, getSelectionRange, nodeTextLength, readEditableContent, selectAll } from './editor-dom'
+import { clearCommandAssembly, clearPending, setVisualRange } from './vim-command-state'
+import {
+  getCaret,
+  getSelectionRange,
+  nodeText,
+  nodeTextLength,
+  readEditableContent,
+  selectAll,
+  setSelectionRange,
+} from './editor-dom'
+import { characterStart } from '../domain/text-characters'
 import { handleVimKey, handleVimNumberKey, isNeutralKeydown } from './vim-keyboard-handler'
 import type { VimKeyboardState } from './vim-keyboard-types'
 import { agendaAllows } from './agenda-key-policy'
@@ -48,6 +57,15 @@ function selectEditorText(
 ): void {
   if (vim?.mode === 'insert') vim.finishInsert?.(input)
   prepareVimCommand(vim, 'select-all', input)
+  const text = nodeText(input)
+  if (vim?.mode === 'normal' && text.length > 0) {
+    // In Vim, selecting everything is a Visual selection: character Visual mode over the whole text,
+    // so Visual commands act on it and Escape returns to Normal mode (PRODUCT §20.2.6).
+    setVisualRange(vim.commandState, nodeId, 0, characterStart(text, text.length - 1), true)
+    vim.setMode('visual')
+    setSelectionRange(input, 0, text.length)
+    return
+  }
   selectAll(input)
   globalThis.queueMicrotask(() => {
     setSelectAllNodeId?.(nodeId)

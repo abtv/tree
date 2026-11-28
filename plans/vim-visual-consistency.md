@@ -1,6 +1,6 @@
 # Consistent Vim character Visual mode
 
-Status: In progress
+Status: Awaiting owner acceptance
 
 ## Objective and scope
 
@@ -24,7 +24,7 @@ Out of scope: Replace and Insert click placement, the Vim help view's pointer pa
 | --- | --- | --- | --- | --- |
 | T1 | One owner for the character Visual range; R1 and R4; operators read the range | — | Mode and range exist together on every path (unit table per interruption, hook tests for focus reaching another node, `gv` into another node, primary and secondary presses, R4); E2E for breadcrumb, enter control, `Cmd+.`, paste, R4, a no-op undo and leave, an Agenda day collapse | Done |
 | T2 | R2: mouse by character | T1 | Right-half click, a few pixels of movement within one character, and a click past the end of a wrapped line place the Normal block on the character under the pointer; a drag includes both end characters; plain and rich editors, Tree and Agenda | Done |
-| T3 | R3: `Cmd+A` enters Visual | T1 | `Cmd+A` and context-menu Select All in Normal and Visual enter Visual over the whole text; empty text stays in Normal; Insert and standard editing unchanged | Planned |
+| T3 | R3: `Cmd+A` enters Visual | T1 | `Cmd+A` and context-menu Select All in Normal and Visual enter Visual over the whole text; empty text stays in Normal; Insert and standard editing unchanged | Done |
 
 ### T1 files
 
@@ -54,9 +54,11 @@ Out of scope: Replace and Insert click placement, the Vim help view's pointer pa
 - Decisions under the recorded principle (not owner questions): a drag that leaves the node above or below reaches the first or last character, as a native text field does, rather than the nearest character on the first or last line; a `Shift`-click stays native and is listed as a divergence; the highlight's moving end may lag one character while the button is held.
 - Two full-suite runs had one or two 60-second timeouts in unrelated specs (`selection-interruptions`, `hyperlink`, `line-numbers`) that pass alone; they are load contention under six workers.
 
+- A defect found during T2 verification and fixed in its own commit: `x` and `X` deleted half of a joined emoji.
+
 ## Next task
 
-T3: `Cmd+A` and context-menu Select All enter character Visual mode (see T3 plan).
+None. All three tasks are done; the initiative awaits final owner acceptance (a real mouse and trackpad round is recommended).
 
 ## Owner involvement
 

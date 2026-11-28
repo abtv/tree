@@ -139,7 +139,8 @@ describeForEachEditingMode('Completed rich text', ({ mode, screenshotName }) => 
       await input.focus()
       await setCursor(input, 3)
       await window.keyboard.press('Meta+a')
-      await expect(input).toHaveClass(/select-all/)
+      // Standard editing marks a select-all; Vim editing selects the whole text in Visual mode.
+      await expect(input).toHaveClass(/select-all|node-input-text-selected/)
       await expect(input).toHaveCSS('text-decoration-line', 'line-through')
       await window.screenshot({ path: testInfo.outputPath(screenshotName(`links-selected-${appearance}.png`)) })
       await window.keyboard.press('Escape')

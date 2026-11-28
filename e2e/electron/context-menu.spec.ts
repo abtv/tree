@@ -131,11 +131,16 @@ test.describe('editable node context menu (mode-independent)', () => {
 
     await editor.click({ button: 'right' })
 
-    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+    // Replace ends with its edit committed, and Select All selects the whole text in Visual mode.
+    await expect(window.getByLabel('Vim mode')).toHaveText('VISUAL')
     await expect(editor).toBeFocused()
     await expect(editor).toHaveValue('aZpha')
     await expect(editor).toHaveJSProperty('selectionStart', 0)
     await expect(editor).toHaveJSProperty('selectionEnd', 5)
+    await window.keyboard.press('Escape')
+
+    await expect(window.getByLabel('Vim mode')).toHaveText('NORMAL')
+
     await window.keyboard.press('Meta+z')
     await expect(editor).toHaveValue('alpha')
   })
