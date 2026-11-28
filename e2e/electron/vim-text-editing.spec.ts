@@ -34,6 +34,38 @@ function seedAttachmentImage(userDataDir: string, attachmentId: string): void {
 
 test.describe('Vim editing: text editing', () => {
   for (const rich of [false, true]) {
+    // @requirement PRODUCT.md §4.3
+    test(`deletes a joined emoji whole with x and X (${rich ? 'rich' : 'plain'})`, async ({ userDataDir }) => {
+      const prefix = rich ? '#go' : 'go'
+      seedDocument(userDataDir, {
+        document: { roots: [{ id: 'first', text: `${prefix} 👩🏽‍🚀z`, children: [] }] },
+        location: { currentParentId: null, selectedNodeId: 'first' },
+      })
+      const { window } = await launchTree(userDataDir)
+      const editor = node(window, 1)
+      const value = () =>
+        editor.evaluate((element) =>
+          element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? ''),
+        )
+      await setCursor(editor, prefix.length + 1)
+
+      // The emoji is one character: `x` removes all of it and never leaves half of a surrogate pair.
+      await window.keyboard.press('x')
+
+      await expect.poll(value).toBe(`${prefix} z`)
+
+      await window.keyboard.press('u')
+
+      await expect.poll(value).toBe(`${prefix} 👩🏽‍🚀z`)
+
+      await window.keyboard.press('$')
+      await window.keyboard.press('X')
+
+      await expect.poll(value).toBe(`${prefix} z`)
+    })
+  }
+
+  for (const rich of [false, true]) {
     // @requirement PRODUCT.md §20.2.17
     // @requirement PRODUCT.md §20.2.19
     test(

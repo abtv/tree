@@ -74,9 +74,10 @@ export function textMotion(
     if (range === undefined) return undefined
     return { target: range.start, start: range.start, end: range.end }
   }
-  if (motion === 'x') end = Math.min(length, cursor + count)
+  // `x` and `X` count whole characters, so a joined emoji is deleted entirely and never split.
+  if (motion === 'x') end = moveCharacterOffset(text, cursor, 1, count)
   else if (motion === 'X') {
-    start = Math.max(0, cursor - count)
+    start = cursor === 0 ? 0 : moveCharacterOffset(text, cursor, -1, count)
     end = cursor
     target = start
   } else if (motion === 'all') {

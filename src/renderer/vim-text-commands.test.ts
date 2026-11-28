@@ -22,6 +22,16 @@ describe('Vim text command calculations', () => {
   })
 
   // @requirement PRODUCT.md §4.3
+  it.each([
+    ['x on a joined emoji', 1, 'x', 1, { target: 1, start: 1, end: 6 }],
+    ['x with a count across an emoji', 0, 'x', 2, { target: 0, start: 0, end: 6 }],
+    ['X after a joined emoji', 6, 'X', 1, { target: 1, start: 1, end: 6 }],
+    ['X with a count across an emoji', 7, 'X', 2, { target: 1, start: 1, end: 7 }],
+  ] as const)('deletes whole characters with %s', (_case, cursor, motion, count, expected) => {
+    expect(textMotion('A👩‍💻Zb', cursor, motion, count)).toEqual(expected)
+  })
+
+  // @requirement PRODUCT.md §4.3
   it('enters Insert after the complete emoji with a', () => {
     expect(insertPosition('A👩‍💻Z', 1, 'a')).toBe(6)
   })
